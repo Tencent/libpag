@@ -86,7 +86,7 @@ std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposi
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
                                                  float maxFrameRate, float scale,
                                                  bool useDiskCache) {
-  if (composition == nullptr) {
+  if (composition == nullptr || maxFrameRate <= 0 || scale <= 0) {
     return nullptr;
   }
   auto width = roundf(static_cast<float>(composition->width()) * scale);

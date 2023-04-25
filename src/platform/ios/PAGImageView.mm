@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageView.h"
-#import <CommonCrypto/CommonCrypto.h>
-#include <compression.h>
 #include <mutex>
 #import "PAGDecoder.h"
 #import "PAGFile.h"
@@ -29,7 +27,6 @@
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
-
 void DestoryImageViewFlushQueue() {
   NSOperationQueue* queue = imageViewFlushQueue;
   [queue cancelAllOperations];
@@ -59,7 +56,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 @property(atomic, assign) NSInteger currentFrameIndex;
 @property(atomic, retain) UIImage* currentUIImage;
 @property(atomic, assign) NSInteger pagContentVersion;
-@property(atomic, assign) float renderScale;
 @property(atomic, assign) NSInteger currentFrameExplicitlySet;
 @property(nonatomic, assign) BOOL memoryCacheEnabled;
 @property(nonatomic, assign) BOOL memeoryCacheFinished;
@@ -77,8 +73,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   PAGComposition* pagComposition;
   PAGDecoder* pagDecoder;
   NSLock* listenersLock;
-  NSInteger numFrames;
+  NSInteger totalFrames;
   float frameRate;
+  float renderScaleFactor;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
 
@@ -89,7 +86,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 @synthesize isPlaying = _isPlaying;
-@synthesize renderScale = _renderScale;
 @synthesize memoryCacheEnabled = _memoryCacheEnabled;
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -109,8 +105,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)initPAG {
   pagDecoder = nil;
   self.currentFrameIndex = -1;
-  _renderScale = 1.0;
-  numFrames = 0;
+  renderScaleFactor = 1.0;
+  totalFrames = 0;
   frameRate = 0;
   cacheImageSize = 0;
   cacheImageRowBytes = 0;
@@ -154,7 +150,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 #pragma mark - private
-
 + (NSOperationQueue*)ImageViewFlushQueue {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
@@ -220,9 +215,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (PAGDecoder*)getPAGDecoder {
   if (pagDecoder == nil) {
-    self.scaleFactor = static_cast<float>(
-        _renderScale * fmax(self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth,
-                            self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight));
+    self.scaleFactor =
+        renderScaleFactor * fmax(self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth,
+                            self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight);
     if (pagComposition) {
       BOOL useDiskCache = YES;
       if ([PAGContentVersion Get:pagComposition] > 0) {
@@ -232,18 +227,19 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
                        maxFrameRate:self.maxFrameRate
                               scale:self.scaleFactor
                        useDiskCache:useDiskCache];
-      [pagDecoder retain];
     } else if (filePath) {
       pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
                        maxFrameRate:self.maxFrameRate
                               scale:self.scaleFactor
                        useDiskCache:YES];
-      [pagDecoder retain];
     }
-    numFrames = [pagDecoder numFrames];
-    frameRate = [pagDecoder frameRate];
-    cacheImageSize = [pagDecoder width] * [pagDecoder height] * 4;
-    cacheImageRowBytes = [pagDecoder width] * 4;
+    if (pagDecoder) {
+      [pagDecoder retain];
+      totalFrames = [pagDecoder numFrames];
+      frameRate = [pagDecoder frameRate];
+      cacheImageSize = [pagDecoder width] * [pagDecoder height] * 4;
+      cacheImageRowBytes = [pagDecoder width] * 4;
+    }
   }
   return pagDecoder;
 }
@@ -473,11 +469,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (self.currentFrameExplicitlySet >= 0) {
     return self.currentFrameExplicitlySet;
   }
-  if (numFrames == 0) {
-    numFrames = [[self getPAGDecoder] numFrames];
+  if (totalFrames == 0) {
+    totalFrames = [[self getPAGDecoder] numFrames];
   }
-  NSInteger frame = static_cast<NSInteger>(floor([valueAnimator getAnimatedFraction] * numFrames));
-  return MAX(MIN(frame, numFrames - 1), 0);
+  NSInteger frame = static_cast<NSInteger>(floor([valueAnimator getAnimatedFraction] * totalFrames));
+  return MAX(MIN(frame, totalFrames - 1), 0);
 }
 
 - (void)reset {
@@ -493,7 +489,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
-    numFrames = 0;
+    totalFrames = 0;
     frameRate = 0;
     cacheImageSize = 0;
     cacheImageRowBytes = 0;
@@ -536,10 +532,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (void)setRenderScale:(float)scale {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if (_renderScale == scale) {
+  if (renderScaleFactor == scale) {
     return;
   }
-  _renderScale = scale;
+  renderScaleFactor = scale;
   if (pagComposition || filePath) {
     [self reset];
   }
@@ -547,7 +543,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (float)renderScale {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  return _renderScale;
+  return renderScaleFactor;
 }
 
 - (void)setContentScaleFactor:(CGFloat)scaleFactor {
@@ -607,6 +603,17 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)pause {
   _isPlaying = false;
   [valueAnimator stop];
+}
+
+- (NSUInteger)numFrames {
+  std::lock_guard<std::mutex> autoLock(imageViewLock);
+  if (pagDecoder) {
+    totalFrames = [pagDecoder numFrames];
+  }
+  if (totalFrames == 0) {
+    totalFrames = [[self getPAGDecoder] numFrames];
+  }
+  return totalFrames;
 }
 
 - (UIImage*)currentImage {

@@ -157,6 +157,12 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)setCurrentFrame:(NSUInteger)currentFrame;
 
 /**
+ * Returns the number of frames in the PAGImageView in one loop. Note that the value may change
+ * if the associated PAGComposition was modified.
+ */
+- (NSUInteger)numFrames;
+
+/**
  * Returns a UIImage capturing the contents of the current PAGImageView.
  */
 - (UIImage*)currentImage;
