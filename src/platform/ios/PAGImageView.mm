@@ -75,7 +75,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSInteger totalFrames;
   float frameRate;
   float renderScaleFactor;
-  float screenScale;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
 
@@ -216,8 +215,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (PAGDecoder*)getPAGDecoder {
   if (pagDecoder == nil) {
     float scaleFactor = static_cast<float>(
-        renderScaleFactor * fmax(self.viewSize.width * screenScale / self.fileWidth,
-                                 self.viewSize.height * screenScale / self.fileHeight));
+        renderScaleFactor *
+        fmax(self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth,
+             self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight));
     if (pagComposition) {
       BOOL useDiskCache = YES;
       if ([PAGContentVersion Get:pagComposition] > 0) {
@@ -497,20 +497,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
 }
 
-- (float)getScreenScale {
-  float scale = 3.0;
-  if (@available(iOS 13.0, *)) {
-    UIWindowScene* windowScene = static_cast<UIWindowScene*>(
-        [[[UIApplication sharedApplication] connectedScenes] anyObject]);
-    if (windowScene) {
-      scale = static_cast<float>(windowScene.screen.scale);
-    }
-  } else {
-    scale = static_cast<float>([UIScreen mainScreen].scale);
-  }
-  return scale;
-}
-
 #pragma mark - pubic
 
 + (NSUInteger)MaxDiskSize {
@@ -537,7 +523,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CGRect oldRect = self.frame;
   [super setFrame:frame];
   self.viewSize = CGSizeMake(frame.size.width, frame.size.height);
-  screenScale = [self getScreenScale];
   if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
@@ -570,7 +555,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
       std::lock_guard<std::mutex> autoLock(imageViewLock);
       [self reset];
       self.viewSize = CGSizeMake(self.frame.size.width, self.frame.size.height);
-      screenScale = [self getScreenScale];
     }
   }
 }
