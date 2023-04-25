@@ -46,4 +46,8 @@ PAG_API jlong JNICALL Java_org_libpag_PAGDiskCache_MaxDiskSize(JNIEnv*, jclass) 
 PAG_API void JNICALL Java_org_libpag_PAGDiskCache_SetMaxDiskSize(JNIEnv*, jclass, jlong size) {
   pag::PAGDiskCache::SetMaxDiskSize(size);
 }
+
+PAG_API void JNICALL Java_org_libpag_PAGDiskCache_RemoveAll(JNIEnv*, jclass) {
+  pag::PAGDiskCache::RemoveAll();
+}
 }

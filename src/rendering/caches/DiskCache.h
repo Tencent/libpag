@@ -56,9 +56,9 @@ class DiskCache {
   uint32_t fileIDCount = 1;
   size_t totalDiskSize = 0;
   size_t maxDiskSize = 1073741824;  // 1 GB
-  std::unordered_map<std::string, uint32_t> fileIDMap = {};
+  std::unordered_map<std::string, uint32_t> cachedFileIDs = {};
+  std::unordered_map<uint32_t, std::shared_ptr<FileInfo>> cachedFileInfos = {};
   std::list<std::shared_ptr<FileInfo>> cachedFiles = {};
-  std::unordered_map<uint32_t, std::shared_ptr<FileInfo>> cachedFileMap = {};
   std::unordered_map<uint32_t, std::weak_ptr<SequenceFile>> openedFiles = {};
 
   static DiskCache* GetInstance();
@@ -67,6 +67,7 @@ class DiskCache {
 
   size_t getMaxDiskSize();
   void setMaxDiskSize(size_t size);
+  void removeAll();
   std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
                                              int frameCount, float frameRate,
                                              const std::vector<TimeRange>& staticTimeRanges);

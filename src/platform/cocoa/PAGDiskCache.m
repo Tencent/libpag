@@ -29,4 +29,8 @@
   [PAGDiskCacheImpl SetMaxDiskSize:size];
 }
 
++ (void)RemoveAll {
+  [PAGDiskCacheImpl RemoveAll];
+}
+
 @end

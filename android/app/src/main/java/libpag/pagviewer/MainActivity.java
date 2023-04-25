@@ -20,9 +20,11 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.libpag.PAGDiskCache;
 import org.libpag.PAGFile;
 import org.libpag.PAGImage;
 import org.libpag.PAGImageView;
@@ -111,6 +113,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             pagImageViewGroup = new RelativeLayout(this);
             pagImageViewGroup.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             containerView.addView(pagImageViewGroup);
+            pagImageViewGroup.setOnClickListener(v -> {
+                PAGDiskCache.RemoveAll();
+                Toast.makeText(getApplicationContext(), "Disk Cache Removed!", Toast.LENGTH_SHORT).show();
+            });
 
             Display display = getWindowManager().getDefaultDisplay();
             Point point = new Point();

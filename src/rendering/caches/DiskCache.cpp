@@ -45,6 +45,10 @@ void PAGDiskCache::SetMaxDiskSize(size_t size) {
   DiskCache::GetInstance()->setMaxDiskSize(size);
 }
 
+void PAGDiskCache::RemoveAll() {
+  DiskCache::GetInstance()->removeAll();
+}
+
 DiskCache* DiskCache::GetInstance() {
   static auto& diskCache = *new DiskCache();
   return &diskCache;
@@ -89,6 +93,26 @@ void DiskCache::setMaxDiskSize(size_t size) {
   }
 }
 
+void DiskCache::removeAll() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (cacheFolder.empty()) {
+    return;
+  }
+  Directory::VisitFiles(cacheFolder, [&](const std::string& path, size_t) {
+    auto fileID = filePathToID(path);
+    if (openedFiles.count(fileID) > 0) {
+      return;
+    }
+    remove(path.c_str());
+  });
+  cachedFileIDs.clear();
+  cachedFiles.clear();
+  cachedFileInfos.clear();
+  totalDiskSize = 0;
+  saveConfig();
+  LOGI("DiskCache::removeAll() all cached files have been removed!");
+}
+
 std::shared_ptr<SequenceFile> DiskCache::openSequence(
     const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
     const std::vector<TimeRange>& staticTimeRanges) {
@@ -102,7 +126,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
     auto sequenceFile = result->second.lock();
     if (sequenceFile != nullptr) {
       if (sequenceFile->compatible(info, frameCount, frameRate, staticTimeRanges)) {
-        moveToFront(cachedFileMap[fileID]);
+        moveToFront(cachedFileInfos[fileID]);
         return sequenceFile;
       }
       changeToTemporary(fileID);
@@ -118,7 +142,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   sequenceFile->fileID = fileID;
   openedFiles[fileID] = sequenceFile;
   if (!key.empty()) {
-    auto oldFileInfo = cachedFileMap[fileID];
+    auto oldFileInfo = cachedFileInfos[fileID];
     if (oldFileInfo) {
       auto fileSize = sequenceFile->fileSize();
       totalDiskSize += fileSize - oldFileInfo->fileSize;
@@ -176,13 +200,13 @@ bool DiskCache::writeFile(const std::string& key, std::shared_ptr<tgfx::Data> da
     return false;
   }
   totalDiskSize += data->size();
-  auto fileInfo = cachedFileMap[fileID];
+  auto fileInfo = cachedFileInfos[fileID];
   if (fileInfo) {
     totalDiskSize -= fileInfo->fileSize;
     fileInfo->fileSize = data->size();
   } else {
     addToCachedFiles(std::make_shared<FileInfo>(key, fileID, data->size()));
-    fileInfo = cachedFileMap[fileID];
+    fileInfo = cachedFileInfos[fileID];
     changed = true;
   }
   moveToBeforeOpenedFiles(fileInfo);
@@ -214,12 +238,12 @@ bool DiskCache::checkDiskSpace(size_t maxSize) {
 void DiskCache::addToCachedFiles(std::shared_ptr<FileInfo> fileInfo) {
   cachedFiles.push_front(fileInfo);
   fileInfo->cachedPosition = cachedFiles.begin();
-  cachedFileMap[fileInfo->fileID] = fileInfo;
+  cachedFileInfos[fileInfo->fileID] = fileInfo;
 }
 
 void DiskCache::removeFromCachedFiles(std::shared_ptr<FileInfo> fileInfo) {
   cachedFiles.erase(fileInfo->cachedPosition);
-  cachedFileMap.erase(fileInfo->fileID);
+  cachedFileInfos.erase(fileInfo->fileID);
 }
 
 void DiskCache::moveToFront(std::shared_ptr<FileInfo> fileInfo) {
@@ -271,12 +295,12 @@ void DiskCache::readConfig() {
     pos += keyLength;
     fileIDCount = std::max(fileIDCount, fileID + 1);
     addToCachedFiles(std::make_shared<FileInfo>(cacheKey, fileID, 0));
-    fileIDMap[cacheKey] = fileID;
+    cachedFileIDs[cacheKey] = fileID;
   }
   Directory::VisitFiles(cacheFolder, [&](const std::string& path, size_t fileSize) {
     auto fileID = filePathToID(path);
-    auto result = cachedFileMap.find(fileID);
-    if (result == cachedFileMap.end()) {
+    auto result = cachedFileInfos.find(fileID);
+    if (result == cachedFileInfos.end()) {
       remove(path.c_str());
     } else {
       result->second->fileSize = fileSize;
@@ -328,25 +352,25 @@ uint32_t DiskCache::getFileID(const std::string& key) {
   if (key.empty()) {
     return fileIDCount++;
   }
-  auto result = fileIDMap.find(key);
-  if (result != fileIDMap.end()) {
+  auto result = cachedFileIDs.find(key);
+  if (result != cachedFileIDs.end()) {
     return result->second;
   }
   auto newFileID = fileIDCount++;
-  fileIDMap[key] = newFileID;
+  cachedFileIDs[key] = newFileID;
   return newFileID;
 }
 
 void DiskCache::changeToTemporary(uint32_t fileID) {
-  auto result = cachedFileMap.find(fileID);
-  if (result == cachedFileMap.end()) {
+  auto result = cachedFileInfos.find(fileID);
+  if (result == cachedFileInfos.end()) {
     return;
   }
   auto fileInfo = result->second;
   cachedFiles.erase(fileInfo->cachedPosition);
-  cachedFileMap.erase(fileID);
+  cachedFileInfos.erase(fileID);
   totalDiskSize -= fileInfo->fileSize;
-  fileIDMap.erase(fileInfo->cacheKey);
+  cachedFileIDs.erase(fileInfo->cacheKey);
 }
 
 std::string DiskCache::fileIDToPath(uint32_t fileID) {
@@ -364,8 +388,8 @@ uint32_t DiskCache::filePathToID(const std::string& path) {
 void DiskCache::notifyFileClosed(uint32_t fileID) {
   std::lock_guard<std::mutex> autoLock(locker);
   openedFiles.erase(fileID);
-  auto result = cachedFileMap.find(fileID);
-  if (result == cachedFileMap.end()) {
+  auto result = cachedFileInfos.find(fileID);
+  if (result == cachedFileInfos.end()) {
     auto filePath = fileIDToPath(fileID);
     remove(filePath.c_str());
   } else {
@@ -379,8 +403,8 @@ void DiskCache::notifyFileClosed(uint32_t fileID) {
 
 void DiskCache::notifyFileSizeChanged(uint32_t fileID, size_t fileSize) {
   std::lock_guard<std::mutex> autoLock(locker);
-  auto result = cachedFileMap.find(fileID);
-  if (result != cachedFileMap.end()) {
+  auto result = cachedFileInfos.find(fileID);
+  if (result != cachedFileInfos.end()) {
     totalDiskSize += fileSize - result->second->fileSize;
     result->second->fileSize = fileSize;
     if (checkDiskSpace(maxDiskSize)) {

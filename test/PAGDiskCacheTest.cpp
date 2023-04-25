@@ -19,6 +19,7 @@
 #include <filesystem>
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/caches/DiskCache.h"
 #include "rendering/utils/Directory.h"
@@ -103,7 +104,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   auto diskCache = sequenceFile->diskCache;
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   EXPECT_TRUE(diskCache->openedFiles.size() == 1);
-  EXPECT_TRUE(diskCache->cachedFileMap.size() == 2);
+  EXPECT_TRUE(diskCache->cachedFileInfos.size() == 2);
   EXPECT_EQ(diskCache->cachedFiles.size(), 2u);
   EXPECT_EQ(diskCache->fileIDCount, 4u);
   const auto InitialDiskSize = 647628u;
@@ -210,12 +211,12 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   sequenceFile2 = nullptr;
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   PAGDiskCache::SetMaxDiskSize(1073741824);  // 1GB
-  std::filesystem::remove_all(cacheDir);
+  pag::PAGDiskCache::RemoveAll();
 }
 
 PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
+  pag::PAGDiskCache::RemoveAll();
   auto cacheDir = Platform::Current()->getCacheDir();
-  std::filesystem::remove_all(cacheDir);
 
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);
@@ -338,13 +339,11 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 3);
 
-  std::filesystem::remove_all(cacheDir);
+  pag::PAGDiskCache::RemoveAll();
 }
 
 PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  std::filesystem::remove_all(cacheDir);
-
+  pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(pagFile != nullptr);
   auto decoder = PAGDecoder::MakeFrom(pagFile);
@@ -412,14 +411,11 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_Image_15"));
   EXPECT_EQ(decoder->sequenceFile->cachedFrames, 28);
   decoder = nullptr;
-
-  std::filesystem::remove_all(cacheDir);
+  pag::PAGDiskCache::RemoveAll();
 }
 
 PAG_TEST_F(PAGDiskCacheTest, FileCache) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  std::filesystem::remove_all(cacheDir);
-
+  pag::PAGDiskCache::RemoveAll();
   auto data = ReadFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(data != nullptr);
   std::string cacheKey = "https://pag.art/resources/apitest/polygon.pag";
@@ -429,8 +425,7 @@ PAG_TEST_F(PAGDiskCacheTest, FileCache) {
   ASSERT_TRUE(cacheData != nullptr);
   EXPECT_EQ(data->size(), cacheData->size());
   EXPECT_TRUE(memcmp(data->bytes(), cacheData->bytes(), data->size()) == 0);
-
-  std::filesystem::remove_all(cacheDir);
+  pag::PAGDiskCache::RemoveAll();
 }
 
 }  // namespace pag

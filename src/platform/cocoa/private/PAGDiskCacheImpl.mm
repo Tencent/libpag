@@ -29,4 +29,8 @@
   pag::PAGDiskCache::SetMaxDiskSize(size);
 }
 
++ (void)RemoveAll {
+  pag::PAGDiskCache::RemoveAll();
+}
+
 @end
