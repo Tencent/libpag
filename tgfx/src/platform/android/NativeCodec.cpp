@@ -53,6 +53,10 @@ static jfieldID BitmapConfig_HARDWARE;
 
 void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapFactoryOptionsClass = env->FindClass("android/graphics/BitmapFactory$Options");
+  if (BitmapFactoryOptionsClass.get() == nullptr) {
+    LOGE("Could not run NativeCodec.InitJNI(), BitmapFactoryOptionsClass is not found!");
+    return;
+  }
   BitmapFactoryOptions_Constructor =
       env->GetMethodID(BitmapFactoryOptionsClass.get(), "<init>", "()V");
   BitmapFactoryOptions_inJustDecodeBounds =
@@ -132,6 +136,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   if (env == nullptr || filePath.empty()) {
     return nullptr;
   }
+  if (BitmapFactoryOptionsClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run NativeCodec.GetEncodedOrigin(), BitmapFactoryOptionsClass is not found!");
+    return nullptr;
+  }
   auto options = env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
   if (options == nullptr) {
     return nullptr;
@@ -162,6 +171,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr || imageBytes == nullptr) {
+    return nullptr;
+  }
+  if (BitmapFactoryOptionsClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run NativeCodec.MakeNativeCodec(), BitmapFactoryOptionsClass is not found!");
     return nullptr;
   }
   auto options = env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
@@ -198,6 +212,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
+    return nullptr;
+  }
+  if (BitmapFactoryOptionsClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run NativeCodec.MakeNativeCodec(), BitmapFactoryOptionsClass is not found!");
     return nullptr;
   }
   auto info = AndroidBitmap::GetInfo(env, nativeImage);

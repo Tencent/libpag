@@ -27,6 +27,7 @@
 #include "tgfx/platform/android/JNIEnvironment.h"
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
+  LOGE("PAG JNI_OnLoad Version: %s", pag::PAG::SDKVersion().c_str());
   tgfx::JNIEnvironment::SetJavaVM(vm);
   pag::NativePlatform::InitJNI();
   return JNI_VERSION_1_4;
@@ -39,6 +40,11 @@ extern "C" void JNI_OnUnload(JavaVM*, void*) {
 namespace pag {
 jobject MakeRectFObject(JNIEnv* env, float x, float y, float width, float height) {
   static Global<jclass> RectFClass = env->FindClass("android/graphics/RectF");
+  if (RectFClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run JNIHelper.MakeRectFObject(), RectFClass is not found!");
+    return nullptr;
+  }
   static auto RectFConstructID = env->GetMethodID(RectFClass.get(), "<init>", "(FFFF)V");
   return env->NewObject(RectFClass.get(), RectFConstructID, x, y, x + width, y + height);
 }
@@ -50,6 +56,11 @@ jint MakeColorInt(JNIEnv*, uint32_t red, uint32_t green, uint32_t blue) {
 
 jobject MakePAGFontObject(JNIEnv* env, const char* familyName, const char* familyStyle) {
   static Global<jclass> PAGFontClass = env->FindClass("org/libpag/PAGFont");
+  if (PAGFontClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run JNIHelper.MakePAGFontObject(), PAGFontClass is not found!");
+    return nullptr;
+  }
   static jmethodID PAGFontConstructID = env->GetMethodID(PAGFontClass.get(), "<init>", "()V");
   static jfieldID PAGFont_fontFamily =
       env->GetFieldID(PAGFontClass.get(), "fontFamily", "Ljava/lang/String;");
@@ -68,6 +79,11 @@ jobject MakePAGFontObject(JNIEnv* env, const char* familyName, const char* famil
 
 jobject MakeByteBufferObject(JNIEnv* env, const void* bytes, size_t length) {
   static Global<jclass> ByteBufferClass = env->FindClass("java/nio/ByteBuffer");
+  if (ByteBufferClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run JNIHelper.MakeByteBufferObject(), ByteBufferClass is not found!");
+    return nullptr;
+  }
   static jmethodID ByteBuffer_wrap =
       env->GetStaticMethodID(ByteBufferClass.get(), "wrap", "([B)Ljava/nio/ByteBuffer;");
   auto byteArray = env->NewByteArray(static_cast<jint>(length));
@@ -114,6 +130,11 @@ std::unique_ptr<pag::ByteData> ReadBytesFromAssets(JNIEnv* env, jobject managerO
 
 tgfx::Rect ToRect(JNIEnv* env, jobject rect) {
   static Global<jclass> RectFClass = env->FindClass("android/graphics/RectF");
+  if (RectFClass.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run JNIHelper.ToRect(), RectFClass is not found!");
+    return {};
+  }
   static auto leftID = env->GetFieldID(RectFClass.get(), "left", "F");
   static auto topID = env->GetFieldID(RectFClass.get(), "top", "F");
   static auto rightID = env->GetFieldID(RectFClass.get(), "right", "F");
@@ -128,6 +149,11 @@ tgfx::Rect ToRect(JNIEnv* env, jobject rect) {
 jobjectArray ToPAGLayerJavaObjectList(JNIEnv* env,
                                       const std::vector<std::shared_ptr<pag::PAGLayer>>& layers) {
   static Global<jclass> PAGLayer_Class = env->FindClass("org/libpag/PAGLayer");
+  if (PAGLayer_Class.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run JNIHelper.ToPAGLayerJavaObjectList(), PAGLayer_Class is not found!");
+    return nullptr;
+  }
   if (layers.empty()) {
     return env->NewObjectArray(0, PAGLayer_Class.get(), nullptr);
   }
@@ -207,6 +233,11 @@ std::shared_ptr<pag::PAGLayer> ToPAGLayerNativeObject(JNIEnv* env, jobject jLaye
   }
 
   static Global<jclass> PAGLayer_Class = env->FindClass("org/libpag/PAGLayer");
+  if (PAGLayer_Class.get() == nullptr) {
+    env->ExceptionClear();
+    LOGE("Could not run JNIHelper.ToPAGLayerNativeObject(), PAGLayer_Class is not found!");
+    return nullptr;
+  }
   static auto PAGLayer_nativeContext = env->GetFieldID(PAGLayer_Class.get(), "nativeContext", "J");
 
   auto nativeContext =

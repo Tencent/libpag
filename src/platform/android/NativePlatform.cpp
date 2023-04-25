@@ -69,6 +69,7 @@ void NativePlatform::InitJNI() {
   HardwareDecoder::InitJNI(env);
   InitPAGTextJNI(env);
   JPAGDiskCache::InitJNI(env);
+  env->ExceptionClear();
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
