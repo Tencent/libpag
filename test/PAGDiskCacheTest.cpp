@@ -320,8 +320,6 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   auto decoder7 = PAGDecoder::MakeFrom(pagFile2, 20, 0.f);
   EXPECT_TRUE(decoder7 == nullptr);
 
-
-
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;
