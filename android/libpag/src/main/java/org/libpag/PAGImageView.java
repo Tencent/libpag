@@ -282,15 +282,30 @@ public class PAGImageView extends View {
         return _currentFrame;
     }
 
+    private int _numFrames = 0;
+
+    /**
+     * Returns the number of frames in the PAGImageView in one loop. Note that the value may change
+     * if the associated PAGComposition was modified.
+     */
+    public int numFrames() {
+        refreshNumFrames();
+        return _numFrames;
+    }
+
     /**
      * Sets the frame index for the PAGImageView to render.
      */
     public void setCurrentFrame(int currentFrame) {
-        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames) {
+        refreshNumFrames();
+        if (_numFrames == 0 || !decoderInfo.isValid() || currentFrame < 0) {
+            return;
+        }
+        if (currentFrame >= _numFrames) {
             return;
         }
         _currentFrame = currentFrame;
-        float value = (float) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames));
+        float value = (float) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames));
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
         synchronized (updateTimeLock) {
@@ -383,12 +398,14 @@ public class PAGImageView extends View {
             return false;
         }
         synchronized (updateTimeLock) {
-            boolean pr = progressExplicitlySet;
+            if (decoderInfo._pagDecoder != null) {
+                _numFrames = decoderInfo._pagDecoder.numFrames();
+            }
             if (progressExplicitlySet) {
                 progressExplicitlySet = false;
-                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
+                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames)));
             }
-            int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
+            int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), _numFrames);
             if (currentFrame == _currentFrame && !forceFlush) {
                 return false;
             }
@@ -420,6 +437,14 @@ public class PAGImageView extends View {
         return composition;
     }
 
+    private void refreshNumFrames() {
+        if (!decoderInfo.isValid() && _numFrames == 0 && width > 0) {
+            initDecoderInfo();
+        }
+        if (decoderInfo.isValid() && decoderInfo._pagDecoder != null) {
+            _numFrames = decoderInfo._pagDecoder.numFrames();
+        }
+    }
 
     private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
         freezeDraw.set(true);
@@ -563,12 +588,13 @@ public class PAGImageView extends View {
         resumeAnimator();
     }
 
-    protected void initDecoderInfo() {
+    protected synchronized void initDecoderInfo() {
         if (!decoderInfo.isValid()) {
             if (_composition == null) {
                 _composition = getCompositionFromPath(_pagFilePath);
             }
-            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate, !(ContentVersion(_composition) > 0 && allInMemoryCache()))) {
+            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate,
+                    !(ContentVersion(_composition) > 0 && cacheAllFramesInMemory()))) {
                 if (_pagFilePath != null) {
                     _composition = null;
                 }
@@ -699,7 +725,10 @@ public class PAGImageView extends View {
     }
 
     private boolean allInMemoryCache() {
-        return bitmapCache.size() == decoderInfo.numFrames;
+        if (decoderInfo.isValid() && decoderInfo._pagDecoder != null) {
+            _numFrames = decoderInfo._pagDecoder.numFrames();
+        }
+        return bitmapCache.size() == _numFrames;
     }
 
     private void releaseDecoder() {

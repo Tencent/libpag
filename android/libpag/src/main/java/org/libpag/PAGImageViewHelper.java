@@ -150,22 +150,6 @@ class PAGImageViewHelper {
         return matrix;
     }
 
-    protected static String getMD5(String str) {
-        if (str == null) {
-            return null;
-        }
-        byte[] digest;
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("md5");
-            digest = md5.digest(str.getBytes("utf-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-        String md5Str = new BigInteger(1, digest).toString(16);
-        return md5Str;
-    }
-
     private static double fmod(double a, double b) {
         int result = (int) Math.floor(a / b);
         return a - result * b;
@@ -193,26 +177,6 @@ class PAGImageViewHelper {
             return 1;
         }
         return (currentFrame * 1.0 + 0.1) / totalFrames;
-    }
-
-
-    protected static class CacheInfo {
-        static CacheInfo Make(PAGImageView pagImageView,
-                              String keyPrefix,
-                              int frame,
-                              Bitmap bitmap) {
-            CacheInfo cacheInfo = new CacheInfo();
-            cacheInfo.pagImageView = pagImageView;
-            cacheInfo.keyPrefix = keyPrefix;
-            cacheInfo.frame = frame;
-            cacheInfo.bitmap = bitmap;
-            return cacheInfo;
-        }
-
-        PAGImageView pagImageView;
-        String keyPrefix;
-        int frame;
-        Bitmap bitmap;
     }
 
     static class PAGViewHandler extends Handler {
@@ -298,8 +262,6 @@ class PAGImageViewHelper {
     static class DecoderInfo {
         int _width;
         int _height;
-        float realFrameRate;
-        int numFrames;
         long duration;
         PAGDecoder _pagDecoder;
 
@@ -309,20 +271,14 @@ class PAGImageViewHelper {
 
         boolean initDecoder(PAGComposition composition,
                             int width, int height, float maxFrameRate, boolean usdDiskCache) {
-            if (composition == null || width == 0) {
+            if (composition == null || width <= 0 || height <= 0 || maxFrameRate <=0) {
                 return false;
             }
             float maxScale = Math.max(width * 1.0f / composition.width(),
                     height * 1.0f / composition.height());
-            if (maxFrameRate <= 0) {
-                realFrameRate = composition.frameRate();
-            } else {
-                realFrameRate = Math.min(composition.frameRate(), maxFrameRate);
-            }
-            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale, usdDiskCache);
+            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, maxScale, usdDiskCache);
             _width = _pagDecoder.width();
             _height = _pagDecoder.height();
-            numFrames = _pagDecoder.numFrames();
             duration = composition.duration();
             return true;
         }
@@ -338,8 +294,6 @@ class PAGImageViewHelper {
             releaseDecoder();
             _width = 0;
             _height = 0;
-            realFrameRate = 0;
-            numFrames = 0;
             duration = 0;
         }
     }
