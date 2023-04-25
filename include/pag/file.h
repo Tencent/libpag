@@ -141,6 +141,8 @@ enum class TagCode {
   EncryptedData = 89,
   Transform3D = 90,
   CameraOption = 91,
+  
+  StrokeStyle = 92,
 
   // add new tags here...
 
