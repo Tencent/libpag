@@ -16,26 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#include <android/bitmap.h>
+#include <jni.h>
+#include "JNIHelper.h"
+#include "rendering/layers/ContentVersion.h"
 
-NS_ASSUME_NONNULL_BEGIN
+extern "C" {
 
-@interface PAGCacheManager : NSObject
-
-+ (instancetype)shareInstance;
-
-- (NSString* __nullable)diskCachePath;
-
-- (void)SetMaxDiskSize:(NSUInteger)size;
-
-- (NSUInteger)MaxDiskSize;
-
-- (NSUInteger)totalSize;
-
-- (void)removeAllFiles;
-
-- (void)removeFileForPath:(NSString*)path;
-
-@end
-
-NS_ASSUME_NONNULL_END
+PAG_API jint Java_org_libpag_PAGImageView_ContentVersion(JNIEnv* env, jclass,
+                                                         jobject jPagComposition) {
+  auto composition = pag::ToPAGCompositionNativeObject(env, jPagComposition);
+  if (composition == nullptr) {
+    return 0;
+  }
+  return pag::ContentVersion::Get(composition);
+}
+}

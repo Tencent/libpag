@@ -350,7 +350,8 @@ void GLCaps::initFormatMap(const GLInfo& info) {
     format.internalFormatRenderBuffer =
         useSizedRbFormats ? format.sizedFormat : format.externalFormat;
   }
-  if (info.hasExtension("GL_APPLE_texture_format_BGRA8888")) {
+  if (info.hasExtension("GL_APPLE_texture_format_BGRA8888") ||
+      info.hasExtension("GL_EXT_texture_format_BGRA8888")) {
     pixelFormatMap[PixelFormat::BGRA_8888].format.internalFormatTexImage = GL_RGBA;
   }
   initColorSampleCount(info);

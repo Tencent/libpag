@@ -314,6 +314,12 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   success = decoder5->readFrame(12, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
 
+  auto decoder6 = PAGDecoder::MakeFrom(pagFile2, 0, 0.5f);
+  EXPECT_TRUE(decoder6 == nullptr);
+
+  auto decoder7 = PAGDecoder::MakeFrom(pagFile2, 20, 0.f);
+  EXPECT_TRUE(decoder7 == nullptr);
+
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;

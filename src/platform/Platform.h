@@ -76,5 +76,13 @@ class Platform {
                                                     const std::shared_ptr<tgfx::Typeface>&) const {
     return std::nullopt;
   }
+
+  /**
+   * Returns the corresponding sandbox path from the absolute file path, which usually starts with
+   * "app://" or "home://". Returns the original path if the platform does not support sandbox.
+   */
+  virtual std::string getSandboxPath(std::string filePath) const {
+    return filePath;
+  }
 };
 }  // namespace pag

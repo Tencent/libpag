@@ -83,7 +83,7 @@ Pod::Spec.new do |s|
   end
 
   s.osx.frameworks   = ['ApplicationServices', 'AGL', 'OpenGL', 'QuartzCore', 'Cocoa', 'Foundation', 'VideoToolbox', 'CoreMedia']
-  s.osx.libraries = ["iconv", "c++"]
+  s.osx.libraries = ["iconv", "c++", "compression"]
 
   s.ios.public_header_files = 'src/platform/ios/*.h',
                               'src/platform/cocoa/*.h'

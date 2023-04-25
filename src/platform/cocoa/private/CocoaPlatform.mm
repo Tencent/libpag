@@ -79,4 +79,5 @@ std::optional<PositionedGlyphs> CocoaPlatform::shapeText(
   return NativeTextShaper::Shape(text, typeface);
 #endif
 }
+
 }  // namespace pag

@@ -18,11 +18,8 @@
 
 package org.libpag;
 
-import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.ColorSpace;
 import android.graphics.Matrix;
-import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -153,22 +150,6 @@ class PAGImageViewHelper {
         return matrix;
     }
 
-    protected static String getMD5(String str) {
-        if (str == null) {
-            return null;
-        }
-        byte[] digest;
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("md5");
-            digest = md5.digest(str.getBytes("utf-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-        String md5Str = new BigInteger(1, digest).toString(16);
-        return md5Str;
-    }
-
     private static double fmod(double a, double b) {
         int result = (int) Math.floor(a / b);
         return a - result * b;
@@ -196,26 +177,6 @@ class PAGImageViewHelper {
             return 1;
         }
         return (currentFrame * 1.0 + 0.1) / totalFrames;
-    }
-
-
-    protected static class CacheInfo {
-        static CacheInfo Make(PAGImageView pagImageView,
-                              String keyPrefix,
-                              int frame,
-                              Bitmap bitmap) {
-            CacheInfo cacheInfo = new CacheInfo();
-            cacheInfo.pagImageView = pagImageView;
-            cacheInfo.keyPrefix = keyPrefix;
-            cacheInfo.frame = frame;
-            cacheInfo.bitmap = bitmap;
-            return cacheInfo;
-        }
-
-        PAGImageView pagImageView;
-        String keyPrefix;
-        int frame;
-        Bitmap bitmap;
     }
 
     static class PAGViewHandler extends Handler {
@@ -270,7 +231,6 @@ class PAGImageViewHelper {
                 case MSG_CLOSE_CACHE: {
                     PAGImageView imageView = (PAGImageView) msg.obj;
                     if (imageView != null) {
-                        imageView.releaseCurrentDiskCache();
                         if (imageView.decoderInfo != null) {
                             imageView.decoderInfo.reset();
                         }
@@ -285,10 +245,6 @@ class PAGImageViewHelper {
                     break;
                 }
                 case MSG_HANDLER_THREAD_QUITE: {
-                    CacheManager manager = CacheManager.Get(null);
-                    if (manager != null) {
-                        manager.autoClean();
-                    }
                     new Handler(Looper.getMainLooper()).post(new Runnable() {
                         @Override
                         public void run() {
@@ -306,8 +262,6 @@ class PAGImageViewHelper {
     static class DecoderInfo {
         int _width;
         int _height;
-        float realFrameRate;
-        int numFrames;
         long duration;
         PAGDecoder _pagDecoder;
 
@@ -315,33 +269,16 @@ class PAGImageViewHelper {
             return _width > 0 && _height > 0;
         }
 
-        boolean initDecoder(Context context, PAGComposition _composition,
-                            String pagFilePath, int width, int height, float maxFrameRate) {
-            if (_composition == null && pagFilePath == null || width == 0) {
-                return false;
-            }
-            PAGComposition composition = _composition;
-            if (composition == null) {
-                if (pagFilePath.startsWith("assets://")) {
-                    composition = PAGFile.Load(context.getAssets(), pagFilePath.substring(9));
-                } else {
-                    composition = PAGFile.Load(pagFilePath);
-                }
-            }
-            if (composition == null) {
+        boolean initDecoder(PAGComposition composition,
+                            int width, int height, float maxFrameRate, boolean usdDiskCache) {
+            if (composition == null || width <= 0 || height <= 0 || maxFrameRate <=0) {
                 return false;
             }
             float maxScale = Math.max(width * 1.0f / composition.width(),
                     height * 1.0f / composition.height());
-            if (maxFrameRate <= 0) {
-                realFrameRate = composition.frameRate();
-            } else {
-                realFrameRate = Math.min(composition.frameRate(), maxFrameRate);
-            }
-            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale, false);
+            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, maxScale, usdDiskCache);
             _width = _pagDecoder.width();
             _height = _pagDecoder.height();
-            numFrames = _pagDecoder.numFrames();
             duration = composition.duration();
             return true;
         }
@@ -357,8 +294,6 @@ class PAGImageViewHelper {
             releaseDecoder();
             _width = 0;
             _height = 0;
-            realFrameRate = 0;
-            numFrames = 0;
             duration = 0;
         }
     }

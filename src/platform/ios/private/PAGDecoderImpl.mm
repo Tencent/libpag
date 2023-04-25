@@ -73,7 +73,7 @@
 }
 
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {
-  return pagDecoder->readFrame(index, pixels, rowBytes, pag::ColorType::BGRA_8888,
+  return pagDecoder->readFrame(static_cast<int>(index), pixels, rowBytes, pag::ColorType::BGRA_8888,
                                pag::AlphaType::Premultiplied);
 }
 
@@ -86,8 +86,8 @@
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
   auto rowBytes = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
   auto pixels = CVPixelBufferGetBaseAddress(pixelBuffer);
-  auto success = pagDecoder->readFrame(index, pixels, rowBytes, pag::ColorType::BGRA_8888,
-                                       pag::AlphaType::Premultiplied);
+  auto success = pagDecoder->readFrame(static_cast<int>(index), pixels, rowBytes,
+                                       pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied);
   CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   if (!success) {
     return nil;

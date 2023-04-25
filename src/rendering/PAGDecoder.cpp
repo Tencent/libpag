@@ -16,11 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <platform/Platform.h>
 #include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
 #include "rendering/caches/DiskCache.h"
+#include "rendering/layers/ContentVersion.h"
 #include "rendering/utils/LockGuard.h"
 
 namespace pag {
@@ -84,7 +86,7 @@ std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposi
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
                                                  float maxFrameRate, float scale,
                                                  bool useDiskCache) {
-  if (composition == nullptr) {
+  if (composition == nullptr || maxFrameRate <= 0 || scale <= 0) {
     return nullptr;
   }
   auto width = roundf(static_cast<float>(composition->width()) * scale);
@@ -228,11 +230,15 @@ bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, 
 }
 
 void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composition) {
-  if (composition == nullptr || composition->contentVersion == lastContentVersion) {
+  if (composition == nullptr) {
+    return;
+  }
+  auto contentVersion = ContentVersion::Get(composition);
+  if (contentVersion == lastContentVersion) {
     return;
   }
   sequenceFile = nullptr;
-  lastContentVersion = composition->contentVersion;
+  lastContentVersion = contentVersion;
   lastReadIndex = -1;
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   _numFrames = result.first;
@@ -245,6 +251,7 @@ std::string PAGDecoder::generateCacheKey(std::shared_ptr<PAGComposition> composi
     return "";
   }
   auto filePath = static_cast<PAGFile*>(composition.get())->path();
+  filePath = Platform::Current()->getSandboxPath(filePath);
   return filePath + "." + std::to_string(_width) + "x" + std::to_string(_height);
 }
 

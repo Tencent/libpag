@@ -31,6 +31,33 @@ import java.util.List;
 
 public class PAGView extends TextureView implements TextureView.SurfaceTextureListener, LifecycleListener {
 
+    public interface PAGViewListener {
+        /**
+         * Notifies the start of the animation.
+         */
+        void onAnimationStart(PAGView view);
+
+        /**
+         * Notifies the end of the animation.
+         */
+        void onAnimationEnd(PAGView view);
+
+        /**
+         * Notifies the cancellation of the animation.
+         */
+        void onAnimationCancel(PAGView view);
+
+        /**
+         * Notifies the repetition of the animation.
+         */
+        void onAnimationRepeat(PAGView view);
+
+        /**
+         * Notifies the occurrence of another frame of the animation.
+         */
+        void onAnimationUpdate(PAGView view);
+    }
+
     private final static String TAG = "PAGView";
     private SurfaceTextureListener mListener;
     private PAGPlayer pagPlayer;
@@ -195,33 +222,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                     break;
             }
         }
-    }
-
-    public interface PAGViewListener {
-        /**
-         * Notifies the start of the animation.
-         */
-        void onAnimationStart(PAGView view);
-
-        /**
-         * Notifies the end of the animation.
-         */
-        void onAnimationEnd(PAGView view);
-
-        /**
-         * Notifies the cancellation of the animation.
-         */
-        void onAnimationCancel(PAGView view);
-
-        /**
-         * Notifies the repetition of the animation.
-         */
-        void onAnimationRepeat(PAGView view);
-
-        /**
-         * Notifies the occurrence of another frame of the animation.
-         */
-        void onAnimationUpdate(PAGView view);
     }
 
     /**

@@ -24,6 +24,11 @@ namespace tgfx {
  */
 enum class PixelFormat {
   /**
+   * uninitialized.
+   */
+  Unknown,
+
+  /**
    * Pixel with 8 bits for alpha. Each pixel is stored on 1 byte.
    */
   ALPHA_8,

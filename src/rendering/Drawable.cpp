@@ -70,6 +70,10 @@ OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx
 }
 
 std::shared_ptr<tgfx::Surface> OffscreenDrawable::createSurface(tgfx::Context* context) {
+#ifdef __APPLE__
+  return tgfx::Surface::Make(context, _width, _height, tgfx::ColorType::BGRA_8888);
+#else
   return tgfx::Surface::Make(context, _width, _height);
+#endif
 }
 }  // namespace pag
