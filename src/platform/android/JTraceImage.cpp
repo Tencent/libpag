@@ -41,7 +41,6 @@ void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const s
     return;
   }
   if (TraceImageClass.get() == nullptr) {
-    env->ExceptionClear();
     LOGE("Could not run TraceImage.Trace(), TraceImageClass is not found!");
     return;
   }

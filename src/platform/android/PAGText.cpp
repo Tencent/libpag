@@ -82,7 +82,6 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   }
   if (PAGTextClass.get() == nullptr) {
     LOGE("Could not run ToPAGTextObject, PAGTextClass is not found!");
-    env->ExceptionClear();
     return nullptr;
   }
   auto textData = env->NewObject(PAGTextClass.get(), PAGTextConstructID);
@@ -128,7 +127,6 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
 TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData) {
   if (PAGTextClass.get() == nullptr) {
     LOGE("Could not run ToTextDocument, PAGTextClass is not found!");
-    env->ExceptionClear();
     return nullptr;
   }
   if (textData == nullptr) {

@@ -94,7 +94,6 @@ HardwareDecoder::~HardwareDecoder() {
 
 bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
   if (HardwareDecoderClass.get() == nullptr) {
-    env->ExceptionClear();
     LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
     return false;
   }

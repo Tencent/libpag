@@ -38,7 +38,6 @@ std::string JPAGDiskCache::GetCacheDir() {
     return "";
   }
   if (PAGClass.get() == nullptr) {
-    env->ExceptionClear();
     LOGE("Could not run PAGDiskCache.GetCacheDir(), PAGClass is not found!");
     return "";
   }

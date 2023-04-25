@@ -137,7 +137,6 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     return nullptr;
   }
   if (BitmapFactoryOptionsClass.get() == nullptr) {
-    env->ExceptionClear();
     LOGE("Could not run NativeCodec.GetEncodedOrigin(), BitmapFactoryOptionsClass is not found!");
     return nullptr;
   }
@@ -174,7 +173,6 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     return nullptr;
   }
   if (BitmapFactoryOptionsClass.get() == nullptr) {
-    env->ExceptionClear();
     LOGE("Could not run NativeCodec.MakeNativeCodec(), BitmapFactoryOptionsClass is not found!");
     return nullptr;
   }
@@ -215,7 +213,6 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
     return nullptr;
   }
   if (BitmapFactoryOptionsClass.get() == nullptr) {
-    env->ExceptionClear();
     LOGE("Could not run NativeCodec.MakeNativeCodec(), BitmapFactoryOptionsClass is not found!");
     return nullptr;
   }

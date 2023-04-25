@@ -27,7 +27,7 @@
 #include "tgfx/platform/android/JNIEnvironment.h"
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
-  LOGE("PAG JNI_OnLoad Version: %s", pag::PAG::SDKVersion().c_str());
+  LOGI("PAG JNI_OnLoad Version: %s", pag::PAG::SDKVersion().c_str());
   tgfx::JNIEnvironment::SetJavaVM(vm);
   pag::NativePlatform::InitJNI();
   return JNI_VERSION_1_4;
