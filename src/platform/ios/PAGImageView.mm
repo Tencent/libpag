@@ -141,6 +141,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagComposition) {
     [pagComposition release];
   }
+  if (_currentUIImage) {
+    [_currentUIImage release];
+  }
   if (filePath != nil) {
     [filePath release];
   }
