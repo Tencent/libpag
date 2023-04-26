@@ -34,5 +34,7 @@ class CocoaPlatform : public Platform {
 
   std::optional<PositionedGlyphs> shapeText(
       const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
+
+  std::string getCacheDir() const override;
 };
 }  // namespace pag

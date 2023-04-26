@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CocoaPlatform.h"
+#import <Foundation/Foundation.h>
 #include "TraceImage.h"
 #include "pag/pag.h"
 #ifdef PAG_USE_HARFBUZZ
@@ -61,6 +62,13 @@ void CocoaPlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   TraceImage(info, pixels, tag);
 }
 
+std::string CocoaPlatform::getCacheDir() const {
+  NSString* cachePath =
+      [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+  cachePath = [cachePath stringByAppendingPathComponent:@"libpag"];
+  return [cachePath UTF8String];
+}
+
 std::optional<PositionedGlyphs> CocoaPlatform::shapeText(
     const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
 #ifdef PAG_USE_HARFBUZZ
@@ -71,4 +79,5 @@ std::optional<PositionedGlyphs> CocoaPlatform::shapeText(
   return NativeTextShaper::Shape(text, typeface);
 #endif
 }
+
 }  // namespace pag

@@ -94,7 +94,7 @@ class DataView {
    * Returns the writable pixel address, the base address corresponding to the pixel origin. Returns
    * nullptr if the Pixmap is constructed from read-only pixels.
    */
-  void* writableBytes() const {
+  uint8_t* writableBytes() const {
     return _writableBytes;
   }
 

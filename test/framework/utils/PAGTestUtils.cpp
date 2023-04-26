@@ -19,10 +19,12 @@
 #include "PAGTestUtils.h"
 #include <dirent.h>
 #include <fstream>
-#include <iostream>
 #include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/utils/Directory.h"
 #include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/utils/Buffer.h"
+#include "tgfx/utils/Stream.h"
 
 namespace pag {
 using namespace tgfx;
@@ -43,22 +45,8 @@ BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, i
   return {glInfo, width, height};
 }
 
-void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
-  struct dirent* dirp;
-  auto dirPath = TestConstants::PAG_ROOT + path;
-  DIR* dir = opendir(dirPath.c_str());
-  std::string p;
-
-  while ((dirp = readdir(dir)) != nullptr) {
-    if (dirp->d_type == DT_REG) {
-      std::string str(dirp->d_name);
-      std::string::size_type idx = str.find(".pag");
-      if (idx != std::string::npos) {
-        files.push_back(p.assign(dirPath).append("/").append(dirp->d_name));
-      }
-    }
-  }
-  closedir(dir);
+std::vector<std::string> GetAllPAGFiles(const std::string& path) {
+  return Directory::FindFiles(TestConstants::PAG_ROOT + path, ".pag");
 }
 
 Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface) {
@@ -130,6 +118,16 @@ std::shared_ptr<tgfx::Image> MakeImage(const std::string& path) {
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
   return PAGImage::FromPath(TestConstants::PAG_ROOT + path);
+}
+
+std::shared_ptr<tgfx::Data> ReadFile(const std::string& path) {
+  auto stream = tgfx::Stream::MakeFromFile(TestConstants::PAG_ROOT + path);
+  if (stream == nullptr) {
+    return nullptr;
+  }
+  tgfx::Buffer buffer(stream->size());
+  stream->read(buffer.data(), buffer.size());
+  return buffer.release();
 }
 
 void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {

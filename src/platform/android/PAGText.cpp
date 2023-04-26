@@ -47,6 +47,10 @@ static jfieldID PAGText_backgroundAlpha;
 
 void InitPAGTextJNI(JNIEnv* env) {
   PAGTextClass = env->FindClass("org/libpag/PAGText");
+  if (PAGTextClass.get() == nullptr) {
+    LOGE("Could not run InitPAGTextJNI, PAGTextClass is not found!");
+    return;
+  }
   PAGTextConstructID = env->GetMethodID(PAGTextClass.get(), "<init>", "()V");
   PAGText_applyFill = env->GetFieldID(PAGTextClass.get(), "applyFill", "Z");
   PAGText_applyStroke = env->GetFieldID(PAGTextClass.get(), "applyStroke", "Z");
@@ -74,6 +78,10 @@ void InitPAGTextJNI(JNIEnv* env) {
 
 jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   if (textDocument == nullptr) {
+    return nullptr;
+  }
+  if (PAGTextClass.get() == nullptr) {
+    LOGE("Could not run ToPAGTextObject, PAGTextClass is not found!");
     return nullptr;
   }
   auto textData = env->NewObject(PAGTextClass.get(), PAGTextConstructID);
@@ -117,6 +125,10 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
 }
 
 TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData) {
+  if (PAGTextClass.get() == nullptr) {
+    LOGE("Could not run ToTextDocument, PAGTextClass is not found!");
+    return nullptr;
+  }
   if (textData == nullptr) {
     return nullptr;
   }

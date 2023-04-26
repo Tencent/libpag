@@ -20,6 +20,8 @@
 #include "layerStyles/DropShadowStyle.h"
 #include "layerStyles/DropShadowStyleV2.h"
 #include "layerStyles/GradientOverlayStyle.h"
+#include "layerStyles/OuterGlowStyle.h"
+#include "layerStyles/StrokeStyle.h"
 
 namespace pag {
 bool ReadLayerStyles(DecodeStream* stream, TagCode code, Layer* layer) {
@@ -36,6 +38,12 @@ bool ReadLayerStyles(DecodeStream* stream, TagCode code, Layer* layer) {
       break;
     case TagCode::GradientOverlayStyle:
       style = ReadTagBlock(stream, GradientOverlayStyleTag);
+      break;
+    case TagCode::StrokeStyle:
+      style = ReadTagBlock(stream, StrokeStyleTag);
+      break;
+    case TagCode::OuterGlowStyle:
+      style = ReadTagBlock(stream, OuterGlowStyleTag);
       break;
     default:
       break;
@@ -63,6 +71,12 @@ void WriteLayerStyles(EncodeStream* stream, const std::vector<LayerStyle*>& laye
       }
       case LayerStyleType::GradientOverlay:
         WriteTagBlock(stream, static_cast<GradientOverlayStyle*>(style), GradientOverlayStyleTag);
+        break;
+      case LayerStyleType::Stroke:
+        WriteTagBlock(stream, static_cast<StrokeStyle*>(style), StrokeStyleTag);
+        break;
+      case LayerStyleType::OuterGlow:
+        WriteTagBlock(stream, static_cast<OuterGlowStyle*>(style), OuterGlowStyleTag);
         break;
       default:
         break;

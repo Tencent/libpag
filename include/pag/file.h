@@ -141,6 +141,9 @@ enum class TagCode {
   EncryptedData = 89,
   Transform3D = 90,
   CameraOption = 91,
+  
+  StrokeStyle = 92,
+  OuterGlowStyle = 93,
 
   // add new tags here...
 
@@ -270,6 +273,7 @@ std::vector<TimeRange> PAG_API OffsetTimeRanges(const std::vector<TimeRange>& ti
                                                 Frame offsetTime);
 bool PAG_API HasVaryingTimeRange(const std::vector<TimeRange>* staticTimeRanges, Frame startTime,
                                  Frame duration);
+TimeRange PAG_API GetTimeRangeContains(const std::vector<TimeRange>& timeRanges, Frame frame);
 
 template <typename T>
 class AnimatableProperty : public Property<T> {
@@ -880,7 +884,7 @@ class HueSaturationEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay };
+enum class LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay, OuterGlow };
 
 enum class LayerStylePosition { Above, Blow };
 
@@ -931,6 +935,18 @@ class PAG_API StrokePosition {
   static const Enum Outside = 0;
   static const Enum Inside = 1;
   static const Enum Center = 2;
+};
+
+class PAG_API GlowColorType {
+ public:
+  static const Enum SingleColor = 0;
+  static const Enum Gradient = 1;
+};
+
+class PAG_API GlowTechniqueType {
+ public:
+  static const Enum Softer = 0;
+  static const Enum Precise = 1;
 };
 
 class PAG_API DropShadowStyle : public LayerStyle {
@@ -1048,6 +1064,43 @@ class PAG_API GradientOverlayStyle : public LayerStyle {
   Property<bool>* alignWithLayer = nullptr;
   Property<float>* scale = nullptr;
   Property<Point>* offset = nullptr;
+
+  RTTR_ENABLE(LayerStyle)
+};
+
+class PAG_API OuterGlowStyle : public LayerStyle {
+ public:
+  ~OuterGlowStyle() override;
+
+  LayerStyleType type() const override {
+    return LayerStyleType::OuterGlow;
+  }
+
+  LayerStylePosition drawPosition() const override {
+    return LayerStylePosition::Above;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<Opacity>* opacity = nullptr;
+  Property<Percent>* noise = nullptr;
+  Property<Enum>* colorType = nullptr;  // GlowColorType
+  Property<Color>* color = nullptr;
+  Property<GradientColorHandle>* colors = nullptr;
+  Property<Percent>* gradientSmoothness = nullptr;
+  Property<Enum>* technique = nullptr;  // GlowTechniqueType
+  Property<Percent>* spread = nullptr;
+  Property<float>* size = nullptr;
+  Property<Percent>* range = nullptr;
+  Property<Percent>* jitter = nullptr;
 
   RTTR_ENABLE(LayerStyle)
 };
@@ -2009,6 +2062,9 @@ class PAG_API Composition {
    */
   Frame audioStartTime = ZeroFrame;
 
+  /**
+   * [FrameStart, FrameEnd(included)], [FrameStar, FrameEnd]...
+   */
   std::vector<TimeRange> staticTimeRanges;
   Cache* cache = nullptr;
   std::mutex locker = {};

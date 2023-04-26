@@ -56,14 +56,17 @@ NS_ASSUME_NONNULL_BEGIN
 PAG_API @interface PAGImageView : UIImageView
 
 /**
+ * [Deprecated]
  * Returns the size limit of the disk cache in bytes.
  */
-+ (NSUInteger)MaxDiskSize;
++ (NSUInteger)MaxDiskSize DEPRECATED_MSG_ATTRIBUTE("Please use [PAGDiskCache MaxDiskSize] instead");
 
 /**
+ * [Deprecated]
  * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
  */
-+ (void)SetMaxDiskSize:(NSUInteger)size;
++ (void)SetMaxDiskSize:(NSUInteger)size
+    DEPRECATED_MSG_ATTRIBUTE("Please use [PAGDiskCache SetMaxDiskSize] instead");
 
 /**
  * Returns the current PAGComposition in the PAGImageView. Returns nil if the internal composition
@@ -94,7 +97,7 @@ PAG_API @interface PAGImageView : UIImageView
  * Loads a pag file from the specified path, returns false if the file does not exist, or it is not
  * a valid pag file.
  */
-- (BOOL)setPath:(NSString*)filePath;
+- (BOOL)setPath:(NSString*)path;
 /**
  * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file
  * does not exist, or it is not a valid pag file.
@@ -152,6 +155,12 @@ PAG_API @interface PAGImageView : UIImageView
  * Sets the frame index for the PAGImageView to render.
  */
 - (void)setCurrentFrame:(NSUInteger)currentFrame;
+
+/**
+ * Returns the number of frames in the PAGImageView in one loop. Note that the value may change
+ * if the associated PAGComposition was modified.
+ */
+- (NSUInteger)numFrames;
 
 /**
  * Returns a UIImage capturing the contents of the current PAGImageView.

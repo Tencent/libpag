@@ -74,6 +74,11 @@ bool HardwareBufferInterface::Available() {
   return available;
 }
 
+bool HardwareBufferInterface::HasBitmapFetchSupport() {
+  static const bool available = GetFunctions()->AHB_from_Bitmap != nullptr;
+  return available;
+}
+
 int HardwareBufferInterface::Allocate(const AHardwareBuffer_Desc* desc,
                                       AHardwareBuffer** outBuffer) {
   return GetFunctions()->allocate(desc, outBuffer);

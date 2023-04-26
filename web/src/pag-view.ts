@@ -484,6 +484,18 @@ export class PAGView {
     }
   }
 
+  protected setTimer() {
+    if (WORKER) {
+      this.timer = self.setTimeout(() => {
+        this.flushLoop();
+      }, (1 / this.frameRate) * 1000);
+    } else {
+      this.timer = globalThis.requestAnimationFrame(() => {
+        this.flushLoop();
+      });
+    }
+  }
+
   protected clearTimer(): void {
     if (this.timer) {
       if (WORKER) {
@@ -531,17 +543,5 @@ export class PAGView {
       if (VideoReader.isSought) return true;
     }
     return false;
-  }
-
-  private setTimer() {
-    if (WORKER) {
-      this.timer = self.setTimeout(() => {
-        this.flushLoop();
-      }, (1 / this.frameRate) * 1000);
-    } else {
-      this.timer = globalThis.requestAnimationFrame(() => {
-        this.flushLoop();
-      });
-    }
   }
 }

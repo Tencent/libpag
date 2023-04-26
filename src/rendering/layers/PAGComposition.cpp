@@ -18,6 +18,7 @@
 
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
+#include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/caches/CompositionCache.h"
 #include "rendering/caches/LayerCache.h"
@@ -184,7 +185,7 @@ bool PAGComposition::doAddLayer(std::shared_ptr<PAGLayer> pagLayer, int index) {
   } else if (pagLayer->layerType() == LayerType::PreCompose &&
              std::static_pointer_cast<PAGComposition>(pagLayer)->doContains(this)) {
     LOGE(
-        "A layer cannot be added as a child to one of it's children "
+        "A layer cannot be added as a child to one of its children "
         "(or children's children, etc.).");
     return false;
   } else if (pagLayer->stage == pagLayer.get()) {
@@ -664,7 +665,8 @@ void PAGComposition::updateDurationAndFrameRate() {
     }
   }
   bool changed = false;
-  auto layerMaxFrameDuration = TimeToFrame(layerMaxTimeDuration, layerMaxFrameRate);
+  auto layerMaxFrameDuration = static_cast<Frame>(
+      round(static_cast<double>(layerMaxTimeDuration) * layerMaxFrameRate / 1000000.0));
   if (_frameDuration != layerMaxFrameDuration) {
     _frameDuration = layerMaxFrameDuration;
     changed = true;

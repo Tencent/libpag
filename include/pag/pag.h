@@ -529,6 +529,8 @@ class PAG_API PAGLayer : public Content {
   friend class AudioClip;
 
   friend class ContentVersion;
+
+  friend class PAGDecoder;
 };
 
 class SolidLayer;
@@ -548,7 +550,7 @@ class PAG_API PAGSolidLayer : public PAGLayer {
   Color solidColor();
 
   /**
-   * Set the the layer's solid color.
+   * Set the layer's solid color.
    */
   void setSolidColor(const Color& value);
 
@@ -716,7 +718,7 @@ class AnimatableProperty;
 class PAG_API PAGImageLayer : public PAGLayer {
  public:
   /**
-   * Make a PAGImageLayer with with, height and duration(in microseconds).
+   * Make a PAGImageLayer with width, height and duration(in microseconds).
    */
   static std::shared_ptr<PAGImageLayer> Make(int width, int height, int64_t duration);
 
@@ -822,7 +824,7 @@ class VectorComposition;
 class PAG_API PAGComposition : public PAGLayer {
  public:
   /**
-   * Make a empty PAGComposition with specified size.
+   * Make an empty PAGComposition with specified size.
    */
   static std::shared_ptr<PAGComposition> Make(int width, int height);
 
@@ -873,26 +875,26 @@ class PAG_API PAGComposition : public PAGLayer {
   void setLayerIndex(std::shared_ptr<PAGLayer> pagLayer, int index);
 
   /**
-   * Add a PAGLayer to current PAGComposition at the top. If you add a layer that already has a
+   * Add a PAGLayer to the current PAGComposition at the top. If you add a layer that already has a
    * different PAGComposition object as a parent, the layer is removed from the other PAGComposition
    * object.
    */
   bool addLayer(std::shared_ptr<PAGLayer> pagLayer);
 
   /**
-   * Add a PAGLayer to current PAGComposition at the specified index. If you add a layer that
+   * Add a PAGLayer to the current PAGComposition at the specified index. If you add a layer that
    * already has a different PAGComposition object as a parent, the layer is removed from the other
    * PAGComposition object.
    */
   bool addLayerAt(std::shared_ptr<PAGLayer> pagLayer, int index);
 
   /**
-   * Check whether current PAGComposition contains the specified pagLayer.
+   * Check whether the current PAGComposition contains the specified pagLayer.
    */
   bool contains(std::shared_ptr<PAGLayer> pagLayer) const;
 
   /**
-   * Remove the specified PAGLayer from current PAGComposition.
+   * Remove the specified PAGLayer from the current PAGComposition.
    */
   std::shared_ptr<PAGLayer> removeLayer(std::shared_ptr<PAGLayer> pagLayer);
 
@@ -1010,6 +1012,8 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class FileReporter;
 
   friend class AudioClip;
+
+  friend class PAGDecoder;
 };
 
 class PAG_API PAGFile : public PAGComposition {
@@ -1208,12 +1212,12 @@ class PAG_API PAGSurface {
   int height();
 
   /**
-   * Update the size of surface, and reset the internal surface.
+   * Update the size of the surface, and reset the internal surface.
    */
   void updateSize();
 
   /**
-   * Erases all pixels of this surface with transparent color. Returns true if the content has
+   * Erases all pixels of the surface with transparent color. Returns true if the content has
    * changed.
    */
   bool clearAll();
@@ -1515,6 +1519,129 @@ class PAG_API PAGPlayer {
   int64_t durationInternal();
 
   friend class PAGSurface;
+};
+
+class SequenceFile;
+
+/**
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition.
+ */
+class PAGDecoder {
+ public:
+  /**
+   * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
+   * decoded image size. If the useDiskCache is true, the returned PAGDecoder will cache image
+   * frames as a sequence file on the disk, which may significantly speed up the reading process
+   * depending on the complexity of the PAG files. And only keep an external reference to the
+   * PAGComposition if you need to modify it in the feature. Otherwise, the internal composition
+   * will not be released automatically after the associated disk cache is complete, which may cost
+   * more memory than necessary. You can use the PAGDiskCache::SetMaxDiskSize() method to manage the
+   * cache limit of the disk usage. Returns nullptr if the composition is nullptr. Note that the
+   * returned PAGDecoder may become invalid if the associated PAGComposition is added to a PAGPlayer
+   * or another PAGDecoder. And while the useDiskCache is true.
+   */
+  static std::shared_ptr<PAGDecoder> MakeFrom(std::shared_ptr<PAGComposition> composition,
+                                              float maxFrameRate = 30.0f, float scale = 1.0f,
+                                              bool useDiskCache = true);
+
+  /**
+   * Returns the width of decoded image frames.
+   */
+  int width() const {
+    return _width;
+  }
+
+  /**
+   * Returns the height of decoded image frames.
+   */
+  int height() const {
+    return _height;
+  }
+
+  /**
+   * Returns the number of frames in the PAGDecoder. Note that the value may change if the
+   * associated PAGComposition was modified.
+   */
+  int numFrames();
+
+  /**
+   * Returns the frame rate of decoded image frames. The value may change if the associated
+   * PAGComposition was modified.
+   */
+  float frameRate();
+
+  /**
+   * Returns true if the frame at the given index has changed since the last readFrame() call. The
+   * caller should skip the corresponding reading call if the frame has not changed.
+   */
+  bool checkFrameChanged(int index);
+
+  /**
+   * Copies pixels of the image frame at the given index into the specified memory address. Returns
+   * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
+   * the same throughout every reading call. Otherwise, it may return false.
+   */
+  bool readFrame(int index, void* pixels, size_t rowBytes,
+                 ColorType colorType = ColorType::RGBA_8888,
+                 AlphaType alphaType = AlphaType::Premultiplied);
+
+ private:
+  std::mutex locker = {};
+  int _width = 0;
+  int _height = 0;
+  int _numFrames = 0;
+  float _frameRate = 30.0f;
+  float maxFrameRate = 30.0f;
+  bool useDiskCache = true;
+  int lastReadIndex = -1;
+  size_t lastRowBytes = 0;
+  ColorType lastColorType = ColorType::RGBA_8888;
+  AlphaType lastAlphaType = AlphaType::Premultiplied;
+  uint32_t lastContentVersion = 0;
+  std::shared_ptr<PAGComposition> container = nullptr;
+  std::shared_ptr<SequenceFile> sequenceFile = nullptr;
+  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
+  std::vector<TimeRange> staticTimeRanges = {};
+
+  static Composition* GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition);
+  static std::pair<int, float> GetFrameCountAndRate(std::shared_ptr<PAGComposition> pagComposition,
+                                                    float maxFrameRate);
+  static std::vector<TimeRange> GetStaticTimeRange(std::shared_ptr<PAGComposition> composition,
+                                                   int numFrames);
+
+  PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
+             float frameRate, float maxFrameRate, bool useDiskCache);
+  bool renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
+                   size_t rowBytes, ColorType colorType, AlphaType alphaType);
+  bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
+                         ColorType colorType, AlphaType alphaType);
+  void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
+  std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
+  std::shared_ptr<PAGComposition> getComposition();
+};
+
+/**
+ * Defines methods to manage the disk cache capabilities.
+ */
+class PAGDiskCache {
+ public:
+  /**
+   * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
+   */
+  static size_t MaxDiskSize();
+
+  /**
+   * Sets the size limit of the disk cache in bytes, which will triggers the cache cleanup if the
+   * disk usage exceeds the limit. The opened files are not removed immediately, even if their disk
+   * usage exceeds the limit, and they will be rechecked after they are closed.
+   */
+  static void SetMaxDiskSize(size_t size);
+
+  /**
+   * Removes all cached files from the disk. All the opened files will be also removed after they
+   * are closed.
+   */
+  static void RemoveAll();
 };
 
 /**

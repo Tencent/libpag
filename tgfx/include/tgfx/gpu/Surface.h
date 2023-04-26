@@ -50,6 +50,16 @@ class Surface {
                                        const SurfaceOptions* options = nullptr);
 
   /**
+   * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
+   * width, height, and colorType. A Surface with MSAA enabled is returned if the sample count is
+   * greater than 1. Return nullptr if the size is invalid or the colorType is not renderable in
+   * the GPU backend.
+   */
+  static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
+                                       int sampleCount = 1, bool mipMapped = false,
+                                       const SurfaceOptions* options = nullptr);
+
+  /**
    * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
    * for the lifetime of the returned Surface. Returns nullptr if the context is nullptr or the
    * renderTarget is invalid.
@@ -60,10 +70,10 @@ class Surface {
                                            const SurfaceOptions* options = nullptr);
 
   /**
-   * Wraps a BackendTexture into Surface. The caller must ensure the texture is valid for the
-   * lifetime of the returned Surface. If the sampleCount greater than zero, creates an intermediate
-   * MSAA Surface which is used for drawing backendTexture. Returns nullptr if the context is
-   * nullptr or the texture is not renderable in the GPU backend.
+   * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
+   * lifetime of the returned Surface. If the sampleCount is greater than zero, creates an
+   * intermediate MSAA Surface which is used for drawing backendTexture. Returns nullptr if the
+   * context is nullptr or the texture is not renderable in the GPU backend.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount = 1,

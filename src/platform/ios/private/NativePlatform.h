@@ -24,5 +24,7 @@ namespace pag {
 class NativePlatform : public CocoaPlatform {
  public:
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+
+  std::string getSandboxPath(std::string filePath) const override;
 };
 }  // namespace pag

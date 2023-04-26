@@ -3,7 +3,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,45 +17,86 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #import "PAGComposition.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
+/**
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition.
+ */
 PAG_API @interface PAGDecoder : NSObject
 /**
- * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame rate
- * and size.Returns nil if the composition is nil.
+ * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame
+ * rate and size, and set the useDiskCache to true. You can use PAGDiskCache::SetMaxDiskSize()
+ * to manage the cache limit of the disk usage. Returns nil if the composition is nil. Note
+ * that the returned PAGDecoder may become invalid if the associated PAGComposition is added to
+ * a PAGPlayer or another PAGDecoder.
  */
 + (nullable instancetype)Make:(nullable PAGComposition*)composition;
 
 /**
- * Creates a new PAGDecoder with the specified PAGComposition, the frame rate limit, and the scale
- * factor for the output image size. Returns nil if the composition is nil.
+ * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
+ * decoded image size, and set the useDiskCache to true. You can use PAGDiskCache::SetMaxDiskSize()
+ * to manage the cache limit of the disk usage. Returns nil if the composition is nil. Note that
+ * the returned PAGDecoder may become invalid if the associated PAGComposition is added to a
+ * PAGPlayer or another PAGDecoder.
  */
 + (nullable instancetype)Make:(nullable PAGComposition*)composition
                  maxFrameRate:(float)maxFrameRate
                         scale:(float)scale;
 
 /**
- * Returns the width of the output image.
+ * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
+ * decoded image size. If the useDiskCache is true, the returned PAGDecoder will cache image
+ * frames as a sequence file on the disk, which may significantly speed up the reading process
+ * depending on the complexity of the PAG files. And only keep an external reference to the
+ * PAGComposition if you need to modify it in the feature. Otherwise, the internal composition
+ * will not be released automatically after the associated disk cache is complete, which may
+ * cost more memory than necessary. You can use the PAGDiskCache::SetMaxDiskSize() method
+ * to manage the cache limit of the disk usage. Returns nil if the composition is nil. Note
+ * that the returned PAGDecoder may become invalid if the associated PAGComposition is added to
+ * a PAGPlayer or another PAGDecoder. And while the useDiskCache is true.
+ */
++ (nullable instancetype)Make:(nullable PAGComposition*)composition
+                 maxFrameRate:(float)maxFrameRate
+                        scale:(float)scale
+                 useDiskCache:(BOOL)useDiskCache;
+
+/**
+ * Returns the width of decoded image frames.
  */
 - (NSInteger)width;
 
 /**
- * Returns the height of the output image.
+ * Returns the height of decoded image frames.
  */
 - (NSInteger)height;
 
 /**
- * Returns the number of animated frames.
+ * Returns the number of frames in the PAGDecoder. Note that the value may change if the associated
+ * PAGComposition was modified.
  */
 - (NSInteger)numFrames;
 
 /**
+ * Returns the frame rate of decoded image frames. The value may change if the associated
+ * PAGComposition was modified.
+ */
+- (float)frameRate;
+
+/**
+ * Returns true if the frame at the given index has changed since the last copyFrameTo() or
+ * frameAtIndex() call. The caller should skip the corresponding reading call if the frame has not
+ * changed.
+ */
+- (BOOL)checkFrameChanged:(int)index;
+
+/**
  * Copies pixels of the image frame at the given index to the specified memory address. The format
  * of the copied pixels is in the BGRA color type with the premultiplied alpha type. Returns false
- * if failed.
+ * if failed. Note that caller must ensure that the rowBytes stays the same throughout every copying
+ * call. Otherwise, it may return false.
  */
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index;
 

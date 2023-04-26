@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
+#include <QStandardPaths>
 #include <vector>
 #include "pag/pag.h"
 #ifdef __APPLE__
@@ -63,6 +64,11 @@ NALUType NativePlatform::naluType() const {
 #else
   return NALUType::AnnexB;
 #endif
+}
+
+std::string NativePlatform::getCacheDir() const {
+  auto cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+  return cacheDir.toStdString();
 }
 
 }  // namespace pag

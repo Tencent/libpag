@@ -31,7 +31,7 @@ std::string ToString(Frame frame);
 
 BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height);
 
-void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files);
+std::vector<std::string> GetAllPAGFiles(const std::string& path);
 
 tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
@@ -47,6 +47,8 @@ std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path);
 std::shared_ptr<tgfx::Image> MakeImage(const std::string& path);
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path);
+
+std::shared_ptr<tgfx::Data> ReadFile(const std::string& path);
 
 void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key);
 

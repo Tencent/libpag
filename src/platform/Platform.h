@@ -67,9 +67,22 @@ class Platform {
   virtual void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                           const std::string& tag) const;
 
+  /**
+   * Returns the absolute path to the platform-specific cache directory on the filesystem.
+   */
+  virtual std::string getCacheDir() const;
+
   virtual std::optional<PositionedGlyphs> shapeText(const std::string&,
                                                     const std::shared_ptr<tgfx::Typeface>&) const {
     return std::nullopt;
+  }
+
+  /**
+   * Returns the corresponding sandbox path from the absolute file path, which usually starts with
+   * "app://" or "home://". Returns the original path if the platform does not support sandbox.
+   */
+  virtual std::string getSandboxPath(std::string filePath) const {
+    return filePath;
   }
 };
 }  // namespace pag

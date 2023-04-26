@@ -31,8 +31,7 @@ PAG_TEST_CASE(PAGBlendTest)
  * 用例描述: 测试基础混合模式
  */
 PAG_TEST_F(PAGBlendTest, Blend) {
-  std::vector<std::string> files;
-  GetAllPAGFiles("resources/blend", files);
+  auto files = GetAllPAGFiles("resources/blend");
   auto pagSurface = PAGSurface::MakeOffscreen(400, 400);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

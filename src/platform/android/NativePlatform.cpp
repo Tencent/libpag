@@ -22,6 +22,7 @@
 #include <cstdarg>
 #include "FontConfigAndroid.h"
 #include "HardwareDecoder.h"
+#include "JPAGDiskCache.h"
 #include "JTraceImage.h"
 #include "PAGText.h"
 
@@ -67,6 +68,8 @@ void NativePlatform::InitJNI() {
   FontConfigAndroid::InitJNI(env);
   HardwareDecoder::InitJNI(env);
   InitPAGTextJNI(env);
+  JPAGDiskCache::InitJNI(env);
+  env->ExceptionClear();
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
@@ -81,5 +84,9 @@ bool NativePlatform::registerFallbackFonts() const {
 void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
   JTraceImage::Trace(info, pixels, tag);
+}
+
+std::string NativePlatform::getCacheDir() const {
+  return JPAGDiskCache::GetCacheDir();
 }
 }  // namespace pag

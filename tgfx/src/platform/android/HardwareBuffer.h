@@ -29,6 +29,8 @@ class HardwareBuffer : public PixelBuffer {
 
   static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
 
+  static std::shared_ptr<PixelBuffer> MakeFrom(JNIEnv* env, jobject bitmap);
+
   explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
 
   ~HardwareBuffer() override;

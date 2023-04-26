@@ -1,6 +1,5 @@
 apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
-apply plugin: 'com.github.panpf.bintray-publish'
 apply plugin: 'signing'
 
 version = '4.1.0'
@@ -8,17 +7,13 @@ project.ext.artifactId = 'libpag'
 project.group = 'com.tencent.tav'
 
 android {
-    compileSdkVersion 29
-    buildToolsVersion '29.0.3'
-    ndkVersion "19.2.5345600"
+    compileSdkVersion rootProject.compileSdkVersion
+    buildToolsVersion rootProject.buildToolsVersion
+    ndkVersion rootProject.ndkVersion
 
     defaultConfig {
-        minSdkVersion 18
-        targetSdkVersion 31
-        versionCode 1
-        versionName "1.0"
-
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        minSdkVersion rootProject.minSdkVersion
+        targetSdkVersion rootProject.targetSdkVersion
 
         externalNativeBuild {
             cmake {
@@ -49,20 +44,16 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version "3.10.2"
+            version rootProject.cmakeVersion
             path '../../CMakeLists.txt'
         }
     }
-    publishNonDefault true
+    namespace 'org.libpag'
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation("androidx.exifinterface:exifinterface:1.3.3")
-    androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
-        exclude group: 'com.android.support', module: 'support-annotations'
-    })
-    testImplementation 'junit:junit:4.12'
 }
 
 task androidSourcesJar(type: Jar) {
@@ -70,15 +61,6 @@ task androidSourcesJar(type: Jar) {
     from android.sourceSets.main.java.source
     exclude "**/R.class"
     exclude "**/BuildConfig.class"
-}
-
-publish {
-    userOrg = 'libpag'
-    groupId = 'com.tencent.tav'
-    artifactId = 'libpag'
-    publishVersion = project.version
-    desc = 'A real-time rendering library for PAG (Portable Animated Graphics) files that renders After Effects animations natively across multiple platforms.'
-    website = 'https://github.com/Tencent/libpag'
 }
 
 publishing {
@@ -137,46 +119,44 @@ signing {
 }
 
 project.afterEvaluate {
-    // 如果使用自动拷贝功能，需要保证NDK是16，否则会生成没有经过strip的包
-    transformNativeLibsWithMergeJniLibsForRelease.doLast {
+    mergeReleaseNativeLibs.doLast {
         delete {
-            delete 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/merged_native_libs/release/out/lib/armeabi'
         }
         copy {
-            from 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi-v7a'
-            into 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/merged_native_libs/release/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/merged_native_libs/release/out/lib/armeabi'
             include '*.so'
         }
     }
-    transformNativeLibsWithStripDebugSymbolForRelease.doLast {
+    stripReleaseDebugSymbols.doLast {
         delete {
-            delete 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/stripped_native_libs/release/out/lib/armeabi'
         }
         copy {
-            from 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi-v7a'
-            into 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/stripped_native_libs/release/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/stripped_native_libs/release/out/lib/armeabi'
             include '*.so'
         }
     }
-    // 新的Skia导致使用NDK16也无法编译armeabi版本
     // 此处为了方便debug，保留debug版本armeabi的拷贝，方便源码接入时候的调试
-    transformNativeLibsWithMergeJniLibsForDebug.doLast {
+    mergeDebugNativeLibs.doLast {
         delete {
-            delete 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/merged_native_libs/debug/out/lib/armeabi'
         }
         copy {
-            from 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi-v7a'
-            into 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/merged_native_libs/debug/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/merged_native_libs/debug/out/lib/armeabi'
             include '*.so'
         }
     }
-    transformNativeLibsWithStripDebugSymbolForDebug.doLast {
+    stripDebugDebugSymbols.doLast {
         delete {
-            delete 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi'
         }
         copy {
-            from 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi-v7a'
-            into 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi'
             include '*.so'
         }
     }

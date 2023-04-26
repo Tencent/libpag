@@ -50,6 +50,7 @@ Build/
 test/out/
 DerivedData/
 xcuserdata
+xcshareddata
 *.xcworkspace
 .DS_Store
 .temp
@@ -75,3 +76,4 @@ test/baseline/.cache
 
 vendor_tools/
 .vscode
+

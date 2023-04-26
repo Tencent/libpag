@@ -26,6 +26,10 @@ static jmethodID TraceImage_Trace;
 
 void JTraceImage::InitJNI(JNIEnv* env) {
   TraceImageClass = env->FindClass("org/libpag/TraceImage");
+  if (TraceImageClass.get() == nullptr) {
+    LOGE("Could not run TraceImage.InitJNI(), TraceImageClass is not found!");
+    return;
+  }
   TraceImage_Trace = env->GetStaticMethodID(TraceImageClass.get(), "Trace",
                                             "(Ljava/lang/String;Ljava/nio/ByteBuffer;II)V");
 }
@@ -36,7 +40,10 @@ void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const s
   if (env == nullptr || info.isEmpty() || pixels == nullptr) {
     return;
   }
-
+  if (TraceImageClass.get() == nullptr) {
+    LOGE("Could not run TraceImage.Trace(), TraceImageClass is not found!");
+    return;
+  }
   auto rowBytes = static_cast<size_t>(info.width() * 4);
   auto dstPixels = new (std::nothrow) uint8_t[info.height() * rowBytes];
   if (dstPixels == nullptr) {

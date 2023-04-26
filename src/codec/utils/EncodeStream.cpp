@@ -149,7 +149,7 @@ void EncodeStream::writeByteData(const pag::ByteData* byteData) {
 }
 
 void EncodeStream::writeUTF8String(const std::string& text) {
-  auto textLength = text.size();
+  auto textLength = static_cast<uint32_t>(text.size());
   if (checkCapacity(textLength + 1)) {
     memcpy(bytes + _position, text.c_str(), textLength + 1);
     positionChanged(static_cast<off_t>(textLength) + 1);
