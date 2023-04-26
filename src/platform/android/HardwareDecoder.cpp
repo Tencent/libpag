@@ -40,6 +40,10 @@ static jmethodID MediaFormat_setFloat;
 
 void HardwareDecoder::InitJNI(JNIEnv* env) {
   HardwareDecoderClass = env->FindClass("org/libpag/HardwareDecoder");
+  if (HardwareDecoderClass.get() == nullptr) {
+    LOGE("Could not run HardwareDecoder.InitJNI(), HardwareDecoderClass is not found!");
+    return;
+  }
   HardwareDecoder_Create =
       env->GetStaticMethodID(HardwareDecoderClass.get(), "Create",
                              "(Landroid/media/MediaFormat;)Lorg/libpag/HardwareDecoder;");
@@ -89,6 +93,10 @@ HardwareDecoder::~HardwareDecoder() {
 }
 
 bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
+  if (HardwareDecoderClass.get() == nullptr) {
+    LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
+    return false;
+  }
   auto mimeType = SafeConvertToJString(env, format.mimeType.c_str());
   auto mediaFormat = env->CallStaticObjectMethod(
       MediaFormatClass.get(), MediaFormat_createVideoFormat, mimeType, format.width, format.height);

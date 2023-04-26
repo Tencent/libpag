@@ -36,5 +36,6 @@ void JNIInit::Run() {
   NativeCodec::JNIInit(env);
   HandlerThread::JNIInit(env);
   SurfaceTexture::JNIInit(env);
+  env->ExceptionClear();
 }
 }  // namespace tgfx

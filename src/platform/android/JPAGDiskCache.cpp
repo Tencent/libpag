@@ -24,6 +24,10 @@ static jmethodID PAG_GetCacheDir;
 
 void JPAGDiskCache::InitJNI(JNIEnv* env) {
   PAGClass = env->FindClass("org/libpag/PAGDiskCache");
+  if (PAGClass.get() == nullptr) {
+    LOGE("Could not run PAGDiskCache.InitJNI(), PAGClass is not found!");
+    return;
+  }
   PAG_GetCacheDir = env->GetStaticMethodID(PAGClass.get(), "GetCacheDir", "()Ljava/lang/String;");
 }
 
@@ -31,6 +35,10 @@ std::string JPAGDiskCache::GetCacheDir() {
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
+    return "";
+  }
+  if (PAGClass.get() == nullptr) {
+    LOGE("Could not run PAGDiskCache.GetCacheDir(), PAGClass is not found!");
     return "";
   }
   jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetCacheDir);
