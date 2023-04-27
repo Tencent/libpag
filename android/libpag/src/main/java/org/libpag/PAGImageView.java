@@ -266,10 +266,13 @@ public class PAGImageView extends View {
         return _cacheAllFramesInMemory;
     }
 
+    private volatile boolean memoryCacheStatusHasChanged = false;
+
     /**
      * Sets the value of the cacheAllFramesInMemory property.
      */
     public void setCacheAllFramesInMemory(boolean enable) {
+        memoryCacheStatusHasChanged = enable != _cacheAllFramesInMemory;
         _cacheAllFramesInMemory = enable;
     }
 
@@ -651,6 +654,7 @@ public class PAGImageView extends View {
         }
         bitmapCache.clear();
         lastContentVersion = -1;
+        memoryCacheStatusHasChanged = false;
         freezeDraw.set(false);
     }
 
@@ -738,22 +742,36 @@ public class PAGImageView extends View {
         }
     }
 
-    private void checkContentChange() {
-        if (_pagFilePath != null || _composition == null) {
-            return;
+    private void checkStatusChange() {
+        boolean needResetBitmapCache = false;
+        if (memoryCacheStatusHasChanged) {
+            needResetBitmapCache = true;
+            memoryCacheStatusHasChanged = false;
         }
-        int nVersion = ContentVersion(_composition);
-        if (lastContentVersion >= 0 && lastContentVersion != nVersion) {
+        if (_pagFilePath == null && _composition != null) {
+            int nVersion = ContentVersion(_composition);
+            if (memoryCacheStatusHasChanged || lastContentVersion >= 0 && lastContentVersion != nVersion) {
+                needResetBitmapCache = true;
+            }
+            lastContentVersion = nVersion;
+        }
+        if (needResetBitmapCache) {
             bitmapCache.clear();
+            if (decoderInfo._pagDecoder == null) {
+                PAGComposition composition = _composition;
+                if (composition == null) {
+                    composition = getCompositionFromPath(_pagFilePath);
+                }
+                decoderInfo.initDecoder(composition, width, height, _maxFrameRate);
+            }
         }
-        lastContentVersion = nVersion;
     }
 
     private boolean handleFrame(final int frame) {
         if (!decoderInfo.isValid() || freezeDraw.get()) {
             return false;
         }
-        checkContentChange();
+        checkStatusChange();
         releaseDecoder();
         Bitmap bitmap = bitmapCache.get(frame);
         if (bitmap != null) {

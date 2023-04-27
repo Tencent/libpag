@@ -45,7 +45,11 @@ public class PAGDecoder {
      * associated PAGComposition is added to a PAGPlayer or another PAGDecoder.
      */
     public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
-        return Make(pagComposition, maxFrameRate, scale);
+        long nativeContext = MakeFrom(pagComposition, maxFrameRate, scale);
+        if (nativeContext == 0) {
+            return null;
+        }
+        return new PAGDecoder(nativeContext);
     }
 
     private static native long MakeFrom(PAGComposition pagComposition, float maxFrameRate, float scale);
