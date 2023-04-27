@@ -30,14 +30,13 @@
 
 + (nullable instancetype)Make:(nullable PAGComposition*)composition
                  maxFrameRate:(float)maxFrameRate
-                        scale:(float)scale
-                 useDiskCache:(BOOL)useDiskCache {
+                        scale:(float)scale {
   std::shared_ptr<pag::PAGComposition> pagComposition = nullptr;
   if (composition != nil) {
     auto layer = [[composition impl] pagLayer];
     pagComposition = std::static_pointer_cast<pag::PAGComposition>(layer);
   }
-  auto decoder = pag::PAGDecoder::MakeFrom(pagComposition, maxFrameRate, scale, useDiskCache);
+  auto decoder = pag::PAGDecoder::MakeFrom(pagComposition, maxFrameRate, scale);
   if (decoder == nullptr) {
     return nil;
   }
@@ -50,6 +49,10 @@
     pagDecoder = value;
   }
   return self;
+}
+
+- (std::shared_ptr<pag::PAGDecoder>)decoder {
+  return pagDecoder;
 }
 
 - (NSInteger)width {
@@ -66,10 +69,6 @@
 
 - (float)frameRate {
   return pagDecoder->frameRate();
-}
-
-- (BOOL)checkFrameChanged:(int)index {
-  return pagDecoder->checkFrameChanged(index);
 }
 
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {
