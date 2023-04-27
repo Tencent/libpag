@@ -1,4 +1,5 @@
 /* global EmscriptenModule */
+import '../utils/polyfills';
 import './babel';
 import { binding } from './binding';
 import * as types from '../types';
