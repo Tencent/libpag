@@ -707,6 +707,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CFMutableDataRef dataRef =
       self.memoryCacheEnabled ? [self getMemoryCacheData] : [self getDiskCacheData];
   if (dataRef == nil) {
+    self.currentUIImage = nil;
+    [self submitToImageView];
     return NO;
   }
   BOOL status;
