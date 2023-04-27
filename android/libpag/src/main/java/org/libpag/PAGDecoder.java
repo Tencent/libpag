@@ -23,15 +23,20 @@ import android.graphics.Bitmap;
 import org.extra.tools.LibraryLoadUtils;
 
 /**
- * PAGDecoder provides a utility to read image frames directly from a PAGComposition.
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition, and caches the
+ * image frames as a sequence file on the disk, which may significantly speed up the reading process
+ * depending on the complexity of the PAG files. You can use the PAGDiskCache::SetMaxDiskSize()
+ * method to manage the cache limit of the disk usage.
  */
 public class PAGDecoder {
     /**
      * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame
-     * rate and size, and set the useDiskCache to true. You can use PAGDiskCache::SetMaxDiskSize()
-     * to manage the cache limit of the disk usage. Returns null if the composition is null. Note
-     * that the returned PAGDecoder may become invalid if the associated PAGComposition is added to
-     * a PAGPlayer or another PAGDecoder.
+     * rate and size. Please only keep an external reference to the PAGComposition if you need to
+     * modify it in the feature. Otherwise, the internal composition will not be released
+     * automatically after the associated disk cache is complete, which may cost more memory than
+     * necessary. Returns nil if the composition is nil. Note that the returned PAGDecoder may
+     * become invalid if the associated PAGComposition is added to a PAGPlayer or another
+     * PAGDecoder.
      */
     public static PAGDecoder Make(PAGComposition pagComposition) {
         return Make(pagComposition, pagComposition.frameRate(), 1.0f);
@@ -39,10 +44,12 @@ public class PAGDecoder {
 
     /**
      * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
-     * decoded image size, and set the useDiskCache to true. You can use
-     * PAGDiskCache::SetMaxDiskSize() to manage the cache limit of the disk usage. Returns null if
-     * the composition is null. Note that the returned PAGDecoder may become invalid if the
-     * associated PAGComposition is added to a PAGPlayer or another PAGDecoder.
+     * decoded image size. Please only keep an external reference to the PAGComposition if you need
+     * to modify it in the feature. Otherwise, the internal composition will not be released
+     * automatically after the associated disk cache is complete, which may cost more memory than
+     * necessary. Returns nullptr if the composition is nullptr. Note that the returned PAGDecoder
+     * may become invalid if the associated PAGComposition is added to a PAGPlayer or another
+     * PAGDecoder.
      */
     public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
         long nativeContext = MakeFrom(pagComposition, maxFrameRate, scale);
