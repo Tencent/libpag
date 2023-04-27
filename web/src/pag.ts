@@ -1,3 +1,4 @@
+import './utils/polyfills';
 import { binding } from './binding';
 import * as types from './types';
 import createPAG from './wasm/libpag';
