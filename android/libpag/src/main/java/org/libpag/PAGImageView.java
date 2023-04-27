@@ -750,7 +750,7 @@ public class PAGImageView extends View {
         }
         if (_pagFilePath == null && _composition != null) {
             int nVersion = ContentVersion(_composition);
-            if (memoryCacheStatusHasChanged || lastContentVersion >= 0 && lastContentVersion != nVersion) {
+            if (lastContentVersion >= 0 && lastContentVersion != nVersion) {
                 needResetBitmapCache = true;
             }
             lastContentVersion = nVersion;
