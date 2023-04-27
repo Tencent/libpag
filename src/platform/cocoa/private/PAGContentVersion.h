@@ -19,11 +19,15 @@
 #import <Foundation/Foundation.h>
 
 #import "platform/cocoa/PAGComposition.h"
+#import "platform/ios/PAGDecoder.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface PAGContentVersion : NSObject
 + (NSInteger)Get:(PAGComposition*)pagComposition;
+
++ (BOOL)CheckFrameChanged:(PAGDecoder*)decoder index:(NSInteger)index;
+
 @end
 
 NS_ASSUME_NONNULL_END

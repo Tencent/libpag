@@ -1524,25 +1524,23 @@ class PAG_API PAGPlayer {
 class SequenceFile;
 
 /**
- * PAGDecoder provides a utility to read image frames directly from a PAGComposition.
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition, and caches the
+ * image frames as a sequence file on the disk, which may significantly speed up the reading process
+ * depending on the complexity of the PAG files. You can use the PAGDiskCache::SetMaxDiskSize()
+ * method to manage the cache limit of the disk usage.
  */
 class PAGDecoder {
  public:
   /**
    * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
-   * decoded image size. If the useDiskCache is true, the returned PAGDecoder will cache image
-   * frames as a sequence file on the disk, which may significantly speed up the reading process
-   * depending on the complexity of the PAG files. And only keep an external reference to the
-   * PAGComposition if you need to modify it in the feature. Otherwise, the internal composition
-   * will not be released automatically after the associated disk cache is complete, which may cost
-   * more memory than necessary. You can use the PAGDiskCache::SetMaxDiskSize() method to manage the
-   * cache limit of the disk usage. Returns nullptr if the composition is nullptr. Note that the
-   * returned PAGDecoder may become invalid if the associated PAGComposition is added to a PAGPlayer
-   * or another PAGDecoder. And while the useDiskCache is true.
+   * decoded image size. Please only keep an external reference to the PAGComposition if you need to
+   * modify it in the feature. Otherwise, the internal composition will not be released
+   * automatically after the associated disk cache is complete, which may cost more memory than
+   * necessary. Returns nullptr if the composition is nullptr. Note that the returned PAGDecoder may
+   * become invalid if the associated PAGComposition is added to a PAGPlayer or another PAGDecoder.
    */
   static std::shared_ptr<PAGDecoder> MakeFrom(std::shared_ptr<PAGComposition> composition,
-                                              float maxFrameRate = 30.0f, float scale = 1.0f,
-                                              bool useDiskCache = true);
+                                              float maxFrameRate = 30.0f, float scale = 1.0f);
 
   /**
    * Returns the width of decoded image frames.
@@ -1569,12 +1567,6 @@ class PAGDecoder {
    * PAGComposition was modified.
    */
   float frameRate();
-
-  /**
-   * Returns true if the frame at the given index has changed since the last readFrame() call. The
-   * caller should skip the corresponding reading call if the frame has not changed.
-   */
-  bool checkFrameChanged(int index);
 
   /**
    * Copies pixels of the image frame at the given index into the specified memory address. Returns
@@ -1611,6 +1603,13 @@ class PAGDecoder {
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
              float frameRate, float maxFrameRate, bool useDiskCache);
+
+  /**
+   * Returns true if the frame at the given index has changed since the last readFrame() call. The
+   * caller should skip the corresponding reading call if the frame has not changed.
+   */
+  bool checkFrameChanged(int index);
+
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
                    size_t rowBytes, ColorType colorType, AlphaType alphaType);
   bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
@@ -1618,6 +1617,7 @@ class PAGDecoder {
   void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
   std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
   std::shared_ptr<PAGComposition> getComposition();
+  friend class ContentVersion;
 };
 
 /**
