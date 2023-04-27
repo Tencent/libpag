@@ -26,26 +26,13 @@
   if (composition == nil) {
     return nil;
   }
-  return [PAGDecoder Make:composition
-             maxFrameRate:[composition frameRate]
-                    scale:1.0f
-             useDiskCache:YES];
+  return [PAGDecoder Make:composition maxFrameRate:[composition frameRate] scale:1.0f];
 }
 
 + (nullable instancetype)Make:(nullable PAGComposition*)composition
                  maxFrameRate:(float)maxFrameRate
                         scale:(float)scale {
-  return [PAGDecoder Make:composition maxFrameRate:maxFrameRate scale:scale useDiskCache:YES];
-}
-
-+ (nullable instancetype)Make:(nullable PAGComposition*)composition
-                 maxFrameRate:(float)maxFrameRate
-                        scale:(float)scale
-                 useDiskCache:(BOOL)useDiskCache {
-  PAGDecoderImpl* decoder = [PAGDecoderImpl Make:composition
-                                    maxFrameRate:maxFrameRate
-                                           scale:scale
-                                    useDiskCache:useDiskCache];
+  PAGDecoderImpl* decoder = [PAGDecoderImpl Make:composition maxFrameRate:maxFrameRate scale:scale];
   if (decoder == nil) {
     return nil;
   }
@@ -64,6 +51,10 @@
   [super dealloc];
 }
 
+- (id)impl {
+  return pagDecoder;
+}
+
 - (NSInteger)width {
   return [pagDecoder width];
 }
@@ -78,10 +69,6 @@
 
 - (float)frameRate {
   return [pagDecoder frameRate];
-}
-
-- (BOOL)checkFrameChanged:(int)index {
-  return [pagDecoder checkFrameChanged:index];
 }
 
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {

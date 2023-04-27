@@ -222,19 +222,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
         fmax(self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth,
              self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight));
     if (pagComposition) {
-      BOOL useDiskCache = YES;
-      if ([PAGContentVersion Get:pagComposition] > 0) {
-        useDiskCache = NO;
-      }
       pagDecoder = [PAGDecoder Make:pagComposition
                        maxFrameRate:self.maxFrameRate
-                              scale:scaleFactor
-                       useDiskCache:useDiskCache];
+                              scale:scaleFactor];
     } else if (filePath) {
       pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
                        maxFrameRate:self.maxFrameRate
-                              scale:scaleFactor
-                       useDiskCache:YES];
+                              scale:scaleFactor];
     }
     if (pagDecoder) {
       [pagDecoder retain];
@@ -337,7 +331,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  if ([[self getPAGDecoder] checkFrameChanged:(int)frameIndex]) {
+  if ([PAGContentVersion CheckFrameChanged:[self getPAGDecoder] index:frameIndex]) {
     uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
     BOOL status = [[self getPAGDecoder] copyFrameTo:rgbaData
                                            rowBytes:static_cast<size_t>(cacheImageRowBytes)

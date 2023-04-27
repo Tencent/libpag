@@ -25,8 +25,7 @@
 
 + (nullable instancetype)Make:(nullable PAGComposition*)composition
                  maxFrameRate:(float)maxFrameRate
-                        scale:(float)scale
-                 useDiskCache:(BOOL)useDiskCache;
+                        scale:(float)scale;
 
 - (NSInteger)width;
 
@@ -35,8 +34,6 @@
 - (NSInteger)numFrames;
 
 - (float)frameRate;
-
-- (BOOL)checkFrameChanged:(int)index;
 
 - (BOOL)copyFrameTo:(nullable void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index;
 

@@ -15,28 +15,20 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+//
 
-#import "PAGContentVersion.h"
+#import <Foundation/Foundation.h>
+#import "PAGDecoderImpl.h"
+#import "platform/ios/PAGDecoder.h"
 
-#import "platform/cocoa/private/PAGLayer+Internal.h"
-#import "platform/cocoa/private/PAGLayerImpl+Internal.h"
-#import "platform/ios/private/PAGDecoder+Internal.h"
-#include "rendering/layers/ContentVersion.h"
+@interface PAGDecoder (Internal)
 
-@implementation PAGContentVersion
-+ (NSInteger)Get:(PAGComposition*)pagComposition {
-  if (pagComposition == nil) {
-    return 0;
-  }
-  auto composition = [[pagComposition impl] pagLayer];
-  return pag::ContentVersion::Get(composition);
-}
+- (id)impl;
 
-+ (BOOL)CheckFrameChanged:(PAGDecoder*)decoder index:(NSInteger)index {
-  if (decoder) {
-    return pag::ContentVersion::CheckFrameChanged([[decoder impl] decoder], (int)index);
-  }
-  return NO;
-}
+@end
+
+@interface PAGDecoderImpl (Internal)
+
+- (std::shared_ptr<pag::PAGDecoder>)decoder;
 
 @end
