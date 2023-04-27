@@ -22,6 +22,7 @@
 #include "JPAGLayerHandle.h"
 #include "NativePlatform.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/layers/ContentVersion.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
 
@@ -60,10 +61,9 @@ PAG_API void Java_org_libpag_PAGDecoder_nativeFinalize(JNIEnv* env, jobject thiz
 
 PAG_API jlong JNICALL Java_org_libpag_PAGDecoder_MakeFrom(JNIEnv* env, jclass,
                                                           jobject newComposition,
-                                                          jfloat maxFrameRate, jfloat scale,
-                                                          jboolean useDiskCache) {
+                                                          jfloat maxFrameRate, jfloat scale) {
   auto composition = ToPAGCompositionNativeObject(env, newComposition);
-  auto decoder = PAGDecoder::MakeFrom(std::move(composition), maxFrameRate, scale, useDiskCache);
+  auto decoder = PAGDecoder::MakeFrom(std::move(composition), maxFrameRate, scale);
   if (decoder == nullptr) {
     LOGE("PAGDecoder::MakeFrom() Failed to create a PAGDecoder!");
     return 0;
@@ -109,7 +109,7 @@ PAG_API jboolean Java_org_libpag_PAGDecoder_checkFrameChanged(JNIEnv* env, jobje
   if (decoder == nullptr) {
     return 0;
   }
-  return decoder->checkFrameChanged(index);
+  return ContentVersion::CheckFrameChanged(decoder, index);
 }
 
 PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thiz,

@@ -593,8 +593,7 @@ public class PAGImageView extends View {
             if (_composition == null) {
                 _composition = getCompositionFromPath(_pagFilePath);
             }
-            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate,
-                    !(ContentVersion(_composition) > 0 && cacheAllFramesInMemory()))) {
+            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
                 if (_pagFilePath != null) {
                     _composition = null;
                 }
@@ -738,7 +737,6 @@ public class PAGImageView extends View {
             }
         }
     }
-
 
     private void checkContentChange() {
         if (_pagFilePath != null || _composition == null) {

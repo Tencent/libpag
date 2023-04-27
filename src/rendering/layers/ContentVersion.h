@@ -31,5 +31,12 @@ class ContentVersion {
     LockGuard autoLock(pagLayer->rootLocker);
     return pagLayer->contentVersion;
   }
+
+  static bool CheckFrameChanged(std::shared_ptr<PAGDecoder> decoder, int index) {
+    if (decoder == nullptr) {
+      return false;
+    }
+    return decoder->checkFrameChanged(index);
+  }
 };
 }  // namespace pag

@@ -84,8 +84,7 @@ std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposi
 }
 
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
-                                                 float maxFrameRate, float scale,
-                                                 bool useDiskCache) {
+                                                 float maxFrameRate, float scale) {
   if (composition == nullptr || maxFrameRate <= 0 || scale <= 0) {
     return nullptr;
   }
@@ -94,7 +93,7 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   return std::shared_ptr<PAGDecoder>(new PAGDecoder(std::move(composition), static_cast<int>(width),
                                                     static_cast<int>(height), result.first,
-                                                    result.second, maxFrameRate, useDiskCache));
+                                                    result.second, maxFrameRate, true));
 }
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
