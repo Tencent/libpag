@@ -463,7 +463,7 @@ public class PAGImageView extends View {
         if (animator != null) {
             animator.setCurrentPlayTime(0);
         }
-        if (!decoderInfo.isValid()) {
+        if (!hasSize()) {
             return;
         }
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
