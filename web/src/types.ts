@@ -24,6 +24,10 @@ declare global {
   interface Window {
     WeixinJSBridge?: any;
   }
+
+  interface Object {
+    __defineGetter__: (name: string, func: () => any) => void;
+  }
 }
 
 export interface PAG extends EmscriptenModule {
