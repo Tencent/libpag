@@ -21,8 +21,8 @@
 #import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
-#import "platform/cocoa/private/PAGContentVersion.h"
 #import "platform/cocoa/private/PixelBufferUtils.h"
+#import "platform/ios/private/PAGContentVersion.h"
 #import "private/PAGValueAnimator.h"
 
 namespace pag {
