@@ -1,4 +1,4 @@
-<img src="resources/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="resources/readme/logo.png" alt="PAG Logo" width="553"/>
 
 [![license](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/Tencent/libpag/blob/master/LICENSE.txt) 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) 
