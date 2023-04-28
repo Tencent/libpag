@@ -243,7 +243,9 @@ version and try again.**
 
 If you find libpag is helpful, please give us a **Star**. We sincerely appreciate your support :)
 
-<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://star-history.com/embed?secret=Z2hwX25zZlVHdHJ6MXNOSnl2VXpPNDhMNXZoTGVMclBVTzNidTNwUQ==#Tencent/libpag&Date" frameBorder="0"></iframe>
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/libpag&type=Date)](https://star-history.com/#Tencent/libpag&Date)
+
 
 ## License
 
