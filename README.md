@@ -243,8 +243,7 @@ version and try again.**
 
 If you find libpag is helpful, please give us a **Star**. We sincerely appreciate your support :)
 
-
-[![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
+<iframe style="width:100%;height:auto;min-width:600px;min-height:400px;" src="https://star-history.com/embed?secret=Z2hwX25zZlVHdHJ6MXNOSnl2VXpPNDhMNXZoTGVMclBVTzNidTNwUQ==#Tencent/libpag&Date" frameBorder="0"></iframe>
 
 ## License
 
