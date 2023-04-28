@@ -60,7 +60,7 @@ inline int64_t ProgressToTime(double progress, int64_t totalTime) {
     return 0;
   }
   auto percent = fmod(progress, 1.0);
-  if (percent < 0) {
+  if (percent <= 0 && progress != 0) {
     percent += 1.0;
   }
   auto currentTime = static_cast<int64_t>(floor(percent * static_cast<double>(totalTime)));
