@@ -48,4 +48,15 @@ PAG_TEST_F(PAGTimeUtilsTest, ConvertProgressAndFrame) {
   }
 }
 
+/**
+ * 用例描述：测试工具类中，时间和进度的转换是否正确
+ */
+PAG_TEST_F(PAGTimeUtilsTest, EdgeTest) {
+  EXPECT_EQ(ProgressToFrame(FrameToProgress(40, 41), 41), 40);
+  EXPECT_EQ(ProgressToFrame(FrameToProgress(0, 41), 41), 0);
+
+  EXPECT_EQ(ProgressToTime(1.0, 41), 40);
+  EXPECT_EQ(ProgressToTime(0.0, 41), 0);
+}
+
 }  // namespace pag
