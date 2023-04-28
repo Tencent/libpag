@@ -173,7 +173,7 @@ static int64_t GetCurrentTimeUS() {
     lock.unlock();
     return;
   }
-  if (repeatedTimes == (repeatCount + 1)) {
+  if (repeatedTimes >= (repeatCount + 1)) {
     repeatedTimes = 0;
   }
   self.animatorId = [PAGValueAnimator AddAnimator:self];
