@@ -69,7 +69,6 @@ void Task::wait() {
   // Try to remove the task from the queue. Execute it directly on the current thread if the task is
   // not in the queue. This is to avoid the deadlock situation.
   if (removeTask()) {
-    LOGI("Task::wait() execute the task directly on the current thread.");
     block();
     _executing = false;
     condition.notify_all();
