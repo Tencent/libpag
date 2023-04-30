@@ -69,7 +69,8 @@ class Task {
 
   /**
    * Blocks the current thread until the Task finishes its execution. Returns immediately if the
-   * Task is finished or canceled.
+   * Task is finished or canceled. The task may be executed on the calling thread if it is not
+   * cancelled and still in the queue.
    */
   void wait();
 
@@ -82,6 +83,7 @@ class Task {
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);
+  bool removeTask();
   void execute();
 
   friend class TaskGroup;
