@@ -25,7 +25,6 @@
 #include "gpu/ops/TriangulatingPathOp.h"
 #include "opengl/GLCaps.h"
 #include "opengl/GLSampler.h"
-#include "platform/apple/HardwareBuffer.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageCodec.h"

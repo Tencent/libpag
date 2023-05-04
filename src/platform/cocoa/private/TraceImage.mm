@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TraceImage.h"
-#include "PixelBufferUtils.h"
+#include <CoreVideo/CoreVideo.h>
 #include "base/utils/Log.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
 void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
@@ -27,7 +28,7 @@ void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::stri
     return;
   }
   @autoreleasepool {
-    auto pixelBuffer = PixelBufferUtils::Make(info.width(), info.height());
+    auto pixelBuffer = tgfx::HardwareBufferAllocate(info.width(), info.height());
     if (pixelBuffer == nil) {
       return;
     }
@@ -42,4 +43,4 @@ void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::stri
     LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
   }
 }
-}
+}  // namespace pag

@@ -20,9 +20,9 @@
 #import <VideoToolbox/VideoToolbox.h>
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
-#include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
 #include "pag/pag.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 @implementation PAGDecoderImpl {
   std::shared_ptr<pag::PAGDecoder> pagDecoder;
@@ -77,7 +77,7 @@
 }
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index {
-  auto pixelBuffer = pag::PixelBufferUtils::Make(pagDecoder->width(), pagDecoder->height());
+  auto pixelBuffer = tgfx::HardwareBufferAllocate(pagDecoder->width(), pagDecoder->height());
   if (pixelBuffer == nil) {
     LOGE("PAGDecoder: CVPixelBufferRef create failed!");
     return nil;

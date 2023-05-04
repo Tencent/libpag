@@ -41,7 +41,7 @@ PAG_TEST(TaskTest, Task) {
     tasks.push_back(task);
   }
   // Wait a little moment for the tasks to be executed.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  std::this_thread::yield();
   auto task = tasks[0];
   EXPECT_TRUE(task->executing());
   task->cancel();

@@ -18,7 +18,6 @@
 
 #include "tgfx/opengl/cgl/CGLWindow.h"
 #include <thread>
-#include "CGLHardwareTexture.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/opengl/GLDefines.h"
 

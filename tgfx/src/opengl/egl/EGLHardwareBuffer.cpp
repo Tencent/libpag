@@ -16,40 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PixelBuffer.h"
 #include "gpu/Texture.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "EGLHardwareTexture.h"
-#include "platform/android/HardwareBuffer.h"
+#include "platform/android/AHardwareBufferFunctions.h"
+#include "tgfx/platform/HardwareBuffer.h"
 #endif
 
 namespace tgfx {
 #if defined(__ANDROID__) || defined(ANDROID)
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
-                                                             bool alphaOnly) {
-  return HardwareBuffer::Make(width, height, alphaOnly);
-}
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace) {
-  return HardwareBuffer::MakeFrom(hardwareBuffer);
+bool HardwareBufferAvailable() {
+  static const bool available = AHardwareBufferFunctions::Get()->allocate != nullptr &&
+                                AHardwareBufferFunctions::Get()->release != nullptr &&
+                                AHardwareBufferFunctions::Get()->lock != nullptr &&
+                                AHardwareBufferFunctions::Get()->unlock != nullptr &&
+                                AHardwareBufferFunctions::Get()->describe != nullptr &&
+                                AHardwareBufferFunctions::Get()->acquire != nullptr &&
+                                AHardwareBufferFunctions::Get()->toHardwareBuffer != nullptr &&
+                                AHardwareBufferFunctions::Get()->fromHardwareBuffer != nullptr;
+  return available;
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return nullptr;
+  }
   return EGLHardwareTexture::MakeFrom(context, hardwareBuffer);
 }
 
 #else
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
-  return nullptr;
-}
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+bool HardwareBufferAvailable() {
+  return false;
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {

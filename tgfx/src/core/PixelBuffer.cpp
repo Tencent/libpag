@@ -18,6 +18,7 @@
 
 #include "core/PixelBuffer.h"
 #include "tgfx/gpu/Device.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 class RasterPixelBuffer : public PixelBuffer {
@@ -33,29 +34,51 @@ class RasterPixelBuffer : public PixelBuffer {
     return false;
   }
 
-  void* lockPixels() override {
-    locker.lock();
+ protected:
+  void* onLockPixels() const override {
     return _pixels;
   }
 
-  void unlockPixels() override {
-    locker.unlock();
+  void onUnlockPixels() const override {
   }
 
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override {
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (isAlphaOnly()) {
-      return Texture::MakeAlpha(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
-                                ImageOrigin::TopLeft, mipMapped);
-    }
-    return Texture::MakeRGBA(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
-                             ImageOrigin::TopLeft, mipMapped);
+  std::shared_ptr<Texture> onBindToHardwareTexture(Context*) const override {
+    return nullptr;
   }
 
  private:
-  mutable std::mutex locker = {};
   uint8_t* _pixels = nullptr;
+};
+
+class HardwarePixelBuffer : public PixelBuffer {
+ public:
+  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
+      : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
+  }
+
+  ~HardwarePixelBuffer() override {
+    HardwareBufferRelease(hardwareBuffer);
+  }
+
+  bool isHardwareBacked() const override {
+    return HardwareBufferCheck(hardwareBuffer);
+  }
+
+ protected:
+  void* onLockPixels() const override {
+    return HardwareBufferLock(hardwareBuffer);
+  }
+
+  void onUnlockPixels() const override {
+    HardwareBufferUnlock(hardwareBuffer);
+  }
+
+  std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const override {
+    return Texture::MakeFrom(context, hardwareBuffer);
+  }
+
+ private:
+  HardwareBufferRef hardwareBuffer;
 };
 
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
@@ -63,14 +86,13 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
   if (tryHardware) {
-    pixelBuffer = MakeHardwareBuffer(width, height, alphaOnly);
-    if (pixelBuffer != nullptr) {
-      return pixelBuffer;
+    auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
+    auto info = HardwareBufferGetInfo(hardwareBuffer);
+    if (!info.isEmpty()) {
+      return std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
     }
   }
-
   auto colorType = alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
   auto info = ImageInfo::Make(width, height, colorType);
   if (info.isEmpty()) {
@@ -81,5 +103,43 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
     return nullptr;
   }
   return std::make_shared<RasterPixelBuffer>(info, pixels);
+}
+
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
+}
+
+PixelBuffer::PixelBuffer(const tgfx::ImageInfo& info) : _info(info) {
+}
+
+void* PixelBuffer::lockPixels() {
+  locker.lock();
+  auto pixels = onLockPixels();
+  if (pixels == nullptr) {
+    locker.unlock();
+  }
+  return pixels;
+}
+
+void PixelBuffer::unlockPixels() {
+  onUnlockPixels();
+  locker.unlock();
+}
+
+std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (!mipMapped && isHardwareBacked()) {
+    return onBindToHardwareTexture(context);
+  }
+  auto pixels = onLockPixels();
+  if (pixels == nullptr) {
+    return nullptr;
+  }
+  auto format = ColorTypeToPixelFormat(_info.colorType());
+  auto texture = Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format,
+                                     ImageOrigin::TopLeft, mipMapped);
+  onUnlockPixels();
+  return texture;
 }
 }  // namespace tgfx

@@ -118,7 +118,8 @@ PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thi
   if (decoder == nullptr) {
     return JNI_FALSE;
   }
-  auto bitmap = tgfx::AndroidBitmap::WrapHardware(env, bitmapObject);
+  auto hardwareBuffer = tgfx::AndroidBitmap::GetHardwareBuffer(env, bitmapObject);
+  tgfx::Bitmap bitmap(hardwareBuffer);
   if (!bitmap.isEmpty()) {
     tgfx::Pixmap pixmap(bitmap);
     return decoder->readFrame(index, pixmap.writablePixels(), pixmap.rowBytes(),

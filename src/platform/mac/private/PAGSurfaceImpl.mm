@@ -20,8 +20,8 @@
 #include "GPUDrawable.h"
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
-#include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -43,8 +43,8 @@
 }
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
-  auto pixelBuffer = pag::PixelBufferUtils::Make(static_cast<int>(roundf(size.width)),
-                                                 static_cast<int>(roundf(size.height)));
+  auto pixelBuffer = tgfx::HardwareBufferAllocate(static_cast<int>(roundf(size.width)),
+                                                  static_cast<int>(roundf(size.height)));
   auto drawable = pag::GPUDrawable::FromCVPixelBuffer(pixelBuffer);
   if (drawable == nullptr) {
     return nil;
@@ -95,8 +95,7 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  CVPixelBufferRef pixelBuffer =
-      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
+  auto pixelBuffer = tgfx::HardwareBufferAllocate(_pagSurface->width(), _pagSurface->height());
   if (pixelBuffer == nil) {
     LOGE("CVPixelBufferRef create failed!");
     return nil;

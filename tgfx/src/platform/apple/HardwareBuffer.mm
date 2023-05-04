@@ -16,27 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "HardwareBuffer.h"
-#include "CVPixelBufferUtil.h"
-#include "gpu/Gpu.h"
-#include "utils/USE.h"
+#include "tgfx/platform/HardwareBuffer.h"
+#import <CoreVideo/CoreVideo.h>
+#include "core/PixelBuffer.h"
+#include "platform/apple/NV12HardwareBuffer.h"
 
 namespace tgfx {
-static std::mutex cacheLocker = {};
-static std::unordered_map<CVPixelBufferRef, std::weak_ptr<HardwareBuffer>> hardwareBufferMap = {};
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace colorSpace) {
+  if (hardwareBuffer == nullptr) {
+    return nullptr;
+  }
+  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
+  if (planeCount > 1) {
+    return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
+  }
+  return PixelBuffer::MakeFrom(hardwareBuffer);
+}
 
-std::shared_ptr<HardwareBuffer> HardwareBuffer::Make(int width, int height, bool alphaOnly) {
-#if TARGET_IPHONE_SIMULATOR
+bool HardwareBufferCheck(HardwareBufferRef buffer) {
+  if (!HardwareBufferAvailable()) {
+    return false;
+  }
+  return CVPixelBufferGetIOSurface(buffer) != nil;
+}
 
-  // We cannot bind CVPixelBuffer to GL on iOS simulator.
-  USE(width);
-  USE(height);
-  USE(alphaOnly);
-  return nullptr;
-
-#else
-
-  if (width == 0 || height == 0) {
+HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
+  if (!HardwareBufferAvailable() || width <= 0 || height <= 0) {
     return nil;
   }
   OSType pixelFormat = alphaOnly ? kCVPixelFormatType_OneComponent8 : kCVPixelFormatType_32BGRA;
@@ -55,85 +61,49 @@ std::shared_ptr<HardwareBuffer> HardwareBuffer::Make(int width, int height, bool
   if (status != kCVReturnSuccess) {
     return nil;
   }
-  auto hardwareBuffer = HardwareBuffer::MakeFrom(pixelBuffer);
-  CFRelease(pixelBuffer);
-  return hardwareBuffer;
-#endif
+  return pixelBuffer;
 }
 
-std::shared_ptr<HardwareBuffer> HardwareBuffer::MakeFrom(CVPixelBufferRef pixelBuffer) {
-#if TARGET_IPHONE_SIMULATOR
-
-  // We cannot bind CVPixelBuffer to GL on iOS simulator.
-  USE(pixelBuffer);
-  return nullptr;
-
-#else
-
-  if (pixelBuffer == nil) {
-    return nullptr;
-  }
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
-  if (pixelFormat != kCVPixelFormatType_32BGRA && pixelFormat != kCVPixelFormatType_OneComponent8) {
-    return nullptr;
-  }
-  std::lock_guard<std::mutex> cacheLock(cacheLocker);
-  auto result = hardwareBufferMap.find(pixelBuffer);
-  if (result != hardwareBufferMap.end()) {
-    auto hardwareBuffer = result->second.lock();
-    if (hardwareBuffer) {
-      return hardwareBuffer;
-    }
-    hardwareBufferMap.erase(result);
-  }
-  auto hardwareBuffer = std::shared_ptr<HardwareBuffer>(new HardwareBuffer(pixelBuffer));
-  hardwareBufferMap[pixelBuffer] = hardwareBuffer;
-  return hardwareBuffer;
-
-#endif
+HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
+  return CVPixelBufferRetain(buffer);
 }
 
-HardwareBuffer::HardwareBuffer(CVPixelBufferRef pixelBuffer)
-    : PixelBuffer(GetImageInfo(pixelBuffer)), pixelBuffer(pixelBuffer) {
-  CFRetain(pixelBuffer);
+void HardwareBufferRelease(HardwareBufferRef buffer) {
+  CVPixelBufferRelease(buffer);
 }
 
-HardwareBuffer::~HardwareBuffer() {
-  CFRelease(pixelBuffer);
-  std::lock_guard<std::mutex> cacheLock(cacheLocker);
-  hardwareBufferMap.erase(pixelBuffer);
+void* HardwareBufferLock(HardwareBufferRef buffer) {
+  CVPixelBufferLockBaseAddress(buffer, 0);
+  return CVPixelBufferGetBaseAddress(buffer);
 }
 
-void* HardwareBuffer::lockPixels() {
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  return CVPixelBufferGetBaseAddress(pixelBuffer);
+void HardwareBufferUnlock(HardwareBufferRef buffer) {
+  CVPixelBufferUnlockBaseAddress(buffer, 0);
 }
 
-void HardwareBuffer::unlockPixels() {
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-}
-
-std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mipMapped) const {
-  if (!mipMapped) {
-    return Texture::MakeFrom(context, pixelBuffer);
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
+  if (buffer == nil) {
+    return {};
   }
-  auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
-                    ? PixelFormat::ALPHA_8
-                    : PixelFormat::BGRA_8888;
-  auto texture =
-      Texture::MakeFormat(context, width(), height(), format, ImageOrigin::TopLeft, true);
-  if (texture == nullptr) {
-    return nullptr;
+  auto planeCount = CVPixelBufferGetPlaneCount(buffer);
+  if (planeCount > 1) {
+    return {};
   }
-  CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-  if (auto* pixels = CVPixelBufferGetBaseAddress(pixelBuffer)) {
-    auto rect = Rect::MakeWH(width(), height());
-    context->gpu()->writePixels(texture->getSampler(), rect, pixels,
-                                CVPixelBufferGetBytesPerRow(pixelBuffer));
-  } else {
-    texture = nullptr;
+  auto width = static_cast<int>(CVPixelBufferGetWidth(buffer));
+  auto height = static_cast<int>(CVPixelBufferGetHeight(buffer));
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(buffer);
+  ColorType colorType = ColorType::Unknown;
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      colorType = ColorType::ALPHA_8;
+      break;
+    case kCVPixelFormatType_32BGRA:
+      colorType = ColorType::BGRA_8888;
+      break;
+    default:
+      break;
   }
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-  return texture;
+  auto rowBytes = CVPixelBufferGetBytesPerRow(buffer);
+  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
 }
 }  // namespace tgfx

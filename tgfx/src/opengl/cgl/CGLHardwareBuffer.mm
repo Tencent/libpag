@@ -16,28 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLHardwareTexture.h"
-#include "platform/apple/HardwareBuffer.h"
-#include "tgfx/opengl/cgl/CGLDevice.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
-  // The CVPixelBuffer on macOS does not shared memory across GPU and CPU.
+bool HardwareBufferAvailable() {
+  return false;
+}
+
+std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
   return nullptr;
-}
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace) {
-  return HardwareBuffer::MakeFrom(hardwareBuffer);
-}
-
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace) {
-  auto cglDevice = static_cast<CGLDevice*>(context->device());
-  if (cglDevice == nullptr) {
-    return nullptr;
-  }
-  auto textureCache = cglDevice->getTextureCache();
-  return CGLHardwareTexture::MakeFrom(context, hardwareBuffer, textureCache);
 }
 }  // namespace tgfx

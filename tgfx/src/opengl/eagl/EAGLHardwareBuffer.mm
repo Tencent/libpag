@@ -16,32 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#import <TargetConditionals.h>
 #include "EAGLHardwareTexture.h"
 #include "EAGLNV12Texture.h"
-#include "platform/apple/HardwareBuffer.h"
+#include "core/PixelBuffer.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
-                                                             bool alphaOnly) {
-  return HardwareBuffer::Make(width, height, alphaOnly);
-}
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace colorSpace) {
-  if (hardwareBuffer == nullptr) {
-    return nullptr;
-  }
-  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
-  if (planeCount > 1) {
-    return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
-  }
-  return HardwareBuffer::MakeFrom(hardwareBuffer);
+bool HardwareBufferAvailable() {
+#if TARGET_IPHONE_SIMULATOR
+  return false;
+#else
+  return true;
+#endif
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace colorSpace) {
-  if (hardwareBuffer == nullptr) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
     return nullptr;
   }
   auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);

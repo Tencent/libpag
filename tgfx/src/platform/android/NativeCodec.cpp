@@ -18,8 +18,8 @@
 
 #include "NativeCodec.h"
 #include <android/bitmap.h>
-#include "HardwareBuffer.h"
 #include "NativeImageBuffer.h"
+#include "platform/android/AHardwareBufferFunctions.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
 #include "utils/Log.h"
@@ -284,9 +284,10 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
   }
   auto bitmap = decodeBitmap(env, ColorType::RGBA_8888, AlphaType::Premultiplied, tryHardware);
   if (tryHardware) {
-    auto hardwareBuffer = HardwareBuffer::MakeFrom(env, nativeImage.get());
-    if (hardwareBuffer != nullptr) {
-      return hardwareBuffer;
+    auto hardwareBuffer = AndroidBitmap::GetHardwareBuffer(env, nativeImage.get());
+    auto imageBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+    if (imageBuffer != nullptr) {
+      return imageBuffer;
     }
     bitmap = ConvertHardwareBitmap(env, bitmap);
   }
@@ -312,7 +313,9 @@ jobject NativeCodec::decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType al
     return nullptr;
   }
   jobject config;
-  if (tryHardware && HardwareBufferInterface::HasBitmapFetchSupport()) {
+  static const bool HasHardwareBitmapSupport =
+      AHardwareBufferFunctions::Get()->fromBitmap != nullptr;
+  if (tryHardware && HasHardwareBitmapSupport) {
     config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_HARDWARE);
   } else if (colorType == ColorType::ALPHA_8) {
     config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);

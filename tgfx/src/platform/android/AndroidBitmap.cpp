@@ -18,9 +18,7 @@
 
 #include "tgfx/platform/android/AndroidBitmap.h"
 #include <android/bitmap.h>
-#include "HardwareBuffer.h"
-#include "NativeImageBuffer.h"
-#include "core/PixelRef.h"
+#include "AHardwareBufferFunctions.h"
 
 namespace tgfx {
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
@@ -64,12 +62,19 @@ ImageInfo AndroidBitmap::GetInfo(JNIEnv* env, jobject bitmap) {
                          colorType, alphaType, bitmapInfo.stride);
 }
 
-Bitmap AndroidBitmap::WrapHardware(JNIEnv* env, jobject bitmap) {
-  auto buffer = HardwareBuffer::MakeFrom(env, bitmap);
-  if (buffer == nullptr) {
-    return {};
+HardwareBufferRef AndroidBitmap::GetHardwareBuffer(JNIEnv* env, jobject bitmap) {
+  static const auto fromBitmap = AHardwareBufferFunctions::Get()->fromBitmap;
+  static const auto release = AHardwareBufferFunctions::Get()->release;
+  if (fromBitmap == nullptr || release == nullptr || bitmap == nullptr) {
+    return nullptr;
   }
-  auto pixelRef = PixelRef::Wrap(std::move(buffer));
-  return Bitmap(std::move(pixelRef));
+  AHardwareBuffer* hardwareBuffer = nullptr;
+  fromBitmap(env, bitmap, &hardwareBuffer);
+  if (hardwareBuffer != nullptr) {
+    // The hardware buffer returned by AndroidBitmap_getHardwareBuffer() has a reference count of 1.
+    // We decrease it to keep the behaviour the same as AHardwareBuffer_fromHardwareBuffer().
+    release(hardwareBuffer);
+  }
+  return hardwareBuffer;
 }
 }  // namespace tgfx

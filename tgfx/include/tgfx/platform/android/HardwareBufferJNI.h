@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,37 +18,20 @@
 
 #pragma once
 
-#include <android/hardware_buffer.h>
-#include "HardwareBufferInterface.h"
-#include "core/PixelBuffer.h"
+#include <jni.h>
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
-class HardwareBuffer : public PixelBuffer {
- public:
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
+/**
+ * Return the HardwareBufferRef associated with a Java HardwareBuffer object, for interacting with
+ * it through native code. This method does not acquire any additional reference to the returned
+ * HardwareBufferRef. To keep the HardwareBufferRef live after the Java HardwareBuffer object got
+ * garbage collected, make sure to use HardwareBufferRetain() to acquire an additional reference.
+ */
+HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject);
 
-  static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
-
-  static std::shared_ptr<PixelBuffer> MakeFrom(JNIEnv* env, jobject bitmap);
-
-  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
-
-  ~HardwareBuffer() override;
-
-  bool isHardwareBacked() const override {
-    return true;
-  }
-
-  void* lockPixels() override;
-
-  void unlockPixels() override;
-
-  AHardwareBuffer* aHardwareBuffer();
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
-
- private:
-  AHardwareBuffer* hardwareBuffer = nullptr;
-};
+/**
+ * Return a new Java HardwareBuffer object that wraps the passed native HardwareBufferRef object.
+ */
+jobject HardwareBufferToJavaObject(JNIEnv* env, HardwareBufferRef hardwareBuffer);
 }  // namespace tgfx
