@@ -40,6 +40,10 @@ class PixelRef : public ImageStream {
   static std::shared_ptr<PixelRef> Make(int width, int height, bool alphaOnly = false,
                                         bool tryHardware = true);
 
+  /**
+   * Creates a new PixelRef with the specified PixelBuffer. Returns nullptr if the pixelBuffer is
+   * nullptr.
+   */
   static std::shared_ptr<PixelRef> Wrap(std::shared_ptr<PixelBuffer> pixelBuffer);
 
   /**

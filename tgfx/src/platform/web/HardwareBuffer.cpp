@@ -16,13 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/platform/HardwareBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
-#import <CoreVideo/CoreVideo.h>
+namespace tgfx {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
+  return nullptr;
+}
 
-namespace pag {
-class PixelBufferUtils {
- public:
-  static CVPixelBufferRef Make(int width, int height);
-};
-}  // namespace pag
+bool HardwareBufferCheck(HardwareBufferRef) {
+  return false;
+}
+
+HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
+  return nullptr;
+}
+
+HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
+  return buffer;
+}
+
+void HardwareBufferRelease(HardwareBufferRef) {
+}
+
+void* HardwareBufferLock(HardwareBufferRef) {
+  return nullptr;
+}
+
+void HardwareBufferUnlock(HardwareBufferRef) {
+}
+
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
+  return {};
+}
+}  // namespace tgfx

@@ -16,16 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PixelBuffer.h"
 #include "gpu/Texture.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
-  return nullptr;
-}
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+bool HardwareBufferAvailable() {
+  return false;
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {

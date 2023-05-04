@@ -20,6 +20,7 @@
 
 #include "gpu/Texture.h"
 #include "tgfx/core/ImageBuffer.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -38,12 +39,10 @@ class PixelBuffer : public ImageBuffer {
                                            bool tryHardware = true);
 
   /**
-   * Creates a hardware-backed PixelBuffer with the specified width and height. Returns nullptr if
-   * the current platform has no hardware buffer support. Hardware buffer is a low-level object
-   * representing a memory buffer accessible by various hardware units. Hardware buffer allows
-   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
+   * Creates a PixelBuffer from the specified hardware buffer. Returns nullptr if the hardwareBuffer
+   * is invalid or the current platform has no hardware buffer support.
    */
-  static std::shared_ptr<PixelBuffer> MakeHardwareBuffer(int width, int height, bool alphaOnly);
+  static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
 
   int width() const override {
     return _info.width();
@@ -54,7 +53,7 @@ class PixelBuffer : public ImageBuffer {
   }
 
   bool isAlphaOnly() const override {
-    return _info.colorType() == ColorType::ALPHA_8;
+    return _info.isAlphaOnly();
   }
 
   /**
@@ -66,25 +65,32 @@ class PixelBuffer : public ImageBuffer {
   }
 
   /**
-   * Returns true if this pixel buffer is hardware backed. A hardware backed PixelBuffer allows
-   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
-   */
-  virtual bool isHardwareBacked() const = 0;
-
-  /**
    * Locks and returns the address of the pixels to ensure that the memory is accessible.
    */
-  virtual void* lockPixels() = 0;
+  void* lockPixels();
 
   /**
    * Call this to balance a successful call to lockPixels().
    */
-  virtual void unlockPixels() = 0;
+  void unlockPixels();
+
+  /**
+   * Returns true if this pixel buffer is hardware backed. A hardware-backed PixelBuffer allows
+   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
+   */
+  virtual bool isHardwareBacked() const = 0;
 
  protected:
-  const ImageInfo _info = {};
+  explicit PixelBuffer(const ImageInfo& info);
 
-  explicit PixelBuffer(const ImageInfo& info) : _info(info) {
-  }
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+
+  virtual void* onLockPixels() const = 0;
+  virtual void onUnlockPixels() const = 0;
+  virtual std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const = 0;
+
+ private:
+  mutable std::mutex locker = {};
+  ImageInfo _info = {};
 };
 }  // namespace tgfx

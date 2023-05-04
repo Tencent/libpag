@@ -16,38 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "HardwareBuffer.h"
-#include "AHardwareBufferUtil.h"
-#include "HardwareBufferInterface.h"
-#include "gpu/Gpu.h"
+#include "AHardwareBufferFunctions.h"
+#include "core/PixelBuffer.h"
+#include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
-
-std::shared_ptr<PixelBuffer> HardwareBuffer::MakeFrom(AHardwareBuffer* hardwareBuffer) {
-  if (!hardwareBuffer || !HardwareBufferInterface::Available()) {
-    return nullptr;
-  }
-  return std::shared_ptr<HardwareBuffer>(new HardwareBuffer(hardwareBuffer));
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace) {
+  return PixelBuffer::MakeFrom(hardwareBuffer);
 }
 
-std::shared_ptr<PixelBuffer> HardwareBuffer::MakeFrom(JNIEnv* env, jobject bitmap) {
-  if (env == nullptr || bitmap == nullptr) {
-    return nullptr;
+bool HardwareBufferCheck(HardwareBufferRef buffer) {
+  if (!HardwareBufferAvailable()) {
+    return false;
   }
-  auto buffer = HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, bitmap);
-  if (buffer == nullptr) {
-    return nullptr;
-  }
-  auto hardwareBuffer = HardwareBuffer::MakeFrom(buffer);
-  HardwareBufferInterface::Release(buffer);
-  return hardwareBuffer;
+  return buffer != nullptr;
 }
 
-std::shared_ptr<PixelBuffer> HardwareBuffer::Make(int width, int height, bool alphaOnly) {
-  if (alphaOnly || !HardwareBufferInterface::Available()) {
+HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
+  if (!HardwareBufferAvailable() || alphaOnly) {
     return nullptr;
   }
-  AHardwareBuffer* buffer = nullptr;
+  AHardwareBuffer* hardwareBuffer = nullptr;
   AHardwareBuffer_Desc desc = {
       static_cast<uint32_t>(width),
       static_cast<uint32_t>(height),
@@ -58,62 +48,84 @@ std::shared_ptr<PixelBuffer> HardwareBuffer::Make(int width, int height, bool al
       0,
       0,
       0};
-  HardwareBufferInterface::Allocate(&desc, &buffer);
-  if (!buffer) {
-    return nullptr;
-  }
-  auto hardwareBuffer = std::shared_ptr<HardwareBuffer>(new HardwareBuffer(buffer));
-  HardwareBufferInterface::Release(buffer);
+  AHardwareBufferFunctions::Get()->allocate(&desc, &hardwareBuffer);
   return hardwareBuffer;
 }
 
-HardwareBuffer::HardwareBuffer(AHardwareBuffer* hardwareBuffer)
-    : PixelBuffer(GetImageInfo(hardwareBuffer)), hardwareBuffer(hardwareBuffer) {
-  HardwareBufferInterface::Acquire(hardwareBuffer);
+HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
+  static const auto acquire = AHardwareBufferFunctions::Get()->acquire;
+  if (acquire != nullptr && buffer != nullptr) {
+    acquire(buffer);
+  }
+  return buffer;
 }
 
-std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mipMapped) const {
-  if (!mipMapped) {
-    return Texture::MakeFrom(context, hardwareBuffer);
+void HardwareBufferRelease(HardwareBufferRef buffer) {
+  static const auto release = AHardwareBufferFunctions::Get()->release;
+  if (release != nullptr && buffer != nullptr) {
+    release(buffer);
   }
-  auto texture = Texture::MakeFormat(context, width(), height(), PixelFormat::RGBA_8888,
-                                     ImageOrigin::TopLeft, true);
-  if (texture == nullptr) {
+}
+
+void* HardwareBufferLock(HardwareBufferRef buffer) {
+  static const auto lock = AHardwareBufferFunctions::Get()->lock;
+  if (lock == nullptr || buffer == nullptr) {
     return nullptr;
   }
-  uint8_t* pixels = nullptr;
-  HardwareBufferInterface::Lock(hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, -1, nullptr,
-                                reinterpret_cast<void**>(&pixels));
-  if (pixels) {
-    auto rect = Rect::MakeWH(width(), height());
-    AHardwareBuffer_Desc desc;
-    HardwareBufferInterface::Describe(hardwareBuffer, &desc);
-    context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride * 4);
-    context->gpu()->regenerateMipMapLevels(texture->getSampler());
-  } else {
-    texture = nullptr;
-  }
-  HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
-  return texture;
-}
-
-void* HardwareBuffer::lockPixels() {
-  uint8_t* pixels = nullptr;
-  HardwareBufferInterface::Lock(
-      hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
-      -1, nullptr, reinterpret_cast<void**>(&pixels));
+  void* pixels = nullptr;
+  lock(buffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1,
+       nullptr, &pixels);
   return pixels;
 }
 
-void HardwareBuffer::unlockPixels() {
-  HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
+void HardwareBufferUnlock(HardwareBufferRef buffer) {
+  static const auto unlock = AHardwareBufferFunctions::Get()->unlock;
+  if (unlock != nullptr && buffer != nullptr) {
+    unlock(buffer, nullptr);
+  }
 }
 
-HardwareBuffer::~HardwareBuffer() {
-  HardwareBufferInterface::Release(hardwareBuffer);
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
+  static const auto describe = AHardwareBufferFunctions::Get()->describe;
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  AHardwareBuffer_Desc desc;
+  describe(buffer, &desc);
+  auto colorType = ColorType::Unknown;
+  auto alphaType = AlphaType::Premultiplied;
+  switch (desc.format) {
+    case HARDWAREBUFFER_FORMAT_R8_UNORM:
+      colorType = ColorType::ALPHA_8;
+      break;
+    case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
+      colorType = ColorType::RGBA_8888;
+      break;
+    case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
+      colorType = ColorType::RGBA_8888;
+      alphaType = AlphaType::Opaque;
+      break;
+    default:
+      break;
+  }
+  auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
+  return ImageInfo::Make(static_cast<int>(desc.width), static_cast<int>(desc.height), colorType,
+                         alphaType, desc.stride * bytesPerPixel);
 }
 
-AHardwareBuffer* HardwareBuffer::aHardwareBuffer() {
-  return hardwareBuffer;
+HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject) {
+  static const auto fromHardwareBuffer = AHardwareBufferFunctions::Get()->fromHardwareBuffer;
+  if (fromHardwareBuffer == nullptr || hardwareBufferObject == nullptr) {
+    return nullptr;
+  }
+  return fromHardwareBuffer(env, hardwareBufferObject);
+}
+
+jobject HardwareBufferToJavaObject(JNIEnv* env, HardwareBufferRef hardwareBuffer) {
+  static const auto toHardwareBuffer = AHardwareBufferFunctions::Get()->toHardwareBuffer;
+  if (toHardwareBuffer == nullptr || hardwareBuffer == nullptr) {
+    return nullptr;
+  }
+  return toHardwareBuffer(env, hardwareBuffer);
 }
 }  // namespace tgfx

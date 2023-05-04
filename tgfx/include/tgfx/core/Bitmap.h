@@ -23,6 +23,7 @@
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 class PixelRef;
@@ -62,9 +63,11 @@ class Bitmap {
   Bitmap(Bitmap&& src);
 
   /**
-   * Creates a new Bitmap from the specified PixelRef object.
+   * Creates a new Bitmap from the platform-specific hardware buffer. For example, the hardware
+   * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The Bitmap takes a reference to the hardwareBuffer.
    */
-  explicit Bitmap(std::shared_ptr<PixelRef> pixelRef);
+  explicit Bitmap(HardwareBufferRef hardwareBuffer);
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
@@ -80,7 +83,7 @@ class Bitmap {
   /**
    * Sets ImageInfo to width, height, and the native color type; and allocates pixel memory. If
    * the alphaOnly is true, sets ImageInfo to ColorType::ALPHA_8. If the tryHardware is true and
-   * there is hardware buffer support on the current platform, a hardware backed PixelRef is
+   * there is hardware buffer support on the current platform, a hardware-backed PixelRef is
    * allocated. Otherwise, a raster PixelRef is allocated. Returns true if the PixelRef is
    * allocated successfully.
    */

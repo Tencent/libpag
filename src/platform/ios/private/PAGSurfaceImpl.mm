@@ -21,9 +21,9 @@
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGSurface+Internal.h"
-#include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -88,8 +88,8 @@
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   // 这里如果添加autoreleasePool会导致PAGSurfaceImpl也被释放，因此不加。
   // 使用时当PAGSurfaceImpl autorelease时，pixelBuffer也会析构
-  auto pixelBuffer = pag::PixelBufferUtils::Make(static_cast<int>(roundf(size.width)),
-                                                 static_cast<int>(roundf(size.height)));
+  auto pixelBuffer = tgfx::HardwareBufferAllocate(static_cast<int>(roundf(size.width)),
+                                                  static_cast<int>(roundf(size.height)));
   return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
 }
 
@@ -129,8 +129,7 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  CVPixelBufferRef pixelBuffer =
-      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
+  auto pixelBuffer = tgfx::HardwareBufferAllocate(_pagSurface->width(), _pagSurface->height());
   if (pixelBuffer == nil) {
     LOGE("CVPixelBufferRef create failed!");
     return nil;

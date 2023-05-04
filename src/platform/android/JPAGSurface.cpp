@@ -158,7 +158,8 @@ PAG_API jboolean JNICALL Java_org_libpag_PAGSurface_copyPixelsTo(JNIEnv* env, jo
   if (surface == nullptr) {
     return false;
   }
-  auto bitmap = tgfx::AndroidBitmap::WrapHardware(env, bitmapObject);
+  auto hardwareBuffer = tgfx::AndroidBitmap::GetHardwareBuffer(env, bitmapObject);
+  tgfx::Bitmap bitmap(hardwareBuffer);
   if (!bitmap.isEmpty()) {
     tgfx::Pixmap pixmap(bitmap);
     return surface->readPixels(ToPAG(pixmap.colorType()), ToPAG(pixmap.alphaType()),

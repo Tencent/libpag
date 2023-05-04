@@ -26,16 +26,7 @@ static std::unordered_map<CVPixelBufferRef, std::weak_ptr<NV12HardwareBuffer>> n
 
 std::shared_ptr<NV12HardwareBuffer> NV12HardwareBuffer::MakeFrom(CVPixelBufferRef pixelBuffer,
                                                                  YUVColorSpace colorSpace) {
-#if TARGET_IPHONE_SIMULATOR
-
-  // We cannot bind CVPixelBuffer to GL on iOS simulator.
-  USE(pixelBuffer);
-  USE(colorSpace);
-  return nullptr;
-
-#else
-
-  if (pixelBuffer == nil) {
+  if (!HardwareBufferCheck(pixelBuffer)) {
     return nullptr;
   }
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer);
@@ -56,8 +47,6 @@ std::shared_ptr<NV12HardwareBuffer> NV12HardwareBuffer::MakeFrom(CVPixelBufferRe
       std::shared_ptr<NV12HardwareBuffer>(new NV12HardwareBuffer(pixelBuffer, colorSpace));
   nv12BufferMap[pixelBuffer] = buffer;
   return buffer;
-
-#endif
 }
 
 NV12HardwareBuffer::NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace)

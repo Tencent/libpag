@@ -19,7 +19,7 @@
 #pragma once
 
 #include <jni.h>
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -35,11 +35,12 @@ class AndroidBitmap {
   static ImageInfo GetInfo(JNIEnv* env, jobject bitmap);
 
   /**
-   * Wraps a hardware-backed Android Bitmap into a tgfx::Bitmap object. The returned tgfx::Bitmap
-   * shares the same pixel memory as the original Android Bitmap. Returns an empty tgfx::Bitmap if
-   * the config of the Android Bitmap is not 'HARDWARE' or the API Level of the current system is
-   * less than 30.
+   * Retrieve the hardware buffer object associated with a HARDWARE Bitmap. This method does not
+   * acquire any additional reference to the returned HardwareBufferRef. To keep the returned
+   * HardwareBufferRef live after the Java Bitmap object got garbage collected, make sure to use
+   * HardwareBufferRetain() to acquire an additional reference. Returns nullptr if the config of the
+   * Bitmap is not 'HARDWARE' or the API level of the current system is less than 30.
    */
-  static Bitmap WrapHardware(JNIEnv* env, jobject bitmap);
+  static HardwareBufferRef GetHardwareBuffer(JNIEnv* env, jobject bitmap);
 };
 }  // namespace tgfx

@@ -42,13 +42,10 @@ class CGLDevice : public GLDevice {
  private:
   NSOpenGLContext* glContext = nil;
   CGLContextObj oldContext = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
 
   static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool isAdopted = false);
 
   explicit CGLDevice(CGLContextObj cglContext);
-
-  CVOpenGLTextureCacheRef getTextureCache();
 
   friend class GLDevice;
   friend class CGLWindow;

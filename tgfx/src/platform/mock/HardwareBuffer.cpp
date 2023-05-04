@@ -16,35 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <CoreVideo/CoreVideo.h>
-#include "core/PixelBuffer.h"
+#include "tgfx/platform/HardwareBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class HardwareBuffer : public PixelBuffer {
- public:
-  static std::shared_ptr<HardwareBuffer> Make(int width, int height, bool alphaOnly = false);
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
+  return nullptr;
+}
 
-  static std::shared_ptr<HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer);
+bool HardwareBufferCheck(HardwareBufferRef) {
+  return false;
+}
 
-  ~HardwareBuffer() override;
+HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
+  return nullptr;
+}
 
-  bool isHardwareBacked() const override {
-    return true;
-  }
+HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
+  return buffer;
+}
 
-  void* lockPixels() override;
+void HardwareBufferRelease(HardwareBufferRef) {
+}
 
-  void unlockPixels() override;
+void* HardwareBufferLock(HardwareBufferRef) {
+  return nullptr;
+}
 
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+void HardwareBufferUnlock(HardwareBufferRef) {
+}
 
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-
-  explicit HardwareBuffer(CVPixelBufferRef pixelBuffer);
-};
-
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
+  return {};
+}
 }  // namespace tgfx
