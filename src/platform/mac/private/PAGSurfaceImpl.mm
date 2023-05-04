@@ -18,10 +18,8 @@
 
 #import "PAGSurfaceImpl.h"
 #include "GPUDrawable.h"
-#import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #include "base/utils/Log.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 @interface PAGSurfaceImpl ()
 

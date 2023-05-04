@@ -1184,10 +1184,10 @@ class PAG_API PAGSurface {
   /**
    * Creates a new PAGSurface from specified backend texture and origin. Note, the texture must not
    * be bound to any frame buffer. Passes true in the forAsyncThread parameter if the returned
-   * PAGSurface will be used for asynchronous rendering. If passing true, the PAGSurface internally
-   * creates a independent GPU context, and the caller can use semaphore objects to synchronise
-   * content (see flushAndSignalSemaphore() and wait()), otherwise, it uses the GPU context on the
-   * calling thread directly. Returns null if the texture is invalid.
+   * PAGSurface needs to be used for asynchronous rendering. If passing true, the PAGSurface
+   * internally creates an independent GPU context, and the caller can use semaphore objects to
+   * synchronise content (see flushAndSignalSemaphore() and wait()), otherwise, it uses the GPU
+   * context on the calling thread directly. Returns null if the texture is invalid.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                               bool forAsyncThread = false);

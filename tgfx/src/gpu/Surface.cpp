@@ -141,6 +141,11 @@ BackendTexture Surface::getBackendTexture() {
   return texture->getBackendTexture();
 }
 
+HardwareBufferRef Surface::getHardwareBuffer() {
+  flushAndSubmit();
+  return texture->getHardwareBuffer();
+}
+
 bool Surface::wait(const BackendSemaphore& waitSemaphore) {
   auto semaphore = Semaphore::Wrap(&waitSemaphore);
   return renderTarget->getContext()->wait(semaphore.get());
@@ -232,6 +237,16 @@ Color Surface::getColor(int x, int y) {
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
   flushAndSubmit();
+  if (texture != nullptr) {
+    auto hardwareBuffer = texture->getHardwareBuffer();
+    auto pixels = HardwareBufferLock(hardwareBuffer);
+    if (pixels != nullptr) {
+      auto info = HardwareBufferGetInfo(hardwareBuffer);
+      auto success = Pixmap(info, pixels).readPixels(dstInfo, dstPixels, srcX, srcY);
+      HardwareBufferUnlock(hardwareBuffer);
+      return success;
+    }
+  }
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx

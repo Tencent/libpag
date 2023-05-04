@@ -31,6 +31,10 @@ class EAGLNV12Texture : public YUVTexture {
 
   ~EAGLNV12Texture() override;
 
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
+  }
+
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef lumaTexture = nullptr;

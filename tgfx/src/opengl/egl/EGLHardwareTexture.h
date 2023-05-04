@@ -37,6 +37,10 @@ class EGLHardwareTexture : public Texture {
     return sampler.get();
   }
 
+  HardwareBufferRef getHardwareBuffer() const override {
+    return hardwareBuffer;
+  }
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   AHardwareBuffer* hardwareBuffer = nullptr;

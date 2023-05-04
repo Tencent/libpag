@@ -43,4 +43,8 @@ Point Texture::getTextureCoord(float x, float y) const {
 BackendTexture Texture::getBackendTexture() const {
   return getSampler()->getBackendTexture(width(), height());
 }
+
+HardwareBufferRef Texture::getHardwareBuffer() const {
+  return nullptr;
+}
 }  // namespace tgfx
