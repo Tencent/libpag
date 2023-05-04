@@ -51,15 +51,6 @@
   return image;
 }
 
-#if TARGET_IPHONE_SIMULATOR
-
-+ (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  LOGE("The simulator does not support [PAGImage FromPixelBuffer:].");
-  return nil;
-}
-
-#else
-
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   auto image = tgfx::Image::MakeFrom(pixelBuffer);
   auto pagImage = pag::StillImage::MakeFrom(std::move(image));
@@ -68,8 +59,6 @@
   }
   return [[[PAGImageImpl alloc] initWidthPAGImage:pagImage] autorelease];
 }
-
-#endif
 
 + (PAGImageImpl*)FromCGImage:(CGImageRef)cgImage {
   if (cgImage == nil) {

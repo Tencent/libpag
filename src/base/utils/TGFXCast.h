@@ -27,6 +27,7 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
 
@@ -57,6 +58,10 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture);
 tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget);
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore);
+
+tgfx::HardwareBufferRef ToTGFX(pag::HardwareBufferRef hardwareBuffer);
+
+pag::HardwareBufferRef ToPAG(tgfx::HardwareBufferRef hardwareBuffer);
 
 static inline const tgfx::Matrix* ToTGFX(const Matrix* matrix) {
   return reinterpret_cast<const tgfx::Matrix*>(matrix);

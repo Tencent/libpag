@@ -25,14 +25,9 @@ namespace tgfx {
 class EAGLWindow : public Window {
  public:
   /**
-   * Creates a new window from a CAEAGLLayer with specified device.
+   * Creates a new window from a CAEAGLLayer with the specified device.
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
-                                              std::shared_ptr<GLDevice> device = nullptr);
-  /**
-   * Creates a new window from a CVPixelBuffer with specified device.
-   */
-  static std::shared_ptr<EAGLWindow> MakeFrom(CVPixelBufferRef pixelBuffer,
                                               std::shared_ptr<GLDevice> device = nullptr);
 
   ~EAGLWindow() override;
@@ -45,8 +40,7 @@ class EAGLWindow : public Window {
   unsigned frameBufferID = 0;
   GLuint colorBuffer = 0;
   CAEAGLLayer* layer = nil;
-  CVPixelBufferRef pixelBuffer = nil;
 
-  explicit EAGLWindow(std::shared_ptr<Device> device);
+  EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer);
 };
 }  // namespace tgfx

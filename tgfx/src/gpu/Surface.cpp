@@ -127,6 +127,9 @@ ImageOrigin Surface::origin() const {
 }
 
 std::shared_ptr<Texture> Surface::getTexture() {
+  if (texture == nullptr) {
+    return nullptr;
+  }
   flush();
   return texture;
 }
@@ -137,11 +140,17 @@ BackendRenderTarget Surface::getBackendRenderTarget() {
 }
 
 BackendTexture Surface::getBackendTexture() {
+  if (texture == nullptr) {
+    return {};
+  }
   flush();
   return texture->getBackendTexture();
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
+  if (texture == nullptr) {
+    return nullptr;
+  }
   flushAndSubmit();
   return texture->getHardwareBuffer();
 }

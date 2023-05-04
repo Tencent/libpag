@@ -38,9 +38,15 @@ class GLDevice : public Device {
   static std::shared_ptr<GLDevice> Current();
 
   /**
-   * Creates an offscreen GLDevice with specified shared OpenGL context.
+   * Creates an independent GLDevice with specified shared OpenGL context.
    */
   static std::shared_ptr<GLDevice> Make(void* sharedContext = nullptr);
+
+  /**
+   * Returns a shared GLDevice of the calling thread from the pool, Creates one immediately if not
+   * exists.
+   */
+  static std::shared_ptr<GLDevice> MakeFromThreadPool();
 
   /**
    * Returns the GLDevice associated with the specified OpenGL context.

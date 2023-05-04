@@ -18,9 +18,9 @@
 
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
-#include "rendering/Drawable.h"
 #include "rendering/FileReporter.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/drawables/Drawable.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/ApplyScaleMode.h"
 #include "rendering/utils/LockGuard.h"

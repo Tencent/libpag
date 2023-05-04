@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "rendering/Drawable.h"
+#include "rendering/drawables/Drawable.h"
 #include "tgfx/opengl/eagl/EAGLWindow.h"
 
 namespace pag {
@@ -30,11 +30,6 @@ class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
 
-  static std::shared_ptr<GPUDrawable> FromCVPixelBuffer(CVPixelBufferRef pixelBuffer,
-                                                        EAGLContext* eaglContext = nil);
-
-  ~GPUDrawable() override;
-
   int width() const override;
 
   int height() const override;
@@ -45,8 +40,6 @@ class GPUDrawable : public Drawable {
 
   void present(tgfx::Context* context) override;
 
-  CVPixelBufferRef getCVPixelBuffer();
-
  protected:
   std::shared_ptr<tgfx::Device> getDevice() override;
 
@@ -55,15 +48,10 @@ class GPUDrawable : public Drawable {
   int _width = 0;
   int _height = 0;
   CAEAGLLayer* layer = nil;
-  CVPixelBufferRef pixelBuffer = nil;
-  EAGLContext* eaglContext = nil;
   std::shared_ptr<tgfx::EAGLWindow> window = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   std::atomic<bool> bufferPreparing;
 
-  static bool IsInMainThread();
-
   explicit GPUDrawable(CAEAGLLayer* layer);
-  explicit GPUDrawable(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace pag

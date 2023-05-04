@@ -19,8 +19,8 @@
 #include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "rendering/Drawable.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/drawables/Drawable.h"
 #include "rendering/graphics/Recorder.h"
 #include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
@@ -93,6 +93,17 @@ bool PAGSurface::clearAll() {
   drawable->present(context);
   unlockContext();
   return true;
+}
+
+HardwareBufferRef PAGSurface::getHardwareBuffer() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext();
+  if (surface == nullptr || !context) {
+    return nullptr;
+  }
+  auto hardwareBuffer = surface->getHardwareBuffer();
+  unlockContext();
+  return ToPAG(hardwareBuffer);
 }
 
 bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,

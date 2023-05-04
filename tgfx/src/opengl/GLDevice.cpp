@@ -17,12 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/opengl/GLDevice.h"
+#include <thread>
 #include "opengl/GLContext.h"
 #include "opengl/GLUtil.h"
 
 namespace tgfx {
 static std::mutex deviceMapLocker = {};
+static std::mutex threadCacheLocker = {};
 static std::unordered_map<void*, GLDevice*> deviceMap = {};
+static std::unordered_map<std::thread::id, std::weak_ptr<tgfx::GLDevice>> threadCacheMap = {};
+
+std::shared_ptr<GLDevice> GLDevice::MakeFromThreadPool() {
+  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
+  auto threadID = std::this_thread::get_id();
+  auto result = threadCacheMap.find(threadID);
+  if (result != threadCacheMap.end()) {
+    auto& weak = result->second;
+    auto context = weak.lock();
+    if (context) {
+      return context;
+    }
+    threadCacheMap.erase(result);
+  }
+  auto device = GLDevice::Make();
+  if (device != nullptr) {
+    threadCacheMap[threadID] = device;
+  } else {
+    device = GLDevice::Current();
+  }
+  return device;
+}
 
 std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   if (nativeHandle == nullptr) {

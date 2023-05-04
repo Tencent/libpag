@@ -23,16 +23,19 @@
 #import "PAGSurface+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"
+#include "rendering/drawables/HardwareBufferDrawable.h"
+#include "tgfx/opengl/eagl/EAGLDevice.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 @interface PAGSurfaceImpl ()
 
 @property(nonatomic) std::shared_ptr<pag::PAGSurface> pagSurface;
-@property(nonatomic) pag::GPUDrawable* gpuDrawable;
 
 @end
 
-@implementation PAGSurfaceImpl
+@implementation PAGSurfaceImpl {
+  CVPixelBufferRef pixelBuffer;
+}
 
 - (std::shared_ptr<pag::PAGSurface>)pagSurface {
   return _pagSurface;
@@ -40,13 +43,11 @@
 
 + (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer {
   auto drawable = pag::GPUDrawable::FromLayer(layer);
-  if (drawable == nullptr) {
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
     return nil;
   }
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  PAGSurfaceImpl* pagSurface = [[PAGSurfaceImpl alloc] initWithSurface:surface
-                                                              drawable:drawable.get()];
-  return [pagSurface autorelease];
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
 }
 
 #if TARGET_IPHONE_SIMULATOR
@@ -62,11 +63,6 @@
   return nil;
 }
 
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
-  LOGE("The simulator does not support [PAGSurface MakeOffscreen:].");
-  return nil;
-}
-
 #else
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
@@ -75,31 +71,39 @@
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext {
-  auto drawable = pag::GPUDrawable::FromCVPixelBuffer(pixelBuffer, eaglContext);
-  if (drawable == nullptr) {
+  auto device = tgfx::EAGLDevice::MakeAdopted(eaglContext);
+  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
     return nil;
   }
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  PAGSurfaceImpl* pagSurface = [[PAGSurfaceImpl alloc] initWithSurface:surface
-                                                              drawable:drawable.get()];
-  return [pagSurface autorelease];
-}
-
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
-  // 这里如果添加autoreleasePool会导致PAGSurfaceImpl也被释放，因此不加。
-  // 使用时当PAGSurfaceImpl autorelease时，pixelBuffer也会析构
-  auto pixelBuffer = tgfx::HardwareBufferAllocate(static_cast<int>(roundf(size.width)),
-                                                  static_cast<int>(roundf(size.height)));
-  return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
 }
 
 #endif
 
-- (instancetype)initWithSurface:(std::shared_ptr<pag::PAGSurface>)value
-                       drawable:(pag::GPUDrawable*)target {
++ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
+  auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),
+                                                static_cast<int>(roundf(size.height)));
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+
+- (instancetype)initWithSurface:(std::shared_ptr<pag::PAGSurface>)value {
   if (self = [super init]) {
     _pagSurface = value;
-    _gpuDrawable = target;
+    pixelBuffer = nil;
+  }
+  return self;
+}
+
+- (instancetype)initWithSurface:(std::shared_ptr<pag::PAGSurface>)value
+                    pixelBuffer:(CVPixelBufferRef)buffer {
+  if (self = [super init]) {
+    _pagSurface = value;
+    pixelBuffer = buffer;
   }
   return self;
 }
@@ -125,7 +129,10 @@
 }
 
 - (CVPixelBufferRef)getCVPixelBuffer {
-  return _gpuDrawable->getCVPixelBuffer();
+  if (pixelBuffer == nil) {
+    pixelBuffer = _pagSurface->getHardwareBuffer();
+  }
+  return pixelBuffer;
 }
 
 - (CVPixelBufferRef)makeSnapshot {

@@ -18,36 +18,40 @@
 
 #pragma once
 
-#include "rendering/drawables/Drawable.h"
-#include "tgfx/opengl/cgl/CGLWindow.h"
+#include "pag/gpu.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
-class GPUDrawable : public Drawable {
+
+class Drawable {
  public:
-  static std::shared_ptr<GPUDrawable> FromView(NSView* view);
+  virtual ~Drawable() = default;
 
-  int width() const override {
-    return _width;
+  virtual int width() const = 0;
+
+  virtual int height() const = 0;
+
+  virtual void updateSize() = 0;
+
+  virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
+
+  virtual void present(tgfx::Context* context) = 0;
+
+  virtual void setTimeStamp(int64_t) {
   }
 
-  int height() const override {
-    return _height;
-  }
+  virtual tgfx::Context* lockContext();
 
-  void updateSize() override;
+  virtual void unlockContext();
 
-  std::shared_ptr<tgfx::Device> getDevice() override;
+  virtual bool prepareDevice();
 
-  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
+  virtual void freeDevice();
 
-  void present(tgfx::Context* context) override;
+ protected:
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
 
  private:
-  int _width = 0;
-  int _height = 0;
-  NSView* view = nil;
-  std::shared_ptr<tgfx::CGLWindow> window = nullptr;
-
-  explicit GPUDrawable(NSView* view);
+  std::shared_ptr<tgfx::Device> currentDevice;
 };
 }  // namespace pag
