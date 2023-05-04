@@ -77,10 +77,6 @@
   [_surface freeCache];
 }
 
-- (CVPixelBufferRef)getCVPixelBuffer {
-  return [_surface getCVPixelBuffer];
-}
-
 - (CVPixelBufferRef)makeSnapshot {
   return [_surface makeSnapshot];
 }

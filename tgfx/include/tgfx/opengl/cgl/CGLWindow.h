@@ -28,11 +28,6 @@ class CGLWindow : public Window {
    * Creates a new window from an NSView with specified shared context.
    */
   static std::shared_ptr<CGLWindow> MakeFrom(NSView* view, CGLContextObj sharedContext = nullptr);
-  /**
-   * Creates a new window from a CVPixelBuffer with specified device.
-   */
-  static std::shared_ptr<CGLWindow> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                             std::shared_ptr<GLDevice> device = nullptr);
 
   ~CGLWindow() override;
 
@@ -42,8 +37,7 @@ class CGLWindow : public Window {
 
  private:
   NSView* view = nil;
-  CVPixelBufferRef pixelBuffer = nil;
 
-  explicit CGLWindow(std::shared_ptr<Device> device);
+  CGLWindow(std::shared_ptr<Device> device, NSView* view);
 };
 }  // namespace tgfx

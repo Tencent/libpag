@@ -16,12 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <thread>
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "rendering/Drawable.h"
 #include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
+
+static std::mutex threadCacheLocker = {};
+static std::unordered_map<std::thread::id, std::weak_ptr<tgfx::GLDevice>> threadCacheMap = {};
+
+static std::shared_ptr<tgfx::GLDevice> MakeDeviceFromThreadPool() {
+  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
+  auto threadID = std::this_thread::get_id();
+  auto result = threadCacheMap.find(threadID);
+  if (result != threadCacheMap.end()) {
+    auto& weak = result->second;
+    auto context = weak.lock();
+    if (context) {
+      return context;
+    }
+    threadCacheMap.erase(result);
+  }
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  threadCacheMap[threadID] = device;
+  return device;
+}
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
   if (drawable == nullptr) {
@@ -67,7 +91,7 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-  auto device = tgfx::GLDevice::Make();
+  auto device = MakeDeviceFromThreadPool();
   if (device == nullptr) {
     device = tgfx::GLDevice::Current();
   }

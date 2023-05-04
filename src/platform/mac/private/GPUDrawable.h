@@ -26,10 +26,6 @@ class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromView(NSView* view);
 
-  static std::shared_ptr<GPUDrawable> FromCVPixelBuffer(CVPixelBufferRef pixelBuffer);
-
-  ~GPUDrawable() override;
-
   int width() const override {
     return _width;
   }
@@ -50,10 +46,8 @@ class GPUDrawable : public Drawable {
   int _width = 0;
   int _height = 0;
   NSView* view = nil;
-  CVPixelBufferRef pixelBuffer = nil;
   std::shared_ptr<tgfx::CGLWindow> window = nullptr;
 
   explicit GPUDrawable(NSView* view);
-  explicit GPUDrawable(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace pag

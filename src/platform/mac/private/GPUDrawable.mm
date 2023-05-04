@@ -28,44 +28,15 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromView(NSView* view) {
   return std::shared_ptr<GPUDrawable>(new GPUDrawable(view));
 }
 
-std::shared_ptr<GPUDrawable> GPUDrawable::FromCVPixelBuffer(CVPixelBufferRef pixelBuffer) {
-  if (pixelBuffer == nil ||
-      CVPixelBufferGetPixelFormatType(pixelBuffer) != kCVPixelFormatType_32BGRA) {
-    return nullptr;
-  }
-  return std::shared_ptr<GPUDrawable>(new GPUDrawable(pixelBuffer));
-}
-
 GPUDrawable::GPUDrawable(NSView* view) : view(view) {
   // do not retain view here, otherwise it can cause circular reference.
   updateSize();
 }
 
-GPUDrawable::GPUDrawable(CVPixelBufferRef pixelBuffer) : pixelBuffer(pixelBuffer) {
-  CFRetain(pixelBuffer);
-  updateSize();
-}
-
-GPUDrawable::~GPUDrawable() {
-  if (pixelBuffer) {
-    CFRelease(pixelBuffer);
-    pixelBuffer = nil;
-  }
-}
-
 void GPUDrawable::updateSize() {
-  CGFloat width;
-  CGFloat height;
-  if (pixelBuffer != nil) {
-    width = CVPixelBufferGetWidth(pixelBuffer);
-    height = CVPixelBufferGetHeight(pixelBuffer);
-  } else {
-    CGSize size = [view convertSizeToBacking:view.bounds.size];
-    width = size.width;
-    height = size.height;
-  }
-  _width = static_cast<int>(roundf(width));
-  _height = static_cast<int>(roundf(height));
+  CGSize size = [view convertSizeToBacking:view.bounds.size];
+  _width = static_cast<int>(roundf(size.width));
+  _height = static_cast<int>(roundf(size.height));
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
@@ -73,12 +44,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-    if (pixelBuffer) {
-      auto device = std::static_pointer_cast<tgfx::CGLDevice>(tgfx::GLDevice::Make());
-      window = tgfx::CGLWindow::MakeFrom(pixelBuffer, device);
-    } else {
-      window = tgfx::CGLWindow::MakeFrom(view);
-    }
+    window = tgfx::CGLWindow::MakeFrom(view);
   }
   return window ? window->getDevice() : nullptr;
 }
@@ -96,4 +62,4 @@ void GPUDrawable::present(tgfx::Context* context) {
   }
   return window->present(context);
 }
-}
+}  // namespace pag

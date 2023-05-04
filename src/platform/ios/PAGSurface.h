@@ -83,7 +83,7 @@ PAG_API @interface PAGSurface : NSObject
 
 /**
  * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if this
- * PAGSurface is not created by [PAGSurface FromCVPixelBuffer].
+ * PAGSurface is created by [PAGSurface FromLayer].
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
