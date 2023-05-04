@@ -1,13 +1,17 @@
 const getGlobalObject = (): typeof globalThis => {
+  if (typeof globalThis !== 'undefined') {
+    return globalThis;
+  }
   if (typeof window !== 'undefined') {
     return window as unknown as typeof globalThis;
-  } else if (typeof global !== 'undefined') {
-    return global as unknown as typeof globalThis;
-  } else if (typeof self !== 'undefined') {
-    return self as unknown as typeof globalThis;
-  } else {
-    throw new Error('unable to locate global object');
   }
+  if (typeof global !== 'undefined') {
+    return global as unknown as typeof globalThis;
+  }
+  if (typeof self !== 'undefined') {
+    return self as unknown as typeof globalThis;
+  }
+  throw new Error('unable to locate global object');
 };
 
 const globalObject = getGlobalObject();
