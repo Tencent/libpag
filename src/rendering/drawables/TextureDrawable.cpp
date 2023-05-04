@@ -16,35 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include "TextureDrawable.h"
 
-namespace tgfx {
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
-                                           std::shared_ptr<ImageBuffer> imageBuffer,
-                                           bool mipMapped) {
-  if (context == nullptr || imageBuffer == nullptr) {
+namespace pag {
+std::shared_ptr<TextureDrawable> TextureDrawable::MakeFrom(std::shared_ptr<tgfx::Device> device,
+                                                           const tgfx::BackendTexture& texture,
+                                                           tgfx::ImageOrigin origin) {
+  if (device == nullptr || !texture.isValid()) {
     return nullptr;
   }
-  return imageBuffer->onMakeTexture(context, mipMapped);
+  return std::shared_ptr<TextureDrawable>(new TextureDrawable(std::move(device), texture, origin));
 }
 
-Texture::Texture(int width, int height, ImageOrigin origin)
-    : _width(width), _height(height), _origin(origin) {
+TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
+                                 const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin)
+    : device(std::move(device)), texture(texture), origin(origin) {
 }
 
-Point Texture::getTextureCoord(float x, float y) const {
-  if (getSampler()->type() == TextureType::Rectangle) {
-    return {x, y};
-  }
-  return {x / static_cast<float>(width()), y / static_cast<float>(height())};
+std::shared_ptr<tgfx::Surface> TextureDrawable::createSurface(tgfx::Context* context) {
+  return tgfx::Surface::MakeFrom(context, texture, origin);
 }
-
-BackendTexture Texture::getBackendTexture() const {
-  return getSampler()->getBackendTexture(width(), height());
-}
-
-HardwareBufferRef Texture::getHardwareBuffer() const {
-  return nullptr;
-}
-}  // namespace tgfx
+}  // namespace pag

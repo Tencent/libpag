@@ -20,7 +20,7 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "opengl/GLCaps.h"
 #include "opengl/GLUtil.h"
-#include "rendering/Drawable.h"
+#include "rendering/drawables/TextureDrawable.h"
 #include "tgfx/opengl/GLDevice.h"
 
 namespace pag {

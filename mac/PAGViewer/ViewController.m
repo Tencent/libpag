@@ -57,7 +57,7 @@
     [pagPlayer setProgress:0.5f];
     [pagPlayer flush];
     
-    CVPixelBufferRef result = [pagSurface getCVPixelBuffer];
+    CVPixelBufferRef result = [pagSurface makeSnapshot];
     NSLog(@"%@", result);
 }
 

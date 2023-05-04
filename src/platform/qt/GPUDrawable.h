@@ -24,7 +24,7 @@
 #include <QQuickItem>
 #include <QSGTexture>
 #pragma clang diagnostic pop
-#include "rendering/Drawable.h"
+#include "rendering/drawables/Drawable.h"
 
 namespace tgfx {
 class QGLWindow;

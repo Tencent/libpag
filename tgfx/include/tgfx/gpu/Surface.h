@@ -132,6 +132,13 @@ class Surface {
   BackendTexture getBackendTexture();
 
   /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the surface is not created from a hardware
+   * buffer.
+   */
+  HardwareBufferRef getHardwareBuffer();
+
+  /**
    * Returns Canvas that draws into Surface. Subsequent calls return the same Canvas. Canvas
    * returned is managed and owned by Surface, and is deleted when Surface is deleted.
    */

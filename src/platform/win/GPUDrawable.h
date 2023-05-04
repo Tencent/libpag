@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "rendering/Drawable.h"
+#include "rendering/drawables/Drawable.h"
 
 namespace tgfx {
 class EGLWindow;

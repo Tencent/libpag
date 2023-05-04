@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "rendering/Drawable.h"
+#include "rendering/drawables/Drawable.h"
 #include "tgfx/opengl/webgl/WebGLWindow.h"
 
 namespace pag {

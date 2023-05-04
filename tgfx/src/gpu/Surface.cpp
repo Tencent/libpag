@@ -127,6 +127,9 @@ ImageOrigin Surface::origin() const {
 }
 
 std::shared_ptr<Texture> Surface::getTexture() {
+  if (texture == nullptr) {
+    return nullptr;
+  }
   flush();
   return texture;
 }
@@ -137,8 +140,19 @@ BackendRenderTarget Surface::getBackendRenderTarget() {
 }
 
 BackendTexture Surface::getBackendTexture() {
+  if (texture == nullptr) {
+    return {};
+  }
   flush();
   return texture->getBackendTexture();
+}
+
+HardwareBufferRef Surface::getHardwareBuffer() {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  flushAndSubmit();
+  return texture->getHardwareBuffer();
 }
 
 bool Surface::wait(const BackendSemaphore& waitSemaphore) {
@@ -232,6 +246,16 @@ Color Surface::getColor(int x, int y) {
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
   flushAndSubmit();
+  if (texture != nullptr) {
+    auto hardwareBuffer = texture->getHardwareBuffer();
+    auto pixels = HardwareBufferLock(hardwareBuffer);
+    if (pixels != nullptr) {
+      auto info = HardwareBufferGetInfo(hardwareBuffer);
+      auto success = Pixmap(info, pixels).readPixels(dstInfo, dstPixels, srcX, srcY);
+      HardwareBufferUnlock(hardwareBuffer);
+      return success;
+    }
+  }
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx

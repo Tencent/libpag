@@ -193,6 +193,13 @@ class Texture : public Resource {
    */
   virtual BackendTexture getBackendTexture() const;
 
+  /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the texture is not created from a hardware
+   * buffer.
+   */
+  virtual HardwareBufferRef getHardwareBuffer() const;
+
  protected:
   Texture(int width, int height, ImageOrigin origin);
 

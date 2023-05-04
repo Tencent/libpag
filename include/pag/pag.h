@@ -1184,10 +1184,10 @@ class PAG_API PAGSurface {
   /**
    * Creates a new PAGSurface from specified backend texture and origin. Note, the texture must not
    * be bound to any frame buffer. Passes true in the forAsyncThread parameter if the returned
-   * PAGSurface will be used for asynchronous rendering. If passing true, the PAGSurface internally
-   * creates a independent GPU context, and the caller can use semaphore objects to synchronise
-   * content (see flushAndSignalSemaphore() and wait()), otherwise, it uses the GPU context on the
-   * calling thread directly. Returns null if the texture is invalid.
+   * PAGSurface needs to be used for asynchronous rendering. If passing true, the PAGSurface
+   * internally creates an independent GPU context, and the caller can use semaphore objects to
+   * synchronize content (see flushAndSignalSemaphore() and wait()), otherwise, it uses the GPU
+   * context on the calling thread directly. Returns null if the texture is invalid.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                               bool forAsyncThread = false);
@@ -1198,6 +1198,12 @@ class PAG_API PAGSurface {
    *  is not valid.
    */
   static std::shared_ptr<PAGSurface> MakeOffscreen(int width, int height);
+
+  /**
+   * Creates a new PAGSurface from specified hardware buffer. Returns null if the hardware buffer
+   * is invalid.
+   */
+  static std::shared_ptr<PAGSurface> MakeFrom(HardwareBufferRef hardwareBuffer);
 
   virtual ~PAGSurface() = default;
 
@@ -1226,6 +1232,13 @@ class PAG_API PAGSurface {
    * Free the cache created by the surface immediately. Can be called to reduce memory pressure.
    */
   void freeCache();
+
+  /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the PAGSurface is not created from a hardware
+   * buffer.
+   */
+  HardwareBufferRef getHardwareBuffer();
 
   /**
    * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
@@ -1351,7 +1364,7 @@ class PAG_API PAGPlayer {
   void setScaleMode(int mode);
 
   /**
-   * Returns a copy of current matrix.
+   * Returns a copy of the current matrix.
    */
   Matrix matrix();
 

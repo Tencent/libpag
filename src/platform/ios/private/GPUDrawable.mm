@@ -33,36 +33,9 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromLayer(CAEAGLLayer* layer) {
   return drawable;
 }
 
-std::shared_ptr<GPUDrawable> GPUDrawable::FromCVPixelBuffer(CVPixelBufferRef pixelBuffer,
-                                                            EAGLContext* eaglContext) {
-  if (pixelBuffer == nil ||
-      CVPixelBufferGetPixelFormatType(pixelBuffer) != kCVPixelFormatType_32BGRA) {
-    return nullptr;
-  }
-  auto drawable = std::shared_ptr<GPUDrawable>(new GPUDrawable(pixelBuffer));
-  [eaglContext retain];
-  drawable->eaglContext = eaglContext;
-  drawable->weakThis = drawable;
-  return drawable;
-}
-
 GPUDrawable::GPUDrawable(CAEAGLLayer* layer) : layer(layer), bufferPreparing(false) {
   // do not retain layer here, otherwise it can cause circular reference.
   updateSize();
-}
-
-GPUDrawable::GPUDrawable(CVPixelBufferRef pixelBuffer)
-    : pixelBuffer(pixelBuffer), bufferPreparing(false) {
-  CFRetain(pixelBuffer);
-  updateSize();
-}
-
-GPUDrawable::~GPUDrawable() {
-  if (pixelBuffer) {
-    CFRelease(pixelBuffer);
-    pixelBuffer = nil;
-  }
-  [eaglContext release];
 }
 
 int GPUDrawable::width() const {
@@ -74,15 +47,8 @@ int GPUDrawable::height() const {
 }
 
 void GPUDrawable::updateSize() {
-  CGFloat width;
-  CGFloat height;
-  if (pixelBuffer != nil) {
-    width = CVPixelBufferGetWidth(pixelBuffer);
-    height = CVPixelBufferGetHeight(pixelBuffer);
-  } else {
-    width = layer.bounds.size.width * layer.contentsScale;
-    height = layer.bounds.size.height * layer.contentsScale;
-  }
+  auto width = layer.bounds.size.width * layer.contentsScale;
+  auto height = layer.bounds.size.height * layer.contentsScale;
   _width = static_cast<int>(roundf(width));
   _height = static_cast<int>(roundf(height));
   surface = nullptr;
@@ -93,12 +59,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-    auto device = tgfx::EAGLDevice::MakeAdopted(eaglContext);
-    if (pixelBuffer) {
-      window = tgfx::EAGLWindow::MakeFrom(pixelBuffer, device);
-    } else {
-      window = tgfx::EAGLWindow::MakeFrom(layer, device);
-    }
+    window = tgfx::EAGLWindow::MakeFrom(layer);
   }
   return window ? window->getDevice() : nullptr;
 }
@@ -110,9 +71,9 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context
   if (surface) {
     return surface;
   }
-  if (layer == nil || IsInMainThread()) {
+  if (NSThread.isMainThread) {
     surface = window->createSurface(context);
-    if (layer != nil && surface != nullptr) {
+    if (surface != nullptr) {
       [[NSNotificationCenter defaultCenter]
           postNotificationName:kGPURenderTargetBufferPreparedNotification
                         object:layer
@@ -154,7 +115,7 @@ void GPUDrawable::present(tgfx::Context* context) {
     return;
   }
 
-  if (pixelBuffer || IsInMainThread()) {
+  if (NSThread.isMainThread) {
     window->present(context);
   } else {
     auto strongThis = weakThis.lock();
@@ -171,15 +132,4 @@ void GPUDrawable::present(tgfx::Context* context) {
     });
   }
 }
-
-bool GPUDrawable::IsInMainThread() {
-  /// 由于current queue有可能是来自main queue sync，这种情况下也没有异步的必要，应该直接上屏
-  /// 因此这里使用NSThread来判断是否主线程。
-  return NSThread.isMainThread;
-}
-
-CVPixelBufferRef GPUDrawable::getCVPixelBuffer() {
-  return pixelBuffer;
-}
-
-}
+}  // namespace pag

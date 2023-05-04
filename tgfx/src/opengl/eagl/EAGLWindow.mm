@@ -17,69 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/opengl/eagl/EAGLWindow.h"
-#include <thread>
-#include "EAGLHardwareTexture.h"
-#include "opengl/GLContext.h"
+#include "tgfx/opengl/GLFunctions.h"
+#include "utils/Log.h"
 
 namespace tgfx {
-static std::mutex threadCacheLocker = {};
-static std::unordered_map<std::thread::id, std::weak_ptr<GLDevice>> threadCacheMap = {};
-
-static std::shared_ptr<GLDevice> MakeDeviceFromThreadPool() {
-  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
-  auto threadID = std::this_thread::get_id();
-  auto result = threadCacheMap.find(threadID);
-  if (result != threadCacheMap.end()) {
-    auto& weak = result->second;
-    auto context = weak.lock();
-    if (context) {
-      return context;
-    }
-    threadCacheMap.erase(result);
-  }
-  auto device = GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  threadCacheMap[threadID] = device;
-  return device;
-}
-
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
                                                  std::shared_ptr<GLDevice> device) {
   if (layer == nil) {
     return nullptr;
   }
   if (device == nullptr) {
-    device = MakeDeviceFromThreadPool();
+    device = tgfx::GLDevice::MakeFromThreadPool();
   }
   if (device == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<EAGLWindow>(new EAGLWindow(device));
+  return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer));
+}
+
+EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
+    : Window(std::move(device)), layer(layer) {
   // do not retain layer here, otherwise it can cause circular reference.
-  window->layer = layer;
-  return window;
-}
-
-std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                 std::shared_ptr<GLDevice> device) {
-  if (pixelBuffer == nil) {
-    return nullptr;
-  }
-  if (device == nullptr) {
-    device = MakeDeviceFromThreadPool();
-  }
-  if (device == nullptr) {
-    return nullptr;
-  }
-  CFRetain(pixelBuffer);
-  auto window = std::shared_ptr<EAGLWindow>(new EAGLWindow(device));
-  window->pixelBuffer = pixelBuffer;
-  return window;
-}
-
-EAGLWindow::EAGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
 EAGLWindow::~EAGLWindow() {
@@ -96,16 +54,9 @@ EAGLWindow::~EAGLWindow() {
     }
     device->unlock();
   }
-  if (pixelBuffer) {
-    CFRelease(pixelBuffer);
-    pixelBuffer = nil;
-  }
 }
 
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
-  if (pixelBuffer != nil) {
-    return Surface::MakeFrom(context, pixelBuffer);
-  }
   auto gl = GLFunctions::Get(context);
   if (frameBufferID > 0) {
     gl->deleteFramebuffers(1, &frameBufferID);
@@ -142,12 +93,10 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {
-  if (layer) {
-    auto gl = GLFunctions::Get(context);
-    gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-    auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
-    [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
-    gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
-  }
+  auto gl = GLFunctions::Get(context);
+  gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
+  auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
+  [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
+  gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
 }
 }  // namespace tgfx

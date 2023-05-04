@@ -18,15 +18,12 @@
 
 #import "PAGSurfaceImpl.h"
 #include "GPUDrawable.h"
-#import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #include "base/utils/Log.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 @interface PAGSurfaceImpl ()
 
 @property(nonatomic) std::shared_ptr<pag::PAGSurface> pagSurface;
-@property(nonatomic) CVPixelBufferRef cvPixelBuffer;
 
 @end
 
@@ -34,24 +31,20 @@
 
 + (PAGSurfaceImpl*)FromView:(NSView*)view {
   auto drawable = pag::GPUDrawable::FromView(view);
-  if (drawable == nullptr) {
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
     return nil;
   }
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  PAGSurfaceImpl* pagSurface = [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-  return pagSurface;
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
 }
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
-  auto pixelBuffer = tgfx::HardwareBufferAllocate(static_cast<int>(roundf(size.width)),
-                                                  static_cast<int>(roundf(size.height)));
-  auto drawable = pag::GPUDrawable::FromCVPixelBuffer(pixelBuffer);
-  if (drawable == nullptr) {
+  auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),
+                                                static_cast<int>(roundf(size.height)));
+  if (surface == nullptr) {
     return nil;
   }
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
   PAGSurfaceImpl* pagSurface = [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-  pagSurface.cvPixelBuffer = pixelBuffer;
   return pagSurface;
 }
 
@@ -60,14 +53,6 @@
     _pagSurface = value;
   }
   return self;
-}
-
-- (void)dealloc {
-  if (_cvPixelBuffer != nil) {
-    CFRelease(_cvPixelBuffer);
-    _cvPixelBuffer = nil;
-  }
-  [super dealloc];
 }
 
 - (void)updateSize {
@@ -88,10 +73,6 @@
 
 - (void)freeCache {
   _pagSurface->freeCache();
-}
-
-- (CVPixelBufferRef)getCVPixelBuffer {
-  return _cvPixelBuffer;
 }
 
 - (CVPixelBufferRef)makeSnapshot {
