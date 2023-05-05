@@ -34,23 +34,18 @@ class OffscreenDrawable : public Drawable {
     return _height;
   }
 
-  void updateSize() override {
-  }
+ protected:
+  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
-  std::shared_ptr<tgfx::Device> getDevice() override {
+  std::shared_ptr<tgfx::Device> onCreateDevice() override {
     return device;
   }
 
-  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
-
-  void present(tgfx::Context*) override {
-  }
+  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
  private:
   int _width = 0;
   int _height = 0;
   std::shared_ptr<tgfx::Device> device = nullptr;
-
-  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 };
 }  // namespace pag

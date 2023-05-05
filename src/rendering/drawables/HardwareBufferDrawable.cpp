@@ -43,7 +43,7 @@ HardwareBufferDrawable::HardwareBufferDrawable(int width, int height,
     : _width(width), _height(height), hardwareBuffer(hardwareBuffer), device(std::move(device)) {
 }
 
-std::shared_ptr<tgfx::Surface> HardwareBufferDrawable::createSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> HardwareBufferDrawable::onCreateSurface(tgfx::Context* context) {
   return tgfx::Surface::MakeFrom(context, hardwareBuffer);
 }
 }  // namespace pag

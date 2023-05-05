@@ -157,8 +157,7 @@ HardwareBufferRef Surface::getHardwareBuffer() {
 }
 
 bool Surface::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(&waitSemaphore);
-  return renderTarget->getContext()->wait(semaphore.get());
+  return renderTarget->getContext()->wait(waitSemaphore);
 }
 
 Canvas* Surface::getCanvas() {

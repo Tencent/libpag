@@ -18,37 +18,39 @@
 
 #pragma once
 
-#include "Drawable.h"
+#include "pag/pag.h"
+#include "rendering/drawables/RasterDrawable.h"
 
 namespace pag {
-
-class TextureDrawable : public Drawable {
+class CompositionReader {
  public:
-  static std::shared_ptr<TextureDrawable> MakeFrom(std::shared_ptr<tgfx::Device> device,
-                                                   const tgfx::BackendTexture& texture,
-                                                   tgfx::ImageOrigin origin);
+  static std::shared_ptr<CompositionReader> Make(int width, int height);
 
-  int width() const override {
-    return texture.width();
+  ~CompositionReader();
+
+  int width() const {
+    return drawable->width();
   }
 
-  int height() const override {
-    return texture.height();
+  int height() const {
+    return drawable->height();
   }
 
- protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override {
-    return device;
-  }
+  std::shared_ptr<PAGComposition> getComposition();
 
-  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+  void setComposition(std::shared_ptr<PAGComposition> composition);
+
+  bool readFrame(double progress, const tgfx::ImageInfo& info, void* pixels);
+
+  bool readFrame(double progress, tgfx::HardwareBufferRef hardwareBuffer);
 
  private:
-  std::shared_ptr<tgfx::Device> device = nullptr;
-  tgfx::BackendTexture texture = {};
-  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
+  std::mutex locker = {};
+  PAGPlayer* pagPlayer = nullptr;
+  std::shared_ptr<RasterDrawable> drawable = nullptr;
 
-  TextureDrawable(std::shared_ptr<tgfx::Device> device, const tgfx::BackendTexture& texture,
-                  tgfx::ImageOrigin origin);
+  CompositionReader(int width, int height);
+
+  bool renderFrame(double progress);
 };
 }  // namespace pag

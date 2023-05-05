@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,51 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Drawable.h"
+#pragma once
+
+#include "OffscreenDrawable.h"
 
 namespace pag {
-void Drawable::updateSize() {
-}
+class RasterDrawable : public OffscreenDrawable {
+ public:
+  static std::shared_ptr<RasterDrawable> Make(int width, int height);
 
-void Drawable::present(tgfx::Context*) {
-}
+  void setHardwareBuffer(tgfx::HardwareBufferRef buffer);
 
-void Drawable::setTimeStamp(int64_t) {
-}
+  void setPixelBuffer(const tgfx::ImageInfo& info, void* pixels);
 
-tgfx::Context* Drawable::lockContext(bool force) {
-  if (force && device == nullptr) {
-    device = onCreateDevice();
+  bool isPixelCopied() const {
+    return pixelCopied;
   }
-  if (device == nullptr) {
-    return nullptr;
-  }
-  return device->lockContext();
-}
 
-void Drawable::unlockContext() {
-  if (device == nullptr) {
-    return;
-  }
-  device->unlock();
-}
+ protected:
+  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
-void Drawable::freeDevice() {
-  device = nullptr;
-}
+ private:
+  std::shared_ptr<tgfx::Surface> offscreenSurface = nullptr;
+  tgfx::HardwareBufferRef hardwareBuffer = nullptr;
+  tgfx::ImageInfo info = {};
+  void* pixels = nullptr;
+  bool pixelCopied = false;
 
-std::shared_ptr<tgfx::Surface> Drawable::getSurface(tgfx::Context* context, bool force) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  if (force && surface == nullptr) {
-    surface = onCreateSurface(context);
-  }
-  return surface;
-}
+  RasterDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
-void Drawable::freeSurface() {
-  surface = nullptr;
-}
-
+  void present(tgfx::Context* context) override;
+};
 }  // namespace pag

@@ -33,7 +33,7 @@ OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx
     : _width(width), _height(height), device(std::move(device)) {
 }
 
-std::shared_ptr<tgfx::Surface> OffscreenDrawable::createSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> OffscreenDrawable::onCreateSurface(tgfx::Context* context) {
   if (tgfx::HardwareBufferAvailable()) {
     auto hardwareBuffer = tgfx::HardwareBufferAllocate(_width, _height);
     auto surface = tgfx::Surface::MakeFrom(context, hardwareBuffer);

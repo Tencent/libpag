@@ -1258,7 +1258,6 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
 
@@ -1266,7 +1265,7 @@ class PAG_API PAGSurface {
             bool autoClear = true);
   bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  tgfx::Context* lockContext();
+  tgfx::Context* lockContext(bool force = false);
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
 
@@ -1535,6 +1534,7 @@ class PAG_API PAGPlayer {
 };
 
 class SequenceFile;
+class CompositionReader;
 
 /**
  * PAGDecoder provides a utility to read image frames directly from a PAGComposition, and caches the
@@ -1605,7 +1605,7 @@ class PAGDecoder {
   uint32_t lastContentVersion = 0;
   std::shared_ptr<PAGComposition> container = nullptr;
   std::shared_ptr<SequenceFile> sequenceFile = nullptr;
-  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
+  std::shared_ptr<CompositionReader> reader = nullptr;
   std::vector<TimeRange> staticTimeRanges = {};
 
   static Composition* GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition);

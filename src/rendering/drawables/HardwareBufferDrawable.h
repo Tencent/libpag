@@ -34,17 +34,12 @@ class HardwareBufferDrawable : public Drawable {
     return _height;
   }
 
-  void updateSize() override {
-  }
-
-  std::shared_ptr<tgfx::Device> getDevice() override {
+ protected:
+  std::shared_ptr<tgfx::Device> onCreateDevice() override {
     return device;
   }
 
-  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
-
-  void present(tgfx::Context*) override {
-  }
+  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
  private:
   int _width = 0;

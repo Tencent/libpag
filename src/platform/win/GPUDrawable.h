@@ -39,12 +39,12 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
-
   void present(tgfx::Context* context) override;
 
  protected:
-  std::shared_ptr<tgfx::Device> getDevice() override;
+  std::shared_ptr<tgfx::Device> onCreateDevice() override;
+
+  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
  private:
   int _width = 0;

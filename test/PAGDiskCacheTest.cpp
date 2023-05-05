@@ -235,7 +235,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   }
   EXPECT_TRUE(decoder->sequenceFile->isComplete());
   EXPECT_TRUE(decoder->sequenceFile != nullptr);
-  EXPECT_TRUE(decoder->pagPlayer == nullptr);
+  EXPECT_TRUE(decoder->reader == nullptr);
   EXPECT_TRUE(decoder->getComposition() == nullptr);
   auto success = decoder->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
@@ -248,7 +248,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   success = decoder2->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
   EXPECT_EQ(decoder->sequenceFile, decoder2->sequenceFile);
-  EXPECT_TRUE(decoder2->pagPlayer == nullptr);
+  EXPECT_TRUE(decoder2->reader == nullptr);
   EXPECT_TRUE(decoder2->getComposition() != nullptr);
   success =
       decoder2->readFrame(50, pixmap.writablePixels(), pixmap.rowBytes(), ColorType::BGRA_8888);
@@ -276,7 +276,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   EXPECT_TRUE(
       Baseline::Compare(tgfx::Pixmap(info, pixmap.pixels()), "PAGDiskCacheTest/decoder_frame_0"));
   EXPECT_NE(decoder->sequenceFile, decoder3->sequenceFile);
-  EXPECT_TRUE(decoder3->pagPlayer != nullptr);
+  EXPECT_TRUE(decoder3->reader != nullptr);
   EXPECT_TRUE(decoder3->getComposition() != nullptr);
 
   auto pagFile2 = LoadPAGFile("resources/apitest/ZC2.pag");
@@ -356,7 +356,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_polygon_5"));
   EXPECT_TRUE(decoder->sequenceFile != nullptr);
   EXPECT_TRUE(decoder->sequenceFile->isComplete());
-  EXPECT_TRUE(decoder->pagPlayer == nullptr);
+  EXPECT_TRUE(decoder->reader == nullptr);
   EXPECT_TRUE(decoder->getComposition() == nullptr);
   success = decoder->readFrame(55, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
