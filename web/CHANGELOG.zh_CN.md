@@ -1,5 +1,66 @@
 # CHANGELOG
 
+## 4.2.77 (2023年5月4日)
+
+### BugFixes
+
+- 修复 Safari 和 iOS 微信浏览器的用户代理检测问题 (#905)
+- 修复兼容老浏览器 globalThis 的问题，例如 iOS 12.1 Safari (#898)
+- 更新 ImageBitmap 兼容性检查，以适应 Safari 15 (#884)
+- 修复 WebMask 纹理类型上传错误导致的微信崩溃问题 (#877)
+- 为内置 iOS 16.4 的 AppleWebKit 浏览器添加 OffscreenCanvas 回退 (#875)
+
+### Refactor 
+
+- 重构微信小程序的 PAGView (#871)
+
+## 4.2.56 (2023年4月13日)
+
+### Feature
+
+- 添加 isInstanceOf 方法来替代 instanceOf，在 Web 上防止未定义的全局类问题 (#861)
+- VideoReader 支持从 HTMLVideoElement 上创建 (#850)
+- 整理与 Web 上上传纹理相关的代码 (#826)
+- 发布 Web Lite SDK 0.0.7 版本 (#809)
+- 在 API 文档中添加了 Web Workers 的接口 (#806)
+- 在 Web Lite SDK 上启用抗锯齿并使用线性过滤 (#803)
+- 从 Matrix 类上移除了透视值 (#794)
+- 使用 tgfx::ImageBuffer 替代 WebVideoBuffer (#750)
+- 在 Web 平台上支持从 HTTP URL 制作 ImageCodec (#745)
+- 在 Web 平台上实现了 NativeCodec::readPixels() 方法 (#742)
+- 使用 emsdk 安装 emscripten (#733)
+- 实现了 ByteBuffer (#727)
+- 在 Web 平台上添加了创建图像的静态函数 (#728)
+- 锁定了 emscripten 版本到 3.1.20 (#725)
+- 在 Web 上异步实现图像解码器 (#720)
+
+### BugFixes
+
+- 修复 Safari 版本低于 16.4 时由于缺少全局变量 OffscreenCanvas 而导致的类型检查错误 (#860)
+- 修复在 Web 上 iOS 16.4 的 OffscreenCanvas 和 WebGL 接口之间的冲突 (#831)
+- 修复了 Web 上的帧准备错误 (#823)
+- 修复了 Web 上内存扩展后的指针丢失问题 (#799)
+- 修复了在 iOS Safari 上的 MP4 崩溃问题 (#786)
+- 修复了 desp.sh (#731)
+- 修复了 WeChat 上的用户代理获取失败问题 (#718)
+
+## 4.1.43 (2023年2月2日)
+
+### Feature
+
+- 在 VideoSequenceReader 中实现了 decodeFrame 方法 (#705)
+- 添加了 Web Worker 版本 (#675)
+- 更新了 README 和 CHANGLOG (#673)
+- 在 Wechat 上使用 Date.now() 替代 wx.getPerformance().now() (#669)
+- 解除了 VideoReader 和 PAGPlayer 之间的关联 (#667)
+- 在 Web 上通过 JS 数组返回 PAGImageLayer.getVideoRanges (#661)
+- 发布了 libpag-lite 0.0
+
+### BugFixes
+
+- 修复 Web 上的 onAnimationStart 事件（#688）
+- 在 Safari 浏览器上修复可播放状态时的空视频帧。（#655）
+
 ## 4.1.35
 
 ### BugFixes

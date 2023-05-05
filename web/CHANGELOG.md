@@ -1,5 +1,66 @@
 # CHANGELOG
 
+## 4.2.77 (May 4, 2023)
+
+### BugFixes
+
+- Fix user agent detection for Safari and iOS WeChat browsers (#905)
+- Fix globalThis compatibility issue for older browsers, e.g. iOS 12.1 Safari (#898)
+- Fix: update ImageBitmap compatibility check for Safari 15 (#884)
+- Fixing the WebMask texture type upload error that causes WeChat crash. (#877)
+- Fix: Add fallback for OffscreenCanvas in built-in iOS 16.4 AppleWebKit browsers (#875)
+
+### Refactor
+
+- Refactor PAGView on WeChat miniprogram (#871)
+
+## 4.2.56 (April 13, 2023)
+
+### Features
+
+- Add the isInstanceOf method to replace instanceOf, preventing issues with undefined global classes on Web. (#861)
+- VideoReader supports creating from an HTMLVideoElement on Web. (#850)
+- Organize the code related to uploading textures on the Web. (#826)
+- Publish Web lite SDK 0.0.7 version. (#809)
+- Add interfaces for Web Workers to the API documentation. (#806)
+- Enable antialias and use linear filtering on Web Lite SDK. (#803)
+- Remove the perspective values from the Matrix class on Web. (#794)
+- Use tgfx::ImageBuffer replace WebVideoBuffer. (#750)
+- Add support for making the ImageCodec from a HTTP URL on the Web platform. (#745)
+- Implements the NativeCodec::readPixels() method on the web platform. (#742)
+- Use emsdk to install emscripten. (#733)
+- Implements ByteBuffer. (#727)
+- Add static function to create image on Web platform。 (#728)
+- Pin emscripten version to 3.1.20 (#725)
+- Implement decoder image async on Web. (#720)
+
+### BugFixes
+
+- Fix type-check error caused by missing global variable OffscreenCanvas in Safari versions below 16.4 (#860)
+- Fix the conflict between OffscreenCanvas and WebGL interfaces in iOS version 16.4 on the Web. (#831)
+- Fix the prepare frame error on the Web. (#823)
+- Fix ptr loss after memory expansion on Web. (#799)
+- Fix covert MP4 crush on iOS safari. (#786)
+- Fix desp.sh (#731)
+- Fix get user agent fail on WeChat. (#718)
+
+## 4.1.43 (February 2, 2023)
+
+### Features
+
+- Implements decodeFrame in VideoSequenceReader. (#705)
+- Add Web Worker version. (#675)
+- Update README and CHANGLOG. (#673)
+- Replace `wx.getPerformance().now()` with `Date.now()` on Wechat. (#669)
+- Unlink VideoReader from PAGPlayer. (#667)
+- Return JS Array at PAGImageLayer.getVideoRanges on Web. (#661)
+- Released libpag-lite version 0.0.6. (#658)
+
+### BugFixes
+
+- Fix onAnimationStart event on Web (#688)
+- Fix empty video frame when playable state on Safari. (#655)
+
 ## 4.1.35
 
 ### BugFixes
