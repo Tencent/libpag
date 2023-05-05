@@ -82,6 +82,7 @@
     LOGE("PAGDecoder: CVPixelBufferRef create failed!");
     return nil;
   }
+  CFAutorelease(pixelBuffer);
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
   auto rowBytes = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
   auto pixels = CVPixelBufferGetBaseAddress(pixelBuffer);

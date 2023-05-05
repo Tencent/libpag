@@ -170,7 +170,7 @@ class Bitmap {
   }
 
   /**
-   * Returns true if the Bitmap is backed by a platform-specified hardware buffer. A hardware backed
+   * Returns true if the Bitmap is backed by a platform-specified hardware buffer. A hardware-backed
    * Bitmap allows sharing buffers across CPU and GPU, which can be used to speed up the texture
    * uploading.
    */

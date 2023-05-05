@@ -27,20 +27,16 @@ void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::stri
   if (info.isEmpty() || pixels == nullptr) {
     return;
   }
-  @autoreleasepool {
-    auto pixelBuffer = tgfx::HardwareBufferAllocate(info.width(), info.height());
-    if (pixelBuffer == nil) {
-      return;
-    }
-    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-    auto dstPixels = CVPixelBufferGetBaseAddress(pixelBuffer);
-    auto rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
-    auto dstInfo = tgfx::ImageInfo::Make(info.width(), info.height(), tgfx::ColorType::BGRA_8888,
-                                         tgfx::AlphaType::Premultiplied, rowBytes);
-    tgfx::Pixmap pixmap(dstInfo, dstPixels);
-    pixmap.writePixels(info, pixels);
-    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-    LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
+  auto pixelBuffer = tgfx::HardwareBufferAllocate(info.width(), info.height());
+  if (pixelBuffer == nil) {
+    return;
   }
+  auto dstPixels = tgfx::HardwareBufferLock(pixelBuffer);
+  auto dstInfo = tgfx::HardwareBufferGetInfo(pixelBuffer);
+  tgfx::Pixmap pixmap(dstInfo, dstPixels);
+  pixmap.writePixels(info, pixels);
+  tgfx::HardwareBufferUnlock(pixelBuffer);
+  tgfx::HardwareBufferRelease(pixelBuffer);
+  LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
 }
 }  // namespace pag

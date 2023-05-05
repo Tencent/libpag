@@ -86,11 +86,12 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (tryHardware) {
+  if (tryHardware && tgfx::HardwareBufferAvailable()) {
     auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
-    auto info = HardwareBufferGetInfo(hardwareBuffer);
-    if (!info.isEmpty()) {
-      return std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
+    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+    tgfx::HardwareBufferRelease(hardwareBuffer);
+    if (pixelBuffer != nullptr) {
+      return pixelBuffer;
     }
   }
   auto colorType = alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
