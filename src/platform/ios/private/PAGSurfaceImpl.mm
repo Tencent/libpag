@@ -141,6 +141,7 @@
     LOGE("CVPixelBufferRef create failed!");
     return nil;
   }
+  CFAutorelease(pixelBuffer);
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
   size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
