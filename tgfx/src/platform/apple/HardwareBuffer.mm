@@ -42,7 +42,7 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
 }
 
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
-  if (!HardwareBufferAvailable() || width <= 0 || height <= 0) {
+  if (width <= 0 || height <= 0) {
     return nil;
   }
   OSType pixelFormat = alphaOnly ? kCVPixelFormatType_OneComponent8 : kCVPixelFormatType_32BGRA;
