@@ -52,6 +52,8 @@ enum class Backend {
   OPENGL,
   METAL,
   VULKAN,
+  DIRECTX11,
+  DIRECTX12
 };
 
 /**
@@ -129,6 +131,28 @@ struct VkImageInfo {
   void* image = nullptr;
 };
 
+/**
+ * Types for interacting with DirectX11 resources created externally to PAG. Holds the ID3D11Texture2D as a
+ * void*.
+ */
+struct DX11TextureInfo {
+  /**
+   * Pointer to ID3D11Texture2D.
+   */
+  void* texture = nullptr;
+};
+
+/**
+ * Types for interacting with DirectX12 resources created externally to PAG. Holds the ID3D12Resource as a
+ * void*.
+ */
+struct DX12ResourceInfo {
+  /**
+   * Pointer to ID3D12Resource.
+   */
+  void* resource = nullptr;
+};
+
 class PAG_API BackendTexture {
  public:
   /**
@@ -151,6 +175,16 @@ class PAG_API BackendTexture {
    * Creates a Vulkan backend texture.
    */
   BackendTexture(const VkImageInfo& vkInfo, int width, int height);
+
+  /**
+   * Creates a DirectX11 backend texture.
+   */
+  BackendTexture(const DX11TextureInfo& dx11Info, int width, int height);
+
+  /**
+   * Creates a DirectX12 backend texture.
+   */
+  BackendTexture(const DX12ResourceInfo& dx12Info, int width, int height);
 
   BackendTexture(const BackendTexture& that);
 
@@ -202,6 +236,18 @@ class PAG_API BackendTexture {
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
+  /**
+   * If the backend API is DirectX11, copies a snapshot of the DX11TextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not DirectX11.
+   */
+  bool getDX11TextureInfo(DX11TextureInfo* dx11TextureInfo) const;
+
+  /**
+   * If the backend API is DirectX12, copies a snapshot of the DX12ResourceInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not DirectX12.
+   */
+  bool getDX12ResourceInfo(DX12ResourceInfo* dx12ResourceInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -211,6 +257,8 @@ class PAG_API BackendTexture {
     GLTextureInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    DX11TextureInfo dx11Info;
+    DX12ResourceInfo dx12Info;
   };
 };
 
@@ -236,6 +284,16 @@ class PAG_API BackendRenderTarget {
    * Creates a Vulkan backend render target.
    */
   BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height);
+
+  /**
+   * Creates a DirectX11 backend render target.
+   */
+  BackendRenderTarget(const DX11TextureInfo& dx11Info, int width, int height);
+
+  /**
+   * Creates a DirectX12 backend render target.
+   */
+  BackendRenderTarget(const DX12ResourceInfo& dx12Info, int width, int height);
 
   BackendRenderTarget(const BackendRenderTarget& that);
 
@@ -287,6 +345,18 @@ class PAG_API BackendRenderTarget {
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
+  /**
+   * If the backend API is DirectX11, copies a snapshot of the DX11TextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not DirectX11.
+   */
+  bool getDX11TextureInfo(DX11TextureInfo* dx11TextureInfo) const;
+
+  /**
+   * If the backend API is DirectX12, copies a snapshot of the DX12ResourceInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not DirectX11.
+   */
+  bool getDX12ResourceInfo(DX12ResourceInfo* dx12ResourceInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -295,6 +365,8 @@ class PAG_API BackendRenderTarget {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    DX11TextureInfo dx11Info;
+    DX12ResourceInfo dx12Info;
   };
 };
 
