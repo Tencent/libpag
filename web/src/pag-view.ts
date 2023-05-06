@@ -28,6 +28,10 @@ export interface PAGViewOptions {
    * Render first frame when pag view init. default true.
    */
   firstFrame?: boolean;
+  /**
+   * Use pre-rendering for the animation frames. default false.
+   */
+  usePreRendering?: boolean;
 }
 
 @destroyVerify
@@ -68,6 +72,7 @@ export class PAGView {
     }
     pagView.resetSize(pagView.pagViewOptions.useScale);
     pagView.frameRate = file.frameRate();
+    pagView.totalFrames = Math.floor((file.duration() / 1000000) * pagView.frameRate);
     pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
@@ -75,6 +80,13 @@ export class PAGView {
     if (pagView.pagViewOptions.firstFrame) {
       await pagView.flush();
       pagView.playFrame = 0;
+    }
+    if (pagView.pagViewOptions.usePreRendering) {
+      for (let i = 0; i < pagView.totalFrames; i++) {
+        await pagView.preRenderFrame(i);
+      }
+      pagView.setProgress(0);
+      await pagView.flush();
     }
     return pagView;
   }
@@ -117,6 +129,7 @@ export class PAGView {
   protected startTime = 0;
   protected repeatedTimes = 0;
   protected eventManager: EventManager<PAGViewEventMap, PAGView> = new EventManager();
+  protected totalFrames = 0;
 
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
@@ -423,6 +436,15 @@ export class PAGView {
 
   public setDebugData(data: DebugData) {
     this.debugData = { ...this.debugData, ...data };
+  }
+
+  public async preRenderFrame(frameIndex: number): Promise<void> {
+    if (!this.pagViewOptions.usePreRendering) {
+      throw new Error('Pre-rendering is not enabled.');
+    }
+  
+    this.player.setProgress(frameIndex / this.totalFrames);
+    await this.flush();
   }
 
   protected async flushLoop(force = false) {
