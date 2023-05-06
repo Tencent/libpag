@@ -245,6 +245,9 @@ Color Surface::getColor(int x, int y) {
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+    return false;
+  }
   auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
   flushAndSubmit(hardwareBuffer != nullptr);
   if (hardwareBuffer != nullptr) {

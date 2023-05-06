@@ -54,12 +54,15 @@ void RasterDrawable::setPixelBuffer(const tgfx::ImageInfo& newInfo, void* newPix
   freeSurface();
 }
 
-void RasterDrawable::present(tgfx::Context*) {
-  if (pixels == nullptr || offscreenSurface == nullptr) {
+void RasterDrawable::present(tgfx::Context* context) {
+  if (hardwareBuffer != nullptr) {
+    context->submit(true);
     pixelCopied = true;
     return;
   }
-  pixelCopied = offscreenSurface->readPixels(info, pixels);
+  if (offscreenSurface != nullptr) {
+    pixelCopied = offscreenSurface->readPixels(info, pixels);
+  }
 }
 
 std::shared_ptr<tgfx::Surface> RasterDrawable::onCreateSurface(tgfx::Context* context) {
