@@ -148,11 +148,12 @@ BackendTexture Surface::getBackendTexture() {
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
-  if (texture == nullptr) {
+  auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
+  if (hardwareBuffer == nullptr) {
     return nullptr;
   }
-  flushAndSubmit();
-  return texture->getHardwareBuffer();
+  flushAndSubmit(true);
+  return hardwareBuffer;
 }
 
 bool Surface::wait(const BackendSemaphore& waitSemaphore) {
@@ -245,9 +246,9 @@ Color Surface::getColor(int x, int y) {
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  flushAndSubmit();
-  if (texture != nullptr) {
-    auto hardwareBuffer = texture->getHardwareBuffer();
+  auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
+  flushAndSubmit(hardwareBuffer != nullptr);
+  if (hardwareBuffer != nullptr) {
     auto pixels = HardwareBufferLock(hardwareBuffer);
     if (pixels != nullptr) {
       auto info = HardwareBufferGetInfo(hardwareBuffer);
