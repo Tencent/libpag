@@ -72,10 +72,6 @@ public class PAGFont {
     private static final String SystemFontConfigPath_Lollipop = "/system/etc/fonts.xml";
     private static final String SystemFontConfigPath_JellyBean = "/system/etc/fallback_fonts.xml";
     private static final String SystemFontPath = "/system/fonts/";
-    private static final String[] FallbackFontFileNames =
-            {"/system/fonts/NotoSansCJK-Regular.ttc",
-                    "/system/fonts/NotoSansSC-Regular.otf",
-                    "/system/fonts/DroidSansFallback.ttf"};
 
     private static class FontConfig {
         String language = "";
@@ -332,11 +328,6 @@ public class PAGFont {
         ArrayList<Integer> ttcList = new ArrayList<>();
         FontConfig font = getFontByLanguage(fontList, DefaultLanguage);
         if (font != null) {
-            addFont(font, fontPaths, ttcList);
-        }
-        for (String fileName : FallbackFontFileNames) {
-            font = new FontConfig();
-            font.fileName = fileName;
             addFont(font, fontPaths, ttcList);
         }
         for (FontConfig fontConfig : fontList) {
