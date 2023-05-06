@@ -69,7 +69,7 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(HardwareBufferRef hardwareBuffer) {
-  auto drawable = HardwareBufferDrawable::MakeFrom(ToTGFX(hardwareBuffer));
+  auto drawable = HardwareBufferDrawable::MakeFrom(hardwareBuffer);
   return MakeFrom(drawable);
 }
 

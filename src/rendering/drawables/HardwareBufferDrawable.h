@@ -24,7 +24,7 @@ namespace pag {
 class HardwareBufferDrawable : public Drawable {
  public:
   static std::shared_ptr<HardwareBufferDrawable> MakeFrom(
-      tgfx::HardwareBufferRef hardwareBuffer, std::shared_ptr<tgfx::Device> device = nullptr);
+      HardwareBufferRef hardwareBuffer, std::shared_ptr<tgfx::Device> device = nullptr);
 
   int width() const override {
     return _width;
@@ -44,10 +44,10 @@ class HardwareBufferDrawable : public Drawable {
  private:
   int _width = 0;
   int _height = 0;
-  tgfx::HardwareBufferRef hardwareBuffer = nullptr;
+  HardwareBufferRef hardwareBuffer = nullptr;
   std::shared_ptr<tgfx::Device> device = nullptr;
 
-  HardwareBufferDrawable(int width, int height, tgfx::HardwareBufferRef hardwareBuffer,
+  HardwareBufferDrawable(int width, int height, HardwareBufferRef hardwareBuffer,
                          std::shared_ptr<tgfx::Device> device);
 };
 }  // namespace pag

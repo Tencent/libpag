@@ -53,7 +53,7 @@ bool CompositionReader::readFrame(double progress, const tgfx::ImageInfo& info, 
   return renderFrame(progress);
 }
 
-bool CompositionReader::readFrame(double progress, tgfx::HardwareBufferRef hardwareBuffer) {
+bool CompositionReader::readFrame(double progress, HardwareBufferRef hardwareBuffer) {
   std::lock_guard<std::mutex> autoLock(locker);
   drawable->setHardwareBuffer(hardwareBuffer);
   return renderFrame(progress);

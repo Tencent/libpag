@@ -42,7 +42,7 @@ class CompositionReader {
 
   bool readFrame(double progress, const tgfx::ImageInfo& info, void* pixels);
 
-  bool readFrame(double progress, tgfx::HardwareBufferRef hardwareBuffer);
+  bool readFrame(double progress, HardwareBufferRef hardwareBuffer);
 
  private:
   std::mutex locker = {};

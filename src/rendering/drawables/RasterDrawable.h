@@ -25,7 +25,7 @@ class RasterDrawable : public OffscreenDrawable {
  public:
   static std::shared_ptr<RasterDrawable> Make(int width, int height);
 
-  void setHardwareBuffer(tgfx::HardwareBufferRef buffer);
+  void setHardwareBuffer(HardwareBufferRef buffer);
 
   void setPixelBuffer(const tgfx::ImageInfo& info, void* pixels);
 
@@ -38,7 +38,7 @@ class RasterDrawable : public OffscreenDrawable {
 
  private:
   std::shared_ptr<tgfx::Surface> offscreenSurface = nullptr;
-  tgfx::HardwareBufferRef hardwareBuffer = nullptr;
+  HardwareBufferRef hardwareBuffer = nullptr;
   tgfx::ImageInfo info = {};
   void* pixels = nullptr;
   bool pixelCopied = false;

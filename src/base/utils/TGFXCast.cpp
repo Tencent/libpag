@@ -178,12 +178,4 @@ tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
   glSemaphore.initGL(semaphore.glSync());
   return glSemaphore;
 }
-
-tgfx::HardwareBufferRef ToTGFX(pag::HardwareBufferRef hardwareBuffer) {
-  return reinterpret_cast<tgfx::HardwareBufferRef>(hardwareBuffer);
-}
-
-pag::HardwareBufferRef ToPAG(tgfx::HardwareBufferRef hardwareBuffer) {
-  return reinterpret_cast<pag::HardwareBufferRef>(hardwareBuffer);
-}
 }  // namespace pag

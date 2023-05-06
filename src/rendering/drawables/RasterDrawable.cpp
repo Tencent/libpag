@@ -32,7 +32,7 @@ RasterDrawable::RasterDrawable(int width, int height, std::shared_ptr<tgfx::Devi
     : OffscreenDrawable(width, height, device) {
 }
 
-void RasterDrawable::setHardwareBuffer(tgfx::HardwareBufferRef buffer) {
+void RasterDrawable::setHardwareBuffer(HardwareBufferRef buffer) {
   pixelCopied = false;
   if (hardwareBuffer == buffer) {
     return;

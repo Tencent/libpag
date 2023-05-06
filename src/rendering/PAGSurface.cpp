@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
@@ -103,7 +102,7 @@ HardwareBufferRef PAGSurface::getHardwareBuffer() {
   }
   auto hardwareBuffer = surface->getHardwareBuffer();
   unlockContext();
-  return ToPAG(hardwareBuffer);
+  return hardwareBuffer;
 }
 
 bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,

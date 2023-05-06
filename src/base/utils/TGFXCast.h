@@ -59,10 +59,6 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget);
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore);
 
-tgfx::HardwareBufferRef ToTGFX(pag::HardwareBufferRef hardwareBuffer);
-
-pag::HardwareBufferRef ToPAG(tgfx::HardwareBufferRef hardwareBuffer);
-
 static inline const tgfx::Matrix* ToTGFX(const Matrix* matrix) {
   return reinterpret_cast<const tgfx::Matrix*>(matrix);
 }
