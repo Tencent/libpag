@@ -25,6 +25,7 @@
 #include "rendering/layers/ContentVersion.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
+#include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace pag {
 static jfieldID PAGDecoder_nativeContext;
@@ -109,7 +110,7 @@ PAG_API jboolean Java_org_libpag_PAGDecoder_checkFrameChanged(JNIEnv* env, jobje
   if (decoder == nullptr) {
     return 0;
   }
-  return ContentVersion::CheckFrameChanged(decoder, index);
+  return decoder->checkFrameChanged(index);
 }
 
 PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thiz,
@@ -119,11 +120,8 @@ PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thi
     return JNI_FALSE;
   }
   auto hardwareBuffer = tgfx::AndroidBitmap::GetHardwareBuffer(env, bitmapObject);
-  tgfx::Bitmap bitmap(hardwareBuffer);
-  if (!bitmap.isEmpty()) {
-    tgfx::Pixmap pixmap(bitmap);
-    return decoder->readFrame(index, pixmap.writablePixels(), pixmap.rowBytes(),
-                              ToPAG(pixmap.colorType()), ToPAG(pixmap.alphaType()));
+  if (hardwareBuffer != nullptr) {
+    return decoder->readFrame(index, hardwareBuffer);
   }
   auto info = tgfx::AndroidBitmap::GetInfo(env, bitmapObject);
   if (info.isEmpty()) {
@@ -140,5 +138,19 @@ PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thi
                                     ToPAG(info.alphaType()));
   AndroidBitmap_unlockPixels(env, bitmapObject);
   return success;
+}
+
+PAG_API jboolean Java_org_libpag_PAGDecoder_readFrameTo(JNIEnv* env, jobject thiz,
+                                                        jobject hardwareBufferObject, jint index) {
+  auto decoder = getPAGDecoder(env, thiz);
+  if (decoder == nullptr) {
+    return JNI_FALSE;
+  }
+  auto hardwareBuffer = tgfx::HardwareBufferFromJavaObject(env, hardwareBufferObject);
+  if (hardwareBuffer == nullptr) {
+    LOGE("PAGDecoder::readFrameTo() Invalid hardwareBuffer specified!");
+    return JNI_FALSE;
+  }
+  return decoder->readFrame(index, hardwareBuffer);
 }
 }

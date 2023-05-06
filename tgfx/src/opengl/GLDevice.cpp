@@ -19,7 +19,6 @@
 #include "tgfx/opengl/GLDevice.h"
 #include <thread>
 #include "opengl/GLContext.h"
-#include "opengl/GLUtil.h"
 
 namespace tgfx {
 static std::mutex deviceMapLocker = {};
