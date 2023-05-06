@@ -15,20 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-//
 
-#import <Foundation/Foundation.h>
-#import "PAGDecoderImpl.h"
-#import "platform/ios/PAGDecoder.h"
+#include "ContentVersion.h"
 
-@interface PAGDecoder (Internal)
-
-- (id)impl;
-
-@end
-
-@interface PAGDecoderImpl (Internal)
-
-- (std::shared_ptr<pag::PAGDecoder>)decoder;
-
-@end
+namespace pag {
+uint32_t ContentVersion::Get(std::shared_ptr<PAGLayer> pagLayer) {
+  if (pagLayer == nullptr) {
+    return 0;
+  }
+  LockGuard autoLock(pagLayer->rootLocker);
+  return pagLayer->contentVersion;
+}
+}  // namespace pag

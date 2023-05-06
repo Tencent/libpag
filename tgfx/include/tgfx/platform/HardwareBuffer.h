@@ -21,31 +21,19 @@
 #include "tgfx/core/ImageInfo.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
-
 struct AHardwareBuffer;
-
 #elif defined(__APPLE__)
-
 struct __CVBuffer;
-
 #endif
 
 namespace tgfx {
 #if defined(__ANDROID__) || defined(ANDROID)
-
 typedef AHardwareBuffer* HardwareBufferRef;
-
 #elif defined(__APPLE__)
-
 // __CVBuffer == CVPixelBufferRef
 typedef __CVBuffer* HardwareBufferRef;
-
 #else
-
-struct HardwareBuffer {};
-
-typedef HardwareBuffer* HardwareBufferRef;
-
+typedef void* HardwareBufferRef;
 #endif
 
 /**

@@ -36,8 +36,7 @@ typedef AHardwareBuffer* HardwareBufferRef;
 // __CVBuffer == CVPixelBufferRef
 typedef __CVBuffer* HardwareBufferRef;
 #else
-struct HardwareBuffer {};
-typedef HardwareBuffer* HardwareBufferRef;
+typedef void* HardwareBufferRef;
 #endif
 
 /**

@@ -33,7 +33,7 @@ TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
     : device(std::move(device)), texture(texture), origin(origin) {
 }
 
-std::shared_ptr<tgfx::Surface> TextureDrawable::createSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> TextureDrawable::onCreateSurface(tgfx::Context* context) {
   return tgfx::Surface::MakeFrom(context, texture, origin);
 }
 }  // namespace pag

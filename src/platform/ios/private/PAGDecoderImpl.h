@@ -35,7 +35,11 @@
 
 - (float)frameRate;
 
+- (BOOL)checkFrameChanged:(int)index;
+
 - (BOOL)copyFrameTo:(nullable void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index;
+
+- (BOOL)readFrameTo:(_Nullable CVPixelBufferRef)pixelBuffer at:(NSInteger)index;
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index;
 

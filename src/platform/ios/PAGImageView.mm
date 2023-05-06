@@ -330,11 +330,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  if ([PAGContentVersion CheckFrameChanged:[self getPAGDecoder] index:frameIndex]) {
+  PAGDecoder* pagDecoder = [self getPAGDecoder];
+  if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
     uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
-    BOOL status = [[self getPAGDecoder] copyFrameTo:rgbaData
-                                           rowBytes:static_cast<size_t>(cacheImageRowBytes)
-                                                 at:frameIndex];
+    BOOL status = [pagDecoder copyFrameTo:rgbaData
+                                 rowBytes:static_cast<size_t>(cacheImageRowBytes)
+                                       at:frameIndex];
     if (!status) {
       return status;
     }

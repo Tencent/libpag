@@ -31,7 +31,6 @@ class DrawingManager;
 class Gpu;
 class ResourceProvider;
 class ProxyProvider;
-class Semaphore;
 
 class Context {
  public:
@@ -115,7 +114,7 @@ class Context {
    * GPU back-end will not wait on the passed semaphore, and the client will still own the
    * semaphore. Returns true if GPU is waiting on the semaphore.
    */
-  bool wait(const Semaphore* waitSemaphore);
+  bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
    * Apply all pending changes to the render target immediately. After issuing all commands, the
@@ -126,7 +125,7 @@ class Context {
    * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
    * the caller should not instruct the GPU to wait on the semaphore.
    */
-  bool flush(Semaphore* signalSemaphore = nullptr);
+  bool flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
    * Submit outstanding work to the gpu from all previously un-submitted flushes. The return

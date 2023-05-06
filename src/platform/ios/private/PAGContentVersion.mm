@@ -20,7 +20,6 @@
 
 #import "platform/cocoa/private/PAGLayer+Internal.h"
 #import "platform/cocoa/private/PAGLayerImpl+Internal.h"
-#import "platform/ios/private/PAGDecoder+Internal.h"
 #include "rendering/layers/ContentVersion.h"
 
 @implementation PAGContentVersion
@@ -31,12 +30,4 @@
   auto composition = [[pagComposition impl] pagLayer];
   return pag::ContentVersion::Get(composition);
 }
-
-+ (BOOL)CheckFrameChanged:(PAGDecoder*)decoder index:(NSInteger)index {
-  if (decoder) {
-    return pag::ContentVersion::CheckFrameChanged([[decoder impl] decoder], (int)index);
-  }
-  return NO;
-}
-
 @end

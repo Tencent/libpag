@@ -39,7 +39,7 @@ void GPUDrawable::updateSize() {
   _height = static_cast<int>(roundf(size.height));
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -49,7 +49,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   return window ? window->getDevice() : nullptr;
 }
 
-std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
   if (window == nullptr) {
     return nullptr;
   }

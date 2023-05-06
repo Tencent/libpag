@@ -18,36 +18,39 @@
 
 #pragma once
 
-#include "Drawable.h"
+#include "pag/pag.h"
+#include "rendering/drawables/RasterDrawable.h"
 
 namespace pag {
-class HardwareBufferDrawable : public Drawable {
+class CompositionReader {
  public:
-  static std::shared_ptr<HardwareBufferDrawable> MakeFrom(
-      HardwareBufferRef hardwareBuffer, std::shared_ptr<tgfx::Device> device = nullptr);
+  static std::shared_ptr<CompositionReader> Make(int width, int height);
 
-  int width() const override {
-    return _width;
+  ~CompositionReader();
+
+  int width() const {
+    return drawable->width();
   }
 
-  int height() const override {
-    return _height;
+  int height() const {
+    return drawable->height();
   }
 
- protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override {
-    return device;
-  }
+  std::shared_ptr<PAGComposition> getComposition();
 
-  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+  void setComposition(std::shared_ptr<PAGComposition> composition);
+
+  bool readFrame(double progress, const tgfx::ImageInfo& info, void* pixels);
+
+  bool readFrame(double progress, HardwareBufferRef hardwareBuffer);
 
  private:
-  int _width = 0;
-  int _height = 0;
-  HardwareBufferRef hardwareBuffer = nullptr;
-  std::shared_ptr<tgfx::Device> device = nullptr;
+  std::mutex locker = {};
+  PAGPlayer* pagPlayer = nullptr;
+  std::shared_ptr<RasterDrawable> drawable = nullptr;
 
-  HardwareBufferDrawable(int width, int height, HardwareBufferRef hardwareBuffer,
-                         std::shared_ptr<tgfx::Device> device);
+  CompositionReader(int width, int height);
+
+  bool renderFrame(double progress);
 };
 }  // namespace pag

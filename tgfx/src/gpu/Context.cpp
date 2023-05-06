@@ -47,8 +47,13 @@ Context::~Context() {
   delete _proxyProvider;
 }
 
-bool Context::flush(Semaphore* signalSemaphore) {
-  return _drawingManager->flush(signalSemaphore);
+bool Context::flush(BackendSemaphore* signalSemaphore) {
+  auto semaphore = Semaphore::Wrap(signalSemaphore);
+  auto success = _drawingManager->flush(semaphore.get());
+  if (signalSemaphore != nullptr) {
+    *signalSemaphore = semaphore->getBackendSemaphore();
+  }
+  return success;
 }
 
 bool Context::submit(bool syncCpu) {
@@ -60,11 +65,12 @@ void Context::flushAndSubmit(bool syncCpu) {
   submit(syncCpu);
 }
 
-bool Context::wait(const Semaphore* waitSemaphore) {
-  if (waitSemaphore == nullptr) {
+bool Context::wait(const BackendSemaphore& waitSemaphore) {
+  auto semaphore = Semaphore::Wrap(&waitSemaphore);
+  if (semaphore == nullptr) {
     return false;
   }
-  return caps()->semaphoreSupport && _gpu->waitSemaphore(waitSemaphore);
+  return caps()->semaphoreSupport && _gpu->waitSemaphore(semaphore.get());
 }
 
 void Context::onLocked() {

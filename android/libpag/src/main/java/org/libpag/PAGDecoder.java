@@ -19,6 +19,7 @@
 package org.libpag;
 
 import android.graphics.Bitmap;
+import android.hardware.HardwareBuffer;
 
 import org.extra.tools.LibraryLoadUtils;
 
@@ -88,11 +89,11 @@ public class PAGDecoder {
     public native float frameRate();
 
     /**
-     * Returns true if the frame at the given index has changed since the last copyFrameTo() or
-     * frameAtIndex() call. The caller should skip the corresponding reading call if the frame has
-     * not changed.
+     * Returns true if the frame at the given index has changed since the last copyFrameTo(),
+     * readFrameTo(), or frameAtIndex() call. The caller should skip the corresponding call
+     * if the frame has not changed.
      */
-    native boolean checkFrameChanged(int index);
+    public native boolean checkFrameChanged(int index);
 
     /**
      * Copies pixels of the image frame at the given index to the specified Bitmap. Returns false if
@@ -100,6 +101,13 @@ public class PAGDecoder {
      * every copying call. Otherwise, it may return false.
      */
     public native boolean copyFrameTo(Bitmap bitmap, int index);
+
+    /**
+     * Reads pixels of the image frame at the given index into the specified HardwareBuffer.
+     * Returns false if failed. Reading image frames into HardwareBuffer usually has better
+     * performance than reading into memory.
+     */
+    public native boolean readFrameTo(HardwareBuffer hardwareBuffer, int index);
 
     /**
      * Returns the image frame at the specified index. It's recommended to read the image frames in

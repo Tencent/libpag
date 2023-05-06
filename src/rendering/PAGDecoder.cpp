@@ -21,6 +21,7 @@
 #include "base/utils/TGFXCast.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
+#include "rendering/CompositionReader.h"
 #include "rendering/caches/DiskCache.h"
 #include "rendering/layers/ContentVersion.h"
 #include "rendering/utils/LockGuard.h"
@@ -93,16 +94,21 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   return std::shared_ptr<PAGDecoder>(new PAGDecoder(std::move(composition), static_cast<int>(width),
                                                     static_cast<int>(height), result.first,
-                                                    result.second, maxFrameRate, true));
+                                                    result.second, maxFrameRate));
 }
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
-                       int numFrames, float frameRate, float maxFrameRate, bool useDiskCache)
+                       int numFrames, float frameRate, float maxFrameRate)
     : _width(width), _height(height), _numFrames(numFrames), _frameRate(frameRate),
-      maxFrameRate(maxFrameRate), useDiskCache(useDiskCache) {
+      maxFrameRate(maxFrameRate) {
   container = PAGComposition::Make(width, height);
   container->addLayer(composition);
   staticTimeRanges = GetStaticTimeRange(composition, _numFrames);
+  lastImageInfo = new tgfx::ImageInfo();
+}
+
+PAGDecoder::~PAGDecoder() {
+  delete lastImageInfo;
 }
 
 int PAGDecoder::numFrames() {
@@ -130,34 +136,48 @@ bool PAGDecoder::checkFrameChanged(int index) {
   return !timeRange.contains(lastReadIndex);
 }
 
-bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorType colorType,
-                           pag::AlphaType alphaType) {
+bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, ColorType colorType,
+                           AlphaType alphaType) {
   std::lock_guard<std::mutex> auoLock(locker);
+  auto info =
+      tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
+  return readFrame(index, info, pixels, nullptr);
+}
+
+bool PAGDecoder::readFrame(int index, HardwareBufferRef hardwareBuffer) {
+  std::lock_guard<std::mutex> auoLock(locker);
+  auto info = tgfx::HardwareBufferGetInfo(hardwareBuffer);
+  return readFrame(index, info, nullptr, hardwareBuffer);
+}
+
+bool PAGDecoder::readFrame(int index, const tgfx::ImageInfo& info, void* pixels,
+                           HardwareBufferRef hardwareBuffer) {
+  if (info.isEmpty()) {
+    LOGE("PAGDecoder::readFrame() The specified image info is invalid!");
+    return false;
+  }
   auto composition = getComposition();
   checkCompositionChange(composition);
   if (index < 0 || index >= _numFrames) {
     LOGE("PAGDecoder::readFrame() The index is out of range!");
     return false;
   }
-  if (!useDiskCache) {
-    return renderFrame(composition, index, pixels, rowBytes, colorType, alphaType);
-  }
-  if (!checkSequenceFile(composition, rowBytes, colorType, alphaType)) {
+  if (!checkSequenceFile(composition, info)) {
     return false;
   }
-  auto success = sequenceFile->readFrame(index, pixels);
+  auto success = readFromFile(index, pixels, hardwareBuffer);
   if (!success) {
-    success = renderFrame(composition, index, pixels, rowBytes, colorType, alphaType);
+    success = renderFrame(composition, index, info, pixels, hardwareBuffer);
     if (success) {
-      success = sequenceFile->writeFrame(index, pixels);
+      success = writeToFile(index, pixels, hardwareBuffer);
       if (!success) {
         LOGE("PAGDecoder::readFrame() Failed to write frame to SequenceFile!");
       }
     }
   }
   if (sequenceFile->isComplete() && composition != nullptr) {
-    if (pagPlayer != nullptr) {
-      pagPlayer = nullptr;
+    if (reader != nullptr) {
+      reader = nullptr;
       if (!composition.unique()) {
         container->addLayer(composition);
       }
@@ -171,36 +191,63 @@ bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorT
   return success;
 }
 
-bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
-                             size_t rowBytes, pag::ColorType colorType, pag::AlphaType alphaType) {
+bool PAGDecoder::readFromFile(int index, void* pixels, HardwareBufferRef hardwareBuffer) {
+  if (hardwareBuffer != nullptr) {
+    pixels = tgfx::HardwareBufferLock(hardwareBuffer);
+  }
+  if (pixels == nullptr) {
+    return false;
+  }
+  auto success = sequenceFile->readFrame(index, pixels);
+  if (hardwareBuffer != nullptr) {
+    tgfx::HardwareBufferUnlock(hardwareBuffer);
+  }
+  return success;
+}
+
+bool PAGDecoder::writeToFile(int index, void* pixels, HardwareBufferRef hardwareBuffer) {
+  if (hardwareBuffer != nullptr) {
+    pixels = tgfx::HardwareBufferLock(hardwareBuffer);
+  }
+  if (pixels == nullptr) {
+    return false;
+  }
+  auto success = sequenceFile->writeFrame(index, pixels);
+  if (hardwareBuffer != nullptr) {
+    tgfx::HardwareBufferUnlock(hardwareBuffer);
+  }
+  return success;
+}
+
+bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int index,
+                             const tgfx::ImageInfo& info, void* pixels,
+                             HardwareBufferRef hardwareBuffer) {
   if (composition == nullptr) {
-    pagPlayer = nullptr;
+    reader = nullptr;
     LOGE(
         "PAGDecoder: Failed to get PAGComposition! the associated PAGComposition "
         "may be added to another parent after the PAGDecoder was created.");
     return false;
   }
-  if (pagPlayer == nullptr) {
-    auto pagSurface = PAGSurface::MakeOffscreen(_width, _height);
-    if (pagSurface == nullptr) {
-      LOGE("PAGDecoder::renderFrame() Failed to create PAGSurface!");
+  if (reader == nullptr) {
+    reader = CompositionReader::Make(_width, _height);
+    if (reader == nullptr) {
+      LOGE("PAGDecoder::renderFrame() Failed to create a CompositionReader!");
       return false;
     }
-    pagPlayer = std::make_unique<PAGPlayer>();
-    pagPlayer->setSurface(pagSurface);
-    pagPlayer->setComposition(composition);
+    reader->setComposition(composition);
   }
   auto progress = FrameToProgress(static_cast<Frame>(index), _numFrames);
-  pagPlayer->setProgress(progress);
-  pagPlayer->flush();
-  auto pagSurface = pagPlayer->getSurface();
-  return pagSurface->readPixels(colorType, alphaType, pixels, rowBytes);
+  if (hardwareBuffer != nullptr) {
+    return reader->readFrame(progress, hardwareBuffer);
+  }
+  return reader->readFrame(progress, info, pixels);
 }
 
-bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
-                                   ColorType colorType, AlphaType alphaType) {
+bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition,
+                                   const tgfx::ImageInfo& info) {
   if (sequenceFile != nullptr) {
-    if (rowBytes != lastRowBytes || colorType != lastColorType || alphaType != lastAlphaType) {
+    if (*lastImageInfo != info) {
       LOGE(
           "PAGDecoder::readFrame() The rowBytes, colorType or alphaType is not the same as the "
           "previous call!");
@@ -215,16 +262,12 @@ bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, 
     return false;
   }
   auto key = generateCacheKey(composition);
-  auto info =
-      tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
   sequenceFile = DiskCache::OpenSequence(key, info, _numFrames, _frameRate, staticTimeRanges);
   if (sequenceFile == nullptr) {
     LOGE("PAGDecoder: Failed to open SequenceFile!");
     return false;
   }
-  lastRowBytes = rowBytes;
-  lastColorType = colorType;
-  lastAlphaType = alphaType;
+  *lastImageInfo = info;
   return true;
 }
 
@@ -258,8 +301,8 @@ std::shared_ptr<PAGComposition> PAGDecoder::getComposition() {
   if (container->numChildren() == 1) {
     return std::static_pointer_cast<PAGComposition>(container->getLayerAt(0));
   }
-  if (pagPlayer != nullptr) {
-    return pagPlayer->getComposition();
+  if (reader != nullptr) {
+    return reader->getComposition();
   }
   return nullptr;
 }

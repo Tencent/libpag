@@ -29,6 +29,7 @@ namespace tgfx {
 struct Rect;
 class Context;
 class Surface;
+class ImageInfo;
 }  // namespace tgfx
 
 namespace pag {
@@ -1258,7 +1259,6 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
 
@@ -1266,7 +1266,7 @@ class PAG_API PAGSurface {
             bool autoClear = true);
   bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  tgfx::Context* lockContext();
+  tgfx::Context* lockContext(bool force = false);
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
 
@@ -1535,6 +1535,7 @@ class PAG_API PAGPlayer {
 };
 
 class SequenceFile;
+class CompositionReader;
 
 /**
  * PAGDecoder provides a utility to read image frames directly from a PAGComposition, and caches the
@@ -1554,6 +1555,8 @@ class PAGDecoder {
    */
   static std::shared_ptr<PAGDecoder> MakeFrom(std::shared_ptr<PAGComposition> composition,
                                               float maxFrameRate = 30.0f, float scale = 1.0f);
+
+  ~PAGDecoder();
 
   /**
    * Returns the width of decoded image frames.
@@ -1582,13 +1585,26 @@ class PAGDecoder {
   float frameRate();
 
   /**
-   * Copies pixels of the image frame at the given index into the specified memory address. Returns
+   * Returns true if the frame at the given index has changed since the last readFrame() call. The
+   * caller should skip the corresponding reading call if the frame has not changed.
+   */
+  bool checkFrameChanged(int index);
+
+  /**
+   * Reads pixels of the image frame at the given index into the specified memory address. Returns
    * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
    * the same throughout every reading call. Otherwise, it may return false.
    */
   bool readFrame(int index, void* pixels, size_t rowBytes,
                  ColorType colorType = ColorType::RGBA_8888,
                  AlphaType alphaType = AlphaType::Premultiplied);
+
+  /**
+   * Reads pixels of the image frame at the given index into the specified HardwareBuffer. Returns
+   * false if failed. Reading image frames into HardwareBuffer usually has better performance than
+   * reading into memory.
+   */
+  bool readFrame(int index, HardwareBufferRef hardwareBuffer);
 
  private:
   std::mutex locker = {};
@@ -1597,15 +1613,12 @@ class PAGDecoder {
   int _numFrames = 0;
   float _frameRate = 30.0f;
   float maxFrameRate = 30.0f;
-  bool useDiskCache = true;
   int lastReadIndex = -1;
-  size_t lastRowBytes = 0;
-  ColorType lastColorType = ColorType::RGBA_8888;
-  AlphaType lastAlphaType = AlphaType::Premultiplied;
+  tgfx::ImageInfo* lastImageInfo = nullptr;
   uint32_t lastContentVersion = 0;
   std::shared_ptr<PAGComposition> container = nullptr;
   std::shared_ptr<SequenceFile> sequenceFile = nullptr;
-  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
+  std::shared_ptr<CompositionReader> reader = nullptr;
   std::vector<TimeRange> staticTimeRanges = {};
 
   static Composition* GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition);
@@ -1615,22 +1628,18 @@ class PAGDecoder {
                                                    int numFrames);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate, float maxFrameRate, bool useDiskCache);
+             float frameRate, float maxFrameRate);
 
-  /**
-   * Returns true if the frame at the given index has changed since the last readFrame() call. The
-   * caller should skip the corresponding reading call if the frame has not changed.
-   */
-  bool checkFrameChanged(int index);
-
-  bool renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
-                   size_t rowBytes, ColorType colorType, AlphaType alphaType);
-  bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
-                         ColorType colorType, AlphaType alphaType);
+  bool readFrame(int index, const tgfx::ImageInfo& info, void* pixels,
+                 HardwareBufferRef hardwareBuffer);
+  bool readFromFile(int index, void* pixels, HardwareBufferRef hardwareBuffer);
+  bool writeToFile(int index, void* pixels, HardwareBufferRef hardwareBuffer);
+  bool renderFrame(std::shared_ptr<PAGComposition> composition, int index,
+                   const tgfx::ImageInfo& info, void* pixels, HardwareBufferRef hardwareBuffer);
+  bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, const tgfx::ImageInfo& info);
   void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
   std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
   std::shared_ptr<PAGComposition> getComposition();
-  friend class ContentVersion;
 };
 
 /**

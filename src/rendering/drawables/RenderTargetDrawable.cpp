@@ -35,7 +35,7 @@ RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
     : device(std::move(device)), renderTarget(renderTarget), origin(origin) {
 }
 
-std::shared_ptr<tgfx::Surface> RenderTargetDrawable::createSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> RenderTargetDrawable::onCreateSurface(tgfx::Context* context) {
   return tgfx::Surface::MakeFrom(context, renderTarget, origin);
 }
 }  // namespace pag

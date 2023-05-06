@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
@@ -60,7 +59,7 @@ void PAGSurface::onFreeCache() {
   if (pagPlayer) {
     pagPlayer->renderCache->releaseAll();
   }
-  surface = nullptr;
+  drawable->freeSurface();
   auto context = drawable->lockContext();
   if (context) {
     context->purgeResourcesNotUsedSince(0);
@@ -71,16 +70,11 @@ void PAGSurface::onFreeCache() {
 
 bool PAGSurface::clearAll() {
   LockGuard autoLock(rootLocker);
-  if (!drawable->prepareDevice()) {
-    return false;
-  }
-  auto context = lockContext();
+  auto context = lockContext(true);
   if (!context) {
     return false;
   }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
+  auto surface = drawable->getSurface(context, true);
   if (surface == nullptr) {
     unlockContext();
     return false;
@@ -98,19 +92,29 @@ bool PAGSurface::clearAll() {
 HardwareBufferRef PAGSurface::getHardwareBuffer() {
   LockGuard autoLock(rootLocker);
   auto context = lockContext();
-  if (surface == nullptr || !context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto surface = drawable->getSurface(context);
+  if (surface == nullptr) {
+    unlockContext();
     return nullptr;
   }
   auto hardwareBuffer = surface->getHardwareBuffer();
   unlockContext();
-  return ToPAG(hardwareBuffer);
+  return hardwareBuffer;
 }
 
 bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,
                             size_t dstRowBytes) {
   LockGuard autoLock(rootLocker);
   auto context = lockContext();
-  if (surface == nullptr || !context) {
+  if (context == nullptr) {
+    return false;
+  }
+  auto surface = drawable->getSurface(context);
+  if (surface == nullptr) {
+    unlockContext();
     return false;
   }
   auto info = tgfx::ImageInfo::Make(surface->width(), surface->height(), ToTGFX(colorType),
@@ -122,20 +126,18 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
-  if (!drawable->prepareDevice()) {
-    return false;
-  }
-  auto context = lockContext();
+  auto context = lockContext(true);
   if (!context) {
     return false;
   }
   cache->prepareLayers();
+  auto surface = drawable->getSurface(context);
   if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
     return false;
   }
   if (surface == nullptr) {
-    surface = drawable->createSurface(context);
+    surface = drawable->getSurface(context, true);
   }
   if (surface == nullptr) {
     unlockContext();
@@ -167,24 +169,14 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
   if (!waitSemaphore.isInitialized()) {
     return false;
   }
-  if (!drawable->prepareDevice()) {
-    return false;
-  }
-  auto context = lockContext();
+  auto context = lockContext(true);
   if (!context) {
     return false;
   }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
-  if (surface == nullptr) {
-    unlockContext();
-    return false;
-  }
   auto semaphore = ToTGFX(waitSemaphore);
-  auto ret = surface->wait(semaphore);
+  auto success = context->wait(semaphore);
   unlockContext();
-  return ret;
+  return success;
 }
 
 bool PAGSurface::prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic) {
@@ -217,8 +209,8 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   return result;
 }
 
-tgfx::Context* PAGSurface::lockContext() {
-  auto context = drawable->lockContext();
+tgfx::Context* PAGSurface::lockContext(bool force) {
+  auto context = drawable->lockContext(force);
   if (context != nullptr && contextAdopted) {
 #ifndef PAG_BUILD_FOR_WEB
     glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));

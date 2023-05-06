@@ -71,9 +71,17 @@
   return pagDecoder->frameRate();
 }
 
+- (BOOL)checkFrameChanged:(int)index {
+  return pagDecoder->checkFrameChanged(index);
+}
+
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {
   return pagDecoder->readFrame(static_cast<int>(index), pixels, rowBytes, pag::ColorType::BGRA_8888,
                                pag::AlphaType::Premultiplied);
+}
+
+- (BOOL)readFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index {
+  return pagDecoder->readFrame(static_cast<int>(index), pixelBuffer);
 }
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index {

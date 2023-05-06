@@ -157,8 +157,7 @@ HardwareBufferRef Surface::getHardwareBuffer() {
 }
 
 bool Surface::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(&waitSemaphore);
-  return renderTarget->getContext()->wait(semaphore.get());
+  return renderTarget->getContext()->wait(waitSemaphore);
 }
 
 Canvas* Surface::getCanvas() {
@@ -246,6 +245,9 @@ Color Surface::getColor(int x, int y) {
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+    return false;
+  }
   auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
   flushAndSubmit(hardwareBuffer != nullptr);
   if (hardwareBuffer != nullptr) {

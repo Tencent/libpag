@@ -42,14 +42,14 @@ void GPUDrawable::updateSize() {
   _height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
   return window->getDevice();
 }
 
-std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context) {
+std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
   return window->createSurface(context);
 }
 

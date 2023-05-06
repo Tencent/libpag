@@ -26,8 +26,6 @@ NS_ASSUME_NONNULL_BEGIN
 @interface PAGContentVersion : NSObject
 + (NSInteger)Get:(PAGComposition*)pagComposition;
 
-+ (BOOL)CheckFrameChanged:(PAGDecoder*)decoder index:(NSInteger)index;
-
 @end
 
 NS_ASSUME_NONNULL_END
