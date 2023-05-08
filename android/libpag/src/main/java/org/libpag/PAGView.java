@@ -849,8 +849,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             result = pagPlayer.flush();
             progressExplicitlySet = false;
             synchronized (updateTimeLock) {
-                long repeatCount = currentPlayTime / animator.getDuration();
-                long playTime = (long) ((pagPlayer.getProgress() + repeatCount) * pagPlayer.duration());
+                long playTime = 0;
+                if (animator.getDuration() > 0) {
+                    long repeatCount = currentPlayTime / animator.getDuration();
+                    playTime = (long) ((pagPlayer.getProgress() + repeatCount) * pagPlayer.duration());
+                }
                 animator.setCurrentPlayTime(playTime / 1000);
             }
         } else {
