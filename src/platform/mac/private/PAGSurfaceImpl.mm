@@ -20,6 +20,7 @@
 #include "GPUDrawable.h"
 #import "PAGLayerImpl+Internal.h"
 #include "base/utils/Log.h"
+#include "platform/cocoa/private/PixelBufferUtil.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -86,12 +87,11 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  auto hardwareBuffer = tgfx::HardwareBufferAllocate(_pagSurface->width(), _pagSurface->height());
+  auto hardwareBuffer = PixelBufferUtil::Make(_pagSurface->width(), _pagSurface->height());
   if (hardwareBuffer == nil) {
     LOGE("CVPixelBufferRef create failed!");
     return nil;
   }
-  CFAutorelease(hardwareBuffer);
   CVPixelBufferLockBaseAddress(hardwareBuffer, 0);
   size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(hardwareBuffer, 0);
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(hardwareBuffer);

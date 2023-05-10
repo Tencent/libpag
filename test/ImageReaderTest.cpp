@@ -95,7 +95,7 @@ PAG_TEST(ImageReaderTest, updateBitmap) {
   canvas->drawImage(image);
   canvas->flush();
   context->submit(true);
-  
+
   auto codec2 = MakeImageCodec("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(codec != nullptr);
   pixels = bitmap.lockPixels();

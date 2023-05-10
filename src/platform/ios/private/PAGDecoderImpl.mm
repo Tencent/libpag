@@ -22,7 +22,7 @@
 #import "PAGLayerImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/pag.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#include "platform/cocoa/private/PixelBufferUtil.h"
 
 @implementation PAGDecoderImpl {
   std::shared_ptr<pag::PAGDecoder> pagDecoder;
@@ -85,12 +85,11 @@
 }
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index {
-  auto pixelBuffer = tgfx::HardwareBufferAllocate(pagDecoder->width(), pagDecoder->height());
+  auto pixelBuffer = pag::PixelBufferUtil::Make(pagDecoder->width(), pagDecoder->height());
   if (pixelBuffer == nil) {
     LOGE("PAGDecoder: CVPixelBufferRef create failed!");
     return nil;
   }
-  CFAutorelease(pixelBuffer);
   auto success = pagDecoder->readFrame(static_cast<int>(index), pixelBuffer);
   if (!success) {
     return nil;

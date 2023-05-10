@@ -50,10 +50,7 @@ bool HardwareBufferCheck(HardwareBufferRef buffer);
 /**
  * Allocates a hardware buffer for a given size and pixel format (alphaOnly). Returns nullptr if
  * allocation fails. The returned buffer has a reference count of 1, and the caller must call
- * HardwareBufferRelease() when finished with it. Note that the allocation may succeed even when the
- * current platform lacks hardware buffer support, which means the returned buffer may be unable to
- * share memory across CPU and GPU. Please use HardwareBufferAvailable() to check whether the
- * current platform has real hardware buffer support.
+ * HardwareBufferRelease() when finished with it.
  */
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly = false);
 

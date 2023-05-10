@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TraceImage.h"
-#include <CoreVideo/CoreVideo.h>
-#include "base/utils/Log.h"
-#include "platform/cocoa/private/PixelBufferUtil.h"
-#include "tgfx/core/Pixmap.h"
+#include "PixelBufferUtil.h"
+#import <Foundation/Foundation.h>
 
 namespace pag {
-void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
-  if (info.isEmpty() || pixels == nullptr) {
-    return;
+CVPixelBufferRef PixelBufferUtil::Make(int width, int height, bool alphaOnly) {
+  OSType pixelFormat = alphaOnly ? kCVPixelFormatType_OneComponent8 : kCVPixelFormatType_32BGRA;
+  NSDictionary* options = @{(id)kCVPixelBufferIOSurfacePropertiesKey : @{}};
+  CVPixelBufferRef pixelBuffer = nil;
+  CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width),
+                                        static_cast<size_t>(height), pixelFormat,
+                                        (CFDictionaryRef)options, &pixelBuffer);
+  if (status != kCVReturnSuccess) {
+    return nil;
   }
-  @autoreleasepool {
-    auto pixelBuffer = PixelBufferUtil::Make(info.width(), info.height());
-    if (pixelBuffer == nil) {
-      return;
-    }
-    auto dstPixels = tgfx::HardwareBufferLock(pixelBuffer);
-    auto dstInfo = tgfx::HardwareBufferGetInfo(pixelBuffer);
-    tgfx::Pixmap pixmap(dstInfo, dstPixels);
-    pixmap.writePixels(info, pixels);
-    tgfx::HardwareBufferUnlock(pixelBuffer);
-    LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
-  }
+  CFAutorelease(pixelBuffer);
+  return pixelBuffer;
 }
 }  // namespace pag
