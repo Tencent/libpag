@@ -32,6 +32,9 @@ bool HardwareBufferAvailable() {
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return nullptr;
+  }
   auto qglDevice = static_cast<QGLDevice*>(context->device());
   if (qglDevice == nullptr) {
     return nullptr;

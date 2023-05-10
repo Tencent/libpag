@@ -51,6 +51,7 @@ PAG_TEST(ImageReaderTest, updateMask) {
   EXPECT_FALSE(newBuffer != nullptr);
   canvas->drawImage(maskImage);
   canvas->flush();
+  context->submit(true);
 
   path.reset();
   path.addRoundRect(Rect::MakeXYWH(22, 22, 10, 10), 3, 3);
@@ -93,7 +94,8 @@ PAG_TEST(ImageReaderTest, updateBitmap) {
   EXPECT_FALSE(newBuffer != nullptr);
   canvas->drawImage(image);
   canvas->flush();
-
+  context->submit(true);
+  
   auto codec2 = MakeImageCodec("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(codec != nullptr);
   pixels = bitmap.lockPixels();

@@ -18,6 +18,7 @@
 
 #include "tgfx/platform/HardwareBuffer.h"
 #import <CoreVideo/CoreVideo.h>
+#import <TargetConditionals.h>
 #include "core/PixelBuffer.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
@@ -38,13 +39,26 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable()) {
     return false;
   }
-  return CVPixelBufferGetIOSurface(buffer) != nil;
+  auto success = CVPixelBufferGetIOSurface(buffer) != nil;
+#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1 && defined(__aarch64__)
+  if (success && CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_OneComponent8) {
+    return false;
+  }
+#endif
+  return success;
 }
 
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
   if (width <= 0 || height <= 0) {
     return nil;
   }
+#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1 && defined(__aarch64__)
+  if (alphaOnly) {
+    // The alphaOnly CVPixelBuffer on macOS with Apple Silicon does not share memory across GPU and
+    // CPU.
+    return nil;
+  }
+#endif
   OSType pixelFormat = alphaOnly ? kCVPixelFormatType_OneComponent8 : kCVPixelFormatType_32BGRA;
   CFDictionaryRef empty =
       CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
