@@ -24,6 +24,7 @@
 #include "rendering/CompositionReader.h"
 #include "rendering/caches/DiskCache.h"
 #include "rendering/layers/ContentVersion.h"
+#include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LockGuard.h"
 
 namespace pag {
@@ -141,19 +142,19 @@ bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, ColorType c
   std::lock_guard<std::mutex> auoLock(locker);
   auto info =
       tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
-  return readFrame(index, info, pixels, nullptr);
+  auto bitmap = BitmapBuffer::Wrap(info, pixels);
+  return readFrameInternal(index, bitmap);
 }
 
 bool PAGDecoder::readFrame(int index, HardwareBufferRef hardwareBuffer) {
   std::lock_guard<std::mutex> auoLock(locker);
-  auto info = tgfx::HardwareBufferGetInfo(hardwareBuffer);
-  return readFrame(index, info, nullptr, hardwareBuffer);
+  auto bitmap = BitmapBuffer::Wrap(hardwareBuffer);
+  return readFrameInternal(index, bitmap);
 }
 
-bool PAGDecoder::readFrame(int index, const tgfx::ImageInfo& info, void* pixels,
-                           HardwareBufferRef hardwareBuffer) {
-  if (info.isEmpty()) {
-    LOGE("PAGDecoder::readFrame() The specified image info is invalid!");
+bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap) {
+  if (bitmap == nullptr) {
+    LOGE("PAGDecoder::readFrame() The specified bitmap buffer is invalid!");
     return false;
   }
   auto composition = getComposition();
@@ -162,14 +163,14 @@ bool PAGDecoder::readFrame(int index, const tgfx::ImageInfo& info, void* pixels,
     LOGE("PAGDecoder::readFrame() The index is out of range!");
     return false;
   }
-  if (!checkSequenceFile(composition, info)) {
+  if (!checkSequenceFile(composition, bitmap->info())) {
     return false;
   }
-  auto success = readFromFile(index, pixels, hardwareBuffer);
+  auto success = sequenceFile->readFrame(index, bitmap);
   if (!success) {
-    success = renderFrame(composition, index, info, pixels, hardwareBuffer);
+    success = renderFrame(composition, index, bitmap);
     if (success) {
-      success = writeToFile(index, pixels, hardwareBuffer);
+      success = sequenceFile->writeFrame(index, bitmap);
       if (!success) {
         LOGE("PAGDecoder::readFrame() Failed to write frame to SequenceFile!");
       }
@@ -191,37 +192,8 @@ bool PAGDecoder::readFrame(int index, const tgfx::ImageInfo& info, void* pixels,
   return success;
 }
 
-bool PAGDecoder::readFromFile(int index, void* pixels, HardwareBufferRef hardwareBuffer) {
-  if (hardwareBuffer != nullptr) {
-    pixels = tgfx::HardwareBufferLock(hardwareBuffer);
-  }
-  if (pixels == nullptr) {
-    return false;
-  }
-  auto success = sequenceFile->readFrame(index, pixels);
-  if (hardwareBuffer != nullptr) {
-    tgfx::HardwareBufferUnlock(hardwareBuffer);
-  }
-  return success;
-}
-
-bool PAGDecoder::writeToFile(int index, void* pixels, HardwareBufferRef hardwareBuffer) {
-  if (hardwareBuffer != nullptr) {
-    pixels = tgfx::HardwareBufferLock(hardwareBuffer);
-  }
-  if (pixels == nullptr) {
-    return false;
-  }
-  auto success = sequenceFile->writeFrame(index, pixels);
-  if (hardwareBuffer != nullptr) {
-    tgfx::HardwareBufferUnlock(hardwareBuffer);
-  }
-  return success;
-}
-
 bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int index,
-                             const tgfx::ImageInfo& info, void* pixels,
-                             HardwareBufferRef hardwareBuffer) {
+                             std::shared_ptr<BitmapBuffer> bitmap) {
   if (composition == nullptr) {
     reader = nullptr;
     LOGE(
@@ -238,10 +210,7 @@ bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int in
     reader->setComposition(composition);
   }
   auto progress = FrameToProgress(static_cast<Frame>(index), _numFrames);
-  if (hardwareBuffer != nullptr) {
-    return reader->readFrame(progress, hardwareBuffer);
-  }
-  return reader->readFrame(progress, info, pixels);
+  return reader->readFrame(progress, bitmap);
 }
 
 bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition,

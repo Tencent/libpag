@@ -140,8 +140,8 @@ PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thi
   return success;
 }
 
-PAG_API jboolean Java_org_libpag_PAGDecoder_readFrameTo(JNIEnv* env, jobject thiz,
-                                                        jobject hardwareBufferObject, jint index) {
+PAG_API jboolean Java_org_libpag_PAGDecoder_readFrame(JNIEnv* env, jobject thiz, jint index,
+                                                      jobject hardwareBufferObject) {
   auto decoder = getPAGDecoder(env, thiz);
   if (decoder == nullptr) {
     return JNI_FALSE;

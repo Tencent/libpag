@@ -19,7 +19,8 @@
 #pragma once
 
 #include "pag/pag.h"
-#include "rendering/drawables/RasterDrawable.h"
+#include "rendering/drawables/BitmapDrawable.h"
+#include "rendering/utils/BitmapBuffer.h"
 
 namespace pag {
 class CompositionReader {
@@ -40,14 +41,12 @@ class CompositionReader {
 
   void setComposition(std::shared_ptr<PAGComposition> composition);
 
-  bool readFrame(double progress, const tgfx::ImageInfo& info, void* pixels);
-
-  bool readFrame(double progress, HardwareBufferRef hardwareBuffer);
+  bool readFrame(double progress, std::shared_ptr<BitmapBuffer> bitmap);
 
  private:
   std::mutex locker = {};
   PAGPlayer* pagPlayer = nullptr;
-  std::shared_ptr<RasterDrawable> drawable = nullptr;
+  std::shared_ptr<BitmapDrawable> drawable = nullptr;
 
   CompositionReader(int width, int height);
 

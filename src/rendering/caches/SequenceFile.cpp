@@ -212,10 +212,14 @@ bool SequenceFile::isComplete() {
   return cachedFrames == _numFrames;
 }
 
-bool SequenceFile::readFrame(int index, void* pixels) {
+bool SequenceFile::readFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (index < 0 || index >= _numFrames || pixels == nullptr) {
+  if (index < 0 || index >= _numFrames || bitmap == nullptr) {
     LOGE("SequenceFile::readFrame() invalid index or pixels!");
+    return false;
+  }
+  if (bitmap->info() != _info) {
+    LOGE("SequenceFile::readFrame() the info of the specified bitmap is different from ours!");
     return false;
   }
   const auto& frame = frames[index];
@@ -235,8 +239,14 @@ bool SequenceFile::readFrame(int index, void* pixels) {
     return false;
   }
   auto byteSize = _info.byteSize();
+  auto pixels = bitmap->lockPixels();
+  if (pixels == nullptr) {
+    LOGE("SequenceFile::readFrame() failed to lock pixels from the specified bitmap!");
+    return false;
+  }
   auto decodedLength = decoder->decode(reinterpret_cast<uint8_t*>(pixels), byteSize,
                                        scratchBuffer.bytes(), encodedLength);
+  bitmap->unlockPixels();
   if (decodedLength != byteSize) {
     LOGE("SequenceFile::readFrame() decode failed! (decoded: %zu, expected: %zu)", decodedLength,
          byteSize);
@@ -245,17 +255,27 @@ bool SequenceFile::readFrame(int index, void* pixels) {
   return true;
 }
 
-bool SequenceFile::writeFrame(int index, const void* pixels) {
+bool SequenceFile::writeFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (index < 0 || index >= _numFrames || pixels == nullptr) {
+  if (index < 0 || index >= _numFrames || bitmap == nullptr) {
     LOGE("SequenceFile::writeFrame() invalid index or pixels!");
+    return false;
+  }
+  if (bitmap->info() != _info) {
+    LOGE("SequenceFile::writeFrame() the specified bitmap info is different from ours!");
     return false;
   }
   auto timeRange = GetTimeRangeContains(_staticTimeRanges, index);
   if (frames[timeRange.start].size != 0) {
     return false;
   }
+  auto pixels = bitmap->lockPixels();
+  if (pixels == nullptr) {
+    LOGE("SequenceFile::writeFrame() failed to lock pixels from the specified bitmap!");
+    return false;
+  }
   auto compressedSize = compressFrame(static_cast<int>(timeRange.start), pixels, _info.byteSize());
+  bitmap->unlockPixels();
   if (compressedSize == 0) {
     return false;
   }

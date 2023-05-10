@@ -22,6 +22,7 @@
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/caches/DiskCache.h"
+#include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/Directory.h"
 
 namespace pag {
@@ -112,12 +113,13 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
 
   tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
   tgfx::Pixmap pixmap(bitmap);
-  auto success = sequenceFile->readFrame(10, pixmap.writablePixels());
+  auto buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
+  auto success = sequenceFile->readFrame(10, buffer);
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_10"));
-  success = sequenceFile->readFrame(15, pixmap.writablePixels());
+  success = sequenceFile->readFrame(15, buffer);
   EXPECT_FALSE(success);
-  success = sequenceFile->readFrame(20, pixmap.writablePixels());
+  success = sequenceFile->readFrame(20, buffer);
   EXPECT_FALSE(success);
 
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -130,7 +132,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
     success = pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
                                      pixmap.writablePixels(), pixmap.rowBytes());
     ASSERT_TRUE(success);
-    success = sequenceFile->writeFrame(i, pixmap.pixels());
+    success = sequenceFile->writeFrame(i, buffer);
     if (i < 11) {
       EXPECT_FALSE(success);
       EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
@@ -140,16 +142,17 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize + sequenceFile->fileSize() - initialFileSize);
   EXPECT_TRUE(sequenceFile->isComplete());
   EXPECT_TRUE(sequenceFile->encoder == nullptr);
-  success = sequenceFile->readFrame(15, pixmap.writablePixels());
+  success = sequenceFile->readFrame(15, buffer);
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_15"));
-  success = sequenceFile->readFrame(30, pixmap.writablePixels());
+  success = sequenceFile->readFrame(30, buffer);
   EXPECT_FALSE(success);
 
   info = tgfx::ImageInfo::Make(360, 640, tgfx::ColorType::RGBA_8888);
   pixmap.reset();
   bitmap.allocPixels(info.width(), info.height());
   pixmap.reset(bitmap);
+  buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
   auto halfSequenceFile =
       DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", info, 30, pagFile->frameRate());
   ASSERT_TRUE(halfSequenceFile != nullptr);
@@ -158,7 +161,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_EQ(halfSequenceFile->numFrames(), 30u);
   EXPECT_EQ(halfSequenceFile->frameRate(), pagFile->frameRate());
   EXPECT_TRUE(halfSequenceFile->isComplete());
-  success = halfSequenceFile->readFrame(20, pixmap.writablePixels());
+  success = halfSequenceFile->readFrame(20, buffer);
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_20"));
   const auto halfSequenceFileSize = halfSequenceFile->fileSize();
@@ -170,6 +173,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   pixmap.reset();
   bitmap.allocPixels(info.width(), info.height());
   pixmap.reset(bitmap);
+  buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
 
   const auto lastTotalDiskSize = diskCache->totalDiskSize;
 
@@ -183,10 +187,10 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
     success = pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
                                      pixmap.writablePixels(), pixmap.rowBytes());
     ASSERT_TRUE(success);
-    sequenceFile->writeFrame(i, pixmap.pixels());
+    sequenceFile->writeFrame(i, buffer);
     pagPlayer->nextFrame();
   }
-  success = sequenceFile->readFrame(22, pixmap.writablePixels());
+  success = sequenceFile->readFrame(22, buffer);
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
   EXPECT_EQ(diskCache->totalDiskSize,

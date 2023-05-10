@@ -107,7 +107,7 @@ public class PAGDecoder {
      * Returns false if failed. Reading image frames into HardwareBuffer usually has better
      * performance than reading into memory.
      */
-    public native boolean readFrameTo(HardwareBuffer hardwareBuffer, int index);
+    public native boolean readFrame(int index, HardwareBuffer hardwareBuffer);
 
     /**
      * Returns the image frame at the specified index. It's recommended to read the image frames in

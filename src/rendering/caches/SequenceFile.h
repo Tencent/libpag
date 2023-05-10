@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "pag/types.h"
+#include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LZ4Decoder.h"
 #include "rendering/utils/LZ4Encoder.h"
 #include "tgfx/core/ImageInfo.h"
@@ -100,18 +101,16 @@ class SequenceFile {
   bool isComplete();
 
   /**
-   * Reads an image frame from the sequence into the specified pixel address. The caller must ensure
-   * the pixel address is large enough to hold the image data. Returns false if the specified index
-   * is empty.
+   * Reads an image frame from the sequence into the specified pixel address. Returns false if the
+   * specified index is empty or the bitmap info is different from ours.
    */
-  bool readFrame(int index, void* pixels);
+  bool readFrame(int index, std::shared_ptr<BitmapBuffer> bitmap);
 
   /**
-   * Writes an image frame in the pixel address into the sequence.The caller must ensure the pixel
-   * address has the same size as the image data. Returns false if the specified index is not empty
-   * and leave the sequence unchanged.
+   * Writes an image frame in the pixel address into the sequence.Returns false if the specified
+   * index is not empty or the bitmap info is different from ours, and leave the sequence unchanged.
    */
-  bool writeFrame(int index, const void* pixels);
+  bool writeFrame(int index, std::shared_ptr<BitmapBuffer> bitmap);
 
  private:
   std::mutex locker = {};

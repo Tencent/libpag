@@ -71,6 +71,15 @@ class PixelRef : public ImageStream {
   }
 
   /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the PixelRef is not backed by a hardware
+   * buffer.
+   */
+  HardwareBufferRef getHardwareBuffer() const {
+    return pixelBuffer->getHardwareBuffer();
+  }
+
+  /**
    * Locks and returns the address of the read-only pixels to ensure that the memory is accessible.
    */
   const void* lockPixels() const {

@@ -92,6 +92,10 @@ bool Bitmap::isHardwareBacked() const {
   return pixelRef ? pixelRef->isHardwareBacked() : false;
 }
 
+HardwareBufferRef Bitmap::getHardwareBuffer() const {
+  return pixelRef ? pixelRef->getHardwareBuffer() : nullptr;
+}
+
 std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
   Pixmap pixmap(*this);
   return ImageCodec::Encode(pixmap, format, quality);

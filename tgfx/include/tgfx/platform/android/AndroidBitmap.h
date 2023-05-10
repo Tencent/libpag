@@ -19,7 +19,7 @@
 #pragma once
 
 #include <jni.h>
-#include "tgfx/platform/HardwareBuffer.h"
+#include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
 /**

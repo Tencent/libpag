@@ -79,8 +79,8 @@
   return [pagDecoder copyFrameTo:pixels rowBytes:rowBytes at:index];
 }
 
-- (BOOL)readFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index {
-  return [pagDecoder readFrameTo:pixelBuffer at:index];
+- (BOOL)readFrame:(NSInteger)index to:(CVPixelBufferRef)pixelBuffer {
+  return [pagDecoder readFrame:index to:pixelBuffer];
 }
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index {

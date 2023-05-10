@@ -93,7 +93,7 @@ PAG_API @interface PAGDecoder : NSObject
  * false if failed. Reading image frames into HardwareBuffer usually has better performance than
  * reading into memory.
  */
-- (BOOL)readFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index;
+- (BOOL)readFrame:(NSInteger)index to:(CVPixelBufferRef)pixelBuffer;
 
 /**
  * Returns the image frame at the specified index. Note that this method must be called while the
