@@ -90,6 +90,10 @@ CGLDevice::CGLDevice(CGLContextObj cglContext) : GLDevice(cglContext) {
 
 CGLDevice::~CGLDevice() {
   releaseAll();
+  if (textureCache != nil) {
+    CFRelease(textureCache);
+    textureCache = nil;
+  }
   [glContext release];
 }
 
@@ -103,6 +107,15 @@ bool CGLDevice::sharableWith(void* nativeContext) const {
 
 CGLContextObj CGLDevice::cglContext() const {
   return glContext.CGLContextObj;
+}
+
+CVOpenGLTextureCacheRef CGLDevice::getTextureCache() {
+  if (!textureCache) {
+    auto pixelFormatObj = CGLGetPixelFormat(glContext.CGLContextObj);
+    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, glContext.CGLContextObj, pixelFormatObj,
+                               NULL, &textureCache);
+  }
+  return textureCache;
 }
 
 bool CGLDevice::onMakeCurrent() {

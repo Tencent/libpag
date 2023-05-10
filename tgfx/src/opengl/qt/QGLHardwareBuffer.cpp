@@ -17,9 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Texture.h"
+#include "tgfx/opengl/qt/QGLDevice.h"
+#ifdef __APPLE__
+#include "opengl/cgl/CGLHardwareTexture.h"
+#endif
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
+#ifdef __APPLE__
+
+bool HardwareBufferAvailable() {
+  return true;
+}
+
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           YUVColorSpace) {
+  auto qglDevice = static_cast<QGLDevice*>(context->device());
+  if (qglDevice == nullptr) {
+    return nullptr;
+  }
+  auto textureCache = qglDevice->getTextureCache();
+  return CGLHardwareTexture::MakeFrom(context, hardwareBuffer, textureCache);
+}
+
+#else
+
 bool HardwareBufferAvailable() {
   return false;
 }
@@ -27,4 +49,6 @@ bool HardwareBufferAvailable() {
 std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
+
+#endif
 }  // namespace tgfx

@@ -16,14 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PixelBuffer.h"
+#include "CGLHardwareTexture.h"
+#include "tgfx/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {
 bool HardwareBufferAvailable() {
-  return false;
+  return true;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           YUVColorSpace) {
+  auto cglDevice = static_cast<CGLDevice*>(context->device());
+  if (cglDevice == nullptr) {
+    return nullptr;
+  }
+  auto textureCache = cglDevice->getTextureCache();
+  return CGLHardwareTexture::MakeFrom(context, hardwareBuffer, textureCache);
 }
 }  // namespace tgfx

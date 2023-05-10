@@ -27,7 +27,9 @@
 
 @end
 
-@implementation PAGSurfaceImpl
+@implementation PAGSurfaceImpl {
+  CVPixelBufferRef pixelBuffer;
+}
 
 + (PAGSurfaceImpl*)FromView:(NSView*)view {
   auto drawable = pag::GPUDrawable::FromView(view);
@@ -72,26 +74,34 @@
 }
 
 - (void)freeCache {
+  pixelBuffer = nil;
   _pagSurface->freeCache();
 }
 
-- (CVPixelBufferRef)makeSnapshot {
-  auto pixelBuffer = tgfx::HardwareBufferAllocate(_pagSurface->width(), _pagSurface->height());
+- (CVPixelBufferRef)getCVPixelBuffer {
   if (pixelBuffer == nil) {
+    pixelBuffer = _pagSurface->getHardwareBuffer();
+  }
+  return pixelBuffer;
+}
+
+- (CVPixelBufferRef)makeSnapshot {
+  auto hardwareBuffer = tgfx::HardwareBufferAllocate(_pagSurface->width(), _pagSurface->height());
+  if (hardwareBuffer == nil) {
     LOGE("CVPixelBufferRef create failed!");
     return nil;
   }
-  CFAutorelease(pixelBuffer);
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
+  CFAutorelease(hardwareBuffer);
+  CVPixelBufferLockBaseAddress(hardwareBuffer, 0);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(hardwareBuffer, 0);
+  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(hardwareBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  return pixelBuffer;
+  CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
+  return hardwareBuffer;
 }
 
 @end

@@ -42,5 +42,7 @@
 
 - (void)freeCache;
 
+- (CVPixelBufferRef)getCVPixelBuffer;
+
 - (CVPixelBufferRef)makeSnapshot;
 @end
