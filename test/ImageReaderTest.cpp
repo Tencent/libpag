@@ -37,7 +37,7 @@ PAG_TEST(ImageReaderTest, updateMask) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto mask = Mask::Make(100, 50);
+  auto mask = Mask::Make(100, 50, false);
   auto surface = Surface::Make(context, mask->width(), mask->height());
   auto canvas = surface->getCanvas();
   Path path;
@@ -51,7 +51,6 @@ PAG_TEST(ImageReaderTest, updateMask) {
   EXPECT_FALSE(newBuffer != nullptr);
   canvas->drawImage(maskImage);
   canvas->flush();
-  context->submit(true);
 
   path.reset();
   path.addRoundRect(Rect::MakeXYWH(22, 22, 10, 10), 3, 3);
@@ -94,7 +93,9 @@ PAG_TEST(ImageReaderTest, updateBitmap) {
   EXPECT_FALSE(newBuffer != nullptr);
   canvas->drawImage(image);
   canvas->flush();
-  context->submit(true);
+  if (tgfx::HardwareBufferAvailable()) {
+    context->submit(true);
+  }
 
   auto codec2 = MakeImageCodec("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(codec != nullptr);
@@ -103,12 +104,17 @@ PAG_TEST(ImageReaderTest, updateBitmap) {
   pixels = bitmap.info().computeOffset(pixels, 100, 0);
   codec2->readPixels(bitmap.info(), pixels);
   bitmap.unlockPixels();
+  if (tgfx::HardwareBufferAvailable()) {
+    EXPECT_TRUE(buffer->expired());
+  }
   newBuffer = reader->acquireNextBuffer();
   EXPECT_TRUE(newBuffer != nullptr);
   image = Image::MakeFrom(newBuffer);
   canvas->setMatrix(Matrix::MakeTrans(120, 0));
   canvas->drawImage(image);
-  EXPECT_FALSE(buffer->expired());
+  if (!tgfx::HardwareBufferAvailable()) {
+    EXPECT_FALSE(buffer->expired());
+  }
   canvas->flush();
   EXPECT_TRUE(buffer->expired());
 

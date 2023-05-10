@@ -103,7 +103,7 @@ std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
 
 bool ImageReader::checkExpired(uint64_t contentVersion) {
   std::lock_guard<std::mutex> autoLock(locker);
-  return contentVersion < textureVersion;
+  return contentVersion != textureVersion && contentVersion < bufferVersion;
 }
 
 std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Context* context,
@@ -140,6 +140,7 @@ void ImageReader::onContentDirty(const Rect& bounds) {
   if (stream->isHardwareBacked() && texture != nullptr) {
     texture->markUniqueKeyExpired();
     textureVersion = 0;
+    bufferVersion++;
   }
 }
 }  // namespace tgfx
