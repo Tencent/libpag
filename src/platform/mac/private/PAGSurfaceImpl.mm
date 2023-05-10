@@ -87,7 +87,7 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  auto hardwareBuffer = PixelBufferUtil::Make(_pagSurface->width(), _pagSurface->height());
+  auto hardwareBuffer = pag::PixelBufferUtil::Make(_pagSurface->width(), _pagSurface->height());
   if (hardwareBuffer == nil) {
     LOGE("CVPixelBufferRef create failed!");
     return nil;

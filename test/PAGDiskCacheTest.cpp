@@ -111,7 +111,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   const auto InitialDiskSize = 647628u;
   EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
 
-  tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
+  tgfx::Bitmap bitmap(pagFile->width(), pagFile->height(), false, false);
   tgfx::Pixmap pixmap(bitmap);
   auto buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
   auto success = sequenceFile->readFrame(10, buffer);
@@ -150,7 +150,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
 
   info = tgfx::ImageInfo::Make(360, 640, tgfx::ColorType::RGBA_8888);
   pixmap.reset();
-  bitmap.allocPixels(info.width(), info.height());
+  bitmap.allocPixels(info.width(), info.height(), false, false);
   pixmap.reset(bitmap);
   buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
   auto halfSequenceFile =
@@ -171,7 +171,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   pagSurface = PAGSurface::MakeOffscreen(info.width(), info.height());
   pagPlayer->setSurface(pagSurface);
   pixmap.reset();
-  bitmap.allocPixels(info.width(), info.height());
+  bitmap.allocPixels(info.width(), info.height(), false, false);
   pixmap.reset(bitmap);
   buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
 
@@ -231,7 +231,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   EXPECT_EQ(decoder->numFrames(), 95);
   EXPECT_EQ(decoder->frameRate(), 24.0f);
   pagFile = nullptr;
-  tgfx::Bitmap bitmap(decoder->width(), decoder->height());
+  tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
   tgfx::Pixmap pixmap(bitmap);
   for (int i = 0; i < decoder->numFrames(); i++) {
     auto success = decoder->readFrame(i, pixmap.writablePixels(), pixmap.rowBytes());
@@ -298,7 +298,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   EXPECT_EQ(decoder4->numFrames(), 119);
   EXPECT_EQ(decoder4->frameRate(), 30.0f);
   pixmap.reset();
-  bitmap.allocPixels(pagFile2->width(), pagFile2->height());
+  bitmap.allocPixels(pagFile2->width(), pagFile2->height(), false, false);
   pixmap.reset(bitmap);
   success = decoder4->readFrame(15, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
@@ -353,7 +353,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   auto decoder = PAGDecoder::MakeFrom(pagFile);
   ASSERT_TRUE(decoder != nullptr);
   pagFile = nullptr;
-  tgfx::Bitmap bitmap(decoder->width(), decoder->height());
+  tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
   tgfx::Pixmap pixmap(bitmap);
   auto success = decoder->readFrame(5, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
@@ -372,7 +372,7 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   ASSERT_TRUE(decoder != nullptr);
   EXPECT_EQ(decoder->frameRate(), 24.0f);
   pixmap.reset();
-  bitmap.allocPixels(decoder->width(), decoder->height());
+  bitmap.allocPixels(decoder->width(), decoder->height(), false, false);
   pixmap.reset(bitmap);
   success = decoder->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
