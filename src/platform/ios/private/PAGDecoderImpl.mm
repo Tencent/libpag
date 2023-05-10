@@ -91,12 +91,7 @@
     return nil;
   }
   CFAutorelease(pixelBuffer);
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  auto rowBytes = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-  auto pixels = CVPixelBufferGetBaseAddress(pixelBuffer);
-  auto success = pagDecoder->readFrame(static_cast<int>(index), pixels, rowBytes,
-                                       pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied);
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+  auto success = pagDecoder->readFrame(static_cast<int>(index), pixelBuffer);
   if (!success) {
     return nil;
   }
