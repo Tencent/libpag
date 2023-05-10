@@ -28,7 +28,7 @@ std::shared_ptr<CompositionReader> CompositionReader::Make(int width, int height
 
 CompositionReader::CompositionReader(int width, int height) {
   pagPlayer = new PAGPlayer();
-  drawable = RasterDrawable::Make(width, height);
+  drawable = BitmapDrawable::Make(width, height);
   auto pagSurface = PAGSurface::MakeFrom(drawable);
   pagPlayer->setSurface(pagSurface);
 }
@@ -47,15 +47,9 @@ void CompositionReader::setComposition(std::shared_ptr<PAGComposition> compositi
   pagPlayer->setComposition(std::move(composition));
 }
 
-bool CompositionReader::readFrame(double progress, const tgfx::ImageInfo& info, void* pixels) {
+bool CompositionReader::readFrame(double progress, std::shared_ptr<BitmapBuffer> bitmap) {
   std::lock_guard<std::mutex> autoLock(locker);
-  drawable->setPixelBuffer(info, pixels);
-  return renderFrame(progress);
-}
-
-bool CompositionReader::readFrame(double progress, HardwareBufferRef hardwareBuffer) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  drawable->setHardwareBuffer(hardwareBuffer);
+  drawable->setBitmap(std::move(bitmap));
   return renderFrame(progress);
 }
 

@@ -75,7 +75,7 @@ class PAGLayer;
 class PAG_API PAGImage {
  public:
   /**
-   * Creates a PAGImage object from a path of a image file, return null if the file does not exist
+   * Creates a PAGImage object from a path of an image file, return null if the file does not exist,
    * or it's not a valid image file.
    */
   static std::shared_ptr<PAGImage> FromPath(const std::string& filePath);
@@ -140,7 +140,7 @@ class PAG_API PAGImage {
   void setScaleMode(int mode);
 
   /**
-   * Returns a copy of current matrix.
+   * Returns a copy of the current matrix.
    */
   Matrix matrix() const;
 
@@ -1171,7 +1171,7 @@ class GLRestorer;
 class PAG_API PAGSurface {
  public:
   /**
-   *  Creates a new PAGSurface from specified GPUDrawable, Returns nullptr if drawable is nullptr.
+   *  Creates a new PAGSurface from specified Drawable, Returns nullptr if drawable is nullptr.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable);
 
@@ -1536,6 +1536,7 @@ class PAG_API PAGPlayer {
 
 class SequenceFile;
 class CompositionReader;
+class BitmapBuffer;
 
 /**
  * PAGDecoder provides a utility to read image frames directly from a PAGComposition, and caches the
@@ -1543,7 +1544,7 @@ class CompositionReader;
  * depending on the complexity of the PAG files. You can use the PAGDiskCache::SetMaxDiskSize()
  * method to manage the cache limit of the disk usage.
  */
-class PAGDecoder {
+class PAG_API PAGDecoder {
  public:
   /**
    * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
@@ -1630,12 +1631,9 @@ class PAGDecoder {
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
              float frameRate, float maxFrameRate);
 
-  bool readFrame(int index, const tgfx::ImageInfo& info, void* pixels,
-                 HardwareBufferRef hardwareBuffer);
-  bool readFromFile(int index, void* pixels, HardwareBufferRef hardwareBuffer);
-  bool writeToFile(int index, void* pixels, HardwareBufferRef hardwareBuffer);
+  bool readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap);
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index,
-                   const tgfx::ImageInfo& info, void* pixels, HardwareBufferRef hardwareBuffer);
+                   std::shared_ptr<BitmapBuffer> bitmap);
   bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, const tgfx::ImageInfo& info);
   void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
   std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
@@ -1645,7 +1643,7 @@ class PAGDecoder {
 /**
  * Defines methods to manage the disk cache capabilities.
  */
-class PAGDiskCache {
+class PAG_API PAGDiskCache {
  public:
   /**
    * Returns the size limit of the disk cache in bytes. The default value is 1 GB.

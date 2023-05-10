@@ -18,32 +18,44 @@
 
 #pragma once
 
-#include "OffscreenDrawable.h"
+#include "Drawable.h"
+#include "rendering/utils/BitmapBuffer.h"
 
 namespace pag {
-class RasterDrawable : public OffscreenDrawable {
+class BitmapDrawable : public Drawable {
  public:
-  static std::shared_ptr<RasterDrawable> Make(int width, int height);
+  static std::shared_ptr<BitmapDrawable> Make(int width, int height);
 
-  void setHardwareBuffer(HardwareBufferRef buffer);
+  int width() const override {
+    return _width;
+  }
 
-  void setPixelBuffer(const tgfx::ImageInfo& info, void* pixels);
+  int height() const override {
+    return _height;
+  }
+
+  void setBitmap(std::shared_ptr<BitmapBuffer> buffer);
 
   bool isPixelCopied() const {
     return pixelCopied;
   }
 
  protected:
+  std::shared_ptr<tgfx::Device> onCreateDevice() override {
+    return device;
+  }
+
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
  private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> offscreenSurface = nullptr;
-  HardwareBufferRef hardwareBuffer = nullptr;
-  tgfx::ImageInfo info = {};
-  void* pixels = nullptr;
+  std::shared_ptr<BitmapBuffer> bitmap = nullptr;
   bool pixelCopied = false;
 
-  RasterDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
+  BitmapDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
   void present(tgfx::Context* context) override;
 };

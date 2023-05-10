@@ -35,8 +35,6 @@ class OffscreenDrawable : public Drawable {
   }
 
  protected:
-  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
-
   std::shared_ptr<tgfx::Device> onCreateDevice() override {
     return device;
   }
@@ -47,5 +45,7 @@ class OffscreenDrawable : public Drawable {
   int _width = 0;
   int _height = 0;
   std::shared_ptr<tgfx::Device> device = nullptr;
+
+  OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 };
 }  // namespace pag
