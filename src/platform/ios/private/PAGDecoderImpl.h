@@ -39,7 +39,7 @@
 
 - (BOOL)copyFrameTo:(nullable void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index;
 
-- (BOOL)readFrameTo:(_Nullable CVPixelBufferRef)pixelBuffer at:(NSInteger)index;
+- (BOOL)readFrame:(NSInteger)index to:(nullable CVPixelBufferRef)pixelBuffer;
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index;
 

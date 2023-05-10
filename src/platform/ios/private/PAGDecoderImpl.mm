@@ -80,7 +80,7 @@
                                pag::AlphaType::Premultiplied);
 }
 
-- (BOOL)readFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index {
+- (BOOL)readFrame:(NSInteger)index to:(CVPixelBufferRef)pixelBuffer {
   return pagDecoder->readFrame(static_cast<int>(index), pixelBuffer);
 }
 
