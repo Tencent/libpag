@@ -3,6 +3,7 @@
         Java_org*;
         alc*;
         JNI_OnLoad*;
+        *pag*;
     local:
         *;
 };
