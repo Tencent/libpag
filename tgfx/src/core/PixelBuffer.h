@@ -80,6 +80,13 @@ class PixelBuffer : public ImageBuffer {
    */
   virtual bool isHardwareBacked() const = 0;
 
+  /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the PixelBuffer is not backed by a hardware
+   * buffer.
+   */
+  virtual HardwareBufferRef getHardwareBuffer() const = 0;
+
  protected:
   explicit PixelBuffer(const ImageInfo& info);
 

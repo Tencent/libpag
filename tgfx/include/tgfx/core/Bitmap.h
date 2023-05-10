@@ -177,6 +177,12 @@ class Bitmap {
   bool isHardwareBacked() const;
 
   /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the Bitmap is not backed by a hardware buffer.
+   */
+  HardwareBufferRef getHardwareBuffer() const;
+
+  /**
    * Encodes the pixels in Bitmap into a binary image format.
    * @param format One of: EncodedFormat::JPEG, EncodedFormat::PNG, EncodedFormat::WEBP
    * @param quality A platform and format specific metric trading off size and encoding error. When

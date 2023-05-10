@@ -27,7 +27,6 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
 

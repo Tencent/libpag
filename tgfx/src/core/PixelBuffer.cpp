@@ -34,6 +34,10 @@ class RasterPixelBuffer : public PixelBuffer {
     return false;
   }
 
+  HardwareBufferRef getHardwareBuffer() const override {
+    return nullptr;
+  }
+
  protected:
   void* onLockPixels() const override {
     return _pixels;
@@ -62,6 +66,10 @@ class HardwarePixelBuffer : public PixelBuffer {
 
   bool isHardwareBacked() const override {
     return HardwareBufferCheck(hardwareBuffer);
+  }
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return isHardwareBacked() ? hardwareBuffer : nullptr;
   }
 
  protected:
