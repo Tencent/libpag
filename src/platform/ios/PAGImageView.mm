@@ -701,6 +701,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   std::lock_guard<std::mutex> autoLock(imageViewLock);
   NSInteger frameIndex = [self nextFrame];
   if (self.currentFrameIndex == frameIndex) {
+    self.currentFrameExplicitlySet = -1;
     return NO;
   }
   [self checkPAGCompositionChanged];
