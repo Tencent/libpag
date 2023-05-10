@@ -53,7 +53,7 @@ bool HardwareBufferCheck(HardwareBufferRef buffer);
  * HardwareBufferRelease() when finished with it. Note that the allocation may succeed even when the
  * current platform lacks hardware buffer support, which means the returned buffer may be unable to
  * share memory across CPU and GPU. Please use HardwareBufferAvailable() to check whether the
- * current platform has hardware buffer support.
+ * current platform has real hardware buffer support.
  */
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly = false);
 
