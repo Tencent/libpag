@@ -32,6 +32,8 @@ class Drawable {
   virtual int height() const = 0;
 
  protected:
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
+
   void freeSurface();
 
   virtual std::shared_ptr<tgfx::Device> onCreateDevice() = 0;
@@ -40,7 +42,6 @@ class Drawable {
 
  private:
   std::shared_ptr<tgfx::Device> device = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
 
   virtual void updateSize();
 
