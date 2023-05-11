@@ -70,10 +70,6 @@ bool RenderCache::initFilter(Filter* filter) {
 
 void RenderCache::prepareLayers() {
   int64_t timeDistance = DECODING_VISIBLE_DISTANCE;
-#ifdef PAG_BUILD_FOR_WEB
-  // always prepare the whole timeline on the web platoform.
-  timeDistance = INT64_MAX;
-#endif
   auto layerDistances = stage->findNearlyVisibleLayersIn(timeDistance);
   for (auto& item : layerDistances) {
     for (auto pagLayer : item.second) {
