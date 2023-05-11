@@ -94,7 +94,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (tryHardware && tgfx::HardwareBufferAvailable()) {
+  if (tryHardware) {
     auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
     auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
     tgfx::HardwareBufferRelease(hardwareBuffer);

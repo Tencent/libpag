@@ -19,24 +19,25 @@
 #include "TraceImage.h"
 #include <CoreVideo/CoreVideo.h>
 #include "base/utils/Log.h"
+#include "platform/cocoa/private/PixelBufferUtil.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
 void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
   if (info.isEmpty() || pixels == nullptr) {
     return;
   }
-  auto pixelBuffer = tgfx::HardwareBufferAllocate(info.width(), info.height());
-  if (pixelBuffer == nil) {
-    return;
+  @autoreleasepool {
+    auto pixelBuffer = PixelBufferUtil::Make(info.width(), info.height());
+    if (pixelBuffer == nil) {
+      return;
+    }
+    auto dstPixels = tgfx::HardwareBufferLock(pixelBuffer);
+    auto dstInfo = tgfx::HardwareBufferGetInfo(pixelBuffer);
+    tgfx::Pixmap pixmap(dstInfo, dstPixels);
+    pixmap.writePixels(info, pixels);
+    tgfx::HardwareBufferUnlock(pixelBuffer);
+    LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
   }
-  auto dstPixels = tgfx::HardwareBufferLock(pixelBuffer);
-  auto dstInfo = tgfx::HardwareBufferGetInfo(pixelBuffer);
-  tgfx::Pixmap pixmap(dstInfo, dstPixels);
-  pixmap.writePixels(info, pixels);
-  tgfx::HardwareBufferUnlock(pixelBuffer);
-  tgfx::HardwareBufferRelease(pixelBuffer);
-  LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
 }
 }  // namespace pag

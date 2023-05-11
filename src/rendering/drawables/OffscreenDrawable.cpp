@@ -34,13 +34,11 @@ OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx
 }
 
 std::shared_ptr<tgfx::Surface> OffscreenDrawable::onCreateSurface(tgfx::Context* context) {
-  if (tgfx::HardwareBufferAvailable()) {
-    auto hardwareBuffer = tgfx::HardwareBufferAllocate(_width, _height);
-    auto surface = tgfx::Surface::MakeFrom(context, hardwareBuffer);
-    tgfx::HardwareBufferRelease(hardwareBuffer);
-    if (surface != nullptr) {
-      return surface;
-    }
+  auto hardwareBuffer = tgfx::HardwareBufferAllocate(_width, _height);
+  auto surface = tgfx::Surface::MakeFrom(context, hardwareBuffer);
+  tgfx::HardwareBufferRelease(hardwareBuffer);
+  if (surface != nullptr) {
+    return surface;
   }
 #ifdef __APPLE__
   return tgfx::Surface::Make(context, _width, _height, tgfx::ColorType::BGRA_8888);

@@ -43,7 +43,6 @@ class TiledTextureEffectProxy : public FragmentProcessorProxy {
 
   std::unique_ptr<FragmentProcessor> instantiate() override {
     auto texture = textureProxy->getTexture();
-    DEBUG_ASSERT(texture != nullptr);
     if ((tileModeX != TileMode::Clamp || tileModeY != TileMode::Clamp) && !texture->isYUV()) {
       if (auto proc = TiledTextureEffect::Make(
               std::move(texture), SamplerState(tileModeX, tileModeY, sampling), &localMatrix)) {

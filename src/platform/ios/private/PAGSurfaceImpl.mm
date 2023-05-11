@@ -23,9 +23,9 @@
 #import "PAGSurface+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"
+#include "platform/cocoa/private/PixelBufferUtil.h"
 #include "rendering/drawables/HardwareBufferDrawable.h"
 #include "tgfx/opengl/eagl/EAGLDevice.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -125,6 +125,7 @@
 }
 
 - (void)freeCache {
+  pixelBuffer = nil;
   _pagSurface->freeCache();
 }
 
@@ -136,23 +137,22 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  auto pixelBuffer = tgfx::HardwareBufferAllocate(_pagSurface->width(), _pagSurface->height());
-  if (pixelBuffer == nil) {
+  auto hardwareBuffer = pag::PixelBufferUtil::Make(_pagSurface->width(), _pagSurface->height());
+  if (hardwareBuffer == nil) {
     LOGE("CVPixelBufferRef create failed!");
     return nil;
   }
-  CFAutorelease(pixelBuffer);
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
+  CVPixelBufferLockBaseAddress(hardwareBuffer, 0);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(hardwareBuffer, 0);
+  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(hardwareBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+  CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
   if (!status) {
     LOGE("ReadPixels failed!");
     return nil;
   }
-  return pixelBuffer;
+  return hardwareBuffer;
 }
 
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes {

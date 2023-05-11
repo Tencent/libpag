@@ -18,40 +18,38 @@
 
 #pragma once
 
-#include <AppKit/AppKit.h>
-#include "tgfx/opengl/GLDevice.h"
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/Texture.h"
+#include "gpu/TextureSampler.h"
 
 namespace tgfx {
-class CGLDevice : public GLDevice {
+class CGLHardwareTexture : public Texture {
  public:
-  /**
-   * Creates an CGL device with adopted CGL context.
-   */
-  static std::shared_ptr<CGLDevice> MakeAdopted(CGLContextObj cglContext);
+  static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
+                                                      CVPixelBufferRef pixelBuffer,
+                                                      CVOpenGLTextureCacheRef textureCache);
 
-  ~CGLDevice() override;
+  explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
 
-  bool sharableWith(void* nativeHandle) const override;
+  ~CGLHardwareTexture() override;
 
-  CGLContextObj cglContext() const;
+  size_t memoryUsage() const override;
+
+  const TextureSampler* getSampler() const override {
+    return sampler.get();
+  }
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  void computeScratchKey(BytesKey* scratchKey) const override;
 
  private:
-  NSOpenGLContext* glContext = nil;
-  CGLContextObj oldContext = nil;
+  std::unique_ptr<TextureSampler> sampler = {};
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool isAdopted = false);
+  static void ComputeScratchKey(BytesKey* scratchKey, CVPixelBufferRef pixelBuffer);
 
-  explicit CGLDevice(CGLContextObj cglContext);
-
-  CVOpenGLTextureCacheRef getTextureCache();
-
-  friend class GLDevice;
-  friend class CGLWindow;
-  friend class Texture;
+  void onReleaseGPU() override;
 };
 }  // namespace tgfx

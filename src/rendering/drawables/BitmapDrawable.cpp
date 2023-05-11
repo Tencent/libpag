@@ -70,11 +70,9 @@ std::shared_ptr<tgfx::Surface> BitmapDrawable::onCreateSurface(tgfx::Context* co
     return tgfx::Surface::MakeFrom(context, hardwareBuffer);
   }
   if (offscreenSurface == nullptr) {
-    if (tgfx::HardwareBufferAvailable()) {
-      hardwareBuffer = tgfx::HardwareBufferAllocate(_width, _height);
-      offscreenSurface = tgfx::Surface::MakeFrom(context, hardwareBuffer);
-      tgfx::HardwareBufferRelease(hardwareBuffer);
-    }
+    hardwareBuffer = tgfx::HardwareBufferAllocate(_width, _height);
+    offscreenSurface = tgfx::Surface::MakeFrom(context, hardwareBuffer);
+    tgfx::HardwareBufferRelease(hardwareBuffer);
     if (offscreenSurface == nullptr) {
       auto colorType = bitmap->info().colorType() == tgfx::ColorType::BGRA_8888
                            ? tgfx::ColorType::BGRA_8888
