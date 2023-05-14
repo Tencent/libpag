@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageView.h"
+#include <VideoToolbox/VideoToolbox.h>
 #include <mutex>
 #import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
+#import "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/ios/private/PAGContentVersion.h"
 #import "private/PAGValueAnimator.h"
 
@@ -76,11 +78,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   float renderScaleFactor;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
-
-  CFMutableDataRef currentImageDataRef;
-  NSInteger cacheImageSize;
-  NSInteger cacheImageRowBytes;
   std::mutex imageViewLock;
+  CVPixelBufferRef cvPixeBuffer;
 }
 
 @synthesize isPlaying = _isPlaying;
@@ -106,8 +105,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   renderScaleFactor = 1.0;
   totalFrames = 0;
   frameRate = 0;
-  cacheImageSize = 0;
-  cacheImageRowBytes = 0;
   self.memoryCacheEnabled = NO;
   self.memeoryCacheFinished = NO;
   listeners = [[NSHashTable weakObjectsHashTable] retain];
@@ -192,26 +189,28 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [self reset];
 }
 
-- (CFMutableDataRef)getDiskCacheData {
-  if (currentImageDataRef == nil && [[self getPAGDecoder] width] > 0 &&
-      [[self getPAGDecoder] height] > 0) {
-    currentImageDataRef = CFDataCreateMutable(kCFAllocatorDefault, cacheImageSize);
-    CFDataSetLength(currentImageDataRef, cacheImageSize);
+- (CVPixelBufferRef)getDickCacheCVPixelBuffer {
+  if (cvPixeBuffer == nil) {
+    cvPixeBuffer = pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
+                                              static_cast<int>([[self getPAGDecoder] height]));
+    if (cvPixeBuffer == nil) {
+      NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
+      return nil;
+    }
+    CFRetain(cvPixeBuffer);
   }
-  return currentImageDataRef;
+  return cvPixeBuffer;
 }
 
-- (CFMutableDataRef)getMemoryCacheData {
-  if (cacheImageSize == 0) {
-    [self getPAGDecoder];
+- (CVPixelBufferRef)getMemoryCacheCVPixelBuffer {
+  CVPixelBufferRef pixelBuffer =
+      pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
+                                 static_cast<int>([[self getPAGDecoder] height]));
+  if (pixelBuffer == nil) {
+    NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
+    return nil;
   }
-  if (cacheImageSize > 0) {
-    CFMutableDataRef dataRef = CFDataCreateMutable(kCFAllocatorDefault, cacheImageSize);
-    CFDataSetLength(dataRef, cacheImageSize);
-    CFAutorelease(dataRef);
-    return dataRef;
-  }
-  return nil;
+  return pixelBuffer;
 }
 
 - (PAGDecoder*)getPAGDecoder {
@@ -233,8 +232,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
       [pagDecoder retain];
       totalFrames = [pagDecoder numFrames];
       frameRate = [pagDecoder frameRate];
-      cacheImageSize = [pagDecoder width] * [pagDecoder height] * 4;
-      cacheImageRowBytes = [pagDecoder width] * 4;
     }
   }
   return pagDecoder;
@@ -319,7 +316,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
 }
 
-- (BOOL)updateImageViewFrom:(CFMutableDataRef)dataRef atIndex:(NSInteger)frameIndex {
+- (BOOL)updateImageViewFrom:(CVPixelBufferRef)pixelBuffer atIndex:(NSInteger)frameIndex {
   [self freeCache];
   if ([[imagesMap allKeys] containsObject:@(frameIndex)]) {
     UIImage* image = imagesMap[@(frameIndex)];
@@ -332,20 +329,20 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   PAGDecoder* pagDecoder = [self getPAGDecoder];
   if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
-    uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
-    BOOL status = [pagDecoder copyFrameTo:rgbaData
-                                 rowBytes:static_cast<size_t>(cacheImageRowBytes)
-                                       at:frameIndex];
+    BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
     if (!status) {
       return status;
     }
-    UIImage* image = [self imageForCFMutableData:dataRef];
+    UIImage* image = [self imageForCVPixelBuffer:pixelBuffer];
     if (image) {
       self.currentUIImage = image;
       [self submitToImageView];
     }
   }
   if (self.memoryCacheEnabled && self.currentUIImage) {
+    if (imagesMap == nil) {
+      imagesMap = [NSMutableDictionary new];
+    }
     self->imagesMap[@(frameIndex)] = self.currentUIImage;
   }
 
@@ -433,25 +430,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
 }
 
-- (UIImage*)imageForCFMutableData:(CFMutableDataRef)dataRef {
-  CGBitmapInfo bitmapInfo = kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst;
-  size_t componentsPerPixel = 4;
-  size_t bitsPerPixel = 8;
-  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-  CGDataProviderRef provider = CGDataProviderCreateWithCFData(dataRef);
-  CGImageRef cgImage =
-      CGImageCreate(static_cast<size_t>([[self getPAGDecoder] width]),
-                    static_cast<size_t>([[self getPAGDecoder] height]), bitsPerPixel,
-                    bitsPerPixel * componentsPerPixel, static_cast<size_t>(cacheImageRowBytes),
-                    colorSpace, bitmapInfo, provider, NULL, NO, kCGRenderingIntentDefault);
-  UIImage* image = [UIImage imageWithCGImage:cgImage];
-  CGColorSpaceRelease(colorSpace);
-  CGImageRelease(cgImage);
-  CGDataProviderRelease(provider);
-
-  return image;
-}
-
 - (int64_t)FrameToTime:(NSInteger)frame {
   if (frameRate <= 0) {
     frameRate = [[self getPAGDecoder] frameRate];
@@ -477,21 +455,31 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)reset {
   if (imagesMap) {
     [imagesMap removeAllObjects];
+    [imagesMap release];
     imagesMap = nil;
     self.memeoryCacheFinished = NO;
   }
-  if (currentImageDataRef) {
-    CFRelease(currentImageDataRef);
-    currentImageDataRef = nil;
+  if (cvPixeBuffer) {
+    CFRelease(cvPixeBuffer);
+    cvPixeBuffer = nil;
   }
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
     totalFrames = 0;
     frameRate = 0;
-    cacheImageSize = 0;
-    cacheImageRowBytes = 0;
   }
+}
+
+- (UIImage*)imageForCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+  if (pixelBuffer == nil) {
+    return nil;
+  }
+  CGImageRef imageRef = nil;
+  VTCreateCGImageFromCVPixelBuffer(pixelBuffer, nil, &imageRef);
+  UIImage* uiImage = [UIImage imageWithCGImage:imageRef];
+  CGImageRelease(imageRef);
+  return uiImage;
 }
 
 #pragma mark - pubic
@@ -564,17 +552,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)setCacheAllFramesInMemory:(BOOL)enable {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
   _memoryCacheEnabled = enable;
-  if (_memoryCacheEnabled) {
-    if (imagesMap == nil) {
-      imagesMap = [NSMutableDictionary new];
-    }
-  } else {
-    if (imagesMap) {
-      [imagesMap removeAllObjects];
-      [imagesMap release];
-      imagesMap = nil;
-      self.memoryCacheEnabled = NO;
-    }
+  if (!_memoryCacheEnabled && imagesMap) {
+    [imagesMap removeAllObjects];
+    [imagesMap release];
+    imagesMap = nil;
   }
 }
 
@@ -705,9 +686,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     return NO;
   }
   [self checkPAGCompositionChanged];
-  CFMutableDataRef dataRef =
-      self.memoryCacheEnabled ? [self getMemoryCacheData] : [self getDiskCacheData];
-  if (dataRef == nil) {
+  CVPixelBufferRef pixelBuffer = self.memoryCacheEnabled ? [self getMemoryCacheCVPixelBuffer]
+                                                         : [self getDickCacheCVPixelBuffer];
+  if (pixelBuffer == nil) {
     self.currentUIImage = nil;
     [self submitToImageView];
     return NO;
@@ -715,10 +696,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   BOOL status;
   if (self.currentFrameExplicitlySet >= 0) {
     self.currentFrameExplicitlySet = -1;
-    status = [self updateImageViewFrom:dataRef atIndex:frameIndex];
+    status = [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
     [self->valueAnimator setCurrentPlayTime:[self FrameToTime:frameIndex]];
   } else {
-    status = [self updateImageViewFrom:dataRef atIndex:frameIndex];
+    status = [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
   }
   self.currentFrameIndex = frameIndex;
   return status;
