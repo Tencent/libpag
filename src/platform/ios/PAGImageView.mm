@@ -553,9 +553,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   std::lock_guard<std::mutex> autoLock(imageViewLock);
   _memoryCacheEnabled = enable;
   if (!_memoryCacheEnabled && imagesMap) {
-      [imagesMap removeAllObjects];
-      [imagesMap release];
-      imagesMap = nil;
+    [imagesMap removeAllObjects];
+    [imagesMap release];
+    imagesMap = nil;
   }
 }
 
