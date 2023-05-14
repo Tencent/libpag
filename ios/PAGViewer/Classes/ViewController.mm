@@ -108,7 +108,6 @@
             PAGImageView* pagImageView = [[PAGImageView alloc] initWithFrame:CGRectMake(itemWidth * (i % 4), (i / 4) * itemHeight + startY, itemWidth, itemHeight)];
             NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithFormat:@"%d", i] ofType:@"pag" inDirectory:@"list"];
             [pagImageView setPath:path];
-            [pagImageView setCacheAllFramesInMemory:NO];
             [self.pagImageViewGroup addSubview:pagImageView];
             [pagImageView setRepeatCount:-1];
             [pagImageView play];

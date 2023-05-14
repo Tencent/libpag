@@ -17,16 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageView.h"
-
 #include <VideoToolbox/VideoToolbox.h>
 #include <mutex>
-
 #import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
+#import "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/ios/private/PAGContentVersion.h"
 #import "private/PAGValueAnimator.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
@@ -193,25 +191,25 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (CVPixelBufferRef)getDickCacheCVPixelBuffer {
   if (cvPixeBuffer == nil) {
-    cvPixeBuffer = tgfx::HardwareBufferAllocate(static_cast<int>([[self getPAGDecoder] width]),
-                                                static_cast<int>([[self getPAGDecoder] height]));
+    cvPixeBuffer = pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
+                                              static_cast<int>([[self getPAGDecoder] height]));
     if (cvPixeBuffer == nil) {
       NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
       return nil;
     }
+    CFRetain(cvPixeBuffer);
   }
   return cvPixeBuffer;
 }
 
 - (CVPixelBufferRef)getMemoryCacheCVPixelBuffer {
   CVPixelBufferRef pixelBuffer =
-      tgfx::HardwareBufferAllocate(static_cast<int>([[self getPAGDecoder] width]),
-                                   static_cast<int>([[self getPAGDecoder] height]));
+      pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
+                                 static_cast<int>([[self getPAGDecoder] height]));
   if (pixelBuffer == nil) {
     NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
     return nil;
   }
-  CFAutorelease(pixelBuffer);
   return pixelBuffer;
 }
 
@@ -342,7 +340,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
   }
   if (self.memoryCacheEnabled && self.currentUIImage) {
-    self->imagesMap[@(frameIndex)] = [[self.currentUIImage retain] autorelease];
+    if (imagesMap == nil) {
+      imagesMap = [NSMutableDictionary new];
+    }
+    self->imagesMap[@(frameIndex)] = self.currentUIImage;
   }
 
   return YES;
@@ -551,17 +552,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)setCacheAllFramesInMemory:(BOOL)enable {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
   _memoryCacheEnabled = enable;
-  if (_memoryCacheEnabled) {
-    if (imagesMap == nil) {
-      imagesMap = [NSMutableDictionary new];
-    }
-  } else {
-    if (imagesMap) {
+  if (!_memoryCacheEnabled && imagesMap) {
       [imagesMap removeAllObjects];
       [imagesMap release];
       imagesMap = nil;
-      self.memoryCacheEnabled = NO;
-    }
   }
 }
 
