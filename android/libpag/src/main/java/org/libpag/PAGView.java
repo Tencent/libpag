@@ -544,11 +544,23 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
     };
 
-    public void stop() {
-        Log.i(TAG, "stop");
+    /**
+     * Pauses the animation at the current playing position. Calling the play method can resume the
+     * animation from the last paused playing position.
+     */
+    public void pause() {
+        Log.i(TAG, "pause");
         _isPlaying = false;
         _isAnimatorPreRunning = null;
         cancelAnimator();
+    }
+
+    /**
+     * Pauses the animation at the current playing position. Calling the play method can resume the
+     * animation from the last paused playing position.
+     */
+    public void stop() {
+        pause();
     }
 
     private boolean isMainThread() {

@@ -24,7 +24,9 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.ColorSpace;
 import android.graphics.Matrix;
+import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.os.Looper;
 import android.provider.Settings;
@@ -81,6 +83,7 @@ public class PAGImageView extends View {
     private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
     private volatile Bitmap renderBitmap;
+    private volatile HardwareBuffer hardwareBuffer;
     private Matrix renderMatrix;
     private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
@@ -454,7 +457,7 @@ public class PAGImageView extends View {
         _maxFrameRate = maxFrameRate;
         PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         _matrix = null;
-        renderBitmap = null;
+        releaseBitmap();
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
@@ -585,7 +588,7 @@ public class PAGImageView extends View {
         viewHeight = h;
         width = (int) (_renderScale * w);
         height = (int) (_renderScale * h);
-        renderBitmap = null;
+        releaseBitmap();
         forceFlush = true;
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         resumeAnimator();
@@ -650,12 +653,20 @@ public class PAGImageView extends View {
             PAGImageViewHelper.DestroyHandlerThread();
         }
         if (_isAnimatorPreRunning == null || _isAnimatorPreRunning) {
-            renderBitmap = null;
+            releaseBitmap();
         }
         bitmapCache.clear();
         lastContentVersion = -1;
         memoryCacheStatusHasChanged = false;
         freezeDraw.set(false);
+    }
+
+    private void releaseBitmap() {
+        renderBitmap = null;
+        if (hardwareBuffer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            hardwareBuffer.close();
+        }
+        hardwareBuffer = null;
     }
 
     private final Runnable mAnimatorStartRunnable = new Runnable() {
@@ -788,10 +799,25 @@ public class PAGImageView extends View {
             return true;
         }
         if (renderBitmap == null || _cacheAllFramesInMemory) {
-            renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                hardwareBuffer = BitmapHelper.CreateHardwareBuffer(decoderInfo._width,
+                        decoderInfo._height);
+                if (hardwareBuffer != null) {
+                    renderBitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, ColorSpace.get(ColorSpace.Named.SRGB));
+                }
+            }
+            if (renderBitmap == null) {
+                renderBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            }
         }
-        if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
-            return false;
+        if (hardwareBuffer != null) {
+            if (!decoderInfo._pagDecoder.readFrame(frame, hardwareBuffer)) {
+                return false;
+            }
+        } else {
+            if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
+                return false;
+            }
         }
         if (_cacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
