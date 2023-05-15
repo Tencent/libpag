@@ -48,7 +48,8 @@ void SequenceImageQueue::prepareNextImage() {
 }
 
 void SequenceImageQueue::prepare(Frame targetFrame) {
-  if (preparedImage != nullptr || targetFrame < 0 || targetFrame >= totalFrames) {
+  if ((preparedImage != nullptr && targetFrame == preparedFrame) || targetFrame < 0 ||
+      targetFrame >= totalFrames) {
     return;
   }
   auto image = sequence->makeFrameImage(reader, targetFrame);
