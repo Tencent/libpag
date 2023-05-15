@@ -35,9 +35,11 @@ class BitmapHelper {
 
     static HardwareBuffer CreateHardwareBuffer(int width, int height) {
         if (width > 0 && height > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height, HardwareBuffer.RGBA_8888, 1, HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
-            if (hardwareBuffer != null) {
-                return hardwareBuffer;
+            try {
+                return HardwareBuffer.create(width, height, HardwareBuffer.RGBA_8888, 1,
+                        HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
         return null;
