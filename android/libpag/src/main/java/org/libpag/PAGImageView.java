@@ -807,7 +807,7 @@ public class PAGImageView extends View {
                 }
             }
             if (renderBitmap == null) {
-                renderBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                renderBitmap = Bitmap.createBitmap(decoderInfo._width, decoderInfo._height, Bitmap.Config.ARGB_8888);
             }
         }
         if (hardwareBuffer != null) {
