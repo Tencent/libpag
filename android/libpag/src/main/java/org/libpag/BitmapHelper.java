@@ -4,36 +4,35 @@ import android.graphics.Bitmap;
 import android.graphics.ColorSpace;
 import android.hardware.HardwareBuffer;
 import android.os.Build;
+import android.util.Pair;
 
 class BitmapHelper {
-    static Bitmap CreateBitmap(int width, int height) {
+
+    static Pair<Bitmap, HardwareBuffer> CreateBitmap(int width, int height,
+                                                     boolean needGetHardwareBufferFromNative) {
         if (width == 0 || height == 0) {
             return null;
         }
         // The AndroidBitmap_getHardwareBuffer() method in NDK is available since API level 30.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R || !needGetHardwareBufferFromNative && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             Bitmap bitmap = null;
             HardwareBuffer hardwareBuffer = CreateHardwareBuffer(width, height);
             if (hardwareBuffer != null) {
                 try {
                     bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, ColorSpace.get(ColorSpace.Named.SRGB));
-                    // HardwareBuffer will automatically close when it is finalized, but StrictMode
-                    // will incorrectly think it is not closed.
-                    // So we manually call close to avoid printing annoying logs.
-                    hardwareBuffer.close();
                 } catch (Exception e) {
                     bitmap = null;
                     e.printStackTrace();
                 }
             }
             if (bitmap != null) {
-                return bitmap;
+                return Pair.create(bitmap, hardwareBuffer);
             }
         }
-        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        return Pair.create(Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888), null);
     }
 
-    static HardwareBuffer CreateHardwareBuffer(int width, int height) {
+    private static HardwareBuffer CreateHardwareBuffer(int width, int height) {
         if (width > 0 && height > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 return HardwareBuffer.create(width, height, HardwareBuffer.RGBA_8888, 1,

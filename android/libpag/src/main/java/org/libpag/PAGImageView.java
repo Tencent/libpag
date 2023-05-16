@@ -24,7 +24,6 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.ColorSpace;
 import android.graphics.Matrix;
 import android.hardware.HardwareBuffer;
 import android.os.Build;
@@ -32,6 +31,7 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
@@ -318,7 +318,6 @@ public class PAGImageView extends View {
             animator.setCurrentPlayTime(currentPlayTime);
             progressExplicitlySet = true;
         }
-        PAGImageViewHelper.NeedsUpdateView(this);
     }
 
     /**
@@ -799,16 +798,13 @@ public class PAGImageView extends View {
             return true;
         }
         if (renderBitmap == null || _cacheAllFramesInMemory) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                hardwareBuffer = BitmapHelper.CreateHardwareBuffer(decoderInfo._width,
-                        decoderInfo._height);
-                if (hardwareBuffer != null) {
-                    renderBitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, ColorSpace.get(ColorSpace.Named.SRGB));
-                }
+            Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
+                    decoderInfo._height, false);
+            if (pair == null || pair.first == null) {
+                return false;
             }
-            if (renderBitmap == null) {
-                renderBitmap = Bitmap.createBitmap(decoderInfo._width, decoderInfo._height, Bitmap.Config.ARGB_8888);
-            }
+            hardwareBuffer = pair.second;
+            renderBitmap = pair.first;
         }
         if (hardwareBuffer != null) {
             if (!decoderInfo._pagDecoder.readFrame(frame, hardwareBuffer)) {
