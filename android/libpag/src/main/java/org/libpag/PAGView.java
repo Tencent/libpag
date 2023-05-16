@@ -298,7 +298,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             // Align with iOS platform, avoid triggering this method when stopping
             int repeatCount = ((ValueAnimator) animation).getRepeatCount();
             if (repeatCount >= 0 && (animation.getDuration() > 0) &&
-                    (currentPlayTime / animation.getDuration() > repeatCount)) {
+                    (currentPlayTime * 1.0 / animation.getDuration() > repeatCount)) {
                 notifyEnd();
             }
         }
