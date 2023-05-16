@@ -324,8 +324,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [self freeCache];
   if ([[imagesMap allKeys] containsObject:@(frameIndex)]) {
     UIImage* image = imagesMap[@(frameIndex)];
-    self.currentUIImage = image;
-    [self submitToImageView];
+    if (image) {
+      self.currentFrameIndex = frameIndex;
+      self.currentUIImage = image;
+      [self submitToImageView];
+    }
     if ([imagesMap count] == (NSUInteger)[[self getPAGDecoder] numFrames]) {
       self.memeoryCacheFinished = YES;
     }
@@ -341,6 +344,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     UIImage* image = [self imageForCFMutableData:dataRef];
     if (image) {
+      self.currentFrameIndex = frameIndex;
       self.currentUIImage = image;
       [self submitToImageView];
     }
@@ -720,7 +724,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   } else {
     status = [self updateImageViewFrom:dataRef atIndex:frameIndex];
   }
-  self.currentFrameIndex = frameIndex;
   return status;
 }
 
