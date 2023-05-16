@@ -48,7 +48,7 @@ class CompositionReader {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<BitmapDrawable> drawable = nullptr;
 
-  CompositionReader(int width, int height);
+  CompositionReader(std::shared_ptr<BitmapDrawable> bitmapDrawable);
 
   bool renderFrame(double progress);
 };
