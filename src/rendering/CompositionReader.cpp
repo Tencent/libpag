@@ -23,12 +23,16 @@ std::shared_ptr<CompositionReader> CompositionReader::Make(int width, int height
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::shared_ptr<CompositionReader>(new CompositionReader(width, height));
+  auto drawable = BitmapDrawable::Make(width, height);
+  if (drawable == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<CompositionReader>(new CompositionReader(drawable));
 }
 
-CompositionReader::CompositionReader(int width, int height) {
+CompositionReader::CompositionReader(std::shared_ptr<BitmapDrawable> bitmapDrawable)
+    : drawable(std::move(bitmapDrawable)) {
   pagPlayer = new PAGPlayer();
-  drawable = BitmapDrawable::Make(width, height);
   auto pagSurface = PAGSurface::MakeFrom(drawable);
   pagPlayer->setSurface(pagSurface);
 }
