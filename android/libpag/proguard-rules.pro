@@ -28,9 +28,9 @@
     *;
 }
 
--keeppackagenames org.libpag.*
+-keeppackagenames org.libpag.**
 
--keeppackagenames org.extra.*
+-keeppackagenames org.extra.**
 
 -keepclasseswithmembers class ** {
     native <methods>;

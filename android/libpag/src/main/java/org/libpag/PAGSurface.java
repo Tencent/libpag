@@ -2,9 +2,11 @@ package org.libpag;
 
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
+import android.hardware.HardwareBuffer;
 import android.opengl.EGL14;
 import android.opengl.EGLContext;
 import android.os.Build;
+import android.util.Pair;
 import android.view.Surface;
 
 import org.extra.tools.LibraryLoadUtils;
@@ -171,14 +173,14 @@ public class PAGSurface {
      * PAGSurface will not be captured.
      */
     public Bitmap makeSnapshot() {
-        Bitmap bitmap = BitmapHelper.CreateBitmap(width(), height());
-        if (bitmap == null) {
+        Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(width(), height(), true);
+        if (pair.first == null) {
             return null;
         }
-        if (copyPixelsTo(bitmap)) {
-            return bitmap;
+        if (pair.second != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            pair.second.close();
         }
-        return null;
+        return copyPixelsTo(pair.first) ? pair.first : null;
     }
 
     /**

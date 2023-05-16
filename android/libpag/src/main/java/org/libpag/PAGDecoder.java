@@ -20,6 +20,8 @@ package org.libpag;
 
 import android.graphics.Bitmap;
 import android.hardware.HardwareBuffer;
+import android.os.Build;
+import android.util.Pair;
 
 import org.extra.tools.LibraryLoadUtils;
 
@@ -114,14 +116,20 @@ public class PAGDecoder {
      * forward order for better performance.
      */
     public Bitmap frameAtIndex(int index) {
-        Bitmap bitmap = BitmapHelper.CreateBitmap(width(), height());
-        if (bitmap == null) {
+        Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(width(), height(), false);
+        if (pair.first == null) {
             return null;
         }
-        if (copyFrameTo(bitmap, index)) {
-            return bitmap;
+        boolean success;
+        if (pair.second != null) {
+            success = readFrame(index, pair.second);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                pair.second.close();
+            }
+        } else {
+            success = copyFrameTo(pair.first, index);
         }
-        return null;
+        return success ? pair.first : null;
     }
 
     /**
