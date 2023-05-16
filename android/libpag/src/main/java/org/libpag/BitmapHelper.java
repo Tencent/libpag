@@ -11,7 +11,7 @@ class BitmapHelper {
     static Pair<Bitmap, HardwareBuffer> CreateBitmap(int width, int height,
                                                      boolean needGetHardwareBufferFromNative) {
         if (width == 0 || height == 0) {
-            return null;
+            return Pair.create(null, null);
         }
         // The AndroidBitmap_getHardwareBuffer() method in NDK is available since API level 30.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R || !needGetHardwareBufferFromNative && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

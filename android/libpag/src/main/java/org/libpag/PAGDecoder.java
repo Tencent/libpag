@@ -117,18 +117,19 @@ public class PAGDecoder {
      */
     public Bitmap frameAtIndex(int index) {
         Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(width(), height(), false);
-        if (pair == null || pair.first == null) {
+        if (pair.first == null) {
             return null;
         }
+        boolean success;
         if (pair.second != null) {
-            boolean success = readFrame(index, pair.second);
+            success = readFrame(index, pair.second);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 pair.second.close();
             }
-            return success ? pair.first : null;
         } else {
-            return copyFrameTo(pair.first, index) ? pair.first : null;
+            success = copyFrameTo(pair.first, index);
         }
+        return success ? pair.first : null;
     }
 
     /**

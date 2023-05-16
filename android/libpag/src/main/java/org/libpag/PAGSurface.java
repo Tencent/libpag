@@ -174,16 +174,13 @@ public class PAGSurface {
      */
     public Bitmap makeSnapshot() {
         Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(width(), height(), true);
-        if (pair == null || pair.first == null) {
+        if (pair.first == null) {
             return null;
         }
         if (pair.second != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             pair.second.close();
         }
-        if (copyPixelsTo(pair.first)) {
-            return pair.first;
-        }
-        return null;
+        return copyPixelsTo(pair.first) ? pair.first : null;
     }
 
     /**
