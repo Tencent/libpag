@@ -19,6 +19,11 @@
 #include "ImageGeneratorTask.h"
 
 namespace tgfx {
+class ImageResult {
+ public:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+};
+
 std::shared_ptr<ImageGeneratorTask> ImageGeneratorTask::MakeFrom(
     std::shared_ptr<ImageGenerator> generator, bool tryHardware) {
   if (generator == nullptr) {
@@ -30,17 +35,18 @@ std::shared_ptr<ImageGeneratorTask> ImageGeneratorTask::MakeFrom(
 
 ImageGeneratorTask::ImageGeneratorTask(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
     : imageGenerator(std::move(generator)) {
-  task = Task::Run([=] { imageBuffer = imageGenerator->makeBuffer(tryHardware); });
+  imageResult = std::make_shared<ImageResult>();
+  task = Task::Run([result = imageResult, generator = imageGenerator, tryHardware]() {
+    result->imageBuffer = generator->makeBuffer(tryHardware);
+  });
 }
 
 ImageGeneratorTask::~ImageGeneratorTask() {
-  // Must cancel and wait the task finishes, otherwise, the task may access wild pointers.
   task->cancel();
-  task->wait();
 }
 
 std::shared_ptr<ImageBuffer> ImageGeneratorTask::getBuffer() const {
   task->wait();
-  return imageBuffer;
+  return imageResult->imageBuffer;
 }
 }  // namespace tgfx

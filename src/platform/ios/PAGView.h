@@ -54,7 +54,7 @@
 PAG_API @interface PAGView : UIView
 
 /**
- * Default is NO.
+ * Returns YES if PAGView is playing in the main thread. The default value is NO.
  */
 @property(nonatomic) BOOL sync;
 

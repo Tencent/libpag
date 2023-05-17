@@ -22,6 +22,8 @@
 #include "tgfx/utils/Task.h"
 
 namespace tgfx {
+class ImageResult;
+
 /**
  * ImageGeneratorTask wraps an ImageGenerator and schedules an asynchronous decoding task
  * immediately.
@@ -45,7 +47,7 @@ class ImageGeneratorTask {
 
  private:
   std::shared_ptr<Task> task = nullptr;
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<ImageResult> imageResult = nullptr;
   std::shared_ptr<ImageGenerator> imageGenerator = nullptr;
 
   ImageGeneratorTask(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
