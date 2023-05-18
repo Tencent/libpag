@@ -18,6 +18,7 @@
 
 #include "TaskGroup.h"
 #include <algorithm>
+#include <cstdlib>
 #include "utils/Log.h"
 
 #ifdef __APPLE__
@@ -43,7 +44,7 @@ int GetCPUCores() {
 }
 
 TaskGroup* TaskGroup::GetInstance() {
-  static TaskGroup taskGroup = {};
+  static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
 }
 
@@ -64,12 +65,14 @@ static void ReleaseThread(std::thread* thread) {
   delete thread;
 }
 
-TaskGroup::~TaskGroup() {
-  exit();
-  for (auto& thread : threads) {
-    ReleaseThread(thread);
-  }
-  threads.clear();
+void OnAppExit() {
+  // Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
+  // pointers.
+  TaskGroup::GetInstance()->exit();
+}
+
+TaskGroup::TaskGroup() {
+  std::atexit(OnAppExit);
 }
 
 bool TaskGroup::checkThreads() {
@@ -104,7 +107,7 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 #ifdef TGFX_BUILD_FOR_WEB
   return false;
 #endif
-  if (!checkThreads()) {
+  if (exited || !checkThreads()) {
     return false;
   }
   tasks.push_back(std::move(task));
@@ -148,8 +151,14 @@ bool TaskGroup::removeTask(Task* target) {
 }
 
 void TaskGroup::exit() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  locker.lock();
   exited = true;
+  tasks.clear();
   condition.notify_all();
+  locker.unlock();
+  for (auto& thread : threads) {
+    ReleaseThread(thread);
+  }
+  threads.clear();
 }
 }  // namespace tgfx
