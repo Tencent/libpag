@@ -493,6 +493,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     public void play() {
+        if (_isPlaying) {
+            return;
+        }
         _isPlaying = true;
         _isAnimatorPreRunning = null;
         float progress = 0;
@@ -804,9 +807,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     public void setProgress(double value) {
         synchronized (updateTimeLock) {
             pagPlayer.setProgress(value);
-            if (animator.isRunning()) {
-                currentPlayTime = animator.getCurrentPlayTime();
-            }
+            syncCurrentTime();
             progressExplicitlySet = true;
         }
         NeedsUpdateView(this);
@@ -849,12 +850,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             result = pagPlayer.flush();
             progressExplicitlySet = false;
             synchronized (updateTimeLock) {
-                long playTime = 0;
-                if (animator.getDuration() > 0) {
-                    long repeatCount = currentPlayTime / animator.getDuration();
-                    playTime = (long) ((pagPlayer.getProgress() + repeatCount) * pagPlayer.duration());
-                }
-                animator.setCurrentPlayTime(playTime / 1000);
+                syncCurrentTime();
+                animator.setCurrentPlayTime(currentPlayTime);
             }
         } else {
             synchronized (updateTimeLock) {
@@ -955,4 +952,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         doPlay();
     }
 
+    private void syncCurrentTime() {
+        long playTime = 0;
+        if (animator.getDuration() > 0) {
+            long repeatCount = currentPlayTime / animator.getDuration();
+            if (animator.getAnimatedFraction() == 1.0f) {
+                repeatCount = Math.round(currentPlayTime * 1.0 / animator.getDuration()) - 1;
+            }
+            playTime = (long) ((pagPlayer.getProgress() + repeatCount) * pagPlayer.duration());
+        }
+        currentPlayTime = playTime / 1000;
+    }
 }
