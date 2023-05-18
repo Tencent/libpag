@@ -16,8 +16,23 @@ export class ScalerContext {
     ScalerContext.context = context;
   }
 
+  public static isUnicodePropertyEscapeSupported(): boolean {
+    try {
+      // eslint-disable-next-line prefer-regex-literals
+      const regex = new RegExp("\\p{L}", "u");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   public static isEmoji(text: string): boolean {
-    const emojiRegExp = /\p{Extended_Pictographic}|[#*0-9]\uFE0F?\u20E3|[\uD83C\uDDE6-\uD83C\uDDFF]/u;
+    let emojiRegExp: RegExp;
+    if (this.isUnicodePropertyEscapeSupported()) {
+      emojiRegExp = /\p{Extended_Pictographic}|[#*0-9]\uFE0F?\u20E3|[\uD83C\uDDE6-\uD83C\uDDFF]/u;
+    } else {
+      emojiRegExp = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
+    }
     return emojiRegExp.test(text);
   }
 
