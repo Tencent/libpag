@@ -24,13 +24,9 @@
 #include <thread>
 #include <vector>
 #include "tgfx/utils/Task.h"
-#include "tgfx/utils/TaskQueue.h"
 
 namespace tgfx {
 class TaskGroup {
- public:
-  ~TaskGroup();
-
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
@@ -43,7 +39,7 @@ class TaskGroup {
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
 
-  TaskGroup() = default;
+  TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
@@ -51,6 +47,6 @@ class TaskGroup {
   void exit();
 
   friend class Task;
-  friend class TaskQueue;
+  friend void OnAppExit();
 };
 }  // namespace tgfx

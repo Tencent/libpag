@@ -32,17 +32,6 @@ std::shared_ptr<Task> Task::Run(std::function<void()> block) {
   return task;
 }
 
-std::shared_ptr<Task> Task::Run(std::shared_ptr<TaskQueue> queue, std::function<void()> block) {
-  if (queue == nullptr || block == nullptr) {
-    return nullptr;
-  }
-  auto task = std::shared_ptr<Task>(new Task(std::move(block)));
-  if (!queue->pushTask(task)) {
-    task->execute();
-  }
-  return task;
-}
-
 Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
@@ -89,10 +78,6 @@ void Task::cancel() {
 }
 
 bool Task::removeTask() {
-  auto taskQueue = queue.lock();
-  if (taskQueue != nullptr) {
-    return taskQueue->removeTask(this);
-  }
   return TaskGroup::GetInstance()->removeTask(this);
 }
 
