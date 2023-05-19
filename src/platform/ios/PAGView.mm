@@ -35,7 +35,6 @@ void DestoryFlushQueue() {
 
 @interface PAGView ()
 @property(atomic, assign) BOOL isAsyncFlushing;
-@property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, assign) BOOL progressExplicitlySet;
 @property(nonatomic, strong) NSRecursiveLock* updateTimeLock;
@@ -102,10 +101,6 @@ void DestoryFlushQueue() {
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(renderTargetBufferPrepared:)
-                                               name:pag::kGPURenderTargetBufferPreparedNotification
-                                             object:self.layer];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationWillResignActive:)
                                                name:UIApplicationWillResignActiveNotification
@@ -425,11 +420,6 @@ void DestoryFlushQueue() {
     return false;
   }
   BOOL result;
-  if (!self.bufferPrepared) {
-    // surface 需要在主线程创建，子线程调用时需要先通过 flush 方法触发创建
-    result = [pagPlayer flush];
-    return result;
-  }
   [self.updateTimeLock lock];
   if (self.progressExplicitlySet) {
     result = [pagPlayer flush];
@@ -451,9 +441,7 @@ void DestoryFlushQueue() {
     }
   }
   [copiedListeners release];
-  if (self.bufferPrepared) {
-    [PAGView RegisterFlushQueueDestoryMethod];
-  }
+  [PAGView RegisterFlushQueueDestoryMethod];
   return result;
 }
 
@@ -495,13 +483,6 @@ void DestoryFlushQueue() {
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
   self.isInBackground = FALSE;
   if (self.isVisible) {
-    [self updateView];
-  }
-}
-
-- (void)renderTargetBufferPrepared:(NSNotification*)notification {
-  self.bufferPrepared = TRUE;
-  if ([notification.userInfo[pag::kPreparedAsync] boolValue]) {
     [self updateView];
   }
 }
