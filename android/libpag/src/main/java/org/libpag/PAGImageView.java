@@ -83,7 +83,9 @@ public class PAGImageView extends View {
     private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
     private volatile Bitmap renderBitmap;
-    private volatile HardwareBuffer hardwareBuffer;
+    private volatile HardwareBuffer renderHardwareBuffer;
+    private volatile Bitmap backgroundBitmap;
+    private volatile HardwareBuffer backgroundHardwareBuffer;
     private Matrix renderMatrix;
     private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
@@ -658,10 +660,17 @@ public class PAGImageView extends View {
 
     private void releaseBitmap() {
         renderBitmap = null;
-        if (hardwareBuffer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            hardwareBuffer.close();
+        backgroundBitmap = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (renderHardwareBuffer != null) {
+                renderHardwareBuffer.close();
+                renderHardwareBuffer = null;
+            }
+            if (backgroundHardwareBuffer != null) {
+                backgroundHardwareBuffer.close();
+                backgroundHardwareBuffer = null;
+            }
         }
-        hardwareBuffer = null;
     }
 
     private final Runnable mAnimatorStartRunnable = new Runnable() {
@@ -775,6 +784,27 @@ public class PAGImageView extends View {
         }
     }
 
+    private boolean checkBackgroundBitmap() {
+        if (backgroundBitmap == null) {
+            Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
+            if (pair.first == null) {
+                return false;
+            }
+            backgroundHardwareBuffer = pair.second;
+            backgroundBitmap = pair.first;
+        }
+        return true;
+    }
+
+    private void swapBitmap() {
+        Bitmap bitmap = renderBitmap;
+        renderBitmap = backgroundBitmap;
+        backgroundBitmap = bitmap;
+        HardwareBuffer hardwareBuffer = renderHardwareBuffer;
+        renderHardwareBuffer = backgroundHardwareBuffer;
+        backgroundHardwareBuffer = hardwareBuffer;
+    }
+
     private boolean handleFrame(final int frame) {
         if (!decoderInfo.isValid() || freezeDraw.get()) {
             return false;
@@ -801,17 +831,33 @@ public class PAGImageView extends View {
             if (pair.first == null) {
                 return false;
             }
-            hardwareBuffer = pair.second;
+            renderHardwareBuffer = pair.second;
             renderBitmap = pair.first;
         }
-        if (hardwareBuffer != null) {
-            if (!decoderInfo._pagDecoder.readFrame(frame, hardwareBuffer)) {
+        HardwareBuffer flushBuffer;
+        Bitmap flushBitmap;
+        if (!_cacheAllFramesInMemory) {
+            if (!checkBackgroundBitmap()) {
+                return false;
+            }
+            flushBuffer = backgroundHardwareBuffer;
+            flushBitmap = backgroundBitmap;
+        } else {
+            flushBuffer = renderHardwareBuffer;
+            flushBitmap = renderBitmap;
+        }
+        if (flushBuffer != null) {
+            if (!decoderInfo._pagDecoder.readFrame(frame, flushBuffer)) {
                 return false;
             }
         } else {
-            if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
+            if (!decoderInfo._pagDecoder.copyFrameTo(flushBitmap, frame)) {
                 return false;
             }
+            flushBitmap.prepareToDraw();
+        }
+        if (!_cacheAllFramesInMemory) {
+            swapBitmap();
         }
         if (_cacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
