@@ -22,29 +22,25 @@
 
 namespace tgfx {
 static std::mutex deviceMapLocker = {};
-static std::mutex threadCacheLocker = {};
 static std::unordered_map<void*, GLDevice*> deviceMap = {};
-static std::unordered_map<std::thread::id, std::weak_ptr<tgfx::GLDevice>> threadCacheMap = {};
 
-std::shared_ptr<GLDevice> GLDevice::MakeFromThreadPool() {
-  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
-  auto threadID = std::this_thread::get_id();
-  auto result = threadCacheMap.find(threadID);
-  if (result != threadCacheMap.end()) {
-    auto& weak = result->second;
-    auto context = weak.lock();
-    if (context) {
-      return context;
-    }
-    threadCacheMap.erase(result);
-  }
+std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
   auto device = GLDevice::Make();
   if (device != nullptr) {
-    threadCacheMap[threadID] = device;
-  } else {
-    device = GLDevice::Current();
+    return device;
   }
-  return device;
+#ifndef TGFX_BUILD_FOR_WEB
+  for (auto& item : deviceMap) {
+    device = std::reinterpret_pointer_cast<GLDevice>(item.second->weakThis.lock());
+    if (device != nullptr && !device->isAdopted) {
+      LOGE(
+          "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
+          "existing one.");
+      return device;
+    }
+  }
+#endif
+  return GLDevice::Current();
 }
 
 std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {

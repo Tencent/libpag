@@ -38,15 +38,16 @@ class GLDevice : public Device {
   static std::shared_ptr<GLDevice> Current();
 
   /**
-   * Creates an independent GLDevice with specified shared OpenGL context.
+   * Creates a new GLDevice with specified shared OpenGL context.
    */
   static std::shared_ptr<GLDevice> Make(void* sharedContext = nullptr);
 
   /**
-   * Returns a shared GLDevice of the calling thread from the pool, Creates one immediately if not
-   * exists.
+   * Creates a new GLDevice. If the creation fails, it will return a pre-created GLDevice. If that
+   * also fails, it will return the active GLDevice of the current thread. If all attempts fail,
+   * nullptr will be returned.
    */
-  static std::shared_ptr<GLDevice> MakeFromThreadPool();
+  static std::shared_ptr<GLDevice> MakeWithFallback();
 
   /**
    * Returns the GLDevice associated with the specified OpenGL context.
