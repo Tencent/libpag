@@ -20,7 +20,6 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES3/glext.h>
 #include "EAGLProcGetter.h"
-#include "base/utils/Log.h"
 
 namespace tgfx {
 static std::mutex deviceLocker = {};
@@ -47,16 +46,6 @@ void ApplicationDidBecomeActive() {
   for (auto& device : delayList) {
     delete device;
   }
-    
-    std::vector<std::shared_ptr<tgfx::GLDevice>> devices = {};
-    while (true) {
-      auto device = tgfx::GLDevice::Make();
-      if (device == nullptr) {
-        break;
-      }
-      devices.push_back(device);
-    }
-    LOGI("PAGSurface::MakeFrom: %d devices created", devices.size());
 }
 
 void* GLDevice::CurrentNativeHandle() {
