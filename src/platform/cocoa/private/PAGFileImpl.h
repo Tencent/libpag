@@ -34,6 +34,8 @@
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length;
 
++ (NSString*)LoadURL:(NSString*)path;
+
 - (uint16_t)tagLevel;
 
 - (int)numTexts;

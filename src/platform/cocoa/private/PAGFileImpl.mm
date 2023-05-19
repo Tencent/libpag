@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGFileImpl.h"
+#import "PAGDiskCacheImpl.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGTextImpl.h"
 #import "pag/pag.h"
@@ -34,11 +35,60 @@
   return pag::PAGFile::MaxSupportedTagLevel();
 }
 
++ (NSString*)LoadURL:(NSString*)path {
+  if (path == nil) {
+    return nil;
+  }
+  __block NSString* cachePath = nil;
+  NSError* error = nil;
+  NSRegularExpression* regex =
+      [NSRegularExpression regularExpressionWithPattern:@"^(http|https|ftp)://.*$"
+                                                options:NSRegularExpressionCaseInsensitive
+                                                  error:&error];
+  if (!error) {
+    NSRange range = [regex rangeOfFirstMatchInString:path
+                                             options:0
+                                               range:NSMakeRange(0, path.length)];
+    if (range.location != NSNotFound) {
+      cachePath = [PAGDiskCacheImpl GetFilePath:path];
+      if (cachePath == nil) {
+        dispatch_semaphore_t signal = dispatch_semaphore_create(1);
+
+        [[[NSURLSession sharedSession]
+            dataTaskWithRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:path]]
+              completionHandler:^(NSData* _Nullable data, NSURLResponse* _Nullable,
+                                  NSError* _Nullable error) {
+                if (error == nil && data != nil) {
+                  PAGFile* pagFile = [PAGFile Load:data.bytes size:data.length];
+                  if (pagFile) {
+                    NSLog(@"---------file----success-----\n");
+                    [PAGDiskCacheImpl WritFile:path data:data];
+                    cachePath = [PAGDiskCacheImpl GetFilePath:path];
+                  }
+                  NSLog(@"---------load----success-----\n");
+                } else {
+                  NSLog(@"---------load----failed-----\n");
+                }
+                dispatch_semaphore_signal(signal);
+              }] resume];
+        dispatch_semaphore_wait(signal, DISPATCH_TIME_FOREVER);
+      }
+    }
+  }
+  return cachePath;
+}
+
 + (PAGFile*)Load:(NSString*)path {
   if (path == nil) {
     return nil;
   }
-  std::string filePath = [path UTF8String];
+  NSString* cachePath = [PAGFileImpl LoadURL:path];
+  std::string filePath;
+  if (cachePath) {
+    filePath = [cachePath UTF8String];
+  } else {
+    filePath = [path UTF8String];
+  }
   auto pagFile = pag::PAGFile::Load(filePath);
   if (pagFile == nullptr) {
     return nil;
