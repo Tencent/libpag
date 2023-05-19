@@ -20,6 +20,7 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES3/glext.h>
 #include "EAGLProcGetter.h"
+#include "base/utils/Log.h"
 
 namespace tgfx {
 static std::mutex deviceLocker = {};
@@ -28,7 +29,8 @@ static std::vector<EAGLDevice*> delayPurgeList = {};
 static std::atomic_bool appInBackground = {true};
 
 void ApplicationWillResignActive() {
-  // 此时需要 applicationInBackground 先为 true，确保回调过程没有没有产生新的 GL 操作。
+  // Set applicationInBackground to true first to ensure that no new GL operation is generated
+  // during the callback process.
   appInBackground = true;
   std::lock_guard<std::mutex> autoLock(deviceLocker);
   for (auto& device : deviceList) {
@@ -45,6 +47,16 @@ void ApplicationDidBecomeActive() {
   for (auto& device : delayList) {
     delete device;
   }
+    
+    std::vector<std::shared_ptr<tgfx::GLDevice>> devices = {};
+    while (true) {
+      auto device = tgfx::GLDevice::Make();
+      if (device == nullptr) {
+        break;
+      }
+      devices.push_back(device);
+    }
+    LOGI("PAGSurface::MakeFrom: %d devices created", devices.size());
 }
 
 void* GLDevice::CurrentNativeHandle() {
