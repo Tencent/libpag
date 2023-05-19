@@ -159,4 +159,9 @@
 - (BOOL)hitTestPoint:(PAGLayer*)layer point:(CGPoint)point pixelHitTest:(BOOL)pixelHitTest {
   return [pagPlayer hitTestPoint:layer point:point pixelHitTest:pixelHitTest];
 }
+
+- (void)onUpdate:(double)progress {
+  [pagPlayer setProgress:progress];
+  [pagPlayer flush];
+}
 @end

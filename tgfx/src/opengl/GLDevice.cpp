@@ -31,7 +31,7 @@ std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
   }
 #ifndef TGFX_BUILD_FOR_WEB
   for (auto& item : deviceMap) {
-    device = std::reinterpret_pointer_cast<GLDevice>(item.second->weakThis.lock());
+    device = std::static_pointer_cast<GLDevice>(item.second->weakThis.lock());
     if (device != nullptr && !device->isAdopted) {
       LOGE(
           "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "

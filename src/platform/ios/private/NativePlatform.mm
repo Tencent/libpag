@@ -18,6 +18,7 @@
 
 #include "NativePlatform.h"
 #include "HardwareDecoder.h"
+#include "NativeDisplayLink.h"
 #include "base/utils/USE.h"
 
 namespace pag {
@@ -74,6 +75,11 @@ std::string NativePlatform::getSandboxPath(std::string filePath) const {
                                                    withString:@"app:/"] UTF8String];
   }
   return filePath;
+}
+
+std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
+    std::function<void()> callback) const {
+  return std::make_shared<NativeDisplayLink>(std::move(callback));
 }
 
 }  // namespace pag

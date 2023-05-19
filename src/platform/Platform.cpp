@@ -36,7 +36,20 @@ NALUType Platform::naluType() const {
 void Platform::traceImage(const tgfx::ImageInfo&, const void*, const std::string&) const {
 }
 
+std::optional<PositionedGlyphs> Platform::shapeText(const std::string&,
+                                                    const std::shared_ptr<tgfx::Typeface>&) const {
+  return std::nullopt;
+}
+
 std::string Platform::getCacheDir() const {
   return "";
+}
+
+std::string Platform::getSandboxPath(std::string filePath) const {
+  return filePath;
+}
+
+std::shared_ptr<DisplayLink> Platform::createDisplayLink(std::function<void()>) const {
+  return nullptr;
 }
 }  // namespace pag

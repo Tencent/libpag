@@ -18,6 +18,7 @@
 
 #include "NativePlatform.h"
 #include "HardwareDecoder.h"
+#include "NativeDisplayLink.h"
 
 namespace pag {
 static std::atomic<NALUType> defaultType = {NALUType::AVCC};
@@ -38,5 +39,10 @@ void NativePlatform::setNALUType(NALUType type) const {
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
   return {HardwareDecoder::Factory(), VideoDecoderFactory::ExternalDecoderFactory(),
           VideoDecoderFactory::SoftwareAVCDecoderFactory()};
+}
+
+std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
+    std::function<void()> callback) const {
+  return std::make_shared<NativeDisplayLink>(std::move(callback));
 }
 }  // namespace pag
