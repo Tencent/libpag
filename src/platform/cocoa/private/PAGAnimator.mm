@@ -53,23 +53,33 @@ class AnimatorListener : public pag::PAGAnimatorListener {
   }
 
   void onAnimationStart(PAGAnimator*) override {
-    [listener onAnimationStart:view];
+    if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
+      [listener onAnimationStart:view];
+    }
   }
 
   void onAnimationEnd(PAGAnimator*) override {
-    [listener onAnimationEnd:view];
+    if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
+      [listener onAnimationEnd:view];
+    }
   }
 
   void onAnimationCancel(PAGAnimator*) override {
-    [listener onAnimationCancel:view];
+    if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
+      [listener onAnimationCancel:view];
+    }
   }
 
   void onAnimationRepeat(PAGAnimator*) override {
-    [listener onAnimationRepeat:view];
+    if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
+      [listener onAnimationRepeat:view];
+    }
   }
 
   void onAnimationUpdate(PAGAnimator*) override {
-    [listener onAnimationUpdate:view];
+    if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
+      [listener onAnimationUpdate:view];
+    }
   };
 
  private:

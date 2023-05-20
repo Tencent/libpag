@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <UIKit/UIKit.h>
+#import <libpag/PAGView.h>
 
-@interface ViewController : UIViewController
+@interface ViewController : UIViewController<PAGViewListener>
 
 @end
