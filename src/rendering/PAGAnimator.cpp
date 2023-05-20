@@ -31,7 +31,7 @@ static constexpr int AnimationTypeUpdate = 5;
 
 class AnimationUpdater {
  public:
-  explicit AnimationUpdater(std::shared_ptr<PAGAnimationUpdater> updater)
+  explicit AnimationUpdater(std::shared_ptr<PAGAnimator::Updater> updater)
       : updater(std::move(updater)) {
   }
 
@@ -52,7 +52,7 @@ class AnimationUpdater {
 
  private:
   std::atomic_int64_t _startTime = INT64_MIN;
-  std::shared_ptr<PAGAnimationUpdater> updater = nullptr;
+  std::shared_ptr<PAGAnimator::Updater> updater = nullptr;
 };
 
 class AnimationTicker {
@@ -102,7 +102,7 @@ class AnimationTicker {
 
 static auto& animationTicker = *new AnimationTicker();
 
-std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(std::shared_ptr<PAGAnimationUpdater> updater) {
+std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(std::shared_ptr<Updater> updater) {
   if (updater == nullptr || !animationTicker.available()) {
     return nullptr;
   }
@@ -115,7 +115,22 @@ std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(std::shared_ptr<PAGAnimationU
 PAGAnimator::PAGAnimator(std::shared_ptr<AnimationUpdater> updater) : updater(std::move(updater)) {
 }
 
-void PAGAnimator::addListener(std::shared_ptr<PAGAnimatorListener> listener) {
+void PAGAnimator::Listener::onAnimationStart(pag::PAGAnimator*) {
+}
+
+void PAGAnimator::Listener::onAnimationEnd(pag::PAGAnimator*) {
+}
+
+void PAGAnimator::Listener::onAnimationCancel(pag::PAGAnimator*) {
+}
+
+void PAGAnimator::Listener::onAnimationRepeat(pag::PAGAnimator*) {
+}
+
+void PAGAnimator::Listener::onAnimationUpdate(pag::PAGAnimator*) {
+}
+
+void PAGAnimator::addListener(std::shared_ptr<Listener> listener) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (findListener(listener) != -1) {
     return;
@@ -123,7 +138,7 @@ void PAGAnimator::addListener(std::shared_ptr<PAGAnimatorListener> listener) {
   listeners.push_back(std::move(listener));
 }
 
-void PAGAnimator::removeListener(std::shared_ptr<PAGAnimatorListener> listener) {
+void PAGAnimator::removeListener(std::shared_ptr<Listener> listener) {
   std::lock_guard<std::mutex> autoLock(locker);
   auto index = findListener(std::move(listener));
   if (index == -1) {
@@ -332,7 +347,7 @@ void PAGAnimator::cancelAnimation() {
   animationTicker.removeAnimator(weakThis.lock());
 }
 
-int PAGAnimator::findListener(std::shared_ptr<PAGAnimatorListener> listener) {
+int PAGAnimator::findListener(std::shared_ptr<Listener> listener) {
   auto count = static_cast<int>(listeners.size());
   for (auto i = 0; i < count; i++) {
     if (listeners[i] == listener) {

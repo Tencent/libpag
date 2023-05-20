@@ -20,7 +20,7 @@
 #include "rendering/PAGAnimator.h"
 
 namespace pag {
-class AnimationUpdaterWrapper : public pag::PAGAnimationUpdater {
+class AnimationUpdaterWrapper : public pag::PAGAnimator::Updater {
  public:
   explicit AnimationUpdaterWrapper(id<PAGAnimationUpdater> updater) : updater(updater) {
     [updater retain];
@@ -38,7 +38,7 @@ class AnimationUpdaterWrapper : public pag::PAGAnimationUpdater {
   id<PAGAnimationUpdater> updater;
 };
 
-class AnimatorListener : public pag::PAGAnimatorListener {
+class AnimatorListener : public pag::PAGAnimator::Listener {
  public:
   AnimatorListener(id<PAGAnimatorListener> listener, id view) : listener(listener), view(view) {
     [listener retain];

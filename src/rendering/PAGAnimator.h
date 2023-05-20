@@ -22,58 +22,7 @@
 #include "tgfx/utils/Task.h"
 
 namespace pag {
-class PAGAnimator;
 class AnimationUpdater;
-
-/**
- * This listener can be used to be notified when the status of the associated PAGAnimator is
- * changed.
- */
-class PAGAnimatorListener {
- public:
-  virtual ~PAGAnimatorListener() = default;
-
-  /**
-   * Notifies the beginning of the animation.
-   */
-  virtual void onAnimationStart(PAGAnimator* animator) = 0;
-
-  /**
-   * Notifies the end of the animation.
-   */
-  virtual void onAnimationEnd(PAGAnimator* animator) = 0;
-
-  /**
-   * Notifies the cancellation of the animation.
-   */
-  virtual void onAnimationCancel(PAGAnimator* animator) = 0;
-
-  /**
-   * Notifies the repetition of the animation.
-   */
-  virtual void onAnimationRepeat(PAGAnimator* animator) = 0;
-
-  /**
-   * Notifies the frame updating of the animation.
-   */
-  virtual void onAnimationUpdate(PAGAnimator* animator) = 0;
-};
-
-/**
- * This interface is used to update the animation.
- */
-class PAGAnimationUpdater {
- public:
-  virtual ~PAGAnimationUpdater() = default;
-
- protected:
-  /**
-  * Called when the animation needs to be updated.
-  */
-  virtual void onUpdate(double progress) = 0;
-
-  friend class AnimationUpdater;
-};
 
 /**
  * PAGAnimator provides a simple timing engine for running animations.
@@ -81,20 +30,70 @@ class PAGAnimationUpdater {
 class PAGAnimator {
  public:
   /**
+   * This interface is used to update the animation.
+   */
+  class Updater {
+   public:
+    virtual ~Updater() = default;
+
+   protected:
+    /**
+     * Called when the animation needs to be updated.
+     */
+    virtual void onUpdate(double progress) = 0;
+
+    friend class AnimationUpdater;
+  };
+
+  /**
+   * This listener can be used to be notified when the status of the associated PAGAnimator is
+   * changed. These methods are optional, you can implement only the events you care about.
+   */
+  class Listener {
+   public:
+    virtual ~Listener() = default;
+
+    /**
+     * Notifies the beginning of the animation.
+     */
+    virtual void onAnimationStart(PAGAnimator* animator);
+
+    /**
+     * Notifies the end of the animation.
+     */
+    virtual void onAnimationEnd(PAGAnimator* animator);
+
+    /**
+     * Notifies the cancellation of the animation.
+     */
+    virtual void onAnimationCancel(PAGAnimator* animator);
+
+    /**
+     * Notifies the repetition of the animation.
+     */
+    virtual void onAnimationRepeat(PAGAnimator* animator);
+
+    /**
+     * Notifies the frame updating of the animation.
+     */
+    virtual void onAnimationUpdate(PAGAnimator* animator);
+  };
+
+  /**
    * Creates a new PAGAnimator with the specified updater.
    */
-  static std::shared_ptr<PAGAnimator> MakeFrom(std::shared_ptr<PAGAnimationUpdater> updater);
+  static std::shared_ptr<PAGAnimator> MakeFrom(std::shared_ptr<Updater> updater);
 
   /**
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
    * such as start, repeat, and end.
    */
-  void addListener(std::shared_ptr<PAGAnimatorListener> listener);
+  void addListener(std::shared_ptr<Listener> listener);
 
   /**
    * Removes a listener from the set listening to this animation.
    */
-  void removeListener(std::shared_ptr<PAGAnimatorListener> listener);
+  void removeListener(std::shared_ptr<Listener> listener);
 
   /**
    * Indicates whether the animation is allowed to run in the UI thread. The default value is false.
@@ -175,7 +174,7 @@ class PAGAnimator {
  private:
   std::mutex locker = {};
   std::weak_ptr<PAGAnimator> weakThis;
-  std::vector<std::shared_ptr<PAGAnimatorListener>> listeners = {};
+  std::vector<std::shared_ptr<Listener>> listeners = {};
   std::shared_ptr<AnimationUpdater> updater = nullptr;
   std::shared_ptr<tgfx::Task> task = nullptr;
   int64_t _duration = 0;
@@ -193,7 +192,7 @@ class PAGAnimator {
   void updateProgress(int64_t playTime);
   void startAnimation();
   void cancelAnimation();
-  int findListener(std::shared_ptr<PAGAnimatorListener> listener);
+  int findListener(std::shared_ptr<Listener> listener);
   void notifyListeners(std::vector<int> types);
 
   friend class AnimationTicker;
