@@ -312,7 +312,7 @@ public class PAGImageView extends View {
         if (currentFrame >= _numFrames) {
             return;
         }
-        synchronized (updateTimeLock) {
+        synchronized (animatorLock) {
             _currentFrame = currentFrame;
             syncCurrentTime();
             progressExplicitlySet = true;
@@ -593,25 +593,27 @@ public class PAGImageView extends View {
         resumeAnimator();
     }
 
-    protected synchronized void initDecoderInfo() {
-        if (!decoderInfo.isValid()) {
-            if (_composition == null) {
-                _composition = getCompositionFromPath(_pagFilePath);
+    protected void initDecoderInfo() {
+        synchronized (decoderInfo) {
+            if (!decoderInfo.isValid()) {
+                if (_composition == null) {
+                    _composition = getCompositionFromPath(_pagFilePath);
+                }
+                if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
+                    if (_pagFilePath != null) {
+                        _composition = null;
+                    }
+                    synchronized (animatorLock) {
+                        animator.setDuration(decoderInfo.duration / 1000);
+                    }
+                    if (!decoderInfo.isValid()) {
+                        return;
+                    }
+                }
             }
-            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
-                if (_pagFilePath != null) {
-                    _composition = null;
-                }
-                synchronized (animatorLock) {
-                    animator.setDuration(decoderInfo.duration / 1000);
-                }
-                if (!decoderInfo.isValid()) {
-                    return;
-                }
-            }
+            refreshMatrixFromScaleMode();
+            freezeDraw.set(false);
         }
-        refreshMatrixFromScaleMode();
-        freezeDraw.set(false);
     }
 
     private float animationScale = 1.0f;
@@ -686,6 +688,7 @@ public class PAGImageView extends View {
         public void run() {
             if (isAttachedToWindow) {
                 synchronized (animatorLock) {
+                    animator.setCurrentPlayTime(currentPlayTime);
                     animator.start();
                 }
             } else {
@@ -715,7 +718,6 @@ public class PAGImageView extends View {
             return;
         }
         Log.i(TAG, "doPlay");
-        animator.setCurrentPlayTime(currentPlayTime);
         startAnimator();
     }
 
@@ -729,6 +731,7 @@ public class PAGImageView extends View {
         }
         if (isMainThread()) {
             synchronized (animatorLock) {
+                animator.setCurrentPlayTime(currentPlayTime);
                 animator.start();
             }
         } else {
