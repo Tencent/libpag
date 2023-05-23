@@ -105,6 +105,10 @@ void DestoryFlushQueue() {
                                            selector:@selector(applicationWillResignActive:)
                                                name:UIApplicationWillResignActiveNotification
                                              object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(applicationDidReceiveMemoryWarning:)
+                                                 name:UIApplicationDidReceiveMemoryWarningNotification
+                                               object:nil];
 }
 
 - (void)dealloc {
@@ -489,6 +493,10 @@ void DestoryFlushQueue() {
 
 - (void)applicationWillResignActive:(NSNotification*)notification {
   self.isInBackground = TRUE;
+}
+
+- (void)applicationDidReceiveMemoryWarning:(NSNotification*)notification {
+    [self freeCache];
 }
 
 - (CVPixelBufferRef)makeSnapshot {
