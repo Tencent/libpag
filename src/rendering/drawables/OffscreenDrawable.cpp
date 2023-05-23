@@ -21,7 +21,7 @@
 
 namespace pag {
 std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height) {
-  auto device = tgfx::GLDevice::MakeFromThreadPool();
+  auto device = tgfx::GLDevice::MakeWithFallback();
   if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }

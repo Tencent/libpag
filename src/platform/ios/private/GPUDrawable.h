@@ -23,9 +23,6 @@
 
 namespace pag {
 
-extern NSString* const kGPURenderTargetBufferPreparedNotification;
-extern NSString* const kPreparedAsync;
-
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
@@ -49,9 +46,8 @@ class GPUDrawable : public Drawable {
   int _height = 0;
   CAEAGLLayer* layer = nil;
   std::shared_ptr<tgfx::EAGLWindow> window = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
-  std::atomic<bool> bufferPreparing;
 
   explicit GPUDrawable(CAEAGLLayer* layer);
+  void tryCreateSurface();
 };
 }  // namespace pag

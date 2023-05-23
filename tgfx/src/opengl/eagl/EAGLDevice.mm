@@ -28,7 +28,8 @@ static std::vector<EAGLDevice*> delayPurgeList = {};
 static std::atomic_bool appInBackground = {true};
 
 void ApplicationWillResignActive() {
-  // 此时需要 applicationInBackground 先为 true，确保回调过程没有没有产生新的 GL 操作。
+  // Set applicationInBackground to true first to ensure that no new GL operation is generated
+  // during the callback process.
   appInBackground = true;
   std::lock_guard<std::mutex> autoLock(deviceLocker);
   for (auto& device : deviceList) {

@@ -77,7 +77,7 @@ public class PAGImageView extends View {
     private volatile boolean _isPlaying = false;
     private volatile Boolean _isAnimatorPreRunning = null;
     private volatile boolean progressExplicitlySet = true;
-    private final Object updateTimeLock = new Object();
+    private final Object animatorLock = new Object();
     private static final Object g_HandlerLock = new Object();
     private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
     private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
@@ -369,7 +369,9 @@ public class PAGImageView extends View {
         if (value < 0) {
             value = 0;
         }
-        animator.setRepeatCount(value - 1);
+        synchronized (animatorLock) {
+            animator.setRepeatCount(value - 1);
+        }
     }
 
     /**
@@ -416,13 +418,13 @@ public class PAGImageView extends View {
                 forceFlush = false;
                 return false;
             }
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 syncCurrentTime();
                 animator.setCurrentPlayTime(currentPlayTime);
             }
         } else {
             int currentFrame = 0;
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), _numFrames);
             }
             if (currentFrame == _currentFrame && !forceFlush) {
@@ -475,7 +477,7 @@ public class PAGImageView extends View {
         _composition = composition;
         _currentFrame = 0;
         progressExplicitlySet = true;
-        synchronized (updateTimeLock) {
+        synchronized (animatorLock) {
             animator.setDuration(_composition == null ? 0 : _composition.duration() / 100);
             animator.setCurrentPlayTime(0);
             currentPlayTime = 0;
@@ -600,7 +602,9 @@ public class PAGImageView extends View {
                 if (_pagFilePath != null) {
                     _composition = null;
                 }
-                animator.setDuration(decoderInfo.duration / 1000);
+                synchronized (animatorLock) {
+                    animator.setDuration(decoderInfo.duration / 1000);
+                }
                 if (!decoderInfo.isValid()) {
                     return;
                 }
@@ -628,8 +632,10 @@ public class PAGImageView extends View {
         isAttachedToWindow = true;
         super.onAttachedToWindow();
         forceFlush = true;
-        animator.addUpdateListener(mAnimatorUpdateListener);
-        animator.addListener(mAnimatorListenerAdapter);
+        synchronized (animatorLock) {
+            animator.addUpdateListener(mAnimatorUpdateListener);
+            animator.addListener(mAnimatorListenerAdapter);
+        }
         synchronized (g_HandlerLock) {
             PAGImageViewHelper.StartHandlerThread();
         }
@@ -642,8 +648,10 @@ public class PAGImageView extends View {
         super.onDetachedFromWindow();
         PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_FLUSH, this);
         pauseAnimator();
-        animator.removeUpdateListener(mAnimatorUpdateListener);
-        animator.removeListener(mAnimatorListenerAdapter);
+        synchronized (animatorLock) {
+            animator.removeUpdateListener(mAnimatorUpdateListener);
+            animator.removeListener(mAnimatorListenerAdapter);
+        }
         PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
         synchronized (g_HandlerLock) {
@@ -677,7 +685,9 @@ public class PAGImageView extends View {
         @Override
         public void run() {
             if (isAttachedToWindow) {
-                animator.start();
+                synchronized (animatorLock) {
+                    animator.start();
+                }
             } else {
                 Log.e(TAG, "AnimatorStartRunnable: PAGView is not attached to window");
             }
@@ -687,7 +697,7 @@ public class PAGImageView extends View {
     private final Runnable mAnimatorCancelRunnable = new Runnable() {
         @Override
         public void run() {
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 currentPlayTime = animator.getCurrentPlayTime();
                 animator.cancel();
             }
@@ -718,7 +728,9 @@ public class PAGImageView extends View {
             return;
         }
         if (isMainThread()) {
-            animator.start();
+            synchronized (animatorLock) {
+                animator.start();
+            }
         } else {
             removeCallbacks(mAnimatorCancelRunnable);
             post(mAnimatorStartRunnable);
@@ -727,7 +739,7 @@ public class PAGImageView extends View {
 
     private void cancelAnimator() {
         if (isMainThread()) {
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 currentPlayTime = animator.getCurrentPlayTime();
                 animator.cancel();
             }
