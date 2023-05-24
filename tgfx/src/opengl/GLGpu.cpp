@@ -81,6 +81,10 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
     return;
   }
   auto gl = GLFunctions::Get(_context);
+  // https://skia-review.googlesource.com/c/skia/+/571418
+  // HUAWEI nova9 pro(Adreno 642L), iqoo neo5(Adreno 650), Redmi K30pro(Adreno 650),
+  // Xiaomi 8(Adreno 630), glaxy s9(Adreno 630)
+  gl->flush();
   auto caps = GLCaps::Get(_context);
   auto glSampler = static_cast<const GLSampler*>(sampler);
   gl->bindTexture(glSampler->target, glSampler->id);

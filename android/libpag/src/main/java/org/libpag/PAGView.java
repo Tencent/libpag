@@ -74,7 +74,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
     private volatile boolean progressExplicitlySet = true;
-    private final Object updateTimeLock = new Object();
+    private final Object animatorLock = new Object();
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -451,8 +451,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
         super.onAttachedToWindow();
-        animator.addUpdateListener(mAnimatorUpdateListener);
-        animator.addListener(mAnimatorListenerAdapter);
+        synchronized (animatorLock) {
+            animator.addUpdateListener(mAnimatorUpdateListener);
+            animator.addListener(mAnimatorListenerAdapter);
+        }
         synchronized (g_HandlerLock) {
             StartHandlerThread();
         }
@@ -474,8 +476,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 DestroyHandlerThread();
             }
         }
-        animator.removeUpdateListener(mAnimatorUpdateListener);
-        animator.removeListener(mAnimatorListenerAdapter);
+        synchronized (animatorLock) {
+            animator.removeUpdateListener(mAnimatorUpdateListener);
+            animator.removeListener(mAnimatorListenerAdapter);
+        }
     }
 
     @Override
@@ -499,7 +503,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         _isPlaying = true;
         _isAnimatorPreRunning = null;
         float progress = 0;
-        synchronized (updateTimeLock) {
+        synchronized (animatorLock) {
             progress = animator.getAnimatedFraction();
         }
         if (progress == 1.0) {
@@ -512,7 +516,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         @Override
         public void run() {
             if (isAttachedToWindow) {
-                synchronized (updateTimeLock) {
+                synchronized (animatorLock) {
                     animator.setCurrentPlayTime(currentPlayTime);
                     animator.start();
                 }
@@ -540,7 +544,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private Runnable mAnimatorCancelRunnable = new Runnable() {
         @Override
         public void run() {
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 currentPlayTime = animator.getCurrentPlayTime();
                 animator.cancel();
             }
@@ -563,7 +567,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             return;
         }
         if (isMainThread()) {
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 animator.setCurrentPlayTime(currentPlayTime);
                 animator.start();
             }
@@ -575,7 +579,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     private void cancelAnimator() {
         if (isMainThread()) {
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 currentPlayTime = animator.getCurrentPlayTime();
                 animator.cancel();
             }
@@ -593,7 +597,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (value < 0) {
             value = 0;
         }
-        animator.setRepeatCount(value - 1);
+        synchronized (animatorLock) {
+            animator.setRepeatCount(value - 1);
+        }
     }
 
     /**
@@ -687,7 +693,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         pagPlayer.setComposition(newComposition);
         progressExplicitlySet = true;
         long duration = pagPlayer.duration();
-        synchronized (updateTimeLock) {
+        synchronized (animatorLock) {
             animator.setDuration(duration / 1000);
             animator.setCurrentPlayTime(0);
             currentPlayTime = 0;
@@ -805,7 +811,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Sets the progress of play position, the valid value is from 0.0 to 1.0.
      */
     public void setProgress(double value) {
-        synchronized (updateTimeLock) {
+        synchronized (animatorLock) {
             pagPlayer.setProgress(value);
             syncCurrentTime();
             progressExplicitlySet = true;
@@ -849,12 +855,12 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (progressExplicitlySet) {
             result = pagPlayer.flush();
             progressExplicitlySet = false;
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 syncCurrentTime();
                 animator.setCurrentPlayTime(currentPlayTime);
             }
         } else {
-            synchronized (updateTimeLock) {
+            synchronized (animatorLock) {
                 pagPlayer.setProgress(animator.getAnimatedFraction());
             }
             result = pagPlayer.flush();
