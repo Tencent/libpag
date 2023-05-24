@@ -22,8 +22,6 @@
 #include "tgfx/utils/Task.h"
 
 namespace pag {
-class AnimationUpdater;
-
 /**
  * PAGAnimator provides a simple timing engine for running animations.
  */
@@ -38,11 +36,12 @@ class PAGAnimator {
 
    protected:
     /**
-     * Called when the animation needs to be updated.
+     * Notifies a new frame of the animation needs to be updated. It may be called from an arbitrary
+     * thread if the animation is running asynchronously.
      */
     virtual void onUpdate(double progress) = 0;
 
-    friend class AnimationUpdater;
+    friend class PAGAnimator;
   };
 
   /**
@@ -53,36 +52,45 @@ class PAGAnimator {
    public:
     virtual ~Listener() = default;
 
+   protected:
     /**
      * Notifies the beginning of the animation.
      */
-    virtual void onAnimationStart(PAGAnimator* animator);
+    virtual void onAnimationStart(PAGAnimator*) {
+    }
 
     /**
      * Notifies the end of the animation.
      */
-    virtual void onAnimationEnd(PAGAnimator* animator);
+    virtual void onAnimationEnd(PAGAnimator*) {
+    }
 
     /**
      * Notifies the cancellation of the animation.
      */
-    virtual void onAnimationCancel(PAGAnimator* animator);
+    virtual void onAnimationCancel(PAGAnimator*) {
+    }
 
     /**
      * Notifies the repetition of the animation.
      */
-    virtual void onAnimationRepeat(PAGAnimator* animator);
+    virtual void onAnimationRepeat(PAGAnimator*) {
+    }
 
     /**
      * Notifies the frame updating of the animation.
      */
-    virtual void onAnimationUpdate(PAGAnimator* animator);
+    virtual void onAnimationUpdate(PAGAnimator*) {
+    }
+
+    friend class PAGAnimator;
   };
 
   /**
-   * Creates a new PAGAnimator with the specified updater.
+   * Creates a new PAGAnimator with the specified updater and listener. The caller must ensure that
+   * the updater and listener will outlive the lifetime of the returned PAGAnimator.
    */
-  static std::shared_ptr<PAGAnimator> MakeFrom(std::shared_ptr<Updater> updater);
+  static std::shared_ptr<PAGAnimator> MakeFrom(Updater* updater);
 
   /**
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
@@ -160,7 +168,8 @@ class PAGAnimator {
 
   /**
    * Stops the animation at the current position. Unlike pause(), stop() not only pauses the
-   * animation but also resets the number of times the animation has played to 0.
+   * animation but also resets the number of times the animation has played to 0. This method may
+   * block the calling thread if there is an asynchronous task running.
    */
   void stop();
 
@@ -174,9 +183,10 @@ class PAGAnimator {
  private:
   std::mutex locker = {};
   std::weak_ptr<PAGAnimator> weakThis;
+  Updater* updater = nullptr;
   std::vector<std::shared_ptr<Listener>> listeners = {};
-  std::shared_ptr<AnimationUpdater> updater = nullptr;
   std::shared_ptr<tgfx::Task> task = nullptr;
+  std::atomic_int64_t _startTime = INT64_MIN;
   int64_t _duration = 0;
   int _repeatCount = 1;
   double _progress = 0;
@@ -186,12 +196,15 @@ class PAGAnimator {
   bool isEnded = false;
   int playedCount = 0;
 
-  explicit PAGAnimator(std::shared_ptr<AnimationUpdater> updater);
+  explicit PAGAnimator(Updater* updater);
   void advance();
   std::vector<int> doAdvance();
   void updateProgress(int64_t playTime);
+  void onUpdate(double progress, int64_t playTime = INT64_MIN);
   void startAnimation();
   void cancelAnimation();
+  void resetStartTime();
+  void resetTask();
   int findListener(std::shared_ptr<Listener> listener);
   void notifyListeners(std::vector<int> types);
 

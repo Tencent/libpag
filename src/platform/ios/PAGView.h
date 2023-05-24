@@ -56,7 +56,7 @@ PAG_API @interface PAGView : UIView
 
 /**
  * Adds a listener to the set of listeners that are sent events through the life of an animation,
- * such as start, repeat, and end.
+ * such as start, repeat, and end. PAGView only holds a weak reference to the listener.
  */
 - (void)addListener:(id<PAGViewListener>)listener;
 
@@ -110,7 +110,8 @@ PAG_API @interface PAGView : UIView
 
 /**
  * Stops the animation at the current position. Unlike pause(), stop() not only pauses the
- * animation but also resets the number of times the animation has played to 0.
+ * animation but also resets the number of times the animation has played to 0. This method may
+ * block the calling thread if there is an asynchronous task running.
  */
 - (void)stop;
 

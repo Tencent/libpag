@@ -44,7 +44,7 @@
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
-  animator = [[PAGAnimator MakeWithUpdater:pagPlayer] retain];
+  animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
@@ -52,8 +52,8 @@
 }
 
 - (void)dealloc {
-  // The animator must be stopped, otherwise, it will not be deallocated because it is referenced by
-  // the global displayLink.
+  // The animator must be stopped, otherwise, it will not be deallocated because it may be
+  // referenced by the global displayLink.
   [animator stop];
   [animator release];
   [pagPlayer release];
@@ -139,11 +139,16 @@
 }
 
 - (void)addListener:(id<PAGViewListener>)listener {
-  [animator addListener:(id<PAGAnimatorListener>)listener view:self];
+  [animator addListener:(id<PAGAnimatorListener>)listener];
 }
 
 - (void)removeListener:(id<PAGViewListener>)listener {
-  [animator removeListener:(id<PAGAnimatorListener>)listener view:self];
+  [animator removeListener:(id<PAGAnimatorListener>)listener];
+}
+
+- (void)onUpdate:(double)progress {
+  [pagPlayer setProgress:progress];
+  [pagPlayer flush];
 }
 
 - (BOOL)sync {

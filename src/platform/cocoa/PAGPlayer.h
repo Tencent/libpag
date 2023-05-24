@@ -22,9 +22,8 @@
 #import "PAGImage.h"
 #import "PAGScaleMode.h"
 #import "PAGSurface.h"
-#import "platform/cocoa/private/PAGAnimator.h"
 
-PAG_API @interface PAGPlayer : NSObject<PAGAnimationUpdater>
+PAG_API @interface PAGPlayer : NSObject
 /**
  * Returns the current PAGComposition for PAGPlayer to render as content.
  */

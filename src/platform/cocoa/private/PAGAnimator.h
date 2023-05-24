@@ -18,8 +18,26 @@
 
 #import <CoreFoundation/CoreFoundation.h>
 
+/**
+ * This interface is used to update the animation.
+ */
+@protocol PAGAnimatorUpdater <NSObject>
+
+/**
+ * Notifies a new frame of the animation needs to be updated. It may be called from an arbitrary
+ * thread if the animation is running asynchronously.
+ */
+- (void)onUpdate:(double)progress;
+
+@end
+
+/**
+ * Interface for listening to the animation life cycle events.  These methods are optional, you can
+ * implement only the events you care about.
+ */
 @protocol PAGAnimatorListener <NSObject>
 
+@optional
 /**
  * Notifies the beginning of the animation.
  */
@@ -47,32 +65,23 @@
 
 @end
 
-@protocol PAGAnimationUpdater <NSObject>
-
-/**
- * Called when the animation needs to be updated.
- */
-- (void)onUpdate:(double)progress;
-
-@end
-
 @interface PAGAnimator : NSObject
 
 /**
- * Creates a new PAGAnimator object with the specified updater.
+ * Initializes a new PAGAnimator object with the specified updater.
  */
-+ (nullable instancetype)MakeWithUpdater:(_Nullable id<PAGAnimationUpdater>)updater;
+- (_Nullable instancetype)initWithUpdater:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
  * Adds a listener to the set of listeners that are sent events through the life of an animation,
- * such as start, repeat, and end.
+ * such as start, repeat, and end. PAGAnimator only holds a weak reference to the listener.
  */
-- (void)addListener:(_Nullable id<PAGAnimatorListener>)listener view:(_Nullable id)view;
+- (void)addListener:(_Nullable id<PAGAnimatorListener>)listener;
 
 /**
  * Removes a listener from the set listening to this animation.
  */
-- (void)removeListener:(_Nullable id<PAGAnimatorListener>)listener view:(_Nullable id)view;
+- (void)removeListener:(_Nullable id<PAGAnimatorListener>)listener;
 
 /**
  * Indicates whether the animation is allowed to run in the UI thread. The default value is NO.
@@ -139,7 +148,8 @@
 
 /**
  * Stops the animation at the current position. Unlike pause(), stop() not only pauses the
- * animation but also resets the number of times the animation has played to 0.
+ * animation but also resets the number of times the animation has played to 0. This method may
+ * block the calling thread if there is an asynchronous task running.
  */
 - (void)stop;
 

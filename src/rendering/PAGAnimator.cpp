@@ -29,32 +29,6 @@ static constexpr int AnimationTypeCancel = 3;
 static constexpr int AnimationTypeRepeat = 4;
 static constexpr int AnimationTypeUpdate = 5;
 
-class AnimationUpdater {
- public:
-  explicit AnimationUpdater(std::shared_ptr<PAGAnimator::Updater> updater)
-      : updater(std::move(updater)) {
-  }
-
-  int64_t startTime() {
-    return _startTime != INT64_MIN;
-  }
-
-  void resetStartTime() {
-    _startTime = INT64_MIN;
-  }
-
-  void update(double progress, int64_t playTime = INT64_MIN) {
-    updater->onUpdate(progress);
-    if (_startTime == INT64_MIN && playTime != INT64_MIN) {
-      _startTime = tgfx::Clock::Now() - playTime;
-    }
-  }
-
- private:
-  std::atomic_int64_t _startTime = INT64_MIN;
-  std::shared_ptr<PAGAnimator::Updater> updater = nullptr;
-};
-
 class AnimationTicker {
  public:
   AnimationTicker() {
@@ -95,6 +69,10 @@ class AnimationTicker {
     auto listCopy = animators;
     locker.unlock();
     for (auto& animator : listCopy) {
+      if (animator.unique()) {
+        animator->cancelAnimation();
+        continue;
+      }
       animator->advance();
     }
   }
@@ -102,32 +80,16 @@ class AnimationTicker {
 
 static auto& animationTicker = *new AnimationTicker();
 
-std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(std::shared_ptr<Updater> updater) {
+std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(Updater* updater) {
   if (updater == nullptr || !animationTicker.available()) {
     return nullptr;
   }
-  auto animationUpdater = std::make_shared<AnimationUpdater>(std::move(updater));
-  auto animator = std::shared_ptr<PAGAnimator>(new PAGAnimator(std::move(animationUpdater)));
+  auto animator = std::shared_ptr<PAGAnimator>(new PAGAnimator(updater));
   animator->weakThis = animator;
   return animator;
 }
 
-PAGAnimator::PAGAnimator(std::shared_ptr<AnimationUpdater> updater) : updater(std::move(updater)) {
-}
-
-void PAGAnimator::Listener::onAnimationStart(pag::PAGAnimator*) {
-}
-
-void PAGAnimator::Listener::onAnimationEnd(pag::PAGAnimator*) {
-}
-
-void PAGAnimator::Listener::onAnimationCancel(pag::PAGAnimator*) {
-}
-
-void PAGAnimator::Listener::onAnimationRepeat(pag::PAGAnimator*) {
-}
-
-void PAGAnimator::Listener::onAnimationUpdate(pag::PAGAnimator*) {
+PAGAnimator::PAGAnimator(Updater* updater) : updater(updater) {
 }
 
 void PAGAnimator::addListener(std::shared_ptr<Listener> listener) {
@@ -158,10 +120,8 @@ void PAGAnimator::setSync(bool value) {
     return;
   }
   _isSync = value;
-  if (_isSync && task != nullptr) {
-    task->cancel();
-    task->wait();
-    task = nullptr;
+  if (_isSync) {
+    resetTask();
   }
 }
 
@@ -207,7 +167,7 @@ void PAGAnimator::setProgress(double value) {
   std::lock_guard<std::mutex> autoLock(locker);
   _progress = ClampProgress(value);
   isEnded = false;
-  updater->resetStartTime();
+  resetStartTime();
 }
 
 bool PAGAnimator::isPlaying() {
@@ -244,6 +204,7 @@ void PAGAnimator::pause() {
 void PAGAnimator::stop() {
   {
     std::lock_guard<std::mutex> autoLock(locker);
+    resetTask();
     if (!_isPlaying) {
       return;
     }
@@ -261,10 +222,10 @@ void PAGAnimator::update() {
     return;
   }
   if (_isSync) {
-    updater->update(_progress);
+    onUpdate(_progress);
   } else {
-    task =
-        tgfx::Task::Run([updater = updater, progress = _progress]() { updater->update(progress); });
+    task = tgfx::Task::Run(
+        [animator = weakThis.lock(), progress = _progress]() { animator->onUpdate(progress); });
   }
   locker.unlock();
   notifyListeners({AnimationTypeUpdate});
@@ -281,18 +242,18 @@ std::vector<int> PAGAnimator::doAdvance() {
     return {};
   }
   int64_t playTime;
-  if (updater->startTime() == INT64_MIN) {
+  if (_startTime == INT64_MIN) {
     playTime =
         static_cast<int64_t>(_progress * static_cast<double>(_duration)) + playedCount * _duration;
   } else {
-    playTime = tgfx::Clock::Now() - updater->startTime();
+    playTime = tgfx::Clock::Now() - _startTime;
     updateProgress(playTime);
   }
   if (_isSync) {
-    updater->update(_progress, playTime);
+    onUpdate(_progress, playTime);
   } else {
-    task = tgfx::Task::Run([updater = updater, progress = _progress, playTime]() {
-      updater->update(progress, playTime);
+    task = tgfx::Task::Run([animator = weakThis.lock(), progress = _progress, playTime]() {
+      animator->onUpdate(progress, playTime);
     });
   }
   std::vector<int> types = {};
@@ -330,6 +291,13 @@ void PAGAnimator::updateProgress(int64_t playTime) {
   _progress = ClampProgress(fraction);
 }
 
+void PAGAnimator::onUpdate(double progress, int64_t playTime) {
+  updater->onUpdate(progress);
+  if (_startTime == INT64_MIN && playTime != INT64_MIN) {
+    _startTime = tgfx::Clock::Now() - playTime;
+  }
+}
+
 void PAGAnimator::startAnimation() {
   if (isAnimating || _duration <= 0) {
     return;
@@ -343,8 +311,20 @@ void PAGAnimator::cancelAnimation() {
     return;
   }
   isAnimating = false;
-  updater->resetStartTime();
+  resetStartTime();
   animationTicker.removeAnimator(weakThis.lock());
+}
+
+void PAGAnimator::resetStartTime() {
+  _startTime = INT64_MIN;
+}
+
+void PAGAnimator::resetTask() {
+  if (task != nullptr) {
+    task->cancel();
+    task->wait();
+    task = nullptr;
+  }
 }
 
 int PAGAnimator::findListener(std::shared_ptr<Listener> listener) {

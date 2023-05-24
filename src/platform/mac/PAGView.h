@@ -55,7 +55,7 @@ PAG_API @interface PAGView : NSView
 
 /**
  * Adds a listener to the set of listeners that are sent events through the life of an animation,
- * such as start, repeat, and end.
+ * such as start, repeat, and end. PAGView only holds a weak reference to the listener.
  */
 - (void)addListener:(id<PAGViewListener>)listener;
 
