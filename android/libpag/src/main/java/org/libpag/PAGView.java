@@ -697,6 +697,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             animator.setDuration(duration / 1000);
             animator.setCurrentPlayTime(0);
             currentPlayTime = 0;
+            if (newComposition == null) {
+                _isPlaying = false;
+            }
         }
     }
 
