@@ -38,10 +38,9 @@ class DiskCache {
       const std::vector<TimeRange>& staticTimeRanges = {});
 
   /**
-   * Reads a file from the disk cache by the specified key. Returns nullptr if the key is empty or
-   * the cache does not exist.
+   * Get a file path from the disk cache by the specified key.
    */
-  static std::shared_ptr<tgfx::Data> ReadFile(const std::string& key);
+  static std::string GetFilePath(const std::string& key);
 
   /**
    * Writes a file to the disk cache by the specified key. Returns false if the key is empty, the
@@ -71,7 +70,7 @@ class DiskCache {
   std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
                                              int frameCount, float frameRate,
                                              const std::vector<TimeRange>& staticTimeRanges);
-  std::shared_ptr<tgfx::Data> readFile(const std::string& key);
+  std::string getFilePath(const std::string& key);
   bool writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 
   bool checkDiskSpace(size_t maxSize);
