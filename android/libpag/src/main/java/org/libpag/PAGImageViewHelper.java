@@ -18,7 +18,6 @@
 
 package org.libpag;
 
-import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.os.Build;
 import android.os.Handler;
@@ -26,8 +25,6 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 
-import java.math.BigInteger;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,8 +35,6 @@ class PAGImageViewHelper {
     private static final int MSG_HANDLER_THREAD_QUITE = 0;
     protected static final int MSG_FLUSH = 1;
     protected static final int MSG_CLOSE_CACHE = 2;
-    protected static final int MSG_INIT_DECODER = 3;
-    protected static final int MSG_REFRESH_DECODER = 4;
 
     protected static synchronized void StartHandlerThread() {
         g_HandlerThreadCount++;
@@ -203,11 +198,6 @@ class PAGImageViewHelper {
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             switch (msg.arg1) {
-                case MSG_INIT_DECODER: {
-                    PAGImageView imageView = (PAGImageView) msg.obj;
-                    imageView.initDecoderInfo();
-                    break;
-                }
                 case MSG_FLUSH: {
                     List<PAGImageView> tempList;
                     synchronized (lock) {
@@ -231,16 +221,7 @@ class PAGImageViewHelper {
                 case MSG_CLOSE_CACHE: {
                     PAGImageView imageView = (PAGImageView) msg.obj;
                     if (imageView != null) {
-                        if (imageView.decoderInfo != null) {
-                            imageView.decoderInfo.reset();
-                        }
-                    }
-                    break;
-                }
-                case MSG_REFRESH_DECODER: {
-                    PAGImageView imageView = (PAGImageView) msg.obj;
-                    if (imageView != null) {
-                        imageView.refreshDecodeInfo();
+                        imageView.decoderInfo.reset();
                     }
                     break;
                 }
@@ -265,11 +246,11 @@ class PAGImageViewHelper {
         long duration;
         PAGDecoder _pagDecoder;
 
-        boolean isValid() {
+        synchronized boolean isValid() {
             return _width > 0 && _height > 0;
         }
 
-        boolean initDecoder(PAGComposition composition, int width, int height, float maxFrameRate) {
+        synchronized boolean initDecoder(PAGComposition composition, int width, int height, float maxFrameRate) {
             if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
                 return false;
             }
@@ -282,14 +263,14 @@ class PAGImageViewHelper {
             return true;
         }
 
-        void releaseDecoder() {
+        synchronized void releaseDecoder() {
             if (_pagDecoder != null) {
                 _pagDecoder.release();
             }
             _pagDecoder = null;
         }
 
-        void reset() {
+        synchronized void reset() {
             releaseDecoder();
             _width = 0;
             _height = 0;

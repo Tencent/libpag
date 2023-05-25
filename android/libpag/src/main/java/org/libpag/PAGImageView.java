@@ -307,15 +307,11 @@ public class PAGImageView extends View {
         if (currentFrame >= _numFrames) {
             return;
         }
-        _currentFrame = currentFrame;
-        float value = (float) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames));
-        value = Math.max(0, Math.min(value, 1));
         synchronized (animatorLock) {
-            currentPlayTime = (long) (value * animator.getDuration());
-            animator.setCurrentPlayTime(currentPlayTime);
+            _currentFrame = currentFrame;
+            syncCurrentTime();
             progressExplicitlySet = true;
         }
-        PAGImageViewHelper.NeedsUpdateView(this);
     }
 
     /**
@@ -329,6 +325,9 @@ public class PAGImageView extends View {
      * Starts to play the animation.
      */
     public void play() {
+        if (_isPlaying) {
+            return;
+        }
         _isPlaying = true;
         _isAnimatorPreRunning = null;
         if (animator.getAnimatedFraction() == 1.0) {
@@ -400,17 +399,30 @@ public class PAGImageView extends View {
      */
     public boolean flush() {
         if (!decoderInfo.isValid()) {
-            return false;
+            initDecoderInfo();
+            if (!decoderInfo.isValid()) {
+                postInvalidate();
+                return false;
+            }
         }
-        synchronized (animatorLock) {
-            if (decoderInfo._pagDecoder != null) {
-                _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo._pagDecoder != null) {
+            _numFrames = decoderInfo._pagDecoder.numFrames();
+        }
+        if (progressExplicitlySet) {
+            progressExplicitlySet = false;
+            if (!handleFrame(_currentFrame)) {
+                forceFlush = false;
+                return false;
             }
-            if (progressExplicitlySet) {
-                progressExplicitlySet = false;
-                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames)));
+            synchronized (animatorLock) {
+                syncCurrentTime();
+                animator.setCurrentPlayTime(currentPlayTime);
             }
-            int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), _numFrames);
+        } else {
+            int currentFrame = 0;
+            synchronized (animatorLock) {
+                currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), _numFrames);
+            }
             if (currentFrame == _currentFrame && !forceFlush) {
                 return false;
             }
@@ -419,9 +431,9 @@ public class PAGImageView extends View {
                 forceFlush = false;
                 return false;
             }
-            forceFlush = false;
-            postInvalidate();
         }
+        forceFlush = false;
+        postInvalidate();
         notifyAnimationUpdate();
         return true;
     }
@@ -453,26 +465,23 @@ public class PAGImageView extends View {
 
     private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
         freezeDraw.set(true);
+        decoderInfo.reset();
         _maxFrameRate = maxFrameRate;
-        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         _matrix = null;
         renderBitmap = null;
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
         progressExplicitlySet = true;
-        currentPlayTime = 0;
         synchronized (animatorLock) {
-            if (animator != null) {
-                animator.setCurrentPlayTime(0);
+            animator.setDuration(_composition == null ? 0 : _composition.duration() / 100);
+            animator.setCurrentPlayTime(0);
+            currentPlayTime = 0;
+            if (_composition == null) {
+                _isPlaying = false;
             }
         }
-        if (!hasSize()) {
-            return;
-        }
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
     }
-
 
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
@@ -498,20 +507,9 @@ public class PAGImageView extends View {
         }
     }
 
-    protected void refreshDecodeInfo() {
-        if (decoderInfo != null) {
-            decoderInfo.reset();
-        }
-        bitmapCache.clear();
-        initDecoderInfo();
-    }
-
     private volatile long currentPlayTime;
 
     private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = animation -> {
-        if (!decoderInfo.isValid() || freezeDraw.get()) {
-            return;
-        }
         PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
         PAGImageViewHelper.NeedsUpdateView(PAGImageView.this);
     };
@@ -584,36 +582,37 @@ public class PAGImageView extends View {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         freezeDraw.set(true);
-        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
+        decoderInfo.reset();
         viewWidth = w;
         viewHeight = h;
         width = (int) (_renderScale * w);
         height = (int) (_renderScale * h);
         renderBitmap = null;
         forceFlush = true;
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         resumeAnimator();
     }
 
-    protected synchronized void initDecoderInfo() {
-        if (!decoderInfo.isValid()) {
-            if (_composition == null) {
-                _composition = getCompositionFromPath(_pagFilePath);
-            }
-            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
-                if (_pagFilePath != null) {
-                    _composition = null;
+    protected void initDecoderInfo() {
+        synchronized (decoderInfo) {
+            if (!decoderInfo.isValid()) {
+                if (_composition == null) {
+                    _composition = getCompositionFromPath(_pagFilePath);
                 }
-                synchronized (animatorLock) {
-                    animator.setDuration(decoderInfo.duration / 1000);
+                if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
+                    if (_pagFilePath != null) {
+                        _composition = null;
+                    }
+                    synchronized (animatorLock) {
+                        animator.setDuration(decoderInfo.duration / 1000);
+                    }
                 }
                 if (!decoderInfo.isValid()) {
                     return;
                 }
             }
+            refreshMatrixFromScaleMode();
+            freezeDraw.set(false);
         }
-        refreshMatrixFromScaleMode();
-        freezeDraw.set(false);
     }
 
     private float animationScale = 1.0f;
@@ -702,8 +701,6 @@ public class PAGImageView extends View {
             Log.e(TAG, "doPlay: The scale of animator duration is turned off");
             return;
         }
-        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
         Log.i(TAG, "doPlay");
         startAnimator();
     }
@@ -812,6 +809,7 @@ public class PAGImageView extends View {
         if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
             return false;
         }
+        renderBitmap.prepareToDraw();
         if (_cacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
         }
@@ -888,6 +886,18 @@ public class PAGImageView extends View {
     }
 
     private static native int ContentVersion(PAGComposition pagComposition);
+
+    private void syncCurrentTime() {
+        long playTime = 0;
+        if (animator.getDuration() > 0) {
+            long repeatCount = currentPlayTime / animator.getDuration();
+            if (animator.getAnimatedFraction() == 1.0f) {
+                repeatCount = Math.round(currentPlayTime * 1.0 / animator.getDuration()) - 1;
+            }
+            playTime = (long) ((PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames) + repeatCount) * animator.getDuration());
+        }
+        currentPlayTime = playTime;
+    }
 
     static {
         LibraryLoadUtils.loadLibrary("pag");
