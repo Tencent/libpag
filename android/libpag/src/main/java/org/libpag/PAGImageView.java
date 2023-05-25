@@ -809,7 +809,9 @@ public class PAGImageView extends View {
         if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
             return false;
         }
-        renderBitmap.prepareToDraw();
+        if (renderBitmap != null) {
+            renderBitmap.prepareToDraw();
+        }
         if (_cacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
         }
