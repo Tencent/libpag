@@ -329,6 +329,19 @@ void DestoryFlushQueue() {
   return file != nil;
 }
 
+- (void)setPath:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+  if (filePath != nil) {
+    [filePath release];
+    filePath = nil;
+  }
+  filePath = [path retain];
+  [PAGFile Load:path
+      completionBlock:^(PAGFile* pagFile) {
+        [self setComposition:pagFile];
+        callback(pagFile);
+      }];
+}
+
 - (PAGComposition*)getComposition {
   return [pagPlayer getComposition];
 }
