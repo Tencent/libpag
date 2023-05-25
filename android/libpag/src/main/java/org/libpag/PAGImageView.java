@@ -406,6 +406,7 @@ public class PAGImageView extends View {
         if (!decoderInfo.isValid()) {
             initDecoderInfo();
             if (!decoderInfo.isValid()) {
+                postInvalidate();
                 return false;
             }
         }
@@ -481,6 +482,9 @@ public class PAGImageView extends View {
             animator.setDuration(_composition == null ? 0 : _composition.duration() / 100);
             animator.setCurrentPlayTime(0);
             currentPlayTime = 0;
+            if (_composition == null) {
+                _isPlaying = false;
+            }
         }
     }
 
@@ -606,9 +610,9 @@ public class PAGImageView extends View {
                     synchronized (animatorLock) {
                         animator.setDuration(decoderInfo.duration / 1000);
                     }
-                    if (!decoderInfo.isValid()) {
-                        return;
-                    }
+                }
+                if (!decoderInfo.isValid()) {
+                    return;
                 }
             }
             refreshMatrixFromScaleMode();
@@ -799,7 +803,7 @@ public class PAGImageView extends View {
         }
     }
 
-    private boolean checkBackgroundBitmap() {
+    private boolean ensureBackgroundBitmap() {
         if (backgroundBitmap == null) {
             Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
             if (pair.first == null) {
@@ -852,7 +856,7 @@ public class PAGImageView extends View {
         HardwareBuffer flushBuffer;
         Bitmap flushBitmap;
         if (!_cacheAllFramesInMemory) {
-            if (!checkBackgroundBitmap()) {
+            if (!ensureBackgroundBitmap()) {
                 return false;
             }
             flushBuffer = backgroundHardwareBuffer;

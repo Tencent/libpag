@@ -246,7 +246,7 @@ class PAGImageViewHelper {
         long duration;
         PAGDecoder _pagDecoder;
 
-        boolean isValid() {
+        synchronized boolean isValid() {
             return _width > 0 && _height > 0;
         }
 
