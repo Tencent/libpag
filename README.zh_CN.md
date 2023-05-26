@@ -156,7 +156,7 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 - [Android API 参考](https://pag.art/api.html#/apis/android/org/libpag/package-summary.html)
 - [Web API 参考](https://pag.art/api.html#/apis/web/)
 
-更多的其他文档可以访问官网  [pag.art](https://pag.art) 获得。
+更多的其他文档可以访问官网  [pag.art](https://pag.art/docs/mobile-sdk-guide.html) 获得。
 
 ## 开发指南
 
