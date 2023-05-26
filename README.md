@@ -6,7 +6,7 @@
 [![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art) | [Forum](https://bbs.pag.art/)
+English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art) | [Forum](https://bbs.pag.art)
 
 ## Introduction
 
