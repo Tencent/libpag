@@ -49,9 +49,9 @@ class Drawable {
 
   virtual void setTimeStamp(int64_t timestamp);
 
-  tgfx::Context* lockContext(bool force = false);
+  virtual tgfx::Context* lockContext(bool force = false);
 
-  void unlockContext();
+  virtual void unlockContext();
 
   std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context, bool force = false);
 
