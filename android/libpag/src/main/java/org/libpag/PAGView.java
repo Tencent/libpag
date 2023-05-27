@@ -225,6 +225,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
+     * [Deprecated](Please use PAGViewListener's onAnimationUpdate instead.)
      * PAG flush callback listener.
      * if add this listener, the PAG View onSurfaceTextureAvailable will send pag flush async, and this will make PAG View hasn't content until the async flush end.
      */
@@ -697,6 +698,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             animator.setDuration(duration / 1000);
             animator.setCurrentPlayTime(0);
             currentPlayTime = 0;
+            if (newComposition == null) {
+                _isPlaying = false;
+            }
         }
     }
 
