@@ -106,15 +106,14 @@ PAG_API @interface PAGView : UIView
 - (void)play;
 
 /**
- * Pauses the animation at the current position. Calling the play() method can resume the
- * animation from the last paused playing position.
+ * Cancels the animation at the current position. Calling the play() method can resume the animation
+ * from the last paused position.
  */
 - (void)pause;
 
 /**
- * Stops the animation at the current position. Unlike pause(), stop() not only pauses the
- * animation but also resets the number of times the animation has played to 0. This method may
- * block the calling thread if there is an asynchronous task running.
+ * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
+ * animation but also tries to cancel any async tasks, which may block the calling thread.
  */
 - (void)stop;
 

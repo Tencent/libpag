@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,25 @@
 
 #pragma once
 
+#include <functional>
 #include "JNIHelper.h"
-#include "platform/Platform.h"
+#include "rendering/utils/DisplayLink.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+class NativeDisplayLink : public DisplayLink {
  public:
-  static void InitJNI();
+  static void InitJNI(JNIEnv* env);
+  static std::shared_ptr<DisplayLink> Make(std::function<void()> callback);
+  ~NativeDisplayLink() override;
 
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  void start() override;
+  void stop() override;
+  void update();
 
-  bool registerFallbackFonts() const override;
+ private:
+  Global<jobject> animator = nullptr;
+  std::function<void()> callback = nullptr;
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+  explicit NativeDisplayLink(std::function<void()> callback);
 };
 }  // namespace pag

@@ -144,21 +144,20 @@
 - (void)play;
 
 /**
- * Pauses the animation at the current position. Calling the play() method can resume the
- * animation from the last paused playing position.
+ * Cancels the animation at the current position. Calling the play() method can resume the animation
+ * from the last paused position.
  */
 - (void)pause;
 
 /**
- * Stops the animation at the current position. Unlike pause(), stop() not only pauses the
- * animation but also resets the number of times the animation has played to 0. This method may
- * block the calling thread if there is an asynchronous task running.
+ * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
+ * animation but also tries to cancel any async tasks, which may block the calling thread.
  */
 - (void)stop;
 
 /**
  * Manually flush the animation to the current progress without altering its playing status. If
- * the animation is already running an flushing task asynchronously, this action will not have
+ * the animation is already running a flushing task asynchronously, this action will not have
  * any effect.
  */
 - (void)flush;

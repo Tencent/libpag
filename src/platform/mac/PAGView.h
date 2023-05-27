@@ -93,14 +93,14 @@ PAG_API @interface PAGView : NSView
 - (void)play;
 
 /**
- * Pauses the animation at the current position. Calling the play() method can resume the
- * animation from the last paused playing position.
+ * Cancels the animation at the current position. Calling the play() method can resume the animation
+ * from the last paused position.
  */
 - (void)pause;
 
 /**
- * Stops the animation at the current position. Unlike pause(), stop() not only pauses the
- * animation but also resets the number of times the animation has played to 0.
+ * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
+ * animation but also tries to cancel any async tasks, which may block the calling thread.
  */
 - (void)stop;
 

@@ -29,6 +29,11 @@ static constexpr int AnimationTypeUpdate = 3;
 
 class AnimationTicker {
  public:
+  static AnimationTicker* GetInstance() {
+    static auto& instance = *new AnimationTicker();
+    return &instance;
+  }
+
   AnimationTicker() {
     displayLink = Platform::Current()->createDisplayLink([this] { onFrameAvailable(); });
   }
@@ -38,21 +43,24 @@ class AnimationTicker {
   }
 
   void addAnimator(std::shared_ptr<PAGAnimator> animator) {
-    std::lock_guard<std::mutex> autoLock(locker);
+    locker.lock();
     auto needStart = animators.empty();
     animators.push_back(std::move(animator));
+    locker.unlock();
     if (needStart) {
       displayLink->start();
     }
   }
 
   void removeAnimator(std::shared_ptr<PAGAnimator> animator) {
-    std::lock_guard<std::mutex> autoLock(locker);
+    locker.lock();
     auto index = std::find(animators.begin(), animators.end(), animator);
     if (index != animators.end()) {
       animators.erase(index);
     }
-    if (animators.empty()) {
+    auto needStop = animators.empty();
+    locker.unlock();
+    if (needStop) {
       displayLink->stop();
     }
   }
@@ -76,10 +84,8 @@ class AnimationTicker {
   }
 };
 
-static auto& animationTicker = *new AnimationTicker();
-
 std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(Listener* listener) {
-  if (listener == nullptr || !animationTicker.available()) {
+  if (listener == nullptr || !AnimationTicker::GetInstance()->available()) {
     return nullptr;
   }
   auto animator = std::shared_ptr<PAGAnimator>(new PAGAnimator(listener));
@@ -180,17 +186,18 @@ void PAGAnimator::pause() {
   }
   _isPlaying = false;
   cancelAnimation();
+  listener->onAnimationCancel(this);
 }
 
 void PAGAnimator::stop() {
   {
+    //TODO(domrjchen): Reset the progress and playedCount to 0.
     std::lock_guard<std::mutex> autoLock(locker);
     resetTask();
     if (!_isPlaying) {
       return;
     }
     _isPlaying = false;
-    playedCount = 0;
     cancelAnimation();
   }
   listener->onAnimationCancel(this);
@@ -298,7 +305,8 @@ void PAGAnimator::startAnimation() {
     return;
   }
   isAnimating = true;
-  animationTicker.addAnimator(weakThis.lock());
+  resetStartTime();
+  AnimationTicker::GetInstance()->addAnimator(weakThis.lock());
 }
 
 void PAGAnimator::cancelAnimation() {
@@ -306,8 +314,7 @@ void PAGAnimator::cancelAnimation() {
     return;
   }
   isAnimating = false;
-  resetStartTime();
-  animationTicker.removeAnimator(weakThis.lock());
+  AnimationTicker::GetInstance()->removeAnimator(weakThis.lock());
 }
 
 void PAGAnimator::resetStartTime() {
