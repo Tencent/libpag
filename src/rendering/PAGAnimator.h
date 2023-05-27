@@ -28,25 +28,8 @@ namespace pag {
 class PAGAnimator {
  public:
   /**
-   * This interface is used to update the animation.
-   */
-  class Updater {
-   public:
-    virtual ~Updater() = default;
-
-   protected:
-    /**
-     * Notifies a new frame of the animation needs to be updated. It may be called from an arbitrary
-     * thread if the animation is running asynchronously.
-     */
-    virtual void onUpdate(double progress) = 0;
-
-    friend class PAGAnimator;
-  };
-
-  /**
-   * This listener can be used to be notified when the status of the associated PAGAnimator is
-   * changed. These methods are optional, you can implement only the events you care about.
+   * This interface is used to receive notifications when the status of the associated PAGAnimator
+   * changes, and to flush the animation frame.
    */
   class Listener {
    public:
@@ -54,34 +37,43 @@ class PAGAnimator {
 
    protected:
     /**
-     * Notifies the beginning of the animation.
+     * Notifies the beginning of the animation. It can be called from either the UI thread or the
+     * thread that calls the play() method.
      */
     virtual void onAnimationStart(PAGAnimator*) {
     }
 
     /**
-     * Notifies the end of the animation.
+     * Notifies the end of the animation. It can only be called from the UI thread.
      */
     virtual void onAnimationEnd(PAGAnimator*) {
     }
 
     /**
-     * Notifies the cancellation of the animation.
+     * Notifies the cancellation of the animation. It can be called from either the UI thread or the
+     * thread that calls the stop() method.
      */
     virtual void onAnimationCancel(PAGAnimator*) {
     }
 
     /**
-     * Notifies the repetition of the animation.
+     * Notifies the repetition of the animation. It can only be called only from the UI thread.
      */
     virtual void onAnimationRepeat(PAGAnimator*) {
     }
 
     /**
-     * Notifies the frame updating of the animation.
+     * Notifies another frame of the animation has occurred. It can be called from either the UI
+     * thread or the thread that calls the play() method.
      */
     virtual void onAnimationUpdate(PAGAnimator*) {
     }
+
+    /**
+     * Notifies a new frame of the animation needs to be flushed. It may be called from an arbitrary
+     * thread if the animation is running asynchronously.
+     */
+    virtual void onAnimationFlush(PAGAnimator* animator) = 0;
 
     friend class PAGAnimator;
   };
@@ -90,18 +82,7 @@ class PAGAnimator {
    * Creates a new PAGAnimator with the specified updater and listener. The caller must ensure that
    * the updater and listener will outlive the lifetime of the returned PAGAnimator.
    */
-  static std::shared_ptr<PAGAnimator> MakeFrom(Updater* updater);
-
-  /**
-   * Adds a listener to the set of listeners that are sent events through the life of an animation,
-   * such as start, repeat, and end.
-   */
-  void addListener(std::shared_ptr<Listener> listener);
-
-  /**
-   * Removes a listener from the set listening to this animation.
-   */
-  void removeListener(std::shared_ptr<Listener> listener);
+  static std::shared_ptr<PAGAnimator> MakeFrom(Listener* listener);
 
   /**
    * Indicates whether the animation is allowed to run in the UI thread. The default value is false.
@@ -174,19 +155,18 @@ class PAGAnimator {
   void stop();
 
   /**
-   * Manually update the animation to the current progress without altering its playing status. If
-   * the animation is currently running an asynchronous updating task, this action will not have any
-   * effect.
+   * Manually flush the animation to the current progress without altering its playing status. If
+   * the animation is already running an flushing task asynchronously, this action will not have
+   * any effect.
    */
-  void update();
+  void flush();
 
  private:
   std::mutex locker = {};
   std::weak_ptr<PAGAnimator> weakThis;
-  Updater* updater = nullptr;
-  std::vector<std::shared_ptr<Listener>> listeners = {};
+  Listener* listener = nullptr;
   std::shared_ptr<tgfx::Task> task = nullptr;
-  std::atomic_int64_t _startTime = INT64_MIN;
+  int64_t _startTime = INT64_MIN;
   int64_t _duration = 0;
   int _repeatCount = 1;
   double _progress = 0;
@@ -196,17 +176,15 @@ class PAGAnimator {
   bool isEnded = false;
   int playedCount = 0;
 
-  explicit PAGAnimator(Updater* updater);
+  explicit PAGAnimator(Listener* listener);
   void advance();
   std::vector<int> doAdvance();
-  void updateProgress(int64_t playTime);
-  void onUpdate(double progress, int64_t playTime = INT64_MIN);
+  void doFlush(bool updateStartTime);
+  void onFlush(bool updateStartTime);
   void startAnimation();
   void cancelAnimation();
   void resetStartTime();
   void resetTask();
-  int findListener(std::shared_ptr<Listener> listener);
-  void notifyListeners(std::vector<int> types);
 
   friend class AnimationTicker;
 };

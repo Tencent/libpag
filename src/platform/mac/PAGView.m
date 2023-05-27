@@ -67,7 +67,7 @@
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
-      [animator update];
+      [animator flush];
     }
   }
 }
@@ -79,7 +79,7 @@
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
     [pagSurface updateSize];
     if (oldRect.size.width == 0 || oldRect.size.height == 0) {
-      [animator update];
+      [animator flush];
     }
   }
 }
@@ -118,7 +118,7 @@
 - (void)initPAGSurface {
   pagSurface = [[PAGSurface FromView:self] retain];
   [pagPlayer setSurface:pagSurface];
-  [animator update];
+  [animator flush];
 }
 
 - (void)addListener:(id<PAGViewListener>)listener {
@@ -129,7 +129,7 @@
   [animator removeListener:(id<PAGAnimatorListener>)listener];
 }
 
-- (void)onUpdate:(double)progress {
+- (void)onAnimationFlush:(double)progress {
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }

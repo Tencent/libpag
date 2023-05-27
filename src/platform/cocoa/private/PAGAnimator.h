@@ -24,44 +24,47 @@
 @protocol PAGAnimatorUpdater <NSObject>
 
 /**
- * Notifies a new frame of the animation needs to be updated. It may be called from an arbitrary
+ * Notifies a new frame of the animation needs to be flushed. It may be called from an arbitrary
  * thread if the animation is running asynchronously.
  */
-- (void)onUpdate:(double)progress;
+- (void)onAnimationFlush:(double)progress;
 
 @end
 
 /**
- * Interface for listening to the animation life cycle events.  These methods are optional, you can
+ * Interface for listening to the animation life cycle events. These methods are optional, you can
  * implement only the events you care about.
  */
 @protocol PAGAnimatorListener <NSObject>
 
 @optional
 /**
- * Notifies the beginning of the animation.
+ * Notifies the beginning of the animation. It can be called from either the UI thread or the thread
+ * that calls the play method.
  */
-- (void)onAnimationStart:(_Nullable id)view;
+- (void)onAnimationStart:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the end of the animation.
+ * Notifies the end of the animation. It can only be called from the UI thread.
  */
-- (void)onAnimationEnd:(_Nullable id)view;
+- (void)onAnimationEnd:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the cancellation of the animation.
+ * Notifies the cancellation of the animation. It can be called from either the UI thread or the
+ * thread that calls the stop method.
  */
-- (void)onAnimationCancel:(_Nullable id)view;
+- (void)onAnimationCancel:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the repetition of the animation.
+ * Notifies the repetition of the animation. It can only be called from the UI thread.
  */
-- (void)onAnimationRepeat:(_Nullable id)view;
+- (void)onAnimationRepeat:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the frame updating of the animation.
+ * Notifies another frame of the animation has occurred. It can be called from either the UI thread
+ * or the thread that calls the play method.
  */
-- (void)onAnimationUpdate:(_Nullable id)view;
+- (void)onAnimationUpdate:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 @end
 
@@ -154,10 +157,10 @@
 - (void)stop;
 
 /**
- * Manually update the animation to the current progress without altering its playing status. If
- * the animation is currently running an asynchronous updating task, this action will not have any
- * effect.
+ * Manually flush the animation to the current progress without altering its playing status. If
+ * the animation is already running an flushing task asynchronously, this action will not have
+ * any effect.
  */
-- (void)update;
+- (void)flush;
 
 @end

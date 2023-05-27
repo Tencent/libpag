@@ -75,7 +75,7 @@
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
-      [animator update];
+      [animator flush];
     }
   }
 }
@@ -87,7 +87,7 @@
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
     [pagSurface updateSize];
     if (oldRect.size.width == 0 || oldRect.size.height == 0) {
-      [animator update];
+      [animator flush];
     }
   }
 }
@@ -135,7 +135,7 @@
   CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
   pagSurface = [[PAGSurface FromLayer:layer] retain];
   [pagPlayer setSurface:pagSurface];
-  [animator update];
+  [animator flush];
 }
 
 - (void)addListener:(id<PAGViewListener>)listener {
@@ -146,7 +146,7 @@
   [animator removeListener:(id<PAGAnimatorListener>)listener];
 }
 
-- (void)onUpdate:(double)progress {
+- (void)onAnimationFlush:(double)progress {
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
 }
@@ -279,7 +279,7 @@
   [pagPlayer setProgress:value];
   [animator setProgress:[pagPlayer getProgress]];
   // TODO(domchen): Remove the next line. All pending changes should be applied in flush().
-  [animator update];
+  [animator flush];
 }
 
 - (int64_t)currentFrame {
@@ -302,7 +302,7 @@
 
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
   if (_isVisible) {
-    [animator update];
+    [animator flush];
   }
 }
 

@@ -33,27 +33,30 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     public interface PAGViewListener {
         /**
-         * Notifies the start of the animation.
+         * Notifies the start of the animation. It can be called from either the UI thread or the
+         * thread that calls the play() method.
          */
         void onAnimationStart(PAGView view);
 
         /**
-         * Notifies the end of the animation.
+         * Notifies the end of the animation. It can only be called from the UI thread.
          */
         void onAnimationEnd(PAGView view);
 
         /**
-         * Notifies the cancellation of the animation.
+         * Notifies the cancellation of the animation. It can be called from either the UI thread or
+         * the thread that calls the stop() method.
          */
         void onAnimationCancel(PAGView view);
 
         /**
-         * Notifies the repetition of the animation.
+         * Notifies the repetition of the animation. It can only be called from the UI thread.
          */
         void onAnimationRepeat(PAGView view);
 
         /**
-         * Notifies the occurrence of another frame of the animation.
+         * Notifies another frame of the animation has occurred. It can be called from either the UI
+         * thread or the thread that calls the play() method.
          */
         void onAnimationUpdate(PAGView view);
     }

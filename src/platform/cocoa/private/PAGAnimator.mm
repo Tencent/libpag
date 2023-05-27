@@ -20,26 +20,13 @@
 #include "rendering/PAGAnimator.h"
 
 namespace pag {
-class AnimationUpdater : public pag::PAGAnimator::Updater {
+class AnimatorListener : public pag::PAGAnimator::Listener {
  public:
-  explicit AnimationUpdater(id<PAGAnimatorUpdater> updater) : updater(updater) {
-  }
-
-  void onUpdate(double progress) override {
-    [updater onUpdate:progress];
-  }
-
- private:
-  id<PAGAnimatorUpdater> updater;
-};
-
-class ListenerManager : public pag::PAGAnimator::Listener {
- public:
-  explicit ListenerManager(id view) : view(view) {
+  explicit AnimatorListener(id<PAGAnimatorUpdater> updater) : updater(updater) {
     listeners = [[NSHashTable weakObjectsHashTable] retain];
   }
 
-  ~ListenerManager() override {
+  ~AnimatorListener() override {
     [listeners release];
   }
 
@@ -60,59 +47,64 @@ class ListenerManager : public pag::PAGAnimator::Listener {
   }
 
  protected:
-  void onAnimationStart(PAGAnimator*) override {
+  void onAnimationStart(pag::PAGAnimator*) override {
     auto copiedListeners = getListeners();
     for (id listener in copiedListeners) {
       if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
-        [listener onAnimationStart:view];
+        [listener onAnimationStart:updater];
       }
     }
     [copiedListeners release];
   }
 
-  void onAnimationEnd(PAGAnimator*) override {
+  void onAnimationEnd(pag::PAGAnimator*) override {
     auto copiedListeners = getListeners();
     for (id listener in copiedListeners) {
       if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
-        [listener onAnimationEnd:view];
+        [listener onAnimationEnd:updater];
       }
     }
     [copiedListeners release];
   }
 
-  void onAnimationCancel(PAGAnimator*) override {
+  void onAnimationCancel(pag::PAGAnimator*) override {
     auto copiedListeners = getListeners();
     for (id listener in copiedListeners) {
       if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
-        [listener onAnimationCancel:view];
+        [listener onAnimationCancel:updater];
       }
     }
     [copiedListeners release];
   }
 
-  void onAnimationRepeat(PAGAnimator*) override {
+  void onAnimationRepeat(pag::PAGAnimator*) override {
     auto copiedListeners = getListeners();
     for (id listener in copiedListeners) {
       if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
-        [listener onAnimationRepeat:view];
+        [listener onAnimationRepeat:updater];
       }
     }
     [copiedListeners release];
   }
 
-  void onAnimationUpdate(PAGAnimator*) override {
+  void onAnimationUpdate(pag::PAGAnimator*) override {
     auto copiedListeners = getListeners();
     for (id listener in copiedListeners) {
       if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
-        [listener onAnimationUpdate:view];
+        [listener onAnimationUpdate:updater];
       }
     }
     [copiedListeners release];
   };
 
+  void onAnimationFlush(pag::PAGAnimator* animator) override {
+    auto progress = animator->progress();
+    [updater onAnimationFlush:progress];
+  }
+
  private:
   std::mutex locker = {};
-  id view = nil;
+  id<PAGAnimatorUpdater> updater = nil;
   NSHashTable* listeners = nil;
 
   NSHashTable* getListeners() {
@@ -124,31 +116,28 @@ class ListenerManager : public pag::PAGAnimator::Listener {
 
 @implementation PAGAnimator {
   std::shared_ptr<pag::PAGAnimator> animator;
-  std::unique_ptr<pag::PAGAnimator::Updater> animationUpdater;
-  std::shared_ptr<pag::ListenerManager> listenerManager;
+  std::unique_ptr<pag::AnimatorListener> animatorListener;
 }
 
 - (instancetype)initWithUpdater:(id<PAGAnimatorUpdater>)updater {
   self = [super init];
   if (self) {
-    self->animationUpdater = updater ? std::make_unique<pag::AnimationUpdater>(updater) : nullptr;
-    self->animator = pag::PAGAnimator::MakeFrom(animationUpdater.get());
+    self->animatorListener = updater ? std::make_unique<pag::AnimatorListener>(updater) : nullptr;
+    self->animator = pag::PAGAnimator::MakeFrom(animatorListener.get());
     if (self->animator == nullptr) {
       [self release];
       return nil;
     }
-    self->listenerManager = std::make_shared<pag::ListenerManager>(updater);
-    self->animator->addListener(self->listenerManager);
   }
   return self;
 }
 
 - (void)addListener:(id<PAGAnimatorListener>)listener {
-  listenerManager->addListener(listener);
+  animatorListener->addListener(listener);
 }
 
 - (void)removeListener:(id<PAGAnimatorListener>)listener {
-  listenerManager->removeListener(listener);
+  animatorListener->removeListener(listener);
 }
 
 - (BOOL)isSync {
@@ -199,8 +188,8 @@ class ListenerManager : public pag::PAGAnimator::Listener {
   animator->stop();
 }
 
-- (void)update {
-  animator->update();
+- (void)flush {
+  animator->flush();
 }
 
 @end
