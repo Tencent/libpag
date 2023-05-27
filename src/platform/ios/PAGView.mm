@@ -107,7 +107,7 @@ void DestoryFlushQueue() {
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidReceiveMemoryWarning:)
-                                               name:UIApplicationWillResignActiveNotification
+                                               name:UIApplicationDidReceiveMemoryWarningNotification
                                              object:nil];
 }
 
