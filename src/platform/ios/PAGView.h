@@ -21,31 +21,35 @@
 #import "PAGLayer.h"
 
 @class PAGView;
+
 @protocol PAGViewListener <NSObject>
 
 @optional
 /**
- * Notifies the start of the animation.
+ * Notifies the beginning of the animation. It can be called from either the UI thread or the thread
+ * that calls the play method.
  */
 - (void)onAnimationStart:(PAGView*)pagView;
 
 /**
- * Notifies the end of the animation.
+ * Notifies the end of the animation. It can only be called from the UI thread.
  */
 - (void)onAnimationEnd:(PAGView*)pagView;
 
 /**
- * Notifies the cancellation of the animation.
+ * Notifies the cancellation of the animation. It can be called from either the UI thread or the
+ * thread that calls the stop method.
  */
 - (void)onAnimationCancel:(PAGView*)pagView;
 
 /**
- * Notifies the repetition of the animation.
+ * Notifies the repetition of the animation. It can only be called from the UI thread.
  */
 - (void)onAnimationRepeat:(PAGView*)pagView;
 
 /**
- * Notifies the occurrence of another frame of the animation.
+ * Notifies another frame of the animation has occurred. It can be called from either the UI thread
+ * or the thread that calls the play method.
  */
 - (void)onAnimationUpdate:(PAGView*)pagView;
 
@@ -54,13 +58,8 @@
 PAG_API @interface PAGView : UIView
 
 /**
- * Returns YES if PAGView is playing in the main thread. The default value is NO.
- */
-@property(nonatomic) BOOL sync;
-
-/**
  * Adds a listener to the set of listeners that are sent events through the life of an animation,
- * such as start, repeat, and end.
+ * such as start, repeat, and end. PAGView only holds a weak reference to the listener.
  */
 - (void)addListener:(id<PAGViewListener>)listener;
 
@@ -70,25 +69,53 @@ PAG_API @interface PAGView : UIView
 - (void)removeListener:(id<PAGViewListener>)listener;
 
 /**
- * Indicates whether or not this pag view is playing.
+ * Indicates whether the animation is allowed to run in the UI thread. The default value is NO.
+ * Regardless of whether the animation runs asynchronously, all listener callbacks will be called
+ * on the UI thread.
+ */
+- (BOOL)sync;
+
+/**
+ * Set whether the animation is allowed to run in the UI thread.
+ */
+- (void)setSync:(BOOL)value;
+
+/**
+ * The total number of times the animation is set to play. The default is 1, which means the
+ * animation will play only once. If the repeat count is set to 0 or a negative value, the
+ * animation will play infinity times.
+ */
+- (int)repeatCount;
+
+/**
+ * Set the number of times the animation to play.
+ */
+- (void)setRepeatCount:(int)repeatCount;
+
+/**
+ * Indicates whether this pag view is playing.
  */
 - (BOOL)isPlaying;
 
 /**
- * Start the animation.
+ * Starts to play the animation from the current position. Calling the play() method when the
+ * animation is already playing has no effect. The play() method does not alter the animation's
+ * current position. However, if the animation previously reached its end, it will restart from
+ * the beginning.
  */
 - (void)play;
 
 /**
- * Stop the animation.
+ * Cancels the animation at the current position. Calling the play() method can resume the animation
+ * from the last paused position.
  */
-- (void)stop;
+- (void)pause;
 
 /**
- * Set the number of times the animation will repeat. The default is 1, which means the animation
- * will play only once. 0 means the animation will play infinity times.
+ * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
+ * animation but also tries to cancel any async tasks, which may block the calling thread.
  */
-- (void)setRepeatCount:(int)repeatCount;
+- (void)stop;
 
 /**
  * The path string of a pag file set by setPath.
@@ -174,7 +201,7 @@ PAG_API @interface PAGView : UIView
 - (void)setScaleMode:(PAGScaleMode)value;
 
 /**
- * Returns a copy of current matrix.
+ * Returns a copy of the current matrix.
  */
 - (CGAffineTransform)matrix;
 

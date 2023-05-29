@@ -14,6 +14,7 @@ import android.opengl.GLES20;
 import android.opengl.GLUtils;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
@@ -34,7 +35,7 @@ import org.libpag.PAGView;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, PAGView.PAGViewListener {
     RelativeLayout containerView;
     Button btPlayFirst;
     Button btPlaySecond;
@@ -77,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (pagView == null) {
             eglSetup();
             pagView = new PAGView(this, eglContext);
+            pagView.addListener(this);
             pagView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
             PAGFile pagFile = PAGFile.Load(getAssets(), "alpha.pag");
@@ -95,10 +97,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 pagFile.replaceImage(0, pagImage);
             }
             pagView.setComposition(pagFile);
-            pagView.setRepeatCount(-1);
+            pagView.setRepeatCount(2);
             pagView.setOnClickListener(v -> {
                 if (pagView.isPlaying()) {
-                    pagView.stop();
+                    pagView.pause();
                 } else {
                     pagView.play();
                 }
@@ -266,5 +268,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             eglSurface = null;
             eglContext = null;
         }
+    }
+
+    public void onAnimationStart(PAGView view) {
+        Log.i("PAGView", "onAnimationStart");
+    }
+
+    public void onAnimationEnd(PAGView view) {
+        Log.i("PAGView", "onAnimationEnd");
+    }
+
+    public void onAnimationCancel(PAGView view) {
+        Log.i("PAGView", "onAnimationCancel");
+    }
+
+    public void onAnimationRepeat(PAGView view) {
+        Log.i("PAGView", "onAnimationRepeat");
+    }
+
+    public void onAnimationUpdate(PAGView view) {
     }
 }

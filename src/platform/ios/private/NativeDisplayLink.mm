@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,19 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "platform/cocoa/private/CocoaPlatform.h"
+#include "NativeDisplayLink.h"
 
 namespace pag {
-class NativePlatform : public CocoaPlatform {
- public:
-  NALUType naluType() const override;
+NativeDisplayLink::NativeDisplayLink(std::function<void()> callback) {
+  animationCallback = [[PAGAnimationCallback alloc] initWithCallback:callback];
+}
 
-  void setNALUType(NALUType type) const;
+NativeDisplayLink::~NativeDisplayLink() {
+  stop();
+  [animationCallback release];
+}
 
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+void NativeDisplayLink::start() {
+  if (displayLink != nullptr) {
+    return;
+  }
+  displayLink = [CADisplayLink displayLinkWithTarget:animationCallback selector:@selector(update:)];
+  // The default mode was previously set here. However, rendering is not possible when the UI is in
+  // drag mode. Therefore, it has been changed to common modes.
+  [displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+}
 
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
+void NativeDisplayLink::stop() {
+  [displayLink invalidate];
+  displayLink = nullptr;
+}
 }  // namespace pag

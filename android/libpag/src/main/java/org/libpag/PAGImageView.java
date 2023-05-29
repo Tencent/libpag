@@ -46,27 +46,30 @@ public class PAGImageView extends View {
 
     public interface PAGImageViewListener {
         /**
-         * Notifies the beginning of the animation.
+         * Notifies the start of the animation. It can be called from either the UI thread or the
+         * thread that calls the play() method.
          */
         void onAnimationStart(PAGImageView view);
 
         /**
-         * Notifies the end of the animation.
+         * Notifies the end of the animation. It can only be called from the UI thread.
          */
         void onAnimationEnd(PAGImageView view);
 
         /**
-         * Notifies the cancellation of the animation.
+         * Notifies the cancellation of the animation. It can be called from either the UI thread or
+         * the thread that calls the stop() method.
          */
         void onAnimationCancel(PAGImageView view);
 
         /**
-         * Notifies the repetition of the animation.
+         * Notifies the repetition of the animation. It can only be called from the UI thread.
          */
         void onAnimationRepeat(PAGImageView view);
 
         /**
-         * Notifies the frame updating of the animation.
+         * Notifies another frame of the animation has occurred. It can be called from either the UI
+         * thread or the thread that calls the play() method.
          */
         void onAnimationUpdate(PAGImageView view);
     }

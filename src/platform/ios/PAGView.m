@@ -18,6 +18,7 @@
 
 #import "PAGView.h"
 #import "PAGPlayer.h"
+#import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 
 @implementation PAGView {
@@ -40,12 +41,14 @@
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
-  self.layer.backgroundColor = [NSColor clearColor].CGColor;
+  self.contentScaleFactor = [UIScreen mainScreen].scale;
+  self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
-  // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
-  // not be created.
-  [animator setSync:YES];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(applicationDidBecomeActive:)
+                                               name:UIApplicationDidBecomeActiveNotification
+                                             object:nil];
 }
 
 - (void)dealloc {
@@ -57,7 +60,12 @@
   [pagSurface release];
   [pagFile release];
   [filePath release];
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
   [super dealloc];
+}
+
++ (Class)layerClass {
+  return [CAEAGLLayer class];
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -84,13 +92,21 @@
   }
 }
 
-- (void)viewDidMoveToWindow {
-  [super viewDidMoveToWindow];
+- (void)setContentScaleFactor:(CGFloat)scaleFactor {
+  CGFloat oldScaleFactor = self.contentScaleFactor;
+  [super setContentScaleFactor:scaleFactor];
+  if (pagSurface != nil && oldScaleFactor != scaleFactor) {
+    [pagSurface updateSize];
+  }
+}
+
+- (void)didMoveToWindow {
+  [super didMoveToWindow];
   [self checkVisible];
 }
 
-- (void)setAlphaValue:(CGFloat)alphaValue {
-  [super setAlphaValue:alphaValue];
+- (void)setAlpha:(CGFloat)alpha {
+  [super setAlpha:alpha];
   [self checkVisible];
 }
 
@@ -100,7 +116,7 @@
 }
 
 - (void)checkVisible {
-  BOOL visible = self.window && !self.isHidden && self.alphaValue > 0.0;
+  BOOL visible = self.window && !self.isHidden && self.alpha > 0.0;
   if (_isVisible == visible) {
     return;
   }
@@ -116,7 +132,8 @@
 }
 
 - (void)initPAGSurface {
-  pagSurface = [[PAGSurface FromView:self] retain];
+  CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
+  pagSurface = [[PAGSurface FromLayer:layer] retain];
   [pagPlayer setSurface:pagSurface];
   [animator flush];
 }
@@ -132,6 +149,14 @@
 - (void)onAnimationFlush:(double)progress {
   [pagPlayer setProgress:progress];
   [pagPlayer flush];
+}
+
+- (BOOL)sync {
+  return [animator isSync];
+}
+
+- (void)setSync:(BOOL)value {
+  [animator setSync:value];
 }
 
 - (int)repeatCount {
@@ -253,6 +278,12 @@
 - (void)setProgress:(double)value {
   [pagPlayer setProgress:value];
   [animator setProgress:[pagPlayer getProgress]];
+  // TODO(domchen): Remove the next line. All pending changes should be applied in flush().
+  [animator flush];
+}
+
+- (int64_t)currentFrame {
+  return [pagPlayer currentFrame];
 }
 
 - (BOOL)flush {
@@ -266,6 +297,12 @@
 - (void)freeCache {
   if (pagSurface != nil) {
     [pagSurface freeCache];
+  }
+}
+
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
+  if (_isVisible) {
+    [animator flush];
   }
 }
 

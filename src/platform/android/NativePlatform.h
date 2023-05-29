@@ -34,5 +34,7 @@ class NativePlatform : public Platform {
                   const std::string& tag) const override;
 
   std::string getCacheDir() const override;
+
+  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
 };
 }  // namespace pag

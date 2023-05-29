@@ -24,6 +24,7 @@
 #include "HardwareDecoder.h"
 #include "JPAGDiskCache.h"
 #include "JTraceImage.h"
+#include "NativeDisplayLink.h"
 #include "PAGText.h"
 
 #define LOG_TAG "libpag"
@@ -69,6 +70,7 @@ void NativePlatform::InitJNI() {
   HardwareDecoder::InitJNI(env);
   InitPAGTextJNI(env);
   JPAGDiskCache::InitJNI(env);
+  NativeDisplayLink::InitJNI(env);
   env->ExceptionClear();
 }
 
@@ -89,4 +91,10 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
 std::string NativePlatform::getCacheDir() const {
   return JPAGDiskCache::GetCacheDir();
 }
+
+std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
+    std::function<void()> callback) const {
+  return NativeDisplayLink::Make(std::move(callback));
+}
+
 }  // namespace pag

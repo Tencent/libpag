@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,17 +18,21 @@
 
 #pragma once
 
-#include "platform/cocoa/private/CocoaPlatform.h"
+#import <QuartzCore/QuartzCore.h>
+#include "PAGAnimationCallback.h"
+#include "rendering/utils/DisplayLink.h"
 
 namespace pag {
-class NativePlatform : public CocoaPlatform {
+class NativeDisplayLink : public DisplayLink {
  public:
-  NALUType naluType() const override;
+  explicit NativeDisplayLink(std::function<void()> callback);
+  ~NativeDisplayLink() override;
 
-  void setNALUType(NALUType type) const;
+  void start() override;
+  void stop() override;
 
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+ private:
+  CADisplayLink* displayLink = nullptr;
+  PAGAnimationCallback* animationCallback = nullptr;
 };
 }  // namespace pag

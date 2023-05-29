@@ -24,6 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
+#include "rendering/utils/DisplayLink.h"
 #include "rendering/utils/shaper/PositionedGlyphs.h"
 #include "rendering/video/VideoDecoderFactory.h"
 #include "tgfx/core/Data.h"
@@ -72,17 +73,22 @@ class Platform {
    */
   virtual std::string getCacheDir() const;
 
-  virtual std::optional<PositionedGlyphs> shapeText(const std::string&,
-                                                    const std::shared_ptr<tgfx::Typeface>&) const {
-    return std::nullopt;
-  }
+  /**
+    * Returns the shaped glyphs of the given text and typeface.
+    */
+  virtual std::optional<PositionedGlyphs> shapeText(
+      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const;
 
   /**
    * Returns the corresponding sandbox path from the absolute file path, which usually starts with
    * "app://" or "home://". Returns the original path if the platform does not support sandbox.
    */
-  virtual std::string getSandboxPath(std::string filePath) const {
-    return filePath;
-  }
+  virtual std::string getSandboxPath(std::string filePath) const;
+
+  /**
+   * Creates a display link with the given callback. Returns nullptr if the current platform does
+   * not have display link support.
+   */
+  virtual std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const;
 };
 }  // namespace pag

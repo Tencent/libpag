@@ -16,19 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#import <CoreFoundation/CoreFoundation.h>
+#include <functional>
 
-#include "platform/cocoa/private/CocoaPlatform.h"
+@interface PAGAnimationCallback : NSObject {
+  std::function<void()> callback;
+}
 
-namespace pag {
-class NativePlatform : public CocoaPlatform {
- public:
-  NALUType naluType() const override;
+- (instancetype)initWithCallback:(std::function<void()>)callback;
 
-  void setNALUType(NALUType type) const;
+- (void)update:(CADisplayLink*)sender;
 
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+@end

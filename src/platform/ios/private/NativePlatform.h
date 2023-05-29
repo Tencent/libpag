@@ -26,5 +26,7 @@ class NativePlatform : public CocoaPlatform {
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 
   std::string getSandboxPath(std::string filePath) const override;
+
+  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
 };
 }  // namespace pag
