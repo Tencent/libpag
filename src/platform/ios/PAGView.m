@@ -49,6 +49,10 @@
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(applicationDidReceiveMemoryWarning:)
+                                               name:UIApplicationDidReceiveMemoryWarningNotification
+                                             object:nil];
 }
 
 - (void)dealloc {
@@ -304,6 +308,10 @@
   if (_isVisible) {
     [animator flush];
   }
+}
+
+- (void)applicationDidReceiveMemoryWarning:(NSNotification*)notification {
+  [self freeCache];
 }
 
 - (CVPixelBufferRef)makeSnapshot {
