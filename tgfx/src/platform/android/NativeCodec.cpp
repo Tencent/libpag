@@ -230,6 +230,9 @@ static jobject ConvertHardwareBitmap(JNIEnv* env, jobject bitmap) {
   // The AndroidBitmapInfo does not contain the ANDROID_BITMAP_FLAGS_IS_HARDWARE flag in the old
   // versions of Android NDK, even when the Java Bitmap has the hardware config. So we check it here
   // by the Java-side methods.
+  if (bitmap == nullptr) {
+    return nullptr;
+  }
   if (BitmapConfig_HARDWARE == nullptr) {
     return bitmap;
   }
