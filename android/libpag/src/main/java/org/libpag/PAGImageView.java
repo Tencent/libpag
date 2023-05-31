@@ -405,8 +405,8 @@ public class PAGImageView extends View {
                 return false;
             }
         }
-        if (decoderInfo._pagDecoder != null) {
-            _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo.hasPAGDecoder()) {
+            _numFrames = decoderInfo.numFrames();
         }
         if (progressExplicitlySet) {
             progressExplicitlySet = false;
@@ -458,8 +458,8 @@ public class PAGImageView extends View {
         if (!decoderInfo.isValid() && _numFrames == 0 && width > 0) {
             initDecoderInfo();
         }
-        if (decoderInfo.isValid() && decoderInfo._pagDecoder != null) {
-            _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo.isValid() & decoderInfo.hasPAGDecoder()) {
+            _numFrames = decoderInfo.numFrames();
         }
     }
 
@@ -744,17 +744,15 @@ public class PAGImageView extends View {
     }
 
     private boolean allInMemoryCache() {
-        if (decoderInfo.isValid() && decoderInfo._pagDecoder != null) {
-            _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo.isValid() && decoderInfo.hasPAGDecoder()) {
+            _numFrames = decoderInfo.numFrames();
         }
         return bitmapCache.size() == _numFrames;
     }
 
     private void releaseDecoder() {
         if (allInMemoryCache()) {
-            if (decoderInfo._pagDecoder != null) {
-                decoderInfo.releaseDecoder();
-            }
+            decoderInfo.releaseDecoder();
         }
     }
 
@@ -773,7 +771,7 @@ public class PAGImageView extends View {
         }
         if (needResetBitmapCache) {
             bitmapCache.clear();
-            if (decoderInfo._pagDecoder == null) {
+            if (!decoderInfo.hasPAGDecoder()) {
                 PAGComposition composition = _composition;
                 if (composition == null) {
                     composition = getCompositionFromPath(_pagFilePath);
@@ -797,16 +795,16 @@ public class PAGImageView extends View {
         if (freezeDraw.get()) {
             return false;
         }
-        if (decoderInfo._pagDecoder == null) {
+        if (!decoderInfo.hasPAGDecoder()) {
             return false;
         }
-        if (!forceFlush && !decoderInfo._pagDecoder.checkFrameChanged(frame)) {
+        if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
         if (renderBitmap == null || _cacheAllFramesInMemory) {
             renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
         }
-        if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
+        if (!decoderInfo.copyFrameTo(renderBitmap, frame)) {
             return false;
         }
         if (renderBitmap != null) {

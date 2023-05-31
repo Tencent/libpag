@@ -18,6 +18,7 @@
 
 package org.libpag;
 
+import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.os.Build;
 import android.os.Handler;
@@ -244,13 +245,27 @@ class PAGImageViewHelper {
         int _width;
         int _height;
         long duration;
-        PAGDecoder _pagDecoder;
+        private PAGDecoder _pagDecoder;
 
         synchronized boolean isValid() {
             return _width > 0 && _height > 0;
         }
 
-        synchronized boolean initDecoder(PAGComposition composition, int width, int height, float maxFrameRate) {
+        synchronized boolean hasPAGDecoder() {
+            return _pagDecoder != null;
+        }
+
+        synchronized boolean checkFrameChanged(int currentFrame) {
+            return _pagDecoder != null && _pagDecoder.checkFrameChanged(currentFrame);
+        }
+
+        synchronized boolean copyFrameTo(Bitmap bitmap, int currentFrame) {
+            return _pagDecoder != null && bitmap != null && _pagDecoder.copyFrameTo(bitmap,
+                    currentFrame);
+        }
+
+        synchronized boolean initDecoder(PAGComposition composition, int width, int height,
+                                         float maxFrameRate) {
             if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
                 return false;
             }
@@ -266,8 +281,8 @@ class PAGImageViewHelper {
         synchronized void releaseDecoder() {
             if (_pagDecoder != null) {
                 _pagDecoder.release();
+                _pagDecoder = null;
             }
-            _pagDecoder = null;
         }
 
         synchronized void reset() {
@@ -275,6 +290,10 @@ class PAGImageViewHelper {
             _width = 0;
             _height = 0;
             duration = 0;
+        }
+
+        synchronized int numFrames() {
+            return _pagDecoder == null ? 0 : _pagDecoder.numFrames();
         }
     }
 }
