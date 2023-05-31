@@ -24,6 +24,7 @@
 #include "codec/tags/FileAttributes.h"
 #include "codec/tags/FontTables.h"
 #include "codec/tags/Images.h"
+#include "codec/tags/ImageScaleModes.h"
 #include "codec/tags/PerformanceTag.h"
 #include "codec/tags/TimeStretchMode.h"
 #include "codec/tags/VectorCompositionTag.h"
@@ -80,6 +81,10 @@ static void ReadTag_EditableIndicesBlock(DecodeStream* stream, CodecContext*) {
   ReadEditableIndices(stream);
 }
 
+static void ReadTag_ImageScaleModesBlock(DecodeStream* stream, CodecContext*) {
+  ReadImageScaleModes(stream);
+}
+
 using ReadTagHandler = void(DecodeStream* stream, CodecContext* context);
 static const std::unordered_map<TagCode, std::function<ReadTagHandler>, EnumClassHash> handlers = {
     {TagCode::FontTables, ReadTag_FontTables},
@@ -93,6 +98,7 @@ static const std::unordered_map<TagCode, std::function<ReadTagHandler>, EnumClas
     {TagCode::BitmapCompositionBlock, ReadTag_BitmapCompositionBlock},
     {TagCode::VideoCompositionBlock, ReadTag_VideoCompositionBlock},
     {TagCode::EditableIndices, ReadTag_EditableIndicesBlock},
+    {TagCode::ImageScaleModes, ReadTag_ImageScaleModesBlock},
 };
 
 void ReadTagsOfFile(DecodeStream* stream, TagCode code, CodecContext* context) {
@@ -174,6 +180,9 @@ void WriteTagsOfFile(EncodeStream* stream, const File* file, PerformanceData* pe
   }
   if (file->editableImages != nullptr || file->editableTexts != nullptr) {
     WriteTag(stream, file, WriteEditableIndices);
+  }
+  if (file->imageScaleModes != nullptr) {
+    WriteTag(stream, file, WriteImageScaleModes);
   }
   auto func = std::bind(WriteComposition, stream, std::placeholders::_1);
   std::for_each(file->compositions.begin(), file->compositions.end(), func);

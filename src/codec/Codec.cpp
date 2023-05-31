@@ -294,5 +294,6 @@ void Codec::UpdateFileAttributes(std::shared_ptr<File> file, CodecContext* conte
   file->fileAttributes = context->fileAttributes;
   file->editableImages = context->editableImages;
   file->editableTexts = context->editableTexts;
+  file->imageScaleModes = context->imageScaleModes;
 }
 }  // namespace pag
