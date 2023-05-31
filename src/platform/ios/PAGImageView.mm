@@ -215,10 +215,15 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (PAGDecoder*)getPAGDecoder {
   if (pagDecoder == nil) {
-    float scaleFactor = static_cast<float>(
-        renderScaleFactor *
-        fmax(self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth,
-             self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight));
+    float scaleFactor;
+    if (self.viewSize.width >= self.viewSize.height) {
+      scaleFactor = static_cast<float>(
+          renderScaleFactor * (self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth));
+    } else {
+      scaleFactor =
+          static_cast<float>(renderScaleFactor * (self.viewSize.height *
+                                                  [UIScreen mainScreen].scale / self.fileHeight));
+    }
     if (pagComposition) {
       pagDecoder = [PAGDecoder Make:pagComposition
                        maxFrameRate:self.maxFrameRate

@@ -275,9 +275,13 @@ class PAGImageViewHelper {
             if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
                 return false;
             }
-            float maxScale = Math.max(width * 1.0f / composition.width(),
-                    height * 1.0f / composition.height());
-            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, maxScale);
+            float scaleFactor;
+            if (composition.width() >= composition.height()) {
+                scaleFactor = width * 1.0f / composition.width();
+            } else {
+                scaleFactor = height * 1.0f / composition.height();
+            }
+            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
             _width = _pagDecoder.width();
             _height = _pagDecoder.height();
             duration = composition.duration();
