@@ -6,6 +6,8 @@ import android.util.Log;
 
 import org.extra.tools.LibraryLoadUtils;
 
+import java.lang.ref.WeakReference;
+
 /**
  * PAGAnimator provides a simple timing engine for running animations.
  */
@@ -45,7 +47,7 @@ class PAGAnimator {
     }
 
 
-    private Listener listener = null;
+    private WeakReference<Listener> weakListener = null;
     private float animationScale = 1.0f;
 
     /**
@@ -59,7 +61,7 @@ class PAGAnimator {
     }
 
     private PAGAnimator(Context context, Listener listener) {
-        this.listener = listener;
+        this.weakListener = new WeakReference<>(listener);
         if (context != null) {
             animationScale = Settings.Global.getFloat(context.getContentResolver(),
                     Settings.Global.ANIMATOR_DURATION_SCALE, 1.0f);
@@ -125,7 +127,10 @@ class PAGAnimator {
     public void start() {
         if (animationScale == 0.0f) {
             Log.e("libpag", "PAGAnimator.play() The scale of animator duration is turned off!");
-            listener.onAnimationEnd(this);
+            Listener listener = weakListener.get();
+            if (listener != null) {
+                listener.onAnimationEnd(this);
+            }
             return;
         }
         doStart();
@@ -148,23 +153,38 @@ class PAGAnimator {
     public native void update();
 
     private void onAnimationStart() {
-        listener.onAnimationStart(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationStart(this);
+        }
     }
 
     private void onAnimationEnd() {
-        listener.onAnimationEnd(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationEnd(this);
+        }
     }
 
     private void onAnimationCancel() {
-        listener.onAnimationCancel(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationCancel(this);
+        }
     }
 
     private void onAnimationRepeat() {
-        listener.onAnimationRepeat(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationRepeat(this);
+        }
     }
 
     private void onAnimationUpdate() {
-        listener.onAnimationUpdate(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationUpdate(this);
+        }
     }
 
     /**
