@@ -85,6 +85,7 @@ public class PAGImageView extends View {
     private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
     private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
+    private final Object bitmapLock = new Object();
     private volatile Bitmap renderBitmap;
     private volatile HardwareBuffer renderHardwareBuffer;
     private volatile Bitmap backgroundBitmap;
@@ -413,8 +414,8 @@ public class PAGImageView extends View {
                 return false;
             }
         }
-        if (decoderInfo._pagDecoder != null) {
-            _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo.hasPAGDecoder()) {
+            _numFrames = decoderInfo.numFrames();
         }
         if (progressExplicitlySet) {
             progressExplicitlySet = false;
@@ -466,8 +467,8 @@ public class PAGImageView extends View {
         if (!decoderInfo.isValid() && _numFrames == 0 && width > 0) {
             initDecoderInfo();
         }
-        if (decoderInfo.isValid() && decoderInfo._pagDecoder != null) {
-            _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo.isValid() & decoderInfo.hasPAGDecoder()) {
+            _numFrames = decoderInfo.numFrames();
         }
     }
 
@@ -676,16 +677,18 @@ public class PAGImageView extends View {
     }
 
     private void releaseBitmap() {
-        renderBitmap = null;
-        backgroundBitmap = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (renderHardwareBuffer != null) {
-                renderHardwareBuffer.close();
-                renderHardwareBuffer = null;
-            }
-            if (backgroundHardwareBuffer != null) {
-                backgroundHardwareBuffer.close();
-                backgroundHardwareBuffer = null;
+        synchronized (bitmapLock) {
+            renderBitmap = null;
+            backgroundBitmap = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (renderHardwareBuffer != null) {
+                    renderHardwareBuffer.close();
+                    renderHardwareBuffer = null;
+                }
+                if (backgroundHardwareBuffer != null) {
+                    backgroundHardwareBuffer.close();
+                    backgroundHardwareBuffer = null;
+                }
             }
         }
     }
@@ -767,17 +770,15 @@ public class PAGImageView extends View {
     }
 
     private boolean allInMemoryCache() {
-        if (decoderInfo.isValid() && decoderInfo._pagDecoder != null) {
-            _numFrames = decoderInfo._pagDecoder.numFrames();
+        if (decoderInfo.isValid() && decoderInfo.hasPAGDecoder()) {
+            _numFrames = decoderInfo.numFrames();
         }
         return bitmapCache.size() == _numFrames;
     }
 
     private void releaseDecoder() {
         if (allInMemoryCache()) {
-            if (decoderInfo._pagDecoder != null) {
-                decoderInfo.releaseDecoder();
-            }
+            decoderInfo.releaseDecoder();
         }
     }
 
@@ -796,7 +797,7 @@ public class PAGImageView extends View {
         }
         if (needResetBitmapCache) {
             bitmapCache.clear();
-            if (decoderInfo._pagDecoder == null) {
+            if (!decoderInfo.hasPAGDecoder()) {
                 PAGComposition composition = _composition;
                 if (composition == null) {
                     composition = getCompositionFromPath(_pagFilePath);
@@ -841,10 +842,10 @@ public class PAGImageView extends View {
         if (freezeDraw.get()) {
             return false;
         }
-        if (decoderInfo._pagDecoder == null) {
+        if (!decoderInfo.hasPAGDecoder()) {
             return false;
         }
-        if (!forceFlush && !decoderInfo._pagDecoder.checkFrameChanged(frame)) {
+        if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
         if (renderBitmap == null || _cacheAllFramesInMemory) {
@@ -856,27 +857,32 @@ public class PAGImageView extends View {
             renderHardwareBuffer = pair.second;
             renderBitmap = pair.first;
         }
-        HardwareBuffer flushBuffer;
-        Bitmap flushBitmap;
-        if (!_cacheAllFramesInMemory) {
-            if (!ensureBackgroundBitmap()) {
+        synchronized (bitmapLock) {
+            if (renderBitmap == null) {
                 return false;
             }
-            flushBuffer = backgroundHardwareBuffer;
-            flushBitmap = backgroundBitmap;
-        } else {
-            flushBuffer = renderHardwareBuffer;
-            flushBitmap = renderBitmap;
-        }
-        if (flushBuffer != null) {
-            if (!decoderInfo._pagDecoder.readFrame(frame, flushBuffer)) {
-                return false;
+            HardwareBuffer flushBuffer;
+            Bitmap flushBitmap;
+            if (!_cacheAllFramesInMemory) {
+                if (!ensureBackgroundBitmap()) {
+                    return false;
+                }
+                flushBuffer = backgroundHardwareBuffer;
+                flushBitmap = backgroundBitmap;
+            } else {
+                flushBuffer = renderHardwareBuffer;
+                flushBitmap = renderBitmap;
             }
-        } else {
-            if (!decoderInfo._pagDecoder.copyFrameTo(flushBitmap, frame)) {
-                return false;
+            if (flushBuffer != null) {
+                if (!decoderInfo.readFrame(frame, flushBuffer)) {
+                    return false;
+                }
+            } else {
+                if (!decoderInfo.copyFrameTo(flushBitmap, frame)) {
+                    return false;
+                }
+                flushBitmap.prepareToDraw();
             }
-            flushBitmap.prepareToDraw();
         }
         if (!_cacheAllFramesInMemory) {
             swapBitmap();
