@@ -33,9 +33,18 @@ public class PAGDiskCache {
 
     private static String GetCacheDir() {
         Context context = LibraryLoadUtils.getAppContext();
-        String cacheDir = Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) ||
-                !isExternalStorageRemovable() ? context.getExternalCacheDir().getPath() : context.getCacheDir().getPath();
-        return cacheDir + File.separator + "libpag";
+        if (context == null) {
+            return "";
+        }
+        File cacheFile = null;
+        if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) ||
+                !isExternalStorageRemovable()) {
+            cacheFile = context.getExternalCacheDir();
+        }
+        if (cacheFile == null) {
+            cacheFile = context.getCacheDir();
+        }
+        return cacheFile == null ? "" : cacheFile.getPath();
     }
 
     static {
