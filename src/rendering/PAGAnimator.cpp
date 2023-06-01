@@ -84,16 +84,16 @@ class AnimationTicker {
   }
 };
 
-std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(Listener* listener) {
-  if (listener == nullptr || !AnimationTicker::GetInstance()->available()) {
+std::shared_ptr<PAGAnimator> PAGAnimator::MakeFrom(std::weak_ptr<Listener> listener) {
+  if (listener.expired() || !AnimationTicker::GetInstance()->available()) {
     return nullptr;
   }
-  auto animator = std::shared_ptr<PAGAnimator>(new PAGAnimator(listener));
+  auto animator = std::shared_ptr<PAGAnimator>(new PAGAnimator(std::move(listener)));
   animator->weakThis = animator;
   return animator;
 }
 
-PAGAnimator::PAGAnimator(Listener* listener) : listener(listener) {
+PAGAnimator::PAGAnimator(std::weak_ptr<Listener> listener) : weakListener(std::move(listener)) {
 }
 
 bool PAGAnimator::isSync() {
@@ -123,7 +123,7 @@ void PAGAnimator::setDuration(int64_t duration) {
     return;
   }
   _duration = duration;
-  if (_isPlaying) {
+  if (_isRunning) {
     if (_duration > 0) {
       startAnimation();
     } else {
@@ -157,62 +157,56 @@ void PAGAnimator::setProgress(double value) {
   resetStartTime();
 }
 
-bool PAGAnimator::isPlaying() {
+bool PAGAnimator::isRunning() {
   std::lock_guard<std::mutex> autoLock(locker);
-  return _isPlaying;
+  return _isRunning;
 }
 
-void PAGAnimator::play() {
+void PAGAnimator::start() {
   {
     std::lock_guard<std::mutex> autoLock(locker);
-    if (_isPlaying) {
+    if (_isRunning) {
       return;
     }
-    _isPlaying = true;
+    _isRunning = true;
     if (isEnded) {
       isEnded = false;
       _progress = 0.0;
     }
     startAnimation();
   }
-  listener->onAnimationStart(this);
+  auto listener = weakListener.lock();
+  if (listener) {
+    listener->onAnimationStart(this);
+  }
   advance();
 }
 
-void PAGAnimator::pause() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!_isPlaying) {
-    return;
-  }
-  _isPlaying = false;
-  cancelAnimation();
-  listener->onAnimationCancel(this);
-}
-
-void PAGAnimator::stop() {
+void PAGAnimator::cancel() {
   {
-    //TODO(domrjchen): Reset the progress and playedCount to 0.
     std::lock_guard<std::mutex> autoLock(locker);
-    resetTask();
-    if (!_isPlaying) {
+    if (!_isRunning) {
       return;
     }
-    _isPlaying = false;
+    _isRunning = false;
     cancelAnimation();
   }
-  listener->onAnimationCancel(this);
+  auto listener = weakListener.lock();
+  if (listener) {
+    listener->onAnimationCancel(this);
+  }
 }
 
-void PAGAnimator::flush() {
-  doFlush(false);
+void PAGAnimator::update() {
+  doUpdate(false);
 }
 
 void PAGAnimator::advance() {
   auto events = doAdvance();
-  if (events.empty()) {
+  auto listener = weakListener.lock();
+  if (listener == nullptr) {
     return;
   }
-  doFlush(true);
   for (auto& type : events) {
     switch (type) {
       case AnimationTypeEnd:
@@ -222,8 +216,7 @@ void PAGAnimator::advance() {
         listener->onAnimationRepeat(this);
         break;
       case AnimationTypeUpdate:
-        listener->onAnimationUpdate(this);
-        break;
+        doUpdate(true);
       default:
         break;
     }
@@ -232,7 +225,7 @@ void PAGAnimator::advance() {
 
 std::vector<int> PAGAnimator::doAdvance() {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (!_isPlaying || _duration <= 0) {
+  if (!_isRunning || _duration <= 0) {
     return {};
   }
   int64_t playTime;
@@ -257,7 +250,7 @@ std::vector<int> PAGAnimator::doAdvance() {
       // Set the playedCount to 0 to allow the animation to be played again.
       playedCount = 0;
       isEnded = true;
-      _isPlaying = false;
+      _isRunning = false;
       cancelAnimation();
       events.push_back(AnimationTypeUpdate);
       events.push_back(AnimationTypeEnd);
@@ -274,7 +267,7 @@ std::vector<int> PAGAnimator::doAdvance() {
   return events;
 }
 
-void PAGAnimator::doFlush(bool updateStartTime) {
+void PAGAnimator::doUpdate(bool setStartTime) {
   locker.lock();
   if (task != nullptr && task->executing()) {
     locker.unlock();
@@ -283,17 +276,24 @@ void PAGAnimator::doFlush(bool updateStartTime) {
   auto isSync = _isSync;
   locker.unlock();
   if (isSync) {
-    onFlush(updateStartTime);
+    onFlush(setStartTime);
   } else {
-    task = tgfx::Task::Run(
-        [animator = weakThis.lock(), updateStartTime]() { animator->onFlush(updateStartTime); });
+    task = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
+      auto animator = weakThis.lock();
+      if (animator) {
+        animator->onFlush(setStartTime);
+      }
+    });
   }
 }
 
-void PAGAnimator::onFlush(bool updateStartTime) {
-  listener->onAnimationFlush(this);
+void PAGAnimator::onFlush(bool setStartTime) {
+  auto listener = weakListener.lock();
+  if (listener) {
+    listener->onAnimationUpdate(this);
+  }
   std::lock_guard<std::mutex> autoLock(locker);
-  if (updateStartTime && _startTime == INT64_MIN) {
+  if (setStartTime && _startTime == INT64_MIN) {
     _startTime = tgfx::Clock::Now() -
                  static_cast<int64_t>(_progress * static_cast<double>(_duration)) -
                  playedCount * _duration;
