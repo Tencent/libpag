@@ -51,7 +51,8 @@ class PAGAnimator {
     private float animationScale = 1.0f;
 
     /**
-     * Creates a new PAGAnimator with the specified listener.
+     * Creates a new PAGAnimator with the specified listener. PAGAnimator only holds a weak
+     * reference to the listener.
      */
     public static PAGAnimator MakeFrom(Context context, Listener listener) {
         if (listener == null) {
