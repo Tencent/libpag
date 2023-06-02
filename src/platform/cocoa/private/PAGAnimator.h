@@ -40,7 +40,7 @@
 @optional
 /**
  * Notifies the beginning of the animation. It can be called from either the UI thread or the thread
- * that calls the play method.
+ * that calls the start method.
  */
 - (void)onAnimationStart:(_Nullable id<PAGAnimatorUpdater>)updater;
 
@@ -51,7 +51,7 @@
 
 /**
  * Notifies the cancellation of the animation. It can be called from either the UI thread or the
- * thread that calls the stop method.
+ * thread that calls the cancel method.
  */
 - (void)onAnimationCancel:(_Nullable id<PAGAnimatorUpdater>)updater;
 
@@ -61,8 +61,8 @@
 - (void)onAnimationRepeat:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies another frame of the animation has occurred. It can be called from either the UI thread
- * or the thread that calls the play method.
+ * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+ * thread if the animation is running asynchronously.
  */
 - (void)onAnimationUpdate:(_Nullable id<PAGAnimatorUpdater>)updater;
 
@@ -71,7 +71,8 @@
 @interface PAGAnimator : NSObject
 
 /**
- * Initializes a new PAGAnimator object with the specified updater.
+ * Initializes a new PAGAnimator object with the specified updater. PAGAnimator only holds a weak
+ * reference to the updater.
  */
 - (_Nullable instancetype)initWithUpdater:(_Nullable id<PAGAnimatorUpdater>)updater;
 
@@ -131,35 +132,29 @@
 - (void)setProgress:(double)value;
 
 /**
- * Indicates whether the animation is playing.
+ * Indicates whether the animation is running.
  */
-- (bool)isPlaying;
+- (bool)isRunning;
 
 /**
- * Starts to play the animation from the current position. Calling the play() method when the
- * animation is already playing has no effect. The play() method does not alter the animation's
- * current position. However, if the animation previously reached its end, it will restart from
- * the beginning.
+ * Starts the animation from the current position. Calling the start() method when the animation is
+ * already started has no effect. The start() method does not alter the animation's current
+ * position. However, if the animation previously reached its end, it will restart from the
+ * beginning.
  */
-- (void)play;
+- (void)start;
 
 /**
- * Cancels the animation at the current position. Calling the play() method can resume the animation
- * from the last paused position.
+ * Cancels the animation at the current position. Calling the start() method can resume the
+ * animation from the last canceled position.
  */
-- (void)pause;
+- (void)cancel;
 
 /**
- * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
- * animation but also tries to cancel any async tasks, which may block the calling thread.
+ * Manually update the animation to the current progress without altering its playing status. If
+ * isSync is set to false, the calling thread won't be blocked. Please note that if the animation
+ * already has an ongoing asynchronous flushing task, this action won't have any effect.
  */
-- (void)stop;
-
-/**
- * Manually flush the animation to the current progress without altering its playing status. If
- * the animation is already running a flushing task asynchronously, this action will not have
- * any effect.
- */
-- (void)flush;
+- (void)update;
 
 @end

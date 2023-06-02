@@ -68,8 +68,8 @@ public class PAGImageView extends View {
         void onAnimationRepeat(PAGImageView view);
 
         /**
-         * Notifies another frame of the animation has occurred. It can be called from either the UI
-         * thread or the thread that calls the play() method.
+         * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+         * thread if the animation is running asynchronously.
          */
         void onAnimationUpdate(PAGImageView view);
     }

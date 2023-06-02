@@ -38,7 +38,7 @@ class PAGAnimator {
    protected:
     /**
      * Notifies the beginning of the animation. It can be called from either the UI thread or the
-     * thread that calls the play() method.
+     * thread that calls the start() method.
      */
     virtual void onAnimationStart(PAGAnimator*) {
     }
@@ -51,7 +51,7 @@ class PAGAnimator {
 
     /**
      * Notifies the cancellation of the animation. It can be called from either the UI thread or the
-     * thread that calls the stop() method.
+     * thread that calls the cancel() method.
      */
     virtual void onAnimationCancel(PAGAnimator*) {
     }
@@ -63,26 +63,18 @@ class PAGAnimator {
     }
 
     /**
-     * Notifies another frame of the animation has occurred. It can be called from either the UI
-     * thread or the thread that calls the play() method.
-     */
-    virtual void onAnimationUpdate(PAGAnimator*) {
-    }
-
-    /**
-     * Notifies a new frame of the animation needs to be flushed. It may be called from an arbitrary
+     * Notifies another frame of the animation has occurred. It may be called from an arbitrary
      * thread if the animation is running asynchronously.
      */
-    virtual void onAnimationFlush(PAGAnimator* animator) = 0;
+    virtual void onAnimationUpdate(PAGAnimator* animator) = 0;
 
     friend class PAGAnimator;
   };
 
   /**
-   * Creates a new PAGAnimator with the specified updater and listener. The caller must ensure that
-   * the updater and listener will outlive the lifetime of the returned PAGAnimator.
+   * Creates a new PAGAnimator with the specified listener.
    */
-  static std::shared_ptr<PAGAnimator> MakeFrom(Listener* listener);
+  static std::shared_ptr<PAGAnimator> MakeFrom(std::weak_ptr<Listener> listener);
 
   /**
    * Indicates whether the animation is allowed to run in the UI thread. The default value is false.
@@ -129,57 +121,51 @@ class PAGAnimator {
   void setProgress(double value);
 
   /**
-   * Indicates whether the animation is playing.
+   * Indicates whether the animation is running.
    */
-  bool isPlaying();
+  bool isRunning();
 
   /**
-   * Starts to play the animation from the current position. Calling the play() method when the
-   * animation is already playing has no effect. The play() method does not alter the animation's
-   * current position. However, if the animation previously reached its end, it will restart from
-   * the beginning.
+   * Starts the animation from the current position. Calling the start() method when the animation
+   * is already started has no effect. The start() method does not alter the animation's current
+   * position. However, if the animation previously reached its end, it will restart from the
+   * beginning.
    */
-  void play();
+  void start();
 
   /**
-   * Cancels the animation at the current position. Calling the play() method can resume the
-   * animation from the last paused position.
+   * Cancels the animation at the current position. Calling the start() method can resume the
+   * animation from the last canceled position.
    */
-  void pause();
+  void cancel();
 
   /**
-   * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
-   * animation but also tries to cancel any async tasks, which may block the calling thread.
+   * Manually update the animation to the current progress without altering its playing status. If
+   * isSync is set to false, the calling thread won't be blocked. Please note that if the animation
+   * already has an ongoing asynchronous flushing task, this action won't have any effect.
    */
-  void stop();
-
-  /**
-   * Manually flush the animation to the current progress without altering its playing status. If
-   * the animation is already running a flushing task asynchronously, this action will not have
-   * any effect.
-   */
-  void flush();
+  void update();
 
  private:
   std::mutex locker = {};
   std::weak_ptr<PAGAnimator> weakThis;
-  Listener* listener = nullptr;
+  std::weak_ptr<Listener> weakListener;
   std::shared_ptr<tgfx::Task> task = nullptr;
   int64_t _startTime = INT64_MIN;
   int64_t _duration = 0;
   int _repeatCount = 1;
   double _progress = 0;
   bool _isSync = false;
-  bool _isPlaying = false;
+  bool _isRunning = false;
   bool isAnimating = false;
   bool isEnded = false;
   int playedCount = 0;
 
-  explicit PAGAnimator(Listener* listener);
+  explicit PAGAnimator(std::weak_ptr<Listener> listener);
   void advance();
   std::vector<int> doAdvance();
-  void doFlush(bool updateStartTime);
-  void onFlush(bool updateStartTime);
+  void doUpdate(bool setStartTime);
+  void onFlush(bool setStartTime);
   void startAnimation();
   void cancelAnimation();
   void resetStartTime();

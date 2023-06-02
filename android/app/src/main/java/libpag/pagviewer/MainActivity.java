@@ -97,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 pagFile.replaceImage(0, pagImage);
             }
             pagView.setComposition(pagFile);
-            pagView.setRepeatCount(2);
+            pagView.setRepeatCount(0);
             pagView.setOnClickListener(v -> {
                 if (pagView.isPlaying()) {
                     pagView.pause();

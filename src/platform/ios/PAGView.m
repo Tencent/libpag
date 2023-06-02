@@ -56,9 +56,7 @@
 }
 
 - (void)dealloc {
-  // The animator must be stopped, otherwise, it will not be deallocated because it may be
-  // referenced by the global displayLink.
-  [animator stop];
+  [animator cancel];
   [animator release];
   [pagPlayer release];
   [pagSurface release];
@@ -79,7 +77,7 @@
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
-      [animator flush];
+      [animator update];
     }
   }
 }
@@ -91,7 +89,7 @@
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
     [pagSurface updateSize];
     if (oldRect.size.width == 0 || oldRect.size.height == 0) {
-      [animator flush];
+      [animator update];
     }
   }
 }
@@ -139,7 +137,7 @@
   CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
   pagSurface = [[PAGSurface FromLayer:layer] retain];
   [pagPlayer setSurface:pagSurface];
-  [animator flush];
+  [animator update];
 }
 
 - (void)addListener:(id<PAGViewListener>)listener {
@@ -172,20 +170,20 @@
 }
 
 - (BOOL)isPlaying {
-  return [animator isPlaying];
+  return [animator isRunning];
 }
 
 - (void)play {
   [pagPlayer prepare];
-  [animator play];
+  [animator start];
 }
 
 - (void)pause {
-  [animator pause];
+  [animator cancel];
 }
 
 - (void)stop {
-  [animator stop];
+  [animator cancel];
 }
 
 - (NSString*)getPath {
@@ -283,7 +281,7 @@
   [pagPlayer setProgress:value];
   [animator setProgress:[pagPlayer getProgress]];
   // TODO(domchen): Remove the next line. All pending changes should be applied in flush().
-  [animator flush];
+  [animator update];
 }
 
 - (int64_t)currentFrame {
@@ -306,7 +304,7 @@
 
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
   if (_isVisible) {
-    [animator flush];
+    [animator update];
   }
 }
 

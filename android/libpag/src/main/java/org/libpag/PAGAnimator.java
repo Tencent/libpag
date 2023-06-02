@@ -6,6 +6,8 @@ import android.util.Log;
 
 import org.extra.tools.LibraryLoadUtils;
 
+import java.lang.ref.WeakReference;
+
 /**
  * PAGAnimator provides a simple timing engine for running animations.
  */
@@ -17,7 +19,7 @@ class PAGAnimator {
     public interface Listener {
         /**
          * Notifies the start of the animation. It can be called from either the UI thread or the
-         * thread that calls the play() method.
+         * thread that calls the start() method.
          */
         void onAnimationStart(PAGAnimator animator);
 
@@ -28,7 +30,7 @@ class PAGAnimator {
 
         /**
          * Notifies the cancellation of the animation. It can be called from either the UI thread or
-         * the thread that calls the stop() method.
+         * the thread that calls the cancel() method.
          */
         void onAnimationCancel(PAGAnimator animator);
 
@@ -38,24 +40,19 @@ class PAGAnimator {
         void onAnimationRepeat(PAGAnimator animator);
 
         /**
-         * Notifies another frame of the animation has occurred. It can be called from either the UI
-         * thread or the thread that calls the play() method.
+         * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+         * thread if the animation is running asynchronously.
          */
         void onAnimationUpdate(PAGAnimator animator);
-
-        /**
-         * Notifies a new frame of the animation needs to be flushed. It may be called from an
-         * arbitrary thread if the animation is running asynchronously.
-         */
-        void onAnimationFlush(PAGAnimator animator);
     }
 
 
-    private Listener listener = null;
+    private WeakReference<Listener> weakListener = null;
     private float animationScale = 1.0f;
 
     /**
-     * Creates a new PAGAnimator with the specified updater.
+     * Creates a new PAGAnimator with the specified listener. PAGAnimator only holds a weak
+     * reference to the listener.
      */
     public static PAGAnimator MakeFrom(Context context, Listener listener) {
         if (listener == null) {
@@ -65,7 +62,7 @@ class PAGAnimator {
     }
 
     private PAGAnimator(Context context, Listener listener) {
-        this.listener = listener;
+        this.weakListener = new WeakReference<>(listener);
         if (context != null) {
             animationScale = Settings.Global.getFloat(context.getContentResolver(),
                     Settings.Global.ANIMATOR_DURATION_SCALE, 1.0f);
@@ -118,68 +115,77 @@ class PAGAnimator {
     public native void setProgress(double value);
 
     /**
-     * Indicates whether the animation is playing.
+     * Indicates whether the animation is running.
      */
-    public native boolean isPlaying();
+    public native boolean isRunning();
 
     /**
-     * Starts to play the animation from the current position. Calling the play() method when the
-     * animation is already playing has no effect. The play() method does not alter the animation's
-     * current position. However, if the animation previously reached its end, it will restart from
-     * the beginning.
+     * Starts the animation from the current position. Calling the start() method when the animation
+     * is already started has no effect. The start() method does not alter the animation's current
+     * position. However, if the animation previously reached its end, it will restart from the
+     * beginning.
      */
-    public void play() {
+    public void start() {
         if (animationScale == 0.0f) {
             Log.e("libpag", "PAGAnimator.play() The scale of animator duration is turned off!");
-            listener.onAnimationEnd(this);
+            Listener listener = weakListener.get();
+            if (listener != null) {
+                listener.onAnimationEnd(this);
+            }
             return;
         }
-        doPlay();
+        doStart();
     }
 
-    private native void doPlay();
+    private native void doStart();
 
     /**
-     * Cancels the animation at the current position. Calling the play() method can resume the
-     * animation from the last paused position.
+     * Cancels the animation at the current position. Calling the start() method can resume the
+     * animation from the last canceled position.
      */
-    public native void pause();
+    public native void cancel();
 
     /**
-     * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
-     * animation but also tries to cancel any async tasks, which may block the calling thread.
+     * Manually update the animation to the current progress without altering its playing status. If
+     * isSync is set to false, the calling thread won't be blocked. Please note that if the
+     * animation already has an ongoing asynchronous flushing task, this action won't have any
+     * effect.
      */
-    public native void stop();
-
-    /**
-     * Manually flush the animation to the current progress without altering its playing status. If
-     * the animation is already running n flushing task asynchronously, this action will not have
-     * any effect.
-     */
-    public native void flush();
+    public native void update();
 
     private void onAnimationStart() {
-        listener.onAnimationStart(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationStart(this);
+        }
     }
 
     private void onAnimationEnd() {
-        listener.onAnimationEnd(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationEnd(this);
+        }
     }
 
     private void onAnimationCancel() {
-        listener.onAnimationCancel(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationCancel(this);
+        }
     }
 
     private void onAnimationRepeat() {
-        listener.onAnimationRepeat(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationRepeat(this);
+        }
     }
 
     private void onAnimationUpdate() {
-        listener.onAnimationUpdate(this);
-    }
-
-    private void onAnimationFlush() {
-        listener.onAnimationFlush(this);
+        Listener listener = weakListener.get();
+        if (listener != null) {
+            listener.onAnimationUpdate(this);
+        }
     }
 
     /**
