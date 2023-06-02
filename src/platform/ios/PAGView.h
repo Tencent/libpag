@@ -256,4 +256,10 @@ PAG_API @interface PAGView : UIView
  * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet.
  */
 - (CVPixelBufferRef)makeSnapshot;
+
+/**
+ * Returns a rectangle in pixels that defines the displaying area of the specified layer, which is
+ * in the coordinate of the PAGView.
+ */
+- (CGRect)getBounds:(PAGLayer*)pagLayer;
 @end

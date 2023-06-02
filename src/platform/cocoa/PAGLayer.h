@@ -149,8 +149,8 @@ PAG_API @interface PAGLayer : NSObject
 - (PAGLayer*)trackMatteLayer;
 
 /**
- * Returns a rectangle that defines the original area of the layer, which is not transformed by the
- * matrix.
+ * Returns a rectangle int pixels that defines the original area of the layer, which is not
+ * transformed by the matrix.
  */
 - (CGRect)getBounds;
 
