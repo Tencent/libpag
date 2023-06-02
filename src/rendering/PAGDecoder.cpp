@@ -251,6 +251,9 @@ std::string PAGDecoder::generateCacheKey(std::shared_ptr<PAGComposition> composi
   }
   auto filePath = static_cast<PAGFile*>(composition.get())->path();
   filePath = Platform::Current()->getSandboxPath(filePath);
+  if (filePath.empty()) {
+    return "";
+  }
   return filePath + "." + std::to_string(_width) + "x" + std::to_string(_height);
 }
 
