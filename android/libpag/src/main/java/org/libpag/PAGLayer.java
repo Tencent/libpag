@@ -156,7 +156,8 @@ public class PAGLayer {
     public native PAGLayer trackMatteLayer();
 
     /**
-     * Returns a rectangle that defines the original area of the layer, which is not transformed by the matrix.
+     * Returns a rectangle in pixels that defines the original area of the layer, which is not
+     * transformed by the matrix.
      */
     public native RectF getBounds();
 

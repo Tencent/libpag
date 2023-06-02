@@ -3,6 +3,7 @@ package org.libpag;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.graphics.drawable.Drawable;
 import android.opengl.EGLContext;
@@ -409,6 +410,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             return pagSurface.makeSnapshot();
         }
         return null;
+    }
+
+    /**
+     * Returns a rectangle in pixels that defines the displaying area of the specified layer, which
+     * is in the coordinate of the PAGView.
+     */
+    public RectF getBounds(PAGLayer pagLayer) {
+        if (pagLayer != null) {
+            return pagPlayer.getBounds(pagLayer);
+        }
+        return new RectF();
     }
 
     private void setupSurfaceTexture() {

@@ -188,8 +188,8 @@ public class PAGPlayer {
     public native boolean waitSync(long sync);
 
     /**
-     * Returns a rectangle that defines the displaying area of the specified layer, which is in the
-     * coordinate of the PAGSurface.
+     * Returns a rectangle in pixels that defines the displaying area of the specified layer, which
+     * is in the coordinate of the PAGSurface.
      */
     public native RectF getBounds(PAGLayer pagLayer);
 

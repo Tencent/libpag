@@ -273,4 +273,11 @@
   }
   return nil;
 }
+
+- (CGRect)getBounds:(PAGLayer*)pagLayer {
+  if (pagLayer != nil) {
+    return [pagPlayer getBounds:pagLayer];
+  }
+  return CGRectNull;
+}
 @end
