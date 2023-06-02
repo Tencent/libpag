@@ -120,10 +120,8 @@ std::shared_ptr<Task> TaskGroup::popTask() {
   activeThreads--;
   while (true) {
     if (tasks.empty()) {
-      static auto res = condition.wait_for(autoLock, THREAD_TIMEOUT);
-      // When wait_for returns, Task may be not empty, so the return value of wait_for
-      // should be used to make the judgment.
-      if (exited || res == std::cv_status::timeout) {
+      auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
+      if (exited || status == std::cv_status::timeout) {
         auto threadID = std::this_thread::get_id();
         timeoutThreads.push_back(threadID);
         //        LOGI("TaskGroup: A task thread is exited, the current number of threads : %lld",
