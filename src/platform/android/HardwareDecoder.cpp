@@ -165,8 +165,7 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
     return pag::DecodingResult::Error;
   }
   auto byteBuffer = env->NewDirectByteBuffer(bytes, length);
-  auto result =
-      env->CallIntMethod(videoDecoder, HardwareDecoder_onSendBytes, byteBuffer, time);
+  auto result = env->CallIntMethod(videoDecoder, HardwareDecoder_onSendBytes, byteBuffer, time);
   return static_cast<pag::DecodingResult>(result);
 }
 
