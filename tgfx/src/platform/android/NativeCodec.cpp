@@ -237,8 +237,14 @@ static jobject ConvertHardwareBitmap(JNIEnv* env, jobject bitmap) {
     return bitmap;
   }
   auto config = env->CallObjectMethod(bitmap, Bitmap_getConfig);
+  if (config == nullptr) {
+    return bitmap;
+  }
   static Global<jobject> HardwareConfig =
       env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_HARDWARE);
+  if (HardwareConfig.isEmpty()) {
+    return bitmap;
+  }
   auto result = env->CallBooleanMethod(config, BitmapConfig_equals, HardwareConfig.get());
   if (result) {
     static Global<jobject> RGBA_Config =
