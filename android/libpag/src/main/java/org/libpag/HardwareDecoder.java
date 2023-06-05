@@ -246,67 +246,22 @@ class HardwareDecoder {
         return videoSurface;
     }
 
-    private boolean released = false;
-
     private void onRelease() {
-        if (released) {
-            return;
-        }
-        released = true;
-        releaseOutputBuffer();
-        releaseDecoder();
-    }
-
-    private void releaseDecoder() {
         if (decoder == null) {
             return;
         }
-        releaseAsync(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    decoder.stop();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                try {
-                    decoder.release();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                decoder = null;
-                videoSurface.release();
-            }
-        });
-    }
-
-    private void releaseAsync(final Runnable runnable) {
-        if (runnable == null) {
-            return;
-        }
-        decoderThreadCount.getAndIncrement();
-        final HandlerThread releaseHandlerThread = new HandlerThread("libpag_GPUDecoder_release_decoder");
+        releaseOutputBuffer();
         try {
-            releaseHandlerThread.start();
-        } catch (Exception | Error e) {
+            decoder.stop();
+        } catch (Exception e) {
             e.printStackTrace();
-            runnable.run();
-            return;
         }
-        Handler releaseHandler = new Handler(releaseHandlerThread.getLooper());
-        releaseHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                runnable.run();
-                decoderThreadCount.getAndDecrement();
-                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                    @Override
-                    public void run() {
-                        releaseHandlerThread.quitSafely();
-                    }
-                });
-            }
-        });
+        try {
+            decoder.release();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        decoder = null;
+        videoSurface.release();
     }
 }
