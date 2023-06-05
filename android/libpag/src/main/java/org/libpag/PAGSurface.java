@@ -193,6 +193,9 @@ public class PAGSurface {
      * garbage collector to do this for you at some point in the future.
      */
     public void release() {
+        // Must call freeCache() here, otherwise, the cache may not be freed until the PAGPlayer is
+        // garbage collected.
+        freeCache();
         if (needsReleaseSurface && surface != null) {
             surface.release();
         }
