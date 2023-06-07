@@ -766,4 +766,19 @@ PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   GLFunctions::Get(context)->deleteTextures(1, &(sampler.id));
   device->unlock();
 }
+
+PAG_TEST(CanvasTest, NothingToDraw) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 50, 50), paint);
+  paint.setColor(Color::FromRGBA(0, 0, 0, 0));
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 20, 20), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NothingToDraw"));
+  device->unlock();
+}
 }  // namespace tgfx

@@ -37,5 +37,9 @@ class ColorFilter {
   virtual ~ColorFilter() = default;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+
+  virtual bool isAlphaUnchanged() const {
+    return false;
+  }
 };
 }  // namespace tgfx

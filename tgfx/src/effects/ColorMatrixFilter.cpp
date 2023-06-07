@@ -18,13 +18,21 @@
 
 #include "ColorMatrixFilter.h"
 #include "gpu/ColorMatrixFragmentProcessor.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 std::shared_ptr<ColorFilter> ColorFilter::Matrix(const std::array<float, 20>& rowMajor) {
   return std::make_shared<ColorMatrixFilter>(rowMajor);
 }
 
-ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix) : matrix(matrix) {
+static bool IsAlphaUnchanged(const float matrix[20]) {
+  const float* srcA = matrix + 15;
+  return FloatNearlyZero(srcA[0]) && FloatNearlyZero(srcA[1]) && FloatNearlyZero(srcA[2]) &&
+         FloatNearlyEqual(srcA[3], 1) && FloatNearlyZero(srcA[4]);
+}
+
+ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
+    : matrix(matrix), alphaIsUnchanged(IsAlphaUnchanged(matrix.data())) {
 }
 
 std::unique_ptr<FragmentProcessor> ColorMatrixFilter::asFragmentProcessor() const {

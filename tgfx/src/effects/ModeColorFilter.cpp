@@ -52,4 +52,8 @@ std::unique_ptr<FragmentProcessor> ModeColorFilter::asFragmentProcessor() const 
   return XfermodeFragmentProcessor::MakeFromSrcProcessor(
       ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore), mode);
 }
+
+bool ModeColorFilter::isAlphaUnchanged() const {
+  return BlendMode::Dst == mode || BlendMode::SrcATop == mode;
+}
 }  // namespace tgfx

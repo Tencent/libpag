@@ -28,6 +28,8 @@ class ModeColorFilter : public ColorFilter {
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 
+  bool isAlphaUnchanged() const override;
+
  private:
   Color color;
   BlendMode mode;
