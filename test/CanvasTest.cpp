@@ -778,6 +778,8 @@ PAG_TEST(CanvasTest, NothingToDraw) {
   canvas->drawRect(Rect::MakeXYWH(0, 0, 50, 50), paint);
   paint.setColor(Color::FromRGBA(0, 0, 0, 0));
   canvas->drawRect(Rect::MakeXYWH(0, 0, 20, 20), paint);
+  paint.setColor(Color::FromRGBA(0, 0, 0, 127));
+  canvas->drawRect(Rect::MakeXYWH(20, 20, 20, 20), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NothingToDraw"));
   device->unlock();
 }
