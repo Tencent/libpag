@@ -696,6 +696,14 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
       !state->matrix.rectStaysRect() || drawContext == nullptr) {
     return false;
   }
+  auto color = paint.color;
+  if (getBlendMode() == BlendMode::Clear) {
+    color = Color::Transparent();
+  } else if (getBlendMode() != BlendMode::Src) {
+    if (!color.isOpaque()) {
+      return false;
+    }
+  }
   auto bounds = Rect::MakeEmpty();
   if (!path.asRect(&bounds)) {
     return false;
@@ -710,11 +718,11 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
     if (useScissor) {
       FlipYIfNeeded(&bounds, surface);
       rect->intersect(bounds);
-      drawContext->addOp(ClearOp::Make(paint.color, *rect));
+      drawContext->addOp(ClearOp::Make(color, *rect));
       return true;
     } else if (rect->isEmpty()) {
       FlipYIfNeeded(&bounds, surface);
-      drawContext->addOp(ClearOp::Make(paint.color, bounds));
+      drawContext->addOp(ClearOp::Make(color, bounds));
       return true;
     }
   }
