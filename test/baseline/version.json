@@ -1,6 +1,7 @@
 {
     "CanvasTest": {
         "Clip": "6a420423",
+        "NothingToDraw": "927bd05a2",
         "blur": "24feb8aa",
         "drawImage": "e4e1e4db",
         "dropShadow": "0c2e520a",
