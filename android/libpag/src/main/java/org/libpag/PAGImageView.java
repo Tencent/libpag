@@ -80,6 +80,7 @@ public class PAGImageView extends View {
     private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
     private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
+    private final Object bitmapLock = new Object();
     private volatile Bitmap renderBitmap;
     private Matrix renderMatrix;
     private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
@@ -468,7 +469,7 @@ public class PAGImageView extends View {
         decoderInfo.reset();
         _maxFrameRate = maxFrameRate;
         _matrix = null;
-        renderBitmap = null;
+        releaseBitmap();
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
@@ -587,7 +588,7 @@ public class PAGImageView extends View {
         viewHeight = h;
         width = (int) (_renderScale * w);
         height = (int) (_renderScale * h);
-        renderBitmap = null;
+        releaseBitmap();
         forceFlush = true;
         resumeAnimator();
     }
@@ -659,12 +660,18 @@ public class PAGImageView extends View {
             PAGImageViewHelper.DestroyHandlerThread();
         }
         if (_isAnimatorPreRunning == null || _isAnimatorPreRunning) {
-            renderBitmap = null;
+            releaseBitmap();
         }
         bitmapCache.clear();
         lastContentVersion = -1;
         memoryCacheStatusHasChanged = false;
         freezeDraw.set(false);
+    }
+
+    private void releaseBitmap() {
+        synchronized (bitmapLock) {
+            renderBitmap = null;
+        }
     }
 
     private final Runnable mAnimatorStartRunnable = new Runnable() {
@@ -804,14 +811,19 @@ public class PAGImageView extends View {
         if (renderBitmap == null || _cacheAllFramesInMemory) {
             renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
         }
-        if (!decoderInfo.copyFrameTo(renderBitmap, frame)) {
-            return false;
-        }
-        if (renderBitmap != null) {
-            renderBitmap.prepareToDraw();
-        }
-        if (_cacheAllFramesInMemory && renderBitmap != null) {
-            bitmapCache.put(frame, renderBitmap);
+        synchronized (bitmapLock) {
+            if (renderBitmap == null) {
+                return false;
+            }
+            if (!decoderInfo.copyFrameTo(renderBitmap, frame)) {
+                return false;
+            }
+            if (renderBitmap != null) {
+                renderBitmap.prepareToDraw();
+            }
+            if (_cacheAllFramesInMemory && renderBitmap != null) {
+                bitmapCache.put(frame, renderBitmap);
+            }
         }
         return true;
     }
