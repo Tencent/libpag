@@ -18,22 +18,16 @@
 
 package org.libpag;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.hardware.HardwareBuffer;
 import android.os.Build;
-import android.os.Looper;
-import android.provider.Settings;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.Pair;
 import android.view.View;
-import android.view.animation.LinearInterpolator;
 
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.extra.tools.LibraryLoadUtils;
 import org.libpag.PAGImageViewHelper.DecoderInfo;
 
-public class PAGImageView extends View {
+public class PAGImageView extends View implements PAGAnimator.Listener {
 
     public interface PAGImageViewListener {
         /**
@@ -76,20 +70,16 @@ public class PAGImageView extends View {
 
     private final static String TAG = "PAGImageView";
     private final static float DEFAULT_MAX_FRAMERATE = 30f;
-    private ValueAnimator animator;
-    private volatile boolean _isPlaying = false;
-    private volatile Boolean _isAnimatorPreRunning = null;
-    private volatile boolean progressExplicitlySet = true;
-    private final Object animatorLock = new Object();
-    private static final Object g_HandlerLock = new Object();
+    private PAGAnimator animator;
     private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
     private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
     private final Object bitmapLock = new Object();
     private volatile Bitmap renderBitmap;
-    private volatile HardwareBuffer renderHardwareBuffer;
-    private volatile Bitmap backgroundBitmap;
-    private volatile HardwareBuffer backgroundHardwareBuffer;
+    private volatile Bitmap firstBackBitmap;
+    private volatile HardwareBuffer firstBackHardwareBuffer;
+    private volatile Bitmap secondBackgroundBitmap;
+    private volatile HardwareBuffer secondBackgroundHardwareBuffer;
     private Matrix renderMatrix;
     private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
@@ -130,23 +120,29 @@ public class PAGImageView extends View {
     private String _pagFilePath;
 
     /**
-     * Returns the file path set by the setPath() method.
+     * The path string of a pag file set by setPath().
      */
     public String getPath() {
         return _pagFilePath;
     }
 
     /**
-     * Loads a pag file from the specified path, returns false if the file does not exist, or it is
-     * not a valid pag file.
+     * Loads a pag file from the specified path, returns false if the file does not exist or the
+     * data is not a pag file. The path starts with "assets://" means that it is located in assets
+     * directory. Note: All PAGFiles loaded by the same path share the same internal cache. The
+     * internal cache remains alive until all PAGFiles are released. Use 'PAGFile.Load(byte[])'
+     * instead if you don't want to load a PAGFile from the internal caches.
      */
     public boolean setPath(String path) {
         return setPath(path, DEFAULT_MAX_FRAMERATE);
     }
 
     /**
-     * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the
-     * file does not exist, or it is not a valid pag file.
+     * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file does not exist or the
+     * data is not a pag file. The path starts with "assets://" means that it is located in assets
+     * directory. Note: All PAGFiles loaded by the same path share the same internal cache. The
+     * internal cache remains alive until all PAGFiles are released. Use 'PAGFile.Load(byte[])'
+     * instead if you don't want to load a PAGFile from the internal caches.
      */
     public boolean setPath(String path, float maxFrameRate) {
         PAGComposition composition = getCompositionFromPath(path);
@@ -316,11 +312,9 @@ public class PAGImageView extends View {
         if (currentFrame >= _numFrames) {
             return;
         }
-        synchronized (animatorLock) {
-            _currentFrame = currentFrame;
-            syncCurrentTime();
-            progressExplicitlySet = true;
-        }
+        _currentFrame = currentFrame;
+        animator.setProgress(PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames));
+        animator.update();
     }
 
     /**
@@ -331,59 +325,49 @@ public class PAGImageView extends View {
     }
 
     /**
-     * Starts to play the animation.
+     * Starts to play the animation from the current position. Calling the play() method when the
+     * animation is already playing has no effect. The play() method does not alter the animation's
+     * current position. However, if the animation previously reached its end, it will restart from
+     * the beginning.
      */
     public void play() {
-        if (_isPlaying) {
-            return;
-        }
-        _isPlaying = true;
-        _isAnimatorPreRunning = null;
-        if (animator.getAnimatedFraction() == 1.0) {
-            setCurrentFrame(0);
-        }
-        doPlay();
+        animator.start();
     }
 
     /**
-     * Indicates whether this PAGImageView is playing.
+     * Indicates whether the animation is playing.
      */
     public boolean isPlaying() {
-        if (animator != null) {
-            return animator.isRunning();
-        }
-        return false;
+        return animator.isRunning();
     }
 
     /**
-     * Pauses the animation at the current playing position. Calling the play method can resume the
-     * animation from the last paused playing position.
+     * Cancels the animation at the current position. Calling the play() method can resume the
+     * animation from the last paused position.
      */
     public void pause() {
-        _isPlaying = false;
-        _isAnimatorPreRunning = null;
-        cancelAnimator();
+        animator.cancel();
     }
 
     /**
-     * Sets the number of times the animation will repeat. The default is 1, which means the
-     * animation will play only once. 0 means the animation will play infinity times.
+     * The total number of times the animation is set to play. The default is 1, which means the
+     * animation will play only once. If the repeat count is set to 0 or a negative value, the
+     * animation will play infinity times.
+     */
+    public int repeatCount() {
+        return animator.repeatCount();
+    }
+
+    /**
+     * Set the number of times the animation to play.
      */
     public void setRepeatCount(int value) {
-        if (value < 0) {
-            value = 0;
-        }
-        synchronized (animatorLock) {
-            animator.setRepeatCount(value - 1);
-        }
+        animator.setRepeatCount(value);
     }
 
     /**
-     * Adds a PAGViewListener to the set of listeners that are sent events through the life of an
-     * animation, such as start, end repeat, and cancel.
-     *
-     * @param listener the PAGViewListener to be added to the current set of listeners for this
-     *                 animation.
+     * Adds a listener to the set of listeners that are sent events through the life of an
+     * animation, such as start, repeat, and end.
      */
     public void addListener(PAGImageViewListener listener) {
         synchronized (this) {
@@ -392,7 +376,7 @@ public class PAGImageView extends View {
     }
 
     /**
-     * Removes the specified listener from the set of listeners.
+     * Removes a listener from the set listening to this animation.
      */
     public void removeListener(PAGImageViewListener listener) {
         synchronized (this) {
@@ -417,33 +401,14 @@ public class PAGImageView extends View {
         if (decoderInfo.hasPAGDecoder()) {
             _numFrames = decoderInfo.numFrames();
         }
-        if (progressExplicitlySet) {
-            progressExplicitlySet = false;
-            if (!handleFrame(_currentFrame)) {
-                forceFlush = false;
-                return false;
-            }
-            synchronized (animatorLock) {
-                syncCurrentTime();
-                animator.setCurrentPlayTime(currentPlayTime);
-            }
-        } else {
-            int currentFrame = 0;
-            synchronized (animatorLock) {
-                currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), _numFrames);
-            }
-            if (currentFrame == _currentFrame && !forceFlush) {
-                return false;
-            }
-            _currentFrame = currentFrame;
-            if (!handleFrame(_currentFrame)) {
-                forceFlush = false;
-                return false;
-            }
+        _currentFrame = PAGImageViewHelper.ProgressToFrame(animator.progress(), _numFrames);
+        if (!handleFrame(_currentFrame)) {
+            forceFlush = false;
+            return false;
         }
+
         forceFlush = false;
         postInvalidate();
-        notifyAnimationUpdate();
         return true;
     }
 
@@ -472,6 +437,8 @@ public class PAGImageView extends View {
         }
     }
 
+    long animationDuration = 0;
+
     private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
         freezeDraw.set(true);
         decoderInfo.reset();
@@ -481,108 +448,21 @@ public class PAGImageView extends View {
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
-        progressExplicitlySet = true;
-        synchronized (animatorLock) {
-            animator.setDuration(_composition == null ? 0 : _composition.duration() / 100);
-            animator.setCurrentPlayTime(0);
-            currentPlayTime = 0;
-            if (_composition == null) {
-                _isPlaying = false;
-            }
+        animator.setProgress(0);
+        animator.update();
+        animationDuration = _composition == null ? 0 : _composition.duration();
+        if (isVisible) {
+            animator.setDuration(animationDuration);
         }
     }
 
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
-        if (preAggregatedVisible == isVisible) {
-            return;
-        }
-        preAggregatedVisible = isVisible;
-        Log.i(TAG, "onVisibilityAggregated isVisible=" + isVisible);
-        if (isVisible) {
-            resumeAnimator();
-        } else {
-            pauseAnimator();
-        }
+        checkVisible();
     }
-
-    private float getAnimationScale(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            return Settings.Global.getFloat(context.getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1.0f);
-        } else {
-            // noinspection deprecation
-            return Settings.System.getFloat(context.getContentResolver(), Settings.System.ANIMATOR_DURATION_SCALE, 1.0f);
-        }
-    }
-
-    private volatile long currentPlayTime;
-
-    private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = animation -> {
-        PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
-        PAGImageViewHelper.NeedsUpdateView(PAGImageView.this);
-    };
 
     private final ArrayList<PAGImageViewListener> mViewListeners = new ArrayList<>();
-
-    private final AnimatorListenerAdapter mAnimatorListenerAdapter = new AnimatorListenerAdapter() {
-        @Override
-        public void onAnimationStart(Animator animator) {
-            super.onAnimationStart(animator);
-            ArrayList<PAGImageViewListener> arrayList;
-            synchronized (PAGImageView.this) {
-                arrayList = new ArrayList<>(mViewListeners);
-            }
-            for (PAGImageViewListener listener : arrayList) {
-                listener.onAnimationStart(PAGImageView.this);
-            }
-        }
-
-        @Override
-        public void onAnimationEnd(Animator animation) {
-            super.onAnimationEnd(animation);
-            // Align with iOS platform, avoid triggering this method when stopping
-            int repeatCount = ((ValueAnimator) animation).getRepeatCount();
-            if (repeatCount >= 0 && (animation.getDuration() > 0) && (currentPlayTime * 1.0 / animation.getDuration() > repeatCount)) {
-                notifyEnd();
-            }
-        }
-
-        @Override
-        public void onAnimationCancel(Animator animator) {
-            super.onAnimationCancel(animator);
-            ArrayList<PAGImageViewListener> arrayList;
-            synchronized (PAGImageView.this) {
-                arrayList = new ArrayList<>(mViewListeners);
-            }
-            for (PAGImageViewListener listener : arrayList) {
-                listener.onAnimationCancel(PAGImageView.this);
-            }
-        }
-
-        @Override
-        public void onAnimationRepeat(Animator animator) {
-            super.onAnimationRepeat(animator);
-            ArrayList<PAGImageViewListener> arrayList;
-            synchronized (PAGImageView.this) {
-                arrayList = new ArrayList<>(mViewListeners);
-            }
-            for (PAGImageViewListener listener : arrayList) {
-                listener.onAnimationRepeat(PAGImageView.this);
-            }
-        }
-    };
-
-    private void notifyEnd() {
-        _isPlaying = false;
-        ArrayList<PAGImageViewListener> arrayList;
-        synchronized (this) {
-            arrayList = new ArrayList<>(mViewListeners);
-        }
-        for (PAGImageViewListener listener : arrayList) {
-            listener.onAnimationEnd(this);
-        }
-    }
 
     private volatile int width, height;
     private volatile int viewWidth, viewHeight;
@@ -598,7 +478,7 @@ public class PAGImageView extends View {
         height = (int) (_renderScale * h);
         releaseBitmap();
         forceFlush = true;
-        resumeAnimator();
+        checkVisible();
     }
 
     protected void initDecoderInfo() {
@@ -611,9 +491,7 @@ public class PAGImageView extends View {
                     if (_pagFilePath != null) {
                         _composition = null;
                     }
-                    synchronized (animatorLock) {
-                        animator.setDuration(decoderInfo.duration / 1000);
-                    }
+                    animator.setDuration(decoderInfo.duration);
                 }
                 if (!decoderInfo.isValid()) {
                     return;
@@ -624,13 +502,13 @@ public class PAGImageView extends View {
         }
     }
 
-    private float animationScale = 1.0f;
+
+    Paint mPaint = null;
+    private static final int DEFAULT_PAINT_FLAGS = Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG;
 
     private void init() {
-        animator = ValueAnimator.ofFloat(0.0f, 1.0f);
-        animator.setRepeatCount(0);
-        animator.setInterpolator(new LinearInterpolator());
-        animationScale = getAnimationScale(getContext());
+        mPaint = new Paint(DEFAULT_PAINT_FLAGS);
+        animator = PAGAnimator.MakeFrom(getContext(), this);
     }
 
     private volatile boolean isAttachedToWindow = false;
@@ -641,33 +519,16 @@ public class PAGImageView extends View {
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
         super.onAttachedToWindow();
-        forceFlush = true;
-        synchronized (animatorLock) {
-            animator.addUpdateListener(mAnimatorUpdateListener);
-            animator.addListener(mAnimatorListenerAdapter);
-        }
-        synchronized (g_HandlerLock) {
-            PAGImageViewHelper.StartHandlerThread();
-        }
-        resumeAnimator();
+        checkVisible();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         isAttachedToWindow = false;
         super.onDetachedFromWindow();
-        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_FLUSH, this);
-        pauseAnimator();
-        synchronized (animatorLock) {
-            animator.removeUpdateListener(mAnimatorUpdateListener);
-            animator.removeListener(mAnimatorListenerAdapter);
-        }
-        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
-        synchronized (g_HandlerLock) {
-            PAGImageViewHelper.DestroyHandlerThread();
-        }
-        if (_isAnimatorPreRunning == null || _isAnimatorPreRunning) {
+        checkVisible();
+        decoderInfo.reset();
+        if (animator.isRunning()) {
             releaseBitmap();
         }
         bitmapCache.clear();
@@ -679,94 +540,19 @@ public class PAGImageView extends View {
     private void releaseBitmap() {
         synchronized (bitmapLock) {
             renderBitmap = null;
-            backgroundBitmap = null;
+            firstBackBitmap = null;
+            secondBackgroundBitmap = null;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (renderHardwareBuffer != null) {
-                    renderHardwareBuffer.close();
-                    renderHardwareBuffer = null;
+                if (firstBackHardwareBuffer != null) {
+                    firstBackHardwareBuffer.close();
+                    firstBackHardwareBuffer = null;
                 }
-                if (backgroundHardwareBuffer != null) {
-                    backgroundHardwareBuffer.close();
-                    backgroundHardwareBuffer = null;
+                if (secondBackgroundHardwareBuffer != null) {
+                    secondBackgroundHardwareBuffer.close();
+                    secondBackgroundHardwareBuffer = null;
                 }
             }
         }
-    }
-
-    private final Runnable mAnimatorStartRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (isAttachedToWindow) {
-                synchronized (animatorLock) {
-                    animator.setCurrentPlayTime(currentPlayTime);
-                    animator.start();
-                }
-            } else {
-                Log.e(TAG, "AnimatorStartRunnable: PAGView is not attached to window");
-            }
-        }
-    };
-
-    private final Runnable mAnimatorCancelRunnable = new Runnable() {
-        @Override
-        public void run() {
-            synchronized (animatorLock) {
-                currentPlayTime = animator.getCurrentPlayTime();
-                animator.cancel();
-            }
-        }
-    };
-
-    private void doPlay() {
-        if (!isAttachedToWindow) {
-            Log.e(TAG, "doPlay: View is not attached to window");
-            return;
-        }
-        if (animationScale == 0.0f) {
-            notifyEnd();
-            Log.e(TAG, "doPlay: The scale of animator duration is turned off");
-            return;
-        }
-        Log.i(TAG, "doPlay");
-        startAnimator();
-    }
-
-    private boolean isMainThread() {
-        return Looper.getMainLooper().getThread() == Thread.currentThread();
-    }
-
-    private void startAnimator() {
-        if (animator.getDuration() <= 0) {
-            return;
-        }
-        if (isMainThread()) {
-            synchronized (animatorLock) {
-                animator.setCurrentPlayTime(currentPlayTime);
-                animator.start();
-            }
-        } else {
-            removeCallbacks(mAnimatorCancelRunnable);
-            post(mAnimatorStartRunnable);
-        }
-    }
-
-    private void cancelAnimator() {
-        if (isMainThread()) {
-            synchronized (animatorLock) {
-                currentPlayTime = animator.getCurrentPlayTime();
-                animator.cancel();
-            }
-        } else {
-            removeCallbacks(mAnimatorStartRunnable);
-            post(mAnimatorCancelRunnable);
-        }
-    }
-
-    protected boolean updateView() {
-        if (!isAttachedToWindow) {
-            return true;
-        }
-        return flush();
     }
 
     private boolean allInMemoryCache() {
@@ -807,26 +593,7 @@ public class PAGImageView extends View {
         }
     }
 
-    private boolean ensureBackgroundBitmap() {
-        if (backgroundBitmap == null) {
-            Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
-            if (pair.first == null) {
-                return false;
-            }
-            backgroundHardwareBuffer = pair.second;
-            backgroundBitmap = pair.first;
-        }
-        return true;
-    }
-
-    private void swapBitmap() {
-        Bitmap bitmap = renderBitmap;
-        renderBitmap = backgroundBitmap;
-        backgroundBitmap = bitmap;
-        HardwareBuffer hardwareBuffer = renderHardwareBuffer;
-        renderHardwareBuffer = backgroundHardwareBuffer;
-        backgroundHardwareBuffer = hardwareBuffer;
-    }
+    private AtomicBoolean useFirst = new AtomicBoolean(true);
 
     private boolean handleFrame(final int frame) {
         if (!decoderInfo.isValid() || freezeDraw.get()) {
@@ -848,30 +615,41 @@ public class PAGImageView extends View {
         if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
-        if (renderBitmap == null || _cacheAllFramesInMemory) {
+        if (firstBackBitmap == null || _cacheAllFramesInMemory) {
             Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
                     decoderInfo._height, false);
             if (pair.first == null) {
                 return false;
             }
-            renderHardwareBuffer = pair.second;
-            renderBitmap = pair.first;
+            firstBackBitmap = pair.first;
+            firstBackHardwareBuffer = pair.second;
         }
         synchronized (bitmapLock) {
-            if (renderBitmap == null) {
+            if (firstBackBitmap == null) {
                 return false;
             }
             HardwareBuffer flushBuffer;
             Bitmap flushBitmap;
             if (!_cacheAllFramesInMemory) {
-                if (!ensureBackgroundBitmap()) {
-                    return false;
+                if (secondBackgroundBitmap == null) {
+                    Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
+                    if (pair.first == null) {
+                        return false;
+                    }
+                    secondBackgroundHardwareBuffer = pair.second;
+                    secondBackgroundBitmap = pair.first;
                 }
-                flushBuffer = backgroundHardwareBuffer;
-                flushBitmap = backgroundBitmap;
+                if (useFirst.get()) {
+                    flushBitmap = firstBackBitmap;
+                    flushBuffer = firstBackHardwareBuffer;
+                } else {
+                    flushBitmap = secondBackgroundBitmap;
+                    flushBuffer = secondBackgroundHardwareBuffer;
+                }
+                useFirst.set(!useFirst.get());
             } else {
-                flushBuffer = renderHardwareBuffer;
-                flushBitmap = renderBitmap;
+                flushBuffer = firstBackHardwareBuffer;
+                flushBitmap = firstBackBitmap;
             }
             if (flushBuffer != null) {
                 if (!decoderInfo.readFrame(frame, flushBuffer)) {
@@ -883,9 +661,7 @@ public class PAGImageView extends View {
                 }
                 flushBitmap.prepareToDraw();
             }
-        }
-        if (!_cacheAllFramesInMemory) {
-            swapBitmap();
+            renderBitmap = flushBitmap;
         }
         if (_cacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
@@ -893,23 +669,11 @@ public class PAGImageView extends View {
         return true;
     }
 
-    private void notifyAnimationUpdate() {
-        if (mViewListeners.isEmpty() || !animator.isRunning()) {
-            return;
-        }
-        ArrayList<PAGImageViewListener> arrayList;
-        synchronized (PAGImageView.this) {
-            arrayList = new ArrayList<>(mViewListeners);
-        }
-        for (PAGImageViewListener listener : arrayList) {
-            listener.onAnimationUpdate(PAGImageView.this);
-        }
-    }
-
     @Override
     protected void onDraw(Canvas canvas) {
         if (!freezeDraw.get() && renderBitmap != null && !renderBitmap.isRecycled()) {
             super.onDraw(canvas);
+            final int saveCount = canvas.getSaveCount();
             canvas.save();
             if (renderMatrix != null) {
                 canvas.concat(renderMatrix);
@@ -918,32 +682,28 @@ public class PAGImageView extends View {
                 canvas.concat(_matrix);
             }
             try {
-                canvas.drawBitmap(renderBitmap, 0, 0, null);
+                canvas.drawBitmap(renderBitmap, 0, 0, mPaint);
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            canvas.restore();
+            canvas.restoreToCount(saveCount);
         }
     }
 
-    private boolean preAggregatedVisible = true;
+    private boolean isVisible = false;
 
-    private void pauseAnimator() {
-        if (_isAnimatorPreRunning == null) {
-            _isAnimatorPreRunning = animator.isRunning();
-        }
-        if (animator.isRunning()) {
-            cancelAnimator();
-        }
-    }
-
-    private void resumeAnimator() {
-        if (width == 0 || height == 0 || !_isPlaying || animator.isRunning() || (_isAnimatorPreRunning != null && !_isAnimatorPreRunning)) {
-            _isAnimatorPreRunning = null;
+    private void checkVisible() {
+        boolean visible = isAttachedToWindow && isShown() && hasSize();
+        if (isVisible == visible) {
             return;
         }
-        _isAnimatorPreRunning = null;
-        doPlay();
+        isVisible = visible;
+        if (isVisible) {
+            animator.setDuration(animationDuration);
+            animator.update();
+        } else {
+            animator.setDuration(0);
+        }
     }
 
     @Override
@@ -964,16 +724,59 @@ public class PAGImageView extends View {
 
     private static native int ContentVersion(PAGComposition pagComposition);
 
-    private void syncCurrentTime() {
-        long playTime = 0;
-        if (animator.getDuration() > 0) {
-            long repeatCount = currentPlayTime / animator.getDuration();
-            if (animator.getAnimatedFraction() == 1.0f) {
-                repeatCount = Math.round(currentPlayTime * 1.0 / animator.getDuration()) - 1;
-            }
-            playTime = (long) ((PAGImageViewHelper.FrameToProgress(_currentFrame, _numFrames) + repeatCount) * animator.getDuration());
+    @Override
+    public void onAnimationStart(PAGAnimator animator) {
+        ArrayList<PAGImageView.PAGImageViewListener> arrayList;
+        synchronized (PAGImageView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
         }
-        currentPlayTime = playTime;
+        for (PAGImageView.PAGImageViewListener listener : arrayList) {
+            listener.onAnimationStart(this);
+        }
+    }
+
+    public void onAnimationEnd(PAGAnimator animator) {
+        ArrayList<PAGImageView.PAGImageViewListener> arrayList;
+        synchronized (PAGImageView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
+        }
+        for (PAGImageView.PAGImageViewListener listener : arrayList) {
+            listener.onAnimationEnd(this);
+        }
+    }
+
+    public void onAnimationCancel(PAGAnimator animator) {
+        ArrayList<PAGImageView.PAGImageViewListener> arrayList;
+        synchronized (PAGImageView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
+        }
+        for (PAGImageView.PAGImageViewListener listener : arrayList) {
+            listener.onAnimationCancel(this);
+        }
+    }
+
+    public void onAnimationRepeat(PAGAnimator animator) {
+        ArrayList<PAGImageView.PAGImageViewListener> arrayList;
+        synchronized (PAGImageView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
+        }
+        for (PAGImageView.PAGImageViewListener listener : arrayList) {
+            listener.onAnimationRepeat(this);
+        }
+    }
+
+    public void onAnimationUpdate(PAGAnimator animator) {
+        if (!isAttachedToWindow) {
+            return;
+        }
+        flush();
+        ArrayList<PAGImageView.PAGImageViewListener> arrayList;
+        synchronized (PAGImageView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
+        }
+        for (PAGImageView.PAGImageViewListener listener : arrayList) {
+            listener.onAnimationUpdate(this);
+        }
     }
 
     static {
