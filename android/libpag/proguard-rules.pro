@@ -67,3 +67,15 @@
 -keepclasseswithmembers class org.libpag.HardwareDecoder {
     <methods>;
 }
+
+-keepclasseswithmembers class org.libpag.DisplayLink {
+    <methods>;
+}
+
+-keepclasseswithmembers class org.libpag.PAGAnimator {
+    private void onAnimationStart();
+    private void onAnimationEnd();
+    private void onAnimationCancel();
+    private void onAnimationRepeat();
+    private void onAnimationUpdate();
+}
