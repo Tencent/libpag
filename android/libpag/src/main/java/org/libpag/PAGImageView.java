@@ -76,10 +76,10 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
     private final Object bitmapLock = new Object();
     private volatile Bitmap renderBitmap;
-    private volatile Bitmap firstBackBitmap;
-    private volatile HardwareBuffer firstBackHardwareBuffer;
-    private volatile Bitmap secondBackgroundBitmap;
-    private volatile HardwareBuffer secondBackgroundHardwareBuffer;
+    private volatile Bitmap frontBitmap;
+    private volatile HardwareBuffer frontHardwareBuffer;
+    private volatile Bitmap backBitmap;
+    private volatile HardwareBuffer backHardwareBuffer;
     private Matrix renderMatrix;
     private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
@@ -448,12 +448,12 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
-        animator.setProgress(0);
-        animator.update();
+        animator.setProgress(_composition == null ? 0 : _composition.getProgress());
         animationDuration = _composition == null ? 0 : _composition.duration();
         if (isVisible) {
             animator.setDuration(animationDuration);
         }
+        animator.update();
     }
 
     @Override
@@ -540,16 +540,16 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     private void releaseBitmap() {
         synchronized (bitmapLock) {
             renderBitmap = null;
-            firstBackBitmap = null;
-            secondBackgroundBitmap = null;
+            frontBitmap = null;
+            backBitmap = null;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (firstBackHardwareBuffer != null) {
-                    firstBackHardwareBuffer.close();
-                    firstBackHardwareBuffer = null;
+                if (frontHardwareBuffer != null) {
+                    frontHardwareBuffer.close();
+                    frontHardwareBuffer = null;
                 }
-                if (secondBackgroundHardwareBuffer != null) {
-                    secondBackgroundHardwareBuffer.close();
-                    secondBackgroundHardwareBuffer = null;
+                if (backHardwareBuffer != null) {
+                    backHardwareBuffer.close();
+                    backHardwareBuffer = null;
                 }
             }
         }
@@ -615,41 +615,41 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
-        if (firstBackBitmap == null || _cacheAllFramesInMemory) {
+        if (frontBitmap == null || _cacheAllFramesInMemory) {
             Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
                     decoderInfo._height, false);
             if (pair.first == null) {
                 return false;
             }
-            firstBackBitmap = pair.first;
-            firstBackHardwareBuffer = pair.second;
+            frontBitmap = pair.first;
+            frontHardwareBuffer = pair.second;
         }
         synchronized (bitmapLock) {
-            if (firstBackBitmap == null) {
+            if (frontBitmap == null) {
                 return false;
             }
             HardwareBuffer flushBuffer;
             Bitmap flushBitmap;
             if (!_cacheAllFramesInMemory) {
-                if (secondBackgroundBitmap == null) {
+                if (backBitmap == null) {
                     Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
                     if (pair.first == null) {
                         return false;
                     }
-                    secondBackgroundHardwareBuffer = pair.second;
-                    secondBackgroundBitmap = pair.first;
+                    backHardwareBuffer = pair.second;
+                    backBitmap = pair.first;
                 }
                 if (useFirst.get()) {
-                    flushBitmap = firstBackBitmap;
-                    flushBuffer = firstBackHardwareBuffer;
+                    flushBitmap = frontBitmap;
+                    flushBuffer = frontHardwareBuffer;
                 } else {
-                    flushBitmap = secondBackgroundBitmap;
-                    flushBuffer = secondBackgroundHardwareBuffer;
+                    flushBitmap = backBitmap;
+                    flushBuffer = backHardwareBuffer;
                 }
                 useFirst.set(!useFirst.get());
             } else {
-                flushBuffer = firstBackHardwareBuffer;
-                flushBitmap = firstBackBitmap;
+                flushBuffer = frontHardwareBuffer;
+                flushBitmap = frontBitmap;
             }
             if (flushBuffer != null) {
                 if (!decoderInfo.readFrame(frame, flushBuffer)) {
