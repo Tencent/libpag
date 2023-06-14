@@ -272,17 +272,19 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  PAGDecoder* pagDecoder = [self getPAGDecoder];
-  if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
-    BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
-    if (!status) {
-      return status;
-    }
-    UIImage* image = [self imageForCVPixelBuffer:pixelBuffer];
-    if (image) {
-      self.currentFrameIndex = frameIndex;
-      self.currentUIImage = image;
-      [self submitToImageView];
+  @autoreleasepool {
+    PAGDecoder* pagDecoder = [self getPAGDecoder];
+    if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
+      BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
+      if (!status) {
+        return status;
+      }
+      UIImage* image = [self imageForCVPixelBuffer:pixelBuffer];
+      if (image) {
+        self.currentFrameIndex = frameIndex;
+        self.currentUIImage = image;
+        [self submitToImageView];
+      }
     }
   }
   if (self.memoryCacheEnabled && self.currentUIImage) {
@@ -572,12 +574,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [self submitToImageView];
     return NO;
   }
-
-  BOOL status = NO;
-  @autoreleasepool {
-    status = [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
-  }
-  return status;
+  return [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
 }
 
 @end
