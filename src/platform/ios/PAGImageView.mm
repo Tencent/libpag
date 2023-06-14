@@ -320,7 +320,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
   if (self.isVisible) {
     [PAGImageView RegisterFlushQueueDestoryMethod];
-    [self flush];
+    [animator update];
   }
 }
 
@@ -385,6 +385,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
+      if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
+        [animator update];
+      }
     }
   }
 }
@@ -397,6 +400,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
+      if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+        [animator update];
+      }
     }
   }
 }
