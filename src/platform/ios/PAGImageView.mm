@@ -272,19 +272,17 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  @autoreleasepool {
-    PAGDecoder* pagDecoder = [self getPAGDecoder];
-    if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
-      BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
-      if (!status) {
-        return status;
-      }
-      UIImage* image = [self imageForCVPixelBuffer:pixelBuffer];
-      if (image) {
-        self.currentFrameIndex = frameIndex;
-        self.currentUIImage = image;
-        [self submitToImageView];
-      }
+  PAGDecoder* pagDecoder = [self getPAGDecoder];
+  if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
+    BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
+    if (!status) {
+      return status;
+    }
+    UIImage* image = [self imageForCVPixelBuffer:pixelBuffer];
+    if (image) {
+      self.currentFrameIndex = frameIndex;
+      self.currentUIImage = image;
+      [self submitToImageView];
     }
   }
   if (self.memoryCacheEnabled && self.currentUIImage) {
