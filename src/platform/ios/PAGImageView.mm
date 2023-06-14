@@ -25,7 +25,6 @@
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/ios/private/PAGContentVersion.h"
-#import "private/PAGValueAnimator.h"
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
@@ -503,10 +502,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [animator removeListener:(id<PAGAnimatorListener>)listener];
 }
 - (void)setRepeatCount:(int)repeatCount {
-  if (repeatCount < 0) {
-    repeatCount = 0;
-  }
-  [animator setRepeatCount:(repeatCount - 1)];
+  [animator setRepeatCount:repeatCount];
 }
 
 - (NSString*)getPath {
