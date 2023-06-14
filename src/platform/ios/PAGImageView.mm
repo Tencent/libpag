@@ -51,7 +51,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 @interface PAGImageView ()
 @property(atomic, assign) BOOL isVisible;
-@property(nonatomic, assign) BOOL isPlaying;
 @property(atomic, assign) NSInteger currentFrameIndex;
 @property(atomic, retain) UIImage* currentUIImage;
 @property(atomic, assign) NSInteger pagContentVersion;
@@ -70,6 +69,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   PAGComposition* pagComposition;
   PAGDecoder* pagDecoder;
   NSInteger totalFrames;
+  NSInteger duartion;
   float frameRate;
   float renderScaleFactor;
 
@@ -78,7 +78,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CVPixelBufferRef cvPixeBuffer;
 }
 
-@synthesize isPlaying = _isPlaying;
 @synthesize memoryCacheEnabled = _memoryCacheEnabled;
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -101,9 +100,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   renderScaleFactor = 1.0;
   totalFrames = 0;
   frameRate = 0;
+  duartion = 0;
   self.memoryCacheEnabled = NO;
   self.memeoryCacheFinished = NO;
-  self.isPlaying = NO;
   self.isVisible = NO;
   filePath = nil;
   self.backgroundColor = [UIColor clearColor];
@@ -180,7 +179,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   self.maxFrameRate = maxFrameRate;
 
   [animator setProgress:0];
-  [animator setDuration:[newComposition duration]];
+  duartion = [newComposition duration];
   [self reset];
 }
 
@@ -238,7 +237,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)onAnimationFlush:(double)progress {
-  [self updateView];
+  [self flush];
 }
 
 - (void)didMoveToWindow {
@@ -253,13 +252,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   self.isVisible = visible;
   if (self.isVisible) {
-    if (self.isPlaying) {
-      [self play];
-    }
+    [animator setDuration:duartion];
   } else {
-    if (self.isPlaying) {
-      [animator cancel];
-    }
+    [animator setDuration:0];
   }
 }
 
@@ -304,15 +299,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if ([PAGContentVersion Get:pagComposition] != self.pagContentVersion) {
     self.pagContentVersion = [PAGContentVersion Get:pagComposition];
     [self reset];
+    if ([pagComposition duration] != duartion) {
+      duartion = [pagComposition duration];
+      [animator setDuration:duartion];
+    }
     return YES;
   }
   return NO;
-}
-
-- (void)updateView {
-  @autoreleasepool {
-    [self flush];
-  }
 }
 
 - (void)submitToImageView {
@@ -325,7 +318,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
   if (self.isVisible) {
     [PAGImageView RegisterFlushQueueDestoryMethod];
-    [self updateView];
+    [self flush];
   }
 }
 
@@ -462,15 +455,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)play {
-  _isPlaying = true;
-  if (!self.isVisible) {
-    return;
-  }
   [animator start];
 }
 
 - (void)pause {
-  _isPlaying = false;
   [animator cancel];
 }
 
@@ -491,7 +479,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (BOOL)isPlaying {
-  return _isPlaying;
+  return [animator isRunning];
 }
 
 - (void)addListener:(id<PAGImageViewListener>)listener {
@@ -584,7 +572,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [self submitToImageView];
     return NO;
   }
-  return [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
+
+  BOOL status = NO;
+  @autoreleasepool {
+    status = [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
+  }
+  return status;
 }
 
 @end
