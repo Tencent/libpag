@@ -175,9 +175,6 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
      * PAGImageView.
      */
     public void setComposition(PAGComposition newComposition, float maxFrameRate) {
-        if (newComposition == _composition && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
-            return;
-        }
         refreshResource(null, newComposition, maxFrameRate);
     }
 
@@ -450,9 +447,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _currentFrame = 0;
         animator.setProgress(_composition == null ? 0 : _composition.getProgress());
         animationDuration = _composition == null ? 0 : _composition.duration();
-        if (isVisible) {
-            animator.setDuration(animationDuration);
-        }
+        checkVisible();
         animator.update();
     }
 
@@ -491,7 +486,6 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
                     if (_pagFilePath != null) {
                         _composition = null;
                     }
-                    animator.setDuration(decoderInfo.duration);
                 }
                 if (!decoderInfo.isValid()) {
                     return;
