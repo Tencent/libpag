@@ -98,14 +98,12 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * Loads a pag file from the specified path, returns false if the file does not exist, or it is not
- * a valid pag file. Note: All PAGFiles loaded by the same path share the same internal cache.
- * The internal cache is alive until all PAGFiles are released.
+ * a valid pag file.
  */
 - (BOOL)setPath:(NSString*)path;
 /**
  * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file
- * does not exist, or it is not a valid pag file. Note: All PAGFiles loaded by the same path share
- * the same internal cache. The internal cache is alive until all PAGFiles are released.
+ * does not exist, or it is not a valid pag file.
  */
 - (BOOL)setPath:(NSString*)filePath maxFrameRate:(float)maxFrameRate;
 

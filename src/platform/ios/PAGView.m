@@ -223,7 +223,7 @@
   [animator setProgress:[pagPlayer getProgress]];
   duartion = [pagPlayer duration];
   if (_isVisible) {
-    [animator setDuration:[pagPlayer duration]];
+    [animator setDuration:duartion];
   }
 }
 
