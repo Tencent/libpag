@@ -447,7 +447,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _currentFrame = 0;
         animator.setProgress(_composition == null ? 0 : _composition.getProgress());
         animationDuration = _composition == null ? 0 : _composition.duration();
-        checkVisible();
+        if (isVisible) {
+            animator.setDuration(animationDuration);
+        }
         animator.update();
     }
 
