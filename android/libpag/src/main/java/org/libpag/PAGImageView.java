@@ -129,9 +129,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     /**
      * Loads a pag file from the specified path, returns false if the file does not exist or the
      * data is not a pag file. The path starts with "assets://" means that it is located in assets
-     * directory. Note: All PAGFiles loaded by the same path share the same internal cache. The
-     * internal cache remains alive until all PAGFiles are released. Use 'PAGFile.Load(byte[])'
-     * instead if you don't want to load a PAGFile from the internal caches.
+     * directory.
      */
     public boolean setPath(String path) {
         return setPath(path, DEFAULT_MAX_FRAMERATE);
@@ -140,9 +138,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     /**
      * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file does not exist or the
      * data is not a pag file. The path starts with "assets://" means that it is located in assets
-     * directory. Note: All PAGFiles loaded by the same path share the same internal cache. The
-     * internal cache remains alive until all PAGFiles are released. Use 'PAGFile.Load(byte[])'
-     * instead if you don't want to load a PAGFile from the internal caches.
+     * directory.
      */
     public boolean setPath(String path, float maxFrameRate) {
         PAGComposition composition = getCompositionFromPath(path);
