@@ -237,6 +237,14 @@
   [pagPlayer setCacheEnabled:value];
 }
 
+- (BOOL)diskCacheEnabled {
+    return [pagPlayer diskCacheEnabled];
+}
+
+- (void)setDiskCacheEnabled:(BOOL)value {
+    [pagPlayer setDiskCacheEnabled:value];
+}
+
 - (float)cacheScale {
   return [pagPlayer cacheScale];
 }

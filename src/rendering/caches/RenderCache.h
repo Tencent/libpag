@@ -97,6 +97,22 @@ class RenderCache : public Performance {
   }
 
   /**
+   * If set to true, PAG will save the rendering data to a file
+   * when first rendering BitmapComposition and VideoComposition,
+   * which will reduces memory consumption, and increases stability.
+   */
+  bool diskCacheEnabled() const {
+    return _diskCacheEnabled;
+  }
+
+  /**
+   * Set the value of diskCacheEnabled property.
+   */
+  void setDiskCacheEnabled(bool value) {
+    _diskCacheEnabled = value;
+  }
+
+  /**
    * Returns a snapshot cache of specified asset id. Returns null if there is no associated cache
    * available. This is a read-only query which is used usually during hit testing.
    */
@@ -171,6 +187,7 @@ class RenderCache : public Performance {
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
   bool _snapshotEnabled = true;
+  bool _diskCacheEnabled = false;
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};

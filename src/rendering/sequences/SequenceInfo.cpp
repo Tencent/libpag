@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceInfo.h"
+#include "DiskSequenceReader.h"
 #include "rendering/sequences/BitmapSequenceReader.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
@@ -27,9 +28,9 @@
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> MakeSequenceImage(
-    std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence) {
+    std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence, bool diskCacheEnabled) {
   auto image = tgfx::Image::MakeFrom(std::move(generator));
-  if (sequence->composition->type() == CompositionType::Video) {
+  if (!diskCacheEnabled && sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
     image = image->makeRGBAAA(sequence->width, sequence->height, videoSequence->alphaStartX,
                               videoSequence->alphaStartY);
@@ -37,16 +38,20 @@ static std::shared_ptr<tgfx::Image> MakeSequenceImage(
   return image;
 }
 
-std::shared_ptr<SequenceInfo> SequenceInfo::Make(Sequence* sequence) {
+std::shared_ptr<SequenceInfo> SequenceInfo::Make(Sequence* sequence, bool diskCacheEnabled) {
   if (sequence == nullptr) {
     return nullptr;
   }
-  auto factory = std::shared_ptr<SequenceInfo>(new SequenceInfo(sequence));
+  auto factory = std::shared_ptr<SequenceInfo>(new SequenceInfo(sequence, diskCacheEnabled));
   factory->weakThis = factory;
   return factory;
 }
 
-SequenceInfo::SequenceInfo(Sequence* sequence) : sequence(sequence) {
+SequenceInfo::SequenceInfo(Sequence* sequence, bool diskCacheEnabled)
+    : sequence(sequence), diskCacheEnabled(diskCacheEnabled) {
+#ifdef PAG_BUILD_FOR_WEB
+  diskCacheEnabled = false;
+#endif
 }
 
 std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> file,
@@ -56,6 +61,12 @@ std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> f
   }
   std::shared_ptr<SequenceReader> reader = nullptr;
   auto composition = sequence->composition;
+  if (diskCacheEnabled) {
+    reader = DiskSequenceReader::Make(std::move(file), sequence);
+    if (reader) {
+      return reader;
+    }
+  }
   if (composition->type() == CompositionType::Bitmap) {
     reader = std::make_shared<BitmapSequenceReader>(std::move(file),
                                                     static_cast<BitmapSequence*>(sequence));
@@ -85,7 +96,7 @@ std::shared_ptr<tgfx::Image> SequenceInfo::makeStaticImage(std::shared_ptr<File>
   }
   auto generator =
       std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(), width, height);
-  return MakeSequenceImage(std::move(generator), sequence);
+  return MakeSequenceImage(std::move(generator), sequence, diskCacheEnabled);
 }
 
 std::shared_ptr<tgfx::Image> SequenceInfo::makeFrameImage(std::shared_ptr<SequenceReader> reader,
@@ -94,7 +105,7 @@ std::shared_ptr<tgfx::Image> SequenceInfo::makeFrameImage(std::shared_ptr<Sequen
     return nullptr;
   }
   auto generator = std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame);
-  return MakeSequenceImage(std::move(generator), sequence);
+  return MakeSequenceImage(std::move(generator), sequence, diskCacheEnabled);
 }
 
 bool SequenceInfo::staticContent() const {

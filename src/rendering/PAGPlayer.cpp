@@ -122,6 +122,16 @@ void PAGPlayer::setCacheEnabled(bool value) {
   renderCache->setSnapshotEnabled(value);
 }
 
+bool PAGPlayer::diskCacheEnabled() {
+  LockGuard autoLock(rootLocker);
+  return renderCache->diskCacheEnabled();
+}
+
+void PAGPlayer::setDiskCacheEnabled(bool value) {
+  LockGuard autoLock(rootLocker);
+  renderCache->setDiskCacheEnabled(value);
+}
+
 float PAGPlayer::cacheScale() {
   LockGuard autoLock(rootLocker);
   return stage->cacheScale();
@@ -288,6 +298,7 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   if (pagSurface == nullptr) {
     return false;
   }
+  renderCache->diskCacheEnabled();
   tgfx::Clock clock = {};
   prepareInternal();
   clock.mark("rendering");

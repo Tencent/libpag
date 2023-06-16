@@ -70,6 +70,18 @@ PAG_API @interface PAGPlayer : NSObject
 - (void)setCacheEnabled:(BOOL)value;
 
 /**
+ * If set to true, PAG will save the rendering data to a file
+ * when first rendering BitmapComposition and VideoComposition,
+ * which will reduces memory consumption, and increases stability.
+ */
+- (BOOL)diskCacheEnabled;
+
+/**
+ * Set the value of diskCacheEnabled property.
+ */
+- (void)setDiskCacheEnabled:(BOOL)value;
+
+/**
  * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
  * scale factors less than 1.0 may result in blurred output, but it can reduce the usage of graphics
  * memory which leads to better performance. The default value is 1.0.

@@ -315,4 +315,21 @@ PAG_API jboolean Java_org_libpag_PAGPlayer_hitTestPoint(JNIEnv* env, jobject thi
   auto pagLayer = ToPAGLayerNativeObject(env, layer);
   return (jboolean)player->hitTestPoint(pagLayer, x, y, pixelHitTest);
 }
+
+PAG_API void Java_org_libpag_PAGPlayer_setDiskCacheEnabled(JNIEnv* env, jobject thiz,
+                                                           jboolean value) {
+  auto player = getPAGPlayer(env, thiz);
+  if (player == nullptr) {
+    return;
+  }
+  player->setDiskCacheEnabled(value);
+}
+
+PAG_API jboolean Java_org_libpag_PAGPlayer_diskCacheEnabled(JNIEnv* env, jobject thiz) {
+  auto player = getPAGPlayer(env, thiz);
+  if (player == nullptr) {
+    return JNI_FALSE;
+  }
+  return player->diskCacheEnabled();
+}
 }

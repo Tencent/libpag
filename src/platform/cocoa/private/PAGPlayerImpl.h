@@ -35,6 +35,10 @@
 
 - (void)setCacheEnabled:(BOOL)value;
 
+- (BOOL)diskCacheEnabled;
+
+- (void)setDiskCacheEnabled:(BOOL)value;
+
 - (float)cacheScale;
 
 - (void)setCacheScale:(float)value;

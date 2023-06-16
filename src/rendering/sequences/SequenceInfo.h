@@ -27,7 +27,7 @@
 namespace pag {
 class SequenceInfo {
  public:
-  static std::shared_ptr<SequenceInfo> Make(Sequence* sequence);
+  static std::shared_ptr<SequenceInfo> Make(Sequence* sequence, bool diskCacheEnabled);
 
   virtual ~SequenceInfo() = default;
 
@@ -50,10 +50,11 @@ class SequenceInfo {
   std::weak_ptr<SequenceInfo> weakThis;
 
  protected:
-  explicit SequenceInfo(Sequence* sequence);
+  explicit SequenceInfo(Sequence* sequence, bool diskCacheEnabled);
 
  private:
   Sequence* sequence;
+  bool diskCacheEnabled = false;
 };
 
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
