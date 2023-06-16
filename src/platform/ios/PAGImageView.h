@@ -142,8 +142,7 @@ PAG_API @interface PAGImageView : UIImageView
 - (int)repeatCount;
 
 /**
- * Set the number of times the animation will repeat. The default is 1, which means the animation
- * will play only once. 0 means the animation will play infinity times.
+ * Set the number of times the animation to play.
  */
 - (void)setRepeatCount:(int)repeatCount;
 
@@ -188,8 +187,8 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)play;
 
 /**
- * Pauses the animation at the current playing position. Calling the play method can resume the
- * animation from the last paused playing position.
+ * Cancels the animation at the current position. Calling the play() method can resume the animation
+ * from the last paused position.
  */
 - (void)pause;
 
