@@ -28,6 +28,7 @@
   NSString* filePath;
   PAGAnimator* animator;
   BOOL _isVisible;
+  NSInteger duartion;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -150,6 +151,10 @@
 
 - (void)onAnimationFlush:(double)progress {
   [pagPlayer setProgress:progress];
+  if (_isVisible && duartion != [pagPlayer duration]) {
+    duartion = [pagPlayer duration];
+    [animator setDuration:duartion];
+  }
   [pagPlayer flush];
 }
 
@@ -216,6 +221,7 @@
   }
   [pagPlayer setComposition:newComposition];
   [animator setProgress:[pagPlayer getProgress]];
+  duartion = [pagPlayer duration];
   if (_isVisible) {
     [animator setDuration:[pagPlayer duration]];
   }

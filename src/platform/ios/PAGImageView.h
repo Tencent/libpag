@@ -98,12 +98,14 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * Loads a pag file from the specified path, returns false if the file does not exist, or it is not
- * a valid pag file.
+ * a valid pag file. Note: All PAGFiles loaded by the same path share the same internal cache.
+ * The internal cache is alive until all PAGFiles are released.
  */
 - (BOOL)setPath:(NSString*)path;
 /**
  * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file
- * does not exist, or it is not a valid pag file.
+ * does not exist, or it is not a valid pag file. Note: All PAGFiles loaded by the same path share
+ * the same internal cache. The internal cache is alive until all PAGFiles are released.
  */
 - (BOOL)setPath:(NSString*)filePath maxFrameRate:(float)maxFrameRate;
 
@@ -133,6 +135,13 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)setRenderScale:(float)scale;
 
 /**
+ * The total number of times the animation is set to play. The default is 1, which means the
+ * animation will play only once. If the repeat count is set to 0 or a negative value, the
+ * animation will play infinity times.
+ */
+- (int)repeatCount;
+
+/**
  * Set the number of times the animation will repeat. The default is 1, which means the animation
  * will play only once. 0 means the animation will play infinity times.
  */
@@ -140,7 +149,7 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * Adds a listener to the set of listeners that are sent events through the life of an animation,
- * such as start, repeat, and end.
+ * such as start, repeat, and end. PAGImageView only holds a weak reference to the listener.
  */
 - (void)addListener:(id<PAGImageViewListener>)listener;
 
@@ -171,7 +180,10 @@ PAG_API @interface PAGImageView : UIImageView
 - (UIImage*)currentImage;
 
 /**
- * Starts to play the animation.
+ * Starts to play the animation from the current position. Calling the play() method when the
+ * animation is already playing has no effect. The play() method does not alter the animation's
+ * current position. However, if the animation previously reached its end, it will restart from
+ * the beginning.
  */
 - (void)play;
 
@@ -187,10 +199,10 @@ PAG_API @interface PAGImageView : UIImageView
 - (BOOL)isPlaying;
 
 /**
- * Renders the current image frame immediately. Note that all the changes previously made to the
- * PAGImageView will only take effect after this method is called. If the play() method is already
- * called, there is no need to call it manually since it will be automatically called every frame.
- * Returns true if the content has changed.
+ * Call this method to render current position immediately. Note that all the changes previously
+ * made to the PAGImageView will only take effect after this method is called. If the play() method
+ * is already called, there is no need to call it manually since it will be automatically called
+ * every frame. Returns true if the content has changed.
  */
 - (BOOL)flush;
 

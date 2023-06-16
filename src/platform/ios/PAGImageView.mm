@@ -19,6 +19,9 @@
 #import "PAGImageView.h"
 #include <VideoToolbox/VideoToolbox.h>
 #include <mutex>
+
+#include "base/utils/TimeUtil.h"
+
 #import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
@@ -68,9 +71,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   PAGAnimator* animator;
   PAGComposition* pagComposition;
   PAGDecoder* pagDecoder;
-  NSInteger totalFrames;
   NSInteger duartion;
-  float frameRate;
   float renderScaleFactor;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
@@ -98,8 +99,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   pagDecoder = nil;
   self.currentFrameIndex = -1;
   renderScaleFactor = 1.0;
-  totalFrames = 0;
-  frameRate = 0;
   duartion = 0;
   self.memoryCacheEnabled = NO;
   self.memeoryCacheFinished = NO;
@@ -152,16 +151,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   });
 }
 
-- (float)frameToProgress:(NSInteger)frame {
-  if (totalFrames == 0) {
-    totalFrames = [[self getPAGDecoder] numFrames];
-  }
-  if (frame > totalFrames || frame < 0) {
-    return 0;
-  }
-  return frame * 1.0 / totalFrames;
-}
-
 - (void)setCompositionInternal:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate {
   if (pagComposition == newComposition) {
     return;
@@ -177,10 +166,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   self.fileHeight = [newComposition height];
   self.pagContentVersion = [PAGContentVersion Get:newComposition];
   self.maxFrameRate = maxFrameRate;
-
-  [animator setProgress:0];
   duartion = [newComposition duration];
+
   [self reset];
+  if (self.isVisible) {
+    [animator setDuration:duartion];
+  }
 }
 
 - (CVPixelBufferRef)getDickCacheCVPixelBuffer {
@@ -229,8 +220,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     if (pagDecoder) {
       [pagDecoder retain];
-      totalFrames = [pagDecoder numFrames];
-      frameRate = [pagDecoder frameRate];
     }
   }
   return pagDecoder;
@@ -299,7 +288,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if ([PAGContentVersion Get:pagComposition] != self.pagContentVersion) {
     self.pagContentVersion = [PAGContentVersion Get:pagComposition];
     [self reset];
-    if ([pagComposition duration] != duartion) {
+    if (self.isVisible && [pagComposition duration] != duartion) {
       duartion = [pagComposition duration];
       [animator setDuration:duartion];
     }
@@ -330,11 +319,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
 }
 
-- (NSInteger)nextFrame {
-  NSInteger frame = static_cast<NSInteger>(floor([animator progress] * totalFrames));
-  return MAX(MIN(frame, totalFrames - 1), 0);
-}
-
 - (void)reset {
   if (imagesMap) {
     [imagesMap removeAllObjects];
@@ -349,8 +333,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
-    totalFrames = 0;
-    frameRate = 0;
   }
 }
 
@@ -470,13 +452,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (NSUInteger)numFrames {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if (pagDecoder) {
-    totalFrames = [pagDecoder numFrames];
-  }
-  if (totalFrames == 0) {
-    totalFrames = [[self getPAGDecoder] numFrames];
-  }
-  return static_cast<NSUInteger>(totalFrames);
+  return [[self getPAGDecoder] numFrames];
 }
 
 - (UIImage*)currentImage {
@@ -495,6 +471,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)removeListener:(id<PAGImageViewListener>)listener {
   [animator removeListener:(id<PAGAnimatorListener>)listener];
 }
+
+- (int)repeatCount {
+  return [animator repeatCount];
+}
+
 - (void)setRepeatCount:(int)repeatCount {
   [animator setRepeatCount:repeatCount];
 }
@@ -544,16 +525,16 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  [animator setProgress:[self frameToProgress:currentFrame]];
+  [animator setProgress:pag::FrameToProgress(currentFrame, [[self getPAGDecoder] numFrames])];
 }
 
 - (NSUInteger)currentFrame {
-  return static_cast<NSUInteger>([animator progress] * totalFrames);
+  return pag::ProgressToFrame([animator progress], [[self getPAGDecoder] numFrames]);
 }
 
 - (BOOL)flush {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  NSInteger frameIndex = [self nextFrame];
+  NSInteger frameIndex = [self currentFrame];
   if (self.memeoryCacheFinished) {
     if ([self checkPAGCompositionChanged] == NO) {
       if (self.currentFrameIndex != frameIndex) {
