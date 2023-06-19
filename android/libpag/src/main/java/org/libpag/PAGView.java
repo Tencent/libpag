@@ -615,6 +615,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 return;
             }
         }
+        if (isVisible) {
+            animator.setDuration(pagPlayer.duration());
+        }
         boolean changed = flush();
         if (changed) {
             updateTextureView();

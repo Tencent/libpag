@@ -691,7 +691,8 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         }
         isVisible = visible;
         if (isVisible) {
-            animator.setDuration(animationDuration);
+            long duration = _composition != null ? _composition.duration() : animationDuration;
+            animator.setDuration(duration);
             animator.update();
         } else {
             animator.setDuration(0);
@@ -760,6 +761,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     public void onAnimationUpdate(PAGAnimator animator) {
         if (!isAttachedToWindow) {
             return;
+        }
+        if (isVisible && (_composition != null)) {
+            animator.setDuration(_composition.duration());
         }
         flush();
         ArrayList<PAGImageView.PAGImageViewListener> arrayList;
