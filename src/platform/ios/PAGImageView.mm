@@ -241,6 +241,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   self.isVisible = visible;
   if (self.isVisible) {
+    duartion = pagComposition ? [pagComposition duration] : duartion;
     [animator setDuration:duartion];
   } else {
     [animator setDuration:0];
@@ -288,9 +289,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if ([PAGContentVersion Get:pagComposition] != self.pagContentVersion) {
     self.pagContentVersion = [PAGContentVersion Get:pagComposition];
     [self reset];
-    if (self.isVisible && [pagComposition duration] != duartion) {
-      duartion = [pagComposition duration];
-      [animator setDuration:duartion];
+    if (self.isVisible) {
+      [animator setDuration:[pagComposition duration]];
     }
     return YES;
   }
