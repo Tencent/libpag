@@ -101,14 +101,14 @@ class RenderCache : public Performance {
    * when first rendering BitmapComposition and VideoComposition,
    * which will reduces memory consumption, and increases stability.
    */
-  bool diskCacheEnabled() const {
+  bool useDiskCache() const {
     return _diskCacheEnabled;
   }
 
   /**
    * Set the value of diskCacheEnabled property.
    */
-  void setDiskCacheEnabled(bool value) {
+  void setUseDiskCache(bool value) {
     _diskCacheEnabled = value;
   }
 

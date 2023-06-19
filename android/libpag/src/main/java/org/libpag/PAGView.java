@@ -9,7 +9,6 @@ import android.graphics.drawable.Drawable;
 import android.opengl.EGLContext;
 import android.os.Build;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 
@@ -287,14 +286,14 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * which will reduces memory consumption, and increases stability.
      */
     public boolean diskCacheEnabled() {
-        return pagPlayer.diskCacheEnabled();
+        return pagPlayer.useDiskCache();
     }
 
     /**
      * Set the value of diskCacheEnabled property.
      */
     public void setDiskCacheEnabled(boolean value) {
-        pagPlayer.setDiskCacheEnabled(value);
+        pagPlayer.setUseDiskCache(value);
     }
 
     /**
