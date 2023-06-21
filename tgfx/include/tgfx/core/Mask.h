@@ -113,7 +113,11 @@ class Mask {
  protected:
   virtual std::shared_ptr<ImageStream> getImageStream() const = 0;
 
-  virtual void onFillPath(const Path& path, const Matrix& matrix) = 0;
+  void onFillPath(const Path& path, const Matrix& m) {
+    onFillPath(path, m, false);
+  }
+
+  virtual void onFillPath(const Path& path, const Matrix& m, bool needsGammaCorrection) = 0;
 
   virtual bool onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix);
 

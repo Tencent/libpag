@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "vectors/coregraphics/CGScalerContext.h"
+#include "CGUtil.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathEffect.h"
 #include "utils/Log.h"
@@ -57,14 +58,6 @@ float FloatInterpFunc(float searchKey, const float keys[], const float values[],
   return Interpolate(values[right - 1], values[right], t);
 }
 
-static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
-  return CGAffineTransformMake(
-      static_cast<CGFloat>(matrix.getScaleX()), -static_cast<CGFloat>(matrix.getSkewY()),
-      -static_cast<CGFloat>(matrix.getSkewX()), static_cast<CGFloat>(matrix.getScaleY()),
-      static_cast<CGFloat>(matrix.getTranslateX()), static_cast<CGFloat>(matrix.getTranslateY()));
-}
-
-static constexpr float ITALIC_SKEW = -0.20f;
 static const float kStdFakeBoldInterpKeys[] = {
     9.f,
     36.f,
