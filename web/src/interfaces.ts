@@ -1,5 +1,5 @@
 import type { WebFont } from './core/web-mask';
-import type { ctor, EmscriptenGL, Point, Rect, Vector } from './types';
+import type { ctor, Point, Rect, Vector } from './types';
 
 export interface TimeRange {
   start: number;

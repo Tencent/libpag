@@ -3,7 +3,7 @@ import { writeBufferToWasm } from './utils/buffer';
 import { BitmapImage } from './core/bitmap-image';
 import { isInstanceOf } from './utils/type-utils';
 
-import type { EmscriptenGL, PAG } from './types';
+import type { EmscriptenGL, TGFX } from './types';
 import type { wx } from './wechat/interfaces';
 
 declare const wx: wx;
@@ -27,7 +27,7 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
   return createImage(URL.createObjectURL(blob));
 };
 
-export const readImagePixels = (module: PAG, image: CanvasImageSource, width: number, height: number) => {
+export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number) => {
   if (!image) {
     return null;
   }
@@ -98,7 +98,7 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
   }
 };
 
-export const getBytesFromPath = async (module: PAG, path: string) => {
+export const getBytesFromPath = async (module: TGFX, path: string) => {
   const buffer = await fetch(path).then((res) => res.arrayBuffer());
   return writeBufferToWasm(module, buffer);
 };

@@ -1,4 +1,4 @@
-import { PAGModule } from '../pag-module';
+import { TGFXModule } from '../tgfx-module';
 import { destroyVerify, wasmAwaitRewind } from '../utils/decorators';
 import { MatrixIndex } from '../types';
 
@@ -34,7 +34,7 @@ export class Matrix {
     pers1 = 0,
     pers2 = 1,
   ): Matrix {
-    const wasmIns = PAGModule._Matrix._MakeAll(scaleX, skewX, transX, skewY, scaleY, transY, pers0, pers1, pers2);
+    const wasmIns = TGFXModule._Matrix._MakeAll(scaleX, skewX, transX, skewY, scaleY, transY, pers0, pers1, pers2);
     if (!wasmIns) throw new Error('Matrix.makeAll fail, please check parameters valid!');
     return new Matrix(wasmIns);
   }
@@ -52,9 +52,9 @@ export class Matrix {
   public static makeScale(scaleX: number, scaleY?: number): Matrix {
     let wasmIns;
     if (scaleY !== undefined) {
-      wasmIns = PAGModule._Matrix._MakeScale(scaleX, scaleY);
+      wasmIns = TGFXModule._Matrix._MakeScale(scaleX, scaleY);
     } else {
-      wasmIns = PAGModule._Matrix._MakeScale(scaleX);
+      wasmIns = TGFXModule._Matrix._MakeScale(scaleX);
     }
     if (!wasmIns) throw new Error('Matrix.makeScale fail, please check parameters valid!');
     return new Matrix(wasmIns);
@@ -71,7 +71,7 @@ export class Matrix {
    * @return    Matrix with translation
    */
   public static makeTrans(dx: number, dy: number): Matrix {
-    const wasmIns = PAGModule._Matrix._MakeTrans(dx, dy);
+    const wasmIns = TGFXModule._Matrix._MakeTrans(dx, dy);
     if (!wasmIns) throw new Error('Matrix.makeTrans fail, please check parameters valid!');
     return new Matrix(wasmIns);
   }

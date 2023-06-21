@@ -1,7 +1,7 @@
 import { WorkerMessageType } from './events';
 import { postMessage } from './utils';
-import { calculateDisplaySize } from '../utils/canvas';
 import { destroyVerify } from '../utils/decorators';
+import { calculateDisplaySize } from '../utils/canvas';
 
 import type { WorkerPAGFile } from './pag-file';
 import type { PAGViewOptions } from '../pag-view';

@@ -2,7 +2,7 @@ import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
-import { writeBufferToWasm } from './utils/buffer';
+import { writeBufferToWasm } from '@tgfx/utils/buffer';
 
 @destroyVerify
 @wasmAwaitRewind

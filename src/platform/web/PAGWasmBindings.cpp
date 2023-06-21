@@ -496,55 +496,5 @@ EMSCRIPTEN_BINDINGS(pag) {
   function("_SDKVersion", &PAG::SDKVersion);
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
-  register_vector<std::string>("VectorString");
-  register_vector<int>("VectorInt");
   register_vector<Marker>("VectorMarker");
-
-  class_<tgfx::Matrix>("TGFXMatrix")
-      .function("_get", &tgfx::Matrix::get)
-      .function("_set", &tgfx::Matrix::set);
-
-  class_<tgfx::ImageInfo>("TGFXImageInfo")
-      .property("width", &tgfx::ImageInfo::width)
-      .property("height", &tgfx::ImageInfo::height)
-      .property("rowBytes", &tgfx::ImageInfo::rowBytes)
-      .property("colorType", &tgfx::ImageInfo::colorType);
-
-  class_<tgfx::Stroke>("TGFXStroke")
-      .property("width", &tgfx::Stroke::width)
-      .property("cap", &tgfx::Stroke::cap)
-      .property("join", &tgfx::Stroke::join)
-      .property("miterLimit", &tgfx::Stroke::miterLimit);
-
-  value_object<tgfx::FontMetrics>("TGFXFontMetrics")
-      .field("ascent", &tgfx::FontMetrics::ascent)
-      .field("descent", &tgfx::FontMetrics::descent)
-      .field("xHeight", &tgfx::FontMetrics::xHeight)
-      .field("capHeight", &tgfx::FontMetrics::capHeight);
-
-  value_object<tgfx::Rect>("TGFXRect")
-      .field("left", &tgfx::Rect::left)
-      .field("top", &tgfx::Rect::top)
-      .field("right", &tgfx::Rect::right)
-      .field("bottom", &tgfx::Rect::bottom);
-
-  enum_<tgfx::PathFillType>("TGFXPathFillType")
-      .value("Winding", tgfx::PathFillType::Winding)
-      .value("EvenOdd", tgfx::PathFillType::EvenOdd)
-      .value("InverseWinding", tgfx::PathFillType::InverseWinding)
-      .value("InverseEvenOdd", tgfx::PathFillType::InverseEvenOdd);
-
-  enum_<tgfx::LineCap>("TGFXLineCap")
-      .value("Butt", tgfx::LineCap::Butt)
-      .value("Round", tgfx::LineCap::Round)
-      .value("Square", tgfx::LineCap::Square);
-
-  enum_<tgfx::LineJoin>("TGFXLineJoin")
-      .value("Miter", tgfx::LineJoin::Miter)
-      .value("Round", tgfx::LineJoin::Round)
-      .value("Bevel", tgfx::LineJoin::Bevel);
-
-  value_object<tgfx::Point>("TGFXPoint").field("x", &tgfx::Point::x).field("y", &tgfx::Point::y);
-
-  register_vector<tgfx::Point>("VectorTGFXPoint");
 }

@@ -1,9 +1,7 @@
-import path from 'path';
 import esbuild from 'rollup-plugin-esbuild';
 import resolve from '@rollup/plugin-node-resolve';
 import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
-import alias from '@rollup/plugin-alias';
 
 const banner = `/////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -27,11 +25,8 @@ const banner = `////////////////////////////////////////////////////////////////
 const plugins = [
   esbuild({ tsconfig: "tsconfig.json", minify: false }),
   json(),
-  resolve({ extensions: ['.ts', '.js'] }),
+  resolve(),
   commonJs(),
-  alias({
-    entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../tgfx/web/src') }],
-  }),
 ];
 
 export default [
@@ -41,13 +36,8 @@ export default [
     plugins: plugins,
   },
   {
-    input: 'demo/worker.ts',
-    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
-    plugins: plugins,
-  },
-  {
-    input: 'src/pag.ts',
-    output: { name: 'libpag', banner, file: 'demo/libpag.js', format: 'umd', exports: 'named', sourcemap: true },
+    input: 'src/main.ts',
+    output: { name: 'tgfx', banner, file: 'demo/tgfx.js', format: 'umd', exports: 'named', sourcemap: true },
     plugins: plugins,
   },
 ];

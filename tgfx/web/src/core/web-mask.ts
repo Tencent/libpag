@@ -1,6 +1,6 @@
-import { PAGModule } from '../pag-module';
+import { TGFXModule } from '../tgfx-module';
 import { ctor, Point, Vector } from '../types';
-import { ScalerContext } from '@tgfx/core/scaler-context';
+import { ScalerContext } from './scaler-context';
 import { Matrix } from './matrix';
 
 export interface WebFont {
@@ -18,9 +18,9 @@ export class WebMask {
 
   private static getLineCap(cap: ctor): CanvasLineCap {
     switch (cap) {
-      case PAGModule.TGFXLineCap.Round:
+      case TGFXModule.TGFXLineCap.Round:
         return 'round';
-      case PAGModule.TGFXLineCap.Square:
+      case TGFXModule.TGFXLineCap.Square:
         return 'square';
       default:
         return 'butt';
@@ -29,9 +29,9 @@ export class WebMask {
 
   private static getLineJoin(join: ctor): CanvasLineJoin {
     switch (join) {
-      case PAGModule.TGFXLineJoin.Round:
+      case TGFXModule.TGFXLineJoin.Round:
         return 'round';
-      case PAGModule.TGFXLineJoin.Bevel:
+      case TGFXModule.TGFXLineJoin.Bevel:
         return 'bevel';
       default:
         return 'miter';
@@ -53,13 +53,13 @@ export class WebMask {
   public fillPath(path: Path2D, fillType: ctor) {
     this.context.setTransform(1, 0, 0, 1, 0, 0);
     if (
-      fillType === PAGModule.TGFXPathFillType.InverseWinding ||
-      fillType === PAGModule.TGFXPathFillType.InverseEvenOdd
+      fillType === TGFXModule.TGFXPathFillType.InverseWinding ||
+      fillType === TGFXModule.TGFXPathFillType.InverseEvenOdd
     ) {
-      this.context.clip(path, fillType === PAGModule.TGFXPathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
+      this.context.clip(path, fillType === TGFXModule.TGFXPathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
       this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     } else {
-      this.context.fill(path, fillType === PAGModule.TGFXPathFillType.EvenOdd ? 'evenodd' : 'nonzero');
+      this.context.fill(path, fillType === TGFXModule.TGFXPathFillType.EvenOdd ? 'evenodd' : 'nonzero');
     }
   }
 

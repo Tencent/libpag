@@ -6,7 +6,7 @@ import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-uti
 
 import type { PAGImage } from './pag-image';
 import { LayerType, PAGTimeStretchMode, TextDocument } from './types';
-import { writeBufferToWasm } from './utils/buffer';
+import { writeBufferToWasm } from '@tgfx/utils/buffer';
 
 @destroyVerify
 @wasmAwaitRewind

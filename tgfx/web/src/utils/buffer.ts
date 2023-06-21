@@ -1,6 +1,4 @@
-import type { PAG } from '../types';
-
-export const writeBufferToWasm = (module: PAG, data: ArrayLike<number> | ArrayBufferLike) => {
+export const writeBufferToWasm = (module: EmscriptenModule, data: ArrayLike<number> | ArrayBufferLike) => {
   const uint8Array = new Uint8Array(data);
   const numBytes = uint8Array.byteLength;
   const dataPtr = module._malloc(numBytes);
@@ -10,7 +8,7 @@ export const writeBufferToWasm = (module: PAG, data: ArrayLike<number> | ArrayBu
 };
 
 export const readBufferFromWasm = (
-  module: PAG,
+  module: EmscriptenModule,
   data: ArrayLike<number> | ArrayBufferLike,
   handle: (byteOffset: number, length: number) => boolean,
 ) => {
