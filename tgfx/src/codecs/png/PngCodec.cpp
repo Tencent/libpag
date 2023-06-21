@@ -280,6 +280,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
           *(alphaPixels++) = *(srcPixels++);
         }
         alphaPixels -= srcRowBytes;
+        srcPixels += (pixmap.rowBytes() - pixmap.width());
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(alphaPixels));
       } else {
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(srcPixels));
