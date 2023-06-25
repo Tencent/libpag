@@ -1,4 +1,3 @@
-*[PAG*
 *_OBJC_CLASS_$_PAG*
 *_OBJC_METACLASS_$_PAG*
 *pag*

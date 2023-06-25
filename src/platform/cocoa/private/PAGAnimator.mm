@@ -112,20 +112,22 @@ class AnimatorListener : public pag::PAGAnimator::Listener {
   }
 
   void onAnimationUpdate(pag::PAGAnimator* animator) override {
-    auto updater = (id<PAGAnimatorUpdater>)[updaterTable.anyObject retain];
-    if (updater == nil) {
-      return;
-    }
-    auto progress = animator->progress();
-    [updater onAnimationFlush:progress];
-    auto copiedListeners = getListeners();
-    for (id listener in copiedListeners) {
-      if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
-        [listener onAnimationUpdate:updater];
+    @autoreleasepool {
+      auto updater = (id<PAGAnimatorUpdater>)[updaterTable.anyObject retain];
+      if (updater == nil) {
+        return;
       }
+      auto progress = animator->progress();
+      [updater onAnimationFlush:progress];
+      auto copiedListeners = getListeners();
+      for (id listener in copiedListeners) {
+        if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
+          [listener onAnimationUpdate:updater];
+        }
+      }
+      [copiedListeners release];
+      [updater release];
     }
-    [copiedListeners release];
-    [updater release];
   };
 
  private:

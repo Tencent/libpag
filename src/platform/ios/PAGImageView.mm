@@ -19,12 +19,15 @@
 #import "PAGImageView.h"
 #include <VideoToolbox/VideoToolbox.h>
 #include <mutex>
+
+#include "base/utils/TimeUtil.h"
+
 #import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
+#import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/ios/private/PAGContentVersion.h"
-#import "private/PAGValueAnimator.h"
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
@@ -50,13 +53,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 #endif
 
 @interface PAGImageView ()
-@property(atomic, assign) BOOL isInBackground;
 @property(atomic, assign) BOOL isVisible;
-@property(nonatomic, assign) BOOL isPlaying;
 @property(atomic, assign) NSInteger currentFrameIndex;
 @property(atomic, retain) UIImage* currentUIImage;
 @property(atomic, assign) NSInteger pagContentVersion;
-@property(atomic, assign) NSInteger currentFrameExplicitlySet;
 @property(nonatomic, assign) BOOL memoryCacheEnabled;
 @property(nonatomic, assign) BOOL memeoryCacheFinished;
 @property(nonatomic, assign) NSInteger fileWidth;
@@ -68,13 +68,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 @implementation PAGImageView {
   NSString* filePath;
-  PAGValueAnimator* valueAnimator;
-  NSHashTable* listeners;
+  PAGAnimator* animator;
   PAGComposition* pagComposition;
   PAGDecoder* pagDecoder;
-  NSLock* listenersLock;
-  NSInteger totalFrames;
-  float frameRate;
+  NSInteger duartion;
   float renderScaleFactor;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
@@ -82,7 +79,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CVPixelBufferRef cvPixeBuffer;
 }
 
-@synthesize isPlaying = _isPlaying;
 @synthesize memoryCacheEnabled = _memoryCacheEnabled;
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -103,36 +99,23 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   pagDecoder = nil;
   self.currentFrameIndex = -1;
   renderScaleFactor = 1.0;
-  totalFrames = 0;
-  frameRate = 0;
+  duartion = 0;
   self.memoryCacheEnabled = NO;
   self.memeoryCacheFinished = NO;
-  listeners = [[NSHashTable weakObjectsHashTable] retain];
-  self.isPlaying = NO;
   self.isVisible = NO;
-  self.isInBackground =
-      [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   filePath = nil;
-  listenersLock = [[NSLock alloc] init];
   self.backgroundColor = [UIColor clearColor];
-  valueAnimator = [[PAGValueAnimator alloc] init];
-  [valueAnimator setListener:self];
+  animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
 
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(applicationWillResignActive:)
-                                               name:UIApplicationWillResignActiveNotification
-                                             object:nil];
 }
 
 - (void)dealloc {
-  [listeners release];
-  [listenersLock release];
-  [valueAnimator stop:false];
-  [valueAnimator release];
+  [animator cancel];
+  [animator release];
   [self reset];
   if (pagComposition) {
     [pagComposition release];
@@ -183,10 +166,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   self.fileHeight = [newComposition height];
   self.pagContentVersion = [PAGContentVersion Get:newComposition];
   self.maxFrameRate = maxFrameRate;
-  self.currentFrameExplicitlySet = 0;
-  [valueAnimator setCurrentPlayTime:0];
-  [valueAnimator setDuration:[newComposition duration]];
+  duartion = [newComposition duration];
+
   [self reset];
+  if (self.isVisible) {
+    [animator setDuration:duartion];
+  }
 }
 
 - (CVPixelBufferRef)getDickCacheCVPixelBuffer {
@@ -235,68 +220,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     if (pagDecoder) {
       [pagDecoder retain];
-      totalFrames = [pagDecoder numFrames];
-      frameRate = [pagDecoder frameRate];
     }
   }
   return pagDecoder;
 }
 
-- (void)onAnimationUpdate {
-  [self updateView];
-}
-
-- (void)onAnimationStart {
-  [listenersLock lock];
-  NSHashTable* copiedListeners = listeners.copy;
-  [listenersLock unlock];
-  for (id item in copiedListeners) {
-    auto listener = (id<PAGImageViewListener>)item;
-    if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
-      [listener onAnimationStart:self];
-    }
-  }
-  [copiedListeners release];
-}
-
-- (void)onAnimationEnd {
-  self.isPlaying = FALSE;
-  [listenersLock lock];
-  NSHashTable* copiedListeners = listeners.copy;
-  [listenersLock unlock];
-  for (id item in copiedListeners) {
-    auto listener = (id<PAGImageViewListener>)item;
-    if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
-      [listener onAnimationEnd:self];
-    }
-  }
-  [copiedListeners release];
-}
-
-- (void)onAnimationCancel {
-  [listenersLock lock];
-  NSHashTable* copiedListeners = listeners.copy;
-  [listenersLock unlock];
-  for (id item in copiedListeners) {
-    auto listener = (id<PAGImageViewListener>)item;
-    if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
-      [listener onAnimationCancel:self];
-    }
-  }
-  [copiedListeners release];
-}
-
-- (void)onAnimationRepeat {
-  [listenersLock lock];
-  NSHashTable* copiedListeners = listeners.copy;
-  [listenersLock unlock];
-  for (id item in copiedListeners) {
-    auto listener = (id<PAGImageViewListener>)item;
-    if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
-      [listener onAnimationRepeat:self];
-    }
-  }
-  [copiedListeners release];
+- (void)onAnimationFlush:(double)progress {
+  [self flush];
 }
 
 - (void)didMoveToWindow {
@@ -311,13 +241,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   self.isVisible = visible;
   if (self.isVisible) {
-    if (self.isPlaying) {
-      [self play];
-    }
+    duartion = pagComposition ? [pagComposition duration] : duartion;
+    [animator setDuration:duartion];
   } else {
-    if (self.isPlaying) {
-      [valueAnimator stop:false];
-    }
+    [animator setDuration:0];
   }
 }
 
@@ -362,48 +289,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if ([PAGContentVersion Get:pagComposition] != self.pagContentVersion) {
     self.pagContentVersion = [PAGContentVersion Get:pagComposition];
     [self reset];
+    if (self.isVisible) {
+      [animator setDuration:[pagComposition duration]];
+    }
     return YES;
   }
   return NO;
-}
-
-- (void)updateView {
-  if (self.memeoryCacheFinished) {
-    if ([self checkPAGCompositionChanged] == NO) {
-      NSInteger frame = [self nextFrame];
-      if (self.currentFrameIndex != frame) {
-        UIImage* image = imagesMap[@(frame)];
-        if (image) {
-          self.currentFrameIndex = frame;
-          self.currentUIImage = image;
-          [self submitToImageView];
-          if (self.currentFrameExplicitlySet >= 0) {
-            self.currentFrameExplicitlySet = -1;
-            [valueAnimator setCurrentPlayTime:[self FrameToTime:frame]];
-          }
-          return;
-        }
-      }
-    }
-  }
-
-  NSOperationQueue* flushQueue = [PAGImageView ImageViewFlushQueue];
-  [self retain];
-  NSBlockOperation* operation = [NSBlockOperation blockOperationWithBlock:^{
-    [self flush];
-    [self releaseSelf];
-  }];
-  [flushQueue addOperation:operation];
-  [listenersLock lock];
-  NSHashTable* copiedListeners = listeners.copy;
-  [listenersLock unlock];
-  for (id item in copiedListeners) {
-    auto listener = (id<PAGImageViewListener>)item;
-    if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
-      [listener onAnimationUpdate:self];
-    }
-  }
-  [copiedListeners release];
 }
 
 - (void)submitToImageView {
@@ -413,22 +304,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   });
 }
 
-- (void)releaseSelf {
-  dispatch_main_async_safe(^{
-    [self release];
-  });
-}
-
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
-  self.isInBackground = FALSE;
   if (self.isVisible) {
     [PAGImageView RegisterFlushQueueDestoryMethod];
-    [self updateView];
+    [animator update];
   }
-}
-
-- (void)applicationWillResignActive:(NSNotification*)notification {
-  self.isInBackground = TRUE;
 }
 
 - (void)freeCache {
@@ -437,28 +317,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [self->pagDecoder release];
     self->pagDecoder = nil;
   }
-}
-
-- (int64_t)FrameToTime:(NSInteger)frame {
-  if (frameRate <= 0) {
-    frameRate = [[self getPAGDecoder] frameRate];
-    if (frameRate <= 0) {
-      return 0;
-    }
-  }
-  return static_cast<int64_t>((frame + 0.1) * 1.0 / frameRate * 1000000);
-}
-
-- (NSInteger)nextFrame {
-  if (self.currentFrameExplicitlySet >= 0) {
-    return self.currentFrameExplicitlySet;
-  }
-  if (totalFrames == 0) {
-    totalFrames = [[self getPAGDecoder] numFrames];
-  }
-  NSInteger frame =
-      static_cast<NSInteger>(floor([valueAnimator getAnimatedFraction] * totalFrames));
-  return MAX(MIN(frame, totalFrames - 1), 0);
 }
 
 - (void)reset {
@@ -475,8 +333,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
-    totalFrames = 0;
-    frameRate = 0;
   }
 }
 
@@ -509,6 +365,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
+      if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
+        [animator update];
+      }
     }
   }
 }
@@ -521,6 +380,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
+      if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+        [animator update];
+      }
     }
   }
 }
@@ -581,27 +443,16 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)play {
-  _isPlaying = true;
-  if (!self.isVisible) {
-    return;
-  }
-  [valueAnimator start];
+  [animator start];
 }
 
 - (void)pause {
-  _isPlaying = false;
-  [valueAnimator stop];
+  [animator cancel];
 }
 
 - (NSUInteger)numFrames {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if (pagDecoder) {
-    totalFrames = [pagDecoder numFrames];
-  }
-  if (totalFrames == 0) {
-    totalFrames = [[self getPAGDecoder] numFrames];
-  }
-  return static_cast<NSUInteger>(totalFrames);
+  return [[self getPAGDecoder] numFrames];
 }
 
 - (UIImage*)currentImage {
@@ -610,26 +461,23 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (BOOL)isPlaying {
-  return _isPlaying;
+  return [animator isRunning];
 }
 
 - (void)addListener:(id<PAGImageViewListener>)listener {
-  [listenersLock lock];
-  [listeners addObject:listener];
-  [listenersLock unlock];
+  [animator addListener:(id<PAGAnimatorListener>)listener];
 }
 
 - (void)removeListener:(id<PAGImageViewListener>)listener {
-  [listenersLock lock];
-  [listeners removeObject:listener];
-  [listenersLock unlock];
+  [animator removeListener:(id<PAGAnimatorListener>)listener];
+}
+
+- (int)repeatCount {
+  return [animator repeatCount];
 }
 
 - (void)setRepeatCount:(int)repeatCount {
-  if (repeatCount < 0) {
-    repeatCount = 0;
-  }
-  [valueAnimator setRepeatCount:(repeatCount - 1)];
+  [animator setRepeatCount:repeatCount];
 }
 
 - (NSString*)getPath {
@@ -677,21 +525,30 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  self.currentFrameExplicitlySet = currentFrame;
+  [animator setProgress:pag::FrameToProgress(currentFrame, [[self getPAGDecoder] numFrames])];
 }
 
 - (NSUInteger)currentFrame {
-  if (self.currentFrameExplicitlySet >= 0) {
-    return static_cast<NSUInteger>(self.currentFrameExplicitlySet);
-  }
-  return static_cast<NSUInteger>(MAX(self.currentFrameIndex, 0));
+  return pag::ProgressToFrame([animator progress], [[self getPAGDecoder] numFrames]);
 }
 
 - (BOOL)flush {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  NSInteger frameIndex = [self nextFrame];
+  NSInteger frameIndex = [self currentFrame];
+  if (self.memeoryCacheFinished) {
+    if ([self checkPAGCompositionChanged] == NO) {
+      if (self.currentFrameIndex != frameIndex) {
+        UIImage* image = imagesMap[@(frameIndex)];
+        if (image) {
+          self.currentFrameIndex = frameIndex;
+          self.currentUIImage = image;
+          [self submitToImageView];
+          return YES;
+        }
+      }
+    }
+  }
   if (self.currentFrameIndex == frameIndex) {
-    self.currentFrameExplicitlySet = -1;
     return NO;
   }
   [self checkPAGCompositionChanged];
@@ -702,15 +559,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [self submitToImageView];
     return NO;
   }
-  BOOL status;
-  if (self.currentFrameExplicitlySet >= 0) {
-    self.currentFrameExplicitlySet = -1;
-    status = [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
-    [self->valueAnimator setCurrentPlayTime:[self FrameToTime:frameIndex]];
-  } else {
-    status = [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
-  }
-  return status;
+  return [self updateImageViewFrom:pixelBuffer atIndex:frameIndex];
 }
 
 @end

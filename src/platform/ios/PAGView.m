@@ -150,6 +150,9 @@
 
 - (void)onAnimationFlush:(double)progress {
   [pagPlayer setProgress:progress];
+  if (_isVisible) {
+    [animator setDuration:[pagPlayer duration]];
+  }
   [pagPlayer flush];
 }
 
