@@ -19,6 +19,7 @@
 #include "DiskSequenceReader.h"
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
+#include "tgfx/utils/Buffer.h"
 
 namespace pag {
 
@@ -43,6 +44,8 @@ int DiskSequenceReader::height() const {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame targetFrame) {
+  // Need a locker here in case there are other threads are decoding at the same time.
+  std::lock_guard<std::mutex> autoLock(locker);
   if (pagDecoder == nullptr) {
     auto root = PAGComposition::Make(sequence->width, sequence->height);
     auto composition = std::make_shared<PAGComposition>(
@@ -64,29 +67,47 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
   if (pagDecoder == nullptr) {
     return nullptr;
   }
-  if (bitmap == nullptr) {
-    bitmap = std::make_shared<tgfx::Bitmap>(pagDecoder->width(), pagDecoder->height(), false, true);
+  if (bitmap == nullptr && pixels == nullptr) {
+    if (tgfx::HardwareBufferAvailable()) {
+      auto hardwareBuffer =
+          tgfx::HardwareBufferAllocate(pagDecoder->width(), pagDecoder->height(), false);
+      if (hardwareBuffer) {
+        bitmap = std::make_shared<tgfx::Bitmap>(hardwareBuffer);
+        tgfx::HardwareBufferRelease(hardwareBuffer);
+      }
+    }
+    if (bitmap == nullptr) {
+      info = tgfx::ImageInfo::Make(pagDecoder->width(), pagDecoder->height(),
+                                   tgfx::ColorType::RGBA_8888);
+      tgfx::Buffer buffer(info.byteSize());
+      buffer.clear();
+      pixels = buffer.release();
+    }
   }
+
   if (!pagDecoder->checkFrameChanged(targetFrame)) {
-    return bitmap->makeBuffer();
+    return imageBuffer;
   }
   bool success = false;
-  if (bitmap->isHardwareBacked()) {
+  if (bitmap) {
     success = pagDecoder->readFrame(targetFrame, bitmap->getHardwareBuffer());
   } else {
-    auto pixels = bitmap->lockPixels();
     if (pixels) {
-      success = pagDecoder->readFrame(targetFrame, pixels, bitmap->info().rowBytes(),
-                                      ToPAG(bitmap->info().colorType()),
-                                      ToPAG(bitmap->info().alphaType()));
-      bitmap->unlockPixels();
+      success =
+          pagDecoder->readFrame(targetFrame, const_cast<void*>(pixels->data()), info.rowBytes(),
+                                ToPAG(info.colorType()), ToPAG(info.alphaType()));
     }
   }
   if (!success) {
     LOGE("DiskSequenceReader: Error on readFrame.\n");
     return nullptr;
   }
-  return bitmap->makeBuffer();
+  if (bitmap) {
+    imageBuffer = bitmap->makeBuffer();
+  } else {
+    imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
+  }
+  return imageBuffer;
 }
 
 void DiskSequenceReader::onReportPerformance(Performance*, int64_t) {

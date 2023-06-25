@@ -286,15 +286,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * when first rendering BitmapComposition and VideoComposition,
      * which will reduces memory consumption, and increases stability.
      */
-    public boolean diskCacheEnabled() {
-        return pagPlayer.diskCacheEnabled();
+    public boolean useDiskCache() {
+        return pagPlayer.useDiskCache();
     }
 
     /**
-     * Set the value of diskCacheEnabled property.
+     * Set the value of useDiskCache property.
      */
-    public void setDiskCacheEnabled(boolean value) {
-        pagPlayer.setDiskCacheEnabled(value);
+    public void setUseDiskCache(boolean value) {
+        pagPlayer.setUseDiskCache(value);
     }
 
     /**

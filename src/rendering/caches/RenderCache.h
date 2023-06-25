@@ -101,15 +101,15 @@ class RenderCache : public Performance {
    * when first rendering BitmapComposition and VideoComposition,
    * which will reduces memory consumption, and increases stability.
    */
-  bool diskCacheEnabled() const {
-    return _diskCacheEnabled;
+  bool useDiskCache() const {
+    return _useDiskCache;
   }
 
   /**
-   * Set the value of diskCacheEnabled property.
+   * Set the value of useDiskCache property.
    */
-  void setDiskCacheEnabled(bool value) {
-    _diskCacheEnabled = value;
+  void setUseDiskCache(bool value) {
+    _useDiskCache = value;
   }
 
   /**
@@ -187,7 +187,7 @@ class RenderCache : public Performance {
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
   bool _snapshotEnabled = true;
-  bool _diskCacheEnabled = false;
+  bool _useDiskCache = false;
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};

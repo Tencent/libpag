@@ -94,7 +94,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   }
   usedAssets.insert(composition->uniqueID);
   auto sequence = Sequence::Get(composition);
-  auto info = SequenceInfo::Make(sequence, _diskCacheEnabled);
+  auto info = SequenceInfo::Make(sequence, _useDiskCache);
   if (composition->staticContent()) {
     SequenceImageProxy proxy(info, 0);
     prepareAssetImage(composition->uniqueID, &proxy);

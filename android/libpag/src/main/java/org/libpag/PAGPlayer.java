@@ -73,12 +73,12 @@ public class PAGPlayer {
      * when first rendering BitmapComposition and VideoComposition,
      * which will reduces memory consumption, and increases stability.
      */
-    public native boolean diskCacheEnabled();
+    public native boolean useDiskCache();
 
     /**
-     * Set the value of diskCacheEnabled property.
+     * Set the value of useDiskCache property.
      */
-    public native void setDiskCacheEnabled(boolean value);
+    public native void setUseDiskCache(boolean value);
 
     /**
      * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
