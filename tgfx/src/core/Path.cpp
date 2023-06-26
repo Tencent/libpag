@@ -282,10 +282,17 @@ void Path::addOval(const Rect& oval, bool reversed, unsigned startIndex) {
   writableRef()->path.addOval(ToSkRect(oval), ToSkDirection(reversed), startIndex);
 }
 
-void Path::addArc(float centerX, float centerY, float radius, float startAngle, float endAngle,
-                  bool reversed) {
+void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
+  auto radiusX = oval.width() * 0.5f;
+  auto radiusY = oval.height() * 0.5f;
+  auto endAngle = startAngle + sweepAngle;
+  auto reversed = sweepAngle < 0;
+  if (reversed) {
+    std::swap(startAngle, endAngle);
+  }
   int numBeziers = 0;
-  auto points = GetArcPoints(centerX, centerY, radius, radius, startAngle, endAngle, &numBeziers);
+  auto points = GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startAngle, endAngle,
+                             &numBeziers);
   PointIterator iter(points, reversed, 0);
   auto path = &(writableRef()->path);
   path->moveTo(iter.current());

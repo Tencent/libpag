@@ -21,8 +21,7 @@
 
 namespace tgfx {
 EAGLProcGetter::EAGLProcGetter() {
-  fLibrary = dlopen("/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib",
-                    RTLD_LAZY);
+  fLibrary = dlopen("/System/Library/Frameworks/OpenGLES.framework/OpenGLES", RTLD_LAZY);
 }
 
 EAGLProcGetter::~EAGLProcGetter() {

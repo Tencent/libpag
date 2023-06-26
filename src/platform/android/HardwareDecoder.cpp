@@ -20,6 +20,7 @@
 #include "base/utils/Log.h"
 #include "platform/android/JStringUtil.h"
 #include "tgfx/utils/Buffer.h"
+#include "tgfx/utils/Task.h"
 
 namespace pag {
 static Global<jclass> HardwareDecoderClass;
@@ -72,6 +73,19 @@ void HardwareDecoder::InitJNI(JNIEnv* env) {
       env->GetMethodID(MediaFormatClass.get(), "setFloat", "(Ljava/lang/String;F)V");
 }
 
+static void ReleaseDecoderAsync(jobject decoder) {
+  tgfx::Task::Run([decoder]() {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env == nullptr) {
+      return;
+    }
+    // It may block the main thread, so we run it in an async task.
+    env->CallVoidMethod(decoder, HardwareDecoder_onRelease);
+    env->DeleteGlobalRef(decoder);
+  });
+}
+
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   JNIEnvironment environment;
   auto env = environment.current();
@@ -82,13 +96,9 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
 }
 
 HardwareDecoder::~HardwareDecoder() {
-  if (videoDecoder.get() != nullptr) {
-    JNIEnvironment environment;
-    auto env = environment.current();
-    if (env == nullptr) {
-      return;
-    }
-    env->CallVoidMethod(videoDecoder.get(), HardwareDecoder_onRelease);
+  if (videoDecoder != nullptr) {
+    ReleaseDecoderAsync(videoDecoder);
+    videoDecoder = nullptr;
   }
 }
 
@@ -136,13 +146,14 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
   if (decoder == nullptr) {
     return false;
   }
+  videoDecoder = env->NewGlobalRef(decoder);
   auto videoSurface = env->CallObjectMethod(decoder, HardwareDecoder_getVideoSurface);
   imageReader = JVideoSurface::GetImageReader(env, videoSurface);
   if (imageReader == nullptr) {
-    env->CallVoidMethod(decoder, HardwareDecoder_onRelease);
+    ReleaseDecoderAsync(videoDecoder);
+    videoDecoder = nullptr;
     return false;
   }
-  videoDecoder = decoder;
   return true;
 }
 
@@ -154,8 +165,7 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
     return pag::DecodingResult::Error;
   }
   auto byteBuffer = env->NewDirectByteBuffer(bytes, length);
-  auto result =
-      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onSendBytes, byteBuffer, time);
+  auto result = env->CallIntMethod(videoDecoder, HardwareDecoder_onSendBytes, byteBuffer, time);
   return static_cast<pag::DecodingResult>(result);
 }
 
@@ -167,7 +177,7 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     return pag::DecodingResult::Error;
   }
   return static_cast<pag::DecodingResult>(
-      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onDecodeFrame));
+      env->CallIntMethod(videoDecoder, HardwareDecoder_onDecodeFrame));
 }
 
 void HardwareDecoder::onFlush() {
@@ -176,7 +186,7 @@ void HardwareDecoder::onFlush() {
   if (env == nullptr) {
     return;
   }
-  env->CallVoidMethod(videoDecoder.get(), HardwareDecoder_onFlush);
+  env->CallVoidMethod(videoDecoder, HardwareDecoder_onFlush);
 }
 
 int64_t HardwareDecoder::presentationTime() {
@@ -185,7 +195,7 @@ int64_t HardwareDecoder::presentationTime() {
   if (env == nullptr) {
     return -1;
   }
-  return env->CallLongMethod(videoDecoder.get(), HardwareDecoder_presentationTime);
+  return env->CallLongMethod(videoDecoder, HardwareDecoder_presentationTime);
 }
 
 DecodingResult HardwareDecoder::onEndOfStream() {
@@ -196,7 +206,7 @@ DecodingResult HardwareDecoder::onEndOfStream() {
     return pag::DecodingResult::Error;
   }
   return static_cast<pag::DecodingResult>(
-      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onEndOfStream));
+      env->CallIntMethod(videoDecoder, HardwareDecoder_onEndOfStream));
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
@@ -205,7 +215,7 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (env == nullptr) {
     return nullptr;
   }
-  auto result = env->CallBooleanMethod(videoDecoder.get(), HardwareDecoder_onRenderFrame);
+  auto result = env->CallBooleanMethod(videoDecoder, HardwareDecoder_onRenderFrame);
   if (!result) {
     return nullptr;
   }

@@ -45,7 +45,7 @@ class HardwareDecoder : public VideoDecoder {
  private:
   bool isValid = false;
   std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
-  Global<jobject> videoDecoder;
+  jobject videoDecoder = nullptr;
 
   explicit HardwareDecoder(const VideoFormat& format);
   bool initDecoder(JNIEnv* env, const VideoFormat& format);

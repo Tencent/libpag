@@ -225,6 +225,8 @@ class Canvas {
 
   void draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa = false);
 
+  bool nothingToDraw(const Paint& paint) const;
+
   Surface* surface = nullptr;
   std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = 0;

@@ -47,8 +47,8 @@
 - (void)onAnimationRepeat:(PAGView*)pagView;
 
 /**
- * Notifies another frame of the animation has occurred. It can be called from either the UI thread
- * or the thread that calls the play method.
+ * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+ * thread if the animation is running asynchronously.
  */
 - (void)onAnimationUpdate:(PAGView*)pagView;
 
@@ -99,8 +99,7 @@ PAG_API @interface PAGView : NSView
 - (void)pause;
 
 /**
- * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
- * animation but also tries to cancel any async tasks, which may block the calling thread.
+ * Cancels the animation at the current position. Currently, it has the same effect as pause().
  */
 - (void)stop;
 
@@ -237,4 +236,10 @@ PAG_API @interface PAGView : NSView
  * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet.
  */
 - (CVPixelBufferRef)makeSnapshot;
+
+/**
+ * Returns a rectangle in pixels that defines the displaying area of the specified layer, which is
+ * in the coordinate of the PAGView.
+ */
+- (CGRect)getBounds:(PAGLayer*)pagLayer;
 @end

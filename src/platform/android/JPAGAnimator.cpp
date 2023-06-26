@@ -26,27 +26,14 @@ static jmethodID PAGAnimator_onAnimationEnd;
 static jmethodID PAGAnimator_onAnimationCancel;
 static jmethodID PAGAnimator_onAnimationRepeat;
 static jmethodID PAGAnimator_onAnimationUpdate;
-static jmethodID PAGAnimator_onAnimationFlush;
 
-class JPAGAnimator : public pag::PAGAnimator::Listener {
+class AnimatorListener : public pag::PAGAnimator::Listener {
  public:
-  JPAGAnimator(JNIEnv* env, jobject animatorObject) {
+  AnimatorListener(JNIEnv* env, jobject animatorObject) {
     weakAnimator = env->NewWeakGlobalRef(animatorObject);
-    animator = pag::PAGAnimator::MakeFrom(this);
   }
 
-  ~JPAGAnimator() override {
-    clear();
-  }
-
-  std::shared_ptr<pag::PAGAnimator> get() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    return animator;
-  }
-
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    animator = nullptr;
+  ~AnimatorListener() override {
     JNIEnvironment environment;
     auto env = environment.current();
     if (env == nullptr) {
@@ -106,19 +93,7 @@ class JPAGAnimator : public pag::PAGAnimator::Listener {
     env->CallVoidMethod(animatorObject, PAGAnimator_onAnimationUpdate);
   }
 
-  void onAnimationFlush(pag::PAGAnimator*) override {
-    JNIEnvironment environment;
-    auto env = environment.current();
-    auto animatorObject = getAnimatorObject(env);
-    if (animatorObject == nullptr) {
-      return;
-    }
-    env->CallVoidMethod(animatorObject, PAGAnimator_onAnimationFlush);
-  }
-
  private:
-  std::mutex locker;
-  std::shared_ptr<pag::PAGAnimator> animator;
   jobject weakAnimator = nullptr;
 
   jobject getAnimatorObject(JNIEnv* env) {
@@ -130,6 +105,35 @@ class JPAGAnimator : public pag::PAGAnimator::Listener {
     }
     return weakAnimator;
   }
+};
+
+class JPAGAnimator {
+ public:
+  JPAGAnimator(JNIEnv* env, jobject animatorObject) {
+    listener = std::make_shared<AnimatorListener>(env, animatorObject);
+    animator = pag::PAGAnimator::MakeFrom(listener);
+  }
+
+  ~JPAGAnimator() {
+    clear();
+  }
+
+  std::shared_ptr<pag::PAGAnimator> get() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return animator;
+  }
+
+  void clear() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    animator->cancel();
+    animator = nullptr;
+    listener = nullptr;
+  }
+
+ private:
+  std::mutex locker;
+  std::shared_ptr<pag::AnimatorListener> listener;
+  std::shared_ptr<pag::PAGAnimator> animator;
 };
 }  // namespace pag
 
@@ -159,7 +163,6 @@ PAG_API void Java_org_libpag_PAGAnimator_nativeInit(JNIEnv* env, jclass clazz) {
   PAGAnimator_onAnimationCancel = env->GetMethodID(clazz, "onAnimationCancel", "()V");
   PAGAnimator_onAnimationRepeat = env->GetMethodID(clazz, "onAnimationRepeat", "()V");
   PAGAnimator_onAnimationUpdate = env->GetMethodID(clazz, "onAnimationUpdate", "()V");
-  PAGAnimator_onAnimationFlush = env->GetMethodID(clazz, "onAnimationFlush", "()V");
 }
 
 PAG_API void Java_org_libpag_PAGAnimator_nativeSetup(JNIEnv* env, jobject thiz) {
@@ -242,43 +245,35 @@ PAG_API void Java_org_libpag_PAGAnimator_setProgress(JNIEnv* env, jobject thiz, 
   animator->setProgress(progress);
 }
 
-PAG_API jboolean Java_org_libpag_PAGAnimator_isPlaying(JNIEnv* env, jobject thiz) {
+PAG_API jboolean Java_org_libpag_PAGAnimator_isRunning(JNIEnv* env, jobject thiz) {
   auto animator = getPAGAnimator(env, thiz);
   if (animator == nullptr) {
     return JNI_FALSE;
   }
-  return animator->isPlaying() ? JNI_TRUE : JNI_FALSE;
+  return animator->isRunning() ? JNI_TRUE : JNI_FALSE;
 }
 
-PAG_API void Java_org_libpag_PAGAnimator_doPlay(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGAnimator_doStart(JNIEnv* env, jobject thiz) {
   auto animator = getPAGAnimator(env, thiz);
   if (animator == nullptr) {
     return;
   }
-  animator->play();
+  animator->start();
 }
 
-PAG_API void Java_org_libpag_PAGAnimator_pause(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGAnimator_cancel(JNIEnv* env, jobject thiz) {
   auto animator = getPAGAnimator(env, thiz);
   if (animator == nullptr) {
     return;
   }
-  animator->pause();
+  animator->cancel();
 }
 
-PAG_API void Java_org_libpag_PAGAnimator_stop(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGAnimator_update(JNIEnv* env, jobject thiz) {
   auto animator = getPAGAnimator(env, thiz);
   if (animator == nullptr) {
     return;
   }
-  animator->stop();
-}
-
-PAG_API void Java_org_libpag_PAGAnimator_flush(JNIEnv* env, jobject thiz) {
-  auto animator = getPAGAnimator(env, thiz);
-  if (animator == nullptr) {
-    return;
-  }
-  animator->flush();
+  animator->update();
 }
 }

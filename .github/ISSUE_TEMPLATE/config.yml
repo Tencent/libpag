@@ -2,6 +2,11 @@
 blank_issues_enabled: false
 contact_links:
   -
-    about: "请通过 PAG 官方论坛进行 Bug 反馈或使用咨询（中文用户专用）"
-    name: 问题反馈
-    url: "https://bbs.pag.art"
+    about: "Please use PAG Discussions to ask usage questions or suggest new features (For English Speakers)"
+    name: Question & Feature Request
+    url: "https://github.com/Tencent/libpag/discussions/1017"
+
+  -
+    about: "请通过 PAG 论坛进行问题咨询或功能建议的相关交流（中文用户专用）"
+    name: 使用咨询 & 功能建议
+    url: "https://github.com/Tencent/libpag/discussions/1018"

@@ -149,8 +149,8 @@ PAG_API @interface PAGPlayer : NSObject
 - (BOOL)flush;
 
 /**
- * Returns a rectangle that defines the displaying area of the specified layer, which is in the
- * coordinate of the PAGSurface.
+ * Returns a rectangle in pixels that defines the displaying area of the specified layer, which is
+ * in the coordinate of the PAGSurface.
  */
 - (CGRect)getBounds:(PAGLayer*)pagLayer;
 

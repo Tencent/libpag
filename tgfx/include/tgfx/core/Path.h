@@ -198,12 +198,18 @@ class Path {
   void addOval(const Rect& oval, bool reversed = false, unsigned startIndex = 0);
 
   /**
-   * Adds an arc to the path which is centered at (x, y) position with radius r starting at
-   * startAngle (in radians) and ending at endAngle. The arc goes in the direction by reversed,
-   * which is clockwise if reversed is false, counterclockwise if reversed is true.
+   * Appends arc to Path, as the start of new contour. Arc added is part of ellipse bounded by oval,
+   * from startAngle through sweepAngle. Both startAngle and sweepAngle are measured in degrees,
+   * where zero degrees is aligned with the positive x-axis, and positive sweeps extends arc
+   * clockwise. If sweepAngle <= -360, or sweepAngle >= 360; and startAngle modulo 90 is nearly
+   * zero, append oval instead of arc. Otherwise, sweepAngle values are treated modulo 360, and arc
+   * may or may not draw depending on numeric rounding.
+   *
+   * @param oval        bounds of ellipse containing arc
+   * @param startAngle  starting angle of arc in degrees
+   * @param sweepAngle  sweep, in degrees. Positive is clockwise; treated modulo 360
    */
-  void addArc(float centerX, float centerY, float radius, float startAngle, float endAngle,
-              bool reversed = false);
+  void addArc(const Rect& oval, float startAngle, float sweepAngle);
 
   /**
    * Adds a round rect to path. creating a new closed contour, each corner is 90 degrees of an

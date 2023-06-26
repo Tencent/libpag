@@ -3,6 +3,7 @@ package org.libpag;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.graphics.drawable.Drawable;
 import android.opengl.EGLContext;
@@ -45,13 +46,12 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         void onAnimationRepeat(PAGView view);
 
         /**
-         * Notifies another frame of the animation has occurred. It can be called from either the UI
-         * thread or the thread that calls the play() method.
+         * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+         * thread if the animation is running asynchronously.
          */
         void onAnimationUpdate(PAGView view);
     }
 
-    private final static String TAG = "PAGView";
     private SurfaceTextureListener mListener;
     private PAGPlayer pagPlayer;
     private PAGSurface pagSurface;
@@ -175,7 +175,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Indicates whether the animation is playing.
      */
     public boolean isPlaying() {
-        return animator.isPlaying();
+        return animator.isRunning();
     }
 
     /**
@@ -186,7 +186,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      */
     public void play() {
         pagPlayer.prepare();
-        animator.play();
+        animator.start();
     }
 
     /**
@@ -194,15 +194,14 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * animation from the last paused position.
      */
     public void pause() {
-        animator.pause();
+        animator.cancel();
     }
 
     /**
-     * Cancels the animation at the current position. Unlike pause(), stop() not only cancels the
-     * animation but also tries to cancel any async tasks, which may block the calling thread.
+     * Cancels the animation at the current position. Currently, it has the same effect as pause().
      */
     public void stop() {
-        animator.stop();
+        animator.cancel();
     }
 
     /**
@@ -365,7 +364,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         pagPlayer.setProgress(value);
         animator.setProgress(pagPlayer.getProgress());
         // TODO(domchen): Remove the next line. All pending changes should be applied in flush().
-        animator.flush();
+        animator.update();
     }
 
     /**
@@ -413,6 +412,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         return null;
     }
 
+    /**
+     * Returns a rectangle in pixels that defines the displaying area of the specified layer, which
+     * is in the coordinate of the PAGView.
+     */
+    public RectF getBounds(PAGLayer pagLayer) {
+        if (pagLayer != null) {
+            return pagPlayer.getBounds(pagLayer);
+        }
+        return new RectF();
+    }
+
     private void setupSurfaceTexture() {
         Lifecycle.getInstance().addListener(this);
         setOpaque(false);
@@ -454,7 +464,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             return;
         }
         pagSurface.clearAll();
-        animator.flush();
+        animator.update();
         if (mListener != null) {
             mListener.onSurfaceTextureAvailable(surface, width, height);
         }
@@ -465,7 +475,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (pagSurface != null) {
             pagSurface.updateSize();
             pagSurface.clearAll();
-            animator.flush();
+            animator.update();
         }
         if (mListener != null) {
             mListener.onSurfaceTextureSizeChanged(surfaceTexture, width, height);
@@ -542,7 +552,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         isVisible = visible;
         if (isVisible) {
             animator.setDuration(pagPlayer.duration());
-            animator.flush();
+            animator.update();
         } else {
             animator.setDuration(0);
         }
@@ -599,25 +609,25 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     public void onAnimationUpdate(PAGAnimator animator) {
-        ArrayList<PAGViewListener> arrayList;
-        synchronized (PAGView.this) {
-            arrayList = new ArrayList<>(mViewListeners);
-        }
-        for (PAGViewListener listener : arrayList) {
-            listener.onAnimationUpdate(this);
-        }
-    }
-
-    public void onAnimationFlush(PAGAnimator animator) {
         pagPlayer.setProgress(animator.progress());
         synchronized (PAGView.this) {
             if (!isAttachedToWindow) {
                 return;
             }
         }
+        if (isVisible) {
+            animator.setDuration(pagPlayer.duration());
+        }
         boolean changed = flush();
         if (changed) {
             updateTextureView();
+        }
+        ArrayList<PAGViewListener> arrayList;
+        synchronized (PAGView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
+        }
+        for (PAGViewListener listener : arrayList) {
+            listener.onAnimationUpdate(this);
         }
         if (!mPAGFlushListeners.isEmpty()) {
             PAGView.this.post(new Runnable() {

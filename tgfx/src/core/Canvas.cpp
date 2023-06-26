@@ -128,7 +128,33 @@ void Canvas::clear(const Color& color) {
   setBlendMode(oldBlend);
 }
 
+static bool AffectsAlpha(const ColorFilter* cf) {
+  return cf && !cf->isAlphaUnchanged();
+}
+
+bool Canvas::nothingToDraw(const Paint& paint) const {
+  switch (getBlendMode()) {
+    case BlendMode::SrcOver:
+    case BlendMode::SrcATop:
+    case BlendMode::DstOut:
+    case BlendMode::DstOver:
+    case BlendMode::Plus:
+      if (0 == getAlpha() || 0 == paint.getAlpha()) {
+        return !AffectsAlpha(paint.getColorFilter().get()) && paint.getImageFilter() == nullptr;
+      }
+      break;
+    case BlendMode::Dst:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
+  if (nothingToDraw(paint)) {
+    return;
+  }
   Path path = {};
   path.addRect(rect);
   drawPath(path, paint);
@@ -321,6 +347,9 @@ Rect Canvas::clipLocalBounds(Rect localBounds) {
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
+  if (nothingToDraw(paint)) {
+    return;
+  }
   if (paint.getStyle() == PaintStyle::Fill) {
     fillPath(path, paint);
     return;
@@ -335,7 +364,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
-  if (shape == nullptr) {
+  if (shape == nullptr || nothingToDraw(paint)) {
     return;
   }
   GpuPaint glPaint;
@@ -384,6 +413,9 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
     return;
   }
   auto realPaint = CleanPaintForDrawImage(paint);
+  if (nothingToDraw(realPaint)) {
+    return;
+  }
   auto oldMatrix = getMatrix();
   auto imageFilter = realPaint.getImageFilter();
   if (imageFilter != nullptr) {
@@ -519,6 +551,9 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
 
 void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
+  if (nothingToDraw(paint)) {
+    return;
+  }
   auto scaleX = state->matrix.getScaleX();
   auto skewY = state->matrix.getSkewY();
   auto scale = std::sqrt(scaleX * scaleX + skewY * skewY);
@@ -661,6 +696,14 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
       !state->matrix.rectStaysRect() || drawContext == nullptr) {
     return false;
   }
+  auto color = paint.color;
+  if (getBlendMode() == BlendMode::Clear) {
+    color = Color::Transparent();
+  } else if (getBlendMode() != BlendMode::Src) {
+    if (!color.isOpaque()) {
+      return false;
+    }
+  }
   auto bounds = Rect::MakeEmpty();
   if (!path.asRect(&bounds)) {
     return false;
@@ -675,11 +718,11 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
     if (useScissor) {
       FlipYIfNeeded(&bounds, surface);
       rect->intersect(bounds);
-      drawContext->addOp(ClearOp::Make(paint.color, *rect));
+      drawContext->addOp(ClearOp::Make(color, *rect));
       return true;
     } else if (rect->isEmpty()) {
       FlipYIfNeeded(&bounds, surface);
-      drawContext->addOp(ClearOp::Make(paint.color, bounds));
+      drawContext->addOp(ClearOp::Make(color, bounds));
       return true;
     }
   }
