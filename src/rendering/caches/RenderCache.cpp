@@ -94,7 +94,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   }
   usedAssets.insert(composition->uniqueID);
   auto sequence = Sequence::Get(composition);
-  auto info = SequenceInfo::Make(sequence, _useDiskCache);
+  auto info = SequenceInfo::Make(sequence);
   if (composition->staticContent()) {
     SequenceImageProxy proxy(info, 0);
     prepareAssetImage(composition->uniqueID, &proxy);
@@ -581,7 +581,7 @@ SequenceImageQueue* RenderCache::makeSequenceImageQueue(std::shared_ptr<Sequence
     return nullptr;
   }
   auto layer = stage->getLayerFromReferenceMap(sequence->uniqueID());
-  auto queue = SequenceImageQueue::MakeFrom(sequence, layer).release();
+  auto queue = SequenceImageQueue::MakeFrom(sequence, layer, _useDiskCache).release();
   if (queue == nullptr) {
     return nullptr;
   }

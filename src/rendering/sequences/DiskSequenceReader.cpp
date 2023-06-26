@@ -35,6 +35,15 @@ DiskSequenceReader::DiskSequenceReader(std::shared_ptr<File> file, Sequence* seq
     : sequence(sequence), file(file) {
 }
 
+DiskSequenceReader::~DiskSequenceReader() {
+  if (frontHardWareBuffer) {
+    tgfx::HardwareBufferRelease(frontHardWareBuffer);
+  }
+  if (backHardwareBuffer) {
+    tgfx::HardwareBufferRelease(backHardwareBuffer);
+  }
+}
+
 int DiskSequenceReader::width() const {
   return sequence->composition->width;
 }
@@ -67,16 +76,16 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
   if (pagDecoder == nullptr) {
     return nullptr;
   }
-  if (bitmap == nullptr && pixels == nullptr) {
+  if (frontHardWareBuffer == nullptr && pixels == nullptr) {
     if (tgfx::HardwareBufferAvailable()) {
-      auto hardwareBuffer =
+      frontHardWareBuffer =
           tgfx::HardwareBufferAllocate(pagDecoder->width(), pagDecoder->height(), false);
-      if (hardwareBuffer) {
-        bitmap = std::make_shared<tgfx::Bitmap>(hardwareBuffer);
-        tgfx::HardwareBufferRelease(hardwareBuffer);
+      if (frontHardWareBuffer && !sequence->composition->staticContent()) {
+        backHardwareBuffer =
+            tgfx::HardwareBufferAllocate(pagDecoder->width(), pagDecoder->height(), false);
       }
     }
-    if (bitmap == nullptr) {
+    if (frontHardWareBuffer == nullptr) {
       info = tgfx::ImageInfo::Make(pagDecoder->width(), pagDecoder->height(),
                                    tgfx::ColorType::RGBA_8888);
       tgfx::Buffer buffer(info.byteSize());
@@ -89,8 +98,9 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
     return imageBuffer;
   }
   bool success = false;
-  if (bitmap) {
-    success = pagDecoder->readFrame(targetFrame, bitmap->getHardwareBuffer());
+  auto renderBuffer = useFrontBuffer ? frontHardWareBuffer : backHardwareBuffer;
+  if (frontHardWareBuffer) {
+    success = pagDecoder->readFrame(targetFrame, renderBuffer);
   } else {
     if (pixels) {
       success =
@@ -102,8 +112,11 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
     LOGE("DiskSequenceReader: Error on readFrame.\n");
     return nullptr;
   }
-  if (bitmap) {
-    imageBuffer = bitmap->makeBuffer();
+  if (frontHardWareBuffer) {
+    if (backHardwareBuffer) {
+      useFrontBuffer = !useFrontBuffer;
+    }
+    imageBuffer = tgfx::ImageBuffer::MakeFrom(renderBuffer);
   } else {
     imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
   }

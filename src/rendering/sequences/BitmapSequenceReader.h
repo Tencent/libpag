@@ -36,6 +36,8 @@ class BitmapSequenceReader : public SequenceReader {
     return sequence->height;
   }
 
+  ~BitmapSequenceReader() override;
+
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
 
@@ -49,8 +51,10 @@ class BitmapSequenceReader : public SequenceReader {
   BitmapSequence* sequence = nullptr;
   Frame lastDecodeFrame = -1;
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
-  tgfx::Bitmap bitmap = {};
   tgfx::ImageInfo info = {};
   std::shared_ptr<tgfx::Data> pixels = nullptr;
+  bool useFrontBuffer = true;
+  HardwareBufferRef backHardwareBuffer = nullptr;
+  HardwareBufferRef frontHardWareBuffer = nullptr;
 };
 }  // namespace pag

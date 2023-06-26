@@ -27,16 +27,18 @@
 namespace pag {
 class SequenceInfo {
  public:
-  static std::shared_ptr<SequenceInfo> Make(Sequence* sequence, bool useDiskCache);
+  static std::shared_ptr<SequenceInfo> Make(Sequence* sequence);
 
   virtual ~SequenceInfo() = default;
 
   virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
-                                                     PAGFile* pagFile = nullptr);
+                                                     PAGFile* pagFile = nullptr,
+                                                     bool useDiskCache = false);
 
-  virtual std::shared_ptr<tgfx::Image> makeStaticImage(std::shared_ptr<File> file);
+  virtual std::shared_ptr<tgfx::Image> makeStaticImage(std::shared_ptr<File> file,
+                                                       bool useDiskCache);
   virtual std::shared_ptr<tgfx::Image> makeFrameImage(std::shared_ptr<SequenceReader> reader,
-                                                      Frame targetFrame);
+                                                      Frame targetFrame, bool useDiskCache);
 
   virtual bool staticContent() const;
   virtual ID uniqueID() const;
@@ -50,18 +52,18 @@ class SequenceInfo {
   std::weak_ptr<SequenceInfo> weakThis;
 
  protected:
-  explicit SequenceInfo(Sequence* sequence, bool useDiskCache);
+  explicit SequenceInfo(Sequence* sequence);
 
  private:
   Sequence* sequence;
-  bool useDiskCache = false;
 };
 
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
  public:
   StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info, int width,
-                          int height)
-      : tgfx::ImageGenerator(width, height), file(std::move(file)), info(info) {
+                          int height, bool useDiskCache)
+      : tgfx::ImageGenerator(width, height), file(std::move(file)), info(info),
+        useDiskCache(useDiskCache) {
   }
 
   bool isAlphaOnly() const override {
@@ -76,13 +78,14 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
 
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
-    auto reader = info->makeReader(file);
+    auto reader = info->makeReader(file, nullptr, useDiskCache);
     return reader->readBuffer(0);
   }
 
  private:
   std::shared_ptr<File> file = nullptr;
   std::shared_ptr<SequenceInfo> info = nullptr;
+  bool useDiskCache = false;
 };
 
 class SequenceFrameGenerator : public tgfx::ImageGenerator {

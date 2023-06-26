@@ -26,15 +26,27 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
     : file(std::move(file)), sequence(sequence) {
   // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
   // decoding will fail due to the memory sharing mechanism.
-  auto staticContent = sequence->composition->staticContent();
-  if (staticContent) {
-    bitmap.allocPixels(sequence->width, sequence->height, false);
-    bitmap.clear();
-  } else {
+  if (tgfx::HardwareBufferAvailable()) {
+    frontHardWareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
+    info = tgfx::HardwareBufferGetInfo(frontHardWareBuffer);
+    if (frontHardWareBuffer && !sequence->composition->staticContent()) {
+      backHardwareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
+    }
+  }
+  if (frontHardWareBuffer == nullptr) {
     info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);
     tgfx::Buffer buffer(info.byteSize());
     buffer.clear();
     pixels = buffer.release();
+  }
+}
+
+BitmapSequenceReader::~BitmapSequenceReader() {
+  if (frontHardWareBuffer) {
+    tgfx::HardwareBufferRelease(frontHardWareBuffer);
+  }
+  if (backHardwareBuffer) {
+    tgfx::HardwareBufferRelease(backHardwareBuffer);
   }
 }
 
@@ -44,14 +56,19 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   if (lastDecodeFrame == targetFrame) {
     return imageBuffer;
   }
-  if (bitmap.isEmpty() && pixels == nullptr) {
+  if (frontHardWareBuffer == nullptr && pixels == nullptr) {
     return nullptr;
   }
   imageBuffer = nullptr;
   lastDecodeFrame = -1;
   tgfx::Pixmap pixmap = {};
-  if (!bitmap.isEmpty()) {
-    pixmap.reset(bitmap);
+  auto renderBuffer = useFrontBuffer ? frontHardWareBuffer : backHardwareBuffer;
+  if (frontHardWareBuffer) {
+    auto hardwarePixels = tgfx::HardwareBufferLock(renderBuffer);
+    if (hardwarePixels == nullptr) {
+      return nullptr;
+    }
+    pixmap.reset(info, hardwarePixels);
   } else {
     pixmap.reset(info, const_cast<void*>(pixels->data()));
   }
@@ -75,14 +92,19 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
         auto result = codec->readPixels(
             pixmap.info(), reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
         if (!result) {
+          tgfx::HardwareBufferUnlock(renderBuffer);
           return nullptr;
         }
         firstRead = false;
       }
     }
   }
-  if (!bitmap.isEmpty()) {
-    imageBuffer = bitmap.makeBuffer();
+  if (renderBuffer) {
+    tgfx::HardwareBufferUnlock(renderBuffer);
+    if (backHardwareBuffer) {
+      useFrontBuffer = !useFrontBuffer;
+    }
+    imageBuffer = tgfx::ImageBuffer::MakeFrom(renderBuffer);
   } else {
     imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
   }

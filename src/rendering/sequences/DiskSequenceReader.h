@@ -29,10 +29,11 @@ class DiskSequenceReader : public SequenceReader {
 
   int height() const override;
 
+  ~DiskSequenceReader() override;
+
  private:
   DiskSequenceReader(std::shared_ptr<File> file, Sequence* sequence);
   Sequence* sequence = nullptr;
-  std::shared_ptr<tgfx::Bitmap> bitmap;
   std::shared_ptr<PAGDecoder> pagDecoder;
   std::shared_ptr<File> file;
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
@@ -41,5 +42,8 @@ class DiskSequenceReader : public SequenceReader {
   std::mutex locker = {};
   tgfx::ImageInfo info = {};
   std::shared_ptr<tgfx::Data> pixels = nullptr;
+  bool useFrontBuffer = true;
+  HardwareBufferRef backHardwareBuffer = nullptr;
+  HardwareBufferRef frontHardWareBuffer = nullptr;
 };
 }  // namespace pag
