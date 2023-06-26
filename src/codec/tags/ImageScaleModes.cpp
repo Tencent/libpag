@@ -22,9 +22,11 @@ namespace pag {
 void ReadImageScaleModes(DecodeStream* stream) {
   auto context = static_cast<CodecContext*>(stream->context);
   auto count = stream->readEncodedUint32();
-  context->imageScaleModes = new std::vector<Enum>(count);
-  for (uint32_t i = 0; i < count; i++) {
-    context->imageScaleModes->at(i) = stream->readEncodedUint32();
+  if (count > 0) {
+    context->imageScaleModes = new std::vector<Enum>(count);
+    for (uint32_t i = 0; i < count; i++) {
+      context->imageScaleModes->at(i) = stream->readEncodedUint32();
+    }
   }
 }
 
