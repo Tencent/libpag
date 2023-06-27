@@ -26,14 +26,11 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
     : file(std::move(file)), sequence(sequence) {
   // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
   // decoding will fail due to the memory sharing mechanism.
-  if (tgfx::HardwareBufferAvailable()) {
-    frontHardWareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
-    info = tgfx::HardwareBufferGetInfo(frontHardWareBuffer);
-    if (frontHardWareBuffer && !sequence->composition->staticContent()) {
-      backHardwareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
-    }
+  if (tgfx::HardwareBufferAvailable() && sequence->composition->staticContent()) {
+    hardWareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
+    info = tgfx::HardwareBufferGetInfo(hardWareBuffer);
   }
-  if (frontHardWareBuffer == nullptr) {
+  if (hardWareBuffer == nullptr) {
     info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);
     tgfx::Buffer buffer(info.byteSize());
     buffer.clear();
@@ -42,11 +39,8 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
 }
 
 BitmapSequenceReader::~BitmapSequenceReader() {
-  if (frontHardWareBuffer) {
-    tgfx::HardwareBufferRelease(frontHardWareBuffer);
-  }
-  if (backHardwareBuffer) {
-    tgfx::HardwareBufferRelease(backHardwareBuffer);
+  if (hardWareBuffer) {
+    tgfx::HardwareBufferRelease(hardWareBuffer);
   }
 }
 
@@ -56,15 +50,14 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   if (lastDecodeFrame == targetFrame) {
     return imageBuffer;
   }
-  if (frontHardWareBuffer == nullptr && pixels == nullptr) {
+  if (hardWareBuffer == nullptr && pixels == nullptr) {
     return nullptr;
   }
   imageBuffer = nullptr;
   lastDecodeFrame = -1;
   tgfx::Pixmap pixmap = {};
-  auto renderBuffer = useFrontBuffer ? frontHardWareBuffer : backHardwareBuffer;
-  if (frontHardWareBuffer) {
-    auto hardwarePixels = tgfx::HardwareBufferLock(renderBuffer);
+  if (hardWareBuffer) {
+    auto hardwarePixels = tgfx::HardwareBufferLock(hardWareBuffer);
     if (hardwarePixels == nullptr) {
       return nullptr;
     }
@@ -92,19 +85,16 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
         auto result = codec->readPixels(
             pixmap.info(), reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
         if (!result) {
-          tgfx::HardwareBufferUnlock(renderBuffer);
+          tgfx::HardwareBufferUnlock(hardWareBuffer);
           return nullptr;
         }
         firstRead = false;
       }
     }
   }
-  if (renderBuffer) {
-    tgfx::HardwareBufferUnlock(renderBuffer);
-    if (backHardwareBuffer) {
-      useFrontBuffer = !useFrontBuffer;
-    }
-    imageBuffer = tgfx::ImageBuffer::MakeFrom(renderBuffer);
+  if (hardWareBuffer) {
+    tgfx::HardwareBufferUnlock(hardWareBuffer);
+    imageBuffer = tgfx::ImageBuffer::MakeFrom(hardWareBuffer);
   } else {
     imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
   }

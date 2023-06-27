@@ -53,8 +53,6 @@ class BitmapSequenceReader : public SequenceReader {
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
   tgfx::ImageInfo info = {};
   std::shared_ptr<tgfx::Data> pixels = nullptr;
-  bool useFrontBuffer = true;
-  HardwareBufferRef backHardwareBuffer = nullptr;
-  HardwareBufferRef frontHardWareBuffer = nullptr;
+  HardwareBufferRef hardWareBuffer = nullptr;
 };
 }  // namespace pag

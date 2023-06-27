@@ -97,9 +97,8 @@ class RenderCache : public Performance {
   }
 
   /**
-   * If set to true, PAG will save the rendering data to a file
-   * when first rendering BitmapComposition and VideoComposition,
-   * which will reduces memory consumption, and increases stability.
+   * If set to true, PAG will cache the associated rendering data into a disk file, such as the decoded image frames
+   * of video compositions. This can help reduce memory usage and improve device stability.
    */
   bool useDiskCache() const {
     return _useDiskCache;
