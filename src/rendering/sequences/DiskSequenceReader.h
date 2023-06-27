@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,42 +17,33 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "SequenceReader.h"
-#include "pag/file.h"
-#include "rendering/Performance.h"
+#include "rendering/sequences/VideoReader.h"
 #include "tgfx/core/Bitmap.h"
 
 namespace pag {
-class BitmapSequenceReader : public SequenceReader {
+class DiskSequenceReader : public SequenceReader {
  public:
-  BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
+  static std::shared_ptr<DiskSequenceReader> Make(std::shared_ptr<File> file, Sequence* sequence);
 
-  int width() const override {
-    return sequence->width;
-  }
+  int width() const override;
 
-  int height() const override {
-    return sequence->height;
-  }
+  int height() const override;
 
-  ~BitmapSequenceReader() override;
+  ~DiskSequenceReader() override;
 
- protected:
+ private:
+  DiskSequenceReader(std::shared_ptr<File> file, Sequence* sequence);
+  Sequence* sequence = nullptr;
+  std::shared_ptr<PAGDecoder> pagDecoder;
+  std::shared_ptr<File> file;
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
-
   void onReportPerformance(Performance* performance, int64_t decodingTime) override;
-
-  Frame findStartFrame(Frame targetFrame);
-
-  std::mutex locker = {};
-  // Keep a reference to the File in case the Sequence object is released while we are using it.
-  std::shared_ptr<File> file = nullptr;
-  BitmapSequence* sequence = nullptr;
-  Frame lastDecodeFrame = -1;
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
+  std::mutex locker = {};
   tgfx::ImageInfo info = {};
   std::shared_ptr<tgfx::Data> pixels = nullptr;
-  HardwareBufferRef hardWareBuffer = nullptr;
+  bool useFrontBuffer = true;
+  HardwareBufferRef backHardwareBuffer = nullptr;
+  HardwareBufferRef frontHardWareBuffer = nullptr;
 };
 }  // namespace pag

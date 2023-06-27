@@ -20,23 +20,24 @@
 
 namespace pag {
 std::unique_ptr<SequenceImageQueue> SequenceImageQueue::MakeFrom(
-    std::shared_ptr<SequenceInfo> sequence, PAGLayer* pagLayer) {
+    std::shared_ptr<SequenceInfo> sequence, PAGLayer* pagLayer, bool useDiskCache) {
   if (sequence == nullptr || pagLayer == nullptr || sequence->staticContent()) {
     return nullptr;
   }
-  auto reader = sequence->makeReader(pagLayer->getFile(), pagLayer->rootFile);
+  auto reader = sequence->makeReader(pagLayer->getFile(), pagLayer->rootFile, useDiskCache);
   if (reader == nullptr) {
     return nullptr;
   }
   auto firstFrame = sequence->firstVisibleFrame(pagLayer->getLayer());
   return std::unique_ptr<SequenceImageQueue>(
-      new SequenceImageQueue(sequence, std::move(reader), firstFrame));
+      new SequenceImageQueue(sequence, std::move(reader), firstFrame, useDiskCache));
 }
 
 SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
-                                       std::shared_ptr<SequenceReader> reader, Frame firstFrame)
+                                       std::shared_ptr<SequenceReader> reader, Frame firstFrame,
+                                       bool useDiskCache)
     : sequence(sequence), reader(std::move(reader)), firstFrame(firstFrame),
-      totalFrames(sequence->duration()) {
+      totalFrames(sequence->duration()), useDiskCache(useDiskCache) {
 }
 
 void SequenceImageQueue::prepareNextImage() {
@@ -51,7 +52,7 @@ void SequenceImageQueue::prepare(Frame targetFrame) {
   if (preparedImage != nullptr || targetFrame < 0 || targetFrame >= totalFrames) {
     return;
   }
-  auto image = sequence->makeFrameImage(reader, targetFrame);
+  auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache);
   preparedImage = image->makeDecoded();
   preparedFrame = targetFrame;
 }
@@ -66,7 +67,7 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(Frame targetFrame) {
     currentFrame = preparedFrame;
     return currentImage;
   }
-  auto image = sequence->makeFrameImage(reader, targetFrame);
+  auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache);
   if (image == nullptr) {
     return nullptr;
   }

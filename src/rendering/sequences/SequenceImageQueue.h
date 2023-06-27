@@ -27,7 +27,7 @@ namespace pag {
 class SequenceImageQueue {
  public:
   static std::unique_ptr<SequenceImageQueue> MakeFrom(std::shared_ptr<SequenceInfo> sequence,
-                                                      PAGLayer* pagLayer);
+                                                      PAGLayer* pagLayer, bool useDiskCache);
 
   /**
    * Prepares the image of the next frame.
@@ -58,9 +58,10 @@ class SequenceImageQueue {
   Frame preparedFrame = -1;
   std::shared_ptr<tgfx::Image> currentImage = nullptr;
   std::shared_ptr<tgfx::Image> preparedImage = nullptr;
+  bool useDiskCache = false;
 
   SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence, std::shared_ptr<SequenceReader> reader,
-                     Frame firstFrame);
+                     Frame firstFrame, bool useDiskCache);
 
   friend class RenderCache;
 };

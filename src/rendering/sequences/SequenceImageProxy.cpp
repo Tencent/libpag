@@ -47,6 +47,6 @@ std::shared_ptr<tgfx::Image> SequenceImageProxy::makeImage(RenderCache* cache) c
     return nullptr;
   }
   auto file = cache->getFileByAssetID(sequence->uniqueID());
-  return sequence->makeStaticImage(std::move(file));
+  return sequence->makeStaticImage(std::move(file), cache->useDiskCache());
 }
 }  // namespace pag

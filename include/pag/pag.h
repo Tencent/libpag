@@ -1329,6 +1329,18 @@ class PAG_API PAGPlayer {
   void setCacheEnabled(bool value);
 
   /**
+   * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+   * decoded image frames of video compositions. This can help reduce memory usage and improve
+   * rendering performance.
+   */
+  bool useDiskCache();
+
+  /**
+   * Set the value of useDiskCache property.
+   */
+  void setUseDiskCache(bool value);
+
+  /**
    * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
    * scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
    * graphics memory which leads to better performance. The default value is 1.0.
@@ -1621,6 +1633,8 @@ class PAG_API PAGDecoder {
   std::shared_ptr<SequenceFile> sequenceFile = nullptr;
   std::shared_ptr<CompositionReader> reader = nullptr;
   std::vector<TimeRange> staticTimeRanges = {};
+  std::function<std::string(PAGDecoder*, std::shared_ptr<PAGComposition>)> cacheKeyGeneratorFun =
+      nullptr;
 
   static Composition* GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition);
   static std::pair<int, float> GetFrameCountAndRate(std::shared_ptr<PAGComposition> pagComposition,
@@ -1638,6 +1652,9 @@ class PAG_API PAGDecoder {
   void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
   std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
   std::shared_ptr<PAGComposition> getComposition();
+  void setCacheKeyGeneratorFun(
+      std::function<std::string(PAGDecoder*, std::shared_ptr<PAGComposition>)> fun);
+  friend class DiskSequenceReader;
 };
 
 /**

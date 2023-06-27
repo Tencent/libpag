@@ -97,6 +97,22 @@ class RenderCache : public Performance {
   }
 
   /**
+   * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+   * decoded image frames of video compositions. This can help reduce memory usage and improve
+   * rendering performance.
+   */
+  bool useDiskCache() const {
+    return _useDiskCache;
+  }
+
+  /**
+   * Set the value of useDiskCache property.
+   */
+  void setUseDiskCache(bool value) {
+    _useDiskCache = value;
+  }
+
+  /**
    * Returns a snapshot cache of specified asset id. Returns null if there is no associated cache
    * available. This is a read-only query which is used usually during hit testing.
    */
@@ -171,6 +187,7 @@ class RenderCache : public Performance {
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
   bool _snapshotEnabled = true;
+  bool _useDiskCache = false;
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};

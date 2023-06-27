@@ -82,6 +82,14 @@
   pagPlayer->setCacheEnabled(value);
 }
 
+- (BOOL)useDiskCache {
+  return pagPlayer->useDiskCache();
+}
+
+- (void)setUseDiskCache:(BOOL)value {
+  pagPlayer->setUseDiskCache(value);
+}
+
 - (float)cacheScale {
   return pagPlayer->cacheScale();
 }
