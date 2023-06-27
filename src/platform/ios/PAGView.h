@@ -166,8 +166,8 @@ PAG_API @interface PAGView : UIView
 
 /**
  * If set to true, PAG will cache the associated rendering data into a disk file, such as the
- * decoded image frames of video compositions. This can help reduce memory usage and improve device
- * stability.
+ * decoded image frames of video compositions. This can help reduce memory usage and improve
+ * rendering performance.
  */
 - (BOOL)useDiskCache;
 

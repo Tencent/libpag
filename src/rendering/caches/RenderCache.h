@@ -97,8 +97,9 @@ class RenderCache : public Performance {
   }
 
   /**
-   * If set to true, PAG will cache the associated rendering data into a disk file, such as the decoded image frames
-   * of video compositions. This can help reduce memory usage and improve device stability.
+   * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+   * decoded image frames of video compositions. This can help reduce memory usage and improve
+   * rendering performance.
    */
   bool useDiskCache() const {
     return _useDiskCache;

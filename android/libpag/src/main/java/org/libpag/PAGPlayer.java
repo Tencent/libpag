@@ -69,8 +69,9 @@ public class PAGPlayer {
     public native void setCacheEnabled(boolean value);
 
     /**
-     * If set to true, PAG will cache the associated rendering data into a disk file, such as the decoded image frames
-     * of video compositions. This can help reduce memory usage and improve device stability.
+     * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+     * decoded image frames of video compositions. This can help reduce memory usage and improve
+     * rendering performance.
      */
     public native boolean useDiskCache();
 
