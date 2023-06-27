@@ -70,8 +70,9 @@ PAG_API @interface PAGPlayer : NSObject
 - (void)setCacheEnabled:(BOOL)value;
 
 /**
- * If set to true, PAG will cache the associated rendering data into a disk file, such as the decoded image frames
- * of video compositions. This can help reduce memory usage and improve device stability.
+ * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+ * decoded image frames of video compositions. This can help reduce memory usage and improve device
+ * stability.
  */
 - (BOOL)useDiskCache;
 
