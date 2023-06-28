@@ -204,7 +204,7 @@
   return file != nil;
 }
 
-- (void)setPath:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+- (void)setPath:(NSString*)path completionBlock:(void (^)(BOOL))callback {
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -213,7 +213,7 @@
   [PAGFile Load:path
       completionBlock:^(PAGFile* pagFile) {
         [self setComposition:pagFile];
-        callback(pagFile);
+        callback(pagFile != nil);
       }];
 }
 

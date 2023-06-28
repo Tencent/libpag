@@ -503,17 +503,17 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   return file != nil;
 }
 
-- (void)setPath:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+- (void)setPath:(NSString*)path completionBlock:(void (^)(BOOL))callback {
   [self setPath:path
          maxFrameRate:DEFAULT_MAX_FRAMERATE
-      completionBlock:^(PAGFile* pagFile) {
-        callback(pagFile);
+      completionBlock:^(BOOL status) {
+        callback(status);
       }];
 }
 
 - (void)setPath:(NSString*)path
        maxFrameRate:(float)maxFrameRate
-    completionBlock:(void (^)(PAGFile*))callback {
+    completionBlock:(void (^)(BOOL))callback {
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -522,7 +522,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [PAGFile Load:path
       completionBlock:^(PAGFile* pagFile) {
         [self setComposition:pagComposition maxFrameRate:maxFrameRate];
-        callback(pagFile);
+        callback(pagFile != nil);
       }];
 }
 

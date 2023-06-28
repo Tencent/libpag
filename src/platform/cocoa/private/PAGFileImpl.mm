@@ -91,7 +91,11 @@
 }
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length {
-  auto pagFile = pag::PAGFile::Load(bytes, length);
+  return [PAGFileImpl Load:bytes size:length path:@""];
+}
+
++ (PAGFile*)Load:(const void*)bytes size:(size_t)length path:(NSString*)filePath {
+  auto pagFile = pag::PAGFile::Load(bytes, length, [filePath UTF8String]);
   if (pagFile == nullptr) {
     return nil;
   }
@@ -124,7 +128,7 @@
                               NSError* _Nullable error) {
             if (error == nil && data != nil) {
               [PAGDiskCacheImpl WritFile:path data:data];
-              callback([PAGFileImpl Load:data.bytes size:data.length]);
+              callback([PAGFileImpl Load:data.bytes size:data.length path:path]);
             } else {
               callback(nil);
             }
