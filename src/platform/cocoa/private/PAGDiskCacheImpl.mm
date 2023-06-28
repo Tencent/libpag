@@ -18,6 +18,7 @@
 
 #import "PAGDiskCacheImpl.h"
 #import "pag/pag.h"
+#include "rendering/caches/DiskCache.h"
 
 @implementation PAGDiskCacheImpl
 
@@ -31,6 +32,26 @@
 
 + (void)RemoveAll {
   pag::PAGDiskCache::RemoveAll();
+}
+
++ (NSString*)GetFilePath:(NSString*)key {
+  if (key == nil) {
+    return nil;
+  }
+  std::string path = pag::DiskCache::GetFilePath([key UTF8String]);
+  if (path.length() == 0) {
+    return nil;
+  }
+  return [NSString stringWithUTF8String:path.c_str()];
+}
+
++ (BOOL)WritFile:(NSString*)key data:(NSData*)data {
+  if (key == nil || data == nil) {
+    return false;
+  }
+  std::string cacheKey = [key UTF8String];
+  auto cacheDatas = tgfx::Data::MakeWithoutCopy(data.bytes, data.length);
+  return pag::DiskCache::WriteFile(cacheKey, cacheDatas);
 }
 
 @end
