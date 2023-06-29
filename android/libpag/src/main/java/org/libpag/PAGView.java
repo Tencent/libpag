@@ -69,7 +69,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         void onAnimationUpdate(PAGView view);
     }
 
-    public interface PAGImageViewLoadListener {
+    public interface PAGViewLoadListener {
         void onLoad(boolean success);
     }
 
@@ -254,7 +254,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     /**
      * Asynchronously load a pag file from the specific path.
      */
-    public void setPath(String path, PAGImageViewLoadListener listener) {
+    public void setPath(String path, PAGViewLoadListener listener) {
         PAGFile.getExecutor().execute(() -> {
             boolean success = setPath(path);
             if (listener != null) {

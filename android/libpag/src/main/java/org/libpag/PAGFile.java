@@ -46,7 +46,7 @@ public class PAGFile extends PAGComposition {
      * if you don't want to load a PAGFile from the intenal caches.
      */
     public static PAGFile Load(String path) {
-        if (!TextUtils.isEmpty(path) && (path.startsWith("http") || path.startsWith("https"))) {
+        if (!TextUtils.isEmpty(path) && (path.startsWith("http://") || path.startsWith("https://"))) {
             return NetworkFetcher.FetchPAGFile(path);
         } else {
             return LoadFromPath(path);
