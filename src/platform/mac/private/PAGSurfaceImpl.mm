@@ -52,6 +52,7 @@
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   PAGSurfaceImpl* pagSurface = [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
   pagSurface.cvPixelBuffer = pixelBuffer;
+  CFRetain(pagSurface.cvPixelBuffer);
   return pagSurface;
 }
 
