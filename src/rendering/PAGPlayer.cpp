@@ -122,6 +122,16 @@ void PAGPlayer::setCacheEnabled(bool value) {
   renderCache->setSnapshotEnabled(value);
 }
 
+bool PAGPlayer::useDiskCache() {
+  LockGuard autoLock(rootLocker);
+  return renderCache->useDiskCache();
+}
+
+void PAGPlayer::setUseDiskCache(bool value) {
+  LockGuard autoLock(rootLocker);
+  renderCache->setUseDiskCache(value);
+}
+
 float PAGPlayer::cacheScale() {
   LockGuard autoLock(rootLocker);
   return stage->cacheScale();

@@ -282,6 +282,22 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
+     * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+     * decoded image frames of video compositions. This can help reduce memory usage and improve
+     * rendering performance.
+     */
+    public boolean useDiskCache() {
+        return pagPlayer.useDiskCache();
+    }
+
+    /**
+     * Set the value of useDiskCache property.
+     */
+    public void setUseDiskCache(boolean value) {
+        pagPlayer.setUseDiskCache(value);
+    }
+
+    /**
      * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
      * scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
      * graphics memory which leads to better performance. The default value is 1.0.

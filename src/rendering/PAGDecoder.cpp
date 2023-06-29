@@ -28,6 +28,21 @@
 #include "rendering/utils/LockGuard.h"
 
 namespace pag {
+
+static std::string DefaultCacheKeyGeneratorFunc(PAGDecoder* decoder,
+                                                std::shared_ptr<PAGComposition> composition) {
+  if (!composition->isPAGFile() || pag::ContentVersion::Get(composition) > 0) {
+    return "";
+  }
+  auto filePath = static_cast<PAGFile*>(composition.get())->path();
+  filePath = Platform::Current()->getSandboxPath(filePath);
+  if (filePath.empty()) {
+    return "";
+  }
+  return filePath + "." + std::to_string(decoder->width()) + "x" +
+         std::to_string(decoder->height());
+}
+
 Composition* PAGDecoder::GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition) {
   auto numChildren = pagComposition->numChildren();
   if (numChildren == 0) {
@@ -258,15 +273,8 @@ void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composit
 }
 
 std::string PAGDecoder::generateCacheKey(std::shared_ptr<PAGComposition> composition) {
-  if (!composition->isPAGFile() || composition->contentModified()) {
-    return "";
-  }
-  auto filePath = static_cast<PAGFile*>(composition.get())->path();
-  filePath = Platform::Current()->getSandboxPath(filePath);
-  if (filePath.empty()) {
-    return "";
-  }
-  return filePath + "." + std::to_string(_width) + "x" + std::to_string(_height);
+  return cacheKeyGeneratorFun == nullptr ? DefaultCacheKeyGeneratorFunc(this, composition)
+                                         : cacheKeyGeneratorFun(this, composition);
 }
 
 std::shared_ptr<PAGComposition> PAGDecoder::getComposition() {
@@ -278,4 +286,10 @@ std::shared_ptr<PAGComposition> PAGDecoder::getComposition() {
   }
   return nullptr;
 }
+
+void PAGDecoder::setCacheKeyGeneratorFun(
+    std::function<std::string(PAGDecoder*, std::shared_ptr<PAGComposition> composition)> fun) {
+  cacheKeyGeneratorFun = fun;
+}
+
 }  // namespace pag

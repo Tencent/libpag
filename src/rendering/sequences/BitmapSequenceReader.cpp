@@ -26,15 +26,21 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
     : file(std::move(file)), sequence(sequence) {
   // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
   // decoding will fail due to the memory sharing mechanism.
-  auto staticContent = sequence->composition->staticContent();
-  if (staticContent) {
-    bitmap.allocPixels(sequence->width, sequence->height, false);
-    bitmap.clear();
-  } else {
+  if (tgfx::HardwareBufferAvailable() && sequence->composition->staticContent()) {
+    hardWareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
+    info = tgfx::HardwareBufferGetInfo(hardWareBuffer);
+  }
+  if (hardWareBuffer == nullptr) {
     info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);
     tgfx::Buffer buffer(info.byteSize());
     buffer.clear();
     pixels = buffer.release();
+  }
+}
+
+BitmapSequenceReader::~BitmapSequenceReader() {
+  if (hardWareBuffer) {
+    tgfx::HardwareBufferRelease(hardWareBuffer);
   }
 }
 
@@ -44,14 +50,18 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   if (lastDecodeFrame == targetFrame) {
     return imageBuffer;
   }
-  if (bitmap.isEmpty() && pixels == nullptr) {
+  if (hardWareBuffer == nullptr && pixels == nullptr) {
     return nullptr;
   }
   imageBuffer = nullptr;
   lastDecodeFrame = -1;
   tgfx::Pixmap pixmap = {};
-  if (!bitmap.isEmpty()) {
-    pixmap.reset(bitmap);
+  if (hardWareBuffer) {
+    auto hardwarePixels = tgfx::HardwareBufferLock(hardWareBuffer);
+    if (hardwarePixels == nullptr) {
+      return nullptr;
+    }
+    pixmap.reset(info, hardwarePixels);
   } else {
     pixmap.reset(info, const_cast<void*>(pixels->data()));
   }
@@ -75,14 +85,16 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
         auto result = codec->readPixels(
             pixmap.info(), reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
         if (!result) {
+          tgfx::HardwareBufferUnlock(hardWareBuffer);
           return nullptr;
         }
         firstRead = false;
       }
     }
   }
-  if (!bitmap.isEmpty()) {
-    imageBuffer = bitmap.makeBuffer();
+  if (hardWareBuffer) {
+    tgfx::HardwareBufferUnlock(hardWareBuffer);
+    imageBuffer = tgfx::ImageBuffer::MakeFrom(hardWareBuffer);
   } else {
     imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
   }

@@ -69,6 +69,18 @@ public class PAGPlayer {
     public native void setCacheEnabled(boolean value);
 
     /**
+     * If set to true, PAG will cache the associated rendering data into a disk file, such as the
+     * decoded image frames of video compositions. This can help reduce memory usage and improve
+     * rendering performance.
+     */
+    public native boolean useDiskCache();
+
+    /**
+     * Set the value of useDiskCache property.
+     */
+    public native void setUseDiskCache(boolean value);
+
+    /**
      * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
      * scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
      * graphics memory which leads to better performance. The default value is 1.0.

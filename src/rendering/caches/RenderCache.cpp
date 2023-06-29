@@ -581,7 +581,7 @@ SequenceImageQueue* RenderCache::makeSequenceImageQueue(std::shared_ptr<Sequence
     return nullptr;
   }
   auto layer = stage->getLayerFromReferenceMap(sequence->uniqueID());
-  auto queue = SequenceImageQueue::MakeFrom(sequence, layer).release();
+  auto queue = SequenceImageQueue::MakeFrom(sequence, layer, _useDiskCache).release();
   if (queue == nullptr) {
     return nullptr;
   }
