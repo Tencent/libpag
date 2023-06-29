@@ -144,6 +144,7 @@ enum class TagCode {
   
   StrokeStyle = 92,
   OuterGlowStyle = 93,
+  ImageScaleModes = 94,
 
   // add new tags here...
 
@@ -2510,6 +2511,7 @@ class PAG_API File {
 
   std::vector<int>* editableImages = nullptr;
   std::vector<int>* editableTexts = nullptr;
+  std::vector<Enum>* imageScaleModes = nullptr;  // PAGScaleMode
 
  private:
   PreComposeLayer* rootLayer = nullptr;

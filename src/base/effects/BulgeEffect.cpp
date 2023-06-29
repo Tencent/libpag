@@ -25,7 +25,7 @@ static void ConvertEllipseToPath(tgfx::Path* path, float centerX, float centerY,
                                  float radiusY) {
   auto start = -static_cast<float>(M_PI_2);
   auto endAngle = static_cast<float>(M_PI + M_PI_2);
-  auto end = 0;
+  auto end = 0.0f;
   auto currentX = centerX + cosf(start) * radiusX;
   auto currentY = centerY + sinf(start) * radiusY;
   path->moveTo(currentX, currentY);

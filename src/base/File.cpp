@@ -57,6 +57,7 @@ File::~File() {
   delete rootLayer;
   delete editableImages;
   delete editableTexts;
+  delete imageScaleModes;
 }
 
 void File::updateEditables(Composition* composition) {

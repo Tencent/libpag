@@ -49,6 +49,7 @@ class CodecContext : public StreamContext {
 
   std::vector<int>* editableImages = nullptr;
   std::vector<int>* editableTexts = nullptr;
+  std::vector<Enum>* imageScaleModes = nullptr;
   uint16_t tagLevel = 0;
 };
 }  // namespace pag
