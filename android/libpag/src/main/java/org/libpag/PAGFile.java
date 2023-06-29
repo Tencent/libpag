@@ -1,16 +1,44 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 package org.libpag;
 
 import android.content.res.AssetManager;
+import android.text.TextUtils;
 
 import org.extra.tools.LibraryLoadUtils;
 
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 public class PAGFile extends PAGComposition {
+
+    public interface PAGFileLoadListener {
+        void onLoad(PAGFile file);
+    }
+
     /**
      * The maximum tag level current SDK supports.
      */
     public static native int MaxSupportedTagLevel();
 
-    /***
+    /**
      * Load a pag file from the specified path, returns null if the file does not exist or the
      * data is not a pag file.
      * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
@@ -18,14 +46,31 @@ public class PAGFile extends PAGComposition {
      * if you don't want to load a PAGFile from the intenal caches.
      */
     public static PAGFile Load(String path) {
-        return LoadFromPath(path);
+        if (!TextUtils.isEmpty(path) && (path.startsWith("http") || path.startsWith("https"))) {
+            return NetworkFetcher.FetchPAGFile(path);
+        } else {
+            return LoadFromPath(path);
+        }
+    }
+
+    /**
+     * Asynchronously load a pag file from the specific path.
+     */
+    public static void Load(String path, PAGFileLoadListener listener) {
+        getExecutor().execute(() -> {
+            PAGFile pagFile = Load(path);
+            if (listener != null) {
+                listener.onLoad(pagFile);
+                Load(path);
+            }
+        });
     }
 
     public static PAGFile Load(byte[] bytes) {
         return LoadFromBytes(bytes, bytes.length);
     }
 
-    /***
+    /**
      * Load a pag file from assets, returns null if the file does not exist or the data is not a
      * pag file.
      * Note: The same path shares resource in memory untill the file is released. If the file
@@ -144,6 +189,24 @@ public class PAGFile extends PAGComposition {
     public native PAGFile copyOriginal();
 
     private static native final void nativeInit();
+
+    private static ThreadPoolExecutor executors;
+
+    protected static ThreadPoolExecutor getExecutor() {
+        if (executors != null) {
+            return executors;
+        }
+        synchronized (PAGFile.class) {
+            if (executors != null) {
+                return executors;
+            }
+            executors = new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                    60L, TimeUnit.SECONDS,
+                    new SynchronousQueue<>());
+            executors.allowCoreThreadTimeOut(true);
+            return executors;
+        }
+    }
 
     static {
         LibraryLoadUtils.loadLibrary("pag");

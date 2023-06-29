@@ -68,6 +68,10 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         void onAnimationUpdate(PAGImageView view);
     }
 
+    public interface PAGImageViewLoadListener {
+        void onLoad(boolean success);
+    }
+
     private final static String TAG = "PAGImageView";
     private final static float DEFAULT_MAX_FRAMERATE = 30f;
     private PAGAnimator animator;
@@ -145,6 +149,26 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         refreshResource(path, composition, maxFrameRate);
         return composition != null;
     }
+
+    /**
+     * Asynchronously Loads a pag file from the specified path.
+     */
+    public void setPath(String path, PAGImageView.PAGImageViewLoadListener listener) {
+        setPath(path, DEFAULT_MAX_FRAMERATE, listener);
+    }
+
+    /**
+     * Asynchronously loads a pag file from the specified path with the maxFrameRate limit.
+     */
+    public void setPath(String path, float maxFrameRate, PAGImageView.PAGImageViewLoadListener listener) {
+        PAGFile.getExecutor().execute(() -> {
+            boolean success = setPath(path, maxFrameRate);
+            if (listener != null) {
+                listener.onLoad(success);
+            }
+        });
+    }
+
 
     private PAGComposition _composition;
 
