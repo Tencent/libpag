@@ -24,5 +24,6 @@ namespace pag {
 class NativePlatform : public Platform {
  public:
   bool registerFallbackFonts() const override;
+  std::string getCacheDir() const override;
 };
 }  // namespace pag
