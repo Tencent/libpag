@@ -49,9 +49,9 @@ public class PAGDiskCache {
      */
     public static native void RemoveAll();
 
-    protected static native String GetFilePath(String key);
+    static native String GetFilePath(String key);
 
-    protected static native boolean WriteFile(String key, byte[] bytes);
+    static native boolean WriteFile(String key, byte[] bytes);
 
     private static String GetCacheDir() {
         Context context = LibraryLoadUtils.getAppContext();

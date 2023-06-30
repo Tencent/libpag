@@ -18,11 +18,9 @@
 
 package org.libpag;
 
-import android.text.TextUtils;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -32,7 +30,7 @@ class NetworkFetcher {
 
     private static final String TAG = "NetworkFetcher";
 
-    private static byte[] FetchData(String urlString) {
+    protected static byte[] FetchData(String urlString) {
         InputStream inputStream = null;
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         HttpURLConnection connection = null;
@@ -81,22 +79,6 @@ class NetworkFetcher {
                 connection.disconnect();
             }
         }
-    }
-
-    protected static PAGFile FetchPAGFile(String url) {
-        String filePath = PAGDiskCache.GetFilePath(url);
-        if (!TextUtils.isEmpty(filePath) && new File(filePath).exists()) {
-            return PAGFile.Load(filePath);
-        }
-        byte[] data = FetchData(url);
-        if (data == null) {
-            return null;
-        }
-        if (PAGDiskCache.WriteFile(url, data)) {
-            filePath = PAGDiskCache.GetFilePath(url);
-            return PAGFile.LoadFromBytes(data, data.length, filePath);
-        }
-        return PAGFile.Load(data);
     }
 
 }

@@ -23,14 +23,12 @@ import android.text.TextUtils;
 
 import org.extra.tools.LibraryLoadUtils;
 
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.io.FileInputStream;
 
 public class PAGFile extends PAGComposition {
 
-    public interface PAGFileLoadListener {
-        void onLoad(PAGFile file);
+    public interface LoadListener<T> {
+        void onLoad(T result);
     }
 
     /**
@@ -47,7 +45,23 @@ public class PAGFile extends PAGComposition {
      */
     public static PAGFile Load(String path) {
         if (!TextUtils.isEmpty(path) && (path.startsWith("http://") || path.startsWith("https://"))) {
-            return NetworkFetcher.FetchPAGFile(path);
+            byte[] data = null;
+            String filePath = PAGDiskCache.GetFilePath(path);
+            if (!TextUtils.isEmpty(filePath)) {
+                try (FileInputStream inputStream = new FileInputStream(filePath)) {
+                    data = new byte[inputStream.available()];
+                    inputStream.read(data);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if (data == null) {
+                data = NetworkFetcher.FetchData(path);
+            }
+            if (data == null) {
+                return null;
+            }
+            return LoadFromBytes(data, data.length, path);
         } else {
             return LoadFromPath(path);
         }
@@ -56,8 +70,8 @@ public class PAGFile extends PAGComposition {
     /**
      * Asynchronously load a pag file from the specific path.
      */
-    public static void Load(String path, PAGFileLoadListener listener) {
-        getExecutor().execute(() -> {
+    public static void LoadAsync(String path, LoadListener<PAGFile> listener) {
+        NativeExecutor.execute(() -> {
             PAGFile pagFile = Load(path);
             if (listener != null) {
                 listener.onLoad(pagFile);
@@ -81,7 +95,7 @@ public class PAGFile extends PAGComposition {
 
     private static native PAGFile LoadFromPath(String path);
 
-    protected static native PAGFile LoadFromBytes(byte[] bytes, int limit, String path);
+    private static native PAGFile LoadFromBytes(byte[] bytes, int limit, String path);
 
     private static native PAGFile LoadFromAssets(AssetManager manager, String fileName);
 
@@ -188,24 +202,6 @@ public class PAGFile extends PAGComposition {
     public native PAGFile copyOriginal();
 
     private static native final void nativeInit();
-
-    private static ThreadPoolExecutor executors;
-
-    protected static ThreadPoolExecutor getExecutor() {
-        if (executors != null) {
-            return executors;
-        }
-        synchronized (PAGFile.class) {
-            if (executors != null) {
-                return executors;
-            }
-            executors = new ThreadPoolExecutor(0, Integer.MAX_VALUE,
-                    60L, TimeUnit.SECONDS,
-                    new SynchronousQueue<>());
-            executors.allowCoreThreadTimeOut(true);
-            return executors;
-        }
-    }
 
     static {
         LibraryLoadUtils.loadLibrary("pag");
