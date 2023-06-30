@@ -45,19 +45,7 @@ public class PAGFile extends PAGComposition {
      */
     public static PAGFile Load(String path) {
         if (!TextUtils.isEmpty(path) && (path.startsWith("http://") || path.startsWith("https://"))) {
-            byte[] data = null;
-            String filePath = PAGDiskCache.GetFilePath(path);
-            if (!TextUtils.isEmpty(filePath)) {
-                try (FileInputStream inputStream = new FileInputStream(filePath)) {
-                    data = new byte[inputStream.available()];
-                    inputStream.read(data);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-            if (data == null) {
-                data = NetworkFetcher.FetchData(path);
-            }
+            byte[] data = NetworkFetcher.FetchData(path);
             if (data == null) {
                 return null;
             }

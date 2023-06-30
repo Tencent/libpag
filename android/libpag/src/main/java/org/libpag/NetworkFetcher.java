@@ -18,9 +18,11 @@
 
 package org.libpag;
 
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -31,10 +33,20 @@ class NetworkFetcher {
     private static final String TAG = "NetworkFetcher";
 
     protected static byte[] FetchData(String urlString) {
+        byte[] result;
+        String filePath = PAGDiskCache.GetFilePath(urlString);
+        if (!TextUtils.isEmpty(filePath)) {
+            try (FileInputStream fileInputStream = new FileInputStream(filePath)) {
+                result = new byte[fileInputStream.available()];
+                fileInputStream.read(result);
+                return result;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         InputStream inputStream = null;
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         HttpURLConnection connection = null;
-
         try {
             URL url = new URL(urlString);
             connection = (HttpURLConnection) url.openConnection();
@@ -55,7 +67,9 @@ class NetworkFetcher {
                 byteArrayOutputStream.write(buffer, 0, bytesRead);
             }
 
-            return byteArrayOutputStream.toByteArray();
+            result = byteArrayOutputStream.toByteArray();
+            PAGDiskCache.WriteFile(urlString, result);
+            return result;
         } catch (IOException e) {
             Log.e(TAG, "Error: " + e.getMessage());
             e.printStackTrace();
@@ -64,14 +78,14 @@ class NetworkFetcher {
             if (inputStream != null) {
                 try {
                     inputStream.close();
-                } catch (IOException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
             if (byteArrayOutputStream != null) {
                 try {
                     byteArrayOutputStream.close();
-                } catch (IOException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
