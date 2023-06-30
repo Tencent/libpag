@@ -20,7 +20,7 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> OuterGlowStyleTag(OuterGlowStyle* style) {
-  auto tagConfig = new BlockConfig(TagCode::StrokeStyle);
+  auto tagConfig = new BlockConfig(TagCode::OuterGlowStyle);
   AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty, BlendMode::Normal);
   AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, (Opacity)191);
   AddAttribute(tagConfig, &style->noise, AttributeType::SimpleProperty, 0.0f);
