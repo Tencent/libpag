@@ -61,7 +61,6 @@ public class PAGFile extends PAGComposition {
             PAGFile pagFile = Load(path);
             if (listener != null) {
                 listener.onLoad(pagFile);
-                Load(path);
             }
         });
     }
