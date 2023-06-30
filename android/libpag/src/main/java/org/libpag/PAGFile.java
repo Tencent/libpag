@@ -67,7 +67,7 @@ public class PAGFile extends PAGComposition {
     }
 
     public static PAGFile Load(byte[] bytes) {
-        return LoadFromBytes(bytes, bytes.length);
+        return LoadFromBytes(bytes, bytes.length, "");
     }
 
     /**
@@ -82,7 +82,7 @@ public class PAGFile extends PAGComposition {
 
     private static native PAGFile LoadFromPath(String path);
 
-    private static native PAGFile LoadFromBytes(byte[] bytes, int limit);
+    protected static native PAGFile LoadFromBytes(byte[] bytes, int limit, String path);
 
     private static native PAGFile LoadFromAssets(AssetManager manager, String fileName);
 

@@ -93,7 +93,8 @@ class NetworkFetcher {
             return null;
         }
         if (PAGDiskCache.WriteFile(url, data)) {
-            return PAGFile.Load(PAGDiskCache.GetFilePath(url));
+            filePath = PAGDiskCache.GetFilePath(url);
+            return PAGFile.LoadFromBytes(data, data.length, filePath);
         }
         return PAGFile.Load(data);
     }
