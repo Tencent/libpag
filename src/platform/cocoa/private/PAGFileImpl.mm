@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGFileImpl.h"
+
+#include "pag/pag.h"
+#include "tgfx/utils/Task.h"
+
 #import "PAGDiskCacheImpl.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGTextImpl.h"
-#import "pag/pag.h"
 
 @interface PAGImageImpl ()
 
@@ -59,31 +62,27 @@
   if (path == nil) {
     return nil;
   }
-  std::string filePath;
+  NSString* filePath = nil;
   if ([PAGFileImpl IsNetWorkPath:path]) {
     NSString* cachePath = [PAGDiskCacheImpl GetFilePath:path];
     if (cachePath == nil) {
-      __block PAGFile* file;
-      dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-      [[[NSURLSession sharedSession]
-          dataTaskWithRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:path]]
-            completionHandler:^(NSData* _Nullable data, NSURLResponse* _Nullable,
-                                NSError* _Nullable error) {
-              if (error == nil && data != nil) {
-                [PAGDiskCacheImpl WritFile:path data:data];
-                file = [PAGFileImpl Load:data.bytes size:data.length path:path];
-              }
-              dispatch_semaphore_signal(semaphore);
-            }] resume];
-      dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-      return file;
+      NSError* error = nil;
+      NSData* data = [NSData dataWithContentsOfURL:[NSURL URLWithString:path]
+                                           options:NSDataReadingUncached
+                                             error:&error];
+      if (error == nil && data != nil) {
+        [PAGDiskCacheImpl WritFile:path data:data];
+        return [PAGFileImpl Load:data.bytes size:data.length path:path];
+      } else {
+        return nil;
+      }
     } else {
-      filePath = [cachePath UTF8String];
+      filePath = cachePath;
     }
   } else {
-    filePath = [path UTF8String];
+    filePath = path;
   }
-  auto pagFile = pag::PAGFile::Load(filePath);
+  auto pagFile = pag::PAGFile::Load([filePath UTF8String]);
   if (pagFile == nullptr) {
     return nil;
   }
@@ -102,38 +101,17 @@
   return (PAGFile*)[PAGLayerImpl ToPAGLayer:pagFile];
 }
 
-+ (void)Load:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
++ (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
   if (path == nil) {
     callback(nil);
     return;
   }
-  NSString* filePath = nil;
-  if ([PAGFileImpl IsNetWorkPath:path]) {
-    NSString* cachePath = [PAGDiskCacheImpl GetFilePath:path];
-    if (cachePath != nil) {
-      filePath = cachePath;
-    }
-  } else {
-    filePath = path;
-  }
-  if (filePath != nil && filePath.length > 0) {
-    NSOperationQueue* queue = [[[NSOperationQueue alloc] init] autorelease];
-    [queue addOperationWithBlock:^{
-      callback([PAGFileImpl Load:filePath]);
-    }];
-  } else {
-    [[[NSURLSession sharedSession]
-        dataTaskWithRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:path]]
-          completionHandler:^(NSData* _Nullable data, NSURLResponse* _Nullable,
-                              NSError* _Nullable error) {
-            if (error == nil && data != nil) {
-              [PAGDiskCacheImpl WritFile:path data:data];
-              callback([PAGFileImpl Load:data.bytes size:data.length path:path]);
-            } else {
-              callback(nil);
-            }
-          }] resume];
-  }
+  void (^copyCallback)(PAGFile*) = Block_copy(callback);
+  tgfx::Task::Run([callBack = copyCallback, path]() {
+    PAGFile* file = [PAGFileImpl Load:path];
+    callBack(file);
+    Block_release(callBack);
+  });
 }
 
 - (uint16_t)tagLevel {

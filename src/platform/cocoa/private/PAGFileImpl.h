@@ -34,7 +34,7 @@
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length;
 
-+ (void)Load:(NSString*)path completionBlock:(void (^)(PAGFile*))callback;
++ (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback;
 
 - (uint16_t)tagLevel;
 
