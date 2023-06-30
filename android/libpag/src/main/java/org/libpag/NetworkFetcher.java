@@ -32,7 +32,7 @@ class NetworkFetcher {
 
     private static final String TAG = "NetworkFetcher";
 
-    protected static byte[] FetchData(String urlString) {
+    static byte[] FetchData(String urlString) {
         byte[] result;
         String filePath = PAGDiskCache.GetFilePath(urlString);
         if (!TextUtils.isEmpty(filePath)) {
