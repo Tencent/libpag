@@ -71,7 +71,7 @@
                                 NSError* _Nullable error) {
               if (error == nil && data != nil) {
                 [PAGDiskCacheImpl WritFile:path data:data];
-                file = [PAGFile Load:data.bytes size:data.length];
+                file = [PAGFileImpl Load:data.bytes size:data.length path:path];
               }
               dispatch_semaphore_signal(semaphore);
             }] resume];
