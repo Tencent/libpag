@@ -42,8 +42,7 @@
   if (!cacheDatas || cacheDatas->empty()) {
     return nil;
   }
-  return [NSData dataWithBytes:const_cast<void*>(cacheDatas->data())
-                          length:cacheDatas->size()];
+  return [NSData dataWithBytes:const_cast<void*>(cacheDatas->data()) length:cacheDatas->size()];
 }
 
 + (BOOL)WritFile:(NSString*)key data:(NSData*)data {

@@ -109,13 +109,14 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * Asynchronously load a PAG file from the specific path, a block with PAGFile will be called
- * when loading is complete.
+ * when loading is complete. If loading fails, PAGFile will be set to nil.
  */
 - (void)setPathAsync:(NSString*)filePath completionBlock:(void (^)(PAGFile*))callback;
 
 /**
  * Asynchronously load a PAG file from the specific path with the maxFrameRate limit, a block
- * with PAGFile will be called when loading is complete.
+ * with PAGFile will be called when loading is complete. If loading fails, PAGFile will be set to
+ * nil.
  */
 - (void)setPathAsync:(NSString*)filePath
         maxFrameRate:(float)maxFrameRate
