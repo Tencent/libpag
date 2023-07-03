@@ -47,6 +47,7 @@ void OuterGlowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
 
   spread = layerStyle->spread->getValueAt(layerFrame);
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
+  opacity = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
   auto range = layerStyle->range->getValueAt(layerFrame);
   spread *= (spread == 1.f) ? 1.f : 0.8f;
@@ -123,6 +124,7 @@ void OuterGlowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSo
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
+  paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
   targetCanvas->flush();
 }
@@ -165,6 +167,7 @@ void OuterGlowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Filt
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
+  paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
   targetCanvas->flush();
 }

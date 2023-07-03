@@ -24,9 +24,9 @@ namespace pag {
 enum class SolidStrokeMode { Normal, Thick };
 
 struct SolidStrokeOption {
-  Enum position = 0;
+  Enum position = -1;
   Color color = Black;
-  Opacity opacity = 0.0f;
+  float opacity = 0.0f;
   float spreadSize = 0.0f;
 };
 

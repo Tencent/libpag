@@ -47,6 +47,7 @@ void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
 
   spread = layerStyle->spread->getValueAt(layerFrame);
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
+  opacity = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
   spread *= (spread == 1.f) ? 1.f : 0.8f;
   spreadSize = size * spread;
@@ -129,6 +130,7 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
+  paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
   targetCanvas->flush();
 }
@@ -171,6 +173,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
+  paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
   targetCanvas->flush();
 }

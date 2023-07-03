@@ -63,6 +63,7 @@ class OuterGlowFilter : public LayerFilter {
   tgfx::Color color = tgfx::Color::Black();
   float spread = 0.f;
   float spreadSize = 0.f;
+  float opacity = 1.0f;
   float blurXSize = 0.f;
   float blurYSize = 0.f;
   float offsetX = 0.f;
