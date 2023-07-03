@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DropShadowFilter.h"
+#include "OuterGlowFilter.h"
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/utils/BlurTypes.h"
@@ -24,43 +24,41 @@
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
-DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {
-  spreadFilter = new DropShadowSpreadFilter(layerStyle, DropShadowStyleMode::Normal);
-  spreadThickFilter = new DropShadowSpreadFilter(layerStyle, DropShadowStyleMode::Thick);
+OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle) : layerStyle(layerStyle) {
+  strokeFilter = new SolidStrokeFilter(SolidStrokeMode::Normal);
+  strokeThickFilter = new SolidStrokeFilter(SolidStrokeMode::Thick);
 }
 
-DropShadowFilter::~DropShadowFilter() {
-  delete spreadFilter;
-  delete spreadThickFilter;
+OuterGlowFilter::~OuterGlowFilter() {
+  delete strokeFilter;
+  delete strokeThickFilter;
 }
 
-bool DropShadowFilter::initialize(tgfx::Context* context) {
-  if (!spreadFilter->initialize(context) || !spreadThickFilter->initialize(context)) {
+bool OuterGlowFilter::initialize(tgfx::Context* context) {
+  if (!strokeFilter->initialize(context) || !strokeThickFilter->initialize(context)) {
     return false;
   }
   return true;
 }
 
-void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
+void OuterGlowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
                               const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
-
-  color = ToTGFX(layerStyle->color->getValueAt(layerFrame),
-                 layerStyle->opacity->getValueAt(layerFrame));
+                                                           
   spread = layerStyle->spread->getValueAt(layerFrame);
+  color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
+  auto range = layerStyle->range->getValueAt(layerFrame);
   spread *= (spread == 1.f) ? 1.f : 0.8f;
-  spreadSize = size * spread;
-  auto blurSize = size * (1.f - spread) * 2.f;
+  spreadSize = size * spread / range;
+  auto blurSize = size * (1.f - spread) * 2.f / range;
   blurXSize = blurSize * filterScale.x;
   blurYSize = blurSize * filterScale.y;
-  auto distance = layerStyle->distance->getValueAt(layerFrame);
-  if (distance > 0.f) {
-    auto angle = layerStyle->angle->getValueAt(layerFrame);
-    auto radians = DegreesToRadians(angle - 180.f);
-    offsetX = cosf(radians) * distance * filterScale.x;
-    offsetY = -sinf(radians) * distance * filterScale.y;
-  }
+  
+  strokeOption = SolidStrokeOption();
+  strokeOption.color = layerStyle->color->getValueAt(layerFrame);
+  strokeOption.opacity = layerStyle->opacity->getValueAt(layerFrame);
+  strokeOption.spreadSize = spreadSize;
 
   filtersBounds.clear();
   filtersBounds.emplace_back(contentBounds);
@@ -71,8 +69,8 @@ void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
   }
 }
 
-void DropShadowFilter::draw(tgfx::Context* context, const FilterSource* source,
-                            const FilterTarget* target) {
+void OuterGlowFilter::draw(tgfx::Context* context, const FilterSource* source,
+                           const FilterTarget* target) {
   if (source == nullptr || target == nullptr) {
     return;
   }
@@ -85,31 +83,35 @@ void DropShadowFilter::draw(tgfx::Context* context, const FilterSource* source,
   }
 }
 
-void DropShadowFilter::updateParamModeNotFullSpread(const tgfx::Rect& contentBounds) {
+void OuterGlowFilter::updateParamModeNotFullSpread(const tgfx::Rect& contentBounds) {
   auto filterBounds = contentBounds;
   filterBounds.outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
   filterBounds.roundOut();
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
+  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
+    strokeFilter->onUpdateOption(strokeOption);
+    strokeFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
   } else {
-    spreadThickFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
+    strokeThickFilter->onUpdateOption(strokeOption);
+    strokeThickFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
   }
   filtersBounds.emplace_back(filterBounds);
 }
 
-void DropShadowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds) {
+void OuterGlowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds) {
   auto filterBounds = contentBounds;
   filterBounds.outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
   filterBounds.offset(offsetX, offsetY);
   filterBounds.roundOut();
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
+  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
+    strokeFilter->onUpdateOption(strokeOption);
+    strokeFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
   } else {
-    spreadThickFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
+    strokeThickFilter->onUpdateOption(strokeOption);
+    strokeThickFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
   }
 }
 
-void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
+void OuterGlowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                                            const FilterTarget* target) {
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
@@ -125,30 +127,30 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
   targetCanvas->flush();
 }
 
-void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
+void OuterGlowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
                                                const FilterTarget* target) {
   auto contentBounds = filtersBounds[0];
   auto filterBounds = filtersBounds[1];
   auto targetWidth = static_cast<int>(ceilf(filterBounds.width() * source->scale.x));
   auto targetHeight = static_cast<int>(ceilf(filterBounds.height() * source->scale.y));
-  if (spreadFilterBuffer == nullptr || spreadFilterBuffer->width() != targetWidth ||
-      spreadFilterBuffer->height() != targetHeight) {
-    spreadFilterBuffer = FilterBuffer::Make(context, targetWidth, targetHeight);
+  if (solidStrokeFilterBuffer == nullptr || solidStrokeFilterBuffer->width() != targetWidth ||
+      solidStrokeFilterBuffer->height() != targetHeight) {
+    solidStrokeFilterBuffer = FilterBuffer::Make(context, targetWidth, targetHeight);
   }
-  if (spreadFilterBuffer == nullptr) {
+  if (solidStrokeFilterBuffer == nullptr) {
     return;
   }
-  spreadFilterBuffer->clearColor();
+  solidStrokeFilterBuffer->clearColor();
   auto offsetMatrix = tgfx::Matrix::MakeTrans((contentBounds.left - filterBounds.left),
                                               (contentBounds.top - filterBounds.top));
-  auto targetSpread = spreadFilterBuffer->toFilterTarget(offsetMatrix);
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->draw(context, source, targetSpread.get());
+  auto targetSpread = solidStrokeFilterBuffer->toFilterTarget(offsetMatrix);
+  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
+    strokeFilter->draw(context, source, targetSpread.get());
   } else {
-    spreadThickFilter->draw(context, source, targetSpread.get());
+    strokeThickFilter->draw(context, source, targetSpread.get());
   }
 
-  auto sourceV = spreadFilterBuffer->toFilterSource(source->scale);
+  auto sourceV = solidStrokeFilterBuffer->toFilterSource(source->scale);
 
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
@@ -167,12 +169,12 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   targetCanvas->flush();
 }
 
-void DropShadowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
+void OuterGlowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
                                             const FilterTarget* target) {
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->draw(context, source, target);
+  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
+    strokeFilter->draw(context, source, target);
   } else {
-    spreadThickFilter->draw(context, source, target);
+    strokeThickFilter->draw(context, source, target);
   }
 }
 }  // namespace pag

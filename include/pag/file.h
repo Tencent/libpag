@@ -1078,7 +1078,7 @@ class PAG_API OuterGlowStyle : public LayerStyle {
   }
 
   LayerStylePosition drawPosition() const override {
-    return LayerStylePosition::Above;
+    return LayerStylePosition::Blow;
   }
 
   bool visibleAt(Frame layerFrame) const override;

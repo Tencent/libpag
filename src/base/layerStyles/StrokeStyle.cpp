@@ -29,10 +29,13 @@ StrokeStyle::~StrokeStyle() {
 }
 
 bool StrokeStyle::visibleAt(Frame) const {
-  return false;
+  return true;
 }
 
-void StrokeStyle::transformBounds(Rect*, const Point&, Frame) const {
+void StrokeStyle::transformBounds(Rect* contentBounds, const Point& filterScale,
+                                  Frame layerFrame) const {
+  auto sizeValue = size->getValueAt(layerFrame);
+  contentBounds->outset(sizeValue * filterScale.x, sizeValue * filterScale.y);
 }
 
 void StrokeStyle::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {

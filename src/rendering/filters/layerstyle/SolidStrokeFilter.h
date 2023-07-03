@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -21,12 +21,23 @@
 #include "rendering/filters/LayerFilter.h"
 
 namespace pag {
-enum class DropShadowStyleMode { Normal, Thick };
+enum class SolidStrokeMode { Normal, Thick };
 
-class DropShadowSpreadFilter : public LayerFilter {
+struct SolidStrokeOption {
+  Enum position = 0;
+  Color color = Black;
+  Opacity opacity = 0.0f;
+  float spreadSize = 0.0f;
+};
+
+class SolidStrokeFilter : public LayerFilter {
  public:
-  explicit DropShadowSpreadFilter(DropShadowStyle* style, DropShadowStyleMode mode);
-  ~DropShadowSpreadFilter() override = default;
+  explicit SolidStrokeFilter(SolidStrokeMode mode);
+  ~SolidStrokeFilter() override = default;
+  
+  void onUpdateOption(SolidStrokeOption option);
+  
+  void onUpdateOriginalTexture(const tgfx::GLTextureInfo* sampler);
 
  protected:
   std::string onBuildFragmentShader() override;
@@ -35,17 +46,23 @@ class DropShadowSpreadFilter : public LayerFilter {
 
   void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
-
+  
   std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
                                            const tgfx::Rect& transformedBounds,
                                            const tgfx::Point& filterScale) override;
 
  private:
-  DropShadowStyle* layerStyle = nullptr;
-  DropShadowStyleMode styleMode;
+  SolidStrokeOption option;
+  SolidStrokeMode styleMode;
+  tgfx::GLTextureInfo originalSampler;
 
-  int spreadColorHandle = -1;
-  int spreadAlphaHandle = -1;
-  int spreadSizeHandle = -1;
+  int colorHandle = -1;
+  int alphaHandle = -1;
+  int sizeHandle = -1;
+  int originalTextureHandle = -1;
+  int isUseOriginalTextureHandle = -1;
+  int isOutsideHandle = -1;
+  int isCenterHandle = -1;
+  int isInsideHandle = -1;
 };
 }  // namespace pag
