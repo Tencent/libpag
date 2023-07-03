@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "rendering/filters/LayerFilter.h"
 
 namespace pag {
 class AlphaEdgeDetectFilter : public LayerFilter {
