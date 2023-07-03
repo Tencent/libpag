@@ -29,6 +29,7 @@ import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.View;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -627,16 +628,16 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
-        if (frontBitmap == null || _cacheAllFramesInMemory) {
-            Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
-                    decoderInfo._height, false);
-            if (pair.first == null) {
-                return false;
-            }
-            frontBitmap = pair.first;
-            frontHardwareBuffer = pair.second;
-        }
         synchronized (bitmapLock) {
+            if (frontBitmap == null || _cacheAllFramesInMemory) {
+                Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
+                        decoderInfo._height, false);
+                if (pair.first == null) {
+                    return false;
+                }
+                frontBitmap = pair.first;
+                frontHardwareBuffer = pair.second;
+            }
             if (frontBitmap == null) {
                 return false;
             }

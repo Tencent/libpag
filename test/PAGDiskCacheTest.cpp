@@ -425,9 +425,7 @@ PAG_TEST_F(PAGDiskCacheTest, FileCache) {
   std::string cacheKey = "https://pag.art/resources/apitest/polygon.pag";
   auto success = DiskCache::WriteFile(cacheKey, data);
   EXPECT_TRUE(success);
-  auto filePath = DiskCache::GetFilePath(cacheKey);
-  EXPECT_FALSE(filePath.empty());
-  auto cacheData = tgfx::Data::MakeFromFile(filePath);
+  auto cacheData = DiskCache::ReadFile(cacheKey);
   ASSERT_TRUE(cacheData != nullptr);
   EXPECT_EQ(data->size(), cacheData->size());
   EXPECT_TRUE(memcmp(data->bytes(), cacheData->bytes(), data->size()) == 0);

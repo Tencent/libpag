@@ -49,7 +49,7 @@ public class PAGDiskCache {
      */
     public static native void RemoveAll();
 
-    static native String GetFilePath(String key);
+    static native byte[] ReadFile(String key);
 
     static native boolean WriteFile(String key, byte[] bytes);
 

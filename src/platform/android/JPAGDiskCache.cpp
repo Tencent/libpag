@@ -60,9 +60,14 @@ PAG_API void JNICALL Java_org_libpag_PAGDiskCache_RemoveAll(JNIEnv*, jclass) {
   pag::PAGDiskCache::RemoveAll();
 }
 
-PAG_API jstring JNICALL Java_org_libpag_PAGDiskCache_GetFilePath(JNIEnv* env, jclass, jstring key) {
-  auto path = pag::DiskCache::GetFilePath(pag::SafeConvertToStdString(env, key));
-  return pag::SafeConvertToJString(env, path.c_str());
+PAG_API jbyteArray JNICALL Java_org_libpag_PAGDiskCache_ReadFile(JNIEnv* env, jclass, jstring key) {
+  auto data = pag::DiskCache::ReadFile(pag::SafeConvertToStdString(env, key));
+  if (data == nullptr) {
+    return nullptr;
+  }
+  auto bytes = env->NewByteArray(data->size());
+  env->SetByteArrayRegion(bytes, 0, data->size(), reinterpret_cast<const jbyte*>(data->data()));
+  return bytes;
 }
 
 PAG_API jboolean JNICALL Java_org_libpag_PAGDiskCache_WriteFile(JNIEnv* env, jclass, jstring jkey,
