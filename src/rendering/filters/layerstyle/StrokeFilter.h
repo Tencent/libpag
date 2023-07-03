@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "SolidStrokeFilter.h"
 #include "AlphaEdgeDetectFilter.h"
+#include "SolidStrokeFilter.h"
 #include "rendering/filters/LayerFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 
@@ -46,14 +46,14 @@ class StrokeFilter : public LayerFilter {
   void onDrawPositionOutside(tgfx::Context* context, const FilterSource* source,
                              const FilterTarget* target);
   void onDrawPositionInsideOrCenter(tgfx::Context* context, const FilterSource* source,
-                            const FilterTarget* target);
+                                    const FilterTarget* target);
 
   StrokeStyle* layerStyle = nullptr;
 
   std::shared_ptr<FilterBuffer> alphaEdgeDetectFilterBuffer = nullptr;
 
   Enum strokePosition;
-  
+
   SolidStrokeOption strokeOption;
   SolidStrokeFilter* strokeFilter = nullptr;
   SolidStrokeFilter* strokeThickFilter = nullptr;

@@ -42,9 +42,9 @@ bool OuterGlowFilter::initialize(tgfx::Context* context) {
 }
 
 void OuterGlowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
-                              const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
+                             const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
-                                                           
+
   spread = layerStyle->spread->getValueAt(layerFrame);
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
@@ -54,7 +54,7 @@ void OuterGlowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
   auto blurSize = size * (1.f - spread) * 2.f / range;
   blurXSize = blurSize * filterScale.x;
   blurYSize = blurSize * filterScale.y;
-  
+
   strokeOption = SolidStrokeOption();
   strokeOption.color = layerStyle->color->getValueAt(layerFrame);
   strokeOption.opacity = layerStyle->opacity->getValueAt(layerFrame);
@@ -112,7 +112,7 @@ void OuterGlowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds)
 }
 
 void OuterGlowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
-                                           const FilterTarget* target) {
+                                          const FilterTarget* target) {
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
@@ -128,7 +128,7 @@ void OuterGlowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSo
 }
 
 void OuterGlowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
-                                               const FilterTarget* target) {
+                                              const FilterTarget* target) {
   auto contentBounds = filtersBounds[0];
   auto filterBounds = filtersBounds[1];
   auto targetWidth = static_cast<int>(ceilf(filterBounds.width() * source->scale.x));
@@ -170,7 +170,7 @@ void OuterGlowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Filt
 }
 
 void OuterGlowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
-                                            const FilterTarget* target) {
+                                           const FilterTarget* target) {
   if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
     strokeFilter->draw(context, source, target);
   } else {

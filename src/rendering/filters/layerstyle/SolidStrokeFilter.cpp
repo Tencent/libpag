@@ -123,8 +123,7 @@ static const char SOLID_STROKE_THICK_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-SolidStrokeFilter::SolidStrokeFilter(SolidStrokeMode mode)
-    : styleMode(mode) {
+SolidStrokeFilter::SolidStrokeFilter(SolidStrokeMode mode) : styleMode(mode) {
 }
 
 std::string SolidStrokeFilter::onBuildFragmentShader() {
@@ -181,8 +180,8 @@ void SolidStrokeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&
 }
 
 std::vector<tgfx::Point> SolidStrokeFilter::computeVertices(const tgfx::Rect&,
-                                                                 const tgfx::Rect& outputBounds,
-                                                                 const tgfx::Point& filterScale) {
+                                                            const tgfx::Rect& outputBounds,
+                                                            const tgfx::Point& filterScale) {
   std::vector<tgfx::Point> vertices = {};
   tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
                                  {outputBounds.right, outputBounds.bottom},

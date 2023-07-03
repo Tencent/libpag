@@ -421,4 +421,37 @@ PAG_TEST(PAGFilterTest, LogoMipmap) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/LogoMipmap"));
 }
+
+/**
+ * 用例描述: OuterGlow
+ */
+PAG_TEST(PAGFilterTest, OuterGlow) {
+  auto pagFile = LoadPAGFile("resources/filter/outerglow.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/OuterGlow"));
+}
+
+/**
+ * 用例描述: Stroke
+ */
+PAG_TEST(PAGFilterTest, Stroke) {
+  auto pagFile = LoadPAGFile("resources/filter/stroke.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/Stroke"));
+}
+
 }  // namespace pag

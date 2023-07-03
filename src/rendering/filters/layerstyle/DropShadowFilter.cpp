@@ -44,7 +44,7 @@ bool DropShadowFilter::initialize(tgfx::Context* context) {
 void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
                               const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
-                                                           
+
   spread = layerStyle->spread->getValueAt(layerFrame);
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
@@ -60,7 +60,7 @@ void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
     offsetX = cosf(radians) * distance * filterScale.x;
     offsetY = -sinf(radians) * distance * filterScale.y;
   }
-  
+
   strokeOption = SolidStrokeOption();
   strokeOption.color = layerStyle->color->getValueAt(layerFrame);
   strokeOption.opacity = layerStyle->opacity->getValueAt(layerFrame);
@@ -108,7 +108,8 @@ void DropShadowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds
   filterBounds.outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
   filterBounds.offset(offsetX, offsetY);
   filterBounds.roundOut();
-  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {    strokeFilter->onUpdateOption(strokeOption);
+  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
+    strokeFilter->onUpdateOption(strokeOption);
     strokeFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
   } else {
     strokeThickFilter->onUpdateOption(strokeOption);

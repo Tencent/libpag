@@ -34,9 +34,9 @@ class SolidStrokeFilter : public LayerFilter {
  public:
   explicit SolidStrokeFilter(SolidStrokeMode mode);
   ~SolidStrokeFilter() override = default;
-  
+
   void onUpdateOption(SolidStrokeOption option);
-  
+
   void onUpdateOriginalTexture(const tgfx::GLTextureInfo* sampler);
 
  protected:
@@ -46,7 +46,7 @@ class SolidStrokeFilter : public LayerFilter {
 
   void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
-  
+
   std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
                                            const tgfx::Rect& transformedBounds,
                                            const tgfx::Point& filterScale) override;
