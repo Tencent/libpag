@@ -23,12 +23,14 @@ import android.text.TextUtils;
 
 import org.extra.tools.LibraryLoadUtils;
 
-import java.io.FileInputStream;
-
 public class PAGFile extends PAGComposition {
 
-    public interface LoadListener<T> {
-        void onLoad(T result);
+    public interface LoadListener {
+        /**
+         * Callback for asynchronous loading.
+         * Returns null if the file does not exist or the data is not a pag file.
+         */
+        void onLoad(PAGFile result);
     }
 
     /**
@@ -58,8 +60,8 @@ public class PAGFile extends PAGComposition {
     /**
      * Asynchronously load a pag file from the specific path.
      */
-    public static void LoadAsync(String path, LoadListener<PAGFile> listener) {
-        NativeExecutor.execute(() -> {
+    public static void LoadAsync(String path, LoadListener listener) {
+        NativeTask.Run(() -> {
             PAGFile pagFile = Load(path);
             if (listener != null) {
                 listener.onLoad(pagFile);

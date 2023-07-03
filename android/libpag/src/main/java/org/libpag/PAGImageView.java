@@ -149,18 +149,18 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     /**
      * Asynchronously Loads a pag file from the specified path.
      */
-    public void setPathAsync(String path, PAGFile.LoadListener<Boolean> listener) {
+    public void setPathAsync(String path, PAGFile.LoadListener listener) {
         setPathAsync(path, DEFAULT_MAX_FRAMERATE, listener);
     }
 
     /**
      * Asynchronously loads a pag file from the specified path with the maxFrameRate limit.
      */
-    public void setPathAsync(String path, float maxFrameRate, PAGFile.LoadListener<Boolean> listener) {
-        NativeExecutor.execute(() -> {
-            boolean success = setPath(path, maxFrameRate);
+    public void setPathAsync(String path, float maxFrameRate, PAGFile.LoadListener listener) {
+        NativeTask.Run(() -> {
+            setPath(path, maxFrameRate);
             if (listener != null) {
-                listener.onLoad(success);
+                listener.onLoad((PAGFile) _composition);
             }
         });
     }

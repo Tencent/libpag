@@ -250,11 +250,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     /**
      * Asynchronously load a pag file from the specific path.
      */
-    public void setPathAsync(String path, PAGFile.LoadListener<Boolean> listener) {
-        NativeExecutor.execute(() -> {
-            boolean success = setPath(path);
+    public void setPathAsync(String path, PAGFile.LoadListener listener) {
+        NativeTask.Run(() -> {
+            setPath(path);
             if (listener != null) {
-                listener.onLoad(success);
+                listener.onLoad((PAGFile) pagPlayer.getComposition());
             }
         });
     }

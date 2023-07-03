@@ -20,9 +20,9 @@ package org.libpag;
 
 import org.extra.tools.LibraryLoadUtils;
 
-class NativeExecutor {
+class NativeTask {
 
-    static native void execute(Runnable runnable);
+    static native void Run(Runnable runnable);
 
     static {
         LibraryLoadUtils.loadLibrary("pag");
