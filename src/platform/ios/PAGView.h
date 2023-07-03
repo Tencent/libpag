@@ -130,10 +130,10 @@ PAG_API @interface PAGView : UIView
 - (BOOL)setPath:(NSString*)filePath;
 
 /**
- * Asynchronously load a PAG file from the specific path, a block with loading status will be
- * called when loading is complete.
+ * Asynchronously load a PAG file from the specific path, a block PAGFile will be called when
+ * loading is complete.
  */
-- (void)setPathAsync:(NSString*)filePath completionBlock:(void (^)(BOOL))callback;
+- (void)setPathAsync:(NSString*)filePath completionBlock:(void (^)(PAGFile*))callback;
 
 /**
  * Returns the current PAGComposition for PAGView to render as content.
