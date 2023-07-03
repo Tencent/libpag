@@ -34,15 +34,16 @@
   pag::PAGDiskCache::RemoveAll();
 }
 
-+ (NSString*)GetFilePath:(NSString*)key {
++ (NSData*)ReadFile:(NSString*)key {
   if (key == nil) {
     return nil;
   }
-  std::string path = pag::DiskCache::GetFilePath([key UTF8String]);
-  if (path.length() == 0) {
+  auto cacheDatas = pag::DiskCache::ReadFile([key UTF8String]);
+  if (!cacheDatas || cacheDatas->empty()) {
     return nil;
   }
-  return [NSString stringWithUTF8String:path.c_str()];
+  return [NSData dataWithBytes:const_cast<void*>(cacheDatas->data())
+                          length:cacheDatas->size()];
 }
 
 + (BOOL)WritFile:(NSString*)key data:(NSData*)data {

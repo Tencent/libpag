@@ -60,8 +60,8 @@ std::shared_ptr<SequenceFile> DiskCache::OpenSequence(
   return GetInstance()->openSequence(key, info, frameCount, frameRate, staticTimeRanges);
 }
 
-std::string DiskCache::GetFilePath(const std::string& key) {
-  return GetInstance()->getFilePath(key);
+std::shared_ptr<tgfx::Data> DiskCache::ReadFile(const std::string& key) {
+  return GetInstance()->readFile(key);
 }
 
 bool DiskCache::WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> data) {
@@ -156,16 +156,23 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   return sequenceFile;
 }
 
-std::string DiskCache::getFilePath(const std::string& key) {
+std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (cacheFolder.empty() || key.empty()) {
-    return "";
+    return nullptr;
   }
-  auto result = cachedFileIDs.find(key);
-  if (result != cachedFileIDs.end()) {
-    return fileIDToPath(result->second);
+  auto fileID = getFileID(key);
+  auto filePath = fileIDToPath(fileID);
+  auto stream = tgfx::Stream::MakeFromFile(filePath);
+  if (stream == nullptr) {
+    return nullptr;
   }
-  return "";
+  tgfx::Buffer buffer(stream->size());
+  auto readLength = stream->read(buffer.data(), buffer.size());
+  if (readLength != buffer.size()) {
+    return nullptr;
+  }
+  return buffer.release();
 }
 
 bool DiskCache::writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data) {

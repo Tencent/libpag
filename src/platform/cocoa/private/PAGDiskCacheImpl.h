@@ -26,7 +26,7 @@
 
 + (void)RemoveAll;
 
-+ (NSString*)GetFilePath:(NSString*)key;
++ (NSData*)ReadFile:(NSString*)key;
 
 + (BOOL)WritFile:(NSString*)key data:(NSData*)data;
 

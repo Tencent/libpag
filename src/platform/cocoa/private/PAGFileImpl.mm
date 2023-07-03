@@ -62,27 +62,20 @@
   if (path == nil) {
     return nil;
   }
-  NSString* filePath = nil;
   if ([PAGFileImpl IsNetWorkPath:path]) {
-    NSString* cachePath = [PAGDiskCacheImpl GetFilePath:path];
-    if (cachePath == nil) {
+    NSData* cacheData = [PAGDiskCacheImpl ReadFile:path];
+    if (cacheData == nil) {
       NSError* error = nil;
-      NSData* data = [NSData dataWithContentsOfURL:[NSURL URLWithString:path]
-                                           options:NSDataReadingUncached
-                                             error:&error];
-      if (error == nil && data != nil) {
-        [PAGDiskCacheImpl WritFile:path data:data];
-        return [PAGFileImpl Load:data.bytes size:data.length path:path];
-      } else {
-        return nil;
+      cacheData = [NSData dataWithContentsOfURL:[NSURL URLWithString:path]
+                                        options:NSDataReadingUncached
+                                          error:&error];
+      if (error == nil && cacheData != nil) {
+        [PAGDiskCacheImpl WritFile:path data:cacheData];
       }
-    } else {
-      filePath = cachePath;
     }
-  } else {
-    filePath = path;
+    return [PAGFileImpl Load:cacheData.bytes size:cacheData.length path:path];
   }
-  auto pagFile = pag::PAGFile::Load([filePath UTF8String]);
+  auto pagFile = pag::PAGFile::Load([path UTF8String]);
   if (pagFile == nullptr) {
     return nil;
   }
@@ -94,6 +87,9 @@
 }
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length path:(NSString*)filePath {
+  if (bytes == nil || length == 0) {
+    return nil;
+  }
   auto pagFile = pag::PAGFile::Load(bytes, length, [filePath UTF8String]);
   if (pagFile == nullptr) {
     return nil;
