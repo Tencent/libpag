@@ -247,8 +247,11 @@ void GLCaps::initGLSupport(const GLInfo& info) {
                              info.hasExtension("GL_APPLE_vertex_array_object");
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_texture_rg");
   multisampleDisableSupport = true;
-  textureBarrierSupport = version >= GL_VER(4, 5) || info.hasExtension("GL_ARB_texture_barrier") ||
-                          info.hasExtension("GL_NV_texture_barrier");
+  if (vendor != GLVendor::Intel) {
+    textureBarrierSupport = version >= GL_VER(4, 5) ||
+                            info.hasExtension("GL_ARB_texture_barrier") ||
+                            info.hasExtension("GL_NV_texture_barrier");
+  }
   semaphoreSupport = version >= GL_VER(3, 2) || info.hasExtension("GL_ARB_sync");
   if (version < GL_VER(1, 3) && !info.hasExtension("GL_ARB_texture_border_clamp")) {
     clampToBorderSupport = false;
