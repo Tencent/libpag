@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,20 +18,20 @@
 
 #pragma once
 
-#include "DropShadowSpreadFilter.h"
+#include "SolidStrokeFilter.h"
 #include "rendering/filters/LayerFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 
 namespace pag {
-class DropShadowFilter : public LayerFilter {
+class OuterGlowFilter : public LayerFilter {
  public:
-  explicit DropShadowFilter(DropShadowStyle* layerStyle);
+  explicit OuterGlowFilter(OuterGlowStyle* layerStyle);
 
-  DropShadowFilter(const DropShadowFilter&) = delete;
+  OuterGlowFilter(const OuterGlowFilter&) = delete;
 
-  DropShadowFilter(DropShadowFilter&&) = delete;
+  OuterGlowFilter(OuterGlowFilter&&) = delete;
 
-  ~DropShadowFilter() override;
+  ~OuterGlowFilter() override;
 
   bool initialize(tgfx::Context* context) override;
 
@@ -52,16 +52,18 @@ class DropShadowFilter : public LayerFilter {
   void onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
                             const FilterTarget* target);
 
-  DropShadowStyle* layerStyle = nullptr;
+  OuterGlowStyle* layerStyle = nullptr;
 
-  std::shared_ptr<FilterBuffer> spreadFilterBuffer = nullptr;
+  std::shared_ptr<FilterBuffer> solidStrokeFilterBuffer = nullptr;
 
-  DropShadowSpreadFilter* spreadFilter = nullptr;
-  DropShadowSpreadFilter* spreadThickFilter = nullptr;
+  SolidStrokeOption strokeOption;
+  SolidStrokeFilter* strokeFilter = nullptr;
+  SolidStrokeFilter* strokeThickFilter = nullptr;
 
   tgfx::Color color = tgfx::Color::Black();
   float spread = 0.f;
   float spreadSize = 0.f;
+  float opacity = 1.0f;
   float blurXSize = 0.f;
   float blurYSize = 0.f;
   float offsetX = 0.f;

@@ -27,9 +27,11 @@
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
-#include "rendering/filters/dropshadow/DropShadowFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
+#include "rendering/filters/layerstyle/DropShadowFilter.h"
+#include "rendering/filters/layerstyle/OuterGlowFilter.h"
+#include "rendering/filters/layerstyle/StrokeFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -118,6 +120,12 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(LayerStyle* layerStyle) {
   switch (layerStyle->type()) {
     case LayerStyleType::DropShadow:
       filter = new DropShadowFilter(reinterpret_cast<DropShadowStyle*>(layerStyle));
+      break;
+    case LayerStyleType::OuterGlow:
+      filter = new OuterGlowFilter(reinterpret_cast<OuterGlowStyle*>(layerStyle));
+      break;
+    case LayerStyleType::Stroke:
+      filter = new StrokeFilter(reinterpret_cast<StrokeStyle*>(layerStyle));
       break;
     case LayerStyleType::GradientOverlay:
       filter = new GradientOverlayFilter(reinterpret_cast<GradientOverlayStyle*>(layerStyle));
