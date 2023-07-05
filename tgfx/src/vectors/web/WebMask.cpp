@@ -80,7 +80,7 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-void WebMask::onFillPath(const Path& path, const Matrix& matrix) {
+void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool) {
   if (path.isEmpty()) {
     return;
   }

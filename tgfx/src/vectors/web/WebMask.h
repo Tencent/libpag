@@ -51,7 +51,7 @@ class WebMask : public Mask {
     return stream;
   }
 
-  void onFillPath(const Path& path, const Matrix& matrix) override;
+  void onFillPath(const Path& path, const Matrix& matrix, bool) override;
 
   bool onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) override;
 

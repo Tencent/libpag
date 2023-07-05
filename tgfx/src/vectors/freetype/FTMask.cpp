@@ -56,7 +56,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   return std::make_shared<FTMask>(std::move(pixelRef));
 }
 
-void FTMask::onFillPath(const Path& path, const Matrix& matrix) {
+void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
   }
@@ -70,7 +70,9 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix) {
   totalMatrix.postScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(pixelRef->height()));
   finalPath.transform(totalMatrix);
-  markContentDirty(finalPath.getBounds(), true);
+  auto bounds = finalPath.getBounds();
+  bounds.roundOut();
+  markContentDirty(bounds, true);
   FTPath ftPath = {};
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
@@ -87,5 +89,8 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix) {
     FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
   }
   pixelRef->unlockPixels();
+  if (needsGammaCorrection) {
+    applyGamma(bounds, true);
+  }
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,15 +18,10 @@
 
 #pragma once
 
-#include "core/PixelRefMask.h"
+#include "CoreGraphics/CGAffineTransform.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class FTMask : public PixelRefMask {
- public:
-  explicit FTMask(std::shared_ptr<PixelRef> pixelRef) : PixelRefMask(std::move(pixelRef)) {
-  }
-
- protected:
-  void onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) override;
-};
+static constexpr float ITALIC_SKEW = -0.20f;
+CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix);
 }  // namespace tgfx

@@ -39,12 +39,15 @@ bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
   if (textBlob == nullptr || textBlob->hasColor()) {
     return false;
   }
-  Path path = {};
-  if (textBlob->getPath(&path, stroke)) {
-    onFillPath(path, matrix);
+  if (onFillText(textBlob, stroke, matrix)) {
     return true;
   }
-  return onFillText(textBlob, stroke, matrix);
+  Path path = {};
+  if (textBlob->getPath(&path, stroke)) {
+    onFillPath(path, matrix, true);
+    return true;
+  }
+  return false;
 }
 
 bool Mask::onFillText(const TextBlob*, const Stroke*, const Matrix&) {

@@ -572,18 +572,9 @@ void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_
     return;
   }
   auto textBlob = TextBlob::MakeFrom(glyphIDs, &scaledPositions[0], glyphCount, scaledFont);
-  if (textBlob == nullptr) {
-    restore();
-    return;
+  if (textBlob) {
+    drawMaskGlyphs(textBlob.get(), scaledPaint);
   }
-  Path path = {};
-  auto stroke = scaledPaint.getStyle() == PaintStyle::Stroke ? scaledPaint.getStroke() : nullptr;
-  if (textBlob->getPath(&path, stroke)) {
-    fillPath(path, scaledPaint);
-    restore();
-    return;
-  }
-  drawMaskGlyphs(textBlob.get(), scaledPaint);
   restore();
 }
 
@@ -634,11 +625,7 @@ void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
   totalMatrix.postConcat(matrix);
   mask->setMatrix(totalMatrix);
-  if (paint.getStyle() == PaintStyle::Stroke) {
-    mask->fillText(textBlob, stroke);
-  } else {
-    mask->fillText(textBlob);
-  }
+  mask->fillText(textBlob, stroke);
   auto texture = Texture::MakeFrom(getContext(), mask->makeBuffer());
   drawMask(deviceBounds, std::move(texture), std::move(glPaint));
 }

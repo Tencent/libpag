@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGMask.h"
+#include "CGTypeface.h"
+#include "CGUtil.h"
+#include "core/SimpleTextBlob.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
@@ -54,7 +57,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   return std::make_shared<CGMask>(std::move(pixelRef));
 }
 
-void CGMask::onFillPath(const Path& path, const Matrix& matrix) {
+void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
   }
@@ -74,7 +77,9 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix) {
   totalMatrix.postScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(info.height()));
   finalPath.transform(totalMatrix);
-  markContentDirty(finalPath.getBounds(), true);
+  auto bounds = finalPath.getBounds();
+  bounds.roundOut();
+  markContentDirty(bounds, true);
   auto cgPath = CGPathCreateMutable();
   finalPath.decompose(Iterator, cgPath);
 
@@ -104,5 +109,59 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix) {
   CGContextRelease(cgContext);
   CGPathRelease(cgPath);
   pixelRef->unlockPixels();
+  if (needsGammaCorrection) {
+    applyGamma(bounds, true);
+  }
+}
+
+bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
+  if (textBlob == nullptr || stroke) {
+    return false;
+  }
+  auto blob = static_cast<const SimpleTextBlob*>(textBlob);
+  if (blob->getFont().isFauxBold()) {
+    return false;
+  }
+  auto pixels = pixelRef->lockWritablePixels();
+  auto cgContext = CreateBitmapContext(pixelRef->info(), pixels);
+  if (cgContext == nullptr) {
+    pixelRef->unlockPixels();
+    return false;
+  }
+  CGContextClearRect(cgContext, CGRectMake(0, 0, width(), height()));
+  auto totalMatrix = matrix;
+  totalMatrix.preScale(1.f, -1.f);
+  totalMatrix.postScale(1.f, -1.f);
+  totalMatrix.postTranslate(0, static_cast<float>(height()));
+  const auto& font = blob->getFont();
+  if (font.isFauxItalic()) {
+    totalMatrix.postSkew(ITALIC_SKEW, 0);
+  }
+  auto transform = MatrixToCGAffineTransform(totalMatrix);
+  CGContextSetTextMatrix(cgContext, transform);
+  CGContextSetBlendMode(cgContext, kCGBlendModeCopy);
+  CGContextSetTextDrawingMode(cgContext, kCGTextFill);
+  CGContextSetGrayFillColor(cgContext, 1.0f, 1.0f);
+  CGContextSetShouldAntialias(cgContext, true);
+  CGContextSetShouldSmoothFonts(cgContext, true);
+  CGContextSetAllowsFontSubpixelQuantization(cgContext, false);
+  CGContextSetShouldSubpixelQuantizeFonts(cgContext, false);
+  CGContextSetAllowsFontSubpixelPositioning(cgContext, true);
+  CGContextSetShouldSubpixelPositionFonts(cgContext, true);
+  CTFontRef ctFont = std::static_pointer_cast<CGTypeface>(font.getTypeface())->getCTFont();
+  ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
+                                          nullptr);
+  std::vector<CGPoint> points;
+  auto count = blob->getGlyphIDs().size();
+  for (size_t i = 0; i < count; ++i) {
+    auto position = blob->getPositions()[i];
+    points.emplace_back(CGPointMake(position.x, position.y));
+  }
+  CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(blob->getGlyphIDs().data()),
+                   static_cast<const CGPoint*>(points.data()), count, cgContext);
+  CFRelease(ctFont);
+  CGContextRelease(cgContext);
+  pixelRef->unlockPixels();
+  return true;
 }
 }  // namespace tgfx

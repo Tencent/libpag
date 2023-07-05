@@ -51,6 +51,8 @@ class PixelRefMask : public Mask {
 
   void markContentDirty(const Rect& bounds, bool flipY);
 
+  void applyGamma(const Rect& bounds, bool flipY);
+
   std::shared_ptr<ImageStream> getImageStream() const override {
     return pixelRef;
   }
