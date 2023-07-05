@@ -38,6 +38,12 @@ PAG_API @interface PAGFile : PAGComposition
 + (PAGFile*)Load:(NSString*)path;
 
 /**
+ * Asynchronously load a PAG file from the specific path, a block with PAGFile will be called
+ * when loading is complete.
+ */
++ (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback;
+
+/**
  *  Load a pag file from byte data, return null if the bytes is empty or it's not a valid pag file.
  */
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length;

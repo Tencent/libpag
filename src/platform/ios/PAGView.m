@@ -204,6 +204,19 @@
   return file != nil;
 }
 
+- (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+  if (filePath != nil) {
+    [filePath release];
+    filePath = nil;
+  }
+  filePath = [path retain];
+  [PAGFile LoadAsync:path
+      completionBlock:^(PAGFile* pagFile) {
+        [self setComposition:pagFile];
+        callback(pagFile);
+      }];
+}
+
 - (PAGComposition*)getComposition {
   return [pagPlayer getComposition];
 }

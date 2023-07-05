@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,18 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#include <jni.h>
+#include "JNIHelper.h"
+#include "tgfx/utils/Task.h"
 
-@interface PAGDiskCacheImpl : NSObject
-
-+ (size_t)MaxDiskSize;
-
-+ (void)SetMaxDiskSize:(size_t)size;
-
-+ (void)RemoveAll;
-
-+ (NSData*)ReadFile:(NSString*)key;
-
-+ (BOOL)WritFile:(NSString*)key data:(NSData*)data;
-
-@end
+extern "C" PAG_API void Java_org_libpag_NativeTask_Run(JNIEnv* env, jclass, jobject runnable) {
+  static pag::Global<jclass> runnableClass = env->FindClass("java/lang/Runnable");
+  if (runnableClass.get() == nullptr || runnable == nullptr) {
+    return;
+  }
+  static jmethodID runMethod = env->GetMethodID(runnableClass.get(), "run", "()V");
+  auto gRunnable = env->NewGlobalRef(runnable);
+  tgfx::Task::Run([gRunnable]() {
+    tgfx::JNIEnvironment environment;
+    auto jniEnv = environment.current();
+    jniEnv->CallVoidMethod(gRunnable, runMethod);
+    jniEnv->DeleteGlobalRef(gRunnable);
+  });
+}

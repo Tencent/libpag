@@ -29,6 +29,7 @@ import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.View;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -145,6 +146,26 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         refreshResource(path, composition, maxFrameRate);
         return composition != null;
     }
+
+    /**
+     * Asynchronously Loads a pag file from the specified path.
+     */
+    public void setPathAsync(String path, PAGFile.LoadListener listener) {
+        setPathAsync(path, DEFAULT_MAX_FRAMERATE, listener);
+    }
+
+    /**
+     * Asynchronously loads a pag file from the specified path with the maxFrameRate limit.
+     */
+    public void setPathAsync(String path, float maxFrameRate, PAGFile.LoadListener listener) {
+        NativeTask.Run(() -> {
+            setPath(path, maxFrameRate);
+            if (listener != null) {
+                listener.onLoad((PAGFile) _composition);
+            }
+        });
+    }
+
 
     private PAGComposition _composition;
 
@@ -607,16 +628,16 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
-        if (frontBitmap == null || _cacheAllFramesInMemory) {
-            Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
-                    decoderInfo._height, false);
-            if (pair.first == null) {
-                return false;
-            }
-            frontBitmap = pair.first;
-            frontHardwareBuffer = pair.second;
-        }
         synchronized (bitmapLock) {
+            if (frontBitmap == null || _cacheAllFramesInMemory) {
+                Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
+                        decoderInfo._height, false);
+                if (pair.first == null) {
+                    return false;
+                }
+                frontBitmap = pair.first;
+                frontHardwareBuffer = pair.second;
+            }
             if (frontBitmap == null) {
                 return false;
             }

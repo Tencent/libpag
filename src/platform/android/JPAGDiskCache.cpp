@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGDiskCache.h"
+#include "rendering/caches/DiskCache.h"
 
 namespace pag {
 static Global<jclass> PAGClass;
@@ -57,5 +58,30 @@ PAG_API void JNICALL Java_org_libpag_PAGDiskCache_SetMaxDiskSize(JNIEnv*, jclass
 
 PAG_API void JNICALL Java_org_libpag_PAGDiskCache_RemoveAll(JNIEnv*, jclass) {
   pag::PAGDiskCache::RemoveAll();
+}
+
+PAG_API jbyteArray JNICALL Java_org_libpag_PAGDiskCache_ReadFile(JNIEnv* env, jclass, jstring key) {
+  auto data = pag::DiskCache::ReadFile(pag::SafeConvertToStdString(env, key));
+  if (data == nullptr) {
+    return nullptr;
+  }
+  auto bytes = env->NewByteArray(data->size());
+  env->SetByteArrayRegion(bytes, 0, data->size(), reinterpret_cast<const jbyte*>(data->data()));
+  return bytes;
+}
+
+PAG_API jboolean JNICALL Java_org_libpag_PAGDiskCache_WriteFile(JNIEnv* env, jclass, jstring jkey,
+                                                                jbyteArray bytes) {
+  auto key = pag::SafeConvertToStdString(env, jkey);
+  if (bytes == nullptr || key.empty()) {
+    LOGE("PAGFile.LoadFromBytes() Invalid image bytes specified.");
+    return JNI_FALSE;
+  }
+  auto data = env->GetByteArrayElements(bytes, nullptr);
+  auto length = env->GetArrayLength(bytes);
+  auto byteData = tgfx::Data::MakeWithoutCopy(data, length);
+  auto result = pag::DiskCache::WriteFile(key, byteData);
+  env->ReleaseByteArrayElements(bytes, data, JNI_ABORT);
+  return result;
 }
 }

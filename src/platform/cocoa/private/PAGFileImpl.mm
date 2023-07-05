@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGFileImpl.h"
+
+#include "pag/pag.h"
+#include "tgfx/utils/Task.h"
+
+#import "PAGDiskCacheImpl.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGTextImpl.h"
-#import "pag/pag.h"
 
 @interface PAGImageImpl ()
 
@@ -34,12 +38,44 @@
   return pag::PAGFile::MaxSupportedTagLevel();
 }
 
++ (BOOL)IsNetWorkPath:(NSString*)path {
+  if (path == nil) {
+    return NO;
+  }
+  NSError* error = nil;
+  NSRegularExpression* regex =
+      [NSRegularExpression regularExpressionWithPattern:@"^(http|https|ftp)://.*$"
+                                                options:NSRegularExpressionCaseInsensitive
+                                                  error:&error];
+  if (!error) {
+    NSRange range = [regex rangeOfFirstMatchInString:path
+                                             options:0
+                                               range:NSMakeRange(0, path.length)];
+    if (range.location != NSNotFound) {
+      return YES;
+    }
+  }
+  return NO;
+}
+
 + (PAGFile*)Load:(NSString*)path {
   if (path == nil) {
     return nil;
   }
-  std::string filePath = [path UTF8String];
-  auto pagFile = pag::PAGFile::Load(filePath);
+  if ([PAGFileImpl IsNetWorkPath:path]) {
+    NSData* cacheData = [PAGDiskCacheImpl ReadFile:path];
+    if (cacheData == nil) {
+      NSError* error = nil;
+      cacheData = [NSData dataWithContentsOfURL:[NSURL URLWithString:path]
+                                        options:NSDataReadingUncached
+                                          error:&error];
+      if (error == nil && cacheData != nil) {
+        [PAGDiskCacheImpl WritFile:path data:cacheData];
+      }
+    }
+    return [PAGFileImpl Load:cacheData.bytes size:cacheData.length path:path];
+  }
+  auto pagFile = pag::PAGFile::Load([path UTF8String]);
   if (pagFile == nullptr) {
     return nil;
   }
@@ -47,11 +83,31 @@
 }
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length {
-  auto pagFile = pag::PAGFile::Load(bytes, length);
+  return [PAGFileImpl Load:bytes size:length path:@""];
+}
+
++ (PAGFile*)Load:(const void*)bytes size:(size_t)length path:(NSString*)filePath {
+  if (bytes == nil || length == 0) {
+    return nil;
+  }
+  auto pagFile = pag::PAGFile::Load(bytes, length, [filePath UTF8String]);
   if (pagFile == nullptr) {
     return nil;
   }
   return (PAGFile*)[PAGLayerImpl ToPAGLayer:pagFile];
+}
+
++ (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+  if (path == nil) {
+    callback(nil);
+    return;
+  }
+  void (^copyCallback)(PAGFile*) = Block_copy(callback);
+  tgfx::Task::Run([callBack = copyCallback, path]() {
+    PAGFile* file = [PAGFileImpl Load:path];
+    callBack(file);
+    Block_release(callBack);
+  });
 }
 
 - (uint16_t)tagLevel {

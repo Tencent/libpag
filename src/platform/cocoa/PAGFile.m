@@ -42,6 +42,10 @@
   return [PAGFileImpl Load:bytes size:length];
 }
 
++ (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+  [PAGFileImpl LoadAsync:path completionBlock:callback];
+}
+
 - (uint16_t)tagLevel {
   return [(PAGFileImpl*)self.impl tagLevel];
 }

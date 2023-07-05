@@ -1,3 +1,21 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 package org.libpag;
 
 import android.content.Context;
@@ -9,7 +27,6 @@ import android.graphics.drawable.Drawable;
 import android.opengl.EGLContext;
 import android.os.Build;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
 
@@ -228,6 +245,18 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         setComposition(pagFile);
         filePath = path;
         return pagFile != null;
+    }
+
+    /**
+     * Asynchronously load a pag file from the specific path.
+     */
+    public void setPathAsync(String path, PAGFile.LoadListener listener) {
+        NativeTask.Run(() -> {
+            setPath(path);
+            if (listener != null) {
+                listener.onLoad((PAGFile) pagPlayer.getComposition());
+            }
+        });
     }
 
     /**

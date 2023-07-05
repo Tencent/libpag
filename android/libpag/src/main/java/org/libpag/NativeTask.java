@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,18 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+package org.libpag;
 
-@interface PAGDiskCacheImpl : NSObject
+import org.extra.tools.LibraryLoadUtils;
 
-+ (size_t)MaxDiskSize;
+class NativeTask {
 
-+ (void)SetMaxDiskSize:(size_t)size;
+    static native void Run(Runnable runnable);
 
-+ (void)RemoveAll;
-
-+ (NSData*)ReadFile:(NSString*)key;
-
-+ (BOOL)WritFile:(NSString*)key data:(NSData*)data;
-
-@end
+    static {
+        LibraryLoadUtils.loadLibrary("pag");
+    }
+}
