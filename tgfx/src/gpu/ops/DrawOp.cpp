@@ -73,8 +73,8 @@ static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, R
   return dstTexture;
 }
 
-ProgramInfo DrawOp::createProgram(OpsRenderPass* opsRenderPass,
-                                  std::unique_ptr<GeometryProcessor> gp) {
+std::unique_ptr<Pipeline> DrawOp::createPipeline(OpsRenderPass* renderPass,
+                                                 std::unique_ptr<GeometryProcessor> gp) {
   auto numColorProcessors = _colors.size();
   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.resize(numColorProcessors + _masks.size());
@@ -83,19 +83,17 @@ ProgramInfo DrawOp::createProgram(OpsRenderPass* opsRenderPass,
             fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
   std::shared_ptr<Texture> dstTexture;
   Point dstTextureOffset = Point::Zero();
-  ProgramInfo info;
-  info.blendFactors = _blendFactors;
-  if (_requiresDstTexture) {
-    dstTexture = CreateDstTexture(opsRenderPass, bounds(), &dstTextureOffset);
+  auto caps = renderPass->context()->caps();
+  if (!BlendModeAsCoeff(blendMode) && !caps->frameBufferFetchSupport) {
+    dstTexture = CreateDstTexture(renderPass, bounds(), &dstTextureOffset);
   }
-  const auto& swizzle = opsRenderPass->renderTarget()->writeSwizzle();
-  info.pipeline =
-      std::make_unique<Pipeline>(std::move(fragmentProcessors), numColorProcessors,
-                                 std::move(_xferProcessor), dstTexture, dstTextureOffset, &swizzle);
-  info.pipeline->setRequiresBarrier(dstTexture != nullptr &&
-                                    dstTexture == opsRenderPass->renderTargetTexture());
-  info.geometryProcessor = std::move(gp);
-  return info;
+  const auto& swizzle = renderPass->renderTarget()->writeSwizzle();
+  auto pipeline =
+      std::make_unique<Pipeline>(std::move(gp), std::move(fragmentProcessors), numColorProcessors,
+                                 blendMode, dstTexture, dstTextureOffset, &swizzle);
+  pipeline->setRequiresBarrier(dstTexture != nullptr &&
+                               dstTexture == renderPass->renderTargetTexture());
+  return pipeline;
 }
 
 static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor>>& frags1,
@@ -114,9 +112,8 @@ static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor
 bool DrawOp::onCombineIfPossible(Op* op) {
   auto* that = static_cast<DrawOp*>(op);
   return aa == that->aa && _scissorRect == that->_scissorRect &&
-         _blendFactors == that->_blendFactors && _requiresDstTexture == that->_requiresDstTexture &&
          CompareFragments(_colors, that->_colors) && CompareFragments(_masks, that->_masks) &&
-         _xferProcessor == that->_xferProcessor;
+         blendMode == that->blendMode;
 }
 
 }  // namespace tgfx

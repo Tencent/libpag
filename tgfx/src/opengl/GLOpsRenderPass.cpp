@@ -106,14 +106,12 @@ static const unsigned gXfermodeCoeff2Blend[] = {
     GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA,
 };
 
-static void UpdateBlend(
-    Context* context,
-    const std::optional<std::pair<BlendModeCoeff, BlendModeCoeff>>& blendFactors) {
+static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
   auto gl = GLFunctions::Get(context);
-  if (blendFactors.has_value()) {
+  if (blendFactors != nullptr) {
     gl->enable(GL_BLEND);
-    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->first)],
-                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->second)]);
+    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcBlend)],
+                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstBlend)]);
     gl->blendEquation(GL_FUNC_ADD);
   } else {
     gl->disable(GL_BLEND);
@@ -135,9 +133,9 @@ void GLOpsRenderPass::reset() {
   _renderTargetTexture = nullptr;
 }
 
-bool GLOpsRenderPass::onBindPipelineAndScissorClip(const ProgramInfo& info,
+bool GLOpsRenderPass::onBindPipelineAndScissorClip(const Pipeline* pipeline,
                                                    const Rect& drawBounds) {
-  GLProgramCreator creator(info.geometryProcessor.get(), info.pipeline.get());
+  GLProgramCreator creator(pipeline->getGeometryProcessor(), pipeline);
   _program = static_cast<GLProgram*>(_context->programCache()->getProgram(&creator));
   if (_program == nullptr) {
     return false;
@@ -150,11 +148,11 @@ bool GLOpsRenderPass::onBindPipelineAndScissorClip(const ProgramInfo& info,
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   UpdateScissor(_context, drawBounds);
-  UpdateBlend(_context, info.blendFactors);
-  if (info.pipeline->requiresBarrier()) {
+  UpdateBlend(_context, pipeline->blendInfo());
+  if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(glRT, *info.geometryProcessor, *info.pipeline);
+  program->updateUniformsAndTextureBindings(glRT, pipeline);
   return true;
 }
 

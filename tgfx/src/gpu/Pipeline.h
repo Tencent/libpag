@@ -20,15 +20,21 @@
 
 #include "EmptyXferProcessor.h"
 #include "Swizzle.h"
+#include "gpu/Blend.h"
 #include "gpu/FragmentProcessor.h"
+#include "gpu/GeometryProcessor.h"
 
 namespace tgfx {
+/**
+ * This immutable object contains information needed to build a shader program and set API state for
+ * a draw.
+ */
 class Pipeline {
  public:
-  Pipeline(std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-           size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
-           std::shared_ptr<Texture> dstTexture, Point dstTextureOffset,
-           const Swizzle* outputSwizzle);
+  Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
+           std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
+           size_t numColorProcessors, BlendMode blendMode, std::shared_ptr<Texture> dstTexture,
+           Point dstTextureOffset, const Swizzle* outputSwizzle);
 
   void computeKey(Context* context, BytesKey* bytesKey) const;
 
@@ -38,6 +44,10 @@ class Pipeline {
 
   size_t numFragmentProcessors() const {
     return fragmentProcessors.size();
+  }
+
+  const GeometryProcessor* getGeometryProcessor() const {
+    return geometryProcessor.get();
   }
 
   const XferProcessor* getXferProcessor() const;
@@ -60,11 +70,17 @@ class Pipeline {
     return _outputSwizzle;
   }
 
+  const BlendInfo* blendInfo() const {
+    return xferProcessor == nullptr ? &_blendInfo : nullptr;
+  }
+
  private:
+  std::unique_ptr<GeometryProcessor> geometryProcessor;
   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors;
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   std::unique_ptr<XferProcessor> xferProcessor;
+  BlendInfo _blendInfo = {};
   std::shared_ptr<Texture> dstTexture;
   bool _requiresBarrier = false;
   Point dstTextureOffset = Point::Zero();

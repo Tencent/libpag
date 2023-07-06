@@ -62,8 +62,7 @@ void GLProgram::onReleaseGPU() {
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
-                                                 const GeometryProcessor& geometryProcessor,
-                                                 const Pipeline& pipeline) {
+                                                 const Pipeline* pipeline) {
   // we set the textures, and uniforms for installed processors in a generic way.
 
   // We must bind to texture units in the same order in which we set the uniforms in
@@ -72,20 +71,21 @@ void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTar
   GLProgramDataManager programDataManager(context, &uniformLocations);
   setRenderTargetState(programDataManager, renderTarget);
   FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
-  glGeometryProcessor->setData(programDataManager, geometryProcessor, &coordTransformIter);
+  glGeometryProcessor->setData(programDataManager, *pipeline->getGeometryProcessor(),
+                               &coordTransformIter);
   int nextTexSamplerIdx = 0;
   setFragmentData(programDataManager, pipeline, &nextTexSamplerIdx);
 
   auto offset = Point::Zero();
-  const auto* dstTexture = pipeline.getDstTexture(&offset);
+  const auto* dstTexture = pipeline->getDstTexture(&offset);
   if (dstTexture) {
-    glXferProcessor->setData(programDataManager, *pipeline.getXferProcessor(), dstTexture, offset);
+    glXferProcessor->setData(programDataManager, *pipeline->getXferProcessor(), dstTexture, offset);
     static_cast<GLGpu*>(context->gpu())->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler());
   }
 }
 
 void GLProgram::setFragmentData(const GLProgramDataManager& programDataManager,
-                                const Pipeline& pipeline, int* nextTexSamplerIdx) {
+                                const Pipeline* pipeline, int* nextTexSamplerIdx) {
   FragmentProcessor::Iter iter(pipeline);
   GLFragmentProcessor::Iter glslIter(glFragmentProcessors);
   const FragmentProcessor* fp = iter.next();

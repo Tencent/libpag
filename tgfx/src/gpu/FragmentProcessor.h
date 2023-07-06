@@ -126,7 +126,7 @@ class FragmentProcessor : public Processor {
       fpStack.push_back(fp);
     }
 
-    explicit Iter(const Pipeline& pipeline);
+    explicit Iter(const Pipeline* pipeline);
 
     const FragmentProcessor* next();
 
@@ -141,7 +141,7 @@ class FragmentProcessor : public Processor {
    */
   class CoordTransformIter {
    public:
-    explicit CoordTransformIter(const Pipeline& pipeline);
+    explicit CoordTransformIter(const Pipeline* pipeline);
 
     const CoordTransform* next();
 

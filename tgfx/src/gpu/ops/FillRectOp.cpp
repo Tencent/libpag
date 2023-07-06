@@ -165,11 +165,11 @@ void FillRectOp::onExecute(OpsRenderPass* opsRenderPass) {
   if (vertexBuffer == nullptr || (needsIndexBuffer() && indexBuffer == nullptr)) {
     return;
   }
-  auto info = createProgram(
+  auto pipeline = createPipeline(
       opsRenderPass, QuadPerEdgeAAGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
                                                           opsRenderPass->renderTarget()->height(),
                                                           aa, !colors.empty()));
-  opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
+  opsRenderPass->bindPipelineAndScissorClip(pipeline.get(), scissorRect());
   opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
   if (needsIndexBuffer()) {
     uint16_t numIndicesPerQuad;
