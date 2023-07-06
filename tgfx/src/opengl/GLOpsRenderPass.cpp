@@ -135,7 +135,7 @@ void GLOpsRenderPass::reset() {
 
 bool GLOpsRenderPass::onBindPipelineAndScissorClip(const Pipeline* pipeline,
                                                    const Rect& drawBounds) {
-  GLProgramCreator creator(pipeline->getGeometryProcessor(), pipeline);
+  GLProgramCreator creator(pipeline);
   _program = static_cast<GLProgram*>(_context->programCache()->getProgram(&creator));
   if (_program == nullptr) {
     return false;

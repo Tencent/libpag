@@ -69,9 +69,9 @@ class ProgramBuilder {
 
  protected:
   Context* context = nullptr;
+  const Pipeline* pipeline = nullptr;
 
-  ProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
-                 const Pipeline* pipeline);
+  ProgramBuilder(Context* context, const Pipeline* pipeline);
 
   bool emitAndInstallProcessors();
 
@@ -79,7 +79,6 @@ class ProgramBuilder {
 
   virtual bool checkSamplerCounts() = 0;
 
-  const GeometryProcessor* geometryProcessor = nullptr;
   std::unique_ptr<GLGeometryProcessor> glGeometryProcessor;
   std::unique_ptr<GLXferProcessor> xferProcessor;
   std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors;
@@ -114,7 +113,6 @@ class ProgramBuilder {
   void emitFSOutputSwizzle();
 
   int stageIndex = -1;
-  const Pipeline* pipeline = nullptr;
   std::vector<ShaderVar> transformedCoordVars = {};
 };
 }  // namespace tgfx

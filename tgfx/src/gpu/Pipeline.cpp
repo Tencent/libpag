@@ -38,6 +38,7 @@ Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
 }
 
 void Pipeline::computeKey(Context* context, BytesKey* bytesKey) const {
+  geometryProcessor->computeProcessorKey(context, bytesKey);
   if (dstTexture != nullptr) {
     dstTexture->getSampler()->computeKey(context, bytesKey);
   }

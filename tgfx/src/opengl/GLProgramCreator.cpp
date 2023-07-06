@@ -21,17 +21,14 @@
 #include "GLProgramBuilder.h"
 
 namespace tgfx {
-GLProgramCreator::GLProgramCreator(const GeometryProcessor* geometryProcessor,
-                                   const Pipeline* pipeline)
-    : geometryProcessor(geometryProcessor), pipeline(pipeline) {
+GLProgramCreator::GLProgramCreator(const Pipeline* pipeline) : pipeline(pipeline) {
 }
 
 void GLProgramCreator::computeUniqueKey(Context* context, BytesKey* bytesKey) const {
-  geometryProcessor->computeProcessorKey(context, bytesKey);
   pipeline->computeKey(context, bytesKey);
 }
 
 std::unique_ptr<Program> GLProgramCreator::createProgram(Context* context) const {
-  return GLProgramBuilder::CreateProgram(context, geometryProcessor, pipeline);
+  return GLProgramBuilder::CreateProgram(context, pipeline);
 }
 }  // namespace tgfx

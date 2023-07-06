@@ -35,9 +35,8 @@ class GLProgramBuilder : public ProgramBuilder {
    * After successful generation, the builder result objects are available
    * to be used.
    */
-  static std::unique_ptr<GLProgram> CreateProgram(Context* context,
-                                                  const GeometryProcessor* geometryProcessor,
-                                                  const Pipeline* pipeline);
+  static std::unique_ptr<GLProgram> CreateProgram(Context* context, const Pipeline* pipeline);
+
   std::string versionDeclString() override;
 
   std::string textureFuncName() const override;
@@ -47,8 +46,7 @@ class GLProgramBuilder : public ProgramBuilder {
   bool isDesktopGL() const;
 
  private:
-  GLProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
-                   const Pipeline* pipeline);
+  GLProgramBuilder(Context* context, const Pipeline* pipeline);
 
   void computeCountsAndStrides(unsigned programID);
 
