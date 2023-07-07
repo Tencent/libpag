@@ -808,10 +808,10 @@ public class PAGImageView extends View {
         if (!forceFlush && !decoderInfo.checkFrameChanged(frame)) {
             return true;
         }
-        if (renderBitmap == null || _cacheAllFramesInMemory) {
-            renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
-        }
         synchronized (bitmapLock) {
+            if (renderBitmap == null || _cacheAllFramesInMemory) {
+                renderBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            }
             if (renderBitmap == null) {
                 return false;
             }
