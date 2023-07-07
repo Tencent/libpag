@@ -25,14 +25,13 @@
 namespace tgfx {
 class GLProgramCreator : public ProgramCreator {
  public:
-  GLProgramCreator(const GeometryProcessor* geometryProcessor, const Pipeline* pipeline);
+  explicit GLProgramCreator(const Pipeline* pipeline);
 
   void computeUniqueKey(Context* context, BytesKey* uniqueKey) const override;
 
   std::unique_ptr<Program> createProgram(Context* context) const override;
 
  private:
-  const GeometryProcessor* geometryProcessor;
   const Pipeline* pipeline;
 };
 }  // namespace tgfx

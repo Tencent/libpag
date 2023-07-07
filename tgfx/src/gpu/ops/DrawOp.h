@@ -35,7 +35,8 @@ class DrawOp : public Op {
 
   void execute(OpsRenderPass* opsRenderPass) final;
 
-  ProgramInfo createProgram(OpsRenderPass* opsRenderPass, std::unique_ptr<GeometryProcessor> gp);
+  std::unique_ptr<Pipeline> createPipeline(OpsRenderPass* renderPass,
+                                           std::unique_ptr<GeometryProcessor> gp);
 
   const Rect& scissorRect() const {
     return _scissorRect;
@@ -45,16 +46,8 @@ class DrawOp : public Op {
     _scissorRect = scissorRect;
   }
 
-  void setBlendFactors(std::optional<std::pair<BlendModeCoeff, BlendModeCoeff>> blendFactors) {
-    _blendFactors = blendFactors;
-  }
-
-  void setXferProcessor(std::unique_ptr<XferProcessor> xferProcessor) {
-    _xferProcessor = std::move(xferProcessor);
-  }
-
-  void setRequireDstTexture(bool requiresDstTexture) {
-    _requiresDstTexture = requiresDstTexture;
+  void setBlendMode(BlendMode mode) {
+    blendMode = mode;
   }
 
   void setAA(AAType type) {
@@ -80,10 +73,8 @@ class DrawOp : public Op {
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();
-  std::optional<std::pair<BlendModeCoeff, BlendModeCoeff>> _blendFactors;
-  bool _requiresDstTexture = false;
   std::vector<std::unique_ptr<FragmentProcessor>> _colors;
   std::vector<std::unique_ptr<FragmentProcessor>> _masks;
-  std::unique_ptr<XferProcessor> _xferProcessor;
+  BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

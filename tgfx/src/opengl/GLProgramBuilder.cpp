@@ -59,18 +59,17 @@ static std::string SLTypeString(ShaderVar::Type t) {
   return "";
 }
 
-std::unique_ptr<GLProgram> GLProgramBuilder::CreateProgram(
-    Context* context, const GeometryProcessor* geometryProcessor, const Pipeline* pipeline) {
-  GLProgramBuilder builder(context, geometryProcessor, pipeline);
+std::unique_ptr<GLProgram> GLProgramBuilder::CreateProgram(Context* context,
+                                                           const Pipeline* pipeline) {
+  GLProgramBuilder builder(context, pipeline);
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;
   }
   return builder.finalize();
 }
 
-GLProgramBuilder::GLProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
-                                   const Pipeline* pipeline)
-    : ProgramBuilder(context, geometryProcessor, pipeline),
+GLProgramBuilder::GLProgramBuilder(Context* context, const Pipeline* pipeline)
+    : ProgramBuilder(context, pipeline),
       _varyingHandler(this),
       _uniformHandler(this),
       _vertexBuilder(this),
@@ -124,7 +123,7 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
   auto gl = GLFunctions::Get(context);
   vertexStride = 0;
-  for (const auto* attr : geometryProcessor->vertexAttributes()) {
+  for (const auto* attr : pipeline->getGeometryProcessor()->vertexAttributes()) {
     GLProgram::Attribute attribute;
     attribute.gpuType = attr->gpuType();
     attribute.offset = vertexStride;

@@ -17,22 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
+#include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {
-Pipeline::Pipeline(std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-                   size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
+Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
+                   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
+                   size_t numColorProcessors, BlendMode blendMode,
                    std::shared_ptr<Texture> dstTexture, Point dstTextureOffset,
                    const Swizzle* outputSwizzle)
-    : fragmentProcessors(std::move(fragmentProcessors)),
+    : geometryProcessor(std::move(geometryProcessor)),
+      fragmentProcessors(std::move(fragmentProcessors)),
       numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)),
       dstTexture(std::move(dstTexture)),
       dstTextureOffset(dstTextureOffset),
       _outputSwizzle(outputSwizzle) {
+  if (!BlendModeAsCoeff(blendMode, &_blendInfo)) {
+    xferProcessor = PorterDuffXferProcessor::Make(blendMode);
+  }
 }
 
 void Pipeline::computeKey(Context* context, BytesKey* bytesKey) const {
+  geometryProcessor->computeProcessorKey(context, bytesKey);
   if (dstTexture != nullptr) {
     dstTexture->getSampler()->computeKey(context, bytesKey);
   }

@@ -20,7 +20,7 @@
 #include <utility>
 
 namespace tgfx {
-bool BlendModeAsCoeff(BlendMode mode, BlendModeCoeff* src, BlendModeCoeff* dst) {
+bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo) {
   // clang-format off
   static constexpr std::pair<BlendModeCoeff, BlendModeCoeff> kCoeffs[] = {
       // For Porter-Duff blend functions, color = src * src coeff + dst * dst coeff
@@ -47,11 +47,9 @@ bool BlendModeAsCoeff(BlendMode mode, BlendModeCoeff* src, BlendModeCoeff* dst) 
   if (mode > BlendMode::Screen) {
     return false;
   }
-  if (src) {
-    *src = kCoeffs[static_cast<int>(mode)].first;
-  }
-  if (dst) {
-    *dst = kCoeffs[static_cast<int>(mode)].second;
+  if (blendInfo != nullptr) {
+    blendInfo->srcBlend = kCoeffs[static_cast<int>(mode)].first;
+    blendInfo->dstBlend = kCoeffs[static_cast<int>(mode)].second;
   }
   return true;
 }

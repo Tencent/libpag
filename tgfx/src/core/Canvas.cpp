@@ -20,11 +20,9 @@
 #include <atomic>
 #include "CanvasState.h"
 #include "gpu/AARectEffect.h"
-#include "gpu/Blend.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/DeviceSpaceTextureEffect.h"
 #include "gpu/GpuPaint.h"
-#include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/SurfaceDrawContext.h"
 #include "gpu/TextureEffect.h"
 #include "gpu/ops/ClearOp.h"
@@ -739,14 +737,7 @@ void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
     masks.push_back(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  BlendModeCoeff first;
-  BlendModeCoeff second;
-  if (BlendModeAsCoeff(state->blendMode, &first, &second)) {
-    op->setBlendFactors(std::make_pair(first, second));
-  } else {
-    op->setXferProcessor(PorterDuffXferProcessor::Make(state->blendMode));
-    op->setRequireDstTexture(!getContext()->caps()->frameBufferFetchSupport);
-  }
+  op->setBlendMode(state->blendMode);
   op->setAA(aaType);
   op->setColors(std::move(paint.colorFragmentProcessors));
   op->setMasks(std::move(masks));

@@ -43,7 +43,7 @@ class GLGeometryProcessor {
    */
   class FPCoordTransformHandler {
    public:
-    FPCoordTransformHandler(const Pipeline& pipeline, std::vector<ShaderVar>* transformedCoordVars)
+    FPCoordTransformHandler(const Pipeline* pipeline, std::vector<ShaderVar>* transformedCoordVars)
         : iter(pipeline), transformedCoordVars(transformedCoordVars) {
     }
 

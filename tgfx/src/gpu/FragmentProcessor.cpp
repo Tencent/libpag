@@ -84,9 +84,9 @@ size_t FragmentProcessor::registerChildProcessor(std::unique_ptr<FragmentProcess
   return index;
 }
 
-FragmentProcessor::Iter::Iter(const Pipeline& pipeline) {
-  for (int i = static_cast<int>(pipeline.numFragmentProcessors()) - 1; i >= 0; --i) {
-    fpStack.push_back(pipeline.getFragmentProcessor(i));
+FragmentProcessor::Iter::Iter(const Pipeline* pipeline) {
+  for (int i = static_cast<int>(pipeline->numFragmentProcessors()) - 1; i >= 0; --i) {
+    fpStack.push_back(pipeline->getFragmentProcessor(i));
   }
 }
 
@@ -102,7 +102,7 @@ const FragmentProcessor* FragmentProcessor::Iter::next() {
   return back;
 }
 
-FragmentProcessor::CoordTransformIter::CoordTransformIter(const Pipeline& pipeline)
+FragmentProcessor::CoordTransformIter::CoordTransformIter(const Pipeline* pipeline)
     : fpIter(pipeline) {
   currFP = fpIter.next();
 }

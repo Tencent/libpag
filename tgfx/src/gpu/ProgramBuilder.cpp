@@ -22,9 +22,8 @@
 #include "GLXferProcessor.h"
 
 namespace tgfx {
-ProgramBuilder::ProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
-                               const Pipeline* pipeline)
-    : context(context), geometryProcessor(geometryProcessor), pipeline(pipeline) {
+ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)
+    : context(context), pipeline(pipeline) {
 }
 
 bool ProgramBuilder::emitAndInstallProcessors() {
@@ -51,7 +50,7 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
 
   uniformHandles.rtAdjustUniform =
       uniformHandler()->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float4, RTAdjustName);
-
+  auto geometryProcessor = pipeline->getGeometryProcessor();
   // Enclose custom code in a block to avoid namespace conflicts
   fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", stageIndex,
                                        geometryProcessor->name().c_str());
@@ -60,7 +59,7 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
 
   glGeometryProcessor = geometryProcessor->createGLInstance();
 
-  GLGeometryProcessor::FPCoordTransformHandler transformHandler(*pipeline, &transformedCoordVars);
+  GLGeometryProcessor::FPCoordTransformHandler transformHandler(pipeline, &transformedCoordVars);
   GLGeometryProcessor::EmitArgs args(
       vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(), uniformHandler(),
       getContext()->caps(), geometryProcessor, *outputColor, *outputCoverage, &transformHandler);

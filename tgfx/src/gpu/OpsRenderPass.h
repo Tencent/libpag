@@ -38,12 +38,6 @@ enum class PrimitiveType {
   TriangleStrip,
 };
 
-struct ProgramInfo {
-  std::unique_ptr<Pipeline> pipeline;
-  std::unique_ptr<GeometryProcessor> geometryProcessor;
-  std::optional<std::pair<BlendModeCoeff, BlendModeCoeff>> blendFactors;
-};
-
 class OpsRenderPass {
  public:
   explicit OpsRenderPass(Context* context) : _context(context) {
@@ -65,14 +59,14 @@ class OpsRenderPass {
 
   void begin();
   void end();
-  void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds);
+  void bindPipelineAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer);
   void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount);
   void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount);
   void clear(const Rect& scissor, Color color);
 
  protected:
-  virtual bool onBindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) = 0;
+  virtual bool onBindPipelineAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
   virtual void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
                              std::shared_ptr<GpuBuffer> vertexBuffer) = 0;
   virtual void onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) = 0;

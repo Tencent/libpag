@@ -60,8 +60,7 @@ class GLProgram : public Program {
    * It is the caller's responsibility to ensure the program is bound before calling.
    */
   void updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
-                                        const GeometryProcessor& geometryProcessor,
-                                        const Pipeline& pipeline);
+                                        const Pipeline* pipeline);
 
   int vertexStride() const {
     return _vertexStride;
@@ -79,7 +78,7 @@ class GLProgram : public Program {
   };
 
   // A helper to loop over effects, set the transforms (via subclass) and bind textures
-  void setFragmentData(const GLProgramDataManager& programDataManager, const Pipeline& pipeline,
+  void setFragmentData(const GLProgramDataManager& programDataManager, const Pipeline* pipeline,
                        int* nextTexSamplerIdx);
 
   void setRenderTargetState(const GLProgramDataManager& programDataManager,

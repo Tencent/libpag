@@ -418,8 +418,8 @@ static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, BlendModeCoef
 
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                 const std::string& dstColor, const std::string& outColor, BlendMode blendMode) {
-  BlendModeCoeff srcCoeff, dstCoeff;
-  if (BlendModeAsCoeff(blendMode, &srcCoeff, &dstCoeff)) {
+  BlendInfo blendInfo = {};
+  if (BlendModeAsCoeff(blendMode, &blendInfo)) {
     // The only coeff mode that can go out of range is plus.
     bool clamp = blendMode == BlendMode::Plus;
 
@@ -428,9 +428,11 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
       fsBuilder->codeAppend("clamp(");
     }
     // append src blend
-    bool didAppend = AppendPorterDuffTerm(fsBuilder, srcCoeff, srcColor, srcColor, dstColor, false);
+    bool didAppend =
+        AppendPorterDuffTerm(fsBuilder, blendInfo.srcBlend, srcColor, srcColor, dstColor, false);
     // append dst blend
-    if (!AppendPorterDuffTerm(fsBuilder, dstCoeff, dstColor, srcColor, dstColor, didAppend)) {
+    if (!AppendPorterDuffTerm(fsBuilder, blendInfo.dstBlend, dstColor, srcColor, dstColor,
+                              didAppend)) {
       fsBuilder->codeAppend("vec4(0, 0, 0, 0)");
     }
     if (clamp) {

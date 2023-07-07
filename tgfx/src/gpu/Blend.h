@@ -64,9 +64,14 @@ enum class BlendModeCoeff {
   IDA,
 };
 
+struct BlendInfo {
+  BlendModeCoeff srcBlend;
+  BlendModeCoeff dstBlend;
+};
+
 /**
  * Returns true if 'mode' is a coefficient-based blend mode. If true is returned, the mode's src and
  * dst coefficient functions are set in 'src' and 'dst'.
  */
-bool BlendModeAsCoeff(BlendMode mode, BlendModeCoeff* src = nullptr, BlendModeCoeff* dst = nullptr);
+bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo = nullptr);
 }  // namespace tgfx

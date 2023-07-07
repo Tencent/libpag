@@ -87,11 +87,11 @@ void TriangulatingPathOp::onExecute(OpsRenderPass* opsRenderPass) {
   if (buffer == nullptr) {
     return;
   }
-  auto info = createProgram(
+  auto pipeline = createPipeline(
       opsRenderPass, DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
                                                     opsRenderPass->renderTarget()->height(),
                                                     viewMatrix, localMatrix));
-  opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
+  opsRenderPass->bindPipelineAndScissorClip(pipeline.get(), scissorRect());
   opsRenderPass->bindBuffers(nullptr, buffer);
   opsRenderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
