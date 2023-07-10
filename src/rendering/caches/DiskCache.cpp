@@ -221,6 +221,7 @@ bool DiskCache::checkDiskSpace(size_t maxSize) {
   if (totalDiskSize <= maxSize) {
     return changed;
   }
+  LOGE("Cached data exceeds threshold, current threshold is:%lld !!! \n", maxSize);
   while (totalDiskSize > maxSize) {
     auto fileInfo = cachedFiles.back();
     if (openedFiles.count(fileInfo->fileID) > 0) {
