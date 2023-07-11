@@ -56,6 +56,46 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   return std::make_shared<FTMask>(std::move(pixelRef));
 }
 
+struct RasterTarget {
+  unsigned char* origin;
+  int pitch;
+  const uint8_t* gammaTable;
+};
+
+static void SpanFunc(int y, int, const FT_Span* spans, void* user) {
+  auto* target = reinterpret_cast<RasterTarget*>(user);
+  auto* q = target->origin - target->pitch * y + spans->x;
+  auto c = spans->coverage;
+  if (target->gammaTable) {
+    c = target->gammaTable[c];
+  }
+  auto aCount = spans->len;
+  /**
+   * For small-spans it is faster to do it by ourselves than calling memset.
+   * This is mainly due to the cost of the function call.
+   */
+  switch (aCount) {
+    case 7:
+      *q++ = c;
+    case 6:
+      *q++ = c;
+    case 5:
+      *q++ = c;
+    case 4:
+      *q++ = c;
+    case 3:
+      *q++ = c;
+    case 2:
+      *q++ = c;
+    case 1:
+      *q = c;
+    case 0:
+      break;
+    default:
+      memset(q, c, aCount);
+  }
+}
+
 void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
@@ -77,20 +117,25 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
   auto outlines = ftPath.getOutlines();
-  FT_Bitmap bitmap;
-  bitmap.width = info.width();
-  bitmap.rows = info.height();
-  bitmap.pitch = static_cast<int>(info.rowBytes());
-  bitmap.buffer = static_cast<unsigned char*>(pixels);
-  bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
-  bitmap.num_grays = 256;
   auto ftLibrary = GetLibrary().library();
+  auto buffer = static_cast<unsigned char*>(pixels);
+  int rows = info.height();
+  int pitch = static_cast<int>(info.rowBytes());
+  RasterTarget target{};
+  target.origin = buffer + (rows - 1) * pitch;
+  target.pitch = pitch;
+  if (needsGammaCorrection) {
+    target.gammaTable = PixelRefMask::GammaTable().data();
+  } else {
+    target.gammaTable = nullptr;
+  }
+  FT_Raster_Params params;
+  params.flags = FT_RASTER_FLAG_AA | FT_RASTER_FLAG_DIRECT;
+  params.gray_spans = SpanFunc;
+  params.user = &target;
   for (auto& outline : outlines) {
-    FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
+    FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }
   pixelRef->unlockPixels();
-  if (needsGammaCorrection) {
-    applyGamma(bounds, true);
-  }
 }
 }  // namespace tgfx

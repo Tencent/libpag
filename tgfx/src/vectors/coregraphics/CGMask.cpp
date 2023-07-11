@@ -57,6 +57,59 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   return std::make_shared<CGMask>(std::move(pixelRef));
 }
 
+static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& info) {
+  auto cgPath = CGPathCreateMutable();
+  path.decompose(Iterator, cgPath);
+
+  CGContextSetShouldAntialias(cgContext, true);
+  static const CGFloat white[] = {1.f, 1.f, 1.f, 1.f};
+  if (path.isInverseFillType()) {
+    auto rect = CGRectMake(0.f, 0.f, info.width(), info.height());
+    CGContextAddRect(cgContext, rect);
+    CGContextSetFillColor(cgContext, white);
+    CGContextFillPath(cgContext);
+    CGContextAddPath(cgContext, cgPath);
+    if (path.getFillType() == PathFillType::InverseWinding) {
+      CGContextClip(cgContext);
+    } else {
+      CGContextEOClip(cgContext);
+    }
+    CGContextClearRect(cgContext, rect);
+  } else {
+    CGContextAddPath(cgContext, cgPath);
+    CGContextSetFillColor(cgContext, white);
+    if (path.getFillType() == PathFillType::Winding) {
+      CGContextFillPath(cgContext);
+    } else {
+      CGContextEOFillPath(cgContext);
+    }
+  }
+  CGPathRelease(cgPath);
+}
+
+static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo& info, float left,
+                                float top, const std::array<uint8_t, 256>& gammaTable) {
+  auto cgContext = CreateBitmapContext(info, pixels);
+  if (cgContext == nullptr) {
+    return nullptr;
+  }
+  CGContextTranslateCTM(cgContext, -left, -top);
+  DrawPath(path, cgContext, info);
+  CGContextFlush(cgContext);
+  auto* p = static_cast<uint8_t*>(pixels);
+  auto stride = info.rowBytes();
+  for (int y = 0; y < info.height(); ++y) {
+    for (int x = 0; x < info.width(); ++x) {
+      p[x] = gammaTable[p[x]];
+    }
+    p += stride;
+  }
+  CGContextSynchronize(cgContext);
+  auto image = CGBitmapContextCreateImage(cgContext);
+  CGContextRelease(cgContext);
+  return image;
+}
+
 void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
@@ -80,38 +133,36 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   auto bounds = finalPath.getBounds();
   bounds.roundOut();
   markContentDirty(bounds, true);
-  auto cgPath = CGPathCreateMutable();
-  finalPath.decompose(Iterator, cgPath);
 
-  CGContextSetShouldAntialias(cgContext, true);
-  static const CGFloat white[] = {1.f, 1.f, 1.f, 1.f};
-  if (finalPath.isInverseFillType()) {
-    auto rect = CGRectMake(0.f, 0.f, info.width(), info.height());
-    CGContextAddRect(cgContext, rect);
-    CGContextSetFillColor(cgContext, white);
-    CGContextFillPath(cgContext);
-    CGContextAddPath(cgContext, cgPath);
-    if (finalPath.getFillType() == PathFillType::InverseWinding) {
-      CGContextClip(cgContext);
-    } else {
-      CGContextEOClip(cgContext);
-    }
-    CGContextClearRect(cgContext, rect);
-  } else {
-    CGContextAddPath(cgContext, cgPath);
-    CGContextSetFillColor(cgContext, white);
-    if (finalPath.getFillType() == PathFillType::Winding) {
-      CGContextFillPath(cgContext);
-    } else {
-      CGContextEOFillPath(cgContext);
-    }
+  if (!needsGammaCorrection) {
+    DrawPath(finalPath, cgContext, info);
+    CGContextRelease(cgContext);
+    pixelRef->unlockPixels();
+    return;
   }
-  CGContextRelease(cgContext);
-  CGPathRelease(cgPath);
+  int width = static_cast<int>(bounds.width());
+  int height = static_cast<int>(bounds.height());
+  auto tempBuffer = PixelBuffer::Make(width, height, true, false);
+  if (tempBuffer == nullptr) {
+    pixelRef->unlockPixels();
+    return;
+  }
+  auto* tempPixels = tempBuffer->lockPixels();
+  if (tempPixels == nullptr) {
+    pixelRef->unlockPixels();
+    return;
+  }
+  memset(tempPixels, 0, tempBuffer->info().byteSize());
+  auto image = CreateCGImage(finalPath, tempPixels, tempBuffer->info(), bounds.left, bounds.top,
+                             PixelRefMask::GammaTable());
+  tempBuffer->unlockPixels();
+  if (image == nullptr) {
+    pixelRef->unlockPixels();
+    return;
+  }
+  auto rect = CGRectMake(bounds.left, bounds.top, bounds.width(), bounds.height());
+  CGContextDrawImage(cgContext, rect, image);
   pixelRef->unlockPixels();
-  if (needsGammaCorrection) {
-    applyGamma(bounds, true);
-  }
 }
 
 bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
@@ -128,17 +179,6 @@ bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Ma
     pixelRef->unlockPixels();
     return false;
   }
-  CGContextClearRect(cgContext, CGRectMake(0, 0, width(), height()));
-  auto totalMatrix = matrix;
-  totalMatrix.preScale(1.f, -1.f);
-  totalMatrix.postScale(1.f, -1.f);
-  totalMatrix.postTranslate(0, static_cast<float>(height()));
-  const auto& font = blob->getFont();
-  if (font.isFauxItalic()) {
-    totalMatrix.postSkew(ITALIC_SKEW, 0);
-  }
-  auto transform = MatrixToCGAffineTransform(totalMatrix);
-  CGContextSetTextMatrix(cgContext, transform);
   CGContextSetBlendMode(cgContext, kCGBlendModeCopy);
   CGContextSetTextDrawingMode(cgContext, kCGTextFill);
   CGContextSetGrayFillColor(cgContext, 1.0f, 1.0f);
@@ -148,17 +188,26 @@ bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Ma
   CGContextSetShouldSubpixelQuantizeFonts(cgContext, false);
   CGContextSetAllowsFontSubpixelPositioning(cgContext, true);
   CGContextSetShouldSubpixelPositionFonts(cgContext, true);
+  const auto& font = blob->getFont();
   CTFontRef ctFont = std::static_pointer_cast<CGTypeface>(font.getTypeface())->getCTFont();
   ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
                                           nullptr);
-  std::vector<CGPoint> points;
-  auto count = blob->getGlyphIDs().size();
-  for (size_t i = 0; i < count; ++i) {
-    auto position = blob->getPositions()[i];
-    points.emplace_back(CGPointMake(position.x, position.y));
+  if (font.isFauxItalic()) {
+    CGContextSetTextMatrix(cgContext, CGAffineTransformMake(1, 0, -ITALIC_SKEW, 1, 0, 0));
   }
-  CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(blob->getGlyphIDs().data()),
-                   static_cast<const CGPoint*>(points.data()), count, cgContext);
+  CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));
+  CGContextScaleCTM(cgContext, 1.f, -1.f);
+  CGContextConcatCTM(cgContext, MatrixToCGAffineTransform(matrix));
+  auto point = CGPointZero;
+  for (size_t i = 0; i < blob->getGlyphIDs().size(); ++i) {
+    auto position = blob->getPositions()[i];
+    CGContextSaveGState(cgContext);
+    CGContextTranslateCTM(cgContext, position.x, position.y);
+    CGContextScaleCTM(cgContext, 1.f, -1.f);
+    CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(&blob->getGlyphIDs()[i]), &point, 1,
+                     cgContext);
+    CGContextRestoreGState(cgContext);
+  }
   CFRelease(ctFont);
   CGContextRelease(cgContext);
   pixelRef->unlockPixels();
