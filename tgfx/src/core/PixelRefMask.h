@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "core/PixelRef.h"
 #include "tgfx/core/Mask.h"
 
@@ -51,7 +52,7 @@ class PixelRefMask : public Mask {
 
   void markContentDirty(const Rect& bounds, bool flipY);
 
-  void applyGamma(const Rect& bounds, bool flipY);
+  static const std::array<uint8_t, 256>& GammaTable();
 
   std::shared_ptr<ImageStream> getImageStream() const override {
     return pixelRef;
