@@ -245,23 +245,19 @@ std::vector<int> PAGAnimator::doAdvance() {
   }
   std::vector<int> events = {};
   auto count = static_cast<int>(playTime / _duration);
-  if (_repeatCount > 0) {
-    if (count >= _repeatCount) {
-      // Set the playedCount to 0 to allow the animation to be played again.
-      playedCount = 0;
-      isEnded = true;
-      _isRunning = false;
-      cancelAnimation();
-      events.push_back(AnimationTypeUpdate);
-      events.push_back(AnimationTypeEnd);
-    } else {
-      if (count > playedCount) {
-        playedCount = count;
-        events.push_back(AnimationTypeRepeat);
-      }
-      events.push_back(AnimationTypeUpdate);
-    }
+  if (_repeatCount > 0 && count >= _repeatCount) {
+    // Set the playedCount to 0 to allow the animation to be played again.
+    playedCount = 0;
+    isEnded = true;
+    _isRunning = false;
+    cancelAnimation();
+    events.push_back(AnimationTypeUpdate);
+    events.push_back(AnimationTypeEnd);
   } else {
+    if (count > playedCount) {
+      playedCount = count;
+      events.push_back(AnimationTypeRepeat);
+    }
     events.push_back(AnimationTypeUpdate);
   }
   return events;
