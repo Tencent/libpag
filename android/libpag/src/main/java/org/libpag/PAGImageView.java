@@ -171,9 +171,6 @@ public class PAGImageView extends View {
      * PAGImageView.
      */
     public void setComposition(PAGComposition newComposition, float maxFrameRate) {
-        if (newComposition == _composition && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
-            return;
-        }
         refreshResource(null, newComposition, maxFrameRate);
     }
 
@@ -473,6 +470,7 @@ public class PAGImageView extends View {
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
+        _numFrames = 0;
         progressExplicitlySet = true;
         synchronized (animatorLock) {
             animator.setDuration(_composition == null ? 0 : _composition.duration() / 100);
