@@ -44,10 +44,7 @@ EMSCRIPTEN_BINDINGS(tgfx) {
       .field("right", &Rect::right)
       .field("bottom", &Rect::bottom);
 
-  register_vector<int>("VectorInt");
   register_vector<Point>("VectorTGFXPoint");
-
-  register_vector<std::string>("VectorString");
 
   class_<ImageInfo>("TGFXImageInfo")
       .property("width", &ImageInfo::width)
