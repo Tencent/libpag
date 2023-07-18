@@ -34,130 +34,51 @@ using namespace emscripten;
 using namespace tgfx;
 
 EMSCRIPTEN_BINDINGS(tgfx) {
-// TGFX binding function
-#ifdef TGFX_BIND_FOR_WEB
-  class_<tgfx::Matrix>("_Matrix")
-      .class_function("_MakeAll", Matrix::MakeAll)
-      .class_function("_MakeScale", optional_override([](float sx, float sy) {
-                        return Matrix::MakeScale(sx, sy);
-                      }))
-      .class_function("_MakeScale",
-                      optional_override([](float scale) { return Matrix::MakeScale(scale); }))
-      .class_function("_MakeTrans", Matrix::MakeTrans)
-      .function("_get", &Matrix::get)
-      .function("_set", &Matrix::set)
-      .function("_setAll", &Matrix::setAll)
-      .function("_setAffine", &Matrix::setAffine)
-      .function("_reset", &Matrix::reset)
-      .function("_setTranslate", &Matrix::setTranslate)
-      .function("_setScale",
-                optional_override([](Matrix& matrix, float sx, float sy, float px, float py) {
-                  return matrix.setScale(sx, sy, px, py);
-                }))
-      .function("_setRotate",
-                optional_override([](Matrix& matrix, float degrees, float px, float py) {
-                  return matrix.setRotate(degrees, px, py);
-                }))
-      .function("_setSinCos",
-                optional_override([](Matrix& matrix, float sinV, float cosV, float px, float py) {
-                  return matrix.setSinCos(sinV, cosV, px, py);
-                }))
-      .function("_setSkew",
-                optional_override([](Matrix& matrix, float kx, float ky, float px, float py) {
-                  return matrix.setSkew(kx, ky, px, py);
-                }))
-      .function("_setConcat", &Matrix::setConcat)
-      .function("_preTranslate", &Matrix::preTranslate)
-      .function("_preScale",
-                optional_override([](Matrix& matrix, float sx, float sy, float px, float py) {
-                  return matrix.preScale(sx, sy, px, py);
-                }))
-      .function("_preRotate",
-                optional_override([](Matrix& matrix, float degrees, float px, float py) {
-                  return matrix.preRotate(degrees, px, py);
-                }))
-      .function("_preSkew",
-                optional_override([](Matrix& matrix, float kx, float ky, float px, float py) {
-                  return matrix.preSkew(kx, ky, px, py);
-                }))
-      .function("_preConcat", &Matrix::preConcat)
-      .function("_postTranslate", &Matrix::postTranslate)
-      .function("_postScale",
-                optional_override([](Matrix& matrix, float sx, float sy, float px, float py) {
-                  return matrix.postScale(sx, sy, px, py);
-                }))
-      .function("_postRotate",
-                optional_override([](Matrix& matrix, float degrees, float px, float py) {
-                  return matrix.postRotate(degrees, px, py);
-                }))
-      .function("_postSkew",
-                optional_override([](Matrix& matrix, float kx, float ky, float px, float py) {
-                  return matrix.postSkew(kx, ky, px, py);
-                }))
-      .function("_postConcat", &Matrix::postConcat);
+  class_<Matrix>("TGFXMatrix").function("_get", &Matrix::get).function("_set", &Matrix::set);
 
-  value_object<tgfx::Rect>("Rect")
+  value_object<Point>("TGFXPoint").field("x", &Point::x).field("y", &Point::y);
+
+  value_object<Rect>("TGFXRect")
       .field("left", &Rect::left)
       .field("top", &Rect::top)
       .field("right", &Rect::right)
       .field("bottom", &Rect::bottom);
 
-  value_object<tgfx::Point>("Point").field("x", &Point::x).field("y", &Point::y);
-
-  value_object<tgfx::Color>("Color")
-      .field("red", &Color::red)
-      .field("green", &Color::green)
-      .field("blue", &Color::blue);
-#else
-  // PAG binding function
-  class_<tgfx::Matrix>("TGFXMatrix")
-      .function("_get", &tgfx::Matrix::get)
-      .function("_set", &tgfx::Matrix::set);
-
-  value_object<tgfx::Point>("TGFXPoint").field("x", &tgfx::Point::x).field("y", &tgfx::Point::y);
-
-  value_object<tgfx::Rect>("TGFXRect")
-      .field("left", &tgfx::Rect::left)
-      .field("top", &tgfx::Rect::top)
-      .field("right", &tgfx::Rect::right)
-      .field("bottom", &tgfx::Rect::bottom);
-#endif
-  // Public binding function
   register_vector<int>("VectorInt");
-  register_vector<tgfx::Point>("VectorTGFXPoint");
+  register_vector<Point>("VectorTGFXPoint");
 
   register_vector<std::string>("VectorString");
 
-  class_<tgfx::ImageInfo>("TGFXImageInfo")
+  class_<ImageInfo>("TGFXImageInfo")
       .property("width", &ImageInfo::width)
       .property("height", &ImageInfo::height)
       .property("rowBytes", &ImageInfo::rowBytes)
       .property("colorType", &ImageInfo::colorType);
 
-  class_<tgfx::Stroke>("TGFXStroke")
+  class_<Stroke>("TGFXStroke")
       .property("width", &Stroke::width)
       .property("cap", &Stroke::cap)
       .property("join", &Stroke::join)
       .property("miterLimit", &Stroke::miterLimit);
 
-  value_object<tgfx::FontMetrics>("TGFXFontMetrics")
+  value_object<FontMetrics>("TGFXFontMetrics")
       .field("ascent", &FontMetrics::ascent)
       .field("descent", &FontMetrics::descent)
       .field("xHeight", &FontMetrics::xHeight)
       .field("capHeight", &FontMetrics::capHeight);
 
-  enum_<tgfx::PathFillType>("TGFXPathFillType")
+  enum_<PathFillType>("TGFXPathFillType")
       .value("Winding", PathFillType::Winding)
       .value("EvenOdd", PathFillType::EvenOdd)
       .value("InverseWinding", PathFillType::InverseWinding)
       .value("InverseEvenOdd", PathFillType::InverseEvenOdd);
 
-  enum_<tgfx::LineCap>("TGFXLineCap")
+  enum_<LineCap>("TGFXLineCap")
       .value("Butt", LineCap::Butt)
       .value("Round", LineCap::Round)
       .value("Square", LineCap::Square);
 
-  enum_<tgfx::LineJoin>("TGFXLineJoin")
+  enum_<LineJoin>("TGFXLineJoin")
       .value("Miter", LineJoin::Miter)
       .value("Round", LineJoin::Round)
       .value("Bevel", LineJoin::Bevel);

@@ -10,3 +10,7 @@ window.onload = async () => {
   TGFXModule.ScalerContext.isEmoji('测试');
   TGFXModule.ScalerContext.isEmoji('👍');
 }
+
+
+
+  

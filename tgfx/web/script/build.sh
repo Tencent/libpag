@@ -17,7 +17,7 @@ if [[ $@ == *debug* ]]; then
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
 fi
 
-emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"  -DTGFX_USE_BIND_FOR_WEB="ON"
+emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
 
 cmake --build $BUILD_DIR --target tgfx
 

@@ -12,11 +12,6 @@ include(${PAG_SOURCE_DIR}/vendor_tools/vendor.cmake)
 option(TGFX_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
 option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
 option(TGFX_USE_SWIFTSHADER "Allow build with SwiftShader library" OFF)
-option(TGFX_USE_BIND_FOR_WEB "Build with TGFX_BIND_FOR_WEB" OFF)
-
-if(TGFX_USE_BIND_FOR_WEB)
-    add_definitions(-DTGFX_BIND_FOR_WEB)
-endif()
 
 if (APPLE OR WEB)
     option(TGFX_USE_FREETYPE "Allow use of embedded freetype library" OFF)
