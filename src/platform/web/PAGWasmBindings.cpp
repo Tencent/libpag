@@ -24,7 +24,6 @@
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
-#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/opengl/GLDefines.h"

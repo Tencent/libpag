@@ -16,19 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include <emscripten/bind.h>
-#include <emscripten/val.h>
-#include "tgfx/core/Color.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Paint.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Stroke.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDefines.h"
-#include "tgfx/opengl/webgl/WebGLWindow.h"
-#include "tgfx/utils/UTF.h"
 
 using namespace emscripten;
 using namespace tgfx;
