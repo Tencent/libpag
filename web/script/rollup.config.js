@@ -1,8 +1,10 @@
+import path from 'path';
 import resolve from '@rollup/plugin-node-resolve';
 import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
+import alias from '@rollup/plugin-alias';
 
 import pkg from '../package.json';
 
@@ -25,6 +27,17 @@ const banner = `////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 `;
 
+const plugins = [
+  esbuild({ tsconfig: 'tsconfig.json', minify: false }),
+  json(),
+  resolve({ extensions: ['.ts', '.js'] }),
+  commonJs(),
+  alias({
+    entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../tgfx/web/src') }],
+  }),
+];
+
+
 const umdConfig = {
   input: 'src/pag.ts',
   output: [
@@ -37,7 +50,7 @@ const umdConfig = {
       file: pkg.browser,
     },
   ],
-  plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+  plugins: [...plugins],
 };
 
 const umdMinConfig = {
@@ -52,7 +65,7 @@ const umdMinConfig = {
       file: 'lib/libpag.min.js',
     },
   ],
-  plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs(), terser()],
+  plugins: [...plugins, terser()],
 };
 
 const workerUmdConfig = {
@@ -67,7 +80,7 @@ const workerUmdConfig = {
       file: 'lib/libpag.worker.js',
     },
   ],
-  plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+  plugins: [...plugins],
 };
 
 const workerUmdMinConfig = {
@@ -82,7 +95,7 @@ const workerUmdMinConfig = {
       file: 'lib/libpag.worker.min.js',
     },
   ],
-  plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs(), terser()],
+  plugins: [...plugins, terser()],
 };
 
 export default [
@@ -94,7 +107,7 @@ export default [
       { banner, file: pkg.module, format: 'esm', sourcemap: true },
       { banner, file: pkg.main, format: 'cjs', exports: 'auto', sourcemap: true },
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+    plugins: [...plugins],
   },
   workerUmdConfig,
   workerUmdMinConfig,
@@ -104,6 +117,6 @@ export default [
       { banner, file: 'lib/libpag.worker.esm.js', format: 'esm', sourcemap: true },
       { banner, file: 'lib/libpag.worker.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+    plugins: [...plugins],
   },
 ];

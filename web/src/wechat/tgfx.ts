@@ -1,6 +1,6 @@
 import { ArrayBufferImage } from './array-buffer-image';
 import { getCanvas2D, releaseCanvas2D } from './canvas';
-import { getSourceSize, isAndroidMiniprogram } from '../tgfx';
+import { getSourceSize, isAndroidMiniprogram } from '@tgfx/tgfx';
 
 import type { EmscriptenGL } from '../types';
 

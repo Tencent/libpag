@@ -1,7 +1,9 @@
+import path from 'path';
 import commonJs from '@rollup/plugin-commonjs';
 import esbuild from 'rollup-plugin-esbuild';
 import resolve from '@rollup/plugin-node-resolve';
 import replaceFunc from './plugin/rollup-plugin-replace';
+import alias from '@rollup/plugin-alias';
 
 const banner = `/////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -25,9 +27,15 @@ const banner = `////////////////////////////////////////////////////////////////
 export default [
   {
     input: 'src/wechat/pag.ts',
-    output: [
-      { banner, file: 'wechat/lib/libpag.js', format: 'cjs', exports: 'auto', sourcemap: true },
+    output: [{ banner, file: 'wechat/lib/libpag.js', format: 'cjs', exports: 'auto', sourcemap: true }],
+    plugins: [
+      esbuild({ tsconfig: 'tsconfig.json', minify: false }),
+      resolve({ extensions: ['.ts', '.js'] }),
+      commonJs(),
+      replaceFunc(),
+      alias({
+        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../tgfx/web/src') }],
+      }),
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs(), replaceFunc()],
   },
 ];

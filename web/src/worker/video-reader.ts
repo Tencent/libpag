@@ -1,8 +1,7 @@
 import { WorkerMessageType } from './events';
 import { postMessage } from './utils';
 
-import type { EmscriptenGL } from '../types';
-import { BitmapImage } from '../core/bitmap-image';
+import { BitmapImage } from '@tgfx/core/bitmap-image';
 
 export class WorkerVideoReader {
   public bitmap: ImageBitmap | null = null;

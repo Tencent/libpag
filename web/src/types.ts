@@ -20,6 +20,9 @@ import { RenderCanvas } from './core/render-canvas';
 import type { ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
 import type { ArrayBufferImage } from './wechat/array-buffer-image';
 
+import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect  } from '@tgfx/types';
+export type { EmscriptenGL, ctor, Point, Vector, Rect }
+
 declare global {
   interface Window {
     WeixinJSBridge?: any;
@@ -114,32 +117,6 @@ export interface PAG extends EmscriptenModule {
   currentPlayer: PAGPlayer | null;
   [key: string]: any;
 }
-
-export interface EmscriptenGL {
-  contexts: (EmscriptenGLContext | null)[];
-  createContext: (
-    canvas: HTMLCanvasElement | OffscreenCanvas,
-    webGLContextAttributes: EmscriptenGLContextAttributes,
-  ) => number;
-  currentContext?: EmscriptenGLContext;
-  deleteContext: (contextHandle: number) => void;
-  framebuffers: (WebGLFramebuffer | null)[];
-  getContext: (contextHandle: number) => EmscriptenGLContext;
-  getNewId: (array: any[]) => number;
-  makeContextCurrent: (contextHandle: number) => boolean;
-  registerContext: (ctx: WebGLRenderingContext, webGLContextAttributes: EmscriptenGLContextAttributes) => number;
-  textures: (WebGLTexture | null)[];
-}
-
-export interface EmscriptenGLContext {
-  handle: number;
-  GLctx: WebGLRenderingContext;
-  attributes: EmscriptenGLContextAttributes;
-  initExtensionsDone: boolean;
-  version: number;
-}
-
-export type EmscriptenGLContextAttributes = { majorVersion: number; minorVersion: number } & WebGLContextAttributes;
 
 /**
  * Defines the rules on how to scale the content to fit the specified area.
@@ -366,11 +343,6 @@ export const enum AlphaType {
   Unpremultiplied,
 }
 
-export interface Point {
-  x: number;
-  y: number;
-}
-
 /**
  * Marker stores comments and other metadata and mark important times in a composition or layer.
  */
@@ -385,60 +357,6 @@ export interface Color {
   green: number;
   blue: number;
 }
-
-export interface ctor {
-  value: number;
-}
-
-export interface TGFXPathFillType {
-  /**
-   * Enclosed by a non-zero sum of contour directions.
-   */
-  Winding: ctor;
-  /**
-   * Enclosed by an odd number of contours.
-   */
-  EvenOdd: ctor;
-  /**
-   * Enclosed by a zero sum of contour directions.
-   */
-  InverseWinding: ctor;
-  /**
-   * Enclosed by an even number of contours.
-   */
-  InverseEvenOdd: ctor;
-}
-
-export interface TGFXLineCap {
-  /**
-   * No stroke extension.
-   */
-  Butt: ctor;
-  /**
-   * Adds circle
-   */
-  Round: ctor;
-  /**
-   * Adds square
-   */
-  Square: ctor;
-}
-
-export interface TGFXLineJoin {
-  /**
-   * Extends to miter limit.
-   */
-  Miter: ctor;
-  /**
-   * Adds circle.
-   */
-  Round: ctor;
-  /**
-   * Connects outside edges.
-   */
-  Bevel: ctor;
-}
-
 export interface YUVBuffer {
   data: number[];
   lineSize: number[];
@@ -498,27 +416,6 @@ export declare class Matrix {
    */
   public set: (index: number, value: number) => {};
   public setAffine: (a: number, b: number, c: number, d: number, tx: number, ty: number) => {};
-
-  private constructor();
-}
-
-export declare class Rect {
-  /**
-   * smaller x-axis bounds.
-   */
-  public left: number;
-  /**
-   * smaller y-axis bounds.
-   */
-  public top: number;
-  /**
-   * larger x-axis bounds.
-   */
-  public right: number;
-  /**
-   * larger y-axis bounds.
-   */
-  public bottom: number;
 
   private constructor();
 }
@@ -608,30 +505,6 @@ export declare class TextDocument {
   public delete: () => void;
 
   private constructor();
-}
-
-export declare class Vector<T> {
-  private constructor();
-
-  /**
-   * Get item from Vector by index.
-   */
-  public get(index: number): T;
-
-  /**
-   * Push item into Vector.
-   */
-  public push_back(value: T): void;
-
-  /**
-   * Get item number in Vector.
-   */
-  public size(): number;
-
-  /**
-   * Delete Vector instance.
-   */
-  public delete(): void;
 }
 
 export declare class SoftwareDecoder {

@@ -9,6 +9,10 @@
     "skipLibCheck": true,
     "experimentalDecorators": true,
     "moduleResolution": "Node",
+    "baseUrl": ".", 
+    "paths": {
+      "@tgfx/*": ["../../tgfx/web/src/*"],
+    },
     "resolveJsonModule": true
   },
   "include": ["../src/wechat/pag.ts"],

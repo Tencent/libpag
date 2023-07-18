@@ -3,7 +3,6 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
-import { calculateDisplaySize, isOffscreenCanvas } from './utils/canvas';
 import { BackendContext } from './core/backend-context';
 import { PAGModule } from './pag-module';
 import { RenderCanvas } from './core/render-canvas';
@@ -13,6 +12,7 @@ import { isInstanceOf } from './utils/type-utils';
 
 import type { PAGComposition } from './pag-composition';
 import type { Matrix } from './core/matrix';
+import { calculateDisplaySize, isOffscreenCanvas } from '@tgfx/utils/canvas';
 
 export interface PAGViewOptions {
   /**

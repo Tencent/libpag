@@ -1,4 +1,4 @@
-import { ScalerContext as NativeScaleContext } from '../core/scaler-context';
+import { ScalerContext as NativeScaleContext }from '@tgfx/core/scaler-context';
 import { getCanvas2D } from './canvas';
 
 import type { Rect } from '../types';

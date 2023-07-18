@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable", "WebWorker"],
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
     "target": "ES2017",
     "allowJs": true,
     "sourceMap": true,
@@ -11,9 +11,9 @@
     "outDir": "./lib",
     "baseUrl": ".", 
     "paths": {
-      "@tgfx/*": ["../tgfx/web/src/*"],
+      "@tgfx/*": ["./src/*"]
     },
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "demo/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
