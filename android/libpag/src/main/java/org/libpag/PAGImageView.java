@@ -807,7 +807,7 @@ public class PAGImageView extends View {
             return true;
         }
         synchronized (bitmapLock) {
-            if (renderBitmap == null || _cacheAllFramesInMemory) {
+            if ((renderBitmap == null || _cacheAllFramesInMemory) && decoderInfo.isValid()) {
                 renderBitmap = Bitmap.createBitmap(decoderInfo._width, decoderInfo._height, Bitmap.Config.ARGB_8888);
             }
             if (renderBitmap == null) {
