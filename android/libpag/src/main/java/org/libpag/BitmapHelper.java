@@ -8,7 +8,7 @@ import android.util.Pair;
 
 class BitmapHelper {
 
-    static Pair<Bitmap, HardwareBuffer> CreateBitmap(int width, int height,
+    static Pair<Bitmap, Object> CreateBitmap(int width, int height,
                                                      boolean needGetHardwareBufferFromNative) {
         if (width == 0 || height == 0) {
             return Pair.create(null, null);
