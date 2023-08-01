@@ -116,16 +116,14 @@ public class PAGDecoder {
      * forward order for better performance.
      */
     public Bitmap frameAtIndex(int index) {
-        Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(width(), height(), false);
+        Pair<Bitmap, Object> pair = BitmapHelper.CreateBitmap(width(), height(), false);
         if (pair.first == null) {
             return null;
         }
         boolean success;
-        if (pair.second != null) {
-            success = readFrame(index, pair.second);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                pair.second.close();
-            }
+        if (pair.second != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            success = readFrame(index, (HardwareBuffer) pair.second);
+            ((HardwareBuffer) pair.second).close();
         } else {
             success = copyFrameTo(pair.first, index);
         }

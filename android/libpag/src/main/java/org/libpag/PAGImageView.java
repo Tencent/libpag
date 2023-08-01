@@ -630,13 +630,15 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         }
         synchronized (bitmapLock) {
             if (frontBitmap == null || _cacheAllFramesInMemory) {
-                Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
+                Pair<Bitmap, Object> pair = BitmapHelper.CreateBitmap(decoderInfo._width,
                         decoderInfo._height, false);
                 if (pair.first == null) {
                     return false;
                 }
                 frontBitmap = pair.first;
-                frontHardwareBuffer = pair.second;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    frontHardwareBuffer = (HardwareBuffer) pair.second;
+                }
             }
             if (frontBitmap == null) {
                 return false;
@@ -645,11 +647,13 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
             Bitmap flushBitmap;
             if (!_cacheAllFramesInMemory) {
                 if (backBitmap == null) {
-                    Pair<Bitmap, HardwareBuffer> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
+                    Pair<Bitmap, Object> pair = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height, false);
                     if (pair.first == null) {
                         return false;
                     }
-                    backHardwareBuffer = pair.second;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        backHardwareBuffer = (HardwareBuffer) pair.second;
+                    }
                     backBitmap = pair.first;
                 }
                 if (useFirst.get()) {
