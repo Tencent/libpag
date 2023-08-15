@@ -156,6 +156,19 @@ static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typef
   return hbFont;
 }
 
+static std::mutex _mutex{};
+
+static hb_buffer_t* HarfbuzzBufferCreate() {
+  //  hb_buffer_create会创建并依赖一些全局的静态属性，在异步调用hb_buffer_destroy时会被释放，引发空指针，所以需要加锁
+  std::lock_guard<std::mutex> autoLock(_mutex);
+  return hb_buffer_create();
+}
+
+static void HarfbuzzBufferDestroy(hb_buffer_t* buffer) {
+  std::lock_guard<std::mutex> autoLock(_mutex);
+  hb_buffer_destroy(buffer);
+}
+
 static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
     const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) {
   auto hbFont = CreateHBFont(typeface);
@@ -163,7 +176,7 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
     return {};
   }
 
-  auto hbBuffer = std::shared_ptr<hb_buffer_t>(hb_buffer_create(), hb_buffer_destroy);
+  auto hbBuffer = std::shared_ptr<hb_buffer_t>(HarfbuzzBufferCreate(), HarfbuzzBufferDestroy);
   if (!hb_buffer_allocation_successful(hbBuffer.get())) {
     LOGI("TextShaperHarfbuzz::shape text = %s, alloc harfbuzz(%p) failure", text.c_str(),
          hbBuffer.get());
