@@ -140,7 +140,7 @@
         "arguments": [
           "-DHB_HAVE_FREETYPE=OFF",
           "-DHB_HAVE_CORETEXT=OFF",
-          "-DCMAKE_CXX_FLAGS=\"-DHB_TINY\""
+          "-DCMAKE_CXX_FLAGS=\"-DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
         ]
       }
     },
