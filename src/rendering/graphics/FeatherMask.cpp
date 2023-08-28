@@ -121,7 +121,7 @@ void FeatherMask::draw(tgfx::Canvas* parentCanvas, RenderCache* cache) const {
     maskCanvas->setMatrix(tgfx::Matrix::MakeTrans(-maskBounds.x(), -maskBounds.y()));
     tgfx::Paint maskPaint;
     float alpha = ToAlpha(mask->maskOpacity->getValueAt(layerFrame));
-    maskPaint.setAlpha(alpha);
+    maskPaint.setColor({1.0, 1.0, 1.0, alpha});
     maskCanvas->drawPath(maskPath, maskPaint);
     auto maskImage = maskSurface->makeImageSnapshot();
     tgfx::Paint blurPaint;
