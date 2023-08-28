@@ -457,7 +457,7 @@ PAG_TEST(PAGFilterTest, Stroke) {
 /**
  * 用例描述: Default feather mask color
  */
-PAG_TEST(PAGFilterTest, Stroke) {
+PAG_TEST(PAGFilterTest, DefaultFeatherMask) {
   auto pagFile = LoadPAGFile("resources/filter/DefaultFeatherMask.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
