@@ -454,4 +454,20 @@ PAG_TEST(PAGFilterTest, Stroke) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/Stroke"));
 }
 
+/**
+ * 用例描述: Default feather mask color
+ */
+PAG_TEST(PAGFilterTest, DefaultFeatherMask) {
+  auto pagFile = LoadPAGFile("resources/filter/DefaultFeatherMask.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/DefaultFeatherMask"));
+}
+
 }  // namespace pag
