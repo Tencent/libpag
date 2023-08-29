@@ -76,16 +76,16 @@ class Swizzle {
     uint32_t k = key;
     // Index of the input color that should be mapped to output r.
     idx = static_cast<int>(k & 15);
-    float outR = componentIdxToFloat(color, idx);
+    float outR = ComponentIdxToFloat(color, idx);
     k >>= 4;
     idx = static_cast<int>(k & 15);
-    float outG = componentIdxToFloat(color, idx);
+    float outG = ComponentIdxToFloat(color, idx);
     k >>= 4;
     idx = static_cast<int>(k & 15);
-    float outB = componentIdxToFloat(color, idx);
+    float outB = ComponentIdxToFloat(color, idx);
     k >>= 4;
     idx = static_cast<int>(k & 15);
-    float outA = componentIdxToFloat(color, idx);
+    float outA = ComponentIdxToFloat(color, idx);
     return {outR, outG, outB, outA};
   }
 
@@ -119,7 +119,7 @@ class Swizzle {
   // next int.
   static const int k1KeyValue = 4;
 
-  static float componentIdxToFloat(const Color& color, int idx) {
+  static float ComponentIdxToFloat(const Color& color, int idx) {
     if (idx <= 3) {
       return color[idx];
     }
