@@ -112,5 +112,6 @@ class RenderTarget : public Resource {
   int _sampleCount = 1;
 
   friend class DrawOp;
+  friend class Canvas;
 };
 }  // namespace tgfx

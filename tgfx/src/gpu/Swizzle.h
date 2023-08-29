@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class Swizzle {
@@ -70,6 +71,24 @@ class Swizzle {
     return Swizzle("rara");
   }
 
+  Color applyTo(const Color& color) const {
+    int idx;
+    uint32_t k = key;
+    // Index of the input color that should be mapped to output r.
+    idx = static_cast<int>(k & 15);
+    float outR = ComponentIdxToFloat(color, idx);
+    k >>= 4;
+    idx = static_cast<int>(k & 15);
+    float outG = ComponentIdxToFloat(color, idx);
+    k >>= 4;
+    idx = static_cast<int>(k & 15);
+    float outB = ComponentIdxToFloat(color, idx);
+    k >>= 4;
+    idx = static_cast<int>(k & 15);
+    float outA = ComponentIdxToFloat(color, idx);
+    return {outR, outG, outB, outA};
+  }
+
  private:
   char swiz[5];
   uint16_t key = 0;
@@ -94,6 +113,20 @@ class Swizzle {
   constexpr explicit Swizzle(const char c[4])
       : swiz{c[0], c[1], c[2], c[3], '\0'},
         key((CToI(c[0]) << 0) | (CToI(c[1]) << 4) | (CToI(c[2]) << 8) | (CToI(c[3]) << 12)) {
+  }
+
+  // The normal component swizzles map to key values 0-3. We set the key for constant 1 to the
+  // next int.
+  static const int k1KeyValue = 4;
+
+  static float ComponentIdxToFloat(const Color& color, int idx) {
+    if (idx <= 3) {
+      return color[idx];
+    }
+    if (idx == k1KeyValue) {
+      return 1.0f;
+    }
+    return -1.0f;
   }
 };
 }  // namespace tgfx

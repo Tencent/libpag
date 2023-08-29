@@ -698,6 +698,7 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
     return false;
   }
   surface->aboutToDraw(true);
+  color = surface->renderTarget->writeSwizzle().applyTo(color);
   auto [rect, useScissor] = getClipRect();
   if (rect.has_value()) {
     if (useScissor) {
