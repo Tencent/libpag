@@ -641,12 +641,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         //When calling the setVisibility function,
         //it does not necessarily trigger a callback to the onVisibilityAggregated method.
         //Therefore, it is necessary to handle this specific situation on your own.
-        ViewParent mParent = getParent();
-        if (mParent != null && getWindowVisibility() == VISIBLE &&
-                ((!(mParent instanceof ViewGroup)) || ((ViewGroup) mParent).isShown())) {
-        }else {
-            checkVisible();
-        }
+        checkVisible();
     }
 
     public void onAnimationCancel(PAGAnimator animator) {
