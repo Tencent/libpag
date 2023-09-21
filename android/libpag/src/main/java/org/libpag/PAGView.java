@@ -29,12 +29,8 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewParent;
-
 import org.extra.tools.Lifecycle;
 import org.extra.tools.LifecycleListener;
-
 import java.util.ArrayList;
 
 
