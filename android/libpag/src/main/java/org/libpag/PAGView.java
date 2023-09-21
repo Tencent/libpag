@@ -634,9 +634,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     @Override
     public void setVisibility(int visibility) {
         super.setVisibility(visibility);
-        //When calling the setVisibility function,
-        //it does not necessarily trigger a callback to the onVisibilityAggregated method.
-        //Therefore, it is necessary to handle this specific situation on your own.
+        // When calling the setVisibility function,
+        // it does not necessarily trigger a callback to the onVisibilityAggregated method.
+        // Therefore, it is necessary to handle this specific situation on your own.
         checkVisible();
     }
 
