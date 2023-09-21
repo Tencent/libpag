@@ -29,10 +29,8 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.view.TextureView;
 import android.view.View;
-
 import org.extra.tools.Lifecycle;
 import org.extra.tools.LifecycleListener;
-
 import java.util.ArrayList;
 
 
@@ -631,6 +629,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         for (PAGViewListener listener : arrayList) {
             listener.onAnimationEnd(this);
         }
+    }
+
+    @Override
+    public void setVisibility(int visibility) {
+        super.setVisibility(visibility);
+        // When calling the setVisibility function,
+        // it does not necessarily trigger a callback to the onVisibilityAggregated method.
+        // Therefore, it is necessary to handle this specific situation on your own.
+        checkVisible();
     }
 
     public void onAnimationCancel(PAGAnimator animator) {
