@@ -68,7 +68,7 @@ PAG_API jobject Java_org_libpag_PAGFile_LoadFromPath(JNIEnv* env, jclass, jstrin
 PAG_API jobject Java_org_libpag_PAGFile_LoadFromBytes(JNIEnv* env, jclass, jbyteArray bytes,
                                                       jint length, jstring jpath) {
   if (bytes == nullptr) {
-    LOGE("PAGFile.LoadFromBytes() Invalid image bytes specified.");
+    LOGE("PAGFile.LoadFromBytes() Invalid pag file bytes specified.");
     return NULL;
   }
   auto data = env->GetByteArrayElements(bytes, nullptr);
@@ -76,7 +76,7 @@ PAG_API jobject Java_org_libpag_PAGFile_LoadFromBytes(JNIEnv* env, jclass, jbyte
   auto pagFile = PAGFile::Load(data, static_cast<size_t>(length), path);
   env->ReleaseByteArrayElements(bytes, data, 0);
   if (pagFile == nullptr) {
-    LOGE("PAGFile.LoadFromBytes() Invalid image bytes specified.");
+    LOGE("PAGFile.LoadFromBytes() Invalid pag file bytes specified.");
     return NULL;
   }
   return ToPAGLayerJavaObject(env, pagFile);

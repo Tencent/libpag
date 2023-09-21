@@ -74,7 +74,7 @@ PAG_API jboolean JNICALL Java_org_libpag_PAGDiskCache_WriteFile(JNIEnv* env, jcl
                                                                 jbyteArray bytes) {
   auto key = pag::SafeConvertToStdString(env, jkey);
   if (bytes == nullptr || key.empty()) {
-    LOGE("PAGFile.LoadFromBytes() Invalid image bytes specified.");
+    LOGE("PAGDiskCache.WriteFile() Invalid file bytes specified.");
     return JNI_FALSE;
   }
   auto data = env->GetByteArrayElements(bytes, nullptr);
