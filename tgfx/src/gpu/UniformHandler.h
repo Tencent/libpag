@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "ResourceHandle.h"
+#include "SamplerHandle.h"
 #include "ShaderVar.h"
 #include "Swizzle.h"
+#include "UniformHandle.h"
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {

@@ -23,22 +23,21 @@ namespace tgfx {
 UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
                                                    const std::string& name, bool mangleName,
                                                    std::string* outName) {
-  Uniform uni;
-  uni.variable.setType(type);
-  uni.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
+  Uniform uniform;
+  uniform.variable.setType(type);
+  uniform.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
   char prefix = 'u';
   if (prefix == name[0] || name.find(NO_MANGLE_PREFIX) == 0) {
     prefix = '\0';
   }
-  uni.variable.setName(programBuilder->nameVariable(prefix, name, mangleName));
-  uni.visibility = visibility;
-  uniforms.push_back(std::move(uni));
-
-  auto index = uniforms.size() - 1;
+  uniform.variable.setName(programBuilder->nameVariable(prefix, name, mangleName));
+  uniform.visibility = visibility;
+  UniformHandle handle(name, programBuilder->stageIndex());
+  uniforms[handle.toKey()] = uniform;
   if (outName) {
-    *outName = uniforms[index].variable.name();
+    *outName = uniform.variable.name();
   }
-  return UniformHandle(index);
+  return handle;
 }
 
 SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const std::string& name) {
@@ -73,7 +72,8 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
 
 std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) const {
   std::string ret;
-  for (const auto& uniform : uniforms) {
+  for (auto& item : uniforms) {
+    auto& uniform = item.second;
     if ((uniform.visibility & visibility) == visibility) {
       ret += programBuilder->getShaderVarDeclarations(uniform.variable, visibility);
       ret += ";\n";
@@ -90,11 +90,20 @@ std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) con
 
 void GLUniformHandler::resolveUniformLocations(unsigned programID) {
   auto gl = GLFunctions::Get(programBuilder->getContext());
-  for (auto& uniform : uniforms) {
+  for (auto& item : uniforms) {
+    auto& uniform = item.second;
     uniform.location = gl->getUniformLocation(programID, uniform.variable.name().c_str());
   }
   for (auto& sampler : samplers) {
     sampler.location = gl->getUniformLocation(programID, sampler.variable.name().c_str());
   }
+}
+
+std::unordered_map<std::string, int> GLUniformHandler::getUniformLocations() const {
+  std::unordered_map<std::string, int> uniformLocations = {};
+  for (auto& item : uniforms) {
+    uniformLocations[item.first] = item.second.location;
+  }
+  return uniformLocations;
 }
 }  // namespace tgfx

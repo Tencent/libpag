@@ -53,7 +53,9 @@ class GLUniformHandler : public UniformHandler {
 
   void resolveUniformLocations(unsigned programID);
 
-  std::vector<Uniform> uniforms;
+  std::unordered_map<std::string, int> getUniformLocations() const;
+
+  std::unordered_map<std::string, Uniform> uniforms;
   std::vector<Uniform> samplers;
   std::vector<Swizzle> samplerSwizzles;
 

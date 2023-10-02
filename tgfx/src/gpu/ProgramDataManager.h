@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "ResourceHandle.h"
+#include "UniformHandle.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {

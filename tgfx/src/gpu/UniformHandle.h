@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,43 +18,28 @@
 
 #pragma once
 
-#include <climits>
-#include <cstddef>
+#include <string>
 
 namespace tgfx {
-class ResourceHandle {
- public:
-  ResourceHandle() = default;
-
-  explicit ResourceHandle(size_t value) : value(value) {
-  }
-
-  bool isValid() const {
-    return kInvalid_ResourceHandle != value;
-  }
-
-  size_t toIndex() const {
-    return value;
-  }
-
- private:
-  static const size_t kInvalid_ResourceHandle = ULONG_MAX;
-  size_t value = kInvalid_ResourceHandle;
-};
-
-class UniformHandle : public ResourceHandle {
+class UniformHandle {
  public:
   UniformHandle() = default;
 
-  explicit UniformHandle(size_t value) : ResourceHandle(value) {
+  explicit UniformHandle(std::string name, int stageIndex = 0) : key(std::move(name)) {
+    if (!key.empty()) {
+      key += "_Stage" + std::to_string(stageIndex);
+    }
   }
-};
 
-class SamplerHandle : public ResourceHandle {
- public:
-  SamplerHandle() = default;
-
-  explicit SamplerHandle(size_t value) : ResourceHandle(value) {
+  bool isValid() const {
+    return !key.empty();
   }
+
+  std::string toKey() const {
+    return key;
+  }
+
+ private:
+  std::string key;
 };
 }  // namespace tgfx

@@ -38,7 +38,7 @@ bool ProgramBuilder::emitAndInstallProcessors() {
 }
 
 void ProgramBuilder::advanceStage() {
-  stageIndex++;
+  _stageIndex++;
   // Each output to the fragment processor gets its own code section
   fragmentShaderBuilder()->nextStage();
 }
@@ -52,7 +52,7 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
       uniformHandler()->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float4, RTAdjustName);
   auto geometryProcessor = pipeline->getGeometryProcessor();
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", stageIndex,
+  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,
                                        geometryProcessor->name().c_str());
   vertexShaderBuilder()->codeAppendf("// Geometry Processor %s\n",
                                      geometryProcessor->name().c_str());
@@ -101,7 +101,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(
   nameExpression(&output, "output");
 
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", stageIndex, processor->name().c_str());
+  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex, processor->name().c_str());
 
   auto fragProc = processor->createGLInstance();
 
@@ -182,7 +182,7 @@ std::string ProgramBuilder::nameVariable(char prefix, const std::string& name, b
       out += "x";
     }
     out += "_Stage";
-    out += std::to_string(stageIndex);
+    out += std::to_string(_stageIndex);
   }
   return out;
 }

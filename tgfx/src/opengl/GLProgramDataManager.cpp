@@ -21,19 +21,20 @@
 #include "GLUtil.h"
 
 namespace tgfx {
-GLProgramDataManager::GLProgramDataManager(Context* context, const std::vector<int>* uniforms)
+GLProgramDataManager::GLProgramDataManager(Context* context,
+                                           std::unordered_map<std::string, int>* uniforms)
     : gl(GLFunctions::Get(context)), uniforms(uniforms) {
 }
 
 void GLProgramDataManager::set1f(UniformHandle handle, float v0) const {
-  auto location = uniforms->at(handle.toIndex());
+  auto location = uniforms->at(handle.toKey());
   if (kUnusedUniform != location) {
     gl->uniform1f(location, v0);
   }
 }
 
 void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const {
-  auto location = uniforms->at(handle.toIndex());
+  auto location = uniforms->at(handle.toKey());
   if (kUnusedUniform != location) {
     gl->uniform2f(location, v0, v1);
   }
@@ -41,28 +42,28 @@ void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const
 
 void GLProgramDataManager::set4f(UniformHandle handle, float v0, float v1, float v2,
                                  float v3) const {
-  auto location = uniforms->at(handle.toIndex());
+  auto location = uniforms->at(handle.toKey());
   if (kUnusedUniform != location) {
     gl->uniform4f(location, v0, v1, v2, v3);
   }
 }
 
 void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const float* v) const {
-  auto location = uniforms->at(handle.toIndex());
+  auto location = uniforms->at(handle.toKey());
   if (kUnusedUniform != location) {
     gl->uniform4fv(location, arrayCount, v);
   }
 }
 
 void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[]) const {
-  auto location = uniforms->at(handle.toIndex());
+  auto location = uniforms->at(handle.toKey());
   if (kUnusedUniform != location) {
     gl->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
   }
 }
 
 void GLProgramDataManager::setMatrix4f(UniformHandle handle, const float matrix[]) const {
-  auto location = uniforms->at(handle.toIndex());
+  auto location = uniforms->at(handle.toKey());
   if (kUnusedUniform != location) {
     gl->uniformMatrix4fv(location, 1, GL_FALSE, matrix);
   }

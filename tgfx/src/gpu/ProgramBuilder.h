@@ -57,6 +57,10 @@ class ProgramBuilder {
    */
   std::string nameVariable(char prefix, const std::string& name, bool mangle = true) const;
 
+  int stageIndex() const {
+    return _stageIndex;
+  }
+
   virtual UniformHandler* uniformHandler() = 0;
 
   virtual const UniformHandler* uniformHandler() const = 0;
@@ -112,7 +116,7 @@ class ProgramBuilder {
 
   void emitFSOutputSwizzle();
 
-  int stageIndex = -1;
+  int _stageIndex = -1;
   std::vector<ShaderVar> transformedCoordVars = {};
 };
 }  // namespace tgfx

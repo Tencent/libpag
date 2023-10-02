@@ -23,7 +23,7 @@
 
 namespace tgfx {
 GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles,
-                     unsigned programID, const std::vector<Uniform>& uniforms,
+                     unsigned programID, std::unordered_map<std::string, int> uniformLocations,
                      std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
                      std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
@@ -31,14 +31,12 @@ GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandl
     : Program(context),
       builtinUniformHandles(builtinUniformHandles),
       programId(programID),
+      uniformLocations(std::move(uniformLocations)),
       glGeometryProcessor(std::move(geometryProcessor)),
       glXferProcessor(std::move(xferProcessor)),
       glFragmentProcessors(std::move(fragmentProcessors)),
       attributes(std::move(attributes)),
       _vertexStride(vertexStride) {
-  for (const auto& uniform : uniforms) {
-    uniformLocations.emplace_back(uniform.location);
-  }
 }
 
 void GLProgram::setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const {

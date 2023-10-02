@@ -18,30 +18,26 @@
 
 #pragma once
 
-#include "GLContext.h"
-#include "gpu/ProgramDataManager.h"
+#include <climits>
+#include <cstddef>
 
 namespace tgfx {
-class GLProgramDataManager : public ProgramDataManager {
+class SamplerHandle {
  public:
-  GLProgramDataManager(Context* context, std::unordered_map<std::string, int>* uniforms);
+  SamplerHandle() = default;
 
-  void set1f(UniformHandle handle, float v0) const override;
+  explicit SamplerHandle(size_t value) : value(value) {
+  }
 
-  void set2f(UniformHandle handle, float v0, float v1) const override;
+  bool isValid() const {
+    return value != ULONG_MAX;
+  }
 
-  void set4f(UniformHandle handle, float v0, float v1, float v2, float v3) const override;
-
-  void set4fv(UniformHandle handle, int arrayCount, const float* v) const override;
-
-  void setMatrix3f(UniformHandle handle, const float matrix[]) const override;
-
-  void setMatrix4f(UniformHandle handle, const float matrix[]) const override;
-
-  void setMatrix(UniformHandle u, const Matrix& matrix) const override;
+  size_t toIndex() const {
+    return value;
+  }
 
  private:
-  const GLFunctions* gl;
-  const std::unordered_map<std::string, int>* uniforms;
+  size_t value = ULONG_MAX;
 };
 }  // namespace tgfx

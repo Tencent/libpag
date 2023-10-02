@@ -38,7 +38,7 @@ class GLProgram : public Program {
   };
 
   GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles, unsigned programID,
-            const std::vector<Uniform>& uniforms,
+            std::unordered_map<std::string, int> uniformLocations,
             std::unique_ptr<GLGeometryProcessor> geometryProcessor,
             std::unique_ptr<GLXferProcessor> xferProcessor,
             std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
@@ -89,6 +89,7 @@ class GLProgram : public Program {
   RenderTargetState renderTargetState;
   BuiltinUniformHandles builtinUniformHandles;
   unsigned programId = 0;
+  std::unordered_map<std::string, int> uniformLocations;
 
   // the installed effects
   std::unique_ptr<GLGeometryProcessor> glGeometryProcessor;
@@ -96,6 +97,5 @@ class GLProgram : public Program {
   std::vector<std::unique_ptr<GLFragmentProcessor>> glFragmentProcessors;
   std::vector<Attribute> attributes;
   int _vertexStride = 0;
-  std::vector<int> uniformLocations;
 };
 }  // namespace tgfx

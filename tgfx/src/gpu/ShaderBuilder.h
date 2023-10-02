@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "ResourceHandle.h"
+#include "SamplerHandle.h"
 #include "ShaderVar.h"
 
 namespace tgfx {
