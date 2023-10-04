@@ -22,12 +22,12 @@
 #include "gpu/UniformHandler.h"
 
 namespace tgfx {
-static constexpr int kUnusedUniform = -1;
+static constexpr int UNUSED_UNIFORM = -1;
 
 struct Uniform {
   ShaderVar variable;
   ShaderFlags visibility = ShaderFlags::None;
-  int location = kUnusedUniform;
+  int location = UNUSED_UNIFORM;
 };
 
 class GLUniformHandler : public UniformHandler {

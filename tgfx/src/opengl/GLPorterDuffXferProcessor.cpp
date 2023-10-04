@@ -75,7 +75,7 @@ void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataMan
     if (dstTopLeftUniform.isValid()) {
       if (dstTopLeftPrev != dstTextureOffset) {
         dstTopLeftPrev = dstTextureOffset;
-        programDataManager.set2f(dstTopLeftUniform, dstTextureOffset.x, dstTextureOffset.y);
+        programDataManager.set2f("DstTextureUpperLeft", dstTextureOffset.x, dstTextureOffset.y);
       }
       int width;
       int height;
@@ -89,7 +89,7 @@ void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataMan
       if (width != widthPrev || height != heightPrev) {
         widthPrev = width;
         heightPrev = height;
-        programDataManager.set2f(dstScaleUniform, 1.f / static_cast<float>(width),
+        programDataManager.set2f("DstTextureCoordScale", 1.f / static_cast<float>(width),
                                  1.f / static_cast<float>(height));
       }
     }

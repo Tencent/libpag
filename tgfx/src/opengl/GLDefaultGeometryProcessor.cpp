@@ -60,12 +60,11 @@ void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataMa
   setTransformDataHelper(gp.localMatrix, programDataManager, transformIter);
   if (colorPrev != gp.color) {
     colorPrev = gp.color;
-    programDataManager.set4f(colorUniform, gp.color.red, gp.color.green, gp.color.blue,
-                             gp.color.alpha);
+    programDataManager.set4f("Color", gp.color.red, gp.color.green, gp.color.blue, gp.color.alpha);
   }
   if (viewMatrixPrev != gp.viewMatrix) {
     viewMatrixPrev = gp.viewMatrix;
-    programDataManager.setMatrix(matrixUniform, gp.viewMatrix);
+    programDataManager.setMatrix("Matrix", gp.viewMatrix);
   }
 }
 }  // namespace tgfx

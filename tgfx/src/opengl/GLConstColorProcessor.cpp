@@ -44,7 +44,7 @@ void GLConstColorProcessor::onSetData(const ProgramDataManager& programDataManag
   const auto& fp = static_cast<const ConstColorProcessor&>(fragmentProcessor);
   if (colorPrev != fp.color) {
     colorPrev = fp.color;
-    programDataManager.set4fv(colorUniform, 1, fp.color.array());
+    programDataManager.set4fv("Color", 1, fp.color.array());
   }
 }
 }  // namespace tgfx

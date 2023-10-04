@@ -26,51 +26,60 @@ GLProgramDataManager::GLProgramDataManager(Context* context,
     : gl(GLFunctions::Get(context)), uniforms(uniforms) {
 }
 
-void GLProgramDataManager::set1f(UniformHandle handle, float v0) const {
-  auto location = uniforms->at(handle.toKey());
-  if (kUnusedUniform != location) {
+void GLProgramDataManager::set1f(const std::string& name, float v0) const {
+  auto location = getUniformLocation(name);
+  if (UNUSED_UNIFORM != location) {
     gl->uniform1f(location, v0);
   }
 }
 
-void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const {
-  auto location = uniforms->at(handle.toKey());
-  if (kUnusedUniform != location) {
+void GLProgramDataManager::set2f(const std::string& name, float v0, float v1) const {
+  auto location = getUniformLocation(name);
+  if (UNUSED_UNIFORM != location) {
     gl->uniform2f(location, v0, v1);
   }
 }
 
-void GLProgramDataManager::set4f(UniformHandle handle, float v0, float v1, float v2,
+void GLProgramDataManager::set4f(const std::string& name, float v0, float v1, float v2,
                                  float v3) const {
-  auto location = uniforms->at(handle.toKey());
-  if (kUnusedUniform != location) {
+  auto location = getUniformLocation(name);
+  if (UNUSED_UNIFORM != location) {
     gl->uniform4f(location, v0, v1, v2, v3);
   }
 }
 
-void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const float* v) const {
-  auto location = uniforms->at(handle.toKey());
-  if (kUnusedUniform != location) {
+void GLProgramDataManager::set4fv(const std::string& name, int arrayCount, const float* v) const {
+  auto location = getUniformLocation(name);
+  if (UNUSED_UNIFORM != location) {
     gl->uniform4fv(location, arrayCount, v);
   }
 }
 
-void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[]) const {
-  auto location = uniforms->at(handle.toKey());
-  if (kUnusedUniform != location) {
+void GLProgramDataManager::setMatrix3f(const std::string& name, const float matrix[]) const {
+  auto location = getUniformLocation(name);
+  if (UNUSED_UNIFORM != location) {
     gl->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
   }
 }
 
-void GLProgramDataManager::setMatrix4f(UniformHandle handle, const float matrix[]) const {
-  auto location = uniforms->at(handle.toKey());
-  if (kUnusedUniform != location) {
+void GLProgramDataManager::setMatrix4f(const std::string& name, const float matrix[]) const {
+  auto location = getUniformLocation(name);
+  if (UNUSED_UNIFORM != location) {
     gl->uniformMatrix4fv(location, 1, GL_FALSE, matrix);
   }
 }
 
-void GLProgramDataManager::setMatrix(UniformHandle u, const Matrix& matrix) const {
+void GLProgramDataManager::setMatrix(const std::string& name, const Matrix& matrix) const {
   auto values = ToGLMatrix(matrix);
-  setMatrix3f(u, &(values[0]));
+  setMatrix3f(name, &(values[0]));
+}
+
+int GLProgramDataManager::getUniformLocation(const std::string& name) const {
+  auto key = getUniformKey(name);
+  auto result = uniforms->find(key);
+  if (result == uniforms->end()) {
+    return UNUSED_UNIFORM;
+  }
+  return result->second;
 }
 }  // namespace tgfx

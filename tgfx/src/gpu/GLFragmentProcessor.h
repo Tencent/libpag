@@ -151,11 +151,10 @@ class GLFragmentProcessor {
    */
   class Iter {
    public:
-    explicit Iter(const std::vector<std::unique_ptr<GLFragmentProcessor>>& fragmentProcessors) {
-      for (auto iter = fragmentProcessors.rbegin(); iter != fragmentProcessors.rend(); iter++) {
-        fpStack.push_back(iter->get());
-      }
+    explicit Iter(GLFragmentProcessor* fp) {
+      fpStack.push_back(fp);
     }
+
     GLFragmentProcessor* next();
 
    private:

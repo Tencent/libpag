@@ -42,10 +42,10 @@ void GLSweepGradientLayout::onSetData(const ProgramDataManager& programDataManag
   const auto& fp = static_cast<const SweepGradientLayout&>(fragmentProcessor);
   if (fp.bias != biasPrev) {
     biasPrev = fp.bias;
-    programDataManager.set1f(biasUniform, fp.bias);
+    programDataManager.set1f("Bias", fp.bias);
   }
   if (fp.scale != scalePrev) {
-    programDataManager.set1f(scaleUniform, fp.scale);
+    programDataManager.set1f("Scale", fp.scale);
   }
 }
 }  // namespace tgfx

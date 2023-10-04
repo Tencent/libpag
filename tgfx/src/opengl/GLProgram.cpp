@@ -46,7 +46,7 @@ void GLProgram::setupSamplerUniforms(const std::vector<Uniform>& textureSamplers
   auto count = static_cast<int>(textureSamplers.size());
   for (int i = 0; i < count; ++i) {
     const auto& sampler = textureSamplers[i];
-    if (kUnusedUniform != sampler.location) {
+    if (UNUSED_UNIFORM != sampler.location) {
       gl->uniform1i(sampler.location, i);
     }
   }
@@ -67,35 +67,42 @@ void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTar
   // GLProgramDataManager. That is, we bind textures for processors in this order:
   // geometryProcessor, fragmentProcessors, XferProcessor.
   GLProgramDataManager programDataManager(context, &uniformLocations);
+  programDataManager.advanceStage();
   setRenderTargetState(programDataManager, renderTarget);
   FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
   glGeometryProcessor->setData(programDataManager, *pipeline->getGeometryProcessor(),
                                &coordTransformIter);
   int nextTexSamplerIdx = 0;
-  setFragmentData(programDataManager, pipeline, &nextTexSamplerIdx);
+  setFragmentData(&programDataManager, pipeline, &nextTexSamplerIdx);
 
   auto offset = Point::Zero();
   const auto* dstTexture = pipeline->getDstTexture(&offset);
   if (dstTexture) {
+    programDataManager.advanceStage();
     glXferProcessor->setData(programDataManager, *pipeline->getXferProcessor(), dstTexture, offset);
     static_cast<GLGpu*>(context->gpu())->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler());
   }
 }
 
-void GLProgram::setFragmentData(const GLProgramDataManager& programDataManager,
-                                const Pipeline* pipeline, int* nextTexSamplerIdx) {
-  FragmentProcessor::Iter iter(pipeline);
-  GLFragmentProcessor::Iter glslIter(glFragmentProcessors);
-  const FragmentProcessor* fp = iter.next();
-  GLFragmentProcessor* glslFP = glslIter.next();
-  while (fp && glslFP) {
-    glslFP->setData(programDataManager, *fp);
-    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      static_cast<GLGpu*>(context->gpu())
-          ->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
+void GLProgram::setFragmentData(GLProgramDataManager* programDataManager, const Pipeline* pipeline,
+                                int* nextTexSamplerIdx) {
+  for (size_t index = 0; index < pipeline->numFragmentProcessors(); ++index) {
+    programDataManager->advanceStage();
+    const auto* currentFP = pipeline->getFragmentProcessor(index);
+    auto currentGLFP = glFragmentProcessors.at(index).get();
+    FragmentProcessor::Iter iter(currentFP);
+    GLFragmentProcessor::Iter glIter(currentGLFP);
+    const FragmentProcessor* fp = iter.next();
+    GLFragmentProcessor* glslFP = glIter.next();
+    while (fp && glslFP) {
+      glslFP->setData(*programDataManager, *fp);
+      for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
+        static_cast<GLGpu*>(context->gpu())
+            ->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
+      }
+      fp = iter.next();
+      glslFP = glIter.next();
     }
-    fp = iter.next();
-    glslFP = glslIter.next();
   }
 }
 
@@ -125,6 +132,6 @@ void GLProgram::setRenderTargetState(const GLProgramDataManager& programDataMana
   renderTargetState.height = height;
   renderTargetState.origin = origin;
   auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
-  programDataManager.set4f(builtinUniformHandles.rtAdjustUniform, v[0], v[1], v[2], v[3]);
+  programDataManager.set4f(RTAdjustName, v[0], v[1], v[2], v[3]);
 }
 }  // namespace tgfx

@@ -57,8 +57,8 @@ void GLColorMatrixFragmentProcessor::onSetData(const ProgramDataManager& program
         fp.matrix[14],
         fp.matrix[19],
     };
-    programDataManager.setMatrix4f(matrixUniform, matrix);
-    programDataManager.set4fv(vectorUniform, 1, vec);
+    programDataManager.setMatrix4f("Matrix", matrix);
+    programDataManager.set4fv("Vector", 1, vec);
   }
 }
 }  // namespace tgfx

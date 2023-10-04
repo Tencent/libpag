@@ -44,12 +44,12 @@ void GLDeviceSpaceTextureEffect::onSetData(const ProgramDataManager& programData
   if (textureFP.texture->width() != widthPrev || textureFP.texture->height() != heightPrev) {
     widthPrev = textureFP.texture->width();
     heightPrev = textureFP.texture->height();
-    programDataManager.set2f(scaleUniform, 1.f / static_cast<float>(*widthPrev),
+    programDataManager.set2f("CoordScale", 1.f / static_cast<float>(*widthPrev),
                              1.f / static_cast<float>(*heightPrev));
   }
   if (textureFP.deviceCoordMatrix != deviceCoordMatrixPrev) {
     deviceCoordMatrixPrev = textureFP.deviceCoordMatrix;
-    programDataManager.setMatrix(deviceCoordMatrixUniform, *deviceCoordMatrixPrev);
+    programDataManager.setMatrix("DeviceCoordMatrix", *deviceCoordMatrixPrev);
   }
 }
 }  // namespace tgfx

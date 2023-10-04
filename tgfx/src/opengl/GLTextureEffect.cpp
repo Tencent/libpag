@@ -57,7 +57,7 @@ void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
         textureFP.texture->getTextureCoord(textureFP.alphaStart.x, textureFP.alphaStart.y);
     if (alphaStartPrev != alphaStart) {
       alphaStartPrev = alphaStart;
-      programDataManager.set2f(alphaStartUniform, static_cast<float>(alphaStart.x),
+      programDataManager.set2f("alphaStart", static_cast<float>(alphaStart.x),
                                static_cast<float>(alphaStart.y));
     }
   }

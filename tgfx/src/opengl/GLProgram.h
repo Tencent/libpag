@@ -78,7 +78,7 @@ class GLProgram : public Program {
   };
 
   // A helper to loop over effects, set the transforms (via subclass) and bind textures
-  void setFragmentData(const GLProgramDataManager& programDataManager, const Pipeline* pipeline,
+  void setFragmentData(GLProgramDataManager* programDataManager, const Pipeline* pipeline,
                        int* nextTexSamplerIdx);
 
   void setRenderTargetState(const GLProgramDataManager& programDataManager,

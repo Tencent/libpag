@@ -26,22 +26,24 @@ class GLProgramDataManager : public ProgramDataManager {
  public:
   GLProgramDataManager(Context* context, std::unordered_map<std::string, int>* uniforms);
 
-  void set1f(UniformHandle handle, float v0) const override;
+  void set1f(const std::string& name, float v0) const override;
 
-  void set2f(UniformHandle handle, float v0, float v1) const override;
+  void set2f(const std::string& name, float v0, float v1) const override;
 
-  void set4f(UniformHandle handle, float v0, float v1, float v2, float v3) const override;
+  void set4f(const std::string& name, float v0, float v1, float v2, float v3) const override;
 
-  void set4fv(UniformHandle handle, int arrayCount, const float* v) const override;
+  void set4fv(const std::string& name, int arrayCount, const float* v) const override;
 
-  void setMatrix3f(UniformHandle handle, const float matrix[]) const override;
+  void setMatrix3f(const std::string& name, const float matrix[]) const override;
 
-  void setMatrix4f(UniformHandle handle, const float matrix[]) const override;
+  void setMatrix4f(const std::string& name, const float matrix[]) const override;
 
-  void setMatrix(UniformHandle u, const Matrix& matrix) const override;
+  void setMatrix(const std::string& name, const Matrix& matrix) const override;
 
  private:
   const GLFunctions* gl;
   const std::unordered_map<std::string, int>* uniforms;
+
+  int getUniformLocation(const std::string& name) const;
 };
 }  // namespace tgfx

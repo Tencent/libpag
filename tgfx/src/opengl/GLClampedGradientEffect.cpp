@@ -56,11 +56,11 @@ void GLClampedGradientEffect::onSetData(const ProgramDataManager& programDataMan
   const auto& fp = static_cast<const ClampedGradientEffect&>(fragmentProcessor);
   if (leftBorderColorPrev != fp.leftBorderColor) {
     leftBorderColorPrev = fp.leftBorderColor;
-    programDataManager.set4fv(leftBorderColorUniform, 1, fp.leftBorderColor.array());
+    programDataManager.set4fv("leftBorderColor", 1, fp.leftBorderColor.array());
   }
   if (rightBorderColorPrev != fp.rightBorderColor) {
     rightBorderColorPrev = fp.rightBorderColor;
-    programDataManager.set4fv(rightBorderColorUniform, 1, fp.rightBorderColor.array());
+    programDataManager.set4fv("rightBorderColor", 1, fp.rightBorderColor.array());
   }
 }
 }  // namespace tgfx

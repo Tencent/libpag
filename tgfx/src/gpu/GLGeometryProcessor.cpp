@@ -19,6 +19,8 @@
 #include "GLGeometryProcessor.h"
 
 namespace tgfx {
+static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
+
 void GLGeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
                                                  const ProgramDataManager& programDataManager,
                                                  FPCoordTransformIter* transformIter) {
@@ -30,7 +32,9 @@ void GLGeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
     if (!uniform.updated || uniform.currentMatrix != combined) {
       uniform.updated = true;
       uniform.currentMatrix = combined;
-      programDataManager.setMatrix(uniform.handle, combined);
+      std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
+      uniformName += std::to_string(i);
+      programDataManager.setMatrix(uniformName, combined);
     }
     ++i;
   }
@@ -46,7 +50,7 @@ void GLGeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
   localCoords += ", 1)";
   int i = 0;
   while (transformHandler->nextCoordTransform() != nullptr) {
-    std::string strUniName = "CoordTransformMatrix_";
+    std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
     std::string uniName;
     TransformUniform transformUniform;

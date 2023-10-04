@@ -44,7 +44,7 @@ void GLAARectEffect::onSetData(const ProgramDataManager& programDataManager,
   auto rect = rectEffect.rect.makeOutset(0.5f, 0.5f);
   if (rectPrev != rect) {
     rectPrev = rect;
-    programDataManager.set4f(rectUniform, rect.left, rect.top, rect.right, rect.bottom);
+    programDataManager.set4f("Rect", rect.left, rect.top, rect.right, rect.bottom);
   }
 }
 }  // namespace tgfx

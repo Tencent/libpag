@@ -356,14 +356,17 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
 void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManager,
                                      const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TiledTextureEffect&>(fragmentProcessor);
-  if (dimensionsUniform.isValid()) {
+  auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(textureFP.shaderModeX) ||
+                              ShaderModeRequiresUnormCoord(textureFP.shaderModeY)) &&
+                             textureFP.texture->getSampler()->type() != TextureType::Rectangle;
+  if (hasDimensionUniform) {
     auto dimensions = textureFP.texture->getTextureCoord(1.f, 1.f);
     if (dimensions != dimensionsPrev) {
       dimensionsPrev = dimensions;
-      programDataManager.set2f(dimensionsUniform, dimensions.x, dimensions.y);
+      programDataManager.set2f("Dimension", dimensions.x, dimensions.y);
     }
   }
-  auto pushRect = [&](Rect subset, std::optional<Rect>& prev, UniformHandle uni) {
+  auto pushRect = [&](Rect subset, std::optional<Rect>& prev, const std::string& uni) {
     if (subset == prev) {
       return;
     }
@@ -376,7 +379,7 @@ void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManage
       std::swap(rect[1], rect[3]);
     }
     auto type = textureFP.texture->getSampler()->type();
-    if (!dimensionsUniform.isValid() && type != TextureType::Rectangle) {
+    if (!hasDimensionUniform && type != TextureType::Rectangle) {
       auto lt = textureFP.texture->getTextureCoord(static_cast<float>(rect[0]),
                                                    static_cast<float>(rect[1]));
       auto rb = textureFP.texture->getTextureCoord(static_cast<float>(rect[2]),
@@ -389,10 +392,10 @@ void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManage
     programDataManager.set4fv(uni, 1, rect);
   };
   if (subsetUniform.isValid()) {
-    pushRect(textureFP.subset, subsetPrev, subsetUniform);
+    pushRect(textureFP.subset, subsetPrev, "Subset");
   }
   if (clampUniform.isValid()) {
-    pushRect(textureFP.clamp, clampPrev, clampUniform);
+    pushRect(textureFP.clamp, clampPrev, "Clamp");
   }
 }
 }  // namespace tgfx

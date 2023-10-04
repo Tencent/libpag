@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "UniformHandle.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -26,19 +25,35 @@ class ProgramDataManager {
  public:
   virtual ~ProgramDataManager() = default;
 
-  virtual void set1f(UniformHandle handle, float v0) const = 0;
+  virtual void set1f(const std::string& name, float v0) const = 0;
 
-  virtual void set2f(UniformHandle handle, float v0, float v1) const = 0;
+  virtual void set2f(const std::string& name, float v0, float v1) const = 0;
 
-  virtual void set4f(UniformHandle handle, float v0, float v1, float v2, float v3) const = 0;
+  virtual void set4f(const std::string& name, float v0, float v1, float v2, float v3) const = 0;
 
-  virtual void set4fv(UniformHandle handle, int arrayCount, const float v[]) const = 0;
+  virtual void set4fv(const std::string& name, int arrayCount, const float v[]) const = 0;
 
-  virtual void setMatrix3f(UniformHandle handle, const float matrix[]) const = 0;
+  virtual void setMatrix3f(const std::string& name, const float matrix[]) const = 0;
 
-  virtual void setMatrix4f(UniformHandle handle, const float matrix[]) const = 0;
+  virtual void setMatrix4f(const std::string& name, const float matrix[]) const = 0;
 
   // convenience method for uploading a Matrix to a 3x3 matrix uniform
-  virtual void setMatrix(UniformHandle u, const Matrix& matrix) const = 0;
+  virtual void setMatrix(const std::string& name, const Matrix& matrix) const = 0;
+
+  /**
+   * advanceStage is called by program between each processor's set data. It increments
+   * the stage offset for variable name mangling.
+   */
+  void advanceStage() {
+    stageIndex++;
+  }
+
+ protected:
+  std::string getUniformKey(const std::string& name) const {
+    return name + "_Stage" + std::to_string(stageIndex);
+  }
+
+ private:
+  int stageIndex = -1;
 };
 }  // namespace tgfx

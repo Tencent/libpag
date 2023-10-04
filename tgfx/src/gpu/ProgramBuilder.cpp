@@ -101,7 +101,8 @@ std::string ProgramBuilder::emitAndInstallFragProc(
   nameExpression(&output, "output");
 
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex, processor->name().c_str());
+  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,
+                                       processor->name().c_str());
 
   auto fragProc = processor->createGLInstance();
 

@@ -107,36 +107,37 @@ static const float ColorConversionJPEGFullRange[] = {
 void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
                                    const FragmentProcessor& fragmentProcessor) {
   const auto& yuvFP = static_cast<const YUVTextureEffect&>(fragmentProcessor);
-  if (alphaStartUniform.isValid()) {
+  if (yuvFP.alphaStart != Point::Zero()) {
     auto alphaStart = yuvFP.texture->getTextureCoord(yuvFP.alphaStart.x, yuvFP.alphaStart.y);
     if (alphaStart != alphaStartPrev) {
       alphaStartPrev = alphaStart;
-      programDataManager.set2f(alphaStartUniform, alphaStart.x, alphaStart.y);
+      programDataManager.set2f("AlphaStart", alphaStart.x, alphaStart.y);
     }
   }
   if (yuvFP.texture->colorSpace() != colorSpacePrev) {
     colorSpacePrev = yuvFP.texture->colorSpace();
+    std::string mat3ColorConversion = "Mat3ColorConversion";
     switch (yuvFP.texture->colorSpace()) {
       case YUVColorSpace::BT601_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion601LimitRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion601LimitRange);
         break;
       case YUVColorSpace::BT601_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion601FullRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion601FullRange);
         break;
       case YUVColorSpace::BT709_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion709LimitRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion709LimitRange);
         break;
       case YUVColorSpace::BT709_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion709FullRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion709FullRange);
         break;
       case YUVColorSpace::BT2020_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion2020LimitRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion2020LimitRange);
         break;
       case YUVColorSpace::BT2020_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion2020FullRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion2020FullRange);
         break;
       case YUVColorSpace::JPEG_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversionJPEGFullRange);
+        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversionJPEGFullRange);
         break;
       default:
         break;

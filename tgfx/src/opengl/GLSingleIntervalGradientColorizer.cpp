@@ -38,11 +38,11 @@ void GLSingleIntervalGradientColorizer::onSetData(const ProgramDataManager& prog
   const auto& fp = static_cast<const SingleIntervalGradientColorizer&>(fragmentProcessor);
   if (startPrev != fp.start) {
     startPrev = fp.start;
-    programDataManager.set4fv(startUniform, 1, fp.start.array());
+    programDataManager.set4fv("start", 1, fp.start.array());
   }
   if (endPrev != fp.end) {
     endPrev = fp.end;
-    programDataManager.set4fv(endUniform, 1, fp.end.array());
+    programDataManager.set4fv("end", 1, fp.end.array());
   }
 }
 }  // namespace tgfx
