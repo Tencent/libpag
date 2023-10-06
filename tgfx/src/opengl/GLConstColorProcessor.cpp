@@ -20,13 +20,20 @@
 #include "gpu/ConstColorProcessor.h"
 
 namespace tgfx {
-void GLConstColorProcessor::emitCode(EmitArgs& args) {
+std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color, InputMode mode) {
+  return std::unique_ptr<ConstColorProcessor>(new GLConstColorProcessor(color, mode));
+}
+
+GLConstColorProcessor::GLConstColorProcessor(Color color, InputMode mode)
+    : ConstColorProcessor(color, mode) {
+}
+
+void GLConstColorProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto colorName =
       args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Color");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-  const auto* fp = static_cast<const ConstColorProcessor*>(args.fragmentProcessor);
-  switch (fp->inputMode) {
+  switch (inputMode) {
     case InputMode::Ignore:
       break;
     case InputMode::ModulateRGBA:
@@ -38,9 +45,7 @@ void GLConstColorProcessor::emitCode(EmitArgs& args) {
   }
 }
 
-void GLConstColorProcessor::onSetData(UniformBuffer* uniformBuffer,
-                                      const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const ConstColorProcessor&>(fragmentProcessor);
-  uniformBuffer->setData("Color", fp.color.array());
+void GLConstColorProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("Color", color.array());
 }
 }  // namespace tgfx

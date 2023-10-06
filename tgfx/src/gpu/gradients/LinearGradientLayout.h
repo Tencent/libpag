@@ -29,9 +29,7 @@ class LinearGradientLayout : public FragmentProcessor {
     return "LinearGradientLayout";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit LinearGradientLayout(Matrix matrix);

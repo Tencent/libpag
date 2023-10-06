@@ -20,7 +20,21 @@
 #include "gpu/DeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) {
+std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
+    std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin) {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  return std::unique_ptr<DeviceSpaceTextureEffect>(
+      new GLDeviceSpaceTextureEffect(std::move(texture), deviceOrigin));
+}
+
+GLDeviceSpaceTextureEffect::GLDeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
+                                                       ImageOrigin deviceOrigin)
+    : DeviceSpaceTextureEffect(std::move(texture), deviceOrigin) {
+}
+
+void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
   auto deviceCoordMatrixName = uniformHandler->addUniform(
@@ -35,12 +49,10 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppend(";");
 }
 
-void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer,
-                                           const FragmentProcessor& fragmentProcessor) {
-  const auto& textureFP = static_cast<const DeviceSpaceTextureEffect&>(fragmentProcessor);
-  float scales[] = {1.f / static_cast<float>(textureFP.texture->width()),
-                    1.f / static_cast<float>(textureFP.texture->height())};
+void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+  float scales[] = {1.f / static_cast<float>(texture->width()),
+                    1.f / static_cast<float>(texture->height())};
   uniformBuffer->setData("CoordScale", scales);
-  uniformBuffer->setMatrix("DeviceCoordMatrix", textureFP.deviceCoordMatrix);
+  uniformBuffer->setMatrix("DeviceCoordMatrix", deviceCoordMatrix);
 }
 }  // namespace tgfx

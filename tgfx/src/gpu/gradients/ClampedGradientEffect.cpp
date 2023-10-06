@@ -17,24 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
-#include "opengl/GLClampedGradientEffect.h"
 
 namespace tgfx {
-std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
-    std::unique_ptr<FragmentProcessor> colorizer, std::unique_ptr<FragmentProcessor> gradLayout,
-    Color leftBorderColor, Color rightBorderColor, bool makePremultiply) {
-  return std::unique_ptr<ClampedGradientEffect>(
-      new ClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
-                                rightBorderColor, makePremultiply));
-}
-
 void ClampedGradientEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flag = makePremultiply ? 1 : 0;
   bytesKey->write(flag);
-}
-
-std::unique_ptr<GLFragmentProcessor> ClampedGradientEffect::onCreateGLInstance() const {
-  return std::make_unique<GLClampedGradientEffect>();
 }
 
 bool ClampedGradientEffect::onIsEqual(const FragmentProcessor& processor) const {

@@ -17,20 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureGradientColorizer.h"
-#include "opengl/GLTextureGradientColorizer.h"
 
 namespace tgfx {
-std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(
-    std::shared_ptr<Texture> gradient) {
-  return std::unique_ptr<TextureGradientColorizer>(
-      new TextureGradientColorizer(std::move(gradient)));
-}
-
 bool TextureGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
   return gradient == static_cast<const TextureGradientColorizer&>(processor).gradient;
-}
-
-std::unique_ptr<GLFragmentProcessor> TextureGradientColorizer::onCreateGLInstance() const {
-  return std::make_unique<GLTextureGradientColorizer>();
 }
 }  // namespace tgfx

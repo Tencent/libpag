@@ -30,14 +30,12 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return "DeviceSpaceTextureEffect";
   }
 
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
   const TextureSampler* onTextureSampler(size_t) const override {
     return texture->getSampler();
@@ -45,7 +43,5 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
 
   std::shared_ptr<Texture> texture;
   Matrix deviceCoordMatrix = Matrix::I();
-
-  friend class GLDeviceSpaceTextureEffect;
 };
 }  // namespace tgfx

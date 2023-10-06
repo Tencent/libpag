@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EmptyXferProcessor.h"
-#include "opengl/GLEmptyXferProcessor.h"
 
 namespace tgfx {
 void EmptyXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {

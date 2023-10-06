@@ -21,7 +21,7 @@
 #include <optional>
 #include "GLContext.h"
 #include "GLUniformHandler.h"
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/Pipeline.h"
 #include "gpu/Program.h"
 #include "opengl/GLRenderTarget.h"
 
@@ -35,7 +35,6 @@ class GLProgram : public Program {
   };
 
   GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
-            std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
             std::vector<Attribute> attributes, int vertexStride);
 
   void setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const;
@@ -82,7 +81,6 @@ class GLProgram : public Program {
   unsigned programId = 0;
   std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
 
-  std::vector<std::unique_ptr<GLFragmentProcessor>> glFragmentProcessors;
   std::vector<Attribute> attributes;
   int _vertexStride = 0;
 };

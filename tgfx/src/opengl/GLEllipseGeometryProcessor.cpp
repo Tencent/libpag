@@ -18,7 +18,6 @@
 
 #include "GLEllipseGeometryProcessor.h"
 #include "gpu/EllipseGeometryProcessor.h"
-#include "tgfx/gpu/Caps.h"
 
 namespace tgfx {
 std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(

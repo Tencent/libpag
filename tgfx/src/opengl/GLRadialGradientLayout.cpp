@@ -19,7 +19,14 @@
 #include "GLRadialGradientLayout.h"
 
 namespace tgfx {
-void GLRadialGradientLayout::emitCode(EmitArgs& args) {
+std::unique_ptr<RadialGradientLayout> RadialGradientLayout::Make(Matrix matrix) {
+  return std::unique_ptr<RadialGradientLayout>(new GLRadialGradientLayout(matrix));
+}
+
+GLRadialGradientLayout::GLRadialGradientLayout(Matrix matrix) : RadialGradientLayout(matrix) {
+}
+
+void GLRadialGradientLayout::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("float t = length(%s);", (*args.transformedCoords)[0].name().c_str());
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());

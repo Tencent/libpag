@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramBuilder.h"
-#include "GLFragmentProcessor.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
 ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)
@@ -70,7 +70,7 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
       inOut = &coverage;
     }
     const auto* fp = pipeline->getFragmentProcessor(i);
-    auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut, &fragmentProcessors);
+    auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut);
     FragmentProcessor::Iter iter(fp);
     while (const FragmentProcessor* tempFP = iter.next()) {
       transformedCoordVarsIdx += tempFP->numCoordTransforms();
@@ -87,9 +87,9 @@ static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
   return &vector[atIndex];
 }
 
-std::string ProgramBuilder::emitAndInstallFragProc(
-    const FragmentProcessor* processor, size_t transformedCoordVarsIdx, const std::string& input,
-    std::vector<std::unique_ptr<GLFragmentProcessor>>* glslFragmentProcessors) {
+std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* processor,
+                                                   size_t transformedCoordVarsIdx,
+                                                   const std::string& input) {
   advanceStage();
   std::string output;
   nameExpression(&output, "output");
@@ -97,8 +97,6 @@ std::string ProgramBuilder::emitAndInstallFragProc(
   // Enclose custom code in a block to avoid namespace conflicts
   fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,
                                        processor->name().c_str());
-
-  auto fragProc = processor->createGLInstance();
 
   std::vector<SamplerHandle> texSamplers;
   FragmentProcessor::Iter fpIter(processor);
@@ -111,15 +109,13 @@ std::string ProgramBuilder::emitAndInstallFragProc(
       texSamplers.emplace_back(emitSampler(sampler, name));
     }
   }
-  GLFragmentProcessor::TransformedCoordVars coords(
+  FragmentProcessor::TransformedCoordVars coords(
       processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
-  GLFragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
-  GLFragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), processor, output,
-                                     input, &coords, &textureSamplers);
+  FragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
+  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
+                                   &coords, &textureSamplers);
 
-  fragProc->emitCode(args);
-
-  glslFragmentProcessors->push_back(std::move(fragProc));
+  processor->emitCode(args);
 
   fragmentShaderBuilder()->codeAppend("}");
   return output;

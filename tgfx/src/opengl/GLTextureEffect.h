@@ -19,14 +19,17 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/TextureEffect.h"
 
 namespace tgfx {
-class GLTextureEffect : public GLFragmentProcessor {
+class GLTextureEffect : public TextureEffect {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLTextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+                  const Point& alphaStart, const Matrix& localMatrix);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

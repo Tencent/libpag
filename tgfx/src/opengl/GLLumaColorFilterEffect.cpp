@@ -19,7 +19,11 @@
 #include "GLLumaColorFilterEffect.h"
 
 namespace tgfx {
-void GLLumaColorFilterEffect::emitCode(EmitArgs& args) {
+std::unique_ptr<LumaColorFilterEffect> LumaColorFilterEffect::Make() {
+  return std::make_unique<GLLumaColorFilterEffect>();
+}
+
+void GLLumaColorFilterEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf(
       "%s = vec4(0.0, 0.0, 0.0, clamp(dot(vec3(0.21260000000000001, 0.71519999999999995, 0.0722), "

@@ -77,13 +77,6 @@ class GeometryProcessor : public Processor {
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
-  /**
-   * This class provides access to the CoordTransforms across all FragmentProcessors in a
-   * Pipeline. It is also used by the primitive processor to specify the fragment shader
-   * variable that will hold the transformed coords for each CoordTransform. It is required that
-   * the primitive processor iterate over each coord transform and insert a shader var result for
-   * each. The GLFragmentProcessors will reference these variables in their fragment code.
-   */
   class FPCoordTransformHandler {
    public:
     FPCoordTransformHandler(const Pipeline* pipeline, std::vector<ShaderVar>* transformedCoordVars)

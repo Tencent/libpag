@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PorterDuffXferProcessor.h"
-#include "opengl/GLPorterDuffXferProcessor.h"
 
 namespace tgfx {
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {

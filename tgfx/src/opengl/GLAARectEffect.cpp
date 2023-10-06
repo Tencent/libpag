@@ -20,7 +20,14 @@
 #include "gpu/AARectEffect.h"
 
 namespace tgfx {
-void GLAARectEffect::emitCode(EmitArgs& args) {
+std::unique_ptr<AARectEffect> AARectEffect::Make(const Rect& rect) {
+  return std::unique_ptr<AARectEffect>(new GLAARectEffect(rect));
+}
+
+GLAARectEffect::GLAARectEffect(const Rect& rect) : AARectEffect(rect) {
+}
+
+void GLAARectEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
@@ -35,12 +42,10 @@ void GLAARectEffect::emitCode(EmitArgs& args) {
                            args.inputColor.c_str());
 }
 
-void GLAARectEffect::onSetData(UniformBuffer* uniformBuffer,
-                               const FragmentProcessor& fragmentProcessor) {
-  const auto& rectEffect = static_cast<const AARectEffect&>(fragmentProcessor);
+void GLAARectEffect::onSetData(UniformBuffer* uniformBuffer) const {
   // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
   // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
-  auto rect = rectEffect.rect.makeOutset(0.5f, 0.5f);
-  uniformBuffer->setData("Rect", &rect);
+  auto outRect = rect.makeOutset(0.5f, 0.5f);
+  uniformBuffer->setData("Rect", &outRect);
 }
 }  // namespace tgfx

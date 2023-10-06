@@ -18,11 +18,13 @@
 
 #pragma once
 
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/LinearGradientLayout.h"
 
 namespace tgfx {
-class GLLinearGradientLayout : public GLFragmentProcessor {
+class GLLinearGradientLayout : public LinearGradientLayout {
  public:
-  void emitCode(EmitArgs& args) override;
+  explicit GLLinearGradientLayout(Matrix matrix);
+
+  void emitCode(EmitArgs& args) const override;
 };
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/YUVTexture.h"
-#include "opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,

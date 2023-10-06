@@ -19,15 +19,18 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/DualIntervalGradientColorizer.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
-class GLDualIntervalGradientColorizer : public GLFragmentProcessor {
+class GLDualIntervalGradientColorizer : public DualIntervalGradientColorizer {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLDualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
+                                  float threshold);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer*, const FragmentProcessor&) override;
+  void onSetData(UniformBuffer*) const override;
 };
 }  // namespace tgfx

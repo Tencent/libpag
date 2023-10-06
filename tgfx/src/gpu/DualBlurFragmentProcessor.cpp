@@ -17,19 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/DualBlurFragmentProcessor.h"
-#include "opengl/GLDualBlurFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
-    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-    Point texelSize) {
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  return std::unique_ptr<DualBlurFragmentProcessor>(
-      new DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize));
-}
-
 DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
                                                      std::unique_ptr<FragmentProcessor> processor,
                                                      Point blurOffset, Point texelSize)
@@ -47,9 +36,5 @@ void DualBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const 
 bool DualBlurFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const DualBlurFragmentProcessor&>(processor);
   return passMode == that.passMode && blurOffset == that.blurOffset && texelSize == that.texelSize;
-}
-
-std::unique_ptr<GLFragmentProcessor> DualBlurFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLDualBlurFragmentProcessor>();
 }
 }  // namespace tgfx

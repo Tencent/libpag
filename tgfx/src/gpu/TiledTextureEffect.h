@@ -38,10 +38,8 @@ class TiledTextureEffect : public FragmentProcessor {
     return "TiledTextureEffect";
   }
 
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
-
-  struct Sampling;
 
   enum class ShaderMode {
     None,                 // Using HW mode
@@ -55,12 +53,21 @@ class TiledTextureEffect : public FragmentProcessor {
     ClampToBorderLinear
   };
 
+  struct Sampling {
+    Sampling(const Texture* texture, SamplerState samplerState, const Rect& subset,
+             const Caps* caps);
+
+    SamplerState hwSampler;
+    ShaderMode shaderModeX = ShaderMode::None;
+    ShaderMode shaderModeY = ShaderMode::None;
+    Rect shaderSubset = Rect::MakeEmpty();
+    Rect shaderClamp = Rect::MakeEmpty();
+  };
+
   TiledTextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
                      const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
@@ -81,7 +88,5 @@ class TiledTextureEffect : public FragmentProcessor {
   ShaderMode shaderModeX;
   ShaderMode shaderModeY;
   CoordTransform coordTransform;
-
-  friend class GLTiledTextureEffect;
 };
 }  // namespace tgfx

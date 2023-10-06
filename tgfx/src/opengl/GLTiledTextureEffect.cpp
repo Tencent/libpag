@@ -17,9 +17,29 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLTiledTextureEffect.h"
+#include "gpu/SamplerState.h"
 #include "gpu/TiledTextureEffect.h"
 
 namespace tgfx {
+std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture> texture,
+                                                            SamplerState samplerState,
+                                                            const Matrix* localMatrix) {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  auto matrix = localMatrix ? *localMatrix : Matrix::I();
+  auto subset = Rect::MakeWH(texture->width(), texture->height());
+  Sampling sampling(texture.get(), samplerState, subset, texture->getContext()->caps());
+  return std::unique_ptr<TiledTextureEffect>(
+      new GLTiledTextureEffect(std::move(texture), sampling, matrix));
+}
+
+GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<Texture> texture,
+                                           const TiledTextureEffect::Sampling& sampling,
+                                           const Matrix& localMatrix)
+    : TiledTextureEffect(std::move(texture), sampling, localMatrix) {
+}
+
 bool GLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
   switch (mode) {
     case TiledTextureEffect::ShaderMode::None:
@@ -69,7 +89,7 @@ bool GLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m)
 }
 
 void GLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensionsName,
-                                     const std::string& coord, const char* out) {
+                                     const std::string& coord, const char* out) const {
   std::string normCoord;
   if (!dimensionsName.empty()) {
     normCoord = "(" + coord + ") * " + dimensionsName + "";
@@ -82,12 +102,11 @@ void GLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensio
   fragBuilder->codeAppend(";");
 }
 
-void GLTiledTextureEffect::subsetCoord(GLFragmentProcessor::EmitArgs& args,
-                                       TiledTextureEffect::ShaderMode mode,
+void GLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode,
                                        const std::string& subsetName, const char* coordSwizzle,
                                        const char* subsetStartSwizzle,
                                        const char* subsetStopSwizzle, const char* extraCoord,
-                                       const char* coordWeight) {
+                                       const char* coordWeight) const {
   auto* fragBuilder = args.fragBuilder;
   switch (mode) {
     case TiledTextureEffect::ShaderMode::None:
@@ -139,9 +158,9 @@ void GLTiledTextureEffect::subsetCoord(GLFragmentProcessor::EmitArgs& args,
   }
 }
 
-void GLTiledTextureEffect::clampCoord(GLFragmentProcessor::EmitArgs& args, bool clamp,
-                                      const std::string& clampName, const char* coordSwizzle,
-                                      const char* clampStartSwizzle, const char* clampStopSwizzle) {
+void GLTiledTextureEffect::clampCoord(EmitArgs& args, bool clamp, const std::string& clampName,
+                                      const char* coordSwizzle, const char* clampStartSwizzle,
+                                      const char* clampStopSwizzle) const {
   auto* fragBuilder = args.fragBuilder;
   if (clamp) {
     fragBuilder->codeAppendf("clampedCoord%s = clamp(subsetCoord%s, %s%s, %s%s);", coordSwizzle,
@@ -152,8 +171,8 @@ void GLTiledTextureEffect::clampCoord(GLFragmentProcessor::EmitArgs& args, bool 
   }
 }
 
-void GLTiledTextureEffect::clampCoord(GLFragmentProcessor::EmitArgs& args, const bool useClamp[2],
-                                      const std::string& clampName) {
+void GLTiledTextureEffect::clampCoord(EmitArgs& args, const bool useClamp[2],
+                                      const std::string& clampName) const {
   if (useClamp[0] == useClamp[1]) {
     clampCoord(args, useClamp[0], clampName, "", ".xy", ".zw");
   } else {
@@ -162,8 +181,9 @@ void GLTiledTextureEffect::clampCoord(GLFragmentProcessor::EmitArgs& args, const
   }
 }
 
-GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(
-    GLFragmentProcessor::EmitArgs& args, const bool useSubset[2], const bool useClamp[2]) {
+GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& args,
+                                                                     const bool useSubset[2],
+                                                                     const bool useClamp[2]) const {
   UniformNames names = {};
   auto* uniformHandler = args.uniformHandler;
   if (useSubset[0] || useSubset[1]) {
@@ -174,11 +194,9 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(
     names.clampName =
         uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Clamp");
   }
-  const auto* textureFP = static_cast<const TiledTextureEffect*>(args.fragmentProcessor);
-  bool unormCoordsRequiredForShaderMode = ShaderModeRequiresUnormCoord(textureFP->shaderModeX) ||
-                                          ShaderModeRequiresUnormCoord(textureFP->shaderModeY);
-  bool sampleCoordsMustBeNormalized =
-      textureFP->texture->getSampler()->type() != TextureType::Rectangle;
+  bool unormCoordsRequiredForShaderMode =
+      ShaderModeRequiresUnormCoord(shaderModeX) || ShaderModeRequiresUnormCoord(shaderModeY);
+  bool sampleCoordsMustBeNormalized = texture->getSampler()->type() != TextureType::Rectangle;
   if (unormCoordsRequiredForShaderMode && sampleCoordsMustBeNormalized) {
     names.dimensionsName =
         uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "Dimension");
@@ -186,25 +204,21 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(
   return names;
 }
 
-void GLTiledTextureEffect::emitCode(EmitArgs& args) {
-  const auto* textureFP = static_cast<const TiledTextureEffect*>(args.fragmentProcessor);
+void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-
   auto vertexColor = (*args.transformedCoords)[0].name();
   if (args.coordFunc) {
     vertexColor = args.coordFunc(vertexColor);
   }
-  if (textureFP->shaderModeX == TiledTextureEffect::ShaderMode::None &&
-      textureFP->shaderModeY == TiledTextureEffect::ShaderMode::None) {
+  if (shaderModeX == TiledTextureEffect::ShaderMode::None &&
+      shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
     fragBuilder->codeAppendf(" * %s;", args.inputColor.c_str());
   } else {
     fragBuilder->codeAppendf("vec2 inCoord = %s;", vertexColor.c_str());
-    bool useSubset[2] = {ShaderModeUsesSubset(textureFP->shaderModeX),
-                         ShaderModeUsesSubset(textureFP->shaderModeY)};
-    bool useClamp[2] = {ShaderModeUsesClamp(textureFP->shaderModeX),
-                        ShaderModeUsesClamp(textureFP->shaderModeY)};
+    bool useSubset[2] = {ShaderModeUsesSubset(shaderModeX), ShaderModeUsesSubset(shaderModeY)};
+    bool useClamp[2] = {ShaderModeUsesClamp(shaderModeX), ShaderModeUsesClamp(shaderModeY)};
     auto names = initUniform(args, useSubset, useClamp);
     if (!names.dimensionsName.empty()) {
       fragBuilder->codeAppendf("inCoord /= %s;", names.dimensionsName.c_str());
@@ -215,12 +229,10 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
     const char* extraRepeatCoordY = nullptr;
     const char* repeatCoordWeightY = nullptr;
 
-    bool mipMapRepeatX =
-        textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
-        textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool mipMapRepeatY =
-        textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
-        textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    bool mipMapRepeatX = shaderModeX == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
+                         shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    bool mipMapRepeatY = shaderModeY == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
+                         shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
 
     if (mipMapRepeatX || mipMapRepeatY) {
       fragBuilder->codeAppend("vec2 extraRepeatCoord;");
@@ -237,9 +249,9 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
     }
 
     fragBuilder->codeAppend("highp vec2 subsetCoord;");
-    subsetCoord(args, textureFP->shaderModeX, names.subsetName, "x", "x", "z", extraRepeatCoordX,
+    subsetCoord(args, shaderModeX, names.subsetName, "x", "x", "z", extraRepeatCoordX,
                 repeatCoordWeightX);
-    subsetCoord(args, textureFP->shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
+    subsetCoord(args, shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
                 repeatCoordWeightY);
 
     fragBuilder->codeAppend("vec2 clampedCoord;");
@@ -294,18 +306,18 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
 
     static const char* repeatReadX = "repeatReadX";
     static const char* repeatReadY = "repeatReadY";
-    bool repeatX = textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
-                   textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool repeatY = textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
-                   textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    if (repeatX || textureFP->shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
+    bool repeatX = shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
+                   shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    bool repeatY = shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
+                   shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    if (repeatX || shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppend("float errX = subsetCoord.x - clampedCoord.x;");
       if (repeatX) {
         fragBuilder->codeAppendf("float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
                                  names.clampName.c_str(), names.clampName.c_str());
       }
     }
-    if (repeatY || textureFP->shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (repeatY || shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppend("float errY = subsetCoord.y - clampedCoord.y;");
       if (repeatY) {
         fragBuilder->codeAppendf("float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
@@ -340,20 +352,20 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
       fragBuilder->codeAppend("}");
     }
 
-    if (textureFP->shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppend("textureColor = mix(textureColor, vec4(0.0), min(abs(errX), 1.0));");
     }
-    if (textureFP->shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppendf("textureColor = mix(textureColor, vec4(0.0), min(abs(errY), 1.0));");
     }
-    if (textureFP->shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
+    if (shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
       fragBuilder->codeAppend("float snappedX = floor(inCoord.x + 0.001) + 0.5;");
       fragBuilder->codeAppendf("if (snappedX < %s.x || snappedX > %s.z) {",
                                names.subsetName.c_str(), names.subsetName.c_str());
       fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
       fragBuilder->codeAppend("}");
     }
-    if (textureFP->shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
+    if (shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
       fragBuilder->codeAppend("float snappedY = floor(inCoord.y + 0.001) + 0.5;");
       fragBuilder->codeAppendf("if (snappedY < %s.y || snappedY > %s.w) {",
                                names.subsetName.c_str(), names.subsetName.c_str());
@@ -365,30 +377,26 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
   }
 }
 
-void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer,
-                                     const FragmentProcessor& fragmentProcessor) {
-  const auto& textureFP = static_cast<const TiledTextureEffect&>(fragmentProcessor);
-  auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(textureFP.shaderModeX) ||
-                              ShaderModeRequiresUnormCoord(textureFP.shaderModeY)) &&
-                             textureFP.texture->getSampler()->type() != TextureType::Rectangle;
+void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+  auto hasDimensionUniform =
+      (ShaderModeRequiresUnormCoord(shaderModeX) || ShaderModeRequiresUnormCoord(shaderModeY)) &&
+      texture->getSampler()->type() != TextureType::Rectangle;
   if (hasDimensionUniform) {
-    auto dimensions = textureFP.texture->getTextureCoord(1.f, 1.f);
+    auto dimensions = texture->getTextureCoord(1.f, 1.f);
     uniformBuffer->setData("Dimension", &dimensions);
   }
   auto pushRect = [&](Rect subset, const std::string& uni) {
     float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
-    if (textureFP.texture->origin() == ImageOrigin::BottomLeft) {
-      auto h = static_cast<float>(textureFP.texture->height());
+    if (texture->origin() == ImageOrigin::BottomLeft) {
+      auto h = static_cast<float>(texture->height());
       rect[1] = h - rect[1];
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
     }
-    auto type = textureFP.texture->getSampler()->type();
+    auto type = texture->getSampler()->type();
     if (!hasDimensionUniform && type != TextureType::Rectangle) {
-      auto lt = textureFP.texture->getTextureCoord(static_cast<float>(rect[0]),
-                                                   static_cast<float>(rect[1]));
-      auto rb = textureFP.texture->getTextureCoord(static_cast<float>(rect[2]),
-                                                   static_cast<float>(rect[3]));
+      auto lt = texture->getTextureCoord(static_cast<float>(rect[0]), static_cast<float>(rect[1]));
+      auto rb = texture->getTextureCoord(static_cast<float>(rect[2]), static_cast<float>(rect[3]));
       rect[0] = lt.x;
       rect[1] = lt.y;
       rect[2] = rb.x;
@@ -396,11 +404,11 @@ void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer,
     }
     uniformBuffer->setData(uni, &rect);
   };
-  if (ShaderModeUsesSubset(textureFP.shaderModeX) || ShaderModeUsesSubset(textureFP.shaderModeY)) {
-    pushRect(textureFP.subset, "Subset");
+  if (ShaderModeUsesSubset(shaderModeX) || ShaderModeUsesSubset(shaderModeY)) {
+    pushRect(subset, "Subset");
   }
-  if (ShaderModeUsesClamp(textureFP.shaderModeX) || ShaderModeUsesClamp(textureFP.shaderModeY)) {
-    pushRect(textureFP.clamp, "Clamp");
+  if (ShaderModeUsesClamp(shaderModeX) || ShaderModeUsesClamp(shaderModeY)) {
+    pushRect(clamp, "Clamp");
   }
 }
 }  // namespace tgfx

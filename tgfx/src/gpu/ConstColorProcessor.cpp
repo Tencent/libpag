@@ -17,13 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ConstColorProcessor.h"
-#include "opengl/GLConstColorProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color, InputMode mode) {
-  return std::unique_ptr<ConstColorProcessor>(new ConstColorProcessor(color, mode));
-}
-
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(inputMode));
 }
@@ -31,9 +26,5 @@ void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
 bool ConstColorProcessor::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const ConstColorProcessor&>(processor);
   return inputMode == that.inputMode && color == that.color;
-}
-
-std::unique_ptr<GLFragmentProcessor> ConstColorProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLConstColorProcessor>();
 }
 }  // namespace tgfx

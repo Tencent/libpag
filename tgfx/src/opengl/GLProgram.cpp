@@ -24,12 +24,10 @@
 namespace tgfx {
 GLProgram::GLProgram(Context* context, unsigned programID,
                      std::unique_ptr<GLUniformBuffer> uniformBuffer,
-                     std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
                      std::vector<Attribute> attributes, int vertexStride)
     : Program(context),
       programId(programID),
       uniformBuffer(std::move(uniformBuffer)),
-      glFragmentProcessors(std::move(fragmentProcessors)),
       attributes(std::move(attributes)),
       _vertexStride(vertexStride) {
 }
@@ -84,19 +82,15 @@ void GLProgram::setFragmentData(const Pipeline* pipeline, int* nextTexSamplerIdx
   for (size_t index = 0; index < pipeline->numFragmentProcessors(); ++index) {
     uniformBuffer->advanceStage();
     const auto* currentFP = pipeline->getFragmentProcessor(index);
-    auto currentGLFP = glFragmentProcessors.at(index).get();
     FragmentProcessor::Iter iter(currentFP);
-    GLFragmentProcessor::Iter glIter(currentGLFP);
     const FragmentProcessor* fp = iter.next();
-    GLFragmentProcessor* glslFP = glIter.next();
-    while (fp && glslFP) {
-      glslFP->setData(uniformBuffer.get(), *fp);
+    while (fp) {
+      fp->setData(uniformBuffer.get());
       for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
         static_cast<GLGpu*>(context->gpu())
             ->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
       }
       fp = iter.next();
-      glslFP = glIter.next();
     }
   }
 }

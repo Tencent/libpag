@@ -20,15 +20,30 @@
 #include "gpu/DualBlurFragmentProcessor.h"
 
 namespace tgfx {
-void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) {
+std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
+    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
+    Point texelSize) {
+  if (processor == nullptr) {
+    return nullptr;
+  }
+  return std::unique_ptr<DualBlurFragmentProcessor>(
+      new GLDualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize));
+}
+
+GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(
+    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
+    Point texelSize)
+    : DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize) {
+}
+
+void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto blurOffsetName =
       args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "Blur");
   auto texelSizeName =
       args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "TexelSize");
   std::string tempColor = "tempColor";
-  const auto* fp = static_cast<const DualBlurFragmentProcessor*>(args.fragmentProcessor);
-  if (fp->passMode == DualBlurPassMode::Down) {
+  if (passMode == DualBlurPassMode::Down) {
     fragBuilder->codeAppend("const int size = 5;");
     fragBuilder->codeAppendf("vec2 coords[size];");
     fragBuilder->codeAppend("coords[0] = vec2(0.0, 0.0);");
@@ -82,10 +97,8 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) {
   }
 }
 
-void GLDualBlurFragmentProcessor::onSetData(UniformBuffer* uniformBuffer,
-                                            const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const DualBlurFragmentProcessor&>(fragmentProcessor);
-  uniformBuffer->setData("Blur", &fp.blurOffset);
-  uniformBuffer->setData("TexelSize", &fp.texelSize);
+void GLDualBlurFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("Blur", &blurOffset);
+  uniformBuffer->setData("TexelSize", &texelSize);
 }
 }  // namespace tgfx

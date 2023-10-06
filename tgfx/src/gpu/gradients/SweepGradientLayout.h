@@ -29,9 +29,7 @@ class SweepGradientLayout : public FragmentProcessor {
     return "SweepGradientLayout";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   SweepGradientLayout(Matrix matrix, float bias, float scale);
@@ -41,7 +39,5 @@ class SweepGradientLayout : public FragmentProcessor {
   CoordTransform coordTransform;
   float bias;
   float scale;
-
-  friend class GLSweepGradientLayout;
 };
 }  // namespace tgfx

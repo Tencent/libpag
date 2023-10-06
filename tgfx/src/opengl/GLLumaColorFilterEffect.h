@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/LumaColorFilterEffect.h"
 
 namespace tgfx {
-class GLLumaColorFilterEffect : public GLFragmentProcessor {
+class GLLumaColorFilterEffect : public LumaColorFilterEffect {
  public:
-  void emitCode(EmitArgs& args) override;
+  void emitCode(EmitArgs& args) const override;
 };
 }  // namespace tgfx

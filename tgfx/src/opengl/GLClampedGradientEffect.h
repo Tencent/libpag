@@ -19,15 +19,19 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/ClampedGradientEffect.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
-class GLClampedGradientEffect : public GLFragmentProcessor {
+class GLClampedGradientEffect : public ClampedGradientEffect {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
+                          std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
+                          Color rightBorderColor, bool makePremultiply);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

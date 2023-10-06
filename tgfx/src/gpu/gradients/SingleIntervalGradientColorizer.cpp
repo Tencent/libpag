@@ -17,21 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SingleIntervalGradientColorizer.h"
-#include "opengl/GLSingleIntervalGradientColorizer.h"
 
 namespace tgfx {
-std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(Color start,
-                                                                                       Color end) {
-  return std::unique_ptr<SingleIntervalGradientColorizer>(
-      new SingleIntervalGradientColorizer(start, end));
-}
-
 bool SingleIntervalGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const SingleIntervalGradientColorizer&>(processor);
   return start == that.start && end == that.end;
-}
-
-std::unique_ptr<GLFragmentProcessor> SingleIntervalGradientColorizer::onCreateGLInstance() const {
-  return std::make_unique<GLSingleIntervalGradientColorizer>();
 }
 }  // namespace tgfx

@@ -20,15 +20,30 @@
 #include "gpu/gradients/ClampedGradientEffect.h"
 
 namespace tgfx {
-void GLClampedGradientEffect::emitCode(EmitArgs& args) {
+std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
+    std::unique_ptr<FragmentProcessor> colorizer, std::unique_ptr<FragmentProcessor> gradLayout,
+    Color leftBorderColor, Color rightBorderColor, bool makePremultiply) {
+  return std::unique_ptr<ClampedGradientEffect>(
+      new GLClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
+                                  rightBorderColor, makePremultiply));
+}
+
+GLClampedGradientEffect::GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
+                                                 std::unique_ptr<FragmentProcessor> gradLayout,
+                                                 tgfx::Color leftBorderColor,
+                                                 tgfx::Color rightBorderColor, bool makePremultiply)
+    : ClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
+                            rightBorderColor, makePremultiply) {
+}
+
+void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  const auto* fp = static_cast<const ClampedGradientEffect*>(args.fragmentProcessor);
   auto leftBorderColorName = args.uniformHandler->addUniform(
       ShaderFlags::Fragment, ShaderVar::Type::Float4, "leftBorderColor");
   auto rightBorderColorName = args.uniformHandler->addUniform(
       ShaderFlags::Fragment, ShaderVar::Type::Float4, "rightBorderColor");
   std::string _child1 = "_child1";
-  emitChild(fp->gradLayoutIndex, &_child1, args);
+  emitChild(gradLayoutIndex, &_child1, args);
   fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());
   fragBuilder->codeAppend("if (t.y < 0.0) {");
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
@@ -39,20 +54,18 @@ void GLClampedGradientEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppend("} else {");
   std::string _input0 = "t";
   std::string _child0 = "_child0";
-  emitChild(fp->colorizerIndex, _input0, &_child0, args);
+  emitChild(colorizerIndex, _input0, &_child0, args);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), _child0.c_str());
   fragBuilder->codeAppend("}");
-  if (fp->makePremultiply) {
+  if (makePremultiply) {
     fragBuilder->codeAppend("{");
     fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
     fragBuilder->codeAppend("}");
   }
 }
 
-void GLClampedGradientEffect::onSetData(UniformBuffer* uniformBuffer,
-                                        const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const ClampedGradientEffect&>(fragmentProcessor);
-  uniformBuffer->setData("leftBorderColor", fp.leftBorderColor.array());
-  uniformBuffer->setData("rightBorderColor", fp.rightBorderColor.array());
+void GLClampedGradientEffect::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("leftBorderColor", leftBorderColor.array());
+  uniformBuffer->setData("rightBorderColor", rightBorderColor.array());
 }
 }  // namespace tgfx

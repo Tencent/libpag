@@ -19,7 +19,7 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
 namespace tgfx {
 /**
@@ -36,11 +36,14 @@ namespace tgfx {
  *  -               .z = boundary between (12,13) and (14,15) -> 13_14
  *  -               .w = unused
  */
-class GLUnrolledBinaryGradientColorizer : public GLFragmentProcessor {
+class GLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColorizer {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLUnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
+                                    Rect thresholds1_7, Rect thresholds9_13);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer*, const FragmentProcessor&) override;
+  void onSetData(UniformBuffer*) const override;
 };
 }  // namespace tgfx

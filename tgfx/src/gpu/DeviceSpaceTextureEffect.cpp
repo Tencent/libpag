@@ -17,18 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeviceSpaceTextureEffect.h"
-#include "opengl/GLDeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
-    std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin) {
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  return std::unique_ptr<DeviceSpaceTextureEffect>(
-      new DeviceSpaceTextureEffect(std::move(texture), deviceOrigin));
-}
-
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
                                                    ImageOrigin deviceOrigin)
     : FragmentProcessor(ClassID()), texture(std::move(texture)) {
@@ -45,9 +35,5 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> text
 bool DeviceSpaceTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const DeviceSpaceTextureEffect&>(processor);
   return texture == that.texture && deviceCoordMatrix == that.deviceCoordMatrix;
-}
-
-std::unique_ptr<GLFragmentProcessor> DeviceSpaceTextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLDeviceSpaceTextureEffect>();
 }
 }  // namespace tgfx

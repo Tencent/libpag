@@ -18,11 +18,14 @@
 
 #pragma once
 
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
-class GLXfermodeFragmentProcessor : public GLFragmentProcessor {
+class GLXfermodeFragmentProcessor : public XfermodeFragmentProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLXfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
+                              std::unique_ptr<FragmentProcessor> dst, BlendMode mode);
+
+  void emitCode(EmitArgs& args) const override;
 };
 }  // namespace tgfx

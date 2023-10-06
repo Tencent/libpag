@@ -27,8 +27,6 @@
 #include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
-class GLXferProcessor;
-
 class XferProcessor : public Processor {
  public:
   struct EmitArgs {

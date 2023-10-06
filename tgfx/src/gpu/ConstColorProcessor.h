@@ -34,9 +34,7 @@ class ConstColorProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   ConstColorProcessor(Color color, InputMode mode)
@@ -47,7 +45,5 @@ class ConstColorProcessor : public FragmentProcessor {
 
   Color color;
   InputMode inputMode;
-
-  friend class GLConstColorProcessor;
 };
 }  // namespace tgfx

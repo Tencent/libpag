@@ -17,18 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AARectEffect.h"
-#include "opengl/GLAARectEffect.h"
 
 namespace tgfx {
-std::unique_ptr<AARectEffect> AARectEffect::Make(const Rect& rect) {
-  return std::unique_ptr<AARectEffect>(new AARectEffect(rect));
-}
-
 bool AARectEffect::onIsEqual(const FragmentProcessor& processor) const {
   return rect == static_cast<const AARectEffect&>(processor).rect;
-}
-
-std::unique_ptr<GLFragmentProcessor> AARectEffect::onCreateGLInstance() const {
-  return std::make_unique<GLAARectEffect>();
 }
 }  // namespace tgfx

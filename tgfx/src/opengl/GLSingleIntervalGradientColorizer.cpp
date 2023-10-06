@@ -20,7 +20,17 @@
 #include "gpu/gradients/SingleIntervalGradientColorizer.h"
 
 namespace tgfx {
-void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
+std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(Color start,
+                                                                                       Color end) {
+  return std::unique_ptr<SingleIntervalGradientColorizer>(
+      new GLSingleIntervalGradientColorizer(start, end));
+}
+
+GLSingleIntervalGradientColorizer::GLSingleIntervalGradientColorizer(Color start, Color end)
+    : SingleIntervalGradientColorizer(start, end) {
+}
+
+void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto startName =
       args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "start");
@@ -31,10 +41,8 @@ void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
                            startName.c_str(), endName.c_str());
 }
 
-void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer,
-                                                  const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const SingleIntervalGradientColorizer&>(fragmentProcessor);
-  uniformBuffer->setData("start", fp.start.array());
-  uniformBuffer->setData("end", fp.end.array());
+void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("start", start.array());
+  uniformBuffer->setData("end", end.array());
 }
 }  // namespace tgfx

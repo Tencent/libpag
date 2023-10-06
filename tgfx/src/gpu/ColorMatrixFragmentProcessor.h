@@ -30,9 +30,7 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
     return "ColorMatrixFragmentProcessor";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
@@ -42,7 +40,5 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::array<float, 20> matrix;
-
-  friend class GLColorMatrixFragmentProcessor;
 };
 }  // namespace tgfx
