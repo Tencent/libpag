@@ -39,12 +39,9 @@ void GLConstColorProcessor::emitCode(EmitArgs& args) {
   }
 }
 
-void GLConstColorProcessor::onSetData(const ProgramDataManager& programDataManager,
+void GLConstColorProcessor::onSetData(UniformBuffer* uniformBuffer,
                                       const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const ConstColorProcessor&>(fragmentProcessor);
-  if (colorPrev != fp.color) {
-    colorPrev = fp.color;
-    programDataManager.set4fv("Color", 1, fp.color.array());
-  }
+  uniformBuffer->setData("Color", fp.color.array());
 }
 }  // namespace tgfx

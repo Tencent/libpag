@@ -49,17 +49,13 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = color * %s;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
-void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer,
                                 const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart =
         textureFP.texture->getTextureCoord(textureFP.alphaStart.x, textureFP.alphaStart.y);
-    if (alphaStartPrev != alphaStart) {
-      alphaStartPrev = alphaStart;
-      programDataManager.set2f("alphaStart", static_cast<float>(alphaStart.x),
-                               static_cast<float>(alphaStart.y));
-    }
+    uniformBuffer->setData("alphaStart", &alphaStart);
   }
 }
 }  // namespace tgfx

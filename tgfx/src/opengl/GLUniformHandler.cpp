@@ -99,11 +99,38 @@ void GLUniformHandler::resolveUniformLocations(unsigned programID) {
   }
 }
 
-std::unordered_map<std::string, int> GLUniformHandler::getUniformLocations() const {
-  std::unordered_map<std::string, int> uniformLocations = {};
+std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
+  std::vector<GLUniform> glUniforms = {};
   for (auto& item : uniforms) {
-    uniformLocations[item.first] = item.second.location;
+    std::optional<GLUniform::Type> type;
+    auto& uniform = item.second;
+    switch (uniform.variable.type()) {
+      case ShaderVar::Type::Float:
+        type = GLUniform::Type::Float;
+        break;
+      case ShaderVar::Type::Float2:
+        type = GLUniform::Type::Float2;
+        break;
+      case ShaderVar::Type::Float3:
+        type = GLUniform::Type::Float3;
+        break;
+      case ShaderVar::Type::Float4:
+        type = GLUniform::Type::Float4;
+        break;
+      case ShaderVar::Type::Float3x3:
+        type = GLUniform::Type::Float3x3;
+        break;
+      case ShaderVar::Type::Float4x4:
+        type = GLUniform::Type::Float4x4;
+        break;
+      default:
+        type = std::nullopt;
+        break;
+    }
+    if (type.has_value()) {
+      glUniforms.push_back({item.first, type.value(), uniform.location});
+    }
   }
-  return uniformLocations;
+  return std::make_unique<GLUniformBuffer>(glUniforms);
 }
 }  // namespace tgfx

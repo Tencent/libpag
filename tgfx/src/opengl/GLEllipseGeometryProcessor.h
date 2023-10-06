@@ -25,7 +25,7 @@ class GLEllipseGeometryProcessor : public GLGeometryProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 
-  void setData(const ProgramDataManager& programDataManager, const GeometryProcessor& priProc,
+  void setData(UniformBuffer* uniformBuffer, const GeometryProcessor& priProc,
                FPCoordTransformIter* transformIter) override;
 };
 }  // namespace tgfx

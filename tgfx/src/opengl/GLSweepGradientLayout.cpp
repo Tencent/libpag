@@ -37,15 +37,10 @@ void GLSweepGradientLayout::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 
-void GLSweepGradientLayout::onSetData(const ProgramDataManager& programDataManager,
+void GLSweepGradientLayout::onSetData(UniformBuffer* uniformBuffer,
                                       const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const SweepGradientLayout&>(fragmentProcessor);
-  if (fp.bias != biasPrev) {
-    biasPrev = fp.bias;
-    programDataManager.set1f("Bias", fp.bias);
-  }
-  if (fp.scale != scalePrev) {
-    programDataManager.set1f("Scale", fp.scale);
-  }
+  uniformBuffer->setData("Bias", &fp.bias);
+  uniformBuffer->setData("Scale", &fp.scale);
 }
 }  // namespace tgfx

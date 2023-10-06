@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
-#include "gpu/YUVTexture.h"
+#include "StagedUniformBuffer.h"
 
 namespace tgfx {
-class GLYUVTextureEffect : public GLFragmentProcessor {
- public:
-  void emitCode(EmitArgs& args) override;
+std::string StagedUniformBuffer::getUniformKey(const std::string& name) const {
+  if (stageIndex >= 0) {
+    return name + "_Stage" + std::to_string(stageIndex);
+  }
+  return name;
+}
 
- private:
-  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle alphaStartUniform;
-  UniformHandle mat3ColorConversionUniform;
-};
+void StagedUniformBuffer::resetStateAndUpload(Context* context) {
+  stageIndex = -1;
+  onUploadToGPU(context);
+}
 }  // namespace tgfx

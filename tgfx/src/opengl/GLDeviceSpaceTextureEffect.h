@@ -27,14 +27,9 @@ class GLDeviceSpaceTextureEffect : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
 
   UniformHandle scaleUniform;
   UniformHandle deviceCoordMatrixUniform;
-
-  std::optional<int> widthPrev;
-  std::optional<int> heightPrev;
-  std::optional<Matrix> deviceCoordMatrixPrev;
 };
 }  // namespace tgfx

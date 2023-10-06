@@ -28,18 +28,12 @@ class GLDualIntervalGradientColorizer : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
+  void onSetData(UniformBuffer*, const FragmentProcessor&) override;
 
   UniformHandle scale01Uniform;
   UniformHandle bias01Uniform;
   UniformHandle scale23Uniform;
   UniformHandle bias23Uniform;
   UniformHandle thresholdUniform;
-
-  std::optional<Color> scale01Prev;
-  std::optional<Color> bias01Prev;
-  std::optional<Color> scale23Prev;
-  std::optional<Color> bias23Prev;
-  std::optional<float> thresholdPrev;
 };
 }  // namespace tgfx

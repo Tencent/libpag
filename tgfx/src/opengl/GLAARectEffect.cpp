@@ -36,15 +36,12 @@ void GLAARectEffect::emitCode(EmitArgs& args) {
                            args.inputColor.c_str());
 }
 
-void GLAARectEffect::onSetData(const ProgramDataManager& programDataManager,
+void GLAARectEffect::onSetData(UniformBuffer* uniformBuffer,
                                const FragmentProcessor& fragmentProcessor) {
   const auto& rectEffect = static_cast<const AARectEffect&>(fragmentProcessor);
   // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
   // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
   auto rect = rectEffect.rect.makeOutset(0.5f, 0.5f);
-  if (rectPrev != rect) {
-    rectPrev = rect;
-    programDataManager.set4f("Rect", rect.left, rect.top, rect.right, rect.bottom);
-  }
+  uniformBuffer->setData("Rect", &rect);
 }
 }  // namespace tgfx

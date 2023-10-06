@@ -19,9 +19,9 @@
 #include "GLFragmentProcessor.h"
 
 namespace tgfx {
-void GLFragmentProcessor::setData(const ProgramDataManager& programDataManager,
+void GLFragmentProcessor::setData(UniformBuffer* uniformBuffer,
                                   const FragmentProcessor& processor) {
-  onSetData(programDataManager, processor);
+  onSetData(uniformBuffer, processor);
 }
 
 void GLFragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,

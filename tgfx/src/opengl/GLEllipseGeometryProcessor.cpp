@@ -116,10 +116,10 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
 
-void GLEllipseGeometryProcessor::setData(const ProgramDataManager& programDataManager,
+void GLEllipseGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                          const GeometryProcessor& priProc,
                                          FPCoordTransformIter* transformIter) {
   const auto& egp = static_cast<const EllipseGeometryProcessor&>(priProc);
-  setTransformDataHelper(egp.localMatrix, programDataManager, transformIter);
+  setTransformDataHelper(egp.localMatrix, uniformBuffer, transformIter);
 }
 }  // namespace tgfx

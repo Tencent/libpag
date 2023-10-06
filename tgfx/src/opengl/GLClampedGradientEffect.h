@@ -28,11 +28,8 @@ class GLClampedGradientEffect : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
 
-  std::optional<Color> leftBorderColorPrev;
-  std::optional<Color> rightBorderColorPrev;
   UniformHandle leftBorderColorUniform;
   UniformHandle rightBorderColorUniform;
 };

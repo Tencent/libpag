@@ -20,6 +20,7 @@
 
 #include "gpu/Swizzle.h"
 #include "gpu/UniformHandler.h"
+#include "opengl/GLUniformBuffer.h"
 
 namespace tgfx {
 static constexpr int UNUSED_UNIFORM = -1;
@@ -53,7 +54,7 @@ class GLUniformHandler : public UniformHandler {
 
   void resolveUniformLocations(unsigned programID);
 
-  std::unordered_map<std::string, int> getUniformLocations() const;
+  std::unique_ptr<GLUniformBuffer> makeUniformBuffer() const;
 
   std::unordered_map<std::string, Uniform> uniforms;
   std::vector<Uniform> samplers;

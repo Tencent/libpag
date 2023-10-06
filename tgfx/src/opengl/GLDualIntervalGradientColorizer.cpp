@@ -49,28 +49,13 @@ void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void GLDualIntervalGradientColorizer::onSetData(const ProgramDataManager& programDataManager,
+void GLDualIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer,
                                                 const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const DualIntervalGradientColorizer&>(fragmentProcessor);
-  if (scale01Prev != fp.scale01) {
-    scale01Prev = fp.scale01;
-    programDataManager.set4fv("scale01", 1, fp.scale01.array());
-  }
-  if (bias01Prev != fp.bias01) {
-    bias01Prev = fp.bias01;
-    programDataManager.set4fv("bias01", 1, fp.bias01.array());
-  }
-  if (scale23Prev != fp.scale23) {
-    scale23Prev = fp.scale23;
-    programDataManager.set4fv("scale23", 1, fp.scale23.array());
-  }
-  if (bias23Prev != fp.bias23) {
-    bias23Prev = fp.bias23;
-    programDataManager.set4fv("bias23", 1, fp.bias23.array());
-  }
-  if (thresholdPrev != fp.threshold) {
-    thresholdPrev = fp.threshold;
-    programDataManager.set1f("threshold", fp.threshold);
-  }
+  uniformBuffer->setData("scale01", fp.scale01.array());
+  uniformBuffer->setData("bias01", fp.bias01.array());
+  uniformBuffer->setData("scale23", fp.scale23.array());
+  uniformBuffer->setData("bias23", fp.bias23.array());
+  uniformBuffer->setData("threshold", &fp.threshold);
 }
 }  // namespace tgfx

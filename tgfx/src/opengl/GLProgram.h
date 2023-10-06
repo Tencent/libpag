@@ -20,7 +20,6 @@
 
 #include <optional>
 #include "GLContext.h"
-#include "GLProgramDataManager.h"
 #include "GLUniformHandler.h"
 #include "gpu/GLFragmentProcessor.h"
 #include "gpu/GLGeometryProcessor.h"
@@ -38,7 +37,7 @@ class GLProgram : public Program {
   };
 
   GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles, unsigned programID,
-            std::unordered_map<std::string, int> uniformLocations,
+            std::unique_ptr<GLUniformBuffer> uniformBuffer,
             std::unique_ptr<GLGeometryProcessor> geometryProcessor,
             std::unique_ptr<GLXferProcessor> xferProcessor,
             std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
@@ -78,18 +77,16 @@ class GLProgram : public Program {
   };
 
   // A helper to loop over effects, set the transforms (via subclass) and bind textures
-  void setFragmentData(GLProgramDataManager* programDataManager, const Pipeline* pipeline,
-                       int* nextTexSamplerIdx);
+  void setFragmentData(const Pipeline* pipeline, int* nextTexSamplerIdx);
 
-  void setRenderTargetState(const GLProgramDataManager& programDataManager,
-                            const GLRenderTarget* renderTarget);
+  void setRenderTargetState(const GLRenderTarget* renderTarget);
 
   void onReleaseGPU() override;
 
   RenderTargetState renderTargetState;
   BuiltinUniformHandles builtinUniformHandles;
   unsigned programId = 0;
-  std::unordered_map<std::string, int> uniformLocations;
+  std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
 
   // the installed effects
   std::unique_ptr<GLGeometryProcessor> glGeometryProcessor;

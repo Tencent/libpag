@@ -28,12 +28,9 @@ class GLSingleIntervalGradientColorizer : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
+  void onSetData(UniformBuffer*, const FragmentProcessor&) override;
 
   UniformHandle startUniform;
   UniformHandle endUniform;
-
-  std::optional<Color> startPrev;
-  std::optional<Color> endPrev;
 };
 }  // namespace tgfx

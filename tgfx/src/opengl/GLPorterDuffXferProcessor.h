@@ -26,15 +26,11 @@ class GLPorterDuffXferProcessor : public GLXferProcessor {
  public:
   void emitCode(const EmitArgs&) override;
 
-  void setData(const ProgramDataManager& programDataManager, const XferProcessor& xferProcessor,
+  void setData(UniformBuffer* uniformBuffer, const XferProcessor& xferProcessor,
                const Texture* dstTexture, const Point& dstTextureOffset) override;
 
  private:
   UniformHandle dstTopLeftUniform;
   UniformHandle dstScaleUniform;
-
-  std::optional<Point> dstTopLeftPrev;
-  std::optional<int> widthPrev;
-  std::optional<int> heightPrev;
 };
 }  // namespace tgfx

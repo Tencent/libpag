@@ -53,18 +53,12 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
   args.vertBuilder->emitNormalizedPosition(position);
 }
 
-void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataManager,
+void GLDefaultGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                          const GeometryProcessor& geometryProcessor,
                                          FPCoordTransformIter* transformIter) {
   const auto& gp = static_cast<const DefaultGeometryProcessor&>(geometryProcessor);
-  setTransformDataHelper(gp.localMatrix, programDataManager, transformIter);
-  if (colorPrev != gp.color) {
-    colorPrev = gp.color;
-    programDataManager.set4f("Color", gp.color.red, gp.color.green, gp.color.blue, gp.color.alpha);
-  }
-  if (viewMatrixPrev != gp.viewMatrix) {
-    viewMatrixPrev = gp.viewMatrix;
-    programDataManager.setMatrix("Matrix", gp.viewMatrix);
-  }
+  setTransformDataHelper(gp.localMatrix, uniformBuffer, transformIter);
+  uniformBuffer->setData("Color", gp.color.array());
+  uniformBuffer->setMatrix("Matrix", gp.viewMatrix);
 }
 }  // namespace tgfx

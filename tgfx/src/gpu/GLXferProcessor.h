@@ -19,8 +19,8 @@
 #pragma once
 
 #include "gpu/FragmentShaderBuilder.h"
-#include "gpu/ProgramDataManager.h"
 #include "gpu/Texture.h"
+#include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/XferProcessor.h"
 
@@ -59,8 +59,7 @@ class GLXferProcessor {
    * parameter is guaranteed to be of the same type that created this GLXferProcessor and
    * to have an identical processor key as the one that created this GLXferProcessor.
    */
-  virtual void setData(const ProgramDataManager&, const XferProcessor&, const Texture*,
-                       const Point&) {
+  virtual void setData(UniformBuffer*, const XferProcessor&, const Texture*, const Point&) {
   }
 };
 }  // namespace tgfx

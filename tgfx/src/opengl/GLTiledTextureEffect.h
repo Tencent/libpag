@@ -28,8 +28,7 @@ class GLTiledTextureEffect : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
 
   static bool ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode m);
 
@@ -57,10 +56,5 @@ class GLTiledTextureEffect : public GLFragmentProcessor {
   std::string subsetName;
   std::string clampName;
   std::string dimensionsName;
-
-  std::optional<Point> alphaStartPrev;
-  std::optional<Point> dimensionsPrev;
-  std::optional<Rect> subsetPrev;
-  std::optional<Rect> clampPrev;
 };
 }  // namespace tgfx

@@ -26,8 +26,7 @@ class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 
-  void setData(const ProgramDataManager& programDataManager,
-               const GeometryProcessor& geometryProcessor,
+  void setData(UniformBuffer* uniformBuffer, const GeometryProcessor& geometryProcessor,
                FPCoordTransformIter* transformIter) override;
 };
 }  // namespace tgfx

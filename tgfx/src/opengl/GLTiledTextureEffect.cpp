@@ -353,7 +353,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
   }
 }
 
-void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer,
                                      const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TiledTextureEffect&>(fragmentProcessor);
   auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(textureFP.shaderModeX) ||
@@ -361,16 +361,9 @@ void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManage
                              textureFP.texture->getSampler()->type() != TextureType::Rectangle;
   if (hasDimensionUniform) {
     auto dimensions = textureFP.texture->getTextureCoord(1.f, 1.f);
-    if (dimensions != dimensionsPrev) {
-      dimensionsPrev = dimensions;
-      programDataManager.set2f("Dimension", dimensions.x, dimensions.y);
-    }
+    uniformBuffer->setData("Dimension", &dimensions);
   }
-  auto pushRect = [&](Rect subset, std::optional<Rect>& prev, const std::string& uni) {
-    if (subset == prev) {
-      return;
-    }
-    prev = subset;
+  auto pushRect = [&](Rect subset, const std::string& uni) {
     float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
     if (textureFP.texture->origin() == ImageOrigin::BottomLeft) {
       auto h = static_cast<float>(textureFP.texture->height());
@@ -389,13 +382,13 @@ void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManage
       rect[2] = rb.x;
       rect[3] = rb.y;
     }
-    programDataManager.set4fv(uni, 1, rect);
+    uniformBuffer->setData(uni, &rect);
   };
   if (subsetUniform.isValid()) {
-    pushRect(textureFP.subset, subsetPrev, "Subset");
+    pushRect(textureFP.subset, "Subset");
   }
   if (clampUniform.isValid()) {
-    pushRect(textureFP.clamp, clampPrev, "Clamp");
+    pushRect(textureFP.clamp, "Clamp");
   }
 }
 }  // namespace tgfx

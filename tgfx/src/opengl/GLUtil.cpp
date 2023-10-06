@@ -154,10 +154,4 @@ bool CheckGLErrorImpl(Context* context, std::string file, int line) {
   return success;
 #endif
 }
-
-std::array<float, 9> ToGLMatrix(const Matrix& matrix) {
-  float values[6];
-  matrix.get6(values);
-  return {values[0], values[3], 0, values[1], values[4], 0, values[2], values[5], 1};
-}
 }  // namespace tgfx

@@ -23,7 +23,7 @@
 
 namespace tgfx {
 GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles,
-                     unsigned programID, std::unordered_map<std::string, int> uniformLocations,
+                     unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
                      std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
                      std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
@@ -31,7 +31,7 @@ GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandl
     : Program(context),
       builtinUniformHandles(builtinUniformHandles),
       programId(programID),
-      uniformLocations(std::move(uniformLocations)),
+      uniformBuffer(std::move(uniformBuffer)),
       glGeometryProcessor(std::move(geometryProcessor)),
       glXferProcessor(std::move(xferProcessor)),
       glFragmentProcessors(std::move(fragmentProcessors)),
@@ -66,28 +66,28 @@ void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTar
   // We must bind to texture units in the same order in which we set the uniforms in
   // GLProgramDataManager. That is, we bind textures for processors in this order:
   // geometryProcessor, fragmentProcessors, XferProcessor.
-  GLProgramDataManager programDataManager(context, &uniformLocations);
-  programDataManager.advanceStage();
-  setRenderTargetState(programDataManager, renderTarget);
+  uniformBuffer->advanceStage();
+  setRenderTargetState(renderTarget);
   FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
-  glGeometryProcessor->setData(programDataManager, *pipeline->getGeometryProcessor(),
+  glGeometryProcessor->setData(uniformBuffer.get(), *pipeline->getGeometryProcessor(),
                                &coordTransformIter);
   int nextTexSamplerIdx = 0;
-  setFragmentData(&programDataManager, pipeline, &nextTexSamplerIdx);
+  setFragmentData(pipeline, &nextTexSamplerIdx);
 
   auto offset = Point::Zero();
   const auto* dstTexture = pipeline->getDstTexture(&offset);
   if (dstTexture) {
-    programDataManager.advanceStage();
-    glXferProcessor->setData(programDataManager, *pipeline->getXferProcessor(), dstTexture, offset);
+    uniformBuffer->advanceStage();
+    glXferProcessor->setData(uniformBuffer.get(), *pipeline->getXferProcessor(), dstTexture,
+                             offset);
     static_cast<GLGpu*>(context->gpu())->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler());
   }
+  uniformBuffer->resetStateAndUpload(context);
 }
 
-void GLProgram::setFragmentData(GLProgramDataManager* programDataManager, const Pipeline* pipeline,
-                                int* nextTexSamplerIdx) {
+void GLProgram::setFragmentData(const Pipeline* pipeline, int* nextTexSamplerIdx) {
   for (size_t index = 0; index < pipeline->numFragmentProcessors(); ++index) {
-    programDataManager->advanceStage();
+    uniformBuffer->advanceStage();
     const auto* currentFP = pipeline->getFragmentProcessor(index);
     auto currentGLFP = glFragmentProcessors.at(index).get();
     FragmentProcessor::Iter iter(currentFP);
@@ -95,7 +95,7 @@ void GLProgram::setFragmentData(GLProgramDataManager* programDataManager, const 
     const FragmentProcessor* fp = iter.next();
     GLFragmentProcessor* glslFP = glIter.next();
     while (fp && glslFP) {
-      glslFP->setData(*programDataManager, *fp);
+      glslFP->setData(uniformBuffer.get(), *fp);
       for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
         static_cast<GLGpu*>(context->gpu())
             ->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
@@ -119,8 +119,7 @@ static std::array<float, 4> GetRTAdjustArray(int width, int height, bool flipY) 
   return result;
 }
 
-void GLProgram::setRenderTargetState(const GLProgramDataManager& programDataManager,
-                                     const GLRenderTarget* renderTarget) {
+void GLProgram::setRenderTargetState(const GLRenderTarget* renderTarget) {
   int width = renderTarget->width();
   int height = renderTarget->height();
   auto origin = renderTarget->origin();
@@ -132,6 +131,6 @@ void GLProgram::setRenderTargetState(const GLProgramDataManager& programDataMana
   renderTargetState.height = height;
   renderTargetState.origin = origin;
   auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
-  programDataManager.set4f(RTAdjustName, v[0], v[1], v[2], v[3]);
+  uniformBuffer->setData(RTAdjustName, v.data());
 }
 }  // namespace tgfx

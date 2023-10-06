@@ -68,15 +68,11 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataManager,
-                                        const XferProcessor&, const Texture* dstTexture,
-                                        const Point& dstTextureOffset) {
+void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const XferProcessor&,
+                                        const Texture* dstTexture, const Point& dstTextureOffset) {
   if (dstTexture) {
     if (dstTopLeftUniform.isValid()) {
-      if (dstTopLeftPrev != dstTextureOffset) {
-        dstTopLeftPrev = dstTextureOffset;
-        programDataManager.set2f("DstTextureUpperLeft", dstTextureOffset.x, dstTextureOffset.y);
-      }
+      uniformBuffer->setData("DstTextureUpperLeft", &dstTextureOffset);
       int width;
       int height;
       if (dstTexture->getSampler()->type() == TextureType::Rectangle) {
@@ -86,12 +82,8 @@ void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataMan
         width = dstTexture->width();
         height = dstTexture->height();
       }
-      if (width != widthPrev || height != heightPrev) {
-        widthPrev = width;
-        heightPrev = height;
-        programDataManager.set2f("DstTextureCoordScale", 1.f / static_cast<float>(width),
-                                 1.f / static_cast<float>(height));
-      }
+      float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+      uniformBuffer->setData("DstTextureCoordScale", scales);
     }
   }
 }

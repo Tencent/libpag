@@ -84,16 +84,10 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) {
   }
 }
 
-void GLDualBlurFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
+void GLDualBlurFragmentProcessor::onSetData(UniformBuffer* uniformBuffer,
                                             const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const DualBlurFragmentProcessor&>(fragmentProcessor);
-  if (blurOffsetPrev != fp.blurOffset) {
-    blurOffsetPrev = fp.blurOffset;
-    programDataManager.set2f("Blur", fp.blurOffset.x, fp.blurOffset.y);
-  }
-  if (texelSizePrev != fp.texelSize) {
-    texelSizePrev = fp.texelSize;
-    programDataManager.set2f("TexelSize", fp.texelSize.x, fp.texelSize.y);
-  }
+  uniformBuffer->setData("Blur", &fp.blurOffset);
+  uniformBuffer->setData("TexelSize", &fp.texelSize);
 }
 }  // namespace tgfx

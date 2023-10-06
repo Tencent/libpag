@@ -193,50 +193,33 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void SetUniformData(const ProgramDataManager& programDataManager, const std::string& name,
-                    const UniformHandle& handle, const Color& current,
-                    std::optional<Color>* previous) {
-  if (handle.isValid() && current != *previous) {
-    *previous = current;
-    programDataManager.set4fv(name, 1, current.array());
+void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name,
+                    const UniformHandle& handle, const Color& current) {
+  if (handle.isValid()) {
+    uniformBuffer->setData(name, current.array());
   }
 }
 
-void GLUnrolledBinaryGradientColorizer::onSetData(const ProgramDataManager& programDataManager,
+void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer,
                                                   const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const UnrolledBinaryGradientColorizer&>(fragmentProcessor);
-  if (scale0_1Prev != fp.scale0_1) {
-    programDataManager.set4fv("scale0_1", 1, fp.scale0_1.array());
-  }
-  SetUniformData(programDataManager, "scale2_3", scale2_3Uniform, fp.scale2_3, &scale2_3Prev);
-  SetUniformData(programDataManager, "scale4_5", scale4_5Uniform, fp.scale4_5, &scale4_5Prev);
-  SetUniformData(programDataManager, "scale6_7", scale6_7Uniform, fp.scale6_7, &scale6_7Prev);
-  SetUniformData(programDataManager, "scale8_9", scale8_9Uniform, fp.scale8_9, &scale8_9Prev);
-  SetUniformData(programDataManager, "scale10_11", scale10_11Uniform, fp.scale10_11,
-                 &scale10_11Prev);
-  SetUniformData(programDataManager, "scale12_13", scale12_13Uniform, fp.scale12_13,
-                 &scale12_13Prev);
-  SetUniformData(programDataManager, "scale14_15", scale14_15Uniform, fp.scale14_15,
-                 &scale14_15Prev);
-  if (bias0_1Prev != fp.bias0_1) {
-    programDataManager.set4fv("bias0_1", 1, fp.bias0_1.array());
-  }
-  SetUniformData(programDataManager, "bias2_3", bias2_3Uniform, fp.bias2_3, &bias2_3Prev);
-  SetUniformData(programDataManager, "bias4_5", bias4_5Uniform, fp.bias4_5, &bias4_5Prev);
-  SetUniformData(programDataManager, "bias6_7", bias6_7Uniform, fp.bias6_7, &bias6_7Prev);
-  SetUniformData(programDataManager, "bias8_9", bias8_9Uniform, fp.bias8_9, &bias8_9Prev);
-  SetUniformData(programDataManager, "bias10_11", bias10_11Uniform, fp.bias10_11, &bias10_11Prev);
-  SetUniformData(programDataManager, "bias12_13", bias12_13Uniform, fp.bias12_13, &bias12_13Prev);
-  SetUniformData(programDataManager, "bias14_15", bias14_15Uniform, fp.bias14_15, &bias14_15Prev);
-  if (thresholds1_7Prev != fp.thresholds1_7) {
-    thresholds1_7Prev = fp.thresholds1_7;
-    programDataManager.set4fv("thresholds1_7", 1,
-                              reinterpret_cast<const float*>(&(fp.thresholds1_7)));
-  }
-  if (thresholds9_13Prev != fp.thresholds9_13) {
-    thresholds9_13Prev = fp.thresholds9_13;
-    programDataManager.set4fv("thresholds9_13", 1,
-                              reinterpret_cast<const float*>(&(fp.thresholds9_13)));
-  }
+  uniformBuffer->setData("scale0_1", fp.scale0_1.array());
+  SetUniformData(uniformBuffer, "scale2_3", scale2_3Uniform, fp.scale2_3);
+  SetUniformData(uniformBuffer, "scale4_5", scale4_5Uniform, fp.scale4_5);
+  SetUniformData(uniformBuffer, "scale6_7", scale6_7Uniform, fp.scale6_7);
+  SetUniformData(uniformBuffer, "scale8_9", scale8_9Uniform, fp.scale8_9);
+  SetUniformData(uniformBuffer, "scale10_11", scale10_11Uniform, fp.scale10_11);
+  SetUniformData(uniformBuffer, "scale12_13", scale12_13Uniform, fp.scale12_13);
+  SetUniformData(uniformBuffer, "scale14_15", scale14_15Uniform, fp.scale14_15);
+  uniformBuffer->setData("bias0_1", fp.bias0_1.array());
+  SetUniformData(uniformBuffer, "bias2_3", bias2_3Uniform, fp.bias2_3);
+  SetUniformData(uniformBuffer, "bias4_5", bias4_5Uniform, fp.bias4_5);
+  SetUniformData(uniformBuffer, "bias6_7", bias6_7Uniform, fp.bias6_7);
+  SetUniformData(uniformBuffer, "bias8_9", bias8_9Uniform, fp.bias8_9);
+  SetUniformData(uniformBuffer, "bias10_11", bias10_11Uniform, fp.bias10_11);
+  SetUniformData(uniformBuffer, "bias12_13", bias12_13Uniform, fp.bias12_13);
+  SetUniformData(uniformBuffer, "bias14_15", bias14_15Uniform, fp.bias14_15);
+  uniformBuffer->setData("thresholds1_7", reinterpret_cast<const float*>(&(fp.thresholds1_7)));
+  uniformBuffer->setData("thresholds9_13", reinterpret_cast<const float*>(&(fp.thresholds9_13)));
 }
 }  // namespace tgfx

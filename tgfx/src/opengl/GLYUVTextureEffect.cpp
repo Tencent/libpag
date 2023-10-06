@@ -104,44 +104,38 @@ static const float ColorConversionJPEGFullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
 };
 
-void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+void GLYUVTextureEffect::onSetData(UniformBuffer* uniformBuffer,
                                    const FragmentProcessor& fragmentProcessor) {
   const auto& yuvFP = static_cast<const YUVTextureEffect&>(fragmentProcessor);
   if (yuvFP.alphaStart != Point::Zero()) {
     auto alphaStart = yuvFP.texture->getTextureCoord(yuvFP.alphaStart.x, yuvFP.alphaStart.y);
-    if (alphaStart != alphaStartPrev) {
-      alphaStartPrev = alphaStart;
-      programDataManager.set2f("AlphaStart", alphaStart.x, alphaStart.y);
-    }
+    uniformBuffer->setData("AlphaStart", &alphaStart);
   }
-  if (yuvFP.texture->colorSpace() != colorSpacePrev) {
-    colorSpacePrev = yuvFP.texture->colorSpace();
-    std::string mat3ColorConversion = "Mat3ColorConversion";
-    switch (yuvFP.texture->colorSpace()) {
-      case YUVColorSpace::BT601_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion601LimitRange);
-        break;
-      case YUVColorSpace::BT601_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion601FullRange);
-        break;
-      case YUVColorSpace::BT709_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion709LimitRange);
-        break;
-      case YUVColorSpace::BT709_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion709FullRange);
-        break;
-      case YUVColorSpace::BT2020_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion2020LimitRange);
-        break;
-      case YUVColorSpace::BT2020_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversion2020FullRange);
-        break;
-      case YUVColorSpace::JPEG_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversion, ColorConversionJPEGFullRange);
-        break;
-      default:
-        break;
-    }
+  std::string mat3ColorConversion = "Mat3ColorConversion";
+  switch (yuvFP.texture->colorSpace()) {
+    case YUVColorSpace::BT601_LIMITED:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
+      break;
+    case YUVColorSpace::BT601_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion601FullRange);
+      break;
+    case YUVColorSpace::BT709_LIMITED:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion709LimitRange);
+      break;
+    case YUVColorSpace::BT709_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion709FullRange);
+      break;
+    case YUVColorSpace::BT2020_LIMITED:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion2020LimitRange);
+      break;
+    case YUVColorSpace::BT2020_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion2020FullRange);
+      break;
+    case YUVColorSpace::JPEG_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
+      break;
+    default:
+      break;
   }
 }
 }  // namespace tgfx

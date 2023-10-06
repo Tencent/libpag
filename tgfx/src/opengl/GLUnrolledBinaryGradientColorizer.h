@@ -41,7 +41,7 @@ class GLUnrolledBinaryGradientColorizer : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
+  void onSetData(UniformBuffer*, const FragmentProcessor&) override;
 
   UniformHandle scale0_1Uniform;
   UniformHandle scale2_3Uniform;
@@ -61,24 +61,5 @@ class GLUnrolledBinaryGradientColorizer : public GLFragmentProcessor {
   UniformHandle bias14_15Uniform;
   UniformHandle thresholds1_7Uniform;
   UniformHandle thresholds9_13Uniform;
-
-  std::optional<Color> scale0_1Prev;
-  std::optional<Color> scale2_3Prev;
-  std::optional<Color> scale4_5Prev;
-  std::optional<Color> scale6_7Prev;
-  std::optional<Color> scale8_9Prev;
-  std::optional<Color> scale10_11Prev;
-  std::optional<Color> scale12_13Prev;
-  std::optional<Color> scale14_15Prev;
-  std::optional<Color> bias0_1Prev;
-  std::optional<Color> bias2_3Prev;
-  std::optional<Color> bias4_5Prev;
-  std::optional<Color> bias6_7Prev;
-  std::optional<Color> bias8_9Prev;
-  std::optional<Color> bias10_11Prev;
-  std::optional<Color> bias12_13Prev;
-  std::optional<Color> bias14_15Prev;
-  std::optional<Rect> thresholds1_7Prev;
-  std::optional<Rect> thresholds9_13Prev;
 };
 }  // namespace tgfx

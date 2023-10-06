@@ -41,24 +41,21 @@ void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
 }
 
-void GLColorMatrixFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
+void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* uniformBuffer,
                                                const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const ColorMatrixFragmentProcessor&>(fragmentProcessor);
-  if (matrixPrev != fp.matrix) {
-    matrixPrev = fp.matrix;
-    float matrix[] = {
-        fp.matrix[0],  fp.matrix[5],  fp.matrix[10], fp.matrix[15], fp.matrix[1],  fp.matrix[6],
-        fp.matrix[11], fp.matrix[16], fp.matrix[2],  fp.matrix[7],  fp.matrix[12], fp.matrix[17],
-        fp.matrix[3],  fp.matrix[8],  fp.matrix[13], fp.matrix[18],
-    };
-    float vec[] = {
-        fp.matrix[4],
-        fp.matrix[9],
-        fp.matrix[14],
-        fp.matrix[19],
-    };
-    programDataManager.setMatrix4f("Matrix", matrix);
-    programDataManager.set4fv("Vector", 1, vec);
-  }
+  float matrix[] = {
+      fp.matrix[0],  fp.matrix[5],  fp.matrix[10], fp.matrix[15], fp.matrix[1],  fp.matrix[6],
+      fp.matrix[11], fp.matrix[16], fp.matrix[2],  fp.matrix[7],  fp.matrix[12], fp.matrix[17],
+      fp.matrix[3],  fp.matrix[8],  fp.matrix[13], fp.matrix[18],
+  };
+  float vec[] = {
+      fp.matrix[4],
+      fp.matrix[9],
+      fp.matrix[14],
+      fp.matrix[19],
+  };
+  uniformBuffer->setData("Matrix", matrix);
+  uniformBuffer->setData("Vector", vec);
 }
 }  // namespace tgfx

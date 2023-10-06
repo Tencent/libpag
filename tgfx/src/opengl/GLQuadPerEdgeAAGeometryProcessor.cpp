@@ -55,9 +55,9 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) {
   args.vertBuilder->emitNormalizedPosition(geometryProcessor->position.name());
 }
 
-void GLQuadPerEdgeAAGeometryProcessor::setData(const ProgramDataManager& programDataManager,
+void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                                const GeometryProcessor&,
                                                FPCoordTransformIter* transformIter) {
-  setTransformDataHelper(Matrix::I(), programDataManager, transformIter);
+  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
 }
 }  // namespace tgfx

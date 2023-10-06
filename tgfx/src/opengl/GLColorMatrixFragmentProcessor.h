@@ -28,12 +28,9 @@ class GLColorMatrixFragmentProcessor : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
 
   UniformHandle matrixUniform;
   UniformHandle vectorUniform;
-
-  std::optional<std::array<float, 20>> matrixPrev;
 };
 }  // namespace tgfx

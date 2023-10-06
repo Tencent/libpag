@@ -20,11 +20,11 @@
 
 #include "FragmentShaderBuilder.h"
 #include "GeometryProcessor.h"
-#include "ProgramDataManager.h"
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
 #include "gpu/FragmentProcessor.h"
+#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 class GLGeometryProcessor {
@@ -97,16 +97,14 @@ class GLGeometryProcessor {
    * GeometryProcessor parameter is guaranteed to be of the same type and to have an
    * identical processor key as the GeometryProcessor that created this GLGeometryProcessor.
    */
-  virtual void setData(const ProgramDataManager& programDataManager,
-                       const GeometryProcessor& geometryProcessor,
+  virtual void setData(UniformBuffer* uniformBuffer, const GeometryProcessor& geometryProcessor,
                        FPCoordTransformIter* coordTransformIter) = 0;
 
  protected:
   /**
    * A helper to upload coord transform matrices in setData().
    */
-  void setTransformDataHelper(const Matrix& localMatrix,
-                              const ProgramDataManager& programDataManager,
+  void setTransformDataHelper(const Matrix& localMatrix, UniformBuffer* uniformBuffer,
                               FPCoordTransformIter* transformIter);
 
   /**
@@ -120,8 +118,6 @@ class GLGeometryProcessor {
  private:
   struct TransformUniform {
     UniformHandle handle = {};
-    Matrix currentMatrix = Matrix::I();
-    bool updated = false;
   };
 
   std::vector<TransformUniform> installedTransforms;

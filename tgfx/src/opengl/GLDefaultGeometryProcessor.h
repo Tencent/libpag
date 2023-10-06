@@ -26,15 +26,11 @@ class GLDefaultGeometryProcessor : public GLGeometryProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 
-  void setData(const ProgramDataManager& programDataManager,
-               const GeometryProcessor& geometryProcessor,
+  void setData(UniformBuffer* uniformBuffer, const GeometryProcessor& geometryProcessor,
                FPCoordTransformIter* transformIter) override;
 
  private:
   UniformHandle matrixUniform;
   UniformHandle colorUniform;
-
-  std::optional<Color> colorPrev;
-  std::optional<Matrix> viewMatrixPrev;
 };
 }  // namespace tgfx

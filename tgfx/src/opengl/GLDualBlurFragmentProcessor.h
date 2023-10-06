@@ -27,13 +27,9 @@ class GLDualBlurFragmentProcessor : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
 
   UniformHandle blurOffsetUniform;
   UniformHandle texelSizeUniform;
-
-  std::optional<Point> blurOffsetPrev;
-  std::optional<Point> texelSizePrev;
 };
 }  // namespace tgfx

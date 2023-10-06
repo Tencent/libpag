@@ -27,12 +27,9 @@ class GLSweepGradientLayout : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
-  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
+  void onSetData(UniformBuffer*, const FragmentProcessor&) override;
 
   UniformHandle biasUniform;
   UniformHandle scaleUniform;
-
-  std::optional<float> biasPrev;
-  std::optional<float> scalePrev;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,28 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
-#include "gpu/YUVTexture.h"
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class GLYUVTextureEffect : public GLFragmentProcessor {
+/**
+ * An object representing the collection of uniform variables in a GPU program.
+ */
+class UniformBuffer {
  public:
-  void emitCode(EmitArgs& args) override;
+  virtual ~UniformBuffer() = default;
 
- private:
-  void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
+  /**
+   * Copies data into the uniform buffer. The data must have the same size as the uniform specified
+   * by name. If the uniform is not found, this method does nothing.
+   */
+  virtual void setData(const std::string& name, const void* data) = 0;
 
-  UniformHandle alphaStartUniform;
-  UniformHandle mat3ColorConversionUniform;
+  /**
+   * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
+   */
+  void setMatrix(const std::string& name, const Matrix& matrix);
 };
 }  // namespace tgfx

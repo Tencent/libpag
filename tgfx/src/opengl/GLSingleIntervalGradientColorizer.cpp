@@ -33,16 +33,10 @@ void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
                            startName.c_str(), endName.c_str());
 }
 
-void GLSingleIntervalGradientColorizer::onSetData(const ProgramDataManager& programDataManager,
+void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer,
                                                   const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const SingleIntervalGradientColorizer&>(fragmentProcessor);
-  if (startPrev != fp.start) {
-    startPrev = fp.start;
-    programDataManager.set4fv("start", 1, fp.start.array());
-  }
-  if (endPrev != fp.end) {
-    endPrev = fp.end;
-    programDataManager.set4fv("end", 1, fp.end.array());
-  }
+  uniformBuffer->setData("start", fp.start.array());
+  uniformBuffer->setData("end", fp.end.array());
 }
 }  // namespace tgfx

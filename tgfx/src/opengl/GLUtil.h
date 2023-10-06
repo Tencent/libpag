@@ -48,8 +48,6 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
 
 bool CheckGLErrorImpl(Context* context, std::string file, int line);
 
-std::array<float, 9> ToGLMatrix(const Matrix& matrix);
-
 #ifdef DEBUG
 
 #define CheckGLError(context) CheckGLErrorImpl(context, __FILE__, __LINE__)

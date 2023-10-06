@@ -20,9 +20,9 @@
 
 #include <functional>
 #include "FragmentShaderBuilder.h"
-#include "ProgramDataManager.h"
 #include "UniformHandler.h"
 #include "gpu/FragmentProcessor.h"
+#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 class GLFragmentProcessor {
@@ -110,7 +110,7 @@ class GLFragmentProcessor {
    */
   virtual void emitCode(EmitArgs&) = 0;
 
-  void setData(const ProgramDataManager& programDataManager, const FragmentProcessor& processor);
+  void setData(UniformBuffer* uniformBuffer, const FragmentProcessor& processor);
 
   size_t numChildProcessors() const {
     return childProcessors.size();
@@ -169,7 +169,7 @@ class GLFragmentProcessor {
    * parameter is guaranteed to be of the same type that created this GLFragmentProcessor and
    * to have an identical processor key as the one that created this GLFragmentProcessor.
    */
-  virtual void onSetData(const ProgramDataManager&, const FragmentProcessor&) {
+  virtual void onSetData(UniformBuffer*, const FragmentProcessor&) {
   }
 
  private:

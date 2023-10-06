@@ -22,20 +22,15 @@ namespace tgfx {
 static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
 
 void GLGeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
-                                                 const ProgramDataManager& programDataManager,
+                                                 UniformBuffer* uniformBuffer,
                                                  FPCoordTransformIter* transformIter) {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
     Matrix combined = Matrix::I();
     combined.setConcat(coordTransform->getTotalMatrix(), localMatrix);
-    auto& uniform = installedTransforms[i];
-    if (!uniform.updated || uniform.currentMatrix != combined) {
-      uniform.updated = true;
-      uniform.currentMatrix = combined;
-      std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
-      uniformName += std::to_string(i);
-      programDataManager.setMatrix(uniformName, combined);
-    }
+    std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
+    uniformName += std::to_string(i);
+    uniformBuffer->setMatrix(uniformName, combined);
     ++i;
   }
 }
@@ -53,10 +48,8 @@ void GLGeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
     std::string uniName;
-    TransformUniform transformUniform;
-    transformUniform.handle = uniformHandler->addUniform(
-        ShaderFlags::Vertex, ShaderVar::Type::Float3x3, strUniName, &uniName);
-    installedTransforms.push_back(transformUniform);
+    uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, strUniName,
+                               &uniName);
     std::string strVaryingName = "TransformedCoords_";
     strVaryingName += std::to_string(i);
     ShaderVar::Type varyingType = ShaderVar::Type::Float2;

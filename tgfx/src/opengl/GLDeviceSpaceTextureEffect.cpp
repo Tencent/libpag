@@ -38,18 +38,12 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppend(";");
 }
 
-void GLDeviceSpaceTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer,
                                            const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const DeviceSpaceTextureEffect&>(fragmentProcessor);
-  if (textureFP.texture->width() != widthPrev || textureFP.texture->height() != heightPrev) {
-    widthPrev = textureFP.texture->width();
-    heightPrev = textureFP.texture->height();
-    programDataManager.set2f("CoordScale", 1.f / static_cast<float>(*widthPrev),
-                             1.f / static_cast<float>(*heightPrev));
-  }
-  if (textureFP.deviceCoordMatrix != deviceCoordMatrixPrev) {
-    deviceCoordMatrixPrev = textureFP.deviceCoordMatrix;
-    programDataManager.setMatrix("DeviceCoordMatrix", *deviceCoordMatrixPrev);
-  }
+  float scales[] = {1.f / static_cast<float>(textureFP.texture->width()),
+                    1.f / static_cast<float>(textureFP.texture->height())};
+  uniformBuffer->setData("CoordScale", scales);
+  uniformBuffer->setMatrix("DeviceCoordMatrix", textureFP.deviceCoordMatrix);
 }
 }  // namespace tgfx
