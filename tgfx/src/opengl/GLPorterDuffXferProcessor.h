@@ -19,15 +19,16 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLXferProcessor.h"
+#include "gpu/PorterDuffXferProcessor.h"
 
 namespace tgfx {
-class GLPorterDuffXferProcessor : public GLXferProcessor {
+class GLPorterDuffXferProcessor : public PorterDuffXferProcessor {
  public:
-  void emitCode(const EmitArgs&) override;
+  explicit GLPorterDuffXferProcessor(BlendMode blend);
 
- private:
-  void setData(UniformBuffer* uniformBuffer, const XferProcessor& xferProcessor,
-               const Texture* dstTexture, const Point& dstTextureOffset) override;
+  void emitCode(const EmitArgs& args) const override;
+
+  void setData(UniformBuffer* uniformBuffer, const Texture* dstTexture,
+               const Point& dstTextureOffset) const override;
 };
 }  // namespace tgfx

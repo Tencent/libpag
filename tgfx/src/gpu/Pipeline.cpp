@@ -51,8 +51,7 @@ void Pipeline::computeKey(Context* context, BytesKey* bytesKey) const {
 
 const XferProcessor* Pipeline::getXferProcessor() const {
   if (xferProcessor == nullptr) {
-    static auto& xferProcessor = *new EmptyXferProcessor();
-    return &xferProcessor;
+    return EmptyXferProcessor::GetInstance();
   }
   return xferProcessor.get();
 }

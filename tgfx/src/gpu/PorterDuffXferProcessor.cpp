@@ -20,16 +20,8 @@
 #include "opengl/GLPorterDuffXferProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlendMode blend) {
-  return std::unique_ptr<PorterDuffXferProcessor>(new PorterDuffXferProcessor(blend));
-}
-
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
   bytesKey->write(static_cast<uint32_t>(blend));
-}
-
-std::unique_ptr<GLXferProcessor> PorterDuffXferProcessor::createGLInstance() const {
-  return std::make_unique<GLPorterDuffXferProcessor>();
 }
 }  // namespace tgfx

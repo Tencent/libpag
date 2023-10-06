@@ -22,7 +22,6 @@
 #include "GLContext.h"
 #include "GLUniformHandler.h"
 #include "gpu/GLFragmentProcessor.h"
-#include "gpu/GLXferProcessor.h"
 #include "gpu/Program.h"
 #include "opengl/GLRenderTarget.h"
 
@@ -36,7 +35,6 @@ class GLProgram : public Program {
   };
 
   GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
-            std::unique_ptr<GLXferProcessor> xferProcessor,
             std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
             std::vector<Attribute> attributes, int vertexStride);
 
@@ -84,8 +82,6 @@ class GLProgram : public Program {
   unsigned programId = 0;
   std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
 
-  // the installed effects
-  std::unique_ptr<GLXferProcessor> glXferProcessor;
   std::vector<std::unique_ptr<GLFragmentProcessor>> glFragmentProcessors;
   std::vector<Attribute> attributes;
   int _vertexStride = 0;

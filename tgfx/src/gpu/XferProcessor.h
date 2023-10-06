@@ -19,8 +19,11 @@
 #pragma once
 
 #include <memory>
-
 #include "Processor.h"
+#include "gpu/FragmentShaderBuilder.h"
+#include "gpu/Texture.h"
+#include "gpu/UniformBuffer.h"
+#include "gpu/UniformHandler.h"
 #include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
@@ -28,11 +31,29 @@ class GLXferProcessor;
 
 class XferProcessor : public Processor {
  public:
-  /**
-   * Returns a new instance of the appropriate *GL* implementation class for the given
-   * XferProcessor.
-   */
-  virtual std::unique_ptr<GLXferProcessor> createGLInstance() const = 0;
+  struct EmitArgs {
+    EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
+             std::string inputColor, std::string inputCoverage, std::string outputColor,
+             const SamplerHandle dstTextureSamplerHandle)
+        : fragBuilder(fragBuilder),
+          uniformHandler(uniformHandler),
+          inputColor(std::move(inputColor)),
+          inputCoverage(std::move(inputCoverage)),
+          outputColor(std::move(outputColor)),
+          dstTextureSamplerHandle(dstTextureSamplerHandle) {
+    }
+    FragmentShaderBuilder* fragBuilder;
+    UniformHandler* uniformHandler;
+    const std::string inputColor;
+    const std::string inputCoverage;
+    const std::string outputColor;
+    const SamplerHandle dstTextureSamplerHandle;
+  };
+
+  virtual void emitCode(const EmitArgs& args) const = 0;
+
+  virtual void setData(UniformBuffer*, const Texture*, const Point&) const {
+  }
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {

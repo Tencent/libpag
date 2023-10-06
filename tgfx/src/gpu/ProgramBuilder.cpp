@@ -18,7 +18,6 @@
 
 #include "ProgramBuilder.h"
 #include "GLFragmentProcessor.h"
-#include "GLXferProcessor.h"
 
 namespace tgfx {
 ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)
@@ -130,10 +129,8 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                             const std::string& coverageIn) {
   advanceStage();
 
-  const auto* processor = pipeline->getXferProcessor();
-  xferProcessor = processor->createGLInstance();
-
-  fragmentShaderBuilder()->codeAppendf("{ // Xfer Processor %s\n", processor->name().c_str());
+  auto xferProcessor = pipeline->getXferProcessor();
+  fragmentShaderBuilder()->codeAppendf("{ // Xfer Processor %s\n", xferProcessor->name().c_str());
 
   SamplerHandle dstTextureSamplerHandle;
   if (const auto* dstTexture = pipeline->getDstTexture()) {
@@ -142,11 +139,9 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
 
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1)";
   std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1)";
-  GLXferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), processor, inputColor,
-                                 inputCoverage, fragmentShaderBuilder()->colorOutputName(),
-                                 dstTextureSamplerHandle);
+  XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
+                               fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
   xferProcessor->emitCode(args);
-
   fragmentShaderBuilder()->codeAppend("}");
 }
 

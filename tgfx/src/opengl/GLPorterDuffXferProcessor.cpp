@@ -21,7 +21,15 @@
 #include "gpu/PorterDuffXferProcessor.h"
 
 namespace tgfx {
-void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
+std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlendMode blend) {
+  return std::unique_ptr<PorterDuffXferProcessor>(new GLPorterDuffXferProcessor(blend));
+}
+
+GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(tgfx::BlendMode blend)
+    : PorterDuffXferProcessor(blend) {
+}
+
+void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
@@ -58,16 +66,15 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
 
   const char* outColor = "localOutputColor";
   fragBuilder->codeAppendf("vec4 %s;", outColor);
-  const auto* pdXP = static_cast<const PorterDuffXferProcessor*>(args.xferProcessor);
-  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, pdXP->getBlend());
+  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, blend);
   fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
                            args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
                            dstColor.c_str());
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const XferProcessor&,
-                                        const Texture* dstTexture, const Point& dstTextureOffset) {
+void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const Texture* dstTexture,
+                                        const Point& dstTextureOffset) const {
   if (dstTexture) {
     uniformBuffer->setData("DstTextureUpperLeft", &dstTextureOffset);
     int width;
