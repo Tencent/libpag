@@ -36,8 +36,7 @@ class GLProgram : public Program {
     int location = 0;
   };
 
-  GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles, unsigned programID,
-            std::unique_ptr<GLUniformBuffer> uniformBuffer,
+  GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
             std::unique_ptr<GLGeometryProcessor> geometryProcessor,
             std::unique_ptr<GLXferProcessor> xferProcessor,
             std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
@@ -84,7 +83,6 @@ class GLProgram : public Program {
   void onReleaseGPU() override;
 
   RenderTargetState renderTargetState;
-  BuiltinUniformHandles builtinUniformHandles;
   unsigned programId = 0;
   std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
 

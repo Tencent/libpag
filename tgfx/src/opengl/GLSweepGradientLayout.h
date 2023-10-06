@@ -28,8 +28,5 @@ class GLSweepGradientLayout : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer*, const FragmentProcessor&) override;
-
-  UniformHandle biasUniform;
-  UniformHandle scaleUniform;
 };
 }  // namespace tgfx

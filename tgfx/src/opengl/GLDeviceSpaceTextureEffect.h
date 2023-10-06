@@ -28,8 +28,5 @@ class GLDeviceSpaceTextureEffect : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle scaleUniform;
-  UniformHandle deviceCoordMatrixUniform;
 };
 }  // namespace tgfx

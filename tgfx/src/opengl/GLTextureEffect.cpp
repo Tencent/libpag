@@ -34,9 +34,8 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppend(";");
   if (textureFP->alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
-    std::string alphaStartName;
-    alphaStartUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                   "alphaStart", &alphaStartName);
+    auto alphaStartName =
+        uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "alphaStart");
     std::string alphaVertexColor = "alphaVertexColor";
     fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), vertexColor.c_str(),
                              alphaStartName.c_str());
@@ -52,7 +51,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
 void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer,
                                 const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
-  if (alphaStartUniform.isValid()) {
+  if (textureFP.alphaStart != Point::Zero()) {
     auto alphaStart =
         textureFP.texture->getTextureCoord(textureFP.alphaStart.x, textureFP.alphaStart.y);
     uniformBuffer->setData("alphaStart", &alphaStart);

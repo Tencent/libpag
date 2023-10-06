@@ -22,9 +22,8 @@
 namespace tgfx {
 void GLConstColorProcessor::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
-  std::string colorName;
-  colorUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                 "Color", &colorName);
+  auto colorName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Color");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   const auto* fp = static_cast<const ConstColorProcessor*>(args.fragmentProcessor);
   switch (fp->inputMode) {

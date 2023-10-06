@@ -29,7 +29,5 @@ class GLConstColorProcessor : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle colorUniform;
 };
 }  // namespace tgfx

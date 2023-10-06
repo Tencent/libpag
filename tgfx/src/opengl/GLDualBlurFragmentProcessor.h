@@ -28,8 +28,5 @@ class GLDualBlurFragmentProcessor : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle blurOffsetUniform;
-  UniformHandle texelSizeUniform;
 };
 }  // namespace tgfx

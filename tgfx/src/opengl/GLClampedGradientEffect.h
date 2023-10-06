@@ -29,8 +29,5 @@ class GLClampedGradientEffect : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle leftBorderColorUniform;
-  UniformHandle rightBorderColorUniform;
 };
 }  // namespace tgfx

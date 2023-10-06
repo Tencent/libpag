@@ -29,11 +29,5 @@ class GLDualIntervalGradientColorizer : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer*, const FragmentProcessor&) override;
-
-  UniformHandle scale01Uniform;
-  UniformHandle bias01Uniform;
-  UniformHandle scale23Uniform;
-  UniformHandle bias23Uniform;
-  UniformHandle thresholdUniform;
 };
 }  // namespace tgfx

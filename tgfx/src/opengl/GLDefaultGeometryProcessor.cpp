@@ -29,9 +29,8 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
 
   varyingHandler->emitAttributes(*geometryProcessor);
 
-  std::string matrixName;
-  matrixUniform = args.uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3,
-                                                  "Matrix", &matrixName);
+  auto matrixName =
+      args.uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, "Matrix");
   std::string position = "position";
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", position.c_str(),
                            matrixName.c_str(), geometryProcessor->position.name().c_str());
@@ -44,9 +43,8 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
                            geometryProcessor->coverage.name().c_str());
   fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverage.fsIn().c_str());
 
-  std::string colorName;
-  colorUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                 "Color", &colorName);
+  auto colorName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Color");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

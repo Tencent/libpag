@@ -28,6 +28,11 @@ namespace tgfx {
 class StagedUniformBuffer : public UniformBuffer {
  public:
   /**
+   * Returns the mangled name for the specified uniform name and stage index.
+   */
+  static std::string GetMangledName(const std::string& name, int stageIndex);
+
+  /**
    * advanceStage is called by Program between each processor's set data. It increments the stage
    * offset for uniform name mangling. If advanceStage is not called, the uniform names will not be
    * mangled.

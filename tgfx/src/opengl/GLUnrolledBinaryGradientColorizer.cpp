@@ -20,14 +20,6 @@
 #include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
 namespace tgfx {
-UniformHandle AddUniform(UniformHandler* uniformHandler, const std::string& name, int intervalCount,
-                         int limit, std::string* out) {
-  if (intervalCount > limit) {
-    return uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, name, out);
-  }
-  return {};
-}
-
 struct UnrolledBinaryUniformName {
   std::string scale0_1;
   std::string scale2_3;
@@ -48,6 +40,14 @@ struct UnrolledBinaryUniformName {
   std::string thresholds1_7;
   std::string thresholds9_13;
 };
+
+std::string AddUniform(UniformHandler* uniformHandler, const std::string& name, int intervalCount,
+                       int limit) {
+  if (intervalCount > limit) {
+    return uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, name);
+  }
+  return "";
+}
 
 void AppendCode1(FragmentShaderBuilder* fragBuilder, int intervalCount,
                  const UnrolledBinaryUniformName& name) {
@@ -148,30 +148,27 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
   const auto* fp = static_cast<const UnrolledBinaryGradientColorizer*>(args.fragmentProcessor);
-  UnrolledBinaryUniformName name;
-  scale0_1Uniform = AddUniform(uniformHandler, "scale0_1", fp->intervalCount, 0, &name.scale0_1);
-  scale2_3Uniform = AddUniform(uniformHandler, "scale2_3", fp->intervalCount, 1, &name.scale2_3);
-  scale4_5Uniform = AddUniform(uniformHandler, "scale4_5", fp->intervalCount, 2, &name.scale4_5);
-  scale6_7Uniform = AddUniform(uniformHandler, "scale6_7", fp->intervalCount, 3, &name.scale6_7);
-  scale8_9Uniform = AddUniform(uniformHandler, "scale8_9", fp->intervalCount, 4, &name.scale8_9);
-  scale10_11Uniform =
-      AddUniform(uniformHandler, "scale10_11", fp->intervalCount, 5, &name.scale10_11);
-  scale12_13Uniform =
-      AddUniform(uniformHandler, "scale12_13", fp->intervalCount, 6, &name.scale12_13);
-  scale14_15Uniform =
-      AddUniform(uniformHandler, "scale14_15", fp->intervalCount, 7, &name.scale14_15);
-  bias0_1Uniform = AddUniform(uniformHandler, "bias0_1", fp->intervalCount, 0, &name.bias0_1);
-  bias2_3Uniform = AddUniform(uniformHandler, "bias2_3", fp->intervalCount, 1, &name.bias2_3);
-  bias4_5Uniform = AddUniform(uniformHandler, "bias4_5", fp->intervalCount, 2, &name.bias4_5);
-  bias6_7Uniform = AddUniform(uniformHandler, "bias6_7", fp->intervalCount, 3, &name.bias6_7);
-  bias8_9Uniform = AddUniform(uniformHandler, "bias8_9", fp->intervalCount, 4, &name.bias8_9);
-  bias10_11Uniform = AddUniform(uniformHandler, "bias10_11", fp->intervalCount, 5, &name.bias10_11);
-  bias12_13Uniform = AddUniform(uniformHandler, "bias12_13", fp->intervalCount, 6, &name.bias12_13);
-  bias14_15Uniform = AddUniform(uniformHandler, "bias14_15", fp->intervalCount, 7, &name.bias14_15);
-  thresholds1_7Uniform = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "thresholds1_7", &name.thresholds1_7);
-  thresholds9_13Uniform = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "thresholds9_13", &name.thresholds9_13);
+  UnrolledBinaryUniformName uniformNames = {};
+  uniformNames.scale0_1 = AddUniform(uniformHandler, "scale0_1", fp->intervalCount, 0);
+  uniformNames.scale2_3 = AddUniform(uniformHandler, "scale2_3", fp->intervalCount, 1);
+  uniformNames.scale4_5 = AddUniform(uniformHandler, "scale4_5", fp->intervalCount, 2);
+  uniformNames.scale6_7 = AddUniform(uniformHandler, "scale6_7", fp->intervalCount, 3);
+  uniformNames.scale8_9 = AddUniform(uniformHandler, "scale8_9", fp->intervalCount, 4);
+  uniformNames.scale10_11 = AddUniform(uniformHandler, "scale10_11", fp->intervalCount, 5);
+  uniformNames.scale12_13 = AddUniform(uniformHandler, "scale12_13", fp->intervalCount, 6);
+  uniformNames.scale14_15 = AddUniform(uniformHandler, "scale14_15", fp->intervalCount, 7);
+  uniformNames.bias0_1 = AddUniform(uniformHandler, "bias0_1", fp->intervalCount, 0);
+  uniformNames.bias2_3 = AddUniform(uniformHandler, "bias2_3", fp->intervalCount, 1);
+  uniformNames.bias4_5 = AddUniform(uniformHandler, "bias4_5", fp->intervalCount, 2);
+  uniformNames.bias6_7 = AddUniform(uniformHandler, "bias6_7", fp->intervalCount, 3);
+  uniformNames.bias8_9 = AddUniform(uniformHandler, "bias8_9", fp->intervalCount, 4);
+  uniformNames.bias10_11 = AddUniform(uniformHandler, "bias10_11", fp->intervalCount, 5);
+  uniformNames.bias12_13 = AddUniform(uniformHandler, "bias12_13", fp->intervalCount, 6);
+  uniformNames.bias14_15 = AddUniform(uniformHandler, "bias14_15", fp->intervalCount, 7);
+  uniformNames.thresholds1_7 = args.uniformHandler->addUniform(
+      ShaderFlags::Fragment, ShaderVar::Type::Float4, "thresholds1_7");
+  uniformNames.thresholds9_13 = args.uniformHandler->addUniform(
+      ShaderFlags::Fragment, ShaderVar::Type::Float4, "thresholds9_13");
 
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppend("vec4 scale, bias;");
@@ -179,13 +176,13 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) {
 
   if (fp->intervalCount >= 4) {
     fragBuilder->codeAppend("// thresholds1_7.w is mid-point for intervals (0,7) and (8,15)\n");
-    fragBuilder->codeAppendf("if (t < %s.w) {", name.thresholds1_7.c_str());
+    fragBuilder->codeAppendf("if (t < %s.w) {", uniformNames.thresholds1_7.c_str());
   }
-  AppendCode1(fragBuilder, fp->intervalCount, name);
+  AppendCode1(fragBuilder, fp->intervalCount, uniformNames);
   if (fp->intervalCount > 4) {
     fragBuilder->codeAppend("} else {");
   }
-  AppendCode2(fragBuilder, fp->intervalCount, name);
+  AppendCode2(fragBuilder, fp->intervalCount, uniformNames);
   if (fp->intervalCount >= 4) {
     fragBuilder->codeAppend("}");
   }
@@ -193,10 +190,10 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name,
-                    const UniformHandle& handle, const Color& current) {
-  if (handle.isValid()) {
-    uniformBuffer->setData(name, current.array());
+void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int intervalCount,
+                    int limit, const Color& value) {
+  if (intervalCount > limit) {
+    uniformBuffer->setData(name, value.array());
   }
 }
 
@@ -204,21 +201,21 @@ void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer,
                                                   const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const UnrolledBinaryGradientColorizer&>(fragmentProcessor);
   uniformBuffer->setData("scale0_1", fp.scale0_1.array());
-  SetUniformData(uniformBuffer, "scale2_3", scale2_3Uniform, fp.scale2_3);
-  SetUniformData(uniformBuffer, "scale4_5", scale4_5Uniform, fp.scale4_5);
-  SetUniformData(uniformBuffer, "scale6_7", scale6_7Uniform, fp.scale6_7);
-  SetUniformData(uniformBuffer, "scale8_9", scale8_9Uniform, fp.scale8_9);
-  SetUniformData(uniformBuffer, "scale10_11", scale10_11Uniform, fp.scale10_11);
-  SetUniformData(uniformBuffer, "scale12_13", scale12_13Uniform, fp.scale12_13);
-  SetUniformData(uniformBuffer, "scale14_15", scale14_15Uniform, fp.scale14_15);
+  SetUniformData(uniformBuffer, "scale2_3", fp.intervalCount, 0, fp.scale2_3);
+  SetUniformData(uniformBuffer, "scale4_5", fp.intervalCount, 1, fp.scale4_5);
+  SetUniformData(uniformBuffer, "scale6_7", fp.intervalCount, 2, fp.scale6_7);
+  SetUniformData(uniformBuffer, "scale8_9", fp.intervalCount, 3, fp.scale8_9);
+  SetUniformData(uniformBuffer, "scale10_11", fp.intervalCount, 5, fp.scale10_11);
+  SetUniformData(uniformBuffer, "scale12_13", fp.intervalCount, 6, fp.scale12_13);
+  SetUniformData(uniformBuffer, "scale14_15", fp.intervalCount, 7, fp.scale14_15);
   uniformBuffer->setData("bias0_1", fp.bias0_1.array());
-  SetUniformData(uniformBuffer, "bias2_3", bias2_3Uniform, fp.bias2_3);
-  SetUniformData(uniformBuffer, "bias4_5", bias4_5Uniform, fp.bias4_5);
-  SetUniformData(uniformBuffer, "bias6_7", bias6_7Uniform, fp.bias6_7);
-  SetUniformData(uniformBuffer, "bias8_9", bias8_9Uniform, fp.bias8_9);
-  SetUniformData(uniformBuffer, "bias10_11", bias10_11Uniform, fp.bias10_11);
-  SetUniformData(uniformBuffer, "bias12_13", bias12_13Uniform, fp.bias12_13);
-  SetUniformData(uniformBuffer, "bias14_15", bias14_15Uniform, fp.bias14_15);
+  SetUniformData(uniformBuffer, "bias2_3", fp.intervalCount, 0, fp.bias2_3);
+  SetUniformData(uniformBuffer, "bias4_5", fp.intervalCount, 1, fp.bias4_5);
+  SetUniformData(uniformBuffer, "bias6_7", fp.intervalCount, 2, fp.bias6_7);
+  SetUniformData(uniformBuffer, "bias8_9", fp.intervalCount, 3, fp.bias8_9);
+  SetUniformData(uniformBuffer, "bias10_11", fp.intervalCount, 5, fp.bias10_11);
+  SetUniformData(uniformBuffer, "bias12_13", fp.intervalCount, 6, fp.bias12_13);
+  SetUniformData(uniformBuffer, "bias14_15", fp.intervalCount, 7, fp.bias14_15);
   uniformBuffer->setData("thresholds1_7", reinterpret_cast<const float*>(&(fp.thresholds1_7)));
   uniformBuffer->setData("thresholds9_13", reinterpret_cast<const float*>(&(fp.thresholds9_13)));
 }

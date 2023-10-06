@@ -22,12 +22,10 @@
 namespace tgfx {
 void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
-  std::string blurOffsetName;
-  blurOffsetUniform = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float2, "Blur", &blurOffsetName);
-  std::string texelSizeName;
-  texelSizeUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                     "TexelSize", &texelSizeName);
+  auto blurOffsetName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "Blur");
+  auto texelSizeName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "TexelSize");
   std::string tempColor = "tempColor";
   const auto* fp = static_cast<const DualBlurFragmentProcessor*>(args.fragmentProcessor);
   if (fp->passMode == DualBlurPassMode::Down) {

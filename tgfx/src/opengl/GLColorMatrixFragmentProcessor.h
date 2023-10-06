@@ -29,8 +29,5 @@ class GLColorMatrixFragmentProcessor : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle matrixUniform;
-  UniformHandle vectorUniform;
 };
 }  // namespace tgfx

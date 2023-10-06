@@ -28,6 +28,12 @@ class GLTiledTextureEffect : public GLFragmentProcessor {
   void emitCode(EmitArgs& args) override;
 
  private:
+  struct UniformNames {
+    std::string subsetName;
+    std::string clampName;
+    std::string dimensionsName;
+  };
+
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
 
   static bool ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode m);
@@ -36,25 +42,20 @@ class GLTiledTextureEffect : public GLFragmentProcessor {
 
   static bool ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m);
 
-  void readColor(EmitArgs& args, const std::string& coord, const char* out);
+  void readColor(EmitArgs& args, const std::string& dimensionsName, const std::string& coord,
+                 const char* out);
 
-  void subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode, const char* coordSwizzle,
+  void subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode,
+                   const std::string& subsetName, const char* coordSwizzle,
                    const char* subsetStartSwizzle, const char* subsetStopSwizzle,
                    const char* extraCoord, const char* coordWeight);
 
-  void clampCoord(EmitArgs& args, bool clamp, const char* coordSwizzle,
-                  const char* clampStartSwizzle, const char* clampStopSwizzle);
+  void clampCoord(EmitArgs& args, bool clamp, const std::string& clampName,
+                  const char* coordSwizzle, const char* clampStartSwizzle,
+                  const char* clampStopSwizzle);
 
-  void clampCoord(EmitArgs& args, const bool useClamp[2]);
+  void clampCoord(EmitArgs& args, const bool useClamp[2], const std::string& clampName);
 
-  void initUniform(EmitArgs& args, const bool useSubset[2], const bool useClamp[2]);
-
-  UniformHandle dimensionsUniform;
-  UniformHandle subsetUniform;
-  UniformHandle clampUniform;
-
-  std::string subsetName;
-  std::string clampName;
-  std::string dimensionsName;
+  UniformNames initUniform(EmitArgs& args, const bool useSubset[2], const bool useClamp[2]);
 };
 }  // namespace tgfx

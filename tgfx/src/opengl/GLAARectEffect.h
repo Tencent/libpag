@@ -28,7 +28,5 @@ class GLAARectEffect : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle rectUniform;
 };
 }  // namespace tgfx

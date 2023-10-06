@@ -22,12 +22,10 @@
 namespace tgfx {
 void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
-  std::string startName;
-  startUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                 "start", &startName);
-  std::string endName;
-  endUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                               "end", &endName);
+  auto startName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "start");
+  auto endName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "end");
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppendf("%s = (1.0 - t) * %s + t * %s;", args.outputColor.c_str(),
                            startName.c_str(), endName.c_str());

@@ -41,12 +41,10 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
     fragBuilder->codeAppend("discard;");
     fragBuilder->codeAppend("}");
 
-    std::string dstTopLeftName;
-    std::string dstCoordScaleName;
-    dstTopLeftUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                   "DstTextureUpperLeft", &dstTopLeftName);
-    dstScaleUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                 "DstTextureCoordScale", &dstCoordScaleName);
+    auto dstTopLeftName = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
+                                                     "DstTextureUpperLeft");
+    auto dstCoordScaleName = uniformHandler->addUniform(
+        ShaderFlags::Fragment, ShaderVar::Type::Float2, "DstTextureCoordScale");
 
     fragBuilder->codeAppend("// Read color from copy of the destination.\n");
     std::string dstTexCoord = "_dstTexCoord";
@@ -71,20 +69,18 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
 void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const XferProcessor&,
                                         const Texture* dstTexture, const Point& dstTextureOffset) {
   if (dstTexture) {
-    if (dstTopLeftUniform.isValid()) {
-      uniformBuffer->setData("DstTextureUpperLeft", &dstTextureOffset);
-      int width;
-      int height;
-      if (dstTexture->getSampler()->type() == TextureType::Rectangle) {
-        width = 1;
-        height = 1;
-      } else {
-        width = dstTexture->width();
-        height = dstTexture->height();
-      }
-      float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
-      uniformBuffer->setData("DstTextureCoordScale", scales);
+    uniformBuffer->setData("DstTextureUpperLeft", &dstTextureOffset);
+    int width;
+    int height;
+    if (dstTexture->getSampler()->type() == TextureType::Rectangle) {
+      width = 1;
+      height = 1;
+    } else {
+      width = dstTexture->width();
+      height = dstTexture->height();
     }
+    float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+    uniformBuffer->setData("DstTextureCoordScale", scales);
   }
 }
 }  // namespace tgfx

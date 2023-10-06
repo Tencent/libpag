@@ -36,9 +36,8 @@ class GLUniformHandler : public UniformHandler {
   explicit GLUniformHandler(ProgramBuilder* program) : UniformHandler(program) {
   }
 
-  UniformHandle internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
-                                   const std::string& name, bool mangleName,
-                                   std::string* outName) override;
+  std::string internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
+                                 const std::string& name, bool mangleName) override;
 
   SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) override;
 

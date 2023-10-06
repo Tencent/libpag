@@ -23,13 +23,10 @@ namespace tgfx {
 void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
-  std::string deviceCoordMatrixName;
-  deviceCoordMatrixUniform =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float3x3,
-                                 "DeviceCoordMatrix", &deviceCoordMatrixName);
-  std::string scaleName;
-  scaleUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                            "CoordScale", &scaleName);
+  auto deviceCoordMatrixName = uniformHandler->addUniform(
+      ShaderFlags::Fragment, ShaderVar::Type::Float3x3, "DeviceCoordMatrix");
+  auto scaleName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "CoordScale");
   fragBuilder->codeAppendf("vec3 deviceCoord = %s * vec3(gl_FragCoord.xy * %s, 1.0);",
                            deviceCoordMatrixName.c_str(), scaleName.c_str());
   std::string coordName = "deviceCoord.xy";

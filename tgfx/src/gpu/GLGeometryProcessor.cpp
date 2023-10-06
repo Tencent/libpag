@@ -47,9 +47,8 @@ void GLGeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
   while (transformHandler->nextCoordTransform() != nullptr) {
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
-    std::string uniName;
-    uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, strUniName,
-                               &uniName);
+    auto uniName =
+        uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, strUniName);
     std::string strVaryingName = "TransformedCoords_";
     strVaryingName += std::to_string(i);
     ShaderVar::Type varyingType = ShaderVar::Type::Float2;

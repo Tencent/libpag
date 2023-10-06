@@ -29,8 +29,5 @@ class GLSingleIntervalGradientColorizer : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer*, const FragmentProcessor&) override;
-
-  UniformHandle startUniform;
-  UniformHandle endUniform;
 };
 }  // namespace tgfx

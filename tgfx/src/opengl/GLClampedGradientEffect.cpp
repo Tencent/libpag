@@ -23,12 +23,10 @@ namespace tgfx {
 void GLClampedGradientEffect::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   const auto* fp = static_cast<const ClampedGradientEffect*>(args.fragmentProcessor);
-  std::string leftBorderColorName;
-  leftBorderColorUniform = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "leftBorderColor", &leftBorderColorName);
-  std::string rightBorderColorName;
-  rightBorderColorUniform = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "rightBorderColor", &rightBorderColorName);
+  auto leftBorderColorName = args.uniformHandler->addUniform(
+      ShaderFlags::Fragment, ShaderVar::Type::Float4, "leftBorderColor");
+  auto rightBorderColorName = args.uniformHandler->addUniform(
+      ShaderFlags::Fragment, ShaderVar::Type::Float4, "rightBorderColor");
   std::string _child1 = "_child1";
   emitChild(fp->gradLayoutIndex, &_child1, args);
   fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());

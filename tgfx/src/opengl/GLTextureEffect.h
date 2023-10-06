@@ -28,7 +28,5 @@ class GLTextureEffect : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle alphaStartUniform;
 };
 }  // namespace tgfx

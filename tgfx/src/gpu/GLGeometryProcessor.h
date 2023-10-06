@@ -114,12 +114,5 @@ class GLGeometryProcessor {
   void emitTransforms(VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
                       UniformHandler* uniformHandler, const ShaderVar& localCoordsVar,
                       FPCoordTransformHandler* transformHandler);
-
- private:
-  struct TransformUniform {
-    UniformHandle handle = {};
-  };
-
-  std::vector<TransformUniform> installedTransforms;
 };
 }  // namespace tgfx

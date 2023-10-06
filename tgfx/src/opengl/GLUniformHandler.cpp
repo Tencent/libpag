@@ -20,9 +20,8 @@
 #include "GLProgramBuilder.h"
 
 namespace tgfx {
-UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
-                                                   const std::string& name, bool mangleName,
-                                                   std::string* outName) {
+std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
+                                                 const std::string& name, bool mangleName) {
   Uniform uniform;
   uniform.variable.setType(type);
   uniform.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
@@ -32,12 +31,9 @@ UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, Shade
   }
   uniform.variable.setName(programBuilder->nameVariable(prefix, name, mangleName));
   uniform.visibility = visibility;
-  UniformHandle handle(name, programBuilder->stageIndex());
-  uniforms[handle.toKey()] = uniform;
-  if (outName) {
-    *outName = uniform.variable.name();
-  }
-  return handle;
+  auto uniformKey = StagedUniformBuffer::GetMangledName(name, programBuilder->stageIndex());
+  uniforms[uniformKey] = uniform;
+  return uniform.variable.name();
 }
 
 SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const std::string& name) {

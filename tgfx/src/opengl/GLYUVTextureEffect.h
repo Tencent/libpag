@@ -29,8 +29,5 @@ class GLYUVTextureEffect : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer* uniformBuffer, const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle alphaStartUniform;
-  UniformHandle mat3ColorConversionUniform;
 };
 }  // namespace tgfx

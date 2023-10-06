@@ -23,12 +23,9 @@ namespace tgfx {
 void GLSweepGradientLayout::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
-  std::string biasName;
-  biasUniform =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Bias", &biasName);
-  std::string scaleName;
-  scaleUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Scale",
-                                            &scaleName);
+  auto biasName = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Bias");
+  auto scaleName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Scale");
   fragBuilder->codeAppendf("float angle = atan(-%s.y, -%s.x);",
                            (*args.transformedCoords)[0].name().c_str(),
                            (*args.transformedCoords)[0].name().c_str());

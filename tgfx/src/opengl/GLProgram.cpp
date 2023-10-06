@@ -22,14 +22,13 @@
 #include "gpu/Pipeline.h"
 
 namespace tgfx {
-GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles,
-                     unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
+GLProgram::GLProgram(Context* context, unsigned programID,
+                     std::unique_ptr<GLUniformBuffer> uniformBuffer,
                      std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
                      std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
                      std::vector<Attribute> attributes, int vertexStride)
     : Program(context),
-      builtinUniformHandles(builtinUniformHandles),
       programId(programID),
       uniformBuffer(std::move(uniformBuffer)),
       glGeometryProcessor(std::move(geometryProcessor)),

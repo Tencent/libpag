@@ -24,9 +24,8 @@ void GLAARectEffect::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
-  std::string rectName;
-  rectUniform =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Rect", &rectName);
+  auto rectName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Rect");
   fragBuilder->codeAppendf(
       "vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - %s), 0.0, 1.0);",
       rectName.c_str());

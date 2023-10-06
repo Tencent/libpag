@@ -42,24 +42,5 @@ class GLUnrolledBinaryGradientColorizer : public GLFragmentProcessor {
 
  private:
   void onSetData(UniformBuffer*, const FragmentProcessor&) override;
-
-  UniformHandle scale0_1Uniform;
-  UniformHandle scale2_3Uniform;
-  UniformHandle scale4_5Uniform;
-  UniformHandle scale6_7Uniform;
-  UniformHandle scale8_9Uniform;
-  UniformHandle scale10_11Uniform;
-  UniformHandle scale12_13Uniform;
-  UniformHandle scale14_15Uniform;
-  UniformHandle bias0_1Uniform;
-  UniformHandle bias2_3Uniform;
-  UniformHandle bias4_5Uniform;
-  UniformHandle bias6_7Uniform;
-  UniformHandle bias8_9Uniform;
-  UniformHandle bias10_11Uniform;
-  UniformHandle bias12_13Uniform;
-  UniformHandle bias14_15Uniform;
-  UniformHandle thresholds1_7Uniform;
-  UniformHandle thresholds9_13Uniform;
 };
 }  // namespace tgfx

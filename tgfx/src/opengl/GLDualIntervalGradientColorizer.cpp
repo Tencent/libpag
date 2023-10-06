@@ -22,21 +22,16 @@
 namespace tgfx {
 void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
-  std::string scale01Name;
-  scale01Uniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                   "scale01", &scale01Name);
-  std::string bias01Name;
-  bias01Uniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                  "bias01", &bias01Name);
-  std::string scale23Name;
-  scale23Uniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                   "scale23", &scale23Name);
-  std::string bias23Name;
-  bias23Uniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                  "bias23", &bias23Name);
-  std::string thresholdName;
-  thresholdUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float,
-                                                     "threshold", &thresholdName);
+  auto scale01Name =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "scale01");
+  auto bias01Name =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "bias01");
+  auto scale23Name =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "scale23");
+  auto bias23Name =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "bias23");
+  auto thresholdName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "threshold");
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppend("vec4 scale, bias;");
   fragBuilder->codeAppendf("if (t < %s) {", thresholdName.c_str());
