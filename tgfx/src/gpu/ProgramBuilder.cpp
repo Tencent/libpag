@@ -18,7 +18,6 @@
 
 #include "ProgramBuilder.h"
 #include "GLFragmentProcessor.h"
-#include "GLGeometryProcessor.h"
 #include "GLXferProcessor.h"
 
 namespace tgfx {
@@ -56,14 +55,11 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   vertexShaderBuilder()->codeAppendf("// Geometry Processor %s\n",
                                      geometryProcessor->name().c_str());
 
-  glGeometryProcessor = geometryProcessor->createGLInstance();
-
-  GLGeometryProcessor::FPCoordTransformHandler transformHandler(pipeline, &transformedCoordVars);
-  GLGeometryProcessor::EmitArgs args(
-      vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(), uniformHandler(),
-      getContext()->caps(), geometryProcessor, *outputColor, *outputCoverage, &transformHandler);
-  glGeometryProcessor->emitCode(args);
-
+  GeometryProcessor::FPCoordTransformHandler transformHandler(pipeline, &transformedCoordVars);
+  GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
+                                   uniformHandler(), getContext()->caps(), *outputColor,
+                                   *outputCoverage, &transformHandler);
+  geometryProcessor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
 }
 

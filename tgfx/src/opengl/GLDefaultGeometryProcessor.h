@@ -19,15 +19,16 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLGeometryProcessor.h"
+#include "gpu/DefaultGeometryProcessor.h"
 
 namespace tgfx {
-class GLDefaultGeometryProcessor : public GLGeometryProcessor {
+class GLDefaultGeometryProcessor : public DefaultGeometryProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLDefaultGeometryProcessor(Color color, int width, int height, const Matrix& viewMatrix,
+                             const Matrix& localMatrix);
 
- private:
-  void setData(UniformBuffer* uniformBuffer, const GeometryProcessor& geometryProcessor,
-               FPCoordTransformIter* transformIter) override;
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformBuffer* uniformBuffer, FPCoordTransformIter* transformIter) const override;
 };
 }  // namespace tgfx

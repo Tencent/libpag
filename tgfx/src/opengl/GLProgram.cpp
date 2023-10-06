@@ -24,14 +24,12 @@
 namespace tgfx {
 GLProgram::GLProgram(Context* context, unsigned programID,
                      std::unique_ptr<GLUniformBuffer> uniformBuffer,
-                     std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
                      std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
                      std::vector<Attribute> attributes, int vertexStride)
     : Program(context),
       programId(programID),
       uniformBuffer(std::move(uniformBuffer)),
-      glGeometryProcessor(std::move(geometryProcessor)),
       glXferProcessor(std::move(xferProcessor)),
       glFragmentProcessors(std::move(fragmentProcessors)),
       attributes(std::move(attributes)),
@@ -68,8 +66,8 @@ void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTar
   uniformBuffer->advanceStage();
   setRenderTargetState(renderTarget);
   FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
-  glGeometryProcessor->setData(uniformBuffer.get(), *pipeline->getGeometryProcessor(),
-                               &coordTransformIter);
+  auto gp = pipeline->getGeometryProcessor();
+  gp->setData(uniformBuffer.get(), &coordTransformIter);
   int nextTexSamplerIdx = 0;
   setFragmentData(pipeline, &nextTexSamplerIdx);
 

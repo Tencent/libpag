@@ -83,7 +83,6 @@ class ProgramBuilder {
 
   virtual bool checkSamplerCounts() = 0;
 
-  std::unique_ptr<GLGeometryProcessor> glGeometryProcessor;
   std::unique_ptr<GLXferProcessor> xferProcessor;
   std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors;
   int numFragmentSamplers = 0;

@@ -19,15 +19,22 @@
 #pragma once
 
 #include <vector>
+#include "FragmentShaderBuilder.h"
 #include "Processor.h"
 #include "ShaderVar.h"
+#include "VertexShaderBuilder.h"
+#include "gpu/FragmentProcessor.h"
 #include "gpu/TextureSampler.h"
+#include "gpu/UniformBuffer.h"
+#include "gpu/UniformHandler.h"
+#include "gpu/VaryingHandler.h"
 
 namespace tgfx {
-class GLGeometryProcessor;
-
 class GeometryProcessor : public Processor {
  public:
+  // Use only for easy-to-use aliases.
+  using FPCoordTransformIter = FragmentProcessor::CoordTransformIter;
+
   /**
    * Describes a vertex attribute.
    */
@@ -70,13 +77,82 @@ class GeometryProcessor : public Processor {
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
-  virtual std::unique_ptr<GLGeometryProcessor> createGLInstance() const = 0;
+  /**
+   * This class provides access to the CoordTransforms across all FragmentProcessors in a
+   * Pipeline. It is also used by the primitive processor to specify the fragment shader
+   * variable that will hold the transformed coords for each CoordTransform. It is required that
+   * the primitive processor iterate over each coord transform and insert a shader var result for
+   * each. The GLFragmentProcessors will reference these variables in their fragment code.
+   */
+  class FPCoordTransformHandler {
+   public:
+    FPCoordTransformHandler(const Pipeline* pipeline, std::vector<ShaderVar>* transformedCoordVars)
+        : iter(pipeline), transformedCoordVars(transformedCoordVars) {
+    }
+
+    const CoordTransform* nextCoordTransform() {
+      return iter.next();
+    }
+
+    // 'args' are constructor params to ShaderVar.
+    template <typename... Args>
+    void specifyCoordsForCurrCoordTransform(Args&&... args) {
+      transformedCoordVars->emplace_back(std::forward<Args>(args)...);
+    }
+
+   private:
+    FragmentProcessor::CoordTransformIter iter;
+    std::vector<ShaderVar>* transformedCoordVars;
+  };
+
+  struct EmitArgs {
+    EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
+             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
+             std::string outputColor, std::string outputCoverage,
+             FPCoordTransformHandler* transformHandler)
+        : vertBuilder(vertBuilder),
+          fragBuilder(fragBuilder),
+          varyingHandler(varyingHandler),
+          uniformHandler(uniformHandler),
+          caps(caps),
+          outputColor(std::move(outputColor)),
+          outputCoverage(std::move(outputCoverage)),
+          fpCoordTransformHandler(transformHandler) {
+    }
+    VertexShaderBuilder* vertBuilder;
+    FragmentShaderBuilder* fragBuilder;
+    VaryingHandler* varyingHandler;
+    UniformHandler* uniformHandler;
+    const Caps* caps;
+    const std::string outputColor;
+    const std::string outputCoverage;
+    FPCoordTransformHandler* fpCoordTransformHandler;
+  };
+
+  virtual void emitCode(EmitArgs&) const = 0;
+
+  virtual void setData(UniformBuffer* uniformBuffer,
+                       FPCoordTransformIter* coordTransformIter) const = 0;
 
  protected:
   explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
   }
 
   void setVertexAttributes(const Attribute* attrs, int attrCount);
+
+  /**
+   * A helper to upload coord transform matrices in setData().
+   */
+  void setTransformDataHelper(const Matrix& localMatrix, UniformBuffer* uniformBuffer,
+                              FPCoordTransformIter* transformIter) const;
+
+  /**
+   * Emit transformed local coords from the vertex shader as a uniform matrix and varying per
+   * coord-transform. localCoordsVar must be a 2-component vector.
+   */
+  void emitTransforms(VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
+                      UniformHandler* uniformHandler, const ShaderVar& localCoordsVar,
+                      FPCoordTransformHandler* transformHandler) const;
 
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {

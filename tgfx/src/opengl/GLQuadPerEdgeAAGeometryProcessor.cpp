@@ -20,44 +20,51 @@
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) {
-  const auto* geometryProcessor = static_cast<const QuadPerEdgeAAGeometryProcessor*>(args.gp);
+std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
+    int width, int height, AAType aa, bool hasColor) {
+  return std::unique_ptr<QuadPerEdgeAAGeometryProcessor>(
+      new GLQuadPerEdgeAAGeometryProcessor(width, height, aa, hasColor));
+}
+
+GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
+                                                                   bool hasColor)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, hasColor) {
+}
+
+void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto* vertBuilder = args.vertBuilder;
   auto* fragBuilder = args.fragBuilder;
   auto* varyingHandler = args.varyingHandler;
   auto* uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*geometryProcessor);
+  varyingHandler->emitAttributes(*this);
 
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler,
-                 geometryProcessor->localCoord.asShaderVar(), args.fpCoordTransformHandler);
+  emitTransforms(vertBuilder, varyingHandler, uniformHandler, localCoord.asShaderVar(),
+                 args.fpCoordTransformHandler);
 
-  if (geometryProcessor->aa == AAType::Coverage) {
+  if (aa == AAType::Coverage) {
     auto coverage = varyingHandler->addVarying("coverage", ShaderVar::Type::Float);
-    vertBuilder->codeAppendf("%s = %s.z;", coverage.vsOut().c_str(),
-                             geometryProcessor->position.name().c_str());
+    vertBuilder->codeAppendf("%s = %s.z;", coverage.vsOut().c_str(), position.name().c_str());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverage.fsIn().c_str());
   } else {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  if (geometryProcessor->color.isInitialized()) {
-    auto color = varyingHandler->addVarying("Color", ShaderVar::Type::Float4);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(),
-                             geometryProcessor->color.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+  if (color.isInitialized()) {
+    auto colorVar = varyingHandler->addVarying("Color", ShaderVar::Type::Float4);
+    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   } else {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(geometryProcessor->position.name());
+  args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
-                                               const GeometryProcessor&,
-                                               FPCoordTransformIter* transformIter) {
+                                               FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
 }
 }  // namespace tgfx

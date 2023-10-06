@@ -31,9 +31,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
     return "DefaultGeometryProcessor";
   }
 
-  std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   DefaultGeometryProcessor(Color color, int width, int height, const Matrix& viewMatrix,
@@ -47,7 +45,5 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   int height = 1;
   Matrix viewMatrix = Matrix::I();
   Matrix localMatrix = Matrix::I();
-
-  friend class GLDefaultGeometryProcessor;
 };
 }  // namespace tgfx
