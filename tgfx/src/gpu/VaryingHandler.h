@@ -37,12 +37,12 @@ class Varying {
   const std::string& name() const {
     return _name;
   }
-  ShaderVar::Type type() const {
+  SLType type() const {
     return _type;
   }
 
  private:
-  ShaderVar::Type _type = ShaderVar::Type::Void;
+  SLType _type = SLType::Void;
   std::string _name;
 
   friend class VaryingHandler;
@@ -55,7 +55,7 @@ class VaryingHandler {
 
   virtual ~VaryingHandler() = default;
 
-  Varying addVarying(const std::string& name, ShaderVar::Type type);
+  Varying addVarying(const std::string& name, SLType type);
 
   void emitAttributes(const GeometryProcessor& processor);
 

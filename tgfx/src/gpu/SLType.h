@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultGeometryProcessor.h"
+#pragma once
 
 namespace tgfx {
-DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height,
-                                                   const Matrix& viewMatrix,
-                                                   const Matrix& localMatrix)
-    : GeometryProcessor(ClassID()),
-      color(color),
-      width(width),
-      height(height),
-      viewMatrix(viewMatrix),
-      localMatrix(localMatrix) {
-  position = {"aPosition", SLType::Float2};
-  coverage = {"inCoverage", SLType::Float};
-  setVertexAttributes(&position, 2);
-}
+/**
+ * Types of shader-language-specific boxed variables we can create.
+ */
+enum class SLType {
+  Void,
+  Float,
+  Float2,
+  Float3,
+  Float4,
+  Float2x2,
+  Float3x3,
+  Float4x4,
+  Int,
+  Int2,
+  Int3,
+  Int4,
+  Texture2DSampler,
+  TextureExternalSampler,
+  Texture2DRectSampler,
+};
 }  // namespace tgfx

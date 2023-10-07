@@ -20,7 +20,7 @@
 #include "ProgramBuilder.h"
 
 namespace tgfx {
-Varying VaryingHandler::addVarying(const std::string& name, ShaderVar::Type type) {
+Varying VaryingHandler::addVarying(const std::string& name, SLType type) {
   Varying varying;
   varying._type = type;
   varying._name = programBuilder->nameVariable('v', name);

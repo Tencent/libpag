@@ -29,7 +29,7 @@ namespace tgfx {
 class GLProgram : public Program {
  public:
   struct Attribute {
-    ShaderVar::Type gpuType = ShaderVar::Type::Float;
+    SLType gpuType = SLType::Float;
     size_t offset = 0;
     int location = 0;
   };

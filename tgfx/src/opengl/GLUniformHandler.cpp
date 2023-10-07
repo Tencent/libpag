@@ -20,7 +20,7 @@
 #include "GLProgramBuilder.h"
 
 namespace tgfx {
-std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
+std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType type,
                                                  const std::string& name, bool mangleName) {
   Uniform uniform;
   uniform.variable.setType(type);
@@ -42,18 +42,18 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
   auto caps = GLCaps::Get(programBuilder->getContext());
   const auto& swizzle = caps->getReadSwizzle(sampler->format);
 
-  ShaderVar::Type type;
+  SLType type;
   switch (static_cast<const GLSampler*>(sampler)->target) {
     case GL_TEXTURE_EXTERNAL_OES:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           "GL_OES_EGL_image_external");
-      type = ShaderVar::Type::TextureExternalSampler;
+      type = SLType::TextureExternalSampler;
       break;
     case GL_TEXTURE_RECTANGLE:
-      type = ShaderVar::Type::Texture2DRectSampler;
+      type = SLType::Texture2DRectSampler;
       break;
     default:
-      type = ShaderVar::Type::Texture2DSampler;
+      type = SLType::Texture2DSampler;
       break;
   }
   Uniform samplerUniform;
@@ -101,23 +101,38 @@ std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
     std::optional<GLUniform::Type> type;
     auto& uniform = item.second;
     switch (uniform.variable.type()) {
-      case ShaderVar::Type::Float:
+      case SLType::Float:
         type = GLUniform::Type::Float;
         break;
-      case ShaderVar::Type::Float2:
+      case SLType::Float2:
         type = GLUniform::Type::Float2;
         break;
-      case ShaderVar::Type::Float3:
+      case SLType::Float3:
         type = GLUniform::Type::Float3;
         break;
-      case ShaderVar::Type::Float4:
+      case SLType::Float4:
         type = GLUniform::Type::Float4;
         break;
-      case ShaderVar::Type::Float3x3:
+      case SLType::Float2x2:
+        type = GLUniform::Type::Float2x2;
+        break;
+      case SLType::Float3x3:
         type = GLUniform::Type::Float3x3;
         break;
-      case ShaderVar::Type::Float4x4:
+      case SLType::Float4x4:
         type = GLUniform::Type::Float4x4;
+        break;
+      case SLType::Int:
+        type = GLUniform::Type::Int;
+        break;
+      case SLType::Int2:
+        type = GLUniform::Type::Int2;
+        break;
+      case SLType::Int3:
+        type = GLUniform::Type::Int3;
+        break;
+      case SLType::Int4:
+        type = GLUniform::Type::Int4;
         break;
       default:
         type = std::nullopt;

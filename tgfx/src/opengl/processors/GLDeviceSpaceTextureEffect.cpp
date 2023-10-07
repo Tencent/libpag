@@ -36,10 +36,9 @@ GLDeviceSpaceTextureEffect::GLDeviceSpaceTextureEffect(std::shared_ptr<Texture> 
 void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
-  auto deviceCoordMatrixName = uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float3x3, "DeviceCoordMatrix");
-  auto scaleName =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "CoordScale");
+  auto deviceCoordMatrixName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float3x3, "DeviceCoordMatrix");
+  auto scaleName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "CoordScale");
   fragBuilder->codeAppendf("vec3 deviceCoord = %s * vec3(gl_FragCoord.xy * %s, 1.0);",
                            deviceCoordMatrixName.c_str(), scaleName.c_str());
   std::string coordName = "deviceCoord.xy";

@@ -186,19 +186,17 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
   UniformNames names = {};
   auto* uniformHandler = args.uniformHandler;
   if (useSubset[0] || useSubset[1]) {
-    names.subsetName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Subset");
+    names.subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
   }
   if (useClamp[0] || useClamp[1]) {
-    names.clampName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Clamp");
+    names.clampName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Clamp");
   }
   bool unormCoordsRequiredForShaderMode =
       ShaderModeRequiresUnormCoord(shaderModeX) || ShaderModeRequiresUnormCoord(shaderModeY);
   bool sampleCoordsMustBeNormalized = texture->getSampler()->type() != TextureType::Rectangle;
   if (unormCoordsRequiredForShaderMode && sampleCoordsMustBeNormalized) {
     names.dimensionsName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "Dimension");
+        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
   }
   return names;
 }

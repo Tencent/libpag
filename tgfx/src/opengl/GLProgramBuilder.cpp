@@ -37,21 +37,26 @@ static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier 
   }
 }
 
-static constexpr std::pair<ShaderVar::Type, const char*> kSLTypes[] = {
-    {ShaderVar::Type::Void, "void"},
-    {ShaderVar::Type::Float, "float"},
-    {ShaderVar::Type::Float2, "vec2"},
-    {ShaderVar::Type::Float3, "vec3"},
-    {ShaderVar::Type::Float4, "vec4"},
-    {ShaderVar::Type::Float3x3, "mat3"},
-    {ShaderVar::Type::Float4x4, "mat4"},
-    {ShaderVar::Type::Texture2DRectSampler, "sampler2DRect"},
-    {ShaderVar::Type::TextureExternalSampler, "samplerExternalOES"},
-    {ShaderVar::Type::Texture2DSampler, "sampler2D"},
+static constexpr std::pair<SLType, const char*> SLTypes[] = {
+    {SLType::Void, "void"},
+    {SLType::Float, "float"},
+    {SLType::Float2, "vec2"},
+    {SLType::Float3, "vec3"},
+    {SLType::Float4, "vec4"},
+    {SLType::Float2x2, "mat2"},
+    {SLType::Float3x3, "mat3"},
+    {SLType::Float4x4, "mat4"},
+    {SLType::Int, "int"},
+    {SLType::Int2, "ivec2"},
+    {SLType::Int3, "ivec3"},
+    {SLType::Int4, "ivec4"},
+    {SLType::Texture2DRectSampler, "sampler2DRect"},
+    {SLType::TextureExternalSampler, "samplerExternalOES"},
+    {SLType::Texture2DSampler, "sampler2D"},
 };
 
-static std::string SLTypeString(ShaderVar::Type t) {
-  for (const auto& pair : kSLTypes) {
+static std::string SLTypeString(SLType t) {
+  for (const auto& pair : SLTypes) {
     if (pair.first == t) {
       return pair.second;
     }

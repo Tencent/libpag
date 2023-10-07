@@ -117,7 +117,7 @@ GLUnrolledBinaryGradientColorizer::GLUnrolledBinaryGradientColorizer(int interva
 std::string AddUniform(UniformHandler* uniformHandler, const std::string& name, int intervalCount,
                        int limit) {
   if (intervalCount > limit) {
-    return uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, name);
+    return uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, name);
   }
   return "";
 }
@@ -237,10 +237,10 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   uniformNames.bias10_11 = AddUniform(uniformHandler, "bias10_11", intervalCount, 5);
   uniformNames.bias12_13 = AddUniform(uniformHandler, "bias12_13", intervalCount, 6);
   uniformNames.bias14_15 = AddUniform(uniformHandler, "bias14_15", intervalCount, 7);
-  uniformNames.thresholds1_7 = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "thresholds1_7");
-  uniformNames.thresholds9_13 = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "thresholds9_13");
+  uniformNames.thresholds1_7 =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "thresholds1_7");
+  uniformNames.thresholds9_13 =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "thresholds9_13");
 
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppend("vec4 scale, bias;");

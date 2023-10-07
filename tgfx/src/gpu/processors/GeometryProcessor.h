@@ -41,8 +41,7 @@ class GeometryProcessor : public Processor {
   class Attribute {
    public:
     Attribute() = default;
-    Attribute(std::string name, ShaderVar::Type gpuType)
-        : _name(std::move(name)), _gpuType(gpuType) {
+    Attribute(std::string name, SLType gpuType) : _name(std::move(name)), _gpuType(gpuType) {
     }
 
     bool isInitialized() const {
@@ -52,7 +51,7 @@ class GeometryProcessor : public Processor {
     const std::string& name() const {
       return _name;
     }
-    ShaderVar::Type gpuType() const {
+    SLType gpuType() const {
       return _gpuType;
     }
 
@@ -68,7 +67,7 @@ class GeometryProcessor : public Processor {
 
    private:
     std::string _name;
-    ShaderVar::Type _gpuType = ShaderVar::Type::Float;
+    SLType _gpuType = SLType::Float;
   };
 
   const std::vector<const Attribute*>& vertexAttributes() const {

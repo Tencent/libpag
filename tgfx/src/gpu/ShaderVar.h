@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include "BitmaskOperators.h"
+#include "SLType.h"
 
 namespace tgfx {
 enum class ShaderFlags : unsigned {
@@ -32,19 +33,6 @@ enum class ShaderFlags : unsigned {
 
 class ShaderVar {
  public:
-  enum class Type {
-    Void,
-    Float,
-    Float2,
-    Float3,
-    Float4,
-    Float3x3,
-    Float4x4,
-    Texture2DSampler,
-    TextureExternalSampler,
-    Texture2DRectSampler,
-  };
-
   enum class TypeModifier {
     None,
     Attribute,
@@ -55,10 +43,10 @@ class ShaderVar {
 
   ShaderVar() = default;
 
-  ShaderVar(std::string name, Type type) : _type(type), _name(std::move(name)) {
+  ShaderVar(std::string name, SLType type) : _type(type), _name(std::move(name)) {
   }
 
-  ShaderVar(std::string name, Type type, TypeModifier typeModifier)
+  ShaderVar(std::string name, SLType type, TypeModifier typeModifier)
       : _type(type), _typeModifier(typeModifier), _name(std::move(name)) {
   }
 
@@ -70,11 +58,11 @@ class ShaderVar {
     return _name;
   }
 
-  void setType(Type type) {
+  void setType(SLType type) {
     _type = type;
   }
 
-  Type type() const {
+  SLType type() const {
     return _type;
   }
 
@@ -87,7 +75,7 @@ class ShaderVar {
   }
 
  private:
-  Type _type = Type::Void;
+  SLType _type = SLType::Void;
   TypeModifier _typeModifier = TypeModifier::None;
   std::string _name;
 };

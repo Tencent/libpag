@@ -31,9 +31,9 @@ GLColorMatrixFragmentProcessor::GLColorMatrixFragmentProcessor(const std::array<
 void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   auto matrixUniformName =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4x4, "Matrix");
+      uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4x4, "Matrix");
   auto vectorUniformName =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Vector");
+      uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Vector");
 
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",

@@ -42,7 +42,7 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
                  args.fpCoordTransformHandler);
 
   if (aa == AAType::Coverage) {
-    auto coverage = varyingHandler->addVarying("coverage", ShaderVar::Type::Float);
+    auto coverage = varyingHandler->addVarying("coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s.z;", coverage.vsOut().c_str(), position.name().c_str());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverage.fsIn().c_str());
@@ -51,7 +51,7 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   if (color.isInitialized()) {
-    auto colorVar = varyingHandler->addVarying("Color", ShaderVar::Type::Float4);
+    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   } else {
