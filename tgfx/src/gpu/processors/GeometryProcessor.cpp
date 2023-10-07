@@ -24,16 +24,24 @@ static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
 /**
  * Returns the size of the attrib type in bytes.
  */
-static constexpr size_t VertexAttribTypeSize(ShaderVar::Type type) {
+static constexpr size_t VertexAttribTypeSize(SLType type) {
   switch (type) {
-    case ShaderVar::Type::Float:
+    case SLType::Float:
       return sizeof(float);
-    case ShaderVar::Type::Float2:
+    case SLType::Float2:
       return 2 * sizeof(float);
-    case ShaderVar::Type::Float3:
+    case SLType::Float3:
       return 3 * sizeof(float);
-    case ShaderVar::Type::Float4:
+    case SLType::Float4:
       return 4 * sizeof(float);
+    case SLType::Int:
+      return sizeof(int32_t);
+    case SLType::Int2:
+      return 2 * sizeof(int32_t);
+    case SLType::Int3:
+      return 3 * sizeof(int32_t);
+    case SLType::Int4:
+      return 4 * sizeof(int32_t);
     default:
       return 0;
   }
@@ -90,11 +98,10 @@ void GeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
   while (transformHandler->nextCoordTransform() != nullptr) {
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
-    auto uniName =
-        uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, strUniName);
+    auto uniName = uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, strUniName);
     std::string strVaryingName = "TransformedCoords_";
     strVaryingName += std::to_string(i);
-    ShaderVar::Type varyingType = ShaderVar::Type::Float2;
+    SLType varyingType = SLType::Float2;
     auto varying = varyingHandler->addVarying(strVaryingName, varyingType);
 
     transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);

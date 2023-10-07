@@ -24,13 +24,13 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
                                                                bool hasColor)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa) {
   if (aa == AAType::Coverage) {
-    position = {"aPositionWithCoverage", ShaderVar::Type::Float3};
+    position = {"aPositionWithCoverage", SLType::Float3};
   } else {
-    position = {"aPosition", ShaderVar::Type::Float2};
+    position = {"aPosition", SLType::Float2};
   }
-  localCoord = {"localCoord", ShaderVar::Type::Float2};
+  localCoord = {"localCoord", SLType::Float2};
   if (hasColor) {
-    color = {"inColor", ShaderVar::Type::Float4};
+    color = {"inColor", SLType::Float4};
   }
   setVertexAttributes(&position, 3);
 }

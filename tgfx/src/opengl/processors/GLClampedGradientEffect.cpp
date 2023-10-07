@@ -37,10 +37,10 @@ GLClampedGradientEffect::GLClampedGradientEffect(std::unique_ptr<FragmentProcess
 
 void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  auto leftBorderColorName = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "leftBorderColor");
-  auto rightBorderColorName = args.uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float4, "rightBorderColor");
+  auto leftBorderColorName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "leftBorderColor");
+  auto rightBorderColorName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "rightBorderColor");
   std::string _child1 = "_child1";
   emitChild(gradLayoutIndex, &_child1, args);
   fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());

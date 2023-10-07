@@ -31,10 +31,8 @@ GLSingleIntervalGradientColorizer::GLSingleIntervalGradientColorizer(Color start
 
 void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  auto startName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "start");
-  auto endName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "end");
+  auto startName = args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "start");
+  auto endName = args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "end");
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppendf("%s = (1.0 - t) * %s + t * %s;", args.outputColor.c_str(),
                            startName.c_str(), endName.c_str());

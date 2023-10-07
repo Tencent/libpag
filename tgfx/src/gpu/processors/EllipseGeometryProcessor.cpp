@@ -27,14 +27,14 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
       localMatrix(localMatrix),
       stroke(stroke),
       useScale(useScale) {
-  inPosition = {"inPosition", ShaderVar::Type::Float2};
-  inColor = {"inColor", ShaderVar::Type::Float4};
+  inPosition = {"inPosition", SLType::Float2};
+  inColor = {"inColor", SLType::Float4};
   if (useScale) {
-    inEllipseOffset = {"inEllipseOffset", ShaderVar::Type::Float3};
+    inEllipseOffset = {"inEllipseOffset", SLType::Float3};
   } else {
-    inEllipseOffset = {"inEllipseOffset", ShaderVar::Type::Float2};
+    inEllipseOffset = {"inEllipseOffset", SLType::Float2};
   }
-  inEllipseRadii = {"inEllipseRadii", ShaderVar::Type::Float4};
+  inEllipseRadii = {"inEllipseRadii", SLType::Float4};
   this->setVertexAttributes(&inPosition, 4);
 }
 

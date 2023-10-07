@@ -40,7 +40,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   auto matrixName =
-      args.uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, "Matrix");
+      args.uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "Matrix");
   std::string positionName = "position";
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
@@ -48,13 +48,12 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
                  args.fpCoordTransformHandler);
 
-  auto coverageVar = varyingHandler->addVarying("Coverage", ShaderVar::Type::Float);
+  auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
   vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
   fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                            coverageVar.fsIn().c_str());
 
-  auto colorName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Color");
+  auto colorName = args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

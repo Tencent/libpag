@@ -31,9 +31,8 @@ GLSweepGradientLayout::GLSweepGradientLayout(Matrix matrix, float bias, float sc
 void GLSweepGradientLayout::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
-  auto biasName = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Bias");
-  auto scaleName =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Scale");
+  auto biasName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Bias");
+  auto scaleName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Scale");
   fragBuilder->codeAppendf("float angle = atan(-%s.y, -%s.x);",
                            (*args.transformedCoords)[0].name().c_str(),
                            (*args.transformedCoords)[0].name().c_str());

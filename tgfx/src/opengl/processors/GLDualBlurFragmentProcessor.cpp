@@ -38,9 +38,9 @@ GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(
 void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto blurOffsetName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "Blur");
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Blur");
   auto texelSizeName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "TexelSize");
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "TexelSize");
   std::string tempColor = "tempColor";
   if (passMode == DualBlurPassMode::Down) {
     fragBuilder->codeAppend("const int size = 5;");

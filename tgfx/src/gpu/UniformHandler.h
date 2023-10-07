@@ -38,7 +38,7 @@ class UniformHandler {
    * be accessible. At least one bit must be set. The actual uniform name will be mangled. Returns
    * the final uniform name.
    */
-  std::string addUniform(ShaderFlags visibility, ShaderVar::Type type, const std::string& name) {
+  std::string addUniform(ShaderFlags visibility, SLType type, const std::string& name) {
     bool mangle = name.find(NO_MANGLE_PREFIX) != 0;
     return internalAddUniform(visibility, type, name, mangle);
   }
@@ -57,7 +57,7 @@ class UniformHandler {
 
   virtual SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) = 0;
 
-  virtual std::string internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
+  virtual std::string internalAddUniform(ShaderFlags visibility, SLType type,
                                          const std::string& name, bool mangleName) = 0;
 
   virtual std::string getUniformDeclarations(ShaderFlags visibility) const = 0;

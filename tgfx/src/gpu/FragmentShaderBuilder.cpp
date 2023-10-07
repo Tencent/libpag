@@ -29,8 +29,7 @@ void FragmentShaderBuilder::onFinalize() {
 }
 
 void FragmentShaderBuilder::declareCustomOutputColor() {
-  outputs.emplace_back(CustomColorOutputName(), ShaderVar::Type::Float4,
-                       ShaderVar::TypeModifier::Out);
+  outputs.emplace_back(CustomColorOutputName(), SLType::Float4, ShaderVar::TypeModifier::Out);
 }
 
 void FragmentShaderBuilder::onBeforeChildProcEmitCode() {

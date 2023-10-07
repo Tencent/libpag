@@ -46,7 +46,7 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   nameExpression(outputColor, "outputColor");
   nameExpression(outputCoverage, "outputCoverage");
 
-  uniformHandler()->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float4, RTAdjustName);
+  uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
   auto geometryProcessor = pipeline->getGeometryProcessor();
   // Enclose custom code in a block to avoid namespace conflicts
   fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,

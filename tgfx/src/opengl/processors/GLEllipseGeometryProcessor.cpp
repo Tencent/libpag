@@ -38,17 +38,17 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // emit attributes
   varyingHandler->emitAttributes(*this);
 
-  auto offsetType = useScale ? ShaderVar::Type::Float3 : ShaderVar::Type::Float2;
+  auto offsetType = useScale ? SLType::Float3 : SLType::Float2;
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", offsetType);
   vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
                            inEllipseOffset.name().c_str());
 
-  auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", ShaderVar::Type::Float4);
+  auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
 
   auto* fragBuilder = args.fragBuilder;
   // setup pass through color
-  auto color = varyingHandler->addVarying("Color", ShaderVar::Type::Float4);
+  auto color = varyingHandler->addVarying("Color", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
 

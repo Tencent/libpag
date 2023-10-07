@@ -61,7 +61,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "alphaStart");
+        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "alphaStart");
     std::string alphaVertexColor = "alphaVertexColor";
     fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), vertexColor.c_str(),
                              alphaStartName.c_str());
