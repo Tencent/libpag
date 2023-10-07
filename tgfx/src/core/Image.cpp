@@ -18,8 +18,8 @@
 
 #include "tgfx/core/Image.h"
 #include "gpu/Texture.h"
-#include "gpu/TextureEffect.h"
-#include "gpu/TiledTextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "images/ImageSource.h"
 #include "images/RGBAAAImage.h"
 #include "images/RasterBuffer.h"

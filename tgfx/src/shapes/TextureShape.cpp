@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureShape.h"
-#include "gpu/TextureEffect.h"
 #include "gpu/ops/FillRectOp.h"
+#include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {

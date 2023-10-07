@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/FragmentProcessor.h"
 #include "gpu/ops/OpsTask.h"
+#include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Surface.h"

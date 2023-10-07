@@ -19,8 +19,8 @@
 #include "FillRectOp.h"
 #include "gpu/Gpu.h"
 #include "gpu/Quad.h"
-#include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/ResourceProvider.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {

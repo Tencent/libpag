@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LocalMatrixShader.h"
-#include "gpu/FragmentProcessor.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::makeWithLocalMatrix(const Matrix& matrix, bool isPre) const {

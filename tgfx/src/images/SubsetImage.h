@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/FragmentProcessor.h"
+#include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {

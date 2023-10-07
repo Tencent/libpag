@@ -19,11 +19,11 @@
 #pragma once
 
 #include "FragmentShaderBuilder.h"
-#include "GeometryProcessor.h"
 #include "Pipeline.h"
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
+#include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
 class ProgramBuilder {

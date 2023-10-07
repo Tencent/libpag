@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramBuilder.h"
-#include "FragmentProcessor.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
 ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)

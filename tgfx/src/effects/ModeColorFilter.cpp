@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModeColorFilter.h"
-#include "gpu/ConstColorProcessor.h"
-#include "gpu/XfermodeFragmentProcessor.h"
+#include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 static bool IsNoOps(float alpha, BlendMode mode) {

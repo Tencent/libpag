@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "EmptyXferProcessor.h"
 #include "Swizzle.h"
 #include "gpu/Blend.h"
-#include "gpu/FragmentProcessor.h"
-#include "gpu/GeometryProcessor.h"
+#include "gpu/processors/EmptyXferProcessor.h"
+#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
 /**

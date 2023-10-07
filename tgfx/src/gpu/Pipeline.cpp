@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
-#include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/TextureSampler.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,

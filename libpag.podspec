@@ -59,6 +59,7 @@ Pod::Spec.new do |s|
                     'tgfx/src/vectors/*.{h,cpp}',
                     'tgfx/src/gpu/**/*.{h,cpp}',
                     'tgfx/src/opengl/*.{h,cpp,mm}',
+                    'tgfx/src/opengl/processors/**/*.{h,cpp}',
                     'tgfx/src/platform/*.{h,cpp}',
                     'tgfx/src/codecs/webp/**/*.{h,cpp,mm}'
 
@@ -99,7 +100,7 @@ Pod::Spec.new do |s|
 
   armv7CFlags = commonCFlags + ["-fno-aligned-allocation"]
   s.xcconfig = {'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17','CLANG_CXX_LIBRARY' => 'libc++',"HEADER_SEARCH_PATHS" => "#{PAG_ROOT}/src #{PAG_ROOT}/include #{PAG_ROOT}/tgfx/src #{PAG_ROOT}/tgfx/include #{PAG_ROOT}/third_party/pathkit #{PAG_ROOT}/third_party/skcms #{PAG_ROOT}/third_party/freetype/include #{PAG_ROOT}/third_party/libwebp/src #{PAG_ROOT}/third_party/libavc/common #{PAG_ROOT}/third_party/libavc/decoder"}
-  s.ios.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" "),"OTHER_CFLAGS[sdk=iphoneos*][arch=armv7]" => armv7CFlags.join(" "),"EXPORTED_SYMBOLS_FILE" => "${PODS_ROOT}/../libpag.lds","OTHER_LDFLAGS" => "-w","VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS" => "OpenGLES"}
+  s.ios.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" "),"OTHER_CFLAGS[sdk=iphoneos*][arch=armv7]" => armv7CFlags.join(" "),"EXPORTED_SYMBOLS_FILE" => "${PODS_ROOT}/../libpag.lds","OTHER_LDFLAGS" => "-w -ld64","VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS" => "OpenGLES"}
   s.osx.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" ")}
   s.ios.vendored_frameworks = 'ios/Pods/pag-vendor/libpag-vendor.xcframework'
   s.osx.vendored_frameworks = 'mac/Pods/pag-vendor/libpag-vendor.xcframework'

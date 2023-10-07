@@ -20,11 +20,11 @@
 
 #include <optional>
 #include "Blend.h"
-#include "GeometryProcessor.h"
 #include "GpuBuffer.h"
 #include "Pipeline.h"
 #include "Program.h"
 #include "gpu/RenderTarget.h"
+#include "gpu/processors/GeometryProcessor.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
