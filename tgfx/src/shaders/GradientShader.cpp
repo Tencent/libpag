@@ -18,14 +18,14 @@
 
 #include "GradientShader.h"
 #include "gpu/ResourceProvider.h"
-#include "gpu/gradients/ClampedGradientEffect.h"
-#include "gpu/gradients/DualIntervalGradientColorizer.h"
-#include "gpu/gradients/LinearGradientLayout.h"
-#include "gpu/gradients/RadialGradientLayout.h"
-#include "gpu/gradients/SingleIntervalGradientColorizer.h"
-#include "gpu/gradients/SweepGradientLayout.h"
-#include "gpu/gradients/TextureGradientColorizer.h"
-#include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
+#include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/DualIntervalGradientColorizer.h"
+#include "gpu/processors/LinearGradientLayout.h"
+#include "gpu/processors/RadialGradientLayout.h"
+#include "gpu/processors/SingleIntervalGradientColorizer.h"
+#include "gpu/processors/SweepGradientLayout.h"
+#include "gpu/processors/TextureGradientColorizer.h"
+#include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {

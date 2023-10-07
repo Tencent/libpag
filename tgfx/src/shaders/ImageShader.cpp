@@ -18,7 +18,7 @@
 
 #include "ImageShader.h"
 #include "gpu/TextureSampler.h"
-#include "gpu/TiledTextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "images/ImageSource.h"
 
 namespace tgfx {

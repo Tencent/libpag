@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {

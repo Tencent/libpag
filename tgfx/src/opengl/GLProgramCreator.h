@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "gpu/GeometryProcessor.h"
 #include "gpu/Pipeline.h"
 #include "gpu/Program.h"
+#include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
 class GLProgramCreator : public ProgramCreator {

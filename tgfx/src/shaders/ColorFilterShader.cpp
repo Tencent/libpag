@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorFilterShader.h"
-#include "gpu/FragmentProcessor.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::makeWithColorFilter(

@@ -124,7 +124,7 @@ std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
         break;
     }
     if (type.has_value()) {
-      glUniforms.push_back({item.first, type.value(), uniform.location});
+      glUniforms.push_back({item.first, *type, uniform.location});
     }
   }
   return std::make_unique<GLUniformBuffer>(glUniforms);

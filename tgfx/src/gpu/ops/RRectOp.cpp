@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectOp.h"
-#include "gpu/EllipseGeometryProcessor.h"
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
+#include "gpu/processors/EllipseGeometryProcessor.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {

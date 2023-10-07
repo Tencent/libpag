@@ -18,8 +18,8 @@
 
 #include "TriangulatingPathOp.h"
 #include "core/PathRef.h"
-#include "gpu/DefaultGeometryProcessor.h"
 #include "gpu/Gpu.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 
 namespace tgfx {
 std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(Color color, const Path& path,

@@ -18,7 +18,7 @@
 
 #include "RGBAAAImage.h"
 #include "ImageSource.h"
-#include "gpu/TextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 RGBAAAImage::RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
