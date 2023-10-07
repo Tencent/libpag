@@ -23,8 +23,7 @@
 namespace tgfx {
 class EmptyXferProcessor : public XferProcessor {
  public:
-  EmptyXferProcessor() : XferProcessor(ClassID()) {
-  }
+  static const EmptyXferProcessor* GetInstance();
 
   std::string name() const override {
     return "EmptyXferProcessor";
@@ -32,7 +31,9 @@ class EmptyXferProcessor : public XferProcessor {
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
-  std::unique_ptr<GLXferProcessor> createGLInstance() const override;
+ protected:
+  EmptyXferProcessor() : XferProcessor(ClassID()) {
+  }
 
  private:
   DEFINE_PROCESSOR_CLASS_ID

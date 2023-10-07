@@ -19,21 +19,18 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/DualBlurFragmentProcessor.h"
 
 namespace tgfx {
-class GLDualBlurFragmentProcessor : public GLFragmentProcessor {
+class GLDualBlurFragmentProcessor : public DualBlurFragmentProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLDualBlurFragmentProcessor(DualBlurPassMode passMode,
+                              std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
+                              Point texelSize);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle blurOffsetUniform;
-  UniformHandle texelSizeUniform;
-
-  std::optional<Point> blurOffsetPrev;
-  std::optional<Point> texelSizePrev;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

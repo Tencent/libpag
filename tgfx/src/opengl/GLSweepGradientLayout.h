@@ -19,20 +19,16 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/SweepGradientLayout.h"
 
 namespace tgfx {
-class GLSweepGradientLayout : public GLFragmentProcessor {
+class GLSweepGradientLayout : public SweepGradientLayout {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLSweepGradientLayout(Matrix matrix, float bias, float scale);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
-
-  UniformHandle biasUniform;
-  UniformHandle scaleUniform;
-
-  std::optional<float> biasPrev;
-  std::optional<float> scalePrev;
+  void onSetData(UniformBuffer*) const override;
 };
 }  // namespace tgfx

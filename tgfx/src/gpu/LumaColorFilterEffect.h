@@ -23,18 +23,15 @@
 namespace tgfx {
 class LumaColorFilterEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<LumaColorFilterEffect> Make() {
-    return std::make_unique<LumaColorFilterEffect>();
-  }
-
-  LumaColorFilterEffect() : FragmentProcessor(ClassID()) {
-  }
+  static std::unique_ptr<LumaColorFilterEffect> Make();
 
   std::string name() const override {
     return "LumaColorFilterEffect";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+ protected:
+  LumaColorFilterEffect() : FragmentProcessor(ClassID()) {
+  }
 
  private:
   DEFINE_PROCESSOR_CLASS_ID

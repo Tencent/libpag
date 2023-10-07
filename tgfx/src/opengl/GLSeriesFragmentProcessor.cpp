@@ -19,7 +19,23 @@
 #include "GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
-void GLSeriesFragmentProcessor::emitCode(EmitArgs& args) {
+std::unique_ptr<FragmentProcessor> SeriesFragmentProcessor::Make(
+    std::unique_ptr<FragmentProcessor>* children, int count) {
+  if (!count) {
+    return nullptr;
+  }
+  if (1 == count) {
+    return std::move(children[0]);
+  }
+  return std::unique_ptr<FragmentProcessor>(new GLSeriesFragmentProcessor(children, count));
+}
+
+GLSeriesFragmentProcessor::GLSeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
+                                                     int count)
+    : SeriesFragmentProcessor(children, count) {
+}
+
+void GLSeriesFragmentProcessor::emitCode(EmitArgs& args) const {
   // First guy's input might be nil.
   std::string temp = "out0";
   emitChild(0, args.inputColor, &temp, args);

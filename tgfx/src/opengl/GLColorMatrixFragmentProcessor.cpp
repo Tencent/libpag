@@ -20,14 +20,21 @@
 #include "gpu/ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) {
+std::unique_ptr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
+    const std::array<float, 20>& matrix) {
+  return std::unique_ptr<ColorMatrixFragmentProcessor>(new GLColorMatrixFragmentProcessor(matrix));
+}
+
+GLColorMatrixFragmentProcessor::GLColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
+    : ColorMatrixFragmentProcessor(matrix) {
+}
+
+void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
-  std::string matrixUniformName;
-  matrixUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4x4,
-                                             "Matrix", &matrixUniformName);
-  std::string vectorUniformName;
-  vectorUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                             "Vector", &vectorUniformName);
+  auto matrixUniformName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4x4, "Matrix");
+  auto vectorUniformName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Vector");
 
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
@@ -41,24 +48,18 @@ void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
 }
 
-void GLColorMatrixFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
-                                               const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const ColorMatrixFragmentProcessor&>(fragmentProcessor);
-  if (matrixPrev != fp.matrix) {
-    matrixPrev = fp.matrix;
-    float matrix[] = {
-        fp.matrix[0],  fp.matrix[5],  fp.matrix[10], fp.matrix[15], fp.matrix[1],  fp.matrix[6],
-        fp.matrix[11], fp.matrix[16], fp.matrix[2],  fp.matrix[7],  fp.matrix[12], fp.matrix[17],
-        fp.matrix[3],  fp.matrix[8],  fp.matrix[13], fp.matrix[18],
-    };
-    float vec[] = {
-        fp.matrix[4],
-        fp.matrix[9],
-        fp.matrix[14],
-        fp.matrix[19],
-    };
-    programDataManager.setMatrix4f(matrixUniform, matrix);
-    programDataManager.set4fv(vectorUniform, 1, vec);
-  }
+void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+  float m[] = {
+      matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
+      matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],
+  };
+  float vec[] = {
+      matrix[4],
+      matrix[9],
+      matrix[14],
+      matrix[19],
+  };
+  uniformBuffer->setData("Matrix", m);
+  uniformBuffer->setData("Vector", vec);
 }
 }  // namespace tgfx

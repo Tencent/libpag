@@ -28,15 +28,13 @@ class YUVTextureEffect : public FragmentProcessor {
     return "YUVTextureEffect";
   }
 
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   YUVTextureEffect(std::shared_ptr<YUVTexture> texture, SamplingOptions sampling,
                    const Point& alphaStart, const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
   const TextureSampler* onTextureSampler(size_t index) const override {
     return texture->getSamplerAt(index);
@@ -54,7 +52,5 @@ class YUVTextureEffect : public FragmentProcessor {
   CoordTransform coordTransform;
 
   friend class TextureEffect;
-
-  friend class GLYUVTextureEffect;
 };
 }  // namespace tgfx

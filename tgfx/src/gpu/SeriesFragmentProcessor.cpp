@@ -17,29 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SeriesFragmentProcessor.h"
-#include "opengl/GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> SeriesFragmentProcessor::Make(
-    std::unique_ptr<FragmentProcessor>* children, int count) {
-  if (!count) {
-    return nullptr;
-  }
-  if (1 == count) {
-    return std::move(children[0]);
-  }
-  return std::unique_ptr<FragmentProcessor>(new SeriesFragmentProcessor(children, count));
-}
-
 SeriesFragmentProcessor::SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
                                                  int count)
     : FragmentProcessor(ClassID()) {
   for (int i = 0; i < count; ++i) {
     registerChildProcessor(std::move(children[i]));
   }
-}
-
-std::unique_ptr<GLFragmentProcessor> SeriesFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLSeriesFragmentProcessor>();
 }
 }  // namespace tgfx

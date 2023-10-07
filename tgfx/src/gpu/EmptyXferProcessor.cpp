@@ -17,14 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EmptyXferProcessor.h"
-#include "opengl/GLEmptyXferProcessor.h"
 
 namespace tgfx {
 void EmptyXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
-}
-
-std::unique_ptr<GLXferProcessor> EmptyXferProcessor::createGLInstance() const {
-  return std::make_unique<GLEmptyXferProcessor>();
 }
 }  // namespace tgfx

@@ -19,7 +19,14 @@
 #include "GLLinearGradientLayout.h"
 
 namespace tgfx {
-void GLLinearGradientLayout::emitCode(EmitArgs& args) {
+std::unique_ptr<LinearGradientLayout> LinearGradientLayout::Make(Matrix matrix) {
+  return std::unique_ptr<LinearGradientLayout>(new GLLinearGradientLayout(matrix));
+}
+
+GLLinearGradientLayout::GLLinearGradientLayout(Matrix matrix) : LinearGradientLayout(matrix) {
+}
+
+void GLLinearGradientLayout::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("float t = %s.x + 1.0000000000000001e-05;",
                            (*args.transformedCoords)[0].name().c_str());

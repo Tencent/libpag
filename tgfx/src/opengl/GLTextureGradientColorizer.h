@@ -18,11 +18,13 @@
 
 #pragma once
 
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/TextureGradientColorizer.h"
 
 namespace tgfx {
-class GLTextureGradientColorizer : public GLFragmentProcessor {
+class GLTextureGradientColorizer : public TextureGradientColorizer {
  public:
-  void emitCode(EmitArgs& args) override;
+  explicit GLTextureGradientColorizer(std::shared_ptr<Texture> gradient);
+
+  void emitCode(EmitArgs& args) const override;
 };
 }  // namespace tgfx

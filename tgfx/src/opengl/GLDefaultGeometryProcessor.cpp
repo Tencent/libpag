@@ -20,52 +20,52 @@
 #include "gpu/DefaultGeometryProcessor.h"
 
 namespace tgfx {
-void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
-  const auto* geometryProcessor = static_cast<const DefaultGeometryProcessor*>(args.gp);
+std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
+    Color color, int width, int height, const Matrix& viewMatrix, const Matrix& localMatrix) {
+  return std::unique_ptr<DefaultGeometryProcessor>(
+      new GLDefaultGeometryProcessor(color, width, height, viewMatrix, localMatrix));
+}
+
+GLDefaultGeometryProcessor::GLDefaultGeometryProcessor(Color color, int width, int height,
+                                                       const Matrix& viewMatrix,
+                                                       const Matrix& localMatrix)
+    : DefaultGeometryProcessor(color, width, height, viewMatrix, localMatrix) {
+}
+
+void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   auto* vertBuilder = args.vertBuilder;
   auto* fragBuilder = args.fragBuilder;
   auto* varyingHandler = args.varyingHandler;
   auto* uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*geometryProcessor);
+  varyingHandler->emitAttributes(*this);
 
-  std::string matrixName;
-  matrixUniform = args.uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3,
-                                                  "Matrix", &matrixName);
-  std::string position = "position";
-  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", position.c_str(),
-                           matrixName.c_str(), geometryProcessor->position.name().c_str());
+  auto matrixName =
+      args.uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, "Matrix");
+  std::string positionName = "position";
+  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
+                           matrixName.c_str(), position.name().c_str());
 
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler,
-                 geometryProcessor->position.asShaderVar(), args.fpCoordTransformHandler);
+  emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
+                 args.fpCoordTransformHandler);
 
-  auto coverage = varyingHandler->addVarying("Coverage", ShaderVar::Type::Float);
-  vertBuilder->codeAppendf("%s = %s;", coverage.vsOut().c_str(),
-                           geometryProcessor->coverage.name().c_str());
-  fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverage.fsIn().c_str());
+  auto coverageVar = varyingHandler->addVarying("Coverage", ShaderVar::Type::Float);
+  vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+  fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                           coverageVar.fsIn().c_str());
 
-  std::string colorName;
-  colorUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                 "Color", &colorName);
+  auto colorName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "Color");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position);
+  args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
-void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataManager,
-                                         const GeometryProcessor& geometryProcessor,
-                                         FPCoordTransformIter* transformIter) {
-  const auto& gp = static_cast<const DefaultGeometryProcessor&>(geometryProcessor);
-  setTransformDataHelper(gp.localMatrix, programDataManager, transformIter);
-  if (colorPrev != gp.color) {
-    colorPrev = gp.color;
-    programDataManager.set4f(colorUniform, gp.color.red, gp.color.green, gp.color.blue,
-                             gp.color.alpha);
-  }
-  if (viewMatrixPrev != gp.viewMatrix) {
-    viewMatrixPrev = gp.viewMatrix;
-    programDataManager.setMatrix(matrixUniform, gp.viewMatrix);
-  }
+void GLDefaultGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+                                         FPCoordTransformIter* transformIter) const {
+  setTransformDataHelper(localMatrix, uniformBuffer, transformIter);
+  uniformBuffer->setData("Color", color.array());
+  uniformBuffer->setMatrix("Matrix", viewMatrix);
 }
 }  // namespace tgfx

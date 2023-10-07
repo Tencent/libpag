@@ -31,9 +31,7 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
     return "DualIntervalGradientColorizer";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   DualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
@@ -53,7 +51,5 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
   Color scale23;
   Color bias23;
   float threshold;
-
-  friend class GLDualIntervalGradientColorizer;
 };
 }  // namespace tgfx

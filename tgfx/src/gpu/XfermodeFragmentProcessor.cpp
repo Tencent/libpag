@@ -18,7 +18,6 @@
 
 #include "gpu/XfermodeFragmentProcessor.h"
 #include "gpu/ConstColorProcessor.h"
-#include "opengl/GLXfermodeFragmentProcessor.h"
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(
@@ -29,25 +28,6 @@ std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcess
 std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromDstProcessor(
     std::unique_ptr<FragmentProcessor> dst, BlendMode mode) {
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(nullptr, std::move(dst), mode);
-}
-
-std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
-    std::unique_ptr<FragmentProcessor> src, std::unique_ptr<FragmentProcessor> dst,
-    BlendMode mode) {
-  if (src == nullptr && dst == nullptr) {
-    return nullptr;
-  }
-  switch (mode) {
-    case BlendMode::Clear:
-      return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
-    case BlendMode::Src:
-      return src;
-    case BlendMode::Dst:
-      return dst;
-    default:
-      return std::unique_ptr<XfermodeFragmentProcessor>(
-          new XfermodeFragmentProcessor(std::move(src), std::move(dst), mode));
-  }
 }
 
 std::string XfermodeFragmentProcessor::name() const {
@@ -85,9 +65,5 @@ void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const 
 bool XfermodeFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const XfermodeFragmentProcessor&>(processor);
   return mode == that.mode && child == that.child;
-}
-
-std::unique_ptr<GLFragmentProcessor> XfermodeFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLXfermodeFragmentProcessor>();
 }
 }  // namespace tgfx

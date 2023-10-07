@@ -38,9 +38,7 @@ class EllipseGeometryProcessor : public GeometryProcessor {
     return "EllipseGeometryProcessor";
   }
 
-  std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   EllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
@@ -59,7 +57,5 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   Matrix localMatrix;
   bool stroke;
   bool useScale;
-
-  friend class GLEllipseGeometryProcessor;
 };
 }  // namespace tgfx

@@ -20,20 +20,16 @@
 
 #include <array>
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-class GLColorMatrixFragmentProcessor : public GLFragmentProcessor {
+class GLColorMatrixFragmentProcessor : public ColorMatrixFragmentProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  explicit GLColorMatrixFragmentProcessor(const std::array<float, 20>& matrix);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle matrixUniform;
-  UniformHandle vectorUniform;
-
-  std::optional<std::array<float, 20>> matrixPrev;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

@@ -19,15 +19,15 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLGeometryProcessor.h"
+#include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
+class GLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, bool hasColor);
 
-  void setData(const ProgramDataManager& programDataManager,
-               const GeometryProcessor& geometryProcessor,
-               FPCoordTransformIter* transformIter) override;
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformBuffer* uniformBuffer, FPCoordTransformIter* transformIter) const override;
 };
 }  // namespace tgfx

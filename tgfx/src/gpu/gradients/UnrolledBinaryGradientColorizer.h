@@ -34,9 +34,7 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   UnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
@@ -84,7 +82,5 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   Color bias14_15;
   Rect thresholds1_7;
   Rect thresholds9_13;
-
-  friend class GLUnrolledBinaryGradientColorizer;
 };
 }  // namespace tgfx

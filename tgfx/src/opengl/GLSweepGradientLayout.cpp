@@ -20,15 +20,21 @@
 #include "gpu/gradients/SweepGradientLayout.h"
 
 namespace tgfx {
-void GLSweepGradientLayout::emitCode(EmitArgs& args) {
+std::unique_ptr<SweepGradientLayout> SweepGradientLayout::Make(Matrix matrix, float bias,
+                                                               float scale) {
+  return std::unique_ptr<SweepGradientLayout>(new GLSweepGradientLayout(matrix, bias, scale));
+}
+
+GLSweepGradientLayout::GLSweepGradientLayout(Matrix matrix, float bias, float scale)
+    : SweepGradientLayout(matrix, bias, scale) {
+}
+
+void GLSweepGradientLayout::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
-  std::string biasName;
-  biasUniform =
-      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Bias", &biasName);
-  std::string scaleName;
-  scaleUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Scale",
-                                            &scaleName);
+  auto biasName = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Bias");
+  auto scaleName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Scale");
   fragBuilder->codeAppendf("float angle = atan(-%s.y, -%s.x);",
                            (*args.transformedCoords)[0].name().c_str(),
                            (*args.transformedCoords)[0].name().c_str());
@@ -37,15 +43,8 @@ void GLSweepGradientLayout::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 
-void GLSweepGradientLayout::onSetData(const ProgramDataManager& programDataManager,
-                                      const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const SweepGradientLayout&>(fragmentProcessor);
-  if (fp.bias != biasPrev) {
-    biasPrev = fp.bias;
-    programDataManager.set1f(biasUniform, fp.bias);
-  }
-  if (fp.scale != scalePrev) {
-    programDataManager.set1f(scaleUniform, fp.scale);
-  }
+void GLSweepGradientLayout::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("Bias", &bias);
+  uniformBuffer->setData("Scale", &scale);
 }
 }  // namespace tgfx

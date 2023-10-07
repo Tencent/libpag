@@ -29,7 +29,7 @@ class AARectEffect : public FragmentProcessor {
     return "AARectEffect";
   }
 
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
@@ -37,10 +37,6 @@ class AARectEffect : public FragmentProcessor {
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
   Rect rect = Rect::MakeEmpty();
-
-  friend class GLAARectEffect;
 };
 }  // namespace tgfx

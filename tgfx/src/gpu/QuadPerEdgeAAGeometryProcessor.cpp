@@ -18,15 +18,8 @@
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/YUVTexture.h"
-#include "opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    int width, int height, AAType aa, bool hasColor) {
-  return std::unique_ptr<QuadPerEdgeAAGeometryProcessor>(
-      new QuadPerEdgeAAGeometryProcessor(width, height, aa, hasColor));
-}
-
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                                                bool hasColor)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa) {
@@ -46,9 +39,5 @@ void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) c
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   flags |= color.isInitialized() ? 2 : 0;
   bytesKey->write(flags);
-}
-
-std::unique_ptr<GLGeometryProcessor> QuadPerEdgeAAGeometryProcessor::createGLInstance() const {
-  return std::make_unique<GLQuadPerEdgeAAGeometryProcessor>();
 }
 }  // namespace tgfx

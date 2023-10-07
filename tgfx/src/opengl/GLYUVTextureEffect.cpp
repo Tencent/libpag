@@ -20,17 +20,22 @@
 #include "gpu/YUVTextureEffect.h"
 
 namespace tgfx {
-void GLYUVTextureEffect::emitCode(EmitArgs& args) {
-  const auto* yuvFP = static_cast<const YUVTextureEffect*>(args.fragmentProcessor);
+GLYUVTextureEffect::GLYUVTextureEffect(std::shared_ptr<YUVTexture> texture,
+                                       tgfx::SamplingOptions sampling,
+                                       const tgfx::Point& alphaStart,
+                                       const tgfx::Matrix& localMatrix)
+    : YUVTextureEffect(std::move(texture), sampling, alphaStart, localMatrix) {
+}
+
+void GLYUVTextureEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
-  auto yuvTexture = yuvFP->texture;
   fragBuilder->codeAppend("vec3 yuv;");
   fragBuilder->codeAppend("yuv.x = ");
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], (*args.transformedCoords)[0].name());
   fragBuilder->codeAppend(".r;");
-  if (yuvTexture->pixelFormat() == YUVPixelFormat::I420) {
+  if (texture->pixelFormat() == YUVPixelFormat::I420) {
     fragBuilder->codeAppend("yuv.y = ");
     fragBuilder->appendTextureLookup((*args.textureSamplers)[1],
                                      (*args.transformedCoords)[0].name());
@@ -39,27 +44,25 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
     fragBuilder->appendTextureLookup((*args.textureSamplers)[2],
                                      (*args.transformedCoords)[0].name());
     fragBuilder->codeAppend(".r;");
-  } else if (yuvTexture->pixelFormat() == YUVPixelFormat::NV12) {
+  } else if (texture->pixelFormat() == YUVPixelFormat::NV12) {
     fragBuilder->codeAppend("yuv.yz = ");
     fragBuilder->appendTextureLookup((*args.textureSamplers)[1],
                                      (*args.transformedCoords)[0].name());
     fragBuilder->codeAppend(".ra;");
   }
-  if (IsLimitedYUVColorRange(yuvFP->texture->colorSpace())) {
+  if (IsLimitedYUVColorRange(texture->colorSpace())) {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
-  std::string mat3Name;
-  mat3ColorConversionUniform = uniformHandler->addUniform(
-      ShaderFlags::Fragment, ShaderVar::Type::Float3x3, "Mat3ColorConversion", &mat3Name);
+  auto mat3Name = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float3x3,
+                                             "Mat3ColorConversion");
   fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
-  if (yuvFP->alphaStart == Point::Zero()) {
+  if (alphaStart == Point::Zero()) {
     fragBuilder->codeAppendf("%s = vec4(rgb, 1.0) * %s;", args.outputColor.c_str(),
                              args.inputColor.c_str());
   } else {
-    std::string alphaStartName;
-    alphaStartUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                   "AlphaStart", &alphaStartName);
+    auto alphaStartName =
+        uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2, "AlphaStart");
     std::string alphaVertexColor = "alphaVertexColor";
     fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(),
                              (*args.transformedCoords)[0].name().c_str(), alphaStartName.c_str());
@@ -104,43 +107,36 @@ static const float ColorConversionJPEGFullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
 };
 
-void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
-                                   const FragmentProcessor& fragmentProcessor) {
-  const auto& yuvFP = static_cast<const YUVTextureEffect&>(fragmentProcessor);
-  if (alphaStartUniform.isValid()) {
-    auto alphaStart = yuvFP.texture->getTextureCoord(yuvFP.alphaStart.x, yuvFP.alphaStart.y);
-    if (alphaStart != alphaStartPrev) {
-      alphaStartPrev = alphaStart;
-      programDataManager.set2f(alphaStartUniform, alphaStart.x, alphaStart.y);
-    }
+void GLYUVTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+  if (alphaStart != Point::Zero()) {
+    auto alphaStartValue = texture->getTextureCoord(alphaStart.x, alphaStart.y);
+    uniformBuffer->setData("AlphaStart", &alphaStartValue);
   }
-  if (yuvFP.texture->colorSpace() != colorSpacePrev) {
-    colorSpacePrev = yuvFP.texture->colorSpace();
-    switch (yuvFP.texture->colorSpace()) {
-      case YUVColorSpace::BT601_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion601LimitRange);
-        break;
-      case YUVColorSpace::BT601_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion601FullRange);
-        break;
-      case YUVColorSpace::BT709_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion709LimitRange);
-        break;
-      case YUVColorSpace::BT709_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion709FullRange);
-        break;
-      case YUVColorSpace::BT2020_LIMITED:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion2020LimitRange);
-        break;
-      case YUVColorSpace::BT2020_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion2020FullRange);
-        break;
-      case YUVColorSpace::JPEG_FULL:
-        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversionJPEGFullRange);
-        break;
-      default:
-        break;
-    }
+  std::string mat3ColorConversion = "Mat3ColorConversion";
+  switch (texture->colorSpace()) {
+    case YUVColorSpace::BT601_LIMITED:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
+      break;
+    case YUVColorSpace::BT601_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion601FullRange);
+      break;
+    case YUVColorSpace::BT709_LIMITED:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion709LimitRange);
+      break;
+    case YUVColorSpace::BT709_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion709FullRange);
+      break;
+    case YUVColorSpace::BT2020_LIMITED:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion2020LimitRange);
+      break;
+    case YUVColorSpace::BT2020_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversion2020FullRange);
+      break;
+    case YUVColorSpace::JPEG_FULL:
+      uniformBuffer->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
+      break;
+    default:
+      break;
   }
 }
 }  // namespace tgfx

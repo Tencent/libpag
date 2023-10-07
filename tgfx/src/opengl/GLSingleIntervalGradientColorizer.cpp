@@ -20,29 +20,29 @@
 #include "gpu/gradients/SingleIntervalGradientColorizer.h"
 
 namespace tgfx {
-void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
+std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(Color start,
+                                                                                       Color end) {
+  return std::unique_ptr<SingleIntervalGradientColorizer>(
+      new GLSingleIntervalGradientColorizer(start, end));
+}
+
+GLSingleIntervalGradientColorizer::GLSingleIntervalGradientColorizer(Color start, Color end)
+    : SingleIntervalGradientColorizer(start, end) {
+}
+
+void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  std::string startName;
-  startUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                                 "start", &startName);
-  std::string endName;
-  endUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
-                                               "end", &endName);
+  auto startName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "start");
+  auto endName =
+      args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4, "end");
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppendf("%s = (1.0 - t) * %s + t * %s;", args.outputColor.c_str(),
                            startName.c_str(), endName.c_str());
 }
 
-void GLSingleIntervalGradientColorizer::onSetData(const ProgramDataManager& programDataManager,
-                                                  const FragmentProcessor& fragmentProcessor) {
-  const auto& fp = static_cast<const SingleIntervalGradientColorizer&>(fragmentProcessor);
-  if (startPrev != fp.start) {
-    startPrev = fp.start;
-    programDataManager.set4fv(startUniform, 1, fp.start.array());
-  }
-  if (endPrev != fp.end) {
-    endPrev = fp.end;
-    programDataManager.set4fv(endUniform, 1, fp.end.array());
-  }
+void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("start", start.array());
+  uniformBuffer->setData("end", end.array());
 }
 }  // namespace tgfx

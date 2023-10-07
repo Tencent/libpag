@@ -19,8 +19,6 @@
 #include "gpu/TiledTextureEffect.h"
 #include "ConstColorProcessor.h"
 #include "TextureEffect.h"
-#include "opengl/GLTiledTextureEffect.h"
-#include "utils/Log.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -88,16 +86,6 @@ std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(
 }
 
 using Wrap = SamplerState::WrapMode;
-
-struct TiledTextureEffect::Sampling {
-  Sampling(const Texture* texture, SamplerState samplerState, const Rect& subset, const Caps* caps);
-
-  SamplerState hwSampler;
-  ShaderMode shaderModeX = ShaderMode::None;
-  ShaderMode shaderModeY = ShaderMode::None;
-  Rect shaderSubset = Rect::MakeEmpty();
-  Rect shaderClamp = Rect::MakeEmpty();
-};
 
 TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
                                                                  MipMapMode mm) {
@@ -191,19 +179,6 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
   shaderClamp = {x.shaderClamp.a, y.shaderClamp.a, x.shaderClamp.b, y.shaderClamp.b};
 }
 
-std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture> texture,
-                                                            SamplerState samplerState,
-                                                            const Matrix* localMatrix) {
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  auto subset = Rect::MakeWH(texture->width(), texture->height());
-  Sampling sampling(texture.get(), samplerState, subset, texture->getContext()->caps());
-  return std::unique_ptr<TiledTextureEffect>(
-      new TiledTextureEffect(std::move(texture), sampling, matrix));
-}
-
 TiledTextureEffect::TiledTextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
                                        const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
@@ -229,9 +204,5 @@ bool TiledTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   return texture == that.texture && samplerState == that.samplerState && subset == that.subset &&
          clamp == that.clamp && shaderModeX == that.shaderModeX &&
          shaderModeY == that.shaderModeY && coordTransform.matrix == that.coordTransform.matrix;
-}
-
-std::unique_ptr<GLFragmentProcessor> TiledTextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLTiledTextureEffect>();
 }
 }  // namespace tgfx

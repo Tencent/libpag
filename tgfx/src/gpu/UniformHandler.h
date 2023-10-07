@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "ResourceHandle.h"
+#include "SamplerHandle.h"
 #include "ShaderVar.h"
 #include "Swizzle.h"
 #include "gpu/TextureSampler.h"
@@ -28,10 +28,6 @@ static constexpr char NO_MANGLE_PREFIX[] = "tgfx_";
 
 class ProgramBuilder;
 
-struct BuiltinUniformHandles {
-  UniformHandle rtAdjustUniform;
-};
-
 class UniformHandler {
  public:
   virtual ~UniformHandler() = default;
@@ -39,13 +35,12 @@ class UniformHandler {
   /**
    * Add a uniform variable to the current program, that has visibility in one or more shaders.
    * visibility is a bitfield of ShaderFlag values indicating from which shaders the uniform should
-   * be accessible. At least one bit must be set. The actual uniform name will be mangled. If
-   * outName is not nullptr then it will refer to the final uniform name after return.
+   * be accessible. At least one bit must be set. The actual uniform name will be mangled. Returns
+   * the final uniform name.
    */
-  UniformHandle addUniform(ShaderFlags visibility, ShaderVar::Type type, const std::string& name,
-                           std::string* outName = nullptr) {
+  std::string addUniform(ShaderFlags visibility, ShaderVar::Type type, const std::string& name) {
     bool mangle = name.find(NO_MANGLE_PREFIX) != 0;
-    return internalAddUniform(visibility, type, name, mangle, outName);
+    return internalAddUniform(visibility, type, name, mangle);
   }
 
  protected:
@@ -62,9 +57,8 @@ class UniformHandler {
 
   virtual SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) = 0;
 
-  virtual UniformHandle internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
-                                           const std::string& name, bool mangleName,
-                                           std::string* outName) = 0;
+  virtual std::string internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
+                                         const std::string& name, bool mangleName) = 0;
 
   virtual std::string getUniformDeclarations(ShaderFlags visibility) const = 0;
 

@@ -18,8 +18,6 @@
 
 #include "TextureEffect.h"
 #include "ConstColorProcessor.h"
-#include "YUVTextureEffect.h"
-#include "opengl/GLTextureEffect.h"
 
 namespace tgfx {
 class TextureEffectProxy : public FragmentProcessorProxy {
@@ -84,28 +82,6 @@ std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(
                                               localMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<Texture> texture,
-                                                       const SamplingOptions& sampling,
-                                                       const Matrix* localMatrix) {
-  return MakeRGBAAA(std::move(texture), sampling, Point::Zero(), localMatrix);
-}
-
-std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Texture> texture,
-                                                             const SamplingOptions& sampling,
-                                                             const Point& alphaStart,
-                                                             const Matrix* localMatrix) {
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  if (texture->isYUV()) {
-    return std::unique_ptr<YUVTextureEffect>(new YUVTextureEffect(
-        std::static_pointer_cast<YUVTexture>(texture), sampling, alphaStart, matrix));
-  }
-  return std::unique_ptr<TextureEffect>(
-      new TextureEffect(std::move(texture), sampling, alphaStart, matrix));
-}
-
 TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
                              const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
@@ -126,9 +102,5 @@ bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
   bytesKey->write(flags);
-}
-
-std::unique_ptr<GLFragmentProcessor> TextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLTextureEffect>();
 }
 }  // namespace tgfx

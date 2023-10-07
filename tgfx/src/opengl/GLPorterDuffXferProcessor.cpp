@@ -21,7 +21,15 @@
 #include "gpu/PorterDuffXferProcessor.h"
 
 namespace tgfx {
-void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
+std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlendMode blend) {
+  return std::unique_ptr<PorterDuffXferProcessor>(new GLPorterDuffXferProcessor(blend));
+}
+
+GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(tgfx::BlendMode blend)
+    : PorterDuffXferProcessor(blend) {
+}
+
+void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
@@ -41,12 +49,10 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
     fragBuilder->codeAppend("discard;");
     fragBuilder->codeAppend("}");
 
-    std::string dstTopLeftName;
-    std::string dstCoordScaleName;
-    dstTopLeftUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                   "DstTextureUpperLeft", &dstTopLeftName);
-    dstScaleUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                                 "DstTextureCoordScale", &dstCoordScaleName);
+    auto dstTopLeftName = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
+                                                     "DstTextureUpperLeft");
+    auto dstCoordScaleName = uniformHandler->addUniform(
+        ShaderFlags::Fragment, ShaderVar::Type::Float2, "DstTextureCoordScale");
 
     fragBuilder->codeAppend("// Read color from copy of the destination.\n");
     std::string dstTexCoord = "_dstTexCoord";
@@ -60,39 +66,28 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
 
   const char* outColor = "localOutputColor";
   fragBuilder->codeAppendf("vec4 %s;", outColor);
-  const auto* pdXP = static_cast<const PorterDuffXferProcessor*>(args.xferProcessor);
-  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, pdXP->getBlend());
+  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, blend);
   fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
                            args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
                            dstColor.c_str());
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataManager,
-                                        const XferProcessor&, const Texture* dstTexture,
-                                        const Point& dstTextureOffset) {
+void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const Texture* dstTexture,
+                                        const Point& dstTextureOffset) const {
   if (dstTexture) {
-    if (dstTopLeftUniform.isValid()) {
-      if (dstTopLeftPrev != dstTextureOffset) {
-        dstTopLeftPrev = dstTextureOffset;
-        programDataManager.set2f(dstTopLeftUniform, dstTextureOffset.x, dstTextureOffset.y);
-      }
-      int width;
-      int height;
-      if (dstTexture->getSampler()->type() == TextureType::Rectangle) {
-        width = 1;
-        height = 1;
-      } else {
-        width = dstTexture->width();
-        height = dstTexture->height();
-      }
-      if (width != widthPrev || height != heightPrev) {
-        widthPrev = width;
-        heightPrev = height;
-        programDataManager.set2f(dstScaleUniform, 1.f / static_cast<float>(width),
-                                 1.f / static_cast<float>(height));
-      }
+    uniformBuffer->setData("DstTextureUpperLeft", &dstTextureOffset);
+    int width;
+    int height;
+    if (dstTexture->getSampler()->type() == TextureType::Rectangle) {
+      width = 1;
+      height = 1;
+    } else {
+      width = dstTexture->width();
+      height = dstTexture->height();
     }
+    float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+    uniformBuffer->setData("DstTextureCoordScale", scales);
   }
 }
 }  // namespace tgfx

@@ -20,14 +20,15 @@
 
 #include "gpu/Swizzle.h"
 #include "gpu/UniformHandler.h"
+#include "opengl/GLUniformBuffer.h"
 
 namespace tgfx {
-static constexpr int kUnusedUniform = -1;
+static constexpr int UNUSED_UNIFORM = -1;
 
 struct Uniform {
   ShaderVar variable;
   ShaderFlags visibility = ShaderFlags::None;
-  int location = kUnusedUniform;
+  int location = UNUSED_UNIFORM;
 };
 
 class GLUniformHandler : public UniformHandler {
@@ -35,9 +36,8 @@ class GLUniformHandler : public UniformHandler {
   explicit GLUniformHandler(ProgramBuilder* program) : UniformHandler(program) {
   }
 
-  UniformHandle internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
-                                   const std::string& name, bool mangleName,
-                                   std::string* outName) override;
+  std::string internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
+                                 const std::string& name, bool mangleName) override;
 
   SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) override;
 
@@ -53,7 +53,9 @@ class GLUniformHandler : public UniformHandler {
 
   void resolveUniformLocations(unsigned programID);
 
-  std::vector<Uniform> uniforms;
+  std::unique_ptr<GLUniformBuffer> makeUniformBuffer() const;
+
+  std::unordered_map<std::string, Uniform> uniforms;
   std::vector<Uniform> samplers;
   std::vector<Swizzle> samplerSwizzles;
 

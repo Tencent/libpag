@@ -51,9 +51,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   enum class Child { DstChild, SrcChild, TwoChild };
@@ -65,7 +63,5 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   Child child;
   BlendMode mode;
-
-  friend class GLXfermodeFragmentProcessor;
 };
 }  // namespace tgfx

@@ -30,9 +30,7 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
     return "SingleIntervalGradientColorizer";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   SingleIntervalGradientColorizer(Color start, Color end)
@@ -43,7 +41,5 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
 
   Color start;
   Color end;
-
-  friend class GLSingleIntervalGradientColorizer;
 };
 }  // namespace tgfx

@@ -57,6 +57,10 @@ class ProgramBuilder {
    */
   std::string nameVariable(char prefix, const std::string& name, bool mangle = true) const;
 
+  int stageIndex() const {
+    return _stageIndex;
+  }
+
   virtual UniformHandler* uniformHandler() = 0;
 
   virtual const UniformHandler* uniformHandler() const = 0;
@@ -79,11 +83,7 @@ class ProgramBuilder {
 
   virtual bool checkSamplerCounts() = 0;
 
-  std::unique_ptr<GLGeometryProcessor> glGeometryProcessor;
-  std::unique_ptr<GLXferProcessor> xferProcessor;
-  std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors;
   int numFragmentSamplers = 0;
-  BuiltinUniformHandles uniformHandles;
 
  private:
   /**
@@ -102,9 +102,8 @@ class ProgramBuilder {
 
   void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
 
-  std::string emitAndInstallFragProc(
-      const FragmentProcessor* processor, size_t transformedCoordVarsIdx, const std::string& input,
-      std::vector<std::unique_ptr<GLFragmentProcessor>>* glslFragmentProcessors);
+  std::string emitAndInstallFragProc(const FragmentProcessor* processor,
+                                     size_t transformedCoordVarsIdx, const std::string& input);
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 
@@ -112,7 +111,7 @@ class ProgramBuilder {
 
   void emitFSOutputSwizzle();
 
-  int stageIndex = -1;
+  int _stageIndex = -1;
   std::vector<ShaderVar> transformedCoordVars = {};
 };
 }  // namespace tgfx

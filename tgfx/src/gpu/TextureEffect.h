@@ -47,7 +47,7 @@ class TextureEffect : public FragmentProcessor {
     return "TextureEffect";
   }
 
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling, const Point& alphaStart,
@@ -56,8 +56,6 @@ class TextureEffect : public FragmentProcessor {
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
   const TextureSampler* onTextureSampler(size_t) const override {
     return texture->getSampler();
@@ -71,7 +69,5 @@ class TextureEffect : public FragmentProcessor {
   SamplerState samplerState;
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
-
-  friend class GLTextureEffect;
 };
 }  // namespace tgfx

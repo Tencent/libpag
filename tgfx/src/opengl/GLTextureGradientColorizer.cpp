@@ -19,7 +19,17 @@
 #include "GLTextureGradientColorizer.h"
 
 namespace tgfx {
-void GLTextureGradientColorizer::emitCode(EmitArgs& args) {
+std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(
+    std::shared_ptr<Texture> gradient) {
+  return std::unique_ptr<TextureGradientColorizer>(
+      new GLTextureGradientColorizer(std::move(gradient)));
+}
+
+GLTextureGradientColorizer::GLTextureGradientColorizer(std::shared_ptr<Texture> gradient)
+    : TextureGradientColorizer(std::move(gradient)) {
+}
+
+void GLTextureGradientColorizer::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());

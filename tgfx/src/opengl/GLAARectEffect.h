@@ -19,19 +19,16 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/AARectEffect.h"
 
 namespace tgfx {
-class GLAARectEffect : public GLFragmentProcessor {
+class GLAARectEffect : public AARectEffect {
  public:
-  void emitCode(EmitArgs& args) override;
+  explicit GLAARectEffect(const Rect& rect);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle rectUniform;
-
-  std::optional<Rect> rectPrev;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

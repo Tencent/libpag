@@ -35,9 +35,7 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor,
@@ -48,7 +46,5 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
   DualBlurPassMode passMode;
   Point blurOffset;
   Point texelSize;
-
-  friend class GLDualBlurFragmentProcessor;
 };
 }  // namespace tgfx

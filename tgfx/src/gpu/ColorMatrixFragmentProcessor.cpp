@@ -17,19 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ColorMatrixFragmentProcessor.h"
-#include "opengl/GLColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
-    const std::array<float, 20>& matrix) {
-  return std::unique_ptr<ColorMatrixFragmentProcessor>(new ColorMatrixFragmentProcessor(matrix));
-}
-
 bool ColorMatrixFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
   return matrix == static_cast<const ColorMatrixFragmentProcessor&>(processor).matrix;
-}
-
-std::unique_ptr<GLFragmentProcessor> ColorMatrixFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLColorMatrixFragmentProcessor>();
 }
 }  // namespace tgfx

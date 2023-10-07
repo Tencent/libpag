@@ -18,37 +18,45 @@
 
 #include "GLEllipseGeometryProcessor.h"
 #include "gpu/EllipseGeometryProcessor.h"
-#include "tgfx/gpu/Caps.h"
 
 namespace tgfx {
-void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
-  const auto& egp = *static_cast<const EllipseGeometryProcessor*>(args.gp);
+std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
+    int width, int height, bool stroke, bool useScale, const Matrix& localMatrix) {
+  return std::unique_ptr<EllipseGeometryProcessor>(
+      new GLEllipseGeometryProcessor(width, height, stroke, useScale, localMatrix));
+}
+
+GLEllipseGeometryProcessor::GLEllipseGeometryProcessor(int width, int height, bool stroke,
+                                                       bool useScale, const Matrix& localMatrix)
+    : EllipseGeometryProcessor(width, height, stroke, useScale, localMatrix) {
+}
+
+void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   auto* vertBuilder = args.vertBuilder;
   auto* varyingHandler = args.varyingHandler;
   auto* uniformHandler = args.uniformHandler;
 
   // emit attributes
-  varyingHandler->emitAttributes(egp);
+  varyingHandler->emitAttributes(*this);
 
-  auto offsetType = egp.useScale ? ShaderVar::Type::Float3 : ShaderVar::Type::Float2;
+  auto offsetType = useScale ? ShaderVar::Type::Float3 : ShaderVar::Type::Float2;
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", offsetType);
   vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                           egp.inEllipseOffset.name().c_str());
+                           inEllipseOffset.name().c_str());
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", ShaderVar::Type::Float4);
-  vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
-                           egp.inEllipseRadii.name().c_str());
+  vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
 
   auto* fragBuilder = args.fragBuilder;
   // setup pass through color
   auto color = varyingHandler->addVarying("Color", ShaderVar::Type::Float4);
-  vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), egp.inColor.name().c_str());
+  vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
 
   // Setup position
-  args.vertBuilder->emitNormalizedPosition(egp.inPosition.name());
+  args.vertBuilder->emitNormalizedPosition(inPosition.name());
   // emit transforms
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, egp.inPosition.asShaderVar(),
+  emitTransforms(vertBuilder, varyingHandler, uniformHandler, inPosition.asShaderVar(),
                  args.fpCoordTransformHandler);
   // For stroked ellipses, we use the full ellipse equation (x^2/a^2 + y^2/b^2 = 1)
   // to compute both the edges because we need two separate test equations for
@@ -63,11 +71,11 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
 
   // for outer curve
   fragBuilder->codeAppendf("vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-  if (egp.stroke) {
+  if (stroke) {
     fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
   }
   fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
-  if (egp.useScale) {
+  if (useScale) {
     fragBuilder->codeAppendf("vec2 grad = 2.0*offset*(%s.z*%s.xy);", ellipseOffsets.fsIn().c_str(),
                              ellipseRadii.fsIn().c_str());
   } else {
@@ -81,7 +89,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   } else {
     fragBuilder->codeAppend("grad_dot = max(grad_dot, 6.1036e-5);");
   }
-  if (egp.useScale) {
+  if (useScale) {
     fragBuilder->codeAppendf("float invlen = %s.z*inversesqrt(grad_dot);",
                              ellipseOffsets.fsIn().c_str());
   } else {
@@ -90,11 +98,11 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
 
   // for inner curve
-  if (egp.stroke) {
+  if (stroke) {
     fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
                              ellipseRadii.fsIn().c_str());
     fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
-    if (egp.useScale) {
+    if (useScale) {
       fragBuilder->codeAppendf("grad = 2.0*offset*(%s.z*%s.zw);", ellipseOffsets.fsIn().c_str(),
                                ellipseRadii.fsIn().c_str());
     } else {
@@ -104,7 +112,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
     if (!args.caps->floatIs32Bits) {
       fragBuilder->codeAppend("grad_dot = max(grad_dot, 6.1036e-5);");
     }
-    if (egp.useScale) {
+    if (useScale) {
       fragBuilder->codeAppendf("invlen = %s.z*inversesqrt(grad_dot);",
                                ellipseOffsets.fsIn().c_str());
     } else {
@@ -116,10 +124,8 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
 
-void GLEllipseGeometryProcessor::setData(const ProgramDataManager& programDataManager,
-                                         const GeometryProcessor& priProc,
-                                         FPCoordTransformIter* transformIter) {
-  const auto& egp = static_cast<const EllipseGeometryProcessor&>(priProc);
-  setTransformDataHelper(egp.localMatrix, programDataManager, transformIter);
+void GLEllipseGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+                                         FPCoordTransformIter* transformIter) const {
+  setTransformDataHelper(localMatrix, uniformBuffer, transformIter);
 }
 }  // namespace tgfx

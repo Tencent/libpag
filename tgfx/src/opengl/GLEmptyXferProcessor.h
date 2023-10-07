@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/GLXferProcessor.h"
+#include "gpu/EmptyXferProcessor.h"
 
 namespace tgfx {
-class GLEmptyXferProcessor : public GLXferProcessor {
+class GLEmptyXferProcessor : public EmptyXferProcessor {
  public:
-  void emitCode(const EmitArgs& args) override;
+  void emitCode(const EmitArgs& args) const override;
 };
 }  // namespace tgfx

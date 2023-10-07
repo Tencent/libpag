@@ -20,11 +20,11 @@
 
 #include <vector>
 
-#include "GeometryProcessor.h"
 #include "ShaderVar.h"
 
 namespace tgfx {
 class ProgramBuilder;
+class GeometryProcessor;
 
 class Varying {
  public:

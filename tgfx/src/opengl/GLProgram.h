@@ -20,11 +20,8 @@
 
 #include <optional>
 #include "GLContext.h"
-#include "GLProgramDataManager.h"
 #include "GLUniformHandler.h"
-#include "gpu/GLFragmentProcessor.h"
-#include "gpu/GLGeometryProcessor.h"
-#include "gpu/GLXferProcessor.h"
+#include "gpu/Pipeline.h"
 #include "gpu/Program.h"
 #include "opengl/GLRenderTarget.h"
 
@@ -37,11 +34,7 @@ class GLProgram : public Program {
     int location = 0;
   };
 
-  GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles, unsigned programID,
-            const std::vector<Uniform>& uniforms,
-            std::unique_ptr<GLGeometryProcessor> geometryProcessor,
-            std::unique_ptr<GLXferProcessor> xferProcessor,
-            std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
+  GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
             std::vector<Attribute> attributes, int vertexStride);
 
   void setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const;
@@ -78,24 +71,17 @@ class GLProgram : public Program {
   };
 
   // A helper to loop over effects, set the transforms (via subclass) and bind textures
-  void setFragmentData(const GLProgramDataManager& programDataManager, const Pipeline* pipeline,
-                       int* nextTexSamplerIdx);
+  void setFragmentData(const Pipeline* pipeline, int* nextTexSamplerIdx);
 
-  void setRenderTargetState(const GLProgramDataManager& programDataManager,
-                            const GLRenderTarget* renderTarget);
+  void setRenderTargetState(const GLRenderTarget* renderTarget);
 
   void onReleaseGPU() override;
 
   RenderTargetState renderTargetState;
-  BuiltinUniformHandles builtinUniformHandles;
   unsigned programId = 0;
+  std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
 
-  // the installed effects
-  std::unique_ptr<GLGeometryProcessor> glGeometryProcessor;
-  std::unique_ptr<GLXferProcessor> glXferProcessor;
-  std::vector<std::unique_ptr<GLFragmentProcessor>> glFragmentProcessors;
   std::vector<Attribute> attributes;
   int _vertexStride = 0;
-  std::vector<int> uniformLocations;
 };
 }  // namespace tgfx

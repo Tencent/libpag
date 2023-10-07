@@ -19,22 +19,16 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/DeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-class GLDeviceSpaceTextureEffect : public GLFragmentProcessor {
+class GLDeviceSpaceTextureEffect : public DeviceSpaceTextureEffect {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLDeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle scaleUniform;
-  UniformHandle deviceCoordMatrixUniform;
-
-  std::optional<int> widthPrev;
-  std::optional<int> heightPrev;
-  std::optional<Matrix> deviceCoordMatrixPrev;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

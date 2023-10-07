@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "YUVTextureEffect.h"
-#include "opengl/GLYUVTextureEffect.h"
 
 namespace tgfx {
 YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, SamplingOptions sampling,
@@ -42,9 +41,5 @@ bool YUVTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const YUVTextureEffect&>(processor);
   return texture == that.texture && alphaStart == that.alphaStart &&
          coordTransform.matrix == that.coordTransform.matrix && samplerState == that.samplerState;
-}
-
-std::unique_ptr<GLFragmentProcessor> YUVTextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLYUVTextureEffect>();
 }
 }  // namespace tgfx

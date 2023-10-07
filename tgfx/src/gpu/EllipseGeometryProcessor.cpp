@@ -17,15 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EllipseGeometryProcessor.h"
-#include "opengl/GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
-    int width, int height, bool stroke, bool useScale, const Matrix& localMatrix) {
-  return std::unique_ptr<EllipseGeometryProcessor>(
-      new EllipseGeometryProcessor(width, height, stroke, useScale, localMatrix));
-}
-
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
                                                    bool useScale, const Matrix& localMatrix)
     : GeometryProcessor(ClassID()),
@@ -48,9 +41,5 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = stroke ? 1 : 0;
   bytesKey->write(flags);
-}
-
-std::unique_ptr<GLGeometryProcessor> EllipseGeometryProcessor::createGLInstance() const {
-  return std::make_unique<GLEllipseGeometryProcessor>();
 }
 }  // namespace tgfx

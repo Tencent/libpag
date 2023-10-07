@@ -18,14 +18,16 @@
 
 #pragma once
 
-#include "gpu/GLGeometryProcessor.h"
+#include "gpu/EllipseGeometryProcessor.h"
 
 namespace tgfx {
-class GLEllipseGeometryProcessor : public GLGeometryProcessor {
+class GLEllipseGeometryProcessor : public EllipseGeometryProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLEllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
+                             const Matrix& localMatrix);
 
-  void setData(const ProgramDataManager& programDataManager, const GeometryProcessor& priProc,
-               FPCoordTransformIter* transformIter) override;
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformBuffer* uniformBuffer, FPCoordTransformIter* transformIter) const override;
 };
 }  // namespace tgfx

@@ -17,15 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultGeometryProcessor.h"
-#include "opengl/GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
-    Color color, int width, int height, const Matrix& viewMatrix, const Matrix& localMatrix) {
-  return std::unique_ptr<DefaultGeometryProcessor>(
-      new DefaultGeometryProcessor(color, width, height, viewMatrix, localMatrix));
-}
-
 DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height,
                                                    const Matrix& viewMatrix,
                                                    const Matrix& localMatrix)
@@ -38,9 +31,5 @@ DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int h
   position = {"aPosition", ShaderVar::Type::Float2};
   coverage = {"inCoverage", ShaderVar::Type::Float};
   setVertexAttributes(&position, 2);
-}
-
-std::unique_ptr<GLGeometryProcessor> DefaultGeometryProcessor::createGLInstance() const {
-  return std::make_unique<GLDefaultGeometryProcessor>();
 }
 }  // namespace tgfx

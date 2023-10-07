@@ -31,9 +31,7 @@ class TextureGradientColorizer : public FragmentProcessor {
     return "TextureGradientColorizer";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit TextureGradientColorizer(std::shared_ptr<Texture> gradient)
@@ -48,7 +46,5 @@ class TextureGradientColorizer : public FragmentProcessor {
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::shared_ptr<Texture> gradient;
-
-  friend class GLTextureGradientColorizer;
 };
 }  // namespace tgfx

@@ -19,7 +19,7 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
 namespace tgfx {
 /**
@@ -36,49 +36,14 @@ namespace tgfx {
  *  -               .z = boundary between (12,13) and (14,15) -> 13_14
  *  -               .w = unused
  */
-class GLUnrolledBinaryGradientColorizer : public GLFragmentProcessor {
+class GLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColorizer {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLUnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
+                                    Rect thresholds1_7, Rect thresholds9_13);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
-
-  UniformHandle scale0_1Uniform;
-  UniformHandle scale2_3Uniform;
-  UniformHandle scale4_5Uniform;
-  UniformHandle scale6_7Uniform;
-  UniformHandle scale8_9Uniform;
-  UniformHandle scale10_11Uniform;
-  UniformHandle scale12_13Uniform;
-  UniformHandle scale14_15Uniform;
-  UniformHandle bias0_1Uniform;
-  UniformHandle bias2_3Uniform;
-  UniformHandle bias4_5Uniform;
-  UniformHandle bias6_7Uniform;
-  UniformHandle bias8_9Uniform;
-  UniformHandle bias10_11Uniform;
-  UniformHandle bias12_13Uniform;
-  UniformHandle bias14_15Uniform;
-  UniformHandle thresholds1_7Uniform;
-  UniformHandle thresholds9_13Uniform;
-
-  std::optional<Color> scale0_1Prev;
-  std::optional<Color> scale2_3Prev;
-  std::optional<Color> scale4_5Prev;
-  std::optional<Color> scale6_7Prev;
-  std::optional<Color> scale8_9Prev;
-  std::optional<Color> scale10_11Prev;
-  std::optional<Color> scale12_13Prev;
-  std::optional<Color> scale14_15Prev;
-  std::optional<Color> bias0_1Prev;
-  std::optional<Color> bias2_3Prev;
-  std::optional<Color> bias4_5Prev;
-  std::optional<Color> bias6_7Prev;
-  std::optional<Color> bias8_9Prev;
-  std::optional<Color> bias10_11Prev;
-  std::optional<Color> bias12_13Prev;
-  std::optional<Color> bias14_15Prev;
-  std::optional<Rect> thresholds1_7Prev;
-  std::optional<Rect> thresholds9_13Prev;
+  void onSetData(UniformBuffer*) const override;
 };
 }  // namespace tgfx

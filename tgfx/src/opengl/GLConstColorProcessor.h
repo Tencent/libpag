@@ -19,19 +19,17 @@
 #pragma once
 
 #include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/ConstColorProcessor.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
-class GLConstColorProcessor : public GLFragmentProcessor {
+class GLConstColorProcessor : public ConstColorProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  GLConstColorProcessor(Color color, InputMode mode);
+
+  void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  std::optional<Color> colorPrev;
-  UniformHandle colorUniform;
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

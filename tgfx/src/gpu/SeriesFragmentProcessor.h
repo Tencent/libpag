@@ -30,13 +30,9 @@ class SeriesFragmentProcessor : public FragmentProcessor {
     return "SeriesFragmentProcessor";
   }
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children, int count);
-
-  friend class GLSeriesFragmentProcessor;
 };
 }  // namespace tgfx

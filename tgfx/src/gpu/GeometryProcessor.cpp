@@ -19,6 +19,8 @@
 #include "GeometryProcessor.h"
 
 namespace tgfx {
+static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
+
 /**
  * Returns the size of the attrib type in bytes.
  */
@@ -61,4 +63,46 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
     }
   }
 }
+
+void GeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
+                                               UniformBuffer* uniformBuffer,
+                                               FPCoordTransformIter* transformIter) const {
+  int i = 0;
+  while (const CoordTransform* coordTransform = transformIter->next()) {
+    Matrix combined = Matrix::I();
+    combined.setConcat(coordTransform->getTotalMatrix(), localMatrix);
+    std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
+    uniformName += std::to_string(i);
+    uniformBuffer->setMatrix(uniformName, combined);
+    ++i;
+  }
+}
+
+void GeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
+                                       VaryingHandler* varyingHandler,
+                                       UniformHandler* uniformHandler,
+                                       const ShaderVar& localCoordsVar,
+                                       FPCoordTransformHandler* transformHandler) const {
+  std::string localCoords = "vec3(";
+  localCoords += localCoordsVar.name();
+  localCoords += ", 1)";
+  int i = 0;
+  while (transformHandler->nextCoordTransform() != nullptr) {
+    std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
+    strUniName += std::to_string(i);
+    auto uniName =
+        uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3, strUniName);
+    std::string strVaryingName = "TransformedCoords_";
+    strVaryingName += std::to_string(i);
+    ShaderVar::Type varyingType = ShaderVar::Type::Float2;
+    auto varying = varyingHandler->addVarying(strVaryingName, varyingType);
+
+    transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
+
+    vertexBuilder->codeAppendf("%s = (%s * %s).xy;", varying.vsOut().c_str(), uniName.c_str(),
+                               localCoords.c_str());
+    ++i;
+  }
+}
+
 }  // namespace tgfx

@@ -36,9 +36,7 @@ class ClampedGradientEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
@@ -52,7 +50,5 @@ class ClampedGradientEffect : public FragmentProcessor {
   Color leftBorderColor;
   Color rightBorderColor;
   bool makePremultiply;
-
-  friend class GLClampedGradientEffect;
 };
 }  // namespace tgfx

@@ -18,13 +18,38 @@
 
 #include "GLXfermodeFragmentProcessor.h"
 #include "GLBlend.h"
+#include "gpu/ConstColorProcessor.h"
 #include "gpu/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
-void GLXfermodeFragmentProcessor::emitCode(EmitArgs& args) {
+std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
+    std::unique_ptr<FragmentProcessor> src, std::unique_ptr<FragmentProcessor> dst,
+    BlendMode mode) {
+  if (src == nullptr && dst == nullptr) {
+    return nullptr;
+  }
+  switch (mode) {
+    case BlendMode::Clear:
+      return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
+    case BlendMode::Src:
+      return src;
+    case BlendMode::Dst:
+      return dst;
+    default:
+      return std::unique_ptr<XfermodeFragmentProcessor>(
+          new GLXfermodeFragmentProcessor(std::move(src), std::move(dst), mode));
+  }
+}
+
+GLXfermodeFragmentProcessor::GLXfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
+                                                         std::unique_ptr<FragmentProcessor> dst,
+                                                         BlendMode mode)
+    : XfermodeFragmentProcessor(std::move(src), std::move(dst), mode) {
+}
+
+void GLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  const auto* fp = static_cast<const XfermodeFragmentProcessor*>(args.fragmentProcessor);
-  if (fp->child == XfermodeFragmentProcessor::Child::TwoChild) {
+  if (child == XfermodeFragmentProcessor::Child::TwoChild) {
     std::string inputColor;
     if (!args.inputColor.empty()) {
       inputColor = "inputColor";
@@ -34,8 +59,8 @@ void GLXfermodeFragmentProcessor::emitCode(EmitArgs& args) {
     emitChild(0, inputColor, &srcColor, args);
     std::string dstColor = "xfer_dst";
     emitChild(1, inputColor, &dstColor, args);
-    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(fp->mode));
-    AppendMode(fragBuilder, srcColor, dstColor, args.outputColor, fp->mode);
+    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(mode));
+    AppendMode(fragBuilder, srcColor, dstColor, args.outputColor, mode);
     // re-multiply the output color by the input color's alpha
     if (!args.inputColor.empty()) {
       fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
@@ -44,11 +69,11 @@ void GLXfermodeFragmentProcessor::emitCode(EmitArgs& args) {
     std::string childColor = "child";
     emitChild(0, &childColor, args);
     // emit blend code
-    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(fp->mode));
-    if (fp->child == XfermodeFragmentProcessor::Child::DstChild) {
-      AppendMode(fragBuilder, args.inputColor, childColor, args.outputColor, fp->mode);
+    fragBuilder->codeAppendf("// Compose Xfer Mode: %s\n", BlendModeName(mode));
+    if (child == XfermodeFragmentProcessor::Child::DstChild) {
+      AppendMode(fragBuilder, args.inputColor, childColor, args.outputColor, mode);
     } else {
-      AppendMode(fragBuilder, childColor, args.inputColor, args.outputColor, fp->mode);
+      AppendMode(fragBuilder, childColor, args.inputColor, args.outputColor, mode);
     }
   }
 }

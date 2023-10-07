@@ -18,27 +18,26 @@
 
 #pragma once
 
-#include "ResourceHandle.h"
-#include "tgfx/core/Matrix.h"
+#include <climits>
+#include <cstddef>
 
 namespace tgfx {
-class ProgramDataManager {
+class SamplerHandle {
  public:
-  virtual ~ProgramDataManager() = default;
+  SamplerHandle() = default;
 
-  virtual void set1f(UniformHandle handle, float v0) const = 0;
+  explicit SamplerHandle(size_t value) : value(value) {
+  }
 
-  virtual void set2f(UniformHandle handle, float v0, float v1) const = 0;
+  bool isValid() const {
+    return value != ULONG_MAX;
+  }
 
-  virtual void set4f(UniformHandle handle, float v0, float v1, float v2, float v3) const = 0;
+  size_t toIndex() const {
+    return value;
+  }
 
-  virtual void set4fv(UniformHandle handle, int arrayCount, const float v[]) const = 0;
-
-  virtual void setMatrix3f(UniformHandle handle, const float matrix[]) const = 0;
-
-  virtual void setMatrix4f(UniformHandle handle, const float matrix[]) const = 0;
-
-  // convenience method for uploading a Matrix to a 3x3 matrix uniform
-  virtual void setMatrix(UniformHandle u, const Matrix& matrix) const = 0;
+ private:
+  size_t value = ULONG_MAX;
 };
 }  // namespace tgfx
