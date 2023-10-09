@@ -33,9 +33,10 @@ void OpsRenderPass::resetActiveBuffers() {
   _vertexBuffer = nullptr;
 }
 
-void OpsRenderPass::bindPipelineAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) {
+void OpsRenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                              const Rect& drawBounds) {
   resetActiveBuffers();
-  if (!onBindPipelineAndScissorClip(pipeline, drawBounds)) {
+  if (!onBindProgramAndScissorClip(programInfo, drawBounds)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
   }

@@ -54,18 +54,4 @@ class Program {
 
   friend class ProgramCache;
 };
-
-class ProgramCreator {
- public:
-  virtual ~ProgramCreator() = default;
-  /**
-   * Overridden to compute a unique key for the program.
-   */
-  virtual void computeUniqueKey(Context* context, BytesKey* uniqueKey) const = 0;
-
-  /**
-   * Overridden to create a new program.
-   */
-  virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
-};
 }  // namespace tgfx

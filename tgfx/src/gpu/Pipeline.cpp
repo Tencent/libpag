@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
+#include "gpu/ProgramBuilder.h"
+#include "gpu/StagedUniformBuffer.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
@@ -24,29 +26,15 @@ namespace tgfx {
 Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
                    std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
                    size_t numColorProcessors, BlendMode blendMode,
-                   std::shared_ptr<Texture> dstTexture, Point dstTextureOffset,
-                   const Swizzle* outputSwizzle)
+                   const DstTextureInfo& dstTextureInfo, const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)),
       numColorProcessors(numColorProcessors),
-      dstTexture(std::move(dstTexture)),
-      dstTextureOffset(dstTextureOffset),
+      dstTextureInfo(dstTextureInfo),
       _outputSwizzle(outputSwizzle) {
   if (!BlendModeAsCoeff(blendMode, &_blendInfo)) {
     xferProcessor = PorterDuffXferProcessor::Make(blendMode);
   }
-}
-
-void Pipeline::computeKey(Context* context, BytesKey* bytesKey) const {
-  geometryProcessor->computeProcessorKey(context, bytesKey);
-  if (dstTexture != nullptr) {
-    dstTexture->getSampler()->computeKey(context, bytesKey);
-  }
-  for (const auto& processor : fragmentProcessors) {
-    processor->computeProcessorKey(context, bytesKey);
-  }
-  getXferProcessor()->computeProcessorKey(context, bytesKey);
-  bytesKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
 }
 
 const XferProcessor* Pipeline::getXferProcessor() const {
@@ -56,13 +44,58 @@ const XferProcessor* Pipeline::getXferProcessor() const {
   return xferProcessor.get();
 }
 
-const Texture* Pipeline::getDstTexture(Point* offset) const {
-  if (dstTexture == nullptr) {
-    return nullptr;
+void Pipeline::getUniforms(UniformBuffer* uniformBuffer) const {
+  auto buffer = static_cast<StagedUniformBuffer*>(uniformBuffer);
+  buffer->advanceStage();
+  FragmentProcessor::CoordTransformIter coordTransformIter(this);
+  geometryProcessor->setData(buffer, &coordTransformIter);
+  for (auto& fragmentProcessor : fragmentProcessors) {
+    buffer->advanceStage();
+    FragmentProcessor::Iter iter(fragmentProcessor.get());
+    const FragmentProcessor* fp = iter.next();
+    while (fp) {
+      fp->setData(buffer);
+      fp = iter.next();
+    }
   }
-  if (offset) {
-    *offset = dstTextureOffset;
+  if (dstTextureInfo.texture != nullptr) {
+    buffer->advanceStage();
+    xferProcessor->setData(buffer, dstTextureInfo.texture.get(), dstTextureInfo.offset);
   }
-  return dstTexture.get();
+  buffer->resetStage();
+}
+
+std::vector<SamplerInfo> Pipeline::getSamplers() const {
+  std::vector<SamplerInfo> samplers = {};
+  FragmentProcessor::Iter iter(this);
+  const FragmentProcessor* fp = iter.next();
+  while (fp) {
+    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
+      SamplerInfo sampler = {fp->textureSampler(i), fp->samplerState(i)};
+      samplers.push_back(sampler);
+    }
+    fp = iter.next();
+  }
+  if (dstTextureInfo.texture != nullptr) {
+    SamplerInfo sampler = {dstTextureInfo.texture->getSampler(), {}};
+    samplers.push_back(sampler);
+  }
+  return samplers;
+}
+
+void Pipeline::computeUniqueKey(Context* context, BytesKey* bytesKey) const {
+  geometryProcessor->computeProcessorKey(context, bytesKey);
+  if (dstTextureInfo.texture != nullptr) {
+    dstTextureInfo.texture->getSampler()->computeKey(context, bytesKey);
+  }
+  for (const auto& processor : fragmentProcessors) {
+    processor->computeProcessorKey(context, bytesKey);
+  }
+  getXferProcessor()->computeProcessorKey(context, bytesKey);
+  bytesKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
+}
+
+std::unique_ptr<Program> Pipeline::createProgram(Context* context) const {
+  return ProgramBuilder::CreateProgram(context, this);
 }
 }  // namespace tgfx

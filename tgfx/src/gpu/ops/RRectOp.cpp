@@ -273,7 +273,7 @@ void RRectOp::onExecute(OpsRenderPass* opsRenderPass) {
       EllipseGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
                                      opsRenderPass->renderTarget()->height(), false,
                                      UseScale(opsRenderPass->context()), localMatrix));
-  opsRenderPass->bindPipelineAndScissorClip(pipeline.get(), scissorRect());
+  opsRenderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
   opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0,
                              static_cast<int>(rRects.size() * kIndicesPerFillRRect));

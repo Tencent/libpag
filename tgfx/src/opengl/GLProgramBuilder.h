@@ -28,15 +28,6 @@
 namespace tgfx {
 class GLProgramBuilder : public ProgramBuilder {
  public:
-  /**
-   * Generates a shader program.
-   *
-   * The program implements what is specified in the stages given as input.
-   * After successful generation, the builder result objects are available
-   * to be used.
-   */
-  static std::unique_ptr<GLProgram> CreateProgram(Context* context, const Pipeline* pipeline);
-
   std::string versionDeclString() override;
 
   std::string textureFuncName() const override;
@@ -84,5 +75,7 @@ class GLProgramBuilder : public ProgramBuilder {
   GLFragmentShaderBuilder _fragBuilder;
   std::vector<GLProgram::Attribute> attributes;
   int vertexStride = 0;
+
+  friend class ProgramBuilder;
 };
 }  // namespace tgfx

@@ -28,6 +28,11 @@
 namespace tgfx {
 class ProgramBuilder {
  public:
+  /**
+   * Generates a shader program.
+   */
+  static std::unique_ptr<Program> CreateProgram(Context* context, const Pipeline* pipeline);
+
   virtual ~ProgramBuilder() = default;
 
   Context* getContext() const {

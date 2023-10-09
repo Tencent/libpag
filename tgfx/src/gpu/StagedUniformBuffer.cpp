@@ -26,11 +26,6 @@ std::string StagedUniformBuffer::GetMangledName(const std::string& name, int sta
   return name;
 }
 
-void StagedUniformBuffer::resetStateAndUpload(Context* context) {
-  stageIndex = -1;
-  onUploadToGPU(context);
-}
-
 std::string StagedUniformBuffer::getUniformKey(const std::string& name) const {
   return GetMangledName(name, stageIndex);
 }

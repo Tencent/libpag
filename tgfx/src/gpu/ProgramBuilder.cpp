@@ -42,11 +42,10 @@ void ProgramBuilder::advanceStage() {
 }
 
 void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) {
+  uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
   advanceStage();
   nameExpression(outputColor, "outputColor");
   nameExpression(outputCoverage, "outputCoverage");
-
-  uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
   auto geometryProcessor = pipeline->getGeometryProcessor();
   // Enclose custom code in a block to avoid namespace conflicts
   fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,
@@ -129,7 +128,7 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   fragmentShaderBuilder()->codeAppendf("{ // Xfer Processor %s\n", xferProcessor->name().c_str());
 
   SamplerHandle dstTextureSamplerHandle;
-  if (const auto* dstTexture = pipeline->getDstTexture()) {
+  if (auto dstTexture = pipeline->dstTexture()) {
     dstTextureSamplerHandle = emitSampler(dstTexture->getSampler(), "DstTextureSampler");
   }
 
@@ -163,7 +162,7 @@ std::string ProgramBuilder::nameVariable(char prefix, const std::string& name, b
     out += prefix;
   }
   out += name;
-  if (mangle) {
+  if (mangle && _stageIndex >= 0) {
     if (out.rfind('_') == out.length() - 1) {
       // Names containing "__" are reserved.
       out += "x";

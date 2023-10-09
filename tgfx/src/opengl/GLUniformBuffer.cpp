@@ -18,6 +18,7 @@
 
 #include "GLUniformBuffer.h"
 #include "tgfx/opengl/GLFunctions.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 static size_t GetUniformSize(GLUniform::Type type) {
@@ -68,6 +69,7 @@ void GLUniformBuffer::setData(const std::string& name, const void* data) {
   auto key = getUniformKey(name);
   auto result = uniforms.find(key);
   if (result == uniforms.end()) {
+    LOGE("GLUniformBuffer::setData: uniform %s not found", name.c_str());
     return;
   }
   auto& uniform = result->second;
@@ -80,7 +82,7 @@ void GLUniformBuffer::setData(const std::string& name, const void* data) {
   memcpy(buffer + uniform.offset, data, size);
 }
 
-void GLUniformBuffer::onUploadToGPU(Context* context) {
+void GLUniformBuffer::uploadToGPU(Context* context) {
   if (!bufferChanged) {
     return;
   }

@@ -18,43 +18,54 @@
 
 #pragma once
 
+#include "gpu/Blend.h"
+#include "gpu/Program.h"
+#include "gpu/SamplerState.h"
+#include "gpu/TextureSampler.h"
 #include "gpu/UniformBuffer.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+struct SamplerInfo {
+  const TextureSampler* sampler;
+  SamplerState state;
+};
 /**
- * StagedUniformBuffer is a UniformBuffer that supports multiple stages.
+ * This immutable object contains information needed to build a shader program and set API state for
+ * a draw.
  */
-class StagedUniformBuffer : public UniformBuffer {
+class ProgramInfo {
  public:
-  /**
-   * Returns the mangled name for the specified uniform name and stage index.
-   */
-  static std::string GetMangledName(const std::string& name, int stageIndex);
+  virtual ~ProgramInfo() = default;
 
   /**
-   * advanceStage is called by Program between each processor's set data. It increments the stage
-   * offset for uniform name mangling. If advanceStage is not called, the uniform names will not be
-   * mangled.
+   * Returns true if the draw requires a texture barrier.
    */
-  void advanceStage() {
-    stageIndex++;
-  }
+  virtual bool requiresBarrier() const = 0;
 
   /**
-   * Resets the stage offset and uploads the uniform data to the GPU.
+   * Returns the blend info for the draw. A nullptr is returned if the draw does not require
+   * blending.
    */
-  void resetStage() {
-    stageIndex = -1;
-  }
+  virtual const BlendInfo* blendInfo() const = 0;
 
- protected:
   /**
-   * Generates a uniform key based on the specified name and the current stage index.
+   * Collects uniform data for the draw.
    */
-  std::string getUniformKey(const std::string& name) const;
+  virtual void getUniforms(UniformBuffer* uniformBuffer) const = 0;
 
- private:
-  int stageIndex = -1;
+  /**
+   * Collects texture samplers for the draw.
+   */
+  virtual std::vector<SamplerInfo> getSamplers() const = 0;
+
+  /**
+   * Computes a unique key for the program.
+   */
+  virtual void computeUniqueKey(Context* context, BytesKey* uniqueKey) const = 0;
+
+  /**
+   * Creates a new program.
+   */
+  virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
 };
 }  // namespace tgfx
