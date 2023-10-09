@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,35 +18,29 @@
 
 #pragma once
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-copy"
-#include <QOpenGLContext>
-#include <QQuickItem>
-#include <QSGTexture>
-#pragma clang diagnostic pop
-#include "rendering/drawables/DoubleBufferedDrawable.h"
-
-namespace tgfx {
-class QGLWindow;
-}
+#include <functional>
+#include <memory>
+#include "pag/c/pag_types.h"
+#include "rendering/utils/DisplayLink.h"
 
 namespace pag {
-class GPUDrawable : public DoubleBufferedDrawable {
+class DisplayLinkWrapper : public DisplayLink {
  public:
-  static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
-                                               QOpenGLContext* sharedContext = nullptr);
+  static std::shared_ptr<DisplayLink> Make(std::function<void()> callback);
 
-  void updateSize() override;
+  ~DisplayLinkWrapper() override;
 
-  void moveToThread(QThread* targetThread);
+  void start() override;
 
-  QSGTexture* getTexture();
+  void stop() override;
+
+  void update();
 
  private:
-  QQuickItem* quickItem = nullptr;
+  DisplayLinkWrapper() = default;
 
-  GPUDrawable(QQuickItem* quickItem, std::shared_ptr<tgfx::QGLWindow> window);
-
-  std::shared_ptr<tgfx::QGLWindow> qGLWindow() const;
+  bool started = false;
+  void* displayLink = nullptr;
+  std::function<void()> callback;
 };
 }  // namespace pag

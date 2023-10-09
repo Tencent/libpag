@@ -26,6 +26,33 @@ else
   system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/ios/Pods/pag-vendor -p ios --xcframework")
 end
 
+iosSourceFiles = ['src/platform/ios/*.{h,cpp,mm,m}',
+                  'src/platform/ios/private/*.{h,cpp,mm,m}',
+                  'src/platform/cocoa/**/*.{h,cpp,mm,m}',
+                  'tgfx/src/opengl/eagl/*.{h,cpp,mm}',
+                  'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}']
+
+if ENV["PAG_USE_QT"] == 'ON'
+  macSourceFiles = ['src/platform/qt/**/*.{h,cpp,mm,m}',
+                    'tgfx/src/platform/apple/*.{h,cpp,m,mm}',
+                    'tgfx/src/opengl/qt/*.{h,cpp,mm}',
+                    'tgfx/src/opengl/cgl/CGLHardwareTexture.mm',
+                    'src/platform/mac/private/HardwareDecoder.mm']
+else
+  macSourceFiles = ['src/platform/mac/**/*.{h,cpp,mm,m}',
+                    'src/platform/cocoa/**/*.{h,cpp,mm,m}',
+                    'tgfx/src/opengl/cgl/*.{h,cpp,mm}',
+                    'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}']
+end
+
+cSourceFiles = []
+if ENV["PAG_USE_C"] == 'ON'
+  commonCFlags += ["-DPAG_USE_C"]
+  cSourceFiles += ["src/c/*.*"]
+  iosSourceFiles += ["src/c/*.{h,cpp,mm,m}"]
+  macSourceFiles += ["src/c/*.{h,cpp,mm,m}"]
+end
+
 Pod::Spec.new do |s|
   s.name     = 'libpag'
   s.version  = '4.0.0'
@@ -63,25 +90,18 @@ Pod::Spec.new do |s|
                     'tgfx/src/platform/*.{h,cpp}',
                     'tgfx/src/codecs/webp/**/*.{h,cpp,mm}'
 
-  s.source_files = $source_files + $rasterSourceFiles;
+  s.source_files = $source_files + $rasterSourceFiles + cSourceFiles;
 
   s.compiler_flags = '-Wno-documentation'
 
   if ENV["PAG_USE_QT"] == 'ON'
     s.osx.public_header_files = ['src/platform/qt/*.h', 'tgfx/src/opengl/*.h']
-    s.osx.source_files = 'src/platform/qt/**/*.{h,cpp,mm,m}',
-                         'tgfx/src/platform/apple/*.{h,cpp,m,mm}',
-                         'tgfx/src/opengl/qt/*.{h,cpp,mm}',
-                         'tgfx/src/opengl/cgl/CGLHardwareTexture.mm',
-                         'src/platform/mac/private/HardwareDecoder.mm'
   else
     s.osx.public_header_files = 'src/platform/mac/*.h',
                                 'src/platform/cocoa/*.h'
-    s.osx.source_files =  'src/platform/mac/**/*.{h,cpp,mm,m}',
-                          'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                          'tgfx/src/opengl/cgl/*.{h,cpp,mm}',
-                          'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
   end
+  
+  s.osx.source_files = macSourceFiles
 
   s.osx.frameworks   = ['ApplicationServices', 'AGL', 'OpenGL', 'QuartzCore', 'Cocoa', 'Foundation', 'VideoToolbox', 'CoreMedia']
   s.osx.libraries = ["iconv", "c++", "compression"]
@@ -89,11 +109,7 @@ Pod::Spec.new do |s|
   s.ios.public_header_files = 'src/platform/ios/*.h',
                               'src/platform/cocoa/*.h'
                               
-  s.ios.source_files =  'src/platform/ios/*.{h,cpp,mm,m}',
-                          'src/platform/ios/private/*.{h,cpp,mm,m}',
-                          'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                          'tgfx/src/opengl/eagl/*.{h,cpp,mm}',
-                          'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
+  s.ios.source_files = iosSourceFiles
 
   s.ios.frameworks   = ['UIKit', 'CoreFoundation', 'QuartzCore', 'CoreGraphics', 'CoreText', 'OpenGLES', 'VideoToolbox', 'CoreMedia']
   s.ios.libraries = ["iconv", "compression"]
