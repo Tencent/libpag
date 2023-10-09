@@ -56,8 +56,7 @@ class GLUniformBuffer : public StagedUniformBuffer {
 
   void setData(const std::string& name, const void* data) override;
 
- protected:
-  void onUploadToGPU(Context* context) override;
+  void uploadToGPU(Context* context);
 
  private:
   struct UniformBlock {

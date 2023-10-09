@@ -21,8 +21,8 @@
 #include <optional>
 #include "Blend.h"
 #include "GpuBuffer.h"
-#include "Pipeline.h"
 #include "Program.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "tgfx/core/BlendMode.h"
@@ -59,14 +59,15 @@ class OpsRenderPass {
 
   void begin();
   void end();
-  void bindPipelineAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds);
+  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer);
   void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount);
   void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount);
   void clear(const Rect& scissor, Color color);
 
  protected:
-  virtual bool onBindPipelineAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
+  virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                           const Rect& drawBounds) = 0;
   virtual void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
                              std::shared_ptr<GpuBuffer> vertexBuffer) = 0;
   virtual void onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) = 0;

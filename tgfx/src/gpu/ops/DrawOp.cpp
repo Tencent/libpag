@@ -42,12 +42,13 @@ void DrawOp::execute(OpsRenderPass* opsRenderPass) {
   onExecute(opsRenderPass);
 }
 
-static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, Rect dstRect,
-                                                 Point* dstOffset) {
+static DstTextureInfo CreateDstTextureInfo(OpsRenderPass* opsRenderPass, Rect dstRect) {
+  DstTextureInfo dstTextureInfo = {};
   if (opsRenderPass->context()->caps()->textureBarrierSupport &&
       opsRenderPass->renderTargetTexture()) {
-    *dstOffset = {0, 0};
-    return opsRenderPass->renderTargetTexture();
+    dstTextureInfo.texture = opsRenderPass->renderTargetTexture();
+    dstTextureInfo.requiresBarrier = true;
+    return dstTextureInfo;
   }
   auto bounds =
       Rect::MakeWH(opsRenderPass->renderTarget()->width(), opsRenderPass->renderTarget()->height());
@@ -57,20 +58,21 @@ static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, R
     dstRect.bottom = dstRect.top + height;
   }
   if (!dstRect.intersect(bounds)) {
-    return nullptr;
+    return {};
   }
   dstRect.roundOut();
-  *dstOffset = {dstRect.x(), dstRect.y()};
+  dstTextureInfo.offset = {dstRect.x(), dstRect.y()};
   auto dstTexture = Texture::MakeRGBA(opsRenderPass->context(), static_cast<int>(dstRect.width()),
                                       static_cast<int>(dstRect.height()),
                                       opsRenderPass->renderTarget()->origin());
   if (dstTexture == nullptr) {
     LOGE("Failed to create dst texture(%f*%f).", dstRect.width(), dstRect.height());
-    return nullptr;
+    return {};
   }
+  dstTextureInfo.texture = dstTexture;
   opsRenderPass->context()->gpu()->copyRenderTargetToTexture(
       opsRenderPass->renderTarget().get(), dstTexture.get(), dstRect, Point::Zero());
-  return dstTexture;
+  return dstTextureInfo;
 }
 
 std::unique_ptr<Pipeline> DrawOp::createPipeline(OpsRenderPass* renderPass,
@@ -81,19 +83,14 @@ std::unique_ptr<Pipeline> DrawOp::createPipeline(OpsRenderPass* renderPass,
   std::move(_colors.begin(), _colors.end(), fragmentProcessors.begin());
   std::move(_masks.begin(), _masks.end(),
             fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
-  std::shared_ptr<Texture> dstTexture;
-  Point dstTextureOffset = Point::Zero();
+  DstTextureInfo dstTextureInfo = {};
   auto caps = renderPass->context()->caps();
   if (!BlendModeAsCoeff(blendMode) && !caps->frameBufferFetchSupport) {
-    dstTexture = CreateDstTexture(renderPass, bounds(), &dstTextureOffset);
+    dstTextureInfo = CreateDstTextureInfo(renderPass, bounds());
   }
   const auto& swizzle = renderPass->renderTarget()->writeSwizzle();
-  auto pipeline =
-      std::make_unique<Pipeline>(std::move(gp), std::move(fragmentProcessors), numColorProcessors,
-                                 blendMode, dstTexture, dstTextureOffset, &swizzle);
-  pipeline->setRequiresBarrier(dstTexture != nullptr &&
-                               dstTexture == renderPass->renderTargetTexture());
-  return pipeline;
+  return std::make_unique<Pipeline>(std::move(gp), std::move(fragmentProcessors),
+                                    numColorProcessors, blendMode, dstTextureInfo, &swizzle);
 }
 
 static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor>>& frags1,

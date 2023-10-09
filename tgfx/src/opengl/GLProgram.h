@@ -20,10 +20,11 @@
 
 #include <optional>
 #include "GLContext.h"
-#include "GLUniformHandler.h"
-#include "gpu/Pipeline.h"
 #include "gpu/Program.h"
+#include "gpu/ProgramInfo.h"
+#include "gpu/SLType.h"
 #include "opengl/GLRenderTarget.h"
+#include "opengl/GLUniformHandler.h"
 
 namespace tgfx {
 class GLProgram : public Program {
@@ -53,7 +54,7 @@ class GLProgram : public Program {
    * It is the caller's responsibility to ensure the program is bound before calling.
    */
   void updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
-                                        const Pipeline* pipeline);
+                                        const ProgramInfo* programInfo);
 
   int vertexStride() const {
     return _vertexStride;
@@ -69,9 +70,6 @@ class GLProgram : public Program {
     std::optional<int> height;
     std::optional<ImageOrigin> origin;
   };
-
-  // A helper to loop over effects, set the transforms (via subclass) and bind textures
-  void setFragmentData(const Pipeline* pipeline, int* nextTexSamplerIdx);
 
   void setRenderTargetState(const GLRenderTarget* renderTarget);
 

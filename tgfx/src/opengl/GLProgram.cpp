@@ -19,7 +19,6 @@
 #include "GLProgram.h"
 #include "GLGpu.h"
 #include "GLUtil.h"
-#include "gpu/Pipeline.h"
 
 namespace tgfx {
 GLProgram::GLProgram(Context* context, unsigned programID,
@@ -53,45 +52,15 @@ void GLProgram::onReleaseGPU() {
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
-                                                 const Pipeline* pipeline) {
-  // we set the textures, and uniforms for installed processors in a generic way.
-
-  // We must bind to texture units in the same order in which we set the uniforms in
-  // GLProgramDataManager. That is, we bind textures for processors in this order:
-  // geometryProcessor, fragmentProcessors, XferProcessor.
-  uniformBuffer->advanceStage();
+                                                 const ProgramInfo* programInfo) {
   setRenderTargetState(renderTarget);
-  FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
-  auto gp = pipeline->getGeometryProcessor();
-  gp->setData(uniformBuffer.get(), &coordTransformIter);
-  int nextTexSamplerIdx = 0;
-  setFragmentData(pipeline, &nextTexSamplerIdx);
-
-  auto offset = Point::Zero();
-  const auto* dstTexture = pipeline->getDstTexture(&offset);
-  if (dstTexture) {
-    uniformBuffer->advanceStage();
-    auto xferProcessor = pipeline->getXferProcessor();
-    xferProcessor->setData(uniformBuffer.get(), dstTexture, offset);
-    static_cast<GLGpu*>(context->gpu())->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler());
-  }
-  uniformBuffer->resetStateAndUpload(context);
-}
-
-void GLProgram::setFragmentData(const Pipeline* pipeline, int* nextTexSamplerIdx) {
-  for (size_t index = 0; index < pipeline->numFragmentProcessors(); ++index) {
-    uniformBuffer->advanceStage();
-    const auto* currentFP = pipeline->getFragmentProcessor(index);
-    FragmentProcessor::Iter iter(currentFP);
-    const FragmentProcessor* fp = iter.next();
-    while (fp) {
-      fp->setData(uniformBuffer.get());
-      for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-        static_cast<GLGpu*>(context->gpu())
-            ->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
-      }
-      fp = iter.next();
-    }
+  programInfo->getUniforms(uniformBuffer.get());
+  uniformBuffer->uploadToGPU(context);
+  auto samplers = programInfo->getSamplers();
+  int textureUnit = 0;
+  auto gpu = static_cast<GLGpu*>(context->gpu());
+  for (auto& info : samplers) {
+    gpu->bindTexture(textureUnit++, info.sampler, info.state);
   }
 }
 

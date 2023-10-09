@@ -28,9 +28,9 @@ bool ProgramCache::empty() const {
   return programMap.empty();
 }
 
-Program* ProgramCache::getProgram(const ProgramCreator* programMaker) {
+Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
   BytesKey uniqueKey = {};
-  programMaker->computeUniqueKey(context, &uniqueKey);
+  programInfo->computeUniqueKey(context, &uniqueKey);
   auto result = programMap.find(uniqueKey);
   if (result != programMap.end()) {
     programLRU.remove(result->second);
@@ -38,7 +38,7 @@ Program* ProgramCache::getProgram(const ProgramCreator* programMaker) {
     return result->second;
   }
   // TODO(domrjchen): createProgram() 应该统计到 programCompilingTime 里。
-  auto program = programMaker->createProgram(context).release();
+  auto program = programInfo->createProgram(context).release();
   if (program == nullptr) {
     return nullptr;
   }

@@ -169,7 +169,7 @@ void FillRectOp::onExecute(OpsRenderPass* opsRenderPass) {
       opsRenderPass, QuadPerEdgeAAGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
                                                           opsRenderPass->renderTarget()->height(),
                                                           aa, !colors.empty()));
-  opsRenderPass->bindPipelineAndScissorClip(pipeline.get(), scissorRect());
+  opsRenderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
   if (needsIndexBuffer()) {
     uint16_t numIndicesPerQuad;

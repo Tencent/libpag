@@ -91,7 +91,7 @@ void TriangulatingPathOp::onExecute(OpsRenderPass* opsRenderPass) {
       opsRenderPass, DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
                                                     opsRenderPass->renderTarget()->height(),
                                                     viewMatrix, localMatrix));
-  opsRenderPass->bindPipelineAndScissorClip(pipeline.get(), scissorRect());
+  opsRenderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   opsRenderPass->bindBuffers(nullptr, buffer);
   opsRenderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }

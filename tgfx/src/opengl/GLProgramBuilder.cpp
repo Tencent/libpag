@@ -64,8 +64,7 @@ static std::string SLTypeString(SLType t) {
   return "";
 }
 
-std::unique_ptr<GLProgram> GLProgramBuilder::CreateProgram(Context* context,
-                                                           const Pipeline* pipeline) {
+std::unique_ptr<Program> ProgramBuilder::CreateProgram(Context* context, const Pipeline* pipeline) {
   GLProgramBuilder builder(context, pipeline);
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;

@@ -22,6 +22,7 @@
 #include "Op.h"
 #include "gpu/AAType.h"
 #include "gpu/OpsRenderPass.h"
+#include "gpu/Pipeline.h"
 
 namespace tgfx {
 class DrawOp : public Op {

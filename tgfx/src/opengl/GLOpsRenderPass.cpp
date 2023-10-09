@@ -18,7 +18,6 @@
 
 #include "GLOpsRenderPass.h"
 #include "GLGpu.h"
-#include "GLProgramCreator.h"
 #include "GLUtil.h"
 #include "gpu/ProgramCache.h"
 
@@ -133,10 +132,9 @@ void GLOpsRenderPass::reset() {
   _renderTargetTexture = nullptr;
 }
 
-bool GLOpsRenderPass::onBindPipelineAndScissorClip(const Pipeline* pipeline,
-                                                   const Rect& drawBounds) {
-  GLProgramCreator creator(pipeline);
-  _program = static_cast<GLProgram*>(_context->programCache()->getProgram(&creator));
+bool GLOpsRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                                  const Rect& drawBounds) {
+  _program = static_cast<GLProgram*>(_context->programCache()->getProgram(programInfo));
   if (_program == nullptr) {
     return false;
   }
@@ -148,11 +146,11 @@ bool GLOpsRenderPass::onBindPipelineAndScissorClip(const Pipeline* pipeline,
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   UpdateScissor(_context, drawBounds);
-  UpdateBlend(_context, pipeline->blendInfo());
-  if (pipeline->requiresBarrier()) {
+  UpdateBlend(_context, programInfo->blendInfo());
+  if (programInfo->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(glRT, pipeline);
+  program->updateUniformsAndTextureBindings(glRT, programInfo);
   return true;
 }
 

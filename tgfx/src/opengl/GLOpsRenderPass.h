@@ -41,7 +41,7 @@ class GLOpsRenderPass : public OpsRenderPass {
 
   void reset();
 
-  bool onBindPipelineAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) override;
+  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) override;
   void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
                      std::shared_ptr<GpuBuffer> vertexBuffer) override;
   void onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) override;
