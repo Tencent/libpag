@@ -42,7 +42,7 @@ void GLSweepGradientLayout::emitCode(EmitArgs& args) const {
 }
 
 void GLSweepGradientLayout::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("Bias", &bias);
-  uniformBuffer->setData("Scale", &scale);
+  uniformBuffer->setData("Bias", bias);
+  uniformBuffer->setData("Scale", scale);
 }
 }  // namespace tgfx

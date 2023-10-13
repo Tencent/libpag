@@ -265,12 +265,12 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
 void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int intervalCount,
                     int limit, const Color& value) {
   if (intervalCount > limit) {
-    uniformBuffer->setData(name, value.array());
+    uniformBuffer->setData(name, value);
   }
 }
 
 void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("scale0_1", scale0_1.array());
+  uniformBuffer->setData("scale0_1", scale0_1);
   SetUniformData(uniformBuffer, "scale2_3", intervalCount, 0, scale2_3);
   SetUniformData(uniformBuffer, "scale4_5", intervalCount, 1, scale4_5);
   SetUniformData(uniformBuffer, "scale6_7", intervalCount, 2, scale6_7);
@@ -278,7 +278,7 @@ void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer) 
   SetUniformData(uniformBuffer, "scale10_11", intervalCount, 5, scale10_11);
   SetUniformData(uniformBuffer, "scale12_13", intervalCount, 6, scale12_13);
   SetUniformData(uniformBuffer, "scale14_15", intervalCount, 7, scale14_15);
-  uniformBuffer->setData("bias0_1", bias0_1.array());
+  uniformBuffer->setData("bias0_1", bias0_1);
   SetUniformData(uniformBuffer, "bias2_3", intervalCount, 0, bias2_3);
   SetUniformData(uniformBuffer, "bias4_5", intervalCount, 1, bias4_5);
   SetUniformData(uniformBuffer, "bias6_7", intervalCount, 2, bias6_7);
@@ -286,7 +286,7 @@ void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer) 
   SetUniformData(uniformBuffer, "bias10_11", intervalCount, 5, bias10_11);
   SetUniformData(uniformBuffer, "bias12_13", intervalCount, 6, bias12_13);
   SetUniformData(uniformBuffer, "bias14_15", intervalCount, 7, bias14_15);
-  uniformBuffer->setData("thresholds1_7", reinterpret_cast<const float*>(&(thresholds1_7)));
-  uniformBuffer->setData("thresholds9_13", reinterpret_cast<const float*>(&(thresholds9_13)));
+  uniformBuffer->setData("thresholds1_7", thresholds1_7);
+  uniformBuffer->setData("thresholds9_13", thresholds9_13);
 }
 }  // namespace tgfx

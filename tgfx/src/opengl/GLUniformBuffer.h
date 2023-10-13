@@ -22,52 +22,21 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-/**
- * Reflected description of a uniform variable in the GPU program.
- */
-struct GLUniform {
-  /**
-   * Possible types of a uniform variable.
-   */
-  enum class Type {
-    Float,
-    Float2,
-    Float3,
-    Float4,
-    Float2x2,
-    Float3x3,
-    Float4x4,
-    Int,
-    Int2,
-    Int3,
-    Int4,
-  };
-
-  std::string name;
-  Type type;
-  int location;
-};
-
 class GLUniformBuffer : public StagedUniformBuffer {
  public:
-  explicit GLUniformBuffer(const std::vector<GLUniform>& uniforms);
+  GLUniformBuffer(std::vector<Uniform> uniforms, std::vector<int> locations);
 
   ~GLUniformBuffer() override;
 
-  void setData(const std::string& name, const void* data) override;
-
   void uploadToGPU(Context* context);
 
- private:
-  struct UniformBlock {
-    size_t offset;
-    GLUniform::Type type;
-    int location;
-    bool dirty;
-  };
+ protected:
+  void onCopyData(int index, size_t offset, size_t size, const void* data) override;
 
+ private:
   uint8_t* buffer = nullptr;
   bool bufferChanged = false;
-  std::unordered_map<std::string, UniformBlock> uniforms = {};
+  std::vector<int> locations = {};
+  std::vector<bool> dirtyFlags = {};
 };
 }  // namespace tgfx

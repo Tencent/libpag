@@ -51,6 +51,6 @@ void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   float scales[] = {1.f / static_cast<float>(texture->width()),
                     1.f / static_cast<float>(texture->height())};
   uniformBuffer->setData("CoordScale", scales);
-  uniformBuffer->setMatrix("DeviceCoordMatrix", deviceCoordMatrix);
+  uniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
 }
 }  // namespace tgfx

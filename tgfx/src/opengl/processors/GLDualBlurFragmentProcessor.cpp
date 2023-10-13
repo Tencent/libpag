@@ -97,7 +97,7 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
 }
 
 void GLDualBlurFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("Blur", &blurOffset);
-  uniformBuffer->setData("TexelSize", &texelSize);
+  uniformBuffer->setData("Blur", blurOffset);
+  uniformBuffer->setData("TexelSize", texelSize);
 }
 }  // namespace tgfx

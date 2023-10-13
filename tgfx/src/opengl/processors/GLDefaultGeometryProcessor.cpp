@@ -63,7 +63,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
 void GLDefaultGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(localMatrix, uniformBuffer, transformIter);
-  uniformBuffer->setData("Color", color.array());
-  uniformBuffer->setMatrix("Matrix", viewMatrix);
+  uniformBuffer->setData("Color", color);
+  uniformBuffer->setData("Matrix", viewMatrix);
 }
 }  // namespace tgfx

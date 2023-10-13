@@ -31,7 +31,7 @@ GLProgram::GLProgram(Context* context, unsigned programID,
       _vertexStride(vertexStride) {
 }
 
-void GLProgram::setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const {
+void GLProgram::setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const {
   auto gl = GLFunctions::Get(context);
   gl->useProgram(programId);
   // Assign texture units to sampler uniforms one time up front.
@@ -89,6 +89,6 @@ void GLProgram::setRenderTargetState(const GLRenderTarget* renderTarget) {
   renderTargetState.height = height;
   renderTargetState.origin = origin;
   auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
-  uniformBuffer->setData(RTAdjustName, v.data());
+  uniformBuffer->setData(RTAdjustName, v);
 }
 }  // namespace tgfx

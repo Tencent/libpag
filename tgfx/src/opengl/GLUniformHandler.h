@@ -25,7 +25,7 @@
 namespace tgfx {
 static constexpr int UNUSED_UNIFORM = -1;
 
-struct Uniform {
+struct GLUniform {
   ShaderVar variable;
   ShaderFlags visibility = ShaderFlags::None;
   int location = UNUSED_UNIFORM;
@@ -55,8 +55,8 @@ class GLUniformHandler : public UniformHandler {
 
   std::unique_ptr<GLUniformBuffer> makeUniformBuffer() const;
 
-  std::unordered_map<std::string, Uniform> uniforms;
-  std::vector<Uniform> samplers;
+  std::unordered_map<std::string, GLUniform> uniformMap;
+  std::vector<GLUniform> samplers;
   std::vector<Swizzle> samplerSwizzles;
 
   friend class GLProgramBuilder;
