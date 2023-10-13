@@ -49,10 +49,12 @@ class StagedUniformBuffer : public UniformBuffer {
   }
 
  protected:
+  explicit StagedUniformBuffer(const std::vector<std::pair<std::string, size_t>>& uniforms);
+
   /**
    * Generates a uniform key based on the specified name and the current stage index.
    */
-  std::string getUniformKey(const std::string& name) const;
+  std::string getUniformKey(const std::string& name) const override;
 
  private:
   int stageIndex = -1;

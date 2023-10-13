@@ -39,7 +39,7 @@ void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
 }
 
 void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("start", start.array());
-  uniformBuffer->setData("end", end.array());
+  uniformBuffer->setData("start", start);
+  uniformBuffer->setData("end", end);
 }
 }  // namespace tgfx

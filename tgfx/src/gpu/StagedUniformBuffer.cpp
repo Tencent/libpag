@@ -26,6 +26,11 @@ std::string StagedUniformBuffer::GetMangledName(const std::string& name, int sta
   return name;
 }
 
+StagedUniformBuffer::StagedUniformBuffer(
+    const std::vector<std::pair<std::string, size_t>>& uniforms)
+    : UniformBuffer(uniforms) {
+}
+
 std::string StagedUniformBuffer::getUniformKey(const std::string& name) const {
   return GetMangledName(name, stageIndex);
 }

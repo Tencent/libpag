@@ -81,7 +81,7 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
     combined.setConcat(coordTransform->getTotalMatrix(), localMatrix);
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
-    uniformBuffer->setMatrix(uniformName, combined);
+    uniformBuffer->setData(uniformName, combined);
     ++i;
   }
 }

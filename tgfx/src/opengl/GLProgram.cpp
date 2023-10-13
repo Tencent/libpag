@@ -89,6 +89,6 @@ void GLProgram::setRenderTargetState(const GLRenderTarget* renderTarget) {
   renderTargetState.height = height;
   renderTargetState.origin = origin;
   auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
-  uniformBuffer->setData(RTAdjustName, v.data());
+  uniformBuffer->setData(RTAdjustName, v);
 }
 }  // namespace tgfx

@@ -75,7 +75,7 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const Texture* dstTexture,
                                         const Point& dstTextureOffset) const {
   if (dstTexture) {
-    uniformBuffer->setData("DstTextureUpperLeft", &dstTextureOffset);
+    uniformBuffer->setData("DstTextureUpperLeft", dstTextureOffset);
     int width;
     int height;
     if (dstTexture->getSampler()->type() == TextureType::Rectangle) {

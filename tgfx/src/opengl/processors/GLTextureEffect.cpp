@@ -77,7 +77,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
 void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = texture->getTextureCoord(alphaStart.x, alphaStart.y);
-    uniformBuffer->setData("alphaStart", &alphaStartValue);
+    uniformBuffer->setData("alphaStart", alphaStartValue);
   }
 }
 }  // namespace tgfx

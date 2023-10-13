@@ -74,10 +74,10 @@ void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
 }
 
 void GLDualIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("scale01", scale01.array());
-  uniformBuffer->setData("bias01", bias01.array());
-  uniformBuffer->setData("scale23", scale23.array());
-  uniformBuffer->setData("bias23", bias23.array());
-  uniformBuffer->setData("threshold", &threshold);
+  uniformBuffer->setData("scale01", scale01);
+  uniformBuffer->setData("bias01", bias01);
+  uniformBuffer->setData("scale23", scale23);
+  uniformBuffer->setData("bias23", bias23);
+  uniformBuffer->setData("threshold", threshold);
 }
 }  // namespace tgfx

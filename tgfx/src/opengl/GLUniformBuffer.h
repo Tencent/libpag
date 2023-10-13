@@ -54,9 +54,10 @@ class GLUniformBuffer : public StagedUniformBuffer {
 
   ~GLUniformBuffer() override;
 
-  void setData(const std::string& name, const void* data) override;
-
   void uploadToGPU(Context* context);
+
+ protected:
+  void onCopyData(int index, const void* data, size_t dataSize) override;
 
  private:
   struct UniformBlock {
@@ -68,6 +69,6 @@ class GLUniformBuffer : public StagedUniformBuffer {
 
   uint8_t* buffer = nullptr;
   bool bufferChanged = false;
-  std::unordered_map<std::string, UniformBlock> uniforms = {};
+  std::vector<UniformBlock> uniforms = {};
 };
 }  // namespace tgfx

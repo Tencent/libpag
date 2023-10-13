@@ -64,7 +64,7 @@ void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLClampedGradientEffect::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("leftBorderColor", leftBorderColor.array());
-  uniformBuffer->setData("rightBorderColor", rightBorderColor.array());
+  uniformBuffer->setData("leftBorderColor", leftBorderColor);
+  uniformBuffer->setData("rightBorderColor", rightBorderColor);
 }
 }  // namespace tgfx

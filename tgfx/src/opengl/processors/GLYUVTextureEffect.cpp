@@ -109,7 +109,7 @@ static const float ColorConversionJPEGFullRange[] = {
 void GLYUVTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = texture->getTextureCoord(alphaStart.x, alphaStart.y);
-    uniformBuffer->setData("AlphaStart", &alphaStartValue);
+    uniformBuffer->setData("AlphaStart", alphaStartValue);
   }
   std::string mat3ColorConversion = "Mat3ColorConversion";
   switch (texture->colorSpace()) {

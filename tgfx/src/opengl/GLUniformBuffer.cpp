@@ -44,12 +44,26 @@ static size_t GetUniformSize(GLUniform::Type type) {
   return 0;
 }
 
-GLUniformBuffer::GLUniformBuffer(const std::vector<GLUniform>& glUniforms) {
+static std::vector<std::pair<std::string, size_t>> GetUniformList(
+    const std::vector<GLUniform>& glUniforms) {
+  std::vector<std::pair<std::string, size_t>> uniforms;
+  for (auto& glUniform : glUniforms) {
+    auto size = GetUniformSize(glUniform.type);
+    if (size > 0) {
+      uniforms.emplace_back(glUniform.name, size);
+    }
+  }
+  return uniforms;
+}
+
+GLUniformBuffer::GLUniformBuffer(const std::vector<GLUniform>& glUniforms)
+    : StagedUniformBuffer(GetUniformList(glUniforms)) {
   size_t offset = 0;
   for (auto& glUniform : glUniforms) {
     auto size = GetUniformSize(glUniform.type);
     if (size > 0) {
-      uniforms[glUniform.name] = {offset, glUniform.type, glUniform.location, true};
+      UniformBlock uniform = {offset, glUniform.type, glUniform.location, true};
+      uniforms.push_back(uniform);
       offset += size;
     }
   }
@@ -65,14 +79,8 @@ GLUniformBuffer::~GLUniformBuffer() {
   delete[] buffer;
 }
 
-void GLUniformBuffer::setData(const std::string& name, const void* data) {
-  auto key = getUniformKey(name);
-  auto result = uniforms.find(key);
-  if (result == uniforms.end()) {
-    LOGE("GLUniformBuffer::setData: uniform %s not found", name.c_str());
-    return;
-  }
-  auto& uniform = result->second;
+void GLUniformBuffer::onCopyData(int index, const void* data, size_t) {
+  auto& uniform = uniforms[index];
   auto size = GetUniformSize(uniform.type);
   if (!uniform.dirty && memcmp(buffer + uniform.offset, data, size) == 0) {
     return;
@@ -88,8 +96,7 @@ void GLUniformBuffer::uploadToGPU(Context* context) {
   }
   bufferChanged = false;
   auto gl = GLFunctions::Get(context);
-  for (auto& item : uniforms) {
-    auto& uniform = item.second;
+  for (auto& uniform : uniforms) {
     if (!uniform.dirty) {
       continue;
     }
