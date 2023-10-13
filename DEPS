@@ -42,7 +42,7 @@
       },
       {
         "url": "https://github.com/webmproject/libwebp.git",
-        "commit": "9ce5843dbabcfd3f7c39ec7ceba9cbeb213cbfdf",
+        "commit": "233960a0ad8c640acd458a6966dea09e12c1325a",
         "dir": "third_party/libwebp"
       },
       {
