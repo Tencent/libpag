@@ -31,7 +31,7 @@ GLProgram::GLProgram(Context* context, unsigned programID,
       _vertexStride(vertexStride) {
 }
 
-void GLProgram::setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const {
+void GLProgram::setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const {
   auto gl = GLFunctions::Get(context);
   gl->useProgram(programId);
   // Assign texture units to sampler uniforms one time up front.

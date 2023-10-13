@@ -38,7 +38,7 @@ class GLProgram : public Program {
   GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
             std::vector<Attribute> attributes, int vertexStride);
 
-  void setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const;
+  void setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const;
 
   /**
    * Gets the GL program ID for this program.

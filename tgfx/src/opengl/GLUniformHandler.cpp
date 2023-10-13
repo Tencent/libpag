@@ -22,7 +22,7 @@
 namespace tgfx {
 std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType type,
                                                  const std::string& name, bool mangleName) {
-  Uniform uniform;
+  GLUniform uniform;
   uniform.variable.setType(type);
   uniform.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
   char prefix = 'u';
@@ -32,7 +32,7 @@ std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType 
   uniform.variable.setName(programBuilder->nameVariable(prefix, name, mangleName));
   uniform.visibility = visibility;
   auto uniformKey = StagedUniformBuffer::GetMangledName(name, programBuilder->stageIndex());
-  uniforms[uniformKey] = uniform;
+  uniformMap[uniformKey] = uniform;
   return uniform.variable.name();
 }
 
@@ -56,7 +56,7 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
       type = SLType::Texture2DSampler;
       break;
   }
-  Uniform samplerUniform;
+  GLUniform samplerUniform;
   samplerUniform.variable.setType(type);
   samplerUniform.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
   samplerUniform.variable.setName(mangleName);
@@ -68,7 +68,7 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
 
 std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) const {
   std::string ret;
-  for (auto& item : uniforms) {
+  for (auto& item : uniformMap) {
     auto& uniform = item.second;
     if ((uniform.visibility & visibility) == visibility) {
       ret += programBuilder->getShaderVarDeclarations(uniform.variable, visibility);
@@ -86,7 +86,7 @@ std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) con
 
 void GLUniformHandler::resolveUniformLocations(unsigned programID) {
   auto gl = GLFunctions::Get(programBuilder->getContext());
-  for (auto& item : uniforms) {
+  for (auto& item : uniformMap) {
     auto& uniform = item.second;
     uniform.location = gl->getUniformLocation(programID, uniform.variable.name().c_str());
   }
@@ -96,52 +96,54 @@ void GLUniformHandler::resolveUniformLocations(unsigned programID) {
 }
 
 std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
-  std::vector<GLUniform> glUniforms = {};
-  for (auto& item : uniforms) {
-    std::optional<GLUniform::Type> type;
+  std::vector<Uniform> uniforms = {};
+  std::vector<int> locations = {};
+  for (auto& item : uniformMap) {
+    std::optional<Uniform::Type> type;
     auto& uniform = item.second;
     switch (uniform.variable.type()) {
       case SLType::Float:
-        type = GLUniform::Type::Float;
+        type = Uniform::Type::Float;
         break;
       case SLType::Float2:
-        type = GLUniform::Type::Float2;
+        type = Uniform::Type::Float2;
         break;
       case SLType::Float3:
-        type = GLUniform::Type::Float3;
+        type = Uniform::Type::Float3;
         break;
       case SLType::Float4:
-        type = GLUniform::Type::Float4;
+        type = Uniform::Type::Float4;
         break;
       case SLType::Float2x2:
-        type = GLUniform::Type::Float2x2;
+        type = Uniform::Type::Float2x2;
         break;
       case SLType::Float3x3:
-        type = GLUniform::Type::Float3x3;
+        type = Uniform::Type::Float3x3;
         break;
       case SLType::Float4x4:
-        type = GLUniform::Type::Float4x4;
+        type = Uniform::Type::Float4x4;
         break;
       case SLType::Int:
-        type = GLUniform::Type::Int;
+        type = Uniform::Type::Int;
         break;
       case SLType::Int2:
-        type = GLUniform::Type::Int2;
+        type = Uniform::Type::Int2;
         break;
       case SLType::Int3:
-        type = GLUniform::Type::Int3;
+        type = Uniform::Type::Int3;
         break;
       case SLType::Int4:
-        type = GLUniform::Type::Int4;
+        type = Uniform::Type::Int4;
         break;
       default:
         type = std::nullopt;
         break;
     }
     if (type.has_value()) {
-      glUniforms.push_back({item.first, *type, uniform.location});
+      uniforms.push_back({item.first, *type});
+      locations.push_back(uniform.location);
     }
   }
-  return std::make_unique<GLUniformBuffer>(glUniforms);
+  return std::make_unique<GLUniformBuffer>(std::move(uniforms), std::move(locations));
 }
 }  // namespace tgfx

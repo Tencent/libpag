@@ -25,10 +25,45 @@
 
 namespace tgfx {
 /**
+ * Reflected description of a uniform variable in the GPU program.
+ */
+struct Uniform {
+  /**
+   * Possible types of a uniform variable.
+   */
+  enum class Type {
+    Float,
+    Float2,
+    Float3,
+    Float4,
+    Float2x2,
+    Float3x3,
+    Float4x4,
+    Int,
+    Int2,
+    Int3,
+    Int4,
+  };
+
+  std::string name;
+  Type type;
+
+  /**
+   * Returns the size of the uniform in bytes.
+   */
+  size_t size() const;
+};
+
+/**
  * An object representing the collection of uniform variables in a GPU program.
  */
 class UniformBuffer {
  public:
+  /**
+   * Constructs a uniform buffer with the specified uniforms.
+   */
+  explicit UniformBuffer(std::vector<Uniform> uniforms);
+
   virtual ~UniformBuffer() = default;
 
   /**
@@ -47,10 +82,8 @@ class UniformBuffer {
   void setData(const std::string& name, const Matrix& matrix);
 
  protected:
-  /**
-   * Constructs a uniform buffer with the specified names and sizes.
-   */
-  explicit UniformBuffer(const std::vector<std::pair<std::string, size_t>>& uniforms);
+  std::vector<Uniform> uniforms = {};
+  std::vector<size_t> offsets = {};
 
   /**
    * Generates a uniform key based on the specified name and the current stage index.
@@ -63,16 +96,11 @@ class UniformBuffer {
    * Copies data into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
    */
-  virtual void onCopyData(int index, const void* data, size_t dataSize) = 0;
+  virtual void onCopyData(int index, size_t offset, size_t size, const void* data) = 0;
 
  private:
-  struct Handle {
-    int index = -1;
-    size_t size = 0;
-  };
+  std::unordered_map<std::string, int> uniformMap = {};
 
-  std::unordered_map<std::string, Handle> handles = {};
-
-  void onSetData(const std::string& name, const void* data, size_t dataSize);
+  void onSetData(const std::string& name, const void* data, size_t size);
 };
 }  // namespace tgfx

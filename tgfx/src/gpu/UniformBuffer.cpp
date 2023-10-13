@@ -20,10 +20,36 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-UniformBuffer::UniformBuffer(const std::vector<std::pair<std::string, size_t>>& uniforms) {
+size_t Uniform::size() const {
+  switch (type) {
+    case Uniform::Type::Float:
+    case Uniform::Type::Int:
+      return 4;
+    case Uniform::Type::Float2:
+    case Uniform::Type::Int2:
+      return 8;
+    case Uniform::Type::Float3:
+    case Uniform::Type::Int3:
+      return 12;
+    case Uniform::Type::Float4:
+    case Uniform::Type::Int4:
+    case Uniform::Type::Float2x2:
+      return 16;
+    case Uniform::Type::Float3x3:
+      return 36;
+    case Uniform::Type::Float4x4:
+      return 64;
+  }
+  return 0;
+}
+
+UniformBuffer::UniformBuffer(std::vector<Uniform> uniformList) : uniforms(std::move(uniformList)) {
   int index = 0;
+  size_t offset = 0;
   for (auto& uniform : uniforms) {
-    handles[uniform.first] = {index++, uniform.second};
+    uniformMap[uniform.name] = index++;
+    offsets.push_back(offset);
+    offset += uniform.size();
   }
 }
 
@@ -34,19 +60,20 @@ void UniformBuffer::setData(const std::string& name, const tgfx::Matrix& matrix)
   onSetData(name, data, sizeof(data));
 }
 
-void UniformBuffer::onSetData(const std::string& name, const void* data, size_t dataSize) {
+void UniformBuffer::onSetData(const std::string& name, const void* data, size_t size) {
   auto key = getUniformKey(name);
-  auto result = handles.find(key);
-  if (result == handles.end()) {
+  auto result = uniformMap.find(key);
+  if (result == uniformMap.end()) {
     LOGE("UniformBuffer::onSetData() uniform '%s' not found!", name.c_str());
     return;
   }
-  auto& handle = result->second;
-  if (handle.size != dataSize) {
+  auto index = result->second;
+  auto uniformSize = uniforms[index].size();
+  if (uniformSize != size) {
     LOGE("UniformBuffer::onSetData() data size mismatch!");
     return;
   }
-  onCopyData(handle.index, data, handle.size);
+  onCopyData(index, offsets[index], size, data);
 }
 
 }  // namespace tgfx
