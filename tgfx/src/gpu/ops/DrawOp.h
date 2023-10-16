@@ -21,8 +21,8 @@
 #include <functional>
 #include "Op.h"
 #include "gpu/AAType.h"
-#include "gpu/OpsRenderPass.h"
 #include "gpu/Pipeline.h"
+#include "gpu/RenderPass.h"
 
 namespace tgfx {
 class DrawOp : public Op {
@@ -34,9 +34,9 @@ class DrawOp : public Op {
 
   void prepare(Gpu* gpu) final;
 
-  void execute(OpsRenderPass* opsRenderPass) final;
+  void execute(RenderPass* renderPass) final;
 
-  std::unique_ptr<Pipeline> createPipeline(OpsRenderPass* renderPass,
+  std::unique_ptr<Pipeline> createPipeline(RenderPass* renderPass,
                                            std::unique_ptr<GeometryProcessor> gp);
 
   const Rect& scissorRect() const {
@@ -68,7 +68,7 @@ class DrawOp : public Op {
 
   virtual void onPrepare(Gpu* gpu) = 0;
 
-  virtual void onExecute(OpsRenderPass* opsRenderPass) = 0;
+  virtual void onExecute(RenderPass* renderPass) = 0;
 
   AAType aa = AAType::None;
 

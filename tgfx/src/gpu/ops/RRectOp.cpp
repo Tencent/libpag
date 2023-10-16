@@ -264,18 +264,17 @@ void RRectOp::onPrepare(Gpu* gpu) {
       GpuBuffer::Make(context, BufferType::Index, &(indices[0]), indices.size() * sizeof(uint16_t));
 }
 
-void RRectOp::onExecute(OpsRenderPass* opsRenderPass) {
+void RRectOp::onExecute(RenderPass* renderPass) {
   if (indexBuffer == nullptr || vertexBuffer == nullptr) {
     return;
   }
   auto pipeline = createPipeline(
-      opsRenderPass,
-      EllipseGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
-                                     opsRenderPass->renderTarget()->height(), false,
-                                     UseScale(opsRenderPass->context()), localMatrix));
-  opsRenderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
-  opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0,
-                             static_cast<int>(rRects.size() * kIndicesPerFillRRect));
+      renderPass, EllipseGeometryProcessor::Make(renderPass->renderTarget()->width(),
+                                                 renderPass->renderTarget()->height(), false,
+                                                 UseScale(renderPass->context()), localMatrix));
+  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  renderPass->bindBuffers(indexBuffer, vertexBuffer);
+  renderPass->drawIndexed(PrimitiveType::Triangles, 0,
+                          static_cast<int>(rRects.size() * kIndicesPerFillRRect));
 }
 }  // namespace tgfx

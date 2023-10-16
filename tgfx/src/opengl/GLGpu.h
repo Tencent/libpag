@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/Gpu.h"
-#include "opengl/GLOpsRenderPass.h"
+#include "opengl/GLRenderPass.h"
 
 namespace tgfx {
 class GLGpu : public Gpu {
@@ -45,12 +45,12 @@ class GLGpu : public Gpu {
 
   bool waitSemaphore(const Semaphore* semaphore) override;
 
-  OpsRenderPass* getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                  std::shared_ptr<Texture> renderTargetTexture) override;
+  RenderPass* getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                            std::shared_ptr<Texture> renderTargetTexture) override;
 
   bool submitToGpu(bool syncCpu) override;
 
-  void submit(OpsRenderPass* renderPass) override;
+  void submit(RenderPass* renderPass) override;
 
  private:
   explicit GLGpu(Context* context) : Gpu(context) {
@@ -58,6 +58,6 @@ class GLGpu : public Gpu {
 
   void onRegenerateMipMapLevels(const TextureSampler* sampler) override;
 
-  std::unique_ptr<GLOpsRenderPass> opsRenderPass;
+  std::unique_ptr<GLRenderPass> glRenderPass;
 };
 }  // namespace tgfx

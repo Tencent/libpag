@@ -38,23 +38,22 @@ void DrawOp::prepare(Gpu* gpu) {
   onPrepare(gpu);
 }
 
-void DrawOp::execute(OpsRenderPass* opsRenderPass) {
-  onExecute(opsRenderPass);
+void DrawOp::execute(RenderPass* renderPass) {
+  onExecute(renderPass);
 }
 
-static DstTextureInfo CreateDstTextureInfo(OpsRenderPass* opsRenderPass, Rect dstRect) {
+static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect) {
   DstTextureInfo dstTextureInfo = {};
-  if (opsRenderPass->context()->caps()->textureBarrierSupport &&
-      opsRenderPass->renderTargetTexture()) {
-    dstTextureInfo.texture = opsRenderPass->renderTargetTexture();
+  if (renderPass->context()->caps()->textureBarrierSupport && renderPass->renderTargetTexture()) {
+    dstTextureInfo.texture = renderPass->renderTargetTexture();
     dstTextureInfo.requiresBarrier = true;
     return dstTextureInfo;
   }
   auto bounds =
-      Rect::MakeWH(opsRenderPass->renderTarget()->width(), opsRenderPass->renderTarget()->height());
-  if (opsRenderPass->renderTarget()->origin() == ImageOrigin::BottomLeft) {
+      Rect::MakeWH(renderPass->renderTarget()->width(), renderPass->renderTarget()->height());
+  if (renderPass->renderTarget()->origin() == ImageOrigin::BottomLeft) {
     auto height = dstRect.height();
-    dstRect.top = static_cast<float>(opsRenderPass->renderTarget()->height()) - dstRect.bottom;
+    dstRect.top = static_cast<float>(renderPass->renderTarget()->height()) - dstRect.bottom;
     dstRect.bottom = dstRect.top + height;
   }
   if (!dstRect.intersect(bounds)) {
@@ -62,20 +61,20 @@ static DstTextureInfo CreateDstTextureInfo(OpsRenderPass* opsRenderPass, Rect ds
   }
   dstRect.roundOut();
   dstTextureInfo.offset = {dstRect.x(), dstRect.y()};
-  auto dstTexture = Texture::MakeRGBA(opsRenderPass->context(), static_cast<int>(dstRect.width()),
-                                      static_cast<int>(dstRect.height()),
-                                      opsRenderPass->renderTarget()->origin());
+  auto dstTexture =
+      Texture::MakeRGBA(renderPass->context(), static_cast<int>(dstRect.width()),
+                        static_cast<int>(dstRect.height()), renderPass->renderTarget()->origin());
   if (dstTexture == nullptr) {
     LOGE("Failed to create dst texture(%f*%f).", dstRect.width(), dstRect.height());
     return {};
   }
   dstTextureInfo.texture = dstTexture;
-  opsRenderPass->context()->gpu()->copyRenderTargetToTexture(
-      opsRenderPass->renderTarget().get(), dstTexture.get(), dstRect, Point::Zero());
+  renderPass->context()->gpu()->copyRenderTargetToTexture(renderPass->renderTarget().get(),
+                                                          dstTexture.get(), dstRect, Point::Zero());
   return dstTextureInfo;
 }
 
-std::unique_ptr<Pipeline> DrawOp::createPipeline(OpsRenderPass* renderPass,
+std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
                                                  std::unique_ptr<GeometryProcessor> gp) {
   auto numColorProcessors = _colors.size();
   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};

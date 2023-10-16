@@ -83,16 +83,16 @@ void TriangulatingPathOp::onPrepare(Gpu* gpu) {
   }
 }
 
-void TriangulatingPathOp::onExecute(OpsRenderPass* opsRenderPass) {
+void TriangulatingPathOp::onExecute(RenderPass* renderPass) {
   if (buffer == nullptr) {
     return;
   }
   auto pipeline = createPipeline(
-      opsRenderPass, DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
-                                                    opsRenderPass->renderTarget()->height(),
-                                                    viewMatrix, localMatrix));
-  opsRenderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  opsRenderPass->bindBuffers(nullptr, buffer);
-  opsRenderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
+      renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
+                                                 renderPass->renderTarget()->height(), viewMatrix,
+                                                 localMatrix));
+  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  renderPass->bindBuffers(nullptr, buffer);
+  renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
 }  // namespace tgfx

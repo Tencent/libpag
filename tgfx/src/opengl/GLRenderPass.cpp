@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLOpsRenderPass.h"
+#include "GLRenderPass.h"
 #include "GLGpu.h"
 #include "GLUtil.h"
 #include "gpu/ProgramCache.h"
@@ -75,7 +75,7 @@ class VertexArrayObject : public Resource {
   }
 };
 
-std::unique_ptr<GLOpsRenderPass> GLOpsRenderPass::Make(Context* context) {
+std::unique_ptr<GLRenderPass> GLRenderPass::Make(Context* context) {
   std::shared_ptr<VertexArrayObject> vertexArrayObject;
   if (GLCaps::Get(context)->vertexArrayObjectSupport) {
     vertexArrayObject = VertexArrayObject::Make(context);
@@ -83,7 +83,7 @@ std::unique_ptr<GLOpsRenderPass> GLOpsRenderPass::Make(Context* context) {
       return nullptr;
     }
   }
-  return std::unique_ptr<GLOpsRenderPass>(new GLOpsRenderPass(context, vertexArrayObject));
+  return std::unique_ptr<GLRenderPass>(new GLRenderPass(context, vertexArrayObject));
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -121,19 +121,19 @@ static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
   }
 }
 
-void GLOpsRenderPass::set(std::shared_ptr<RenderTarget> renderTarget,
-                          std::shared_ptr<Texture> renderTargetTexture) {
+void GLRenderPass::set(std::shared_ptr<RenderTarget> renderTarget,
+                       std::shared_ptr<Texture> renderTargetTexture) {
   _renderTarget = std::move(renderTarget);
   _renderTargetTexture = std::move(renderTargetTexture);
 }
 
-void GLOpsRenderPass::reset() {
+void GLRenderPass::reset() {
   _renderTarget = nullptr;
   _renderTargetTexture = nullptr;
 }
 
-bool GLOpsRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                                  const Rect& drawBounds) {
+bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                               const Rect& drawBounds) {
   _program = static_cast<GLProgram*>(_context->programCache()->getProgram(programInfo));
   if (_program == nullptr) {
     return false;
@@ -154,15 +154,15 @@ bool GLOpsRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo
   return true;
 }
 
-void GLOpsRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                    std::shared_ptr<GpuBuffer> vertexBuffer) {
+void GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                                 std::shared_ptr<GpuBuffer> vertexBuffer) {
   _indexBuffer = std::move(indexBuffer);
   _vertexBuffer = std::move(vertexBuffer);
 }
 
 static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
-void GLOpsRenderPass::onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
+void GLRenderPass::onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
   auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
     gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], baseVertex, vertexCount);
@@ -170,7 +170,7 @@ void GLOpsRenderPass::onDraw(PrimitiveType primitiveType, int baseVertex, int ve
   draw(func);
 }
 
-void GLOpsRenderPass::onDrawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
+void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
   auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
@@ -182,7 +182,7 @@ void GLOpsRenderPass::onDrawIndexed(PrimitiveType primitiveType, int baseIndex, 
   draw(func);
 }
 
-void GLOpsRenderPass::draw(const std::function<void()>& func) {
+void GLRenderPass::draw(const std::function<void()>& func) {
   auto gl = GLFunctions::Get(_context);
   if (vertexArrayObject) {
     gl->bindVertexArray(vertexArrayObject->id);
@@ -204,7 +204,7 @@ void GLOpsRenderPass::draw(const std::function<void()>& func) {
   CheckGLError(_context);
 }
 
-void GLOpsRenderPass::onClear(const Rect& scissor, Color color) {
+void GLRenderPass::onClear(const Rect& scissor, Color color) {
   auto gl = GLFunctions::Get(_context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());

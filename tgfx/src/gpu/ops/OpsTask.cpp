@@ -18,7 +18,7 @@
 
 #include "OpsTask.h"
 #include "gpu/Gpu.h"
-#include "gpu/OpsRenderPass.h"
+#include "gpu/RenderPass.h"
 
 namespace tgfx {
 void OpsTask::addOp(std::unique_ptr<Op> op) {
@@ -32,21 +32,21 @@ bool OpsTask::execute(Gpu* gpu) {
   if (ops.empty()) {
     return false;
   }
-  auto opsRenderPass = gpu->getOpsRenderPass(renderTarget, renderTargetTexture);
-  if (opsRenderPass == nullptr) {
+  auto renderPass = gpu->getRenderPass(renderTarget, renderTargetTexture);
+  if (renderPass == nullptr) {
     return false;
   }
   std::for_each(ops.begin(), ops.end(), [gpu](auto& op) { op->prepare(gpu); });
-  opsRenderPass->begin();
+  renderPass->begin();
   auto tempOps = std::move(ops);
   for (auto& op : tempOps) {
-    op->execute(opsRenderPass);
+    op->execute(renderPass);
   }
   if (renderTargetTexture) {
     gpu->regenerateMipMapLevels(renderTargetTexture->getSampler());
   }
-  opsRenderPass->end();
-  gpu->submit(opsRenderPass);
+  renderPass->end();
+  gpu->submit(renderPass);
   return true;
 }
 
