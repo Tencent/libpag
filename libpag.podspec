@@ -47,7 +47,6 @@ end
 
 cSourceFiles = []
 if ENV["PAG_USE_C"] == 'ON'
-  commonCFlags += ["-DPAG_USE_C"]
   cSourceFiles += ["src/c/*.*"]
   iosSourceFiles += ["src/c/*.{h,cpp,mm,m}"]
   macSourceFiles += ["src/c/*.{h,cpp,mm,m}"]
