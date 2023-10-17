@@ -31,7 +31,7 @@ std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem,
 }
 
 GPUDrawable::GPUDrawable(QQuickItem* quickItem, std::shared_ptr<tgfx::QGLWindow> window)
-    : quickItem(quickItem), window(std::move(window)) {
+    : DoubleBufferedDrawable(std::move(window)), quickItem(quickItem) {
   GPUDrawable::updateSize();
 }
 
@@ -42,26 +42,15 @@ void GPUDrawable::updateSize() {
   _height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
-  if (_width <= 0 || _height <= 0) {
-    return nullptr;
-  }
-  return window->getDevice();
-}
-
-std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window->createSurface(context);
-}
-
-void GPUDrawable::present(tgfx::Context* context) {
-  window->present(context);
+std::shared_ptr<tgfx::QGLWindow> GPUDrawable::qGLWindow() const {
+  return std::static_pointer_cast<tgfx::QGLWindow>(window);
 }
 
 void GPUDrawable::moveToThread(QThread* targetThread) {
-  window->moveToThread(targetThread);
+  qGLWindow()->moveToThread(targetThread);
 }
 
 QSGTexture* GPUDrawable::getTexture() {
-  return window->getTexture();
+  return qGLWindow()->getTexture();
 }
 }  // namespace pag

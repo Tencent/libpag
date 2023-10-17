@@ -40,11 +40,10 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem,
 }
 
 QGLWindow::QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem)
-    : Window(std::move(device)), quickItem(quickItem) {
+    : DoubleBufferedWindow(std::move(device)), quickItem(quickItem) {
 }
 
 QGLWindow::~QGLWindow() {
-  surface = nullptr;
   frontTexture = nullptr;
   backTexture = nullptr;
   delete outTexture;
@@ -92,7 +91,6 @@ void QGLWindow::invalidateTexture() {
 }
 
 std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
-  surface = nullptr;
   frontTexture = nullptr;
   backTexture = nullptr;
   auto nativeWindow = quickItem->window();
@@ -104,22 +102,13 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   }
   frontTexture = Texture::MakeRGBA(context, width, height);
   backTexture = Texture::MakeRGBA(context, width, height);
-  surface = Surface::MakeFrom(backTexture);
-  return surface;
+  frontSurface = Surface::MakeFrom(frontTexture);
+  backSurface = Surface::MakeFrom(backTexture);
+  return backSurface;
 }
 
-void QGLWindow::onPresent(Context* context, int64_t) {
-  if (surface == nullptr) {
-    return;
-  }
-  auto gl = GLFunctions::Get(context);
+void QGLWindow::onSwapSurfaces(Context*) {
   std::swap(frontTexture, backTexture);
-  surface->texture = backTexture;
-  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->renderTarget);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->getFrameBufferID());
-  auto textureID = static_cast<const GLSampler*>(backTexture->getSampler())->id;
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   invalidateTexture();
 }
 }  // namespace tgfx
