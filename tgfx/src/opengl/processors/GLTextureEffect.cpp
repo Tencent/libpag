@@ -20,91 +20,33 @@
 #include <unordered_map>
 
 namespace tgfx {
-static const std::unordered_map<YUVColorSpace, std::array<float, 9>> ColorConversionMatrices = {
-    {YUVColorSpace::BT601_LIMITED,
-     {
-         1.164384f,
-         1.164384f,
-         1.164384f,
-         0.0f,
-         -0.391762f,
-         2.017232f,
-         1.596027f,
-         -0.812968f,
-         0.0f,
-     }},
-    {YUVColorSpace::BT601_FULL,
-     {
-         1.0f,
-         1.0f,
-         1.0f,
-         0.0f,
-         -0.344136f,
-         1.772f,
-         1.402f,
-         -0.714136f,
-         0.0f,
-     }},
-    {YUVColorSpace::BT709_LIMITED,
-     {
-         1.164384f,
-         1.164384f,
-         1.164384f,
-         0.0f,
-         -0.213249f,
-         2.112402f,
-         1.792741f,
-         -0.532909f,
-         0.0f,
-     }},
-    {YUVColorSpace::BT709_FULL,
-     {
-         1.0f,
-         1.0f,
-         1.0f,
-         0.0f,
-         -0.187324f,
-         1.8556f,
-         1.5748f,
-         -0.468124f,
-         0.0f,
-     }},
-    {YUVColorSpace::BT2020_LIMITED,
-     {
-         1.164384f,
-         1.164384f,
-         1.164384f,
-         0.0f,
-         -0.187326f,
-         2.141772f,
-         1.678674f,
-         -0.650424f,
-         0.0f,
-     }},
-    {YUVColorSpace::BT2020_FULL,
-     {
-         1.0f,
-         1.0f,
-         1.0f,
-         0.0f,
-         -0.164553f,
-         1.8814f,
-         1.4746f,
-         -0.571353f,
-         0.0f,
-     }},
-    {YUVColorSpace::JPEG_FULL,
-     {
-         1.0f,
-         1.0f,
-         1.0f,
-         0.0f,
-         -0.344136f,
-         1.772000f,
-         1.402f,
-         -0.714136f,
-         0.0f,
-     }}};
+static const float ColorConversion601LimitRange[] = {
+    1.164384f, 1.164384f, 1.164384f, 0.0f, -0.391762f, 2.017232f, 1.596027f, -0.812968f, 0.0f,
+};
+
+static const float ColorConversion601FullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772f, 1.402f, -0.714136f, 0.0f,
+};
+
+static const float ColorConversion709LimitRange[] = {
+    1.164384f, 1.164384f, 1.164384f, 0.0f, -0.213249f, 2.112402f, 1.792741f, -0.532909f, 0.0f,
+};
+
+static const float ColorConversion709FullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.187324f, 1.8556f, 1.5748f, -0.468124f, 0.0f,
+};
+
+static const float ColorConversion2020LimitRange[] = {
+    1.164384f, 1.164384f, 1.164384f, 0.0f, -0.187326f, 2.141772f, 1.678674f, -0.650424f, 0.0f,
+};
+
+static const float ColorConversion2020FullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.164553f, 1.8814f, 1.4746f, -0.571353f, 0.0f,
+};
+
+static const float ColorConversionJPEGFullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
+};
 
 std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
                                                              const SamplingOptions& sampling,
@@ -222,8 +164,32 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   }
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
-    auto colorConversion = ColorConversionMatrices.at(yuvTexture->colorSpace());
-    uniformBuffer->setData("Mat3ColorConversion", colorConversion);
+    std::string mat3ColorConversion = "Mat3ColorConversion";
+    switch (yuvTexture->colorSpace()) {
+      case YUVColorSpace::BT601_LIMITED:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
+        break;
+      case YUVColorSpace::BT601_FULL:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversion601FullRange);
+        break;
+      case YUVColorSpace::BT709_LIMITED:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversion709LimitRange);
+        break;
+      case YUVColorSpace::BT709_FULL:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversion709FullRange);
+        break;
+      case YUVColorSpace::BT2020_LIMITED:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversion2020LimitRange);
+        break;
+      case YUVColorSpace::BT2020_FULL:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversion2020FullRange);
+        break;
+      case YUVColorSpace::JPEG_FULL:
+        uniformBuffer->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
+        break;
+      default:
+        break;
+    }
   }
 }
 }  // namespace tgfx
