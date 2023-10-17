@@ -82,14 +82,19 @@ std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(
                                               localMatrix);
 }
 
-TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+TextureEffect::TextureEffect(std::shared_ptr<Texture> tex, SamplingOptions sampling,
                              const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
-      texture(std::move(texture)),
+      texture(std::move(tex)),
       samplerState(sampling),
       alphaStart(alphaStart),
-      coordTransform(localMatrix, this->texture.get(), alphaStart) {
-  setTextureSamplerCnt(1);
+      coordTransform(localMatrix, texture.get(), alphaStart) {
+  size_t samplerCount = 1;
+  auto yuvTexture = getYUVTexture();
+  if (yuvTexture) {
+    samplerCount = yuvTexture->samplerCount();
+  }
+  setTextureSamplerCnt(samplerCount);
   addCoordTransform(&coordTransform);
 }
 
@@ -101,6 +106,26 @@ bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
 
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
+  auto yuvTexture = getYUVTexture();
+  if (yuvTexture) {
+    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 2;
+    flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 4;
+  }
   bytesKey->write(flags);
+}
+
+const TextureSampler* TextureEffect::onTextureSampler(size_t index) const {
+  auto yuvTexture = getYUVTexture();
+  if (yuvTexture) {
+    return yuvTexture->getSamplerAt(index);
+  }
+  return texture->getSampler();
+}
+
+YUVTexture* TextureEffect::getYUVTexture() const {
+  if (texture->isYUV()) {
+    return reinterpret_cast<YUVTexture*>(texture.get());
+  }
+  return nullptr;
 }
 }  // namespace tgfx

@@ -20,6 +20,7 @@
 
 #include "gpu/SamplerState.h"
 #include "gpu/TextureProxy.h"
+#include "gpu/YUVTexture.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -57,14 +58,15 @@ class TextureEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  const TextureSampler* onTextureSampler(size_t) const override {
-    return texture->getSampler();
-  }
+  const TextureSampler* onTextureSampler(size_t index) const override;
 
   SamplerState onSamplerState(size_t) const override {
     return samplerState;
   }
 
+  YUVTexture* getYUVTexture() const;
+
+  // Note that the texture could be nullptr!
   std::shared_ptr<Texture> texture;
   SamplerState samplerState;
   Point alphaStart = Point::Zero();
