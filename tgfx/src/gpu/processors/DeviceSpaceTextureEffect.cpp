@@ -22,7 +22,6 @@ namespace tgfx {
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
                                                    ImageOrigin deviceOrigin)
     : FragmentProcessor(ClassID()), texture(std::move(texture)) {
-  setTextureSamplerCnt(1);
   if (deviceOrigin == ImageOrigin::BottomLeft) {
     deviceCoordMatrix.postScale(1, -1);
     deviceCoordMatrix.postTranslate(0, 1);

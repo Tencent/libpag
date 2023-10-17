@@ -35,7 +35,10 @@ class TextureGradientColorizer : public FragmentProcessor {
 
   explicit TextureGradientColorizer(std::shared_ptr<Texture> gradient)
       : FragmentProcessor(ClassID()), gradient(std::move(gradient)) {
-    setTextureSamplerCnt(1);
+  }
+
+  size_t onCountTextureSamplers() const override {
+    return 1;
   }
 
   const TextureSampler* onTextureSampler(size_t) const override {

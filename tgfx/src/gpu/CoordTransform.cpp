@@ -21,9 +21,10 @@
 
 namespace tgfx {
 Matrix CoordTransform::getTotalMatrix() const {
-  if (texture == nullptr) {
+  if (textureProxy == nullptr || textureProxy->getTexture() == nullptr) {
     return matrix;
   }
+  auto texture = textureProxy->getTexture();
   auto combined = matrix;
   // normalize
   auto scale = texture->getTextureCoord(1, 1);

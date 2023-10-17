@@ -37,6 +37,10 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
+  size_t onCountTextureSamplers() const override {
+    return 1;
+  }
+
   const TextureSampler* onTextureSampler(size_t) const override {
     return texture->getSampler();
   }

@@ -77,7 +77,7 @@ class FragmentProcessor : public Processor {
                                                         int count);
 
   size_t numTextureSamplers() const {
-    return textureSamplerCount;
+    return onCountTextureSamplers();
   }
 
   const TextureSampler* textureSampler(size_t i) const {
@@ -103,8 +103,6 @@ class FragmentProcessor : public Processor {
   }
 
   void visitProxies(const std::function<void(TextureProxy*)>& func) const;
-
-  virtual std::unique_ptr<FragmentProcessor> instantiate();
 
   /**
    * Returns the coordinate transformation at index. index must be valid according to
@@ -282,15 +280,15 @@ class FragmentProcessor : public Processor {
     coordTransforms.push_back(transform);
   }
 
-  void setTextureSamplerCnt(size_t count) {
-    textureSamplerCount = count;
-  }
-
   virtual void onSetData(UniformBuffer*) const {
   }
 
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
+  }
+
+  virtual size_t onCountTextureSamplers() const {
+    return 0;
   }
 
   virtual const TextureSampler* onTextureSampler(size_t) const {
@@ -311,17 +309,7 @@ class FragmentProcessor : public Processor {
   void internalEmitChild(size_t, const std::string&, const std::string&, EmitArgs&,
                          std::function<std::string(std::string_view)> = {}) const;
 
-  size_t textureSamplerCount = 0;
   std::vector<const CoordTransform*> coordTransforms;
   std::vector<std::unique_ptr<FragmentProcessor>> childProcessors;
-};
-
-class FragmentProcessorProxy : public FragmentProcessor {
- public:
-  explicit FragmentProcessorProxy(uint32_t classID) : FragmentProcessor(classID) {
-  }
-
-  void emitCode(EmitArgs&) const override {
-  }
 };
 }  // namespace tgfx

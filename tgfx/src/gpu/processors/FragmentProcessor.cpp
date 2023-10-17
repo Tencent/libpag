@@ -61,6 +61,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::RunInSeries(
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
   bytesKey->write(classID());
   onComputeProcessorKey(bytesKey);
+  auto textureSamplerCount = onCountTextureSamplers();
   for (size_t i = 0; i < textureSamplerCount; ++i) {
     textureSampler(i)->computeKey(context, bytesKey);
   }
@@ -151,15 +152,6 @@ void FragmentProcessor::visitProxies(const std::function<void(TextureProxy*)>& f
   for (const auto& fp : childProcessors) {
     fp->visitProxies(func);
   }
-}
-
-std::unique_ptr<FragmentProcessor> FragmentProcessor::instantiate() {
-  for (auto& childFP : childProcessors) {
-    if (auto fp = childFP->instantiate()) {
-      childFP = std::move(fp);
-    }
-  }
-  return nullptr;
 }
 
 void FragmentProcessor::setData(UniformBuffer* uniformBuffer) const {

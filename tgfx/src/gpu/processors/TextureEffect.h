@@ -26,11 +26,11 @@
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
                                                  const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
 
-  static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> textureProxy,
+  static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
                                                        const SamplingOptions& sampling,
                                                        const Point& alphaStart,
                                                        const Matrix* localMatrix = nullptr);
@@ -51,12 +51,14 @@ class TextureEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling, const Point& alphaStart,
-                const Matrix& localMatrix);
+  TextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
+                const Point& alphaStart, const Matrix& localMatrix);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  size_t onCountTextureSamplers() const override;
 
   const TextureSampler* onTextureSampler(size_t index) const override;
 
@@ -64,10 +66,15 @@ class TextureEffect : public FragmentProcessor {
     return samplerState;
   }
 
+  Texture* getTexture() const;
+
   YUVTexture* getYUVTexture() const;
 
-  // Note that the texture could be nullptr!
-  std::shared_ptr<Texture> texture;
+  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
+    func(textureProxy.get());
+  }
+
+  std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;

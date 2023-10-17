@@ -106,27 +106,24 @@ static const std::unordered_map<YUVColorSpace, std::array<float, 9>> ColorConver
          0.0f,
      }}};
 
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<Texture> texture,
-                                                       const SamplingOptions& sampling,
-                                                       const Matrix* localMatrix) {
-  return MakeRGBAAA(std::move(texture), sampling, Point::Zero(), localMatrix);
-}
-
-std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Texture> texture,
+std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
                                                              const SamplingOptions& sampling,
                                                              const Point& alphaStart,
                                                              const Matrix* localMatrix) {
+  if (proxy == nullptr) {
+    return nullptr;
+  }
   auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  return std::unique_ptr<TextureEffect>(
-      new GLTextureEffect(std::move(texture), sampling, alphaStart, matrix));
+  return std::make_unique<GLTextureEffect>(std::move(proxy), sampling, alphaStart, matrix);
 }
 
-GLTextureEffect::GLTextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
                                  const Point& alphaStart, const Matrix& localMatrix)
-    : TextureEffect(std::move(texture), sampling, alphaStart, localMatrix) {
+    : TextureEffect(std::move(proxy), sampling, alphaStart, localMatrix) {
 }
 
 void GLTextureEffect::emitCode(EmitArgs& args) const {
+  auto texture = getTexture();
   if (texture == nullptr) {
     // emit a transparent color as the output color.
     auto* fragBuilder = args.fragBuilder;
@@ -215,6 +212,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
 }
 
 void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+  auto texture = getTexture();
   if (texture == nullptr) {
     return;
   }
