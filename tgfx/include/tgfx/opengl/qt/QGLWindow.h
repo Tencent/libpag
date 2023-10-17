@@ -24,13 +24,13 @@
 #include <QSGTexture>
 #pragma clang diagnostic pop
 #include "QGLDevice.h"
-#include "tgfx/gpu/Window.h"
+#include "tgfx/gpu/DoubleBufferedWindow.h"
 
 namespace tgfx {
 class Texture;
 class GLRenderTarget;
 
-class QGLWindow : public Window {
+class QGLWindow : public DoubleBufferedWindow {
  public:
   ~QGLWindow() override;
 
@@ -57,14 +57,13 @@ class QGLWindow : public Window {
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context, int64_t presentationTime) override;
+  void onSwapSurfaces(Context*) override;
 
  private:
   std::mutex locker = {};
   bool textureInvalid = true;
   QQuickItem* quickItem = nullptr;
   QSGTexture* outTexture = nullptr;
-  std::shared_ptr<Surface> surface = nullptr;
   std::shared_ptr<Texture> frontTexture = nullptr;
   std::shared_ptr<Texture> backTexture = nullptr;
 
