@@ -24,7 +24,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class OpsRenderPass;
+class RenderPass;
 
 class RenderTarget;
 
@@ -55,12 +55,12 @@ class Gpu {
 
   virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
 
-  virtual OpsRenderPass* getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                          std::shared_ptr<Texture> renderTargetTexture) = 0;
+  virtual RenderPass* getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                    std::shared_ptr<Texture> renderTargetTexture) = 0;
 
   virtual bool submitToGpu(bool syncCpu) = 0;
 
-  virtual void submit(OpsRenderPass* opsRenderPass) = 0;
+  virtual void submit(RenderPass* renderPass) = 0;
 
   void regenerateMipMapLevels(const TextureSampler* sampler);
 

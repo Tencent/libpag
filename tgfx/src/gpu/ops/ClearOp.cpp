@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClearOp.h"
-#include "gpu/OpsRenderPass.h"
+#include "gpu/RenderPass.h"
 
 namespace tgfx {
 std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {
@@ -40,7 +40,7 @@ bool ClearOp::onCombineIfPossible(Op* op) {
   return false;
 }
 
-void ClearOp::execute(OpsRenderPass* opsRenderPass) {
-  opsRenderPass->clear(scissor, color);
+void ClearOp::execute(RenderPass* renderPass) {
+  renderPass->clear(scissor, color);
 }
 }  // namespace tgfx

@@ -19,72 +19,10 @@
 #include "TiledTextureEffect.h"
 #include "ConstColorProcessor.h"
 #include "TextureEffect.h"
+#include "gpu/ProxyProvider.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-class TiledTextureEffectProxy : public FragmentProcessorProxy {
- public:
-  TiledTextureEffectProxy(std::shared_ptr<TextureProxy> textureProxy, TileMode tileModeX,
-                          TileMode tileModeY, const SamplingOptions& sampling,
-                          const Matrix* localMatrix)
-      : FragmentProcessorProxy(ClassID()),
-        textureProxy(std::move(textureProxy)),
-        tileModeX(tileModeX),
-        tileModeY(tileModeY),
-        sampling(sampling),
-        localMatrix(localMatrix ? *localMatrix : Matrix::I()) {
-  }
-
-  std::string name() const override {
-    return "TiledTextureEffectProxy";
-  }
-
-  std::unique_ptr<FragmentProcessor> instantiate() override {
-    auto texture = textureProxy->getTexture();
-    if ((tileModeX != TileMode::Clamp || tileModeY != TileMode::Clamp) && !texture->isYUV()) {
-      if (auto proc = TiledTextureEffect::Make(
-              std::move(texture), SamplerState(tileModeX, tileModeY, sampling), &localMatrix)) {
-        return proc;
-      }
-      return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
-    }
-    if (auto proc = TextureEffect::Make(std::move(texture), sampling, &localMatrix)) {
-      return proc;
-    }
-    return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
-  }
-
-  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
-    func(textureProxy.get());
-  }
-
-  bool onIsEqual(const FragmentProcessor& fp) const override {
-    const auto& that = static_cast<const TiledTextureEffectProxy&>(fp);
-    return textureProxy == that.textureProxy && tileModeX == that.tileModeX &&
-           tileModeY == that.tileModeY && sampling.filterMode == that.sampling.filterMode &&
-           sampling.mipMapMode == that.sampling.mipMapMode && localMatrix == that.localMatrix;
-  }
-
- private:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  std::shared_ptr<TextureProxy> textureProxy;
-  TileMode tileModeX;
-  TileMode tileModeY;
-  SamplingOptions sampling;
-  Matrix localMatrix;
-};
-
-std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(
-    std::shared_ptr<TextureProxy> textureProxy, TileMode tileModeX, TileMode tileModeY,
-    const SamplingOptions& sampling, const Matrix* localMatrix) {
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return std::make_unique<TiledTextureEffectProxy>(std::move(textureProxy), tileModeX, tileModeY,
-                                                   sampling, localMatrix);
-}
-
 using Wrap = SamplerState::WrapMode;
 
 TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
@@ -122,8 +60,23 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, Filt
   }
 }
 
+std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture> texture,
+                                                            TileMode tileModeX, TileMode tileModeY,
+                                                            const SamplingOptions& sampling,
+                                                            const Matrix* localMatrix) {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  auto context = texture->getContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto proxy = context->proxyProvider()->wrapTexture(std::move(texture));
+  return Make(std::move(proxy), tileModeX, tileModeY, sampling, localMatrix);
+}
+
 TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler,
-                                       const Rect& subset, const Caps* caps) {
+                                       const Rect& subset) {
   struct Span {
     float a = 0.f;
     float b = 0.f;
@@ -142,6 +95,7 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
     Span shaderClamp;
     Wrap hwWrap = Wrap::Clamp;
   };
+  auto caps = texture->getContext()->caps();
   auto canDoWrapInHW = [&](int size, Wrap wrap) {
     if (wrap == Wrap::ClampToBorder && !caps->clampToBorderSupport) {
       return false;
@@ -179,30 +133,61 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
   shaderClamp = {x.shaderClamp.a, y.shaderClamp.a, x.shaderClamp.b, y.shaderClamp.b};
 }
 
-TiledTextureEffect::TiledTextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
-                                       const Matrix& localMatrix)
+TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
+                                       const SamplerState& samplerState, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
-      texture(std::move(texture)),
-      samplerState(sampling.hwSampler),
-      subset(sampling.shaderSubset),
-      clamp(sampling.shaderClamp),
-      shaderModeX(sampling.shaderModeX),
-      shaderModeY(sampling.shaderModeY),
-      coordTransform(localMatrix, this->texture.get()) {
-  setTextureSamplerCnt(1);
+      textureProxy(std::move(proxy)),
+      samplerState(samplerState),
+      coordTransform(localMatrix, textureProxy.get()) {
   addCoordTransform(&coordTransform);
 }
 
 void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  auto flags = static_cast<uint32_t>(shaderModeX);
-  flags |= static_cast<uint32_t>(shaderModeY) << 4;
+  auto texture = getTexture();
+  if (texture == nullptr) {
+    return;
+  }
+  auto subset = Rect::MakeWH(texture->width(), texture->height());
+  Sampling sampling(texture, samplerState, subset);
+  auto flags = static_cast<uint32_t>(sampling.shaderModeX);
+  flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
   bytesKey->write(flags);
 }
 
 bool TiledTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const TiledTextureEffect&>(processor);
-  return texture == that.texture && samplerState == that.samplerState && subset == that.subset &&
-         clamp == that.clamp && shaderModeX == that.shaderModeX &&
-         shaderModeY == that.shaderModeY && coordTransform.matrix == that.coordTransform.matrix;
+  return textureProxy == that.textureProxy && samplerState == that.samplerState &&
+         coordTransform.matrix == that.coordTransform.matrix;
+}
+
+size_t TiledTextureEffect::onCountTextureSamplers() const {
+  auto texture = getTexture();
+  return texture ? 1 : 0;
+}
+
+const TextureSampler* TiledTextureEffect::onTextureSampler(size_t) const {
+  auto texture = getTexture();
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  return texture->getSampler();
+}
+
+SamplerState TiledTextureEffect::onSamplerState(size_t) const {
+  auto texture = getTexture();
+  if (texture == nullptr) {
+    return {};
+  }
+  auto subset = Rect::MakeWH(texture->width(), texture->height());
+  Sampling sampling(texture, samplerState, subset);
+  return sampling.hwSampler;
+}
+
+const Texture* TiledTextureEffect::getTexture() const {
+  auto texture = textureProxy->getTexture().get();
+  if (texture && !texture->isYUV()) {
+    return texture;
+  }
+  return nullptr;
 }
 }  // namespace tgfx

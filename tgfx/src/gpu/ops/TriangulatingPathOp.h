@@ -44,7 +44,7 @@ class TriangulatingPathOp : public DrawOp {
 
   void onPrepare(Gpu* gpu) override;
 
-  void onExecute(OpsRenderPass* opsRenderPass) override;
+  void onExecute(RenderPass* renderPass) override;
 
   Color color = Color::Transparent();
   std::shared_ptr<GpuBuffer> buffer = nullptr;

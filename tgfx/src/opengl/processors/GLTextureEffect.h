@@ -24,12 +24,14 @@
 namespace tgfx {
 class GLTextureEffect : public TextureEffect {
  public:
-  GLTextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+  GLTextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
                   const Point& alphaStart, const Matrix& localMatrix);
 
   void emitCode(EmitArgs& args) const override;
 
  private:
+  void emitPlainTextureCode(EmitArgs& args) const;
+  void emitYUVTextureCode(EmitArgs& args) const;
   void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

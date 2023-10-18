@@ -41,7 +41,7 @@ class FillRectOp : public DrawOp {
 
   void onPrepare(Gpu* gpu) override;
 
-  void onExecute(OpsRenderPass* opsRenderPass) override;
+  void onExecute(RenderPass* renderPass) override;
 
   bool canAdd(size_t count) const;
 

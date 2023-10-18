@@ -235,15 +235,15 @@ bool GLGpu::waitSemaphore(const Semaphore* semaphore) {
   return true;
 }
 
-OpsRenderPass* GLGpu::getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                       std::shared_ptr<Texture> renderTargetTexture) {
-  if (opsRenderPass == nullptr) {
-    opsRenderPass = GLOpsRenderPass::Make(_context);
+RenderPass* GLGpu::getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                 std::shared_ptr<Texture> renderTargetTexture) {
+  if (glRenderPass == nullptr) {
+    glRenderPass = GLRenderPass::Make(_context);
   }
-  if (opsRenderPass) {
-    opsRenderPass->set(renderTarget, renderTargetTexture);
+  if (glRenderPass) {
+    glRenderPass->set(renderTarget, renderTargetTexture);
   }
-  return opsRenderPass.get();
+  return glRenderPass.get();
 }
 
 bool GLGpu::submitToGpu(bool syncCpu) {
@@ -256,8 +256,8 @@ bool GLGpu::submitToGpu(bool syncCpu) {
   return true;
 }
 
-void GLGpu::submit(OpsRenderPass*) {
-  opsRenderPass->reset();
+void GLGpu::submit(RenderPass*) {
+  glRenderPass->reset();
 }
 
 void GLGpu::onRegenerateMipMapLevels(const TextureSampler* sampler) {

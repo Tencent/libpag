@@ -25,7 +25,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class OpsRenderPass;
+class RenderPass;
 
 #define DEFINE_OP_CLASS_ID                   \
   static uint8_t ClassID() {                 \
@@ -46,7 +46,7 @@ class Op {
   virtual void prepare(Gpu*) {
   }
 
-  virtual void execute(OpsRenderPass* opsRenderPass) = 0;
+  virtual void execute(RenderPass* renderPass) = 0;
 
   bool combineIfPossible(Op* op);
 

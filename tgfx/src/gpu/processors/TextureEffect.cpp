@@ -17,90 +17,105 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
-#include "ConstColorProcessor.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-class TextureEffectProxy : public FragmentProcessorProxy {
- public:
-  TextureEffectProxy(std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling,
-                     const Point& alphaStart, const Matrix* localMatrix)
-      : FragmentProcessorProxy(ClassID()),
-        textureProxy(std::move(textureProxy)),
-        sampling(sampling),
-        alphaStart(alphaStart),
-        localMatrix(localMatrix ? *localMatrix : Matrix::I()) {
-  }
-
-  std::string name() const override {
-    return "TextureEffectProxy";
-  }
-
-  std::unique_ptr<FragmentProcessor> instantiate() override {
-    if (auto proc = TextureEffect::MakeRGBAAA(textureProxy->getTexture(), sampling, alphaStart,
-                                              &localMatrix)) {
-      return proc;
-    }
-    return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
-  }
-
-  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
-    func(textureProxy.get());
-  }
-
-  bool onIsEqual(const FragmentProcessor& fp) const override {
-    const auto& that = static_cast<const TextureEffectProxy&>(fp);
-    return textureProxy == that.textureProxy && sampling.filterMode == that.sampling.filterMode &&
-           sampling.mipMapMode == that.sampling.mipMapMode && alphaStart == that.alphaStart &&
-           localMatrix == that.localMatrix;
-  }
-
- private:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  std::shared_ptr<TextureProxy> textureProxy;
-  SamplingOptions sampling;
-  Point alphaStart;
-  Matrix localMatrix;
-};
-
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> textureProxy,
+std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                        const SamplingOptions& sampling,
                                                        const Matrix* localMatrix) {
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return MakeRGBAAA(std::move(textureProxy), sampling, Point::Zero(), localMatrix);
+  return MakeRGBAAA(std::move(proxy), sampling, Point::Zero(), localMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(
-    std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling,
-    const Point& alphaStart, const Matrix* localMatrix) {
-  if (textureProxy == nullptr) {
+std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<Texture> texture,
+                                                       const SamplingOptions& sampling,
+                                                       const Matrix* localMatrix) {
+  if (texture == nullptr) {
     return nullptr;
   }
-  return std::make_unique<TextureEffectProxy>(std::move(textureProxy), sampling, alphaStart,
-                                              localMatrix);
+  auto context = texture->getContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto proxy = context->proxyProvider()->wrapTexture(std::move(texture));
+  return MakeRGBAAA(std::move(proxy), sampling, Point::Zero(), localMatrix);
 }
 
-TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Texture> texture,
+                                                             const SamplingOptions& sampling,
+                                                             const Point& alphaStart,
+                                                             const Matrix* localMatrix) {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  auto context = texture->getContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto proxy = context->proxyProvider()->wrapTexture(std::move(texture));
+  return MakeRGBAAA(std::move(proxy), sampling, alphaStart, localMatrix);
+}
+
+TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
                              const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
-      texture(std::move(texture)),
+      textureProxy(std::move(proxy)),
       samplerState(sampling),
       alphaStart(alphaStart),
-      coordTransform(localMatrix, this->texture.get(), alphaStart) {
-  setTextureSamplerCnt(1);
+      coordTransform(localMatrix, textureProxy.get(), alphaStart) {
   addCoordTransform(&coordTransform);
 }
 
 bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const TextureEffect&>(processor);
-  return texture == that.texture && alphaStart == that.alphaStart &&
+  return textureProxy == that.textureProxy && alphaStart == that.alphaStart &&
          coordTransform.matrix == that.coordTransform.matrix && samplerState == that.samplerState;
 }
 
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  auto texture = getTexture();
+  if (texture == nullptr) {
+    return;
+  }
   uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
+  auto yuvTexture = getYUVTexture();
+  if (yuvTexture) {
+    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 2;
+    flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 4;
+  }
   bytesKey->write(flags);
+}
+
+size_t TextureEffect::onCountTextureSamplers() const {
+  auto texture = getTexture();
+  if (texture == nullptr) {
+    return 0;
+  }
+  if (texture->isYUV()) {
+    return reinterpret_cast<YUVTexture*>(texture)->samplerCount();
+  }
+  return 1;
+}
+
+const TextureSampler* TextureEffect::onTextureSampler(size_t index) const {
+  auto texture = getTexture();
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  if (texture->isYUV()) {
+    return reinterpret_cast<YUVTexture*>(texture)->getSamplerAt(index);
+  }
+  return texture->getSampler();
+}
+
+Texture* TextureEffect::getTexture() const {
+  return textureProxy->getTexture().get();
+}
+
+YUVTexture* TextureEffect::getYUVTexture() const {
+  auto texture = textureProxy->getTexture().get();
+  if (texture && texture->isYUV()) {
+    return reinterpret_cast<YUVTexture*>(texture);
+  }
+  return nullptr;
 }
 }  // namespace tgfx

@@ -161,16 +161,16 @@ void FillRectOp::onPrepare(Gpu* gpu) {
   }
 }
 
-void FillRectOp::onExecute(OpsRenderPass* opsRenderPass) {
+void FillRectOp::onExecute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr || (needsIndexBuffer() && indexBuffer == nullptr)) {
     return;
   }
-  auto pipeline = createPipeline(
-      opsRenderPass, QuadPerEdgeAAGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
-                                                          opsRenderPass->renderTarget()->height(),
-                                                          aa, !colors.empty()));
-  opsRenderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
+  auto pipeline =
+      createPipeline(renderPass, QuadPerEdgeAAGeometryProcessor::Make(
+                                     renderPass->renderTarget()->width(),
+                                     renderPass->renderTarget()->height(), aa, !colors.empty()));
+  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  renderPass->bindBuffers(indexBuffer, vertexBuffer);
   if (needsIndexBuffer()) {
     uint16_t numIndicesPerQuad;
     if (aa == AAType::Coverage) {
@@ -178,10 +178,10 @@ void FillRectOp::onExecute(OpsRenderPass* opsRenderPass) {
     } else {
       numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }
-    opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0,
-                               static_cast<int>(rects.size()) * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles, 0,
+                            static_cast<int>(rects.size()) * numIndicesPerQuad);
   } else {
-    opsRenderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+    renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
 }
 }  // namespace tgfx

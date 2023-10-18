@@ -22,8 +22,8 @@
 #include "GLBuffer.h"
 #include "GLProgram.h"
 #include "gpu/AAType.h"
-#include "gpu/OpsRenderPass.h"
 #include "gpu/Pipeline.h"
+#include "gpu/RenderPass.h"
 #include "gpu/ops/Op.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -32,15 +32,16 @@
 namespace tgfx {
 class VertexArrayObject;
 
-class GLOpsRenderPass : public OpsRenderPass {
+class GLRenderPass : public RenderPass {
  public:
-  static std::unique_ptr<GLOpsRenderPass> Make(Context* context);
+  static std::unique_ptr<GLRenderPass> Make(Context* context);
 
   void set(std::shared_ptr<RenderTarget> renderTarget,
            std::shared_ptr<Texture> renderTargetTexture);
 
   void reset();
 
+ protected:
   bool onBindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) override;
   void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
                      std::shared_ptr<GpuBuffer> vertexBuffer) override;
@@ -49,8 +50,8 @@ class GLOpsRenderPass : public OpsRenderPass {
   void onClear(const Rect& scissor, Color color) override;
 
  private:
-  GLOpsRenderPass(Context* context, std::shared_ptr<VertexArrayObject> vertexArrayObject)
-      : OpsRenderPass(context), vertexArrayObject(std::move(vertexArrayObject)) {
+  GLRenderPass(Context* context, std::shared_ptr<VertexArrayObject> vertexArrayObject)
+      : RenderPass(context), vertexArrayObject(std::move(vertexArrayObject)) {
   }
 
   void draw(const std::function<void()>& func);

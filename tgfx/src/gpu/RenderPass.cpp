@@ -16,25 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsRenderPass.h"
+#include "RenderPass.h"
 
 namespace tgfx {
-void OpsRenderPass::begin() {
+void RenderPass::begin() {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
 
-void OpsRenderPass::end() {
+void RenderPass::end() {
   resetActiveBuffers();
 }
 
-void OpsRenderPass::resetActiveBuffers() {
+void RenderPass::resetActiveBuffers() {
   _program = nullptr;
   _indexBuffer = nullptr;
   _vertexBuffer = nullptr;
 }
 
-void OpsRenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                              const Rect& drawBounds) {
+void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) {
   resetActiveBuffers();
   if (!onBindProgramAndScissorClip(programInfo, drawBounds)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
@@ -43,29 +42,29 @@ void OpsRenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
   drawPipelineStatus = DrawPipelineStatus::Ok;
 }
 
-void OpsRenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                std::shared_ptr<GpuBuffer> vertexBuffer) {
+void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                             std::shared_ptr<GpuBuffer> vertexBuffer) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
   onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer));
 }
 
-void OpsRenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
+void RenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
   onDraw(primitiveType, baseVertex, vertexCount);
 }
 
-void OpsRenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
+void RenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
   onDrawIndexed(primitiveType, baseIndex, indexCount);
 }
 
-void OpsRenderPass::clear(const Rect& scissor, Color color) {
+void RenderPass::clear(const Rect& scissor, Color color) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   onClear(scissor, color);
 }

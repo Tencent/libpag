@@ -31,7 +31,8 @@ class TiledTextureEffect : public FragmentProcessor {
                                                  const Matrix* localMatrix = nullptr);
 
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
-                                                 SamplerState samplerState = {},
+                                                 TileMode tileModeX, TileMode tileModeY,
+                                                 const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
 
   std::string name() const override {
@@ -54,8 +55,7 @@ class TiledTextureEffect : public FragmentProcessor {
   };
 
   struct Sampling {
-    Sampling(const Texture* texture, SamplerState samplerState, const Rect& subset,
-             const Caps* caps);
+    Sampling(const Texture* texture, SamplerState sampler, const Rect& subset);
 
     SamplerState hwSampler;
     ShaderMode shaderModeX = ShaderMode::None;
@@ -64,29 +64,29 @@ class TiledTextureEffect : public FragmentProcessor {
     Rect shaderClamp = Rect::MakeEmpty();
   };
 
-  TiledTextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
+  TiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                      const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
-  const TextureSampler* onTextureSampler(size_t) const override {
-    return texture->getSampler();
-  }
+  size_t onCountTextureSamplers() const override;
 
-  SamplerState onSamplerState(size_t) const override {
-    return samplerState;
-  }
+  const TextureSampler* onTextureSampler(size_t) const override;
+
+  SamplerState onSamplerState(size_t) const override;
+
+  const Texture* getTexture() const;
 
   static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipMapMode mm);
 
-  std::shared_ptr<Texture> texture;
+  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
+    func(textureProxy.get());
+  }
+
+  std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
-  Rect subset;
-  Rect clamp;
-  ShaderMode shaderModeX;
-  ShaderMode shaderModeY;
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

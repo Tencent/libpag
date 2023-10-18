@@ -24,8 +24,8 @@
 namespace tgfx {
 class GLTiledTextureEffect : public TiledTextureEffect {
  public:
-  GLTiledTextureEffect(std::shared_ptr<Texture> texture,
-                       const TiledTextureEffect::Sampling& sampling, const Matrix& localMatrix);
+  GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
+                       const Matrix& localMatrix);
 
   void emitCode(EmitArgs& args) const override;
 
@@ -58,6 +58,7 @@ class GLTiledTextureEffect : public TiledTextureEffect {
 
   void clampCoord(EmitArgs& args, const bool useClamp[2], const std::string& clampName) const;
 
-  UniformNames initUniform(EmitArgs& args, const bool useSubset[2], const bool useClamp[2]) const;
+  UniformNames initUniform(EmitArgs& args, const Texture* texture, const Sampling& sampling,
+                           const bool useClamp[2]) const;
 };
 }  // namespace tgfx

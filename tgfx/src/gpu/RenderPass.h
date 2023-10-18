@@ -38,9 +38,9 @@ enum class PrimitiveType {
   TriangleStrip,
 };
 
-class OpsRenderPass {
+class RenderPass {
  public:
-  explicit OpsRenderPass(Context* context) : _context(context) {
+  explicit RenderPass(Context* context) : _context(context) {
   }
 
   Context* context() {
@@ -55,7 +55,7 @@ class OpsRenderPass {
     return _renderTargetTexture;
   }
 
-  virtual ~OpsRenderPass() = default;
+  virtual ~RenderPass() = default;
 
   void begin();
   void end();

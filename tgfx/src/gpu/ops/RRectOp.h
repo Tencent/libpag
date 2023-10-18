@@ -35,7 +35,7 @@ class RRectOp : public DrawOp {
 
   void onPrepare(Gpu* gpu) override;
 
-  void onExecute(OpsRenderPass* opsRenderPass) override;
+  void onExecute(RenderPass* renderPass) override;
 
   struct RRectWrap {
     Color color = Color::Transparent();
