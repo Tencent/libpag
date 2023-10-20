@@ -270,19 +270,19 @@ void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int i
 }
 
 void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("scale0_1", scale0_1);
-  SetUniformData(uniformBuffer, "scale2_3", intervalCount, 0, scale2_3);
-  SetUniformData(uniformBuffer, "scale4_5", intervalCount, 1, scale4_5);
-  SetUniformData(uniformBuffer, "scale6_7", intervalCount, 2, scale6_7);
-  SetUniformData(uniformBuffer, "scale8_9", intervalCount, 3, scale8_9);
+  SetUniformData(uniformBuffer, "scale0_1", intervalCount, 0, scale0_1);
+  SetUniformData(uniformBuffer, "scale2_3", intervalCount, 1, scale2_3);
+  SetUniformData(uniformBuffer, "scale4_5", intervalCount, 2, scale4_5);
+  SetUniformData(uniformBuffer, "scale6_7", intervalCount, 3, scale6_7);
+  SetUniformData(uniformBuffer, "scale8_9", intervalCount, 4, scale8_9);
   SetUniformData(uniformBuffer, "scale10_11", intervalCount, 5, scale10_11);
   SetUniformData(uniformBuffer, "scale12_13", intervalCount, 6, scale12_13);
   SetUniformData(uniformBuffer, "scale14_15", intervalCount, 7, scale14_15);
-  uniformBuffer->setData("bias0_1", bias0_1);
-  SetUniformData(uniformBuffer, "bias2_3", intervalCount, 0, bias2_3);
-  SetUniformData(uniformBuffer, "bias4_5", intervalCount, 1, bias4_5);
-  SetUniformData(uniformBuffer, "bias6_7", intervalCount, 2, bias6_7);
-  SetUniformData(uniformBuffer, "bias8_9", intervalCount, 3, bias8_9);
+  SetUniformData(uniformBuffer, "bias0_1", intervalCount, 0, bias0_1);
+  SetUniformData(uniformBuffer, "bias2_3", intervalCount, 1, bias2_3);
+  SetUniformData(uniformBuffer, "bias4_5", intervalCount, 2, bias4_5);
+  SetUniformData(uniformBuffer, "bias6_7", intervalCount, 3, bias6_7);
+  SetUniformData(uniformBuffer, "bias8_9", intervalCount, 4, bias8_9);
   SetUniformData(uniformBuffer, "bias10_11", intervalCount, 5, bias10_11);
   SetUniformData(uniformBuffer, "bias12_13", intervalCount, 6, bias12_13);
   SetUniformData(uniformBuffer, "bias14_15", intervalCount, 7, bias14_15);
