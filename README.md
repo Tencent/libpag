@@ -191,7 +191,7 @@ versions, you can download the precompiled libraries from [here](https://github.
 
 ### Dependency Management
 
-libpag uses `depsync` tool to manage third-party dependencies.
+libpag uses [depsync](https://github.com/domchen/depsync) tool to manage third-party dependencies.
 
 **For macOS platform：**
 

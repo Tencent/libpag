@@ -182,7 +182,7 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 
 ### 依赖管理
 
-libpag 使用 depsync 命令行工具管理第三方依赖项。
+libpag 使用 [depsync](https://github.com/domchen/depsync) 命令行工具管理第三方依赖项。
 
 **macOS 平台：**
 

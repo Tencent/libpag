@@ -87,6 +87,14 @@
       {
         "command": "depsync --clean",
         "dir": "third_party"
+      },
+      {
+        "command": "git lfs prune",
+        "dir": "./"
+      },
+      {
+        "command": "git lfs pull",
+        "dir": "./"
       }
     ]
   }
