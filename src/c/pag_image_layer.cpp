@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
-#include "pag/c/pag_image.h"
 #include "pag/c/pag_image_layer.h"
+#include "pag/c/pag_image.h"
+#include "pag_types_priv.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
 

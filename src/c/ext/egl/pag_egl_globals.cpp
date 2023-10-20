@@ -16,22 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "pag/c/ext/egl/pag_egl_globals.h"
+#include <mutex>
+#include "tgfx/opengl/egl/EGLGlobals.h"
 
-#include "ext/pag_surface_ext.h"
-#include "pag_animator.h"
-#include "pag_backend_semaphore.h"
-#include "pag_backend_texture.h"
-#include "pag_byte_data.h"
-#include "pag_composition.h"
-#include "pag_decoder.h"
-#include "pag_disk_cache.h"
-#include "pag_file.h"
-#include "pag_font.h"
-#include "pag_image.h"
-#include "pag_image_layer.h"
-#include "pag_layer.h"
-#include "pag_player.h"
-#include "pag_solid_layer.h"
-#include "pag_surface.h"
-#include "pag_text_document.h"
+static std::mutex eglGlobalsLocker = {};
+
+egl_globals* pag_egl_globals_get() {
+  std::lock_guard<std::mutex> lock(eglGlobalsLocker);
+  static pag_egl_globals globals = {tgfx::EGLGlobals::Get()->display};
+  return &globals;
+}

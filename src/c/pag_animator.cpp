@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "rendering/PAGAnimator.h"
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_animator.h"
+#include "pag_types_priv.h"
+#include "rendering/PAGAnimator.h"
 
 class PAGAnimatorListenerWrapper : public pag::PAGAnimator::Listener {
  public:

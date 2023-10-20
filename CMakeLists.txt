@@ -122,7 +122,7 @@ add_subdirectory(${TGFX_DIR} EXCLUDE_FROM_ALL)
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
 
 if (PAG_USE_C)
-    file(GLOB_RECURSE PAG_C_FILES src/c/*.*)
+    file(GLOB PAG_C_FILES src/c/*.* src/c/ext/*.*)
     list(APPEND PAG_FILES ${PAG_C_FILES})
 endif ()
 
@@ -320,6 +320,12 @@ if (MACOS OR IOS)
 else ()
     list(APPEND PAG_INCLUDES third_party/lz4/lib)
     list(APPEND PAG_PLATFORM_FILES third_party/lz4/lib/lz4.c)
+endif ()
+
+if (PAG_USE_C)
+    if (ANDROID OR WIN32)
+        list(APPEND PAG_PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
+    endif ()
 endif ()
 
 add_vendor_target(PAG STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_SHARED_VENDORS})

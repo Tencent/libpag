@@ -24,14 +24,7 @@
 namespace pag {
 class DoubleBufferedDrawable : public Drawable {
  public:
-  static std::shared_ptr<DoubleBufferedDrawable> Make(int width, int height,
-                                                      const BackendTexture& frontTexture,
-                                                      const BackendTexture& backTexture,
-                                                      std::shared_ptr<tgfx::Device> device);
-
-  static std::shared_ptr<DoubleBufferedDrawable> Make(int width, int height,
-                                                      HardwareBufferRef frontBuffer,
-                                                      HardwareBufferRef backBuffer,
+  static std::shared_ptr<DoubleBufferedDrawable> Make(int width, int height, bool tryHardware,
                                                       std::shared_ptr<tgfx::Device> device);
 
   int width() const override {
@@ -44,14 +37,20 @@ class DoubleBufferedDrawable : public Drawable {
 
   void present(tgfx::Context* context) override;
 
-  bool isFront(HardwareBufferRef buffer) const {
-    return window->isFront(buffer);
-  }
-
-  bool isFront(const BackendTexture& texture) const;
-
  protected:
   explicit DoubleBufferedDrawable(std::shared_ptr<tgfx::DoubleBufferedWindow> window);
+
+  std::shared_ptr<tgfx::Surface> getFrontSurface() const override {
+    return window->getFrontSurface();
+  }
+
+  std::shared_ptr<tgfx::Surface> getBackSurface() const override {
+    return window->getBackSurface();
+  }
+
+  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+
+  std::shared_ptr<tgfx::Device> onCreateDevice() override;
 
   int _width = 0;
   int _height = 0;
@@ -59,9 +58,5 @@ class DoubleBufferedDrawable : public Drawable {
 
  private:
   DoubleBufferedDrawable(int width, int height, std::shared_ptr<tgfx::DoubleBufferedWindow> window);
-
-  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
-
-  std::shared_ptr<tgfx::Device> onCreateDevice() override;
 };
 }  // namespace pag

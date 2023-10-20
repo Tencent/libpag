@@ -16,22 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "pag/c/pag_solid_layer.h"
+#include "pag_types_priv.h"
 
-#include "ext/pag_surface_ext.h"
-#include "pag_animator.h"
-#include "pag_backend_semaphore.h"
-#include "pag_backend_texture.h"
-#include "pag_byte_data.h"
-#include "pag_composition.h"
-#include "pag_decoder.h"
-#include "pag_disk_cache.h"
-#include "pag_file.h"
-#include "pag_font.h"
-#include "pag_image.h"
-#include "pag_image_layer.h"
-#include "pag_layer.h"
-#include "pag_player.h"
-#include "pag_solid_layer.h"
-#include "pag_surface.h"
-#include "pag_text_document.h"
+pag_color pag_solid_layer_get_solid_color(pag_solid_layer* layer) {
+  if (layer == nullptr) {
+    return {0, 0, 0};
+  }
+  auto color = std::static_pointer_cast<pag::PAGSolidLayer>(layer->p)->solidColor();
+  return pag_color{color.red, color.green, color.blue};
+}
+
+void pag_solid_layer_set_solid_color(pag_solid_layer* layer, pag_color color) {
+  if (layer == nullptr) {
+    return;
+  }
+  auto c = pag::Color{color.red, color.green, color.blue};
+  std::static_pointer_cast<pag::PAGSolidLayer>(layer->p)->setSolidColor(c);
+}
