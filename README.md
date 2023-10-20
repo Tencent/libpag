@@ -176,7 +176,7 @@ We recommend using CLion IDE on the macOS platform for development.
 - The `main` branch is our active developing branch which contains the latest features and bugfixes. 
 - The branches under `release/` are our stable milestone branches which are fully tested. We will 
 periodically cut a `release/{version}` branch from the `main` branch. After one `release/{version}` 
-branch is cut, only high priority fixes are checked into it.
+branch is cut, only high-priority fixes are checked into it.
 
 **Note: This repository only contains the latest code since PAG 4.0. To use the legacy PAG 3.0 
 versions, you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
@@ -195,13 +195,13 @@ libpag uses `depsync` tool to manage third-party dependencies.
 
 **For macOS platform：**
 
-Just simply run the script in the root of libpag project:
+Run the script in the root of the project:
 
 ```
 ./sync_deps.sh
 ```
 
-This script will automatically install necessary tools and synchronize all third-party repositories.
+This script will automatically install the necessary tools and synchronize all third-party repositories.
 
 **For other platforms：**
 
@@ -212,7 +212,7 @@ computer after this step). And then run the following command to install depsync
 npm install -g depsync
 ```
 
-And then run `depsync` in the root directory of libpag project.
+And then run `depsync` in the root directory of the project.
 
 ```
 depsync
