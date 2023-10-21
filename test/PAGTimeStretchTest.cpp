@@ -35,8 +35,8 @@ PAG_TEST_SUIT(PAGTimeStrechTest)
 void TimeStretchTest(std::string path, std::string methodName, float scaleFactor) {
   std::vector<int> shortenArray = {0, 6, 30, 59};
   std::vector<int> stretchArray = {0, 12, 120, 239};
-  int startIndex = path.rfind('/') + 1;
-  int suffixIndex = path.rfind('.');
+  auto startIndex = path.rfind('/') + 1;
+  auto suffixIndex = path.rfind('.');
   auto fileName = path.substr(startIndex, suffixIndex - startIndex);
   std::vector<std::string> compareVector;
 

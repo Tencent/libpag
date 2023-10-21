@@ -291,7 +291,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
     encodeSuccess = true;
   } while (false);
   if (png_ptr) {
-    png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+    png_destroy_write_struct(&png_ptr, &info_ptr);
   }
   if (!encodeSuccess) {
     if (pngWriter.data) {
