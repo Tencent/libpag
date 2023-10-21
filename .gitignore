@@ -46,7 +46,7 @@ local.properties
 /out
 /tgfx
 /result
-vendor_tools
+/vendor_tools
 cmake-build-*
 node_modules
 Build/

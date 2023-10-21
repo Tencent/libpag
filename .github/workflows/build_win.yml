@@ -45,5 +45,5 @@ jobs:
       - if: github.event_name == 'pull_request'
         name: Windows build
         run: |
-          node ./vendor_tools/cmake-build pag -p win -a x64 -o ./win/paglib -v -i -DPAG_BUILD_SHARED=ON
+          node ./tgfx/vendor_tools/cmake-build pag -p win -a x64 -o ./win/paglib -v -i -DPAG_BUILD_SHARED=ON
         shell: bash

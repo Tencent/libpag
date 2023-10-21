@@ -1,10 +1,11 @@
 PAG_ROOT = __dir__
+TGFX_ROOT = PAG_ROOT+"/tgfx"
 
-vendorNames = "pathkit skcms libwebp"
+tgfxVendors = "pathkit skcms libwebp"
 commonCFlags = ["-DGLES_SILENCE_DEPRECATION -DTGFX_USE_WEBP_DECODE -DPAG_DLL -fvisibility=hidden -Wall -Wextra -Weffc++ -pedantic -Werror=return-type"]
 # PAG_USE_FREETYPE=ON pod install
 if ENV["PAG_USE_FREETYPE"] == 'ON' and ENV["PLATFORM"] == "mac"
-  vendorNames += " freetype"
+  tgfxVendors += " freetype"
   commonCFlags += ["-DTGFX_USE_FREETYPE"]
   $rasterSourceFiles = ['tgfx/src/vectors/freetype/**/*.{h,cpp,mm}']
 
@@ -12,19 +13,31 @@ else
   commonCFlags += ["-DTGFX_USE_CORE_GRAPHICS"]
   $rasterSourceFiles = ['tgfx/src/vectors/coregraphics/**/*.{h,cpp,mm}']
 end
-# PAG_USE_LIBAVC=OFF pod install
-if ENV["PAG_USE_LIBAVC"] != 'OFF'
-  vendorNames += " libavc"
-  commonCFlags += ["-DPAG_USE_LIBAVC"]
-end
+
 
 if  ENV["PLATFORM"] == "mac"
   system("depsync mac")
-  system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/mac/Pods/pag-vendor -p mac --xcframework")
+  system("cd tgfx && node build_vendor #{tgfxVendors} -o #{PAG_ROOT}/mac/Pods/tgfx-vendor -p mac --xcframework")
 else
   system("depsync ios")
-  system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/ios/Pods/pag-vendor -p ios --xcframework")
+  system("cd tgfx && node build_vendor #{tgfxVendors} -o #{PAG_ROOT}/ios/Pods/tgfx-vendor -p ios --xcframework")
 end
+
+ios_vendored_frameworks = ['ios/Pods/tgfx-vendor/libtgfx-vendor.xcframework']
+mac_vendored_frameworks = ['mac/Pods/tgfx-vendor/libtgfx-vendor.xcframework']
+
+# PAG_USE_LIBAVC=OFF pod install
+if ENV["PAG_USE_LIBAVC"] != 'OFF'
+  commonCFlags += ["-DPAG_USE_LIBAVC"]
+  if  ENV["PLATFORM"] == "mac"
+    system("node build_vendor libavc -o #{PAG_ROOT}/mac/Pods/pag-vendor -p mac --xcframework")
+    mac_vendored_frameworks += ['mac/Pods/pag-vendor/libpag-vendor.xcframework']
+  else
+    system("node build_vendor libavc -o #{PAG_ROOT}/ios/Pods/pag-vendor -p ios --xcframework")
+    ios_vendored_frameworks += ['ios/Pods/pag-vendor/libpag-vendor.xcframework']
+  end
+end
+
 
 iosSourceFiles = ['src/platform/ios/*.{h,cpp,mm,m}',
                   'src/platform/ios/private/*.{h,cpp,mm,m}',
@@ -114,10 +127,10 @@ Pod::Spec.new do |s|
   s.ios.libraries = ["iconv", "compression"]
 
   armv7CFlags = commonCFlags + ["-fno-aligned-allocation"]
-  s.xcconfig = {'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17','CLANG_CXX_LIBRARY' => 'libc++',"HEADER_SEARCH_PATHS" => "#{PAG_ROOT}/src #{PAG_ROOT}/include #{PAG_ROOT}/tgfx/src #{PAG_ROOT}/tgfx/include #{PAG_ROOT}/third_party/pathkit #{PAG_ROOT}/third_party/skcms #{PAG_ROOT}/third_party/freetype/include #{PAG_ROOT}/third_party/libwebp/src #{PAG_ROOT}/third_party/libavc/common #{PAG_ROOT}/third_party/libavc/decoder"}
+  s.xcconfig = {'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17','CLANG_CXX_LIBRARY' => 'libc++',"HEADER_SEARCH_PATHS" => "#{PAG_ROOT}/src #{PAG_ROOT}/include #{TGFX_ROOT}/src #{TGFX_ROOT}/include #{TGFX_ROOT}/third_party/pathkit #{TGFX_ROOT}/third_party/skcms #{TGFX_ROOT}/third_party/freetype/include #{TGFX_ROOT}/third_party/libwebp/src #{PAG_ROOT}/third_party/libavc/common #{PAG_ROOT}/third_party/libavc/decoder"}
   s.ios.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" "),"OTHER_CFLAGS[sdk=iphoneos*][arch=armv7]" => armv7CFlags.join(" "),"EXPORTED_SYMBOLS_FILE" => "${PODS_ROOT}/../libpag.lds","OTHER_LDFLAGS" => "-w -ld_classic","VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS" => "OpenGLES"}
   s.osx.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" ")}
-  s.ios.vendored_frameworks = 'ios/Pods/pag-vendor/libpag-vendor.xcframework'
-  s.osx.vendored_frameworks = 'mac/Pods/pag-vendor/libpag-vendor.xcframework'
+  s.ios.vendored_frameworks = ios_vendored_frameworks
+  s.osx.vendored_frameworks = mac_vendored_frameworks
 
 end
