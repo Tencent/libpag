@@ -45,7 +45,9 @@ if (NOT WEB)
     option(PAG_BUILD_SHARED "Build shared library" ON)
 endif ()
 
-if (MACOS)
+string(FIND ${CMAKE_COMMAND} "/CLion.app/" CLionPosition)
+get_directory_property(HasParent PARENT_DIRECTORY)
+if (CLionPosition GREATER -1 AND NOT HasParent)
     # CLion project needs test targets.
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
