@@ -355,29 +355,16 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(pag-static tgfx ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 
     list(APPEND TEST_PLATFORM_LIBS pag-static ${PAG_PLATFORM_SHARED_LIBS})
-    set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
-    set(TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include ${TGFX_DIR}/third_party/json/include)
-    list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
+    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} ${TGFX_DIR}/third_party/json/include)
 
     file(GLOB PAG_TEST_FILES
             test/*.*
             test/framework/*.*
-            test/framework/utils/*.*
-            ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
+            test/framework/utils/*.*)
 
-    file(GLOB PAG_SMOKE_TEST_FILES
-            test/PAGSmokeTest.cpp
-            test/TestUtils.cpp
-            test/framework/*.cpp
-            test/framework/utils/*.cpp
-            ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
-
-    file(GLOB PAG_PERFORMANCE_TEST_FILES
-            test/PAGPerformanceTest.cpp
-            test/TestUtils.cpp
-            test/framework/*.cpp
-            test/framework/utils/*.cpp
-            ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
+    set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
+    list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
+    list(APPEND PAG_TEST_FILES ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
@@ -407,9 +394,4 @@ if (PAG_BUILD_TESTS)
     target_include_directories(PAGFullTest PUBLIC ${TEST_INCLUDES})
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGFullTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
-
-    add_executable(PAGPerformanceTest ${Test_VENDOR_TARGET} ${PAG_PERFORMANCE_TEST_FILES})
-    target_include_directories(PAGPerformanceTest PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGPerformanceTest PUBLIC PERFORMANCE_TEST)
-    target_link_libraries(PAGPerformanceTest ${TEST_PLATFORM_LIBS})
 endif ()
