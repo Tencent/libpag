@@ -70,7 +70,7 @@ jobs:
         with:
           path: |
             third_party
-            vendor_tools
+            tgfx
             test/baseline/.cache
           key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third_party-autotest-
