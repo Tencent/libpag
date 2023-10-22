@@ -371,18 +371,18 @@ if (PAG_BUILD_TESTS)
     list(APPEND TEST_INCLUDES vendor/ffavc/include)
 
     # used to update the local md5 data for baseline testing.
-    add_executable(PAGBaseline ${PAG_TEST_FILES})
-    target_include_directories(PAGBaseline PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGBaseline PUBLIC UPDATE_BASELINE)
-    target_link_libraries(PAGBaseline ${TEST_PLATFORM_LIBS})
-    set_target_properties(PAGBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+    add_executable(UpdateBaseline ${PAG_TEST_FILES})
+    target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
+    target_link_libraries(UpdateBaseline ${TEST_PLATFORM_LIBS})
+    set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(PAGGenerateImages ${PAG_TEST_FILES})
-    target_include_directories(PAGGenerateImages PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGGenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
-    target_link_libraries(PAGGenerateImages ${TEST_PLATFORM_LIBS})
-    set_target_properties(PAGGenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+    add_executable(GenerateImages ${PAG_TEST_FILES})
+    target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
+    target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
+    set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     add_executable(PAGUnitTest ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
