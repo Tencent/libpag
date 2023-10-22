@@ -355,7 +355,7 @@ if (PAG_BUILD_TESTS)
     target_link_libraries(pag-static tgfx ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 
     list(APPEND TEST_PLATFORM_LIBS pag-static ${PAG_PLATFORM_SHARED_LIBS})
-    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} ${TGFX_DIR}/third_party/json/include)
+    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} ${TGFX_DIR}/src ${TGFX_DIR}/third_party/json/include)
 
     file(GLOB PAG_TEST_FILES
             test/*.*
@@ -368,7 +368,7 @@ if (PAG_BUILD_TESTS)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
-    list(APPEND TEST_INCLUDES ${TGFX_DIR}/src vendor/ffavc/include)
+    list(APPEND TEST_INCLUDES vendor/ffavc/include)
 
     # used to update the local md5 data for baseline testing.
     add_executable(PAGBaseline ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
