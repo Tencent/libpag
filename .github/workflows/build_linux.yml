@@ -24,7 +24,7 @@ jobs:
         with:
           path: |
             third_party
-            vendor_tools
+            tgfx
           key: third_party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-linux-
 

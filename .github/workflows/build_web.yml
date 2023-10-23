@@ -67,7 +67,7 @@ jobs:
         with:
           path: |
             third_party
-            vendor_tools
+            tgfx
             web/node_node_modules
           key: third_party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-web-

@@ -10,7 +10,10 @@ project(PAG)
 # Uncomment the next line to enable debug mode for third-party libraries.
 #set(VENDOR_DEBUG ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-include(./vendor_tools/vendor.cmake)
+
+set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tgfx)
+
+include(${TGFX_DIR}/vendor_tools/vendor.cmake)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "allow use of OpenGL as GPU backend" ON)
@@ -42,7 +45,9 @@ if (NOT WEB)
     option(PAG_BUILD_SHARED "Build shared library" ON)
 endif ()
 
-if (MACOS)
+string(FIND ${CMAKE_COMMAND} "/CLion.app/" CLionPosition)
+get_directory_property(HasParent PARENT_DIRECTORY)
+if (CLionPosition GREATER -1 AND NOT HasParent)
     # CLion project needs test targets.
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
@@ -113,13 +118,13 @@ set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
 set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-add_subdirectory(tgfx/ EXCLUDE_FROM_ALL)
-list(APPEND PAG_INCLUDES tgfx/include)
+add_subdirectory(${TGFX_DIR} EXCLUDE_FROM_ALL)
+list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
 
 if (PAG_USE_C)
     file(GLOB_RECURSE PAG_C_FILES src/c/*.*)
     list(APPEND PAG_FILES ${PAG_C_FILES})
-endif()
+endif ()
 
 if (PAG_USE_LIBAVC)
     add_definitions(-DPAG_USE_LIBAVC)
@@ -141,9 +146,9 @@ if (PAG_USE_QT)
         list(APPEND PAG_PLATFORM_FILES ${CGL_PLATFORM_FILES})
     endif ()
 elseif (PAG_USE_SWIFTSHADER)
-    file(GLOB SWIFTSHADER_LIBRARIES vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
+    file(GLOB SWIFTSHADER_LIBRARIES ${TGFX_DIR}/vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${SWIFTSHADER_LIBRARIES})
-    list(APPEND PAG_PLATFORM_INCLUDES vendor/swiftshader/include)
+    list(APPEND PAG_PLATFORM_INCLUDES ${TGFX_DIR}/vendor/swiftshader/include)
     file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/swiftshader/*.*)
 endif ()
 
@@ -285,8 +290,8 @@ elseif (WIN32)
     add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES)
 
     if (USE_NATIVE_PLATFORM)
-        list(APPEND PAG_PLATFORM_INCLUDES vendor/angle/include)
-        file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
+        list(APPEND PAG_PLATFORM_INCLUDES ${TGFX_DIR}/vendor/angle/include)
+        file(GLOB ANGLE_LIBS ${TGFX_DIR}/vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
         list(APPEND PAG_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/win/*.*)
     endif ()
@@ -351,62 +356,44 @@ if (PAG_BUILD_TESTS)
     target_include_directories(pag-static PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag-static tgfx ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 
-    list(APPEND TEST_STATIC_VENDORS googletest)
-    add_vendor_target(Test STATIC_VENDORS ${TEST_STATIC_VENDORS} SHARED_VENDORS ${TEST_SHARED_VENDORS})
-    list(APPEND TEST_PLATFORM_LIBS ${Test_VENDOR_STATIC_LIBRARIES})
-    list(APPEND TEST_PLATFORM_LIBS ${Test_VENDOR_SHARED_LIBRARIES})
     list(APPEND TEST_PLATFORM_LIBS pag-static ${PAG_PLATFORM_SHARED_LIBS})
-    set(TEST_INCLUDES third_party/googletest/googletest third_party/googletest/googletest/include third_party/json/include)
-    list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
+    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} ${TGFX_DIR}/src ${TGFX_DIR}/third_party/json/include)
 
     file(GLOB PAG_TEST_FILES
             test/*.*
             test/framework/*.*
             test/framework/utils/*.*)
 
-    file(GLOB PAG_SMOKE_TEST_FILES
-            test/PAGSmokeTest.cpp
-            test/TestUtils.cpp
-            test/framework/*.cpp
-            test/framework/utils/*.cpp)
-
-    file(GLOB PAG_PERFORMANCE_TEST_FILES
-            test/PAGPerformanceTest.cpp
-            test/TestUtils.cpp
-            test/framework/*.cpp
-            test/framework/utils/*.cpp)
+    set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
+    list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
+    list(APPEND PAG_TEST_FILES ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
-    list(APPEND TEST_INCLUDES tgfx/src vendor/ffavc/include)
+    list(APPEND TEST_INCLUDES vendor/ffavc/include)
 
     # used to update the local md5 data for baseline testing.
-    add_executable(PAGBaseline ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
-    target_include_directories(PAGBaseline PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGBaseline PUBLIC UPDATE_BASELINE)
-    target_link_libraries(PAGBaseline ${TEST_PLATFORM_LIBS})
-    set_target_properties(PAGBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+    add_executable(UpdateBaseline ${PAG_TEST_FILES})
+    target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
+    target_link_libraries(UpdateBaseline ${TEST_PLATFORM_LIBS})
+    set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(PAGGenerateImages ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
-    target_include_directories(PAGGenerateImages PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGGenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
-    target_link_libraries(PAGGenerateImages ${TEST_PLATFORM_LIBS})
-    set_target_properties(PAGGenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+    add_executable(GenerateImages ${PAG_TEST_FILES})
+    target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
+    target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
+    set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
+    add_executable(PAGUnitTest ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGFullTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
+    add_executable(PAGFullTest ${PAG_TEST_FILES})
     target_include_directories(PAGFullTest PUBLIC ${TEST_INCLUDES})
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGFullTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
-
-    add_executable(PAGPerformanceTest ${Test_VENDOR_TARGET} ${PAG_PERFORMANCE_TEST_FILES})
-    target_include_directories(PAGPerformanceTest PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGPerformanceTest PUBLIC PERFORMANCE_TEST)
-    target_link_libraries(PAGPerformanceTest ${TEST_PLATFORM_LIBS})
 endif ()

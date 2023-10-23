@@ -1,7 +1,7 @@
 #!/bin/sh
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
-  if [ -f "$CACHE_VERSION_FILE" ]; then
+  if [[ $1 != "1" ]] && [ -f "$CACHE_VERSION_FILE" ]; then
     HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
     if [[ ${HAS_DIFF} == "" ]]; then
       exit 0
@@ -16,6 +16,9 @@
 
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
+    if [ ! $(which gcovr) ]; then
+        brew install gcovr
+    fi
   else
     BUILD_DIR=cmake-build-debug
   fi
@@ -39,13 +42,21 @@
   echo $CMAKE_COMMAND
 
   if [[ $1 == "1" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
-    $CMAKE_COMMAND -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
-  $CMAKE_COMMAND --build . --target PAGBaseline -- -j 12
-  ./PAGBaseline
+  $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
+  ./UpdateBaseline
+
+  if test $? -eq 0; then
+    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
+  else
+    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Failed~~~~~~~~~~~~~~~~~~"
+    COMPLIE_RESULT=false
+  fi
+
   cd ..
 
   git switch $CURRENT_BRANCH --quiet
@@ -53,6 +64,15 @@
     git stash pop --index --quiet
   fi
 
-  echo "~~~~~~~~~~~~~~~~~~~Update Baseline END~~~~~~~~~~~~~~~~~~~~~"
-  exit
+  if [[ $1 == "1" ]]; then
+    mkdir -p result
+    gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
+    gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
+  fi
+
+  if [ "$COMPLIE_RESULT" == false ]; then
+    mkdir -p result
+    cp -r test/out result
+    exit 1
+  fi
 }

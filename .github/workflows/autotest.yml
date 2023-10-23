@@ -70,7 +70,7 @@ jobs:
         with:
           path: |
             third_party
-            vendor_tools
+            tgfx
             test/baseline/.cache
           key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third_party-autotest-
@@ -84,13 +84,8 @@ jobs:
         name: Build cache（push）
         run: |
           node build_vendor -p mac
-          if [ ! $(which gcovr) ]; then
-            brew install gcovr
-          fi
           chmod +x update_baseline.sh
           ./update_baseline.sh 1
-          mkdir result
-          cp -r test/baseline result
 
       - if: github.event_name == 'pull_request'
         name: Run autotest script
@@ -103,7 +98,7 @@ jobs:
         uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: libpag/result/coverage.xml
+          file: result/coverage.xml
       - name: The job has failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
