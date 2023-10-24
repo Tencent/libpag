@@ -64,7 +64,6 @@ cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
 cd ..
 
-gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
 gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
 
 rm -rf build

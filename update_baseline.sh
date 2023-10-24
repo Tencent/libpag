@@ -66,7 +66,6 @@
 
   if [[ $1 == "1" ]]; then
     mkdir -p result
-    gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
     gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
   fi
 
