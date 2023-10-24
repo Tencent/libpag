@@ -162,6 +162,18 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
   return {sampler, texture.width(), texture.height()};
 }
 
+BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
+  tgfx::GLTextureInfo glInfo = {};
+  if (!texture.getGLTextureInfo(&glInfo)) {
+    return {};
+  }
+  GLTextureInfo sampler = {};
+  sampler.id = glInfo.id;
+  sampler.target = glInfo.target;
+  sampler.format = glInfo.format;
+  return {sampler, texture.width(), texture.height()};
+}
+
 tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
   GLFrameBufferInfo glInfo = {};
   if (!renderTarget.getGLFramebufferInfo(&glInfo)) {

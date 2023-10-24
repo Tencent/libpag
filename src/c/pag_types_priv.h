@@ -21,7 +21,6 @@
 #include "pag/c/pag_types.h"
 #include "pag/pag.h"
 #include "rendering/PAGAnimator.h"
-#include "rendering/drawables/DoubleBufferedDrawable.h"
 #include "tgfx/gpu/Device.h"
 
 enum class PAGObjectType : uint8_t {
@@ -74,15 +73,32 @@ struct pag_player {
   std::shared_ptr<pag::PAGPlayer> p;
 };
 
+namespace pag {
+class PAGSurfaceExt {
+ public:
+  explicit PAGSurfaceExt(std::shared_ptr<PAGSurface> surface) : surface(std::move(surface)) {
+  }
+
+  BackendTexture getFrontTexture();
+
+  BackendTexture getBackTexture();
+
+  HardwareBufferRef getFrontHardwareBuffer();
+
+  HardwareBufferRef getBackHardwareBuffer();
+
+  std::shared_ptr<PAGSurface> surface;
+};
+}  // namespace pag
+
 struct pag_surface {
-  explicit pag_surface(std::shared_ptr<pag::PAGSurface> surface,
-                       std::shared_ptr<pag::DoubleBufferedDrawable> drawable = nullptr)
-      : p(std::move(surface)), drawable(std::move(drawable)) {
+  explicit pag_surface(std::shared_ptr<pag::PAGSurface> surface)
+      : p(surface), ext(std::make_shared<pag::PAGSurfaceExt>(surface)) {
   }
 
   PAGObjectType type = PAGObjectType::Surface;
   std::shared_ptr<pag::PAGSurface> p;
-  std::shared_ptr<pag::DoubleBufferedDrawable> drawable;
+  std::shared_ptr<pag::PAGSurfaceExt> ext;
 };
 
 struct pag_image {

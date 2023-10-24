@@ -16,21 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
-#include "pag/c/pag_solid_layer.h"
+#include "pag/c/pag_surface.h"
+#include "pag_types_priv.h"
 
-pag_color pag_solid_layer_get_solid_color(pag_solid_layer* layer) {
-  if (layer == nullptr) {
-    return {0, 0, 0};
+pag_surface* pag_surface_make_offscreen(int width, int height) {
+  if (auto surface = pag::PAGSurface::MakeOffscreen(width, height)) {
+    return new pag_surface(std::move(surface));
   }
-  auto color = std::static_pointer_cast<pag::PAGSolidLayer>(layer->p)->solidColor();
-  return pag_color{color.red, color.green, color.blue};
+  return nullptr;
 }
 
-void pag_solid_layer_set_solid_color(pag_solid_layer* layer, pag_color color) {
-  if (layer == nullptr) {
-    return;
+bool pag_surface_read_pixels(pag_surface* surface, pag_color_type colorType,
+                             pag_alpha_type alphaType, void* dstPixels, size_t dstRowBytes) {
+  if (surface == nullptr) {
+    return false;
   }
-  auto c = pag::Color{color.red, color.green, color.blue};
-  std::static_pointer_cast<pag::PAGSolidLayer>(layer->p)->setSolidColor(c);
+  pag::ColorType pagColorType;
+  if (!FromCColorType(colorType, &pagColorType)) {
+    return false;
+  }
+  pag::AlphaType pagAlphaType;
+  if (!FromCAlphaType(alphaType, &pagAlphaType)) {
+    return false;
+  }
+  return surface->p->readPixels(pagColorType, pagAlphaType, dstPixels, dstRowBytes);
 }

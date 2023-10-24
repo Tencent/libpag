@@ -61,8 +61,8 @@ end
 cSourceFiles = []
 if ENV["PAG_USE_C"] == 'ON'
   cSourceFiles += ["src/c/*.*"]
-  iosSourceFiles += ["src/c/*.{h,cpp,mm,m}"]
-  macSourceFiles += ["src/c/*.{h,cpp,mm,m}"]
+  iosSourceFiles += ["src/c/*.{h,cpp,mm,m}", "src/c/ext/*.{h,cpp,mm,m}"]
+  macSourceFiles += ["src/c/*.{h,cpp,mm,m}", "src/c/ext/*.{h,cpp,mm,m}"]
 end
 
 Pod::Spec.new do |s|

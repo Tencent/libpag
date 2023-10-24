@@ -105,6 +105,66 @@ HardwareBufferRef PAGSurface::getHardwareBuffer() {
   return hardwareBuffer;
 }
 
+BackendTexture PAGSurface::getFrontTexture() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext(true);
+  if (context == nullptr) {
+    return {};
+  }
+  if (drawable->getSurface(context, true) == nullptr) {
+    unlockContext();
+    return {};
+  }
+  auto texture = drawable->getFrontSurface()->getBackendTexture();
+  unlockContext();
+  return ToPAG(texture);
+}
+
+BackendTexture PAGSurface::getBackTexture() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext(true);
+  if (context == nullptr) {
+    return {};
+  }
+  if (drawable->getSurface(context, true) == nullptr) {
+    unlockContext();
+    return {};
+  }
+  auto texture = drawable->getBackSurface()->getBackendTexture();
+  unlockContext();
+  return ToPAG(texture);
+}
+
+HardwareBufferRef PAGSurface::getFrontHardwareBuffer() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext(true);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  if (drawable->getSurface(context, true) == nullptr) {
+    unlockContext();
+    return nullptr;
+  }
+  auto buffer = drawable->getFrontSurface()->getHardwareBuffer();
+  unlockContext();
+  return buffer;
+}
+
+HardwareBufferRef PAGSurface::getBackHardwareBuffer() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext(true);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  if (drawable->getSurface(context, true) == nullptr) {
+    unlockContext();
+    return nullptr;
+  }
+  auto buffer = drawable->getBackSurface()->getHardwareBuffer();
+  unlockContext();
+  return buffer;
+}
+
 bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,
                             size_t dstRowBytes) {
   LockGuard autoLock(rootLocker);

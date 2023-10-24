@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_decoder.h"
+#include "pag_types_priv.h"
 
 pag_decoder* pag_decoder_create(pag_composition* composition, float maxFrameRate, float scale) {
   if (composition == nullptr) {

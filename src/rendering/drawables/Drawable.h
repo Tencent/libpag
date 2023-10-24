@@ -40,6 +40,14 @@ class Drawable {
 
   virtual std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) = 0;
 
+  virtual std::shared_ptr<tgfx::Surface> getFrontSurface() const {
+    return surface;
+  }
+
+  virtual std::shared_ptr<tgfx::Surface> getBackSurface() const {
+    return surface;
+  }
+
  private:
   std::shared_ptr<tgfx::Device> device = nullptr;
 
