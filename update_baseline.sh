@@ -1,7 +1,7 @@
 #!/bin/sh
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
-  if [[ $1 != "1" ]] && [ -f "$CACHE_VERSION_FILE" ]; then
+  if [ -f "$CACHE_VERSION_FILE" ]; then
     HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
     if [[ ${HAS_DIFF} == "" ]]; then
       exit 0
@@ -14,11 +14,10 @@
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
+  depsync
+
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
-    if [ ! $(which gcovr) ]; then
-        brew install gcovr
-    fi
   else
     BUILD_DIR=cmake-build-debug
   fi
@@ -62,11 +61,6 @@
   git switch $CURRENT_BRANCH --quiet
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
     git stash pop --index --quiet
-  fi
-
-  if [[ $1 == "1" ]]; then
-    mkdir -p result
-    gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
   fi
 
   if [ "$COMPLIE_RESULT" == false ]; then

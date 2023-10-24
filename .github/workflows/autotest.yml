@@ -24,8 +24,6 @@ jobs:
             /usr/local/Cellar/ninja
             /usr/local/Cellar/icu4c
             /usr/local/bin/ninja
-            /usr/local/Cellar/node
-            /usr/local/bin/node
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/bin/depsync
@@ -55,7 +53,8 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-macos-20231024
+          key: libpag-environment-macos-20231025
+          restore-keys: libpag-environment-macos-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -80,20 +79,17 @@ jobs:
           ./codeformat.sh
         shell: bash
 
-      - name: Update Baseline
-        if: github.event_name == 'push'
-        run: |
-          chmod +x update_baseline.sh
-          ./update_baseline.sh 1
-
       - name: Run Autotest
-        if: github.event_name == 'pull_request'
         run: |
           chmod +x autotest.sh
           ./autotest.sh
 
-      - name: Update Codecov
-        if: github.event_name == 'push'
+      - name: Run Codecov
+        run: |
+          chmod +x codecov.sh
+          ./codecov.sh
+
+      - name: Upload Codecov
         uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -107,8 +103,6 @@ jobs:
             /usr/local/Cellar/ninja
             /usr/local/Cellar/icu4c
             /usr/local/bin/ninja
-            /usr/local/Cellar/node
-            /usr/local/bin/node
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/bin/depsync
@@ -138,7 +132,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-macos-20231024
+          key: libpag-environment-macos-20231025
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

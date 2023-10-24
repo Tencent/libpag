@@ -31,6 +31,7 @@ cd $WORKSPACE
 make_dir result
 make_dir build
 
+./update_baseline.sh 1
 cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 cd build
@@ -63,8 +64,6 @@ fi
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
 cd ..
-
-gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
 
 rm -rf build
 

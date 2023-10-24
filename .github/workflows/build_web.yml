@@ -55,9 +55,9 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-autotest-20221018
-          restore-keys: |
-            libpag-environment-autotest-20221018
+          key: libpag-environment-macos-20231025
+          restore-keys: libpag-environment-macos-
+
       - uses: actions/checkout@v3
         with:
           lfs: true

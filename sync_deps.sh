@@ -2,7 +2,7 @@
 cd $(dirname $0)
 
 if [[ `uname` == 'Darwin' ]]; then
-  MAC_REQUIRED_TOOLS="node cmake ninja yasm git-lfs emcc"
+  MAC_REQUIRED_TOOLS="node cmake ninja yasm git-lfs emcc gcovr"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
   if [ ! $(which $TOOL) ]; then
     if [ ! $(which brew) ]; then
