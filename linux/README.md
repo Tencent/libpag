@@ -37,6 +37,12 @@
 
 ## Linux demo
     The library files that the sample project depends on come from the previous step.
-     
+     mkdir linux/build
+     cd linux
+     cmake .
+     make
+     mv pag-linux build/
+     cd build/
+     ./pag-linux
   
  
