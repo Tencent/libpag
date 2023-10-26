@@ -54,7 +54,7 @@ jobs:
 
       - name: Build iOS
         run: |
-          node build_tgfx -p ios -a arm64
+          node build_pag -p ios -a arm64
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -125,7 +125,7 @@ jobs:
 
       - name: Build Android
         run: |
-          node build_tgfx -p android -a arm64
+          node build_pag -p android -a arm64
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
@@ -216,7 +216,7 @@ jobs:
 
       - name: Build Web
         run: |
-          node build_tgfx -p web
+          node build_pag -p web
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -304,7 +304,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -p win -a x64
+          node build_pag -p win -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -355,7 +355,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -Dlibpag_USE_SWIFTSHADER=ON -p linux
+          node build_pag -DPAG_USE_SWIFTSHADER=ON -p linux
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -416,7 +416,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_tgfx -Dlibpag_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -p linux
+          node build_pag -DPAG_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -p linux
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
