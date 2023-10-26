@@ -211,9 +211,9 @@
   }
   filePath = [path retain];
   [PAGFile LoadAsync:path
-      completionBlock:^(PAGFile* pagFile) {
-        [self setComposition:pagFile];
-        callback(pagFile);
+      completionBlock:^(PAGFile* file) {
+        [self setComposition:file];
+        callback(file);
       }];
 }
 

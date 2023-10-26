@@ -262,9 +262,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  PAGDecoder* pagDecoder = [self getPAGDecoder];
-  if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
-    BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
+  PAGDecoder* decoder = [self getPAGDecoder];
+  if ([decoder checkFrameChanged:(int)frameIndex]) {
+    BOOL status = [decoder readFrame:frameIndex to:pixelBuffer];
     if (!status) {
       return status;
     }
