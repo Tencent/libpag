@@ -7,8 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  autotest:
-    runs-on: macos-latest
+  mac:
+    # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
+    runs-on: macos-13
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
@@ -30,31 +31,8 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-            /usr/local/Cellar/emsdk
-            /usr/local/Cellar/emsdk/upstream/emscripten
-            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
-            /usr/local/bin/em++
-            /usr/local/bin/em-config
-            /usr/local/bin/emar
-            /usr/local/bin/embuilder
-            /usr/local/bin/emcc
-            /usr/local/bin/emcmake
-            /usr/local/bin/emconfigure
-            /usr/local/bin/emdump
-            /usr/local/bin/emdwp
-            /usr/local/bin/emmake
-            /usr/local/bin/emnm
-            /usr/local/bin/emrun
-            /usr/local/bin/emprofile
-            /usr/local/bin/emscons
-            /usr/local/bin/emsize
-            /usr/local/bin/emstrip
-            /usr/local/bin/emsymbolizer
-            /usr/local/bin/emcc.py
-            /usr/local/bin/emcmake.py
-            /usr/local/bin/emar.py
-          key: libpag-environment-macos-20231025
-          restore-keys: libpag-environment-macos-
+          key: libpag-environment-autotest-20231025
+          restore-keys: libpag-environment-autotest-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -69,8 +47,8 @@ jobs:
 
       - name: Run depsync
         run: |
-          chmod +x sync_deps.sh
-          ./sync_deps.sh
+          npm install depsync -g
+          depsync
         shell: bash
 
       - name: Check Code Format
@@ -90,7 +68,7 @@ jobs:
           ./codecov.sh
 
       - name: Upload Codecov
-        uses: codecov/codecov-action@v2.1.0
+        uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: result/coverage.xml
@@ -109,30 +87,7 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-            /usr/local/Cellar/emsdk
-            /usr/local/Cellar/emsdk/upstream/emscripten
-            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
-            /usr/local/bin/em++
-            /usr/local/bin/em-config
-            /usr/local/bin/emar
-            /usr/local/bin/embuilder
-            /usr/local/bin/emcc
-            /usr/local/bin/emcmake
-            /usr/local/bin/emconfigure
-            /usr/local/bin/emdump
-            /usr/local/bin/emdwp
-            /usr/local/bin/emmake
-            /usr/local/bin/emnm
-            /usr/local/bin/emrun
-            /usr/local/bin/emprofile
-            /usr/local/bin/emscons
-            /usr/local/bin/emsize
-            /usr/local/bin/emstrip
-            /usr/local/bin/emsymbolizer
-            /usr/local/bin/emcc.py
-            /usr/local/bin/emcmake.py
-            /usr/local/bin/emar.py
-          key: libpag-environment-macos-20231025
+          key: libpag-environment-autotest-20231025
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -140,18 +95,18 @@ jobs:
         with:
           path: |
             third_party
-            vendor_tools
+            tgfx
             test/baseline/.cache
           key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: result
           path: result
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: result
           path: result
