@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <CoreFoundation/CoreFoundation.h>
+#import <QuartzCore/QuartzCore.h>
 #include <functional>
 
 @interface PAGAnimationCallback : NSObject {
