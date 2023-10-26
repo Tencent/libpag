@@ -14,7 +14,9 @@
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
+  ./install_tools.sh
   depsync
+  git-lfs pull
 
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build

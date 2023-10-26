@@ -20,10 +20,10 @@
 
 @implementation PAGAnimationCallback
 
-- (instancetype)initWithCallback:(std::function<void()>)callback {
+- (instancetype)initWithCallback:(std::function<void()>)animationCallback {
   self = [super init];
   if (self) {
-    self->callback = callback;
+    self->callback = animationCallback;
   }
   return self;
 }
