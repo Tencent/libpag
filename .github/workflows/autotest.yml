@@ -29,7 +29,11 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: libpag-environment-autotest-20231027
+            /usr/local/Cellar/gcovr
+            /usr/local/bin/gcovr
+            /usr/local/Cellar/python-lxml
+            /usr/local/Cellar/python-markupsafe
+          key: libpag-environment-autotest-20231028
           restore-keys: libpag-environment-autotest-
 
       - name: Get Third-Party Cache
@@ -83,7 +87,11 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: libpag-environment-autotest-20231027
+            /usr/local/Cellar/gcovr
+            /usr/local/bin/gcovr
+            /usr/local/Cellar/python-lxml
+            /usr/local/Cellar/python-markupsafe
+          key: libpag-environment-autotest-20231028
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
