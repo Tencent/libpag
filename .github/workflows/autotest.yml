@@ -33,8 +33,7 @@ jobs:
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
-          key: libpag-environment-autotest-20230928
-          restore-keys: libpag-environment-autotest-
+          key: libpag-environment-autotest-20230929
 
       - name: Check Code Format
         run: |
@@ -44,9 +43,9 @@ jobs:
 
       - name: Run Codecov
         run: |
-          pip show lxml
           chmod +x codecov.sh
           ./codecov.sh
+          pip show lxml
 
       - name: Save Environment Cache
         uses: actions/cache/save@v3
@@ -63,7 +62,7 @@ jobs:
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
-          key: libpag-environment-autotest-20230928
+          key: libpag-environment-autotest-20230929
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
