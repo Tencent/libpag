@@ -13,9 +13,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
@@ -45,7 +42,8 @@ jobs:
         run: |
           chmod +x codecov.sh
           ./codecov.sh
-          pip show lxml
+          brew info python-lxml
+          pip show python-lxml
 
       - name: Save Environment Cache
         uses: actions/cache/save@v3
