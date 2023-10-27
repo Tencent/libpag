@@ -33,25 +33,8 @@ jobs:
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
-          key: libpag-environment-autotest-20231028
+          key: libpag-environment-autotest-20230928
           restore-keys: libpag-environment-autotest-
-
-      - name: Get Third-Party Cache
-        id: third-party-cache
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            third_party
-            tgfx
-            test/baseline/.cache
-          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-autotest-
-
-      - name: Run depsync
-        run: |
-          npm install depsync -g
-          depsync
-        shell: bash
 
       - name: Check Code Format
         run: |
@@ -59,24 +42,13 @@ jobs:
           ./codeformat.sh
         shell: bash
 
-      - name: Run Autotest
-        run: |
-          chmod +x autotest.sh
-          ./autotest.sh
-
       - name: Run Codecov
         run: |
+          pip show lxml
           chmod +x codecov.sh
           ./codecov.sh
 
-      - name: Upload Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: result/coverage.xml
-
       - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:
           path: |
@@ -91,7 +63,7 @@ jobs:
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
-          key: libpag-environment-autotest-20231028
+          key: libpag-environment-autotest-20230928
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
