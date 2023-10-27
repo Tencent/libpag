@@ -28,8 +28,12 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
+            /usr/local/bin/clang-format
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
+            /usr/local/lib/python3.12/site-packages/lxml
+            /usr/local/lib/python3.12/site-packages/markupsafe
+            /usr/local/lib/python3.12/site-packages/pycparser
           key: libpag-environment-autotest-20230929
 
       - name: Check Code Format
@@ -42,9 +46,6 @@ jobs:
         run: |
           chmod +x codecov.sh
           ./codecov.sh
-          cd /usr/local/lib/python3.12/site-packages
-          ls
-          pip show python-lxml
 
       - name: Save Environment Cache
         uses: actions/cache/save@v3
@@ -59,8 +60,12 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
+            /usr/local/bin/clang-format
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
+            /usr/local/lib/python3.12/site-packages/lxml
+            /usr/local/lib/python3.12/site-packages/markupsafe
+            /usr/local/lib/python3.12/site-packages/pycparser
           key: libpag-environment-autotest-20230929
 
       - name: Save Third-Party Cache
