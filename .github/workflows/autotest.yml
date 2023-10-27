@@ -42,7 +42,7 @@ jobs:
         run: |
           chmod +x codecov.sh
           ./codecov.sh
-          cd /usr/local/lib/python3.11/site-packages
+          cd /usr/local/lib/python3.10/site-packages
           ls
           pip show python-lxml
 
