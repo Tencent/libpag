@@ -42,7 +42,10 @@ jobs:
         run: |
           chmod +x codecov.sh
           ./codecov.sh
-          brew info python-lxml
+          cd /usr/local/lib
+          ls
+          cd python3.12/site-packages
+          ls
           pip show python-lxml
 
       - name: Save Environment Cache
