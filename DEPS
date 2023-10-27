@@ -45,10 +45,6 @@
       {
         "command": "git lfs prune",
         "dir": "./"
-      },
-      {
-        "command": "git lfs pull",
-        "dir": "./"
       }
     ]
   }
