@@ -42,8 +42,8 @@ cmake --build $BUILD_DIR --target pag
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
-  -I$SOURCE_DIR/tgfx/include/ \
-  -I$SOURCE_DIR/tgfx/src/ \
+  -I$SOURCE_DIR/third_party/tgfx/include/ \
+  -I$SOURCE_DIR/third_party/tgfx/src/ \
   -DPAG_BUILD_FOR_WEB \
   -Wl,--whole-archive $BUILD_DIR/libpag.a \
   --no-entry \

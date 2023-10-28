@@ -44,7 +44,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
             test/baseline/.cache
           key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-autotest-
@@ -103,7 +102,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
             test/baseline/.cache
           key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 

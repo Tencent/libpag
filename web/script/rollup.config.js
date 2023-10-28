@@ -33,7 +33,7 @@ const plugins = [
   resolve({ extensions: ['.ts', '.js'] }),
   commonJs(),
   alias({
-    entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../tgfx/web/src') }],
+    entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
   }),
 ];
 

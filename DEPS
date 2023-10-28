@@ -6,12 +6,16 @@
   "repos": {
     "common": [
       {
+        "url": "${PAG_GROUP}/vendor_tools.git",
+        "commit": "d3ffae9cb4decad51c2e52464c190f81ae257cc5",
+        "dir": "third_party/vendor_tools"
+      },
+      {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "75360908b0007b8d5afd4aca6d8a504488a7da82",
-        "dir": "tgfx",
+        "commit": "403ab4c1079ac4ff4da360fcc5a416bfa984fd5b",
+        "dir": "third_party/tgfx",
         "keeps": [
-          "third_party",
-          "vendor_tools"
+          "third_party"
         ]
       },
       {
