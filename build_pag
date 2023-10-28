@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-require("./tgfx/vendor_tools/lib-build");
+require("./third_party/tgfx/vendor_tools/lib-build");

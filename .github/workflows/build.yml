@@ -36,7 +36,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-ios-
 
@@ -76,7 +75,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
@@ -105,7 +103,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-android-
 
@@ -135,7 +132,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
@@ -204,7 +200,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-web-
 
@@ -263,7 +258,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
@@ -292,7 +286,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-windows-
 
@@ -312,7 +305,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
@@ -341,7 +333,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-linux-
 
@@ -363,7 +354,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
@@ -392,7 +382,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-qt-
 
@@ -424,7 +413,6 @@ jobs:
         with:
           path: |
             third_party
-            tgfx
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed

@@ -47,7 +47,7 @@ make_dir linux/vendor/pag/$PLATFORM/x64
 cp -a $BUILD_DIR/libpag.a linux/vendor/pag/$PLATFORM/x64
 
 make_dir linux/vendor/swiftshader
-cp -a tgfx/vendor/swiftshader/* linux/vendor/swiftshader
+cp -a third_party/tgfx/vendor/swiftshader/* linux/vendor/swiftshader
 
 rm -rf $BUILD_DIR
 

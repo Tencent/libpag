@@ -36,7 +36,7 @@ export default [
       commonJs(),
       replaceFunc(),
       alias({
-        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../tgfx/web/src') }],
+        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
       }),
     ],
   },

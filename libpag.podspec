@@ -1,5 +1,5 @@
 PAG_ROOT = __dir__
-TGFX_ROOT = PAG_ROOT+"/tgfx"
+TGFX_ROOT = PAG_ROOT+"/third_party/tgfx"
 
 tgfxVendors = "pathkit skcms libwebp"
 commonCFlags = ["-DGLES_SILENCE_DEPRECATION -DTGFX_USE_WEBP_DECODE -DPAG_DLL -fvisibility=hidden -Wall -Wextra -Weffc++ -pedantic -Werror=return-type"]
@@ -7,20 +7,20 @@ commonCFlags = ["-DGLES_SILENCE_DEPRECATION -DTGFX_USE_WEBP_DECODE -DPAG_DLL -fv
 if ENV["PAG_USE_FREETYPE"] == 'ON' and ENV["PLATFORM"] == "mac"
   tgfxVendors += " freetype"
   commonCFlags += ["-DTGFX_USE_FREETYPE"]
-  $rasterSourceFiles = ['tgfx/src/vectors/freetype/**/*.{h,cpp,mm}']
+  $rasterSourceFiles = ['third_party/tgfx/src/vectors/freetype/**/*.{h,cpp,mm}']
 
 else
   commonCFlags += ["-DTGFX_USE_CORE_GRAPHICS"]
-  $rasterSourceFiles = ['tgfx/src/vectors/coregraphics/**/*.{h,cpp,mm}']
+  $rasterSourceFiles = ['third_party/tgfx/src/vectors/coregraphics/**/*.{h,cpp,mm}']
 end
 
 
 if  ENV["PLATFORM"] == "mac"
   system("depsync mac")
-  system("cd tgfx && node build_vendor #{tgfxVendors} -o #{PAG_ROOT}/mac/Pods/tgfx-vendor -p mac --xcframework")
+  system("cd #{TGFX_ROOT} && node build_vendor #{tgfxVendors} -o #{PAG_ROOT}/mac/Pods/tgfx-vendor -p mac --xcframework")
 else
   system("depsync ios")
-  system("cd tgfx && node build_vendor #{tgfxVendors} -o #{PAG_ROOT}/ios/Pods/tgfx-vendor -p ios --xcframework")
+  system("cd #{TGFX_ROOT} && node build_vendor #{tgfxVendors} -o #{PAG_ROOT}/ios/Pods/tgfx-vendor -p ios --xcframework")
 end
 
 ios_vendored_frameworks = ['ios/Pods/tgfx-vendor/libtgfx-vendor.xcframework']
@@ -42,20 +42,20 @@ end
 iosSourceFiles = ['src/platform/ios/*.{h,cpp,mm,m}',
                   'src/platform/ios/private/*.{h,cpp,mm,m}',
                   'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                  'tgfx/src/opengl/eagl/*.{h,cpp,mm}',
-                  'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}']
+                  'third_party/tgfx/src/opengl/eagl/*.{h,cpp,mm}',
+                  'third_party/tgfx/src/platform/apple/**/*.{h,cpp,mm,m}']
 
 if ENV["PAG_USE_QT"] == 'ON'
   macSourceFiles = ['src/platform/qt/**/*.{h,cpp,mm,m}',
-                    'tgfx/src/platform/apple/*.{h,cpp,m,mm}',
-                    'tgfx/src/opengl/qt/*.{h,cpp,mm}',
-                    'tgfx/src/opengl/cgl/CGLHardwareTexture.mm',
+                    'third_party/tgfx/src/platform/apple/*.{h,cpp,m,mm}',
+                    'third_party/tgfx/src/opengl/qt/*.{h,cpp,mm}',
+                    'third_party/tgfx/src/opengl/cgl/CGLHardwareTexture.mm',
                     'src/platform/mac/private/HardwareDecoder.mm']
 else
   macSourceFiles = ['src/platform/mac/**/*.{h,cpp,mm,m}',
                     'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                    'tgfx/src/opengl/cgl/*.{h,cpp,mm}',
-                    'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}']
+                    'third_party/tgfx/src/opengl/cgl/*.{h,cpp,mm}',
+                    'third_party/tgfx/src/platform/apple/**/*.{h,cpp,mm,m}']
 end
 
 cSourceFiles = []
@@ -88,26 +88,26 @@ Pod::Spec.new do |s|
                     'src/video/**/*.{h,cpp}',
                     'src/rendering/**/*.{h,cpp}',
                     'src/platform/*.{h,cpp}',
-                    'tgfx/src/core/*.{h,cpp}',
-                    'tgfx/src/codecs/*.{h,cpp}',
-                    'tgfx/src/effects/**/*.{h,cpp}',
-                    'tgfx/src/images/**/*.{h,cpp}',
-                    'tgfx/src/shaders/**/*.{h,cpp}',
-                    'tgfx/src/shapes/**/*.{h,cpp}',
-                    'tgfx/src/utils/**/*.{h,cpp}',
-                    'tgfx/src/vectors/*.{h,cpp}',
-                    'tgfx/src/gpu/**/*.{h,cpp}',
-                    'tgfx/src/opengl/*.{h,cpp,mm}',
-                    'tgfx/src/opengl/processors/**/*.{h,cpp}',
-                    'tgfx/src/platform/*.{h,cpp}',
-                    'tgfx/src/codecs/webp/**/*.{h,cpp,mm}'
+                    'third_party/tgfx/src/core/*.{h,cpp}',
+                    'third_party/tgfx/src/codecs/*.{h,cpp}',
+                    'third_party/tgfx/src/effects/**/*.{h,cpp}',
+                    'third_party/tgfx/src/images/**/*.{h,cpp}',
+                    'third_party/tgfx/src/shaders/**/*.{h,cpp}',
+                    'third_party/tgfx/src/shapes/**/*.{h,cpp}',
+                    'third_party/tgfx/src/utils/**/*.{h,cpp}',
+                    'third_party/tgfx/src/vectors/*.{h,cpp}',
+                    'third_party/tgfx/src/gpu/**/*.{h,cpp}',
+                    'third_party/tgfx/src/opengl/*.{h,cpp,mm}',
+                    'third_party/tgfx/src/opengl/processors/**/*.{h,cpp}',
+                    'third_party/tgfx/src/platform/*.{h,cpp}',
+                    'third_party/tgfx/src/codecs/webp/**/*.{h,cpp,mm}'
 
   s.source_files = $source_files + $rasterSourceFiles + cSourceFiles;
 
   s.compiler_flags = '-Wno-documentation'
 
   if ENV["PAG_USE_QT"] == 'ON'
-    s.osx.public_header_files = ['src/platform/qt/*.h', 'tgfx/src/opengl/*.h']
+    s.osx.public_header_files = ['src/platform/qt/*.h', 'third_party/tgfx/src/opengl/*.h']
   else
     s.osx.public_header_files = 'src/platform/mac/*.h',
                                 'src/platform/cocoa/*.h'

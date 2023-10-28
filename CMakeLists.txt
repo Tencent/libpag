@@ -11,7 +11,7 @@ project(PAG)
 #set(VENDOR_DEBUG ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tgfx)
+set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tgfx)
 
 include(${TGFX_DIR}/vendor_tools/vendor.cmake)
 
