@@ -18,33 +18,16 @@
 
 #include "DoubleBufferedDrawable.h"
 #include "base/utils/TGFXCast.h"
+#include "tgfx/opengl/GLDevice.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
 std::shared_ptr<DoubleBufferedDrawable> DoubleBufferedDrawable::Make(
-    int width, int height, const BackendTexture& frontTexture, const BackendTexture& backTexture,
-    std::shared_ptr<tgfx::Device> device) {
-  if (!frontTexture.isValid() || !backTexture.isValid() ||
-      frontTexture.backend() != Backend::OPENGL || backTexture.backend() != Backend::OPENGL ||
-      device == nullptr) {
+    int width, int height, bool tryHardware, std::shared_ptr<tgfx::Device> device) {
+  if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto window = tgfx::DoubleBufferedWindow::Make(std::move(device), ToTGFX(frontTexture),
-                                                 ToTGFX(backTexture));
-  if (window == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<DoubleBufferedDrawable>(
-      new DoubleBufferedDrawable(width, height, std::move(window)));
-}
-
-std::shared_ptr<DoubleBufferedDrawable> DoubleBufferedDrawable::Make(
-    int width, int height, HardwareBufferRef frontBuffer, HardwareBufferRef backBuffer,
-    std::shared_ptr<tgfx::Device> device) {
-  if (frontBuffer == nullptr || backBuffer == nullptr || device == nullptr) {
-    return nullptr;
-  }
-  auto window = tgfx::DoubleBufferedWindow::Make(std::move(device), frontBuffer, backBuffer);
+  auto window = tgfx::DoubleBufferedWindow::Make(std::move(device), width, height, tryHardware);
   if (window == nullptr) {
     return nullptr;
   }
@@ -59,10 +42,6 @@ DoubleBufferedDrawable::DoubleBufferedDrawable(std::shared_ptr<tgfx::DoubleBuffe
 DoubleBufferedDrawable::DoubleBufferedDrawable(int width, int height,
                                                std::shared_ptr<tgfx::DoubleBufferedWindow> window)
     : _width(width), _height(height), window(std::move(window)) {
-}
-
-bool DoubleBufferedDrawable::isFront(const BackendTexture& texture) const {
-  return window->isFront(ToTGFX(texture));
 }
 
 std::shared_ptr<tgfx::Device> DoubleBufferedDrawable::onCreateDevice() {

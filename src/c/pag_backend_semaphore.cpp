@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_backend_semaphore.h"
+#include "pag_types_priv.h"
 
 pag_backend_semaphore* pag_backend_semaphore_create() {
   return new pag_backend_semaphore();

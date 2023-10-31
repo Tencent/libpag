@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_composition.h"
+#include "pag_types_priv.h"
 
 PAG_API int pag_composition_get_width(pag_composition* composition) {
   auto p = ToPAGComposition(composition);

@@ -1270,9 +1270,16 @@ class PAG_API PAGSurface {
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
 
+  BackendTexture getFrontTexture();
+  BackendTexture getBackTexture();
+  HardwareBufferRef getFrontHardwareBuffer();
+  HardwareBufferRef getBackHardwareBuffer();
+
   friend class PAGPlayer;
 
   friend class FileReporter;
+
+  friend class PAGSurfaceExt;
 };
 
 class FileReporter;

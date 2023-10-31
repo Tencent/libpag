@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_image.h"
+#include "pag_types_priv.h"
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/Image.h"
 

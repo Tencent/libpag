@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_player.h"
+#include "pag_types_priv.h"
 
 pag_player* pag_player_create() {
   return new pag_player(std::make_shared<pag::PAGPlayer>());

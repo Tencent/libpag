@@ -11,9 +11,9 @@ project(PAG)
 #set(VENDOR_DEBUG ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tgfx)
+set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tgfx)
 
-include(${TGFX_DIR}/vendor_tools/vendor.cmake)
+include(./third_party/vendor_tools/vendor.cmake)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "allow use of OpenGL as GPU backend" ON)
@@ -122,7 +122,7 @@ add_subdirectory(${TGFX_DIR} EXCLUDE_FROM_ALL)
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
 
 if (PAG_USE_C)
-    file(GLOB_RECURSE PAG_C_FILES src/c/*.*)
+    file(GLOB PAG_C_FILES src/c/*.* src/c/ext/*.*)
     list(APPEND PAG_FILES ${PAG_C_FILES})
 endif ()
 
@@ -216,6 +216,8 @@ elseif (IOS)
         endif ()
 
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
+        file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
+        list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
                 src/platform/ios/*.h
                 src/platform/ios/private/*.h
@@ -252,6 +254,8 @@ elseif (MACOS)
         endif ()
 
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
+        file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
+        list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
                 src/platform/mac/*.h
                 src/platform/mac/private/*.h
@@ -322,6 +326,12 @@ else ()
     list(APPEND PAG_PLATFORM_FILES third_party/lz4/lib/lz4.c)
 endif ()
 
+if (PAG_USE_C)
+    if (ANDROID OR WIN32)
+        list(APPEND PAG_PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
+    endif ()
+endif ()
+
 add_vendor_target(PAG STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_SHARED_VENDORS})
 list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
@@ -336,6 +346,30 @@ else ()
     merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
+endif ()
+
+if (MACOS OR IOS)
+    file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
+    set(PAG_VERSION "")
+    while (VERSION_FILE)
+        list(POP_FRONT VERSION_FILE LINE)
+        if (LINE MATCHES "\\sdkVersion[^ $]+")
+            string(REGEX MATCH "\\\"[^ $]+" VERSION ${LINE})
+            string(LENGTH ${VERSION} VERSION_LENGTH)
+            MATH(EXPR VERSION_LENGTH "${VERSION_LENGTH}-2")
+            string(SUBSTRING ${VERSION} 1 ${VERSION_LENGTH} PAG_VERSION)
+            break()
+        endif ()
+    endwhile ()
+    message("PAG_VERSION: ${PAG_VERSION}")
+
+    set_target_properties(pag PROPERTIES
+            FRAMEWORK TRUE
+            PUBLIC_HEADER "${PAG_PLATFORM_HEADERS}"
+            MACOSX_FRAMEWORK_IDENTIFIER "com.tencent.libpag"
+            MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
+            MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
+    set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 endif ()
 
 if (PAG_BUILD_TESTS)

@@ -117,6 +117,10 @@ typedef struct pag_display_link_functions {
   void (*release)(void* displayLink);
 } pag_display_link_functions;
 
+typedef struct pag_egl_globals {
+  void* display = nullptr;
+} egl_globals;
+
 typedef const void* pag_object;
 typedef struct pag_byte_data pag_byte_data;
 typedef struct pag_text_document pag_text_document;

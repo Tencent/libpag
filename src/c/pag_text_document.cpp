@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_text_document.h"
+#include "pag_types_priv.h"
 
 bool pag_text_document_get_apply_fill(pag_text_document* document) {
   if (document == nullptr) {

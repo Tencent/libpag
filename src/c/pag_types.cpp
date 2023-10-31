@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
+#include "pag_types_priv.h"
 
 static void DeletePAGByteData(const void* pointer) {
   delete reinterpret_cast<const pag_byte_data*>(pointer);
@@ -77,6 +77,21 @@ void pag_release(pag_object object) {
   }
   DeleteFunctions[static_cast<uint8_t>(type) - 1](object);
 }
+
+namespace pag {
+BackendTexture PAGSurfaceExt::getFrontTexture() {
+  return surface->getFrontTexture();
+}
+BackendTexture PAGSurfaceExt::getBackTexture() {
+  return surface->getBackTexture();
+}
+HardwareBufferRef PAGSurfaceExt::getFrontHardwareBuffer() {
+  return surface->getFrontHardwareBuffer();
+}
+HardwareBufferRef PAGSurfaceExt::getBackHardwareBuffer() {
+  return surface->getBackHardwareBuffer();
+}
+}  // namespace pag
 
 std::shared_ptr<pag::PAGComposition> ToPAGComposition(pag_composition* composition) {
   if (composition == nullptr) {

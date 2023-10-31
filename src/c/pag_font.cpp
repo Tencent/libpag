@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_font.h"
+#include "pag_types_priv.h"
 
 pag_font* pag_font_register_from_path(const char* filePath, int ttcIndex, const char* fontFamily,
                                       const char* fontStyle) {

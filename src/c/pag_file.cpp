@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_file.h"
+#include "pag_types_priv.h"
 
 pag_file* pag_file_load(const void* bytes, size_t length, const char* filePath,
                         const char* password) {

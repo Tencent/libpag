@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "ext/pag_surface_ext.h"
 #include "pag_animator.h"
 #include "pag_backend_semaphore.h"
 #include "pag_backend_texture.h"

@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTypesPriv.h"
 #include "pag/c/pag_backend_texture.h"
+#include "pag_types_priv.h"
 
 using namespace pag;
 
