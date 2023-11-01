@@ -15,3 +15,5 @@ if [[ `uname` == 'Darwin' ]]; then
 fi
 
 depsync
+
+git lfs prune
