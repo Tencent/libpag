@@ -252,7 +252,7 @@ static void CreateFolder(const std::string& path) {
 
 void Baseline::TearDown() {
 #ifdef UPDATE_BASELINE
-  if (!TGFXTest::HasFailure()) {
+  if (!PAGTest::HasFailure()) {
     CreateFolder(CACHE_MD5_PATH);
     std::ofstream outMD5File(CACHE_MD5_PATH);
     outMD5File << std::setw(4) << OutputMD5 << std::endl;
