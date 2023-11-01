@@ -390,13 +390,9 @@ if (PAG_BUILD_TESTS)
     target_include_directories(pag-static PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag-static tgfx ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 
+    file(GLOB_RECURSE PAG_TEST_FILES test/src/*.*)
     list(APPEND TEST_PLATFORM_LIBS pag-static ${PAG_PLATFORM_SHARED_LIBS})
-    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} ${TGFX_DIR}/src ${TGFX_DIR}/third_party/json/include)
-
-    file(GLOB PAG_TEST_FILES
-            test/*.*
-            test/framework/*.*
-            test/framework/utils/*.*)
+    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} test/src ${TGFX_DIR}/src ${TGFX_DIR}/third_party/json/include)
 
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
