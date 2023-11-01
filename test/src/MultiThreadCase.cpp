@@ -55,9 +55,6 @@ static std::shared_ptr<PAGPlayer> TestPAGPlayer = nullptr;
 static std::shared_ptr<PAGFile> TestPAGFile = nullptr;
 
 void SetupPAG() {
-  if (TestPAGFile != nullptr) {
-    return;
-  }
   TestPAGFile = LoadPAGFile("resources/apitest/test.pag");
   ASSERT_TRUE(TestPAGFile != nullptr);
   TestPAGSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
@@ -65,6 +62,12 @@ void SetupPAG() {
   TestPAGPlayer = std::make_shared<PAGPlayer>();
   TestPAGPlayer->setSurface(TestPAGSurface);
   TestPAGPlayer->setComposition(TestPAGFile);
+}
+
+void TearDownPAG() {
+  TestPAGFile = nullptr;
+  TestPAGSurface = nullptr;
+  TestPAGPlayer = nullptr;
 }
 
 void mockAsyncFlush(int num = 30) {
@@ -102,6 +105,7 @@ PAG_TEST(MultiThreadCase, AsyncFlush) {
   }
   std::cout << "\nAsyncFlush edit" << std::endl;
   mockThread.join();
+  TearDownPAG();
 }
 
 /**
@@ -116,6 +120,7 @@ PAG_TEST(MultiThreadCase, AsyncFlushAndFreeCache) {
   }
   std::cout << "\nAsyncFlush edit" << std::endl;
   mockThread.join();
+  TearDownPAG();
 }
 
 /**
@@ -130,6 +135,7 @@ PAG_TEST(MultiThreadCase, HitTestPoint) {
     TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
   }
   mockThread.join();
+  TearDownPAG();
 }
 
 /**
@@ -142,6 +148,7 @@ PAG_TEST(MultiThreadCase, GetLayersUnderPoint) {
     TestPAGFile->getLayersUnderPoint(720.0 * i / 15, 1080.0 * i / 15);
   }
   mockThread.join();
+  TearDownPAG();
 }
 
 /**
@@ -154,6 +161,7 @@ PAG_TEST(MultiThreadCase_BitmapSequenceHitTest, BitmapSequenceHitTestPoint) {
     TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
   }
   mockThread.join();
+  TearDownPAG();
 }
 
 /**
@@ -166,5 +174,6 @@ PAG_TEST(MultiThreadCase_VideoSequenceHitTest, VideoSequenceHitTestPoint) {
     TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
   }
   mockThread.join();
+  TearDownPAG();
 }
 }  // namespace pag
