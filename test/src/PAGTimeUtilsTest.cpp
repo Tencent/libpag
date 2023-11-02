@@ -26,22 +26,25 @@ namespace pag {
  * 用例描述: 测试图层对时间的输入输出是否一致
  */
 PAG_TEST(PAGTimeUtilsTest, ConvertProgressAndFrame) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  auto pagSurface = OffscreenSurface::Make(320, 180);
+  ASSERT_TRUE(pagSurface != nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
   auto pagFile = LoadPAGFile("resources/apitest/ZC_mg_seky2_landscape.pag");
-  TestPAGPlayer->setComposition(pagFile);
+  pagPlayer->setComposition(pagFile);
   auto duration = pagFile->duration();
   auto totalFrames = TimeToFrame(duration, pagFile->frameRate());
   for (int i = 99; i < 120; i++) {
     auto progress = i * 0.5 / totalFrames;
     pagFile->setProgress(progress);
-    TestPAGPlayer->flush();
-    EXPECT_TRUE(Baseline::Compare(TestPAGSurface,
-                                  "PAGTimeUtilsTest/ConvertProgressAndFrame/" + ToString(i)));
+    pagPlayer->flush();
+    EXPECT_TRUE(
+        Baseline::Compare(pagSurface, "PAGTimeUtilsTest/ConvertProgressAndFrame/" + ToString(i)));
     progress = pagFile->getProgress();
     pagFile->setProgress(progress);
-    TestPAGPlayer->flush();
-    EXPECT_TRUE(Baseline::Compare(TestPAGSurface,
-                                  "PAGTimeUtilsTest/ConvertProgressAndFrame/" + ToString(i)));
+    pagPlayer->flush();
+    EXPECT_TRUE(
+        Baseline::Compare(pagSurface, "PAGTimeUtilsTest/ConvertProgressAndFrame/" + ToString(i)));
   }
 }
 

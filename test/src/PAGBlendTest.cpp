@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "opengl/GLUtil.h"
 #include "tgfx/opengl/GLDevice.h"
+#include "tgfx/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 
 namespace pag {

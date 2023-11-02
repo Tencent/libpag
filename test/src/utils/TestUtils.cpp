@@ -144,15 +144,6 @@ void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {
   out.close();
 }
 
-void SaveImage(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key) {
-  if (pixelBuffer == nullptr) {
-    return;
-  }
-  auto pixels = pixelBuffer->lockPixels();
-  SaveImage(Pixmap(pixelBuffer->info(), pixels), key);
-  pixelBuffer->unlockPixels();
-}
-
 void SaveImage(const tgfx::Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return;

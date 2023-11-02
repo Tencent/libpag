@@ -18,15 +18,12 @@
 
 #pragma once
 
-#include "core/PixelBuffer.h"
 #include "pag/pag.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace pag {
 class Baseline {
  public:
-  static bool Compare(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key);
-
   static bool Compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key);
 
   static bool Compare(const tgfx::Bitmap& bitmap, const std::string& key);
