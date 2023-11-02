@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
+#include "base/utils/Log.h"
 #include "nlohmann/json.hpp"
 #include "utils/TestUtils.h"
 
@@ -76,7 +77,7 @@ void mockAsyncFlush(int num = 30) {
     TestPAGPlayer->flush();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
-  std::cout << "\nmockAsyncFlush finish" << std::endl;
+  LOGI("mockAsyncFlush finish");
 }
 
 /**
@@ -103,7 +104,7 @@ PAG_TEST(MultiThreadCase, AsyncFlush) {
     TestPAGPlayer->flush();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
-  std::cout << "\nAsyncFlush edit" << std::endl;
+  LOGI("AsyncFlush edit");
   mockThread.join();
   TearDownPAG();
 }
@@ -118,7 +119,7 @@ PAG_TEST(MultiThreadCase, AsyncFlushAndFreeCache) {
     TestPAGSurface->freeCache();
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
-  std::cout << "\nAsyncFlush edit" << std::endl;
+  LOGI("AsyncFlush edit");
   mockThread.join();
   TearDownPAG();
 }

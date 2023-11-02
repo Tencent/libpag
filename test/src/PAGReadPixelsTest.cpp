@@ -176,6 +176,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
 
   auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = Image::MakeFrom(bitmap);

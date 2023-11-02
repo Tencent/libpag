@@ -97,10 +97,10 @@ static void MergeClusters(std::vector<Info>& infos) {
 PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
                                          const std::shared_ptr<tgfx::Typeface>& typeface) {
   std::vector<Info> infos;
-  const char* textStart = &(text[0]);
+  const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   while (textStart < textStop) {
-    auto cluster = static_cast<uint32_t>(textStart - &(text[0]));
+    auto cluster = static_cast<uint32_t>(textStart - text.data());
     infos.emplace_back(Info{tgfx::UTF::NextUTF8(&textStart, textStop), cluster});
   }
 

@@ -459,7 +459,8 @@ static void WritePathInternal(EncodeStream* stream, pag::PathHandle value) {
         break;
     }
   }
-  stream->writeFloatList(&pointList[0], static_cast<int32_t>(pointList.size()), SPATIAL_PRECISION);
+  stream->writeFloatList(pointList.data(), static_cast<int32_t>(pointList.size()),
+                         SPATIAL_PRECISION);
 }
 
 void WritePath(EncodeStream* stream, pag::PathHandle value) {

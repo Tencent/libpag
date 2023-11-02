@@ -19,6 +19,7 @@
 #include <rendering/renderers/TextAnimatorRenderer.h>
 #include <iostream>
 #include <thread>
+#include "base/utils/Log.h"
 #include "nlohmann/json.hpp"
 #include "pag/file.h"
 #include "rendering/renderers/TextRenderer.h"
@@ -124,14 +125,14 @@ PAG_TEST(PAGTextLayerTest, multiThreadModify) {
   // 多线程替换文本
   std::thread thread1([textLayer, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
-      std::cout << "线程1 present" << std::endl;
+      LOGI("线程1 present");
       TestPAGPlayer->flush();
     }
   });
 
   std::thread thread2([textLayer, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
-      std::cout << "线程2 替换文本" << std::endl;
+      LOGI("线程2 替换文本");
       textLayer->setFontSize(20);
       textLayer->setFillColor(Blue);
       textLayer->setText("线程222替换文本");

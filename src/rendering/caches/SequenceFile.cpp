@@ -356,7 +356,7 @@ bool SequenceFile::compatible(const tgfx::ImageInfo& info, int frameCount, float
       _staticTimeRanges.size() != staticTimeRanges.size()) {
     return false;
   }
-  return memcmp(&_staticTimeRanges[0], &staticTimeRanges[0],
+  return memcmp(_staticTimeRanges.data(), staticTimeRanges.data(),
                 sizeof(TimeRange) * staticTimeRanges.size()) == 0;
 }
 }  // namespace pag

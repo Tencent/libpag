@@ -96,6 +96,7 @@ PAG_TEST(PAGPlayerTest, switchPAGSurface) {
 PAG_TEST(PAGPlayerTest, autoClear) {
   auto pagFile = LoadPAGFile("resources/apitest/AlphaTrackMatte.pag");
   auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  ASSERT_TRUE(pagSurface != nullptr);
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);

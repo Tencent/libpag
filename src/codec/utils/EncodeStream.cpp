@@ -185,8 +185,8 @@ void EncodeStream::writeEncodedUint64(uint64_t value) {
 }
 
 void EncodeStream::writeBits(int32_t value, uint8_t numBits) {
-  auto data = static_cast<uint32_t>(value << (33 - numBits));
-  data >>= 33 - numBits;
+  auto data = static_cast<uint32_t>(value) << (33 - numBits);
+  data >>= (33 - numBits);
   if (value < 0) {
     data |= 1 << (numBits - 1);
   }
@@ -228,7 +228,7 @@ uint8_t GetBitLength(uint32_t data) {
 }
 
 uint8_t GetBitLength(int32_t value) {
-  auto data = static_cast<uint32_t>(value < 0 ? -value : value);
+  auto data = static_cast<uint32_t>(value < 0 ? -static_cast<int64_t>(value) : value);
   uint8_t length = GetBitLength(data);
   if (length >= 32) {
     length = 31;

@@ -482,8 +482,11 @@ PAG_TEST(CanvasTest, textShape) {
   Paint paint;
   paint.setColor(Color::Black());
   for (const auto& textRun : textRuns) {
-    canvas->drawGlyphs(&(textRun.ids[0]), &(textRun.positions[0]), textRun.ids.size(), textRun.font,
-                       paint);
+    if (textRun.ids.empty()) {
+      continue;
+    }
+    canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                       textRun.font, paint);
   }
   canvas->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));

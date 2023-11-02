@@ -33,6 +33,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   int width = pagFile->width();
   int height = pagFile->height();
   auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
@@ -86,6 +87,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto width = pagFile->width();
   auto height = pagFile->height();
   auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   tgfx::GLTextureInfo textureInfo;

@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <thread>
+#include "base/utils/Log.h"
 #include "nlohmann/json.hpp"
 #include "utils/TestUtils.h"
 
@@ -67,20 +68,20 @@ PAG_TEST(PAGImageLayerTest, imageMultiThreadReplace) {
   // 多线程同时替换图片
   std::thread thread1([imageLayer, image, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
-      std::cout << "线程1 present" << std::endl;
+      LOGI("线程1 present");
       TestPAGPlayer->flush();
     }
   });
   std::thread thread2([imageLayer, image, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
-      std::cout << "线程2 替换图片" << std::endl;
+      LOGI("线程2 替换图片");
       imageLayer->replaceImage(image);
       TestPAGPlayer->flush();
     }
   });
   std::thread thread3([imageLayer, image, TestPAGFile, TestPAGPlayer]() {
     for (int i = 0; i < 10; ++i) {
-      std::cout << "线程3 通过图层名字替换图片" << std::endl;
+      LOGI("线程3 通过图层名字替换图片");
       TestPAGFile->replaceImageByName("PAGImageLayer1", image);
       TestPAGPlayer->flush();
     }
