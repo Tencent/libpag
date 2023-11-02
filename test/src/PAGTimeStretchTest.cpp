@@ -32,12 +32,12 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
   auto fileName = path.substr(startIndex, suffixIndex - startIndex);
   std::vector<std::string> compareVector;
 
-  auto TestPAGFile = LoadPAGFile(path);
-  ASSERT_NE(TestPAGFile, nullptr);
-  int64_t duartion = TestPAGFile->duration();
+  auto pagFile = LoadPAGFile(path);
+  ASSERT_NE(pagFile, nullptr);
+  int64_t duartion = pagFile->duration();
   std::vector<int> array;
 
-  TestPAGFile->setDuration(duartion * scaleFactor);
+  pagFile->setDuration(duartion * scaleFactor);
   if (scaleFactor < 1) {
     fileName += "_shorten";
     array = shortenArray;
@@ -46,18 +46,18 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
     array = stretchArray;
   }
 
-  auto pagSurface = OffscreenSurface::Make(TestPAGFile->width(), TestPAGFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width() / 4, pagFile->height() / 4);
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
-  pagPlayer->setComposition(TestPAGFile);
+  pagPlayer->setComposition(pagFile);
 
-  Frame totalFrames = TimeToFrame(TestPAGFile->duration(), TestPAGFile->frameRate());
+  Frame totalFrames = TimeToFrame(pagFile->duration(), pagFile->frameRate());
 
   std::string errorMsg = "";
 
   auto pagImage = MakePAGImage("resources/apitest/test_timestretch.png");
-  TestPAGFile->replaceImage(0, pagImage);
+  pagFile->replaceImage(0, pagImage);
 
   for (const auto& currentFrame : array) {
     pagPlayer->setProgress((currentFrame + 0.1) * 1.0 / totalFrames);

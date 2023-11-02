@@ -101,17 +101,6 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-bool Baseline::Compare(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key) {
-  if (pixelBuffer == nullptr) {
-    return false;
-  }
-  auto pixels = pixelBuffer->lockPixels();
-  Pixmap pixmap(pixelBuffer->info(), pixels);
-  auto result = Baseline::Compare(pixmap, key);
-  pixelBuffer->unlockPixels();
-  return result;
-}
-
 bool Baseline::Compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key) {
   if (surface == nullptr) {
     return false;

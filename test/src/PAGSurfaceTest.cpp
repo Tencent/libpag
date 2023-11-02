@@ -16,14 +16,46 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "opengl/GLCaps.h"
-#include "opengl/GLUtil.h"
 #include "rendering/drawables/TextureDrawable.h"
 #include "tgfx/opengl/GLDevice.h"
+#include "tgfx/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
+
+#define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
+
+uint32_t GetGLVersion(const char* versionString) {
+  if (versionString == nullptr) {
+    return GL_VER(-1, -1);
+  }
+  int major, minor;
+  int mesaMajor, mesaMinor;
+  int n = sscanf(versionString, "%d.%d Mesa %d.%d", &major, &minor, &mesaMajor, &mesaMinor);
+  if (4 == n) {
+    return GL_VER(major, minor);
+  }
+  n = sscanf(versionString, "%d.%d", &major, &minor);
+  if (2 == n) {
+    return GL_VER(major, minor);
+  }
+  int esMajor, esMinor;
+  n = sscanf(versionString, "OpenGL ES %d.%d (WebGL %d.%d", &esMajor, &esMinor, &major, &minor);
+  if (4 == n) {
+    return GL_VER(major, minor);
+  }
+  char profile[2];
+  n = sscanf(versionString, "OpenGL ES-%c%c %d.%d", profile, profile + 1, &major, &minor);
+  if (4 == n) {
+    return GL_VER(major, minor);
+  }
+  n = sscanf(versionString, "OpenGL ES %d.%d", &major, &minor);
+  if (2 == n) {
+    return GL_VER(major, minor);
+  }
+  return GL_VER(-1, -1);
+}
 
 /**
  * 用例描述: 测试 PAGSurface 数据同步
@@ -37,7 +69,10 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto glVersion = GLCaps::Get(context)->version;
+  auto gl = GLFunctions::Get(context);
+  auto versionString = (const char*)gl->getString(GL_VERSION);
+  auto glVersion = GetGLVersion(versionString);
+
   tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
@@ -137,60 +172,6 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
-  device->unlock();
-}
-
-PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
-  auto device = DevicePool::Make();
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-  tgfx::GLTextureInfo textureInfo;
-  auto width = 200;
-  auto height = 200;
-  CreateGLTexture(context, width, height, &textureInfo);
-  tgfx::BackendTexture backendTexture = {textureInfo, width, height};
-  auto surface = Surface::MakeFrom(context, backendTexture, tgfx::ImageOrigin::BottomLeft);
-  ASSERT_TRUE(surface != nullptr);
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->drawImage(image);
-  auto snapshotImage = surface->makeImageSnapshot();
-  auto snapshotImage2 = surface->makeImageSnapshot();
-  EXPECT_TRUE(snapshotImage == snapshotImage2);
-  auto compareSurface = Surface::Make(context, width, height);
-  auto compareCanvas = compareSurface->getCanvas();
-  compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot1"));
-  canvas->drawImage(image, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface1"));
-  compareCanvas->clear();
-  compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot1"));
-
-  surface = Surface::Make(context, width, height);
-  canvas = surface->getCanvas();
-  snapshotImage = surface->makeImageSnapshot();
-  auto texture = surface->texture;
-  snapshotImage = nullptr;
-  canvas->drawImage(image);
-  canvas->flush();
-  EXPECT_TRUE(texture == surface->texture);
-  snapshotImage = surface->makeImageSnapshot();
-  snapshotImage2 = surface->makeImageSnapshot();
-  EXPECT_TRUE(snapshotImage == snapshotImage2);
-  compareCanvas->clear();
-  compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot2"));
-  canvas->drawImage(image, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface2"));
-  compareCanvas->clear();
-  compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot2"));
-
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
