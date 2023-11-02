@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,24 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "nlohmann/json.hpp"
-#include "utils/TestUtils.h"
+#include "OffscreenSurface.h"
+#include "rendering/drawables/OffscreenDrawable.h"
 
 namespace pag {
-using nlohmann::json;
-
-/**
- * 用例描述: 测试 shader 绘制椭圆
- */
-PAG_TEST(PAGSimplePathTest, TestRect) {
-  auto pagFile = LoadPAGFile("resources/apitest/ellipse.pag");
-  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
-  auto pagPlayer = std::make_shared<PAGPlayer>();
-  pagPlayer->setSurface(pagSurface);
-  pagPlayer->setComposition(pagFile);
-  pagPlayer->setMatrix(Matrix::I());
-  pagPlayer->setProgress(0);
-  pagPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSimplePathTest/TestRect"));
+std::shared_ptr<PAGSurface> OffscreenSurface::Make(int width, int height) {
+  auto device = DevicePool::Make();
+  if (device == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto drawable =
+      std::shared_ptr<OffscreenDrawable>(new OffscreenDrawable(width, height, std::move(device)));
+  return PAGSurface::MakeFrom(std::move(drawable));
 }
 }  // namespace pag

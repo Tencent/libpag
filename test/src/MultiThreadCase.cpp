@@ -57,7 +57,7 @@ static std::shared_ptr<PAGFile> TestPAGFile = nullptr;
 void SetupPAG() {
   TestPAGFile = LoadPAGFile("resources/apitest/test.pag");
   ASSERT_TRUE(TestPAGFile != nullptr);
-  TestPAGSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
+  TestPAGSurface = OffscreenSurface::Make(TestPAGFile->width(), TestPAGFile->height());
   ASSERT_TRUE(TestPAGSurface != nullptr);
   TestPAGPlayer = std::make_shared<PAGPlayer>();
   TestPAGPlayer->setSurface(TestPAGSurface);

@@ -40,7 +40,7 @@ namespace tgfx {
  * 用例描述: 测试 ColorMatrixFilter
  */
 PAG_TEST(CanvasTest, ColorMatrixFilter) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/test_timestretch.png");
@@ -64,7 +64,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
 }
 
 PAG_TEST(CanvasTest, Blur) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -135,7 +135,7 @@ PAG_TEST(CanvasTest, Blur) {
 }
 
 PAG_TEST(CanvasTest, DropShadow) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
@@ -175,7 +175,7 @@ PAG_TEST(CanvasTest, DropShadow) {
 }
 
 PAG_TEST(CanvasTest, clip) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto width = 1080;
@@ -211,7 +211,7 @@ PAG_TEST(CanvasTest, clip) {
  * 用例描述: 测试绘制 Rectangle 纹理时使用 TileMode::Repeat 和 TileMode::Mirror。
  */
 PAG_TEST(CanvasTest, TileMode) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -233,7 +233,7 @@ PAG_TEST(CanvasTest, TileMode) {
  * 用例描述: 测试 rect 合并绘制
  */
 PAG_TEST(CanvasTest, merge_draw_call_rect) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
@@ -272,7 +272,7 @@ PAG_TEST(CanvasTest, merge_draw_call_rect) {
  * 用例描述: 测试 path 合并绘制
  */
 PAG_TEST(CanvasTest, merge_draw_call_triangle) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -321,7 +321,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
  * 用例描述: 测试 rrect 合并绘制
  */
 PAG_TEST(CanvasTest, merge_draw_call_rrect) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
@@ -364,7 +364,7 @@ PAG_TEST(CanvasTest, merge_draw_call_rrect) {
  * 用例描述: 测试 ClearOp
  */
 PAG_TEST(CanvasTest, merge_draw_clear_op) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
@@ -464,7 +464,7 @@ PAG_TEST(CanvasTest, textShape) {
   }
   height += lineHeight;
 
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface =
@@ -494,7 +494,7 @@ PAG_TEST(CanvasTest, textShape) {
  * 用例描述: 测试 filter mode
  */
 PAG_TEST(CanvasTest, filterMode) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -516,7 +516,7 @@ PAG_TEST(CanvasTest, filterMode) {
  * 用例描述: 测试 mipmap
  */
 PAG_TEST(CanvasTest, mipmap) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -567,7 +567,7 @@ PAG_TEST(CanvasTest, mipmap) {
  * 用例描述: 测试 hardware buffer 的 mipmap
  */
 PAG_TEST(CanvasTest, hardwareMipMap) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -597,7 +597,7 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
 }
 
 PAG_TEST(CanvasTest, shape) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 500, 500);
@@ -630,7 +630,7 @@ PAG_TEST(CanvasTest, shape) {
 }
 
 PAG_TEST(CanvasTest, image) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 500);
@@ -744,7 +744,7 @@ static tgfx::GLTextureInfo CreateRectangleTexture(Context* context, int width, i
  * 用例描述: rectangle texture 作为 blend dst 时不需要归一化
  */
 PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto sampler = CreateRectangleTexture(context, 110, 110);
@@ -766,7 +766,7 @@ PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
 }
 
 PAG_TEST(CanvasTest, NothingToDraw) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 100, 100);

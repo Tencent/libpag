@@ -62,7 +62,7 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     }
   }
   auto pagSurface =
-      PAGSurface::MakeOffscreen(static_cast<int>(roundf(width)), static_cast<int>(roundf(height)));
+      OffscreenSurface::Make(static_cast<int>(roundf(width)), static_cast<int>(roundf(height)));
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

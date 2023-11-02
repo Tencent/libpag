@@ -92,7 +92,7 @@ PAG_TEST(PAGCompositionTest, composition) {
  */
 PAG_TEST(PAGCompositionTest, VideoSequence) {
   auto pagFile = LoadPAGFile("resources/apitest/video_sequence_size.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);

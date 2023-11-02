@@ -175,7 +175,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   bitmap.unlockPixels();
   ASSERT_TRUE(result);
 
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = Image::MakeFrom(bitmap);

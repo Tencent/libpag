@@ -30,7 +30,7 @@ namespace pag {
 PAG_TEST(PAGSequenceTest, RenderOnScreen) {
   auto pagFile = LoadPAGFile("resources/apitest/wz_mvp.pag");
   EXPECT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(750, 1334);
+  auto pagSurface = OffscreenSurface::Make(750, 1334);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -46,7 +46,7 @@ PAG_TEST(PAGSequenceTest, RenderOnScreen) {
  */
 PAG_TEST(PAGSequenceTest, BitmapSequenceReader) {
   auto pagFile = LoadPAGFile("resources/apitest/ZC_mg_seky2_landscape.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -62,7 +62,7 @@ PAG_TEST(PAGSequenceTest, BitmapSequenceReader) {
  */
 PAG_TEST(PAGSequenceTest, VideoSequenceAsMask) {
   auto pagFile = LoadPAGFile("resources/apitest/video_sequence_as_mask.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -120,7 +120,7 @@ PAG_TEST(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
 PAG_TEST(PAGSequenceTest, Sequence_Multiple_References) {
   auto pagFile = LoadPAGFile("resources/apitest/sequence_mul_ref.pag");
   EXPECT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);

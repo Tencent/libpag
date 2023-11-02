@@ -161,7 +161,7 @@ PAG_TEST(PAGImageLayerTest, setImage) {
 PAG_TEST(PAGImageLayerTest, mask) {
   auto pagFile = LoadPAGFile("resources/apitest/wumengban.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

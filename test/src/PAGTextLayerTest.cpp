@@ -335,7 +335,7 @@ PAG_TEST(PAGTextLayerTest, TextAnimatorSmooth_ID863204817) {
  */
 PAG_TEST(PAGTextLayerTest, TextBounds) {
   auto pagFile = LoadPAGFile("assets/test2.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);
@@ -408,7 +408,7 @@ PAG_TEST(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/SmallFontSizeScale"));
 
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   TestPAGPlayer->setSurface(pagSurface);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));

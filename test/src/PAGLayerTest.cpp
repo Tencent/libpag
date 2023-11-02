@@ -253,7 +253,7 @@ PAG_TEST(PAGLayerTest, TextScale) {
   textData->text = "耶";
   pagFile->replaceText(0, textData);
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(500, 500);
+  auto pagSurface = OffscreenSurface::Make(500, 500);
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -279,7 +279,7 @@ PAG_TEST(PAGLayerTest, LayerAlpha) {
   ASSERT_NE(pagFile, nullptr);
   pagFile->setAlpha(0.5f);
   ASSERT_TRUE(fabsf(pagFile->alpha() - 0.5f) < 0.01);
-  auto pagSurface = PAGSurface::MakeOffscreen(500, 500);
+  auto pagSurface = OffscreenSurface::Make(500, 500);
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -295,7 +295,7 @@ PAG_TEST(PAGLayerTest, LayerAlpha) {
 PAG_TEST(PAGLayerTest, trackMatte_luma) {
   auto pagFile = LoadPAGFile("resources/apitest/LumaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

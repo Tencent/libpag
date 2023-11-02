@@ -26,7 +26,7 @@ namespace pag {
  */
 PAG_TEST(PAGShapeLayerTest, star) {
   auto pagFile = LoadPAGFile("resources/apitest/poly_star.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -40,7 +40,7 @@ PAG_TEST(PAGShapeLayerTest, star) {
  */
 PAG_TEST(PAGShapeLayerTest, polygon) {
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -54,7 +54,7 @@ PAG_TEST(PAGShapeLayerTest, polygon) {
  */
 PAG_TEST(PAGShapeLayerTest, polygon_round_corner) {
   auto pagFile = LoadPAGFile("resources/apitest/polygon_round_corner.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -68,7 +68,7 @@ PAG_TEST(PAGShapeLayerTest, polygon_round_corner) {
  */
 PAG_TEST(PAGShapeLayerTest, star_round_corner) {
   auto pagFile = LoadPAGFile("resources/apitest/poly_star_round_corner.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -82,7 +82,7 @@ PAG_TEST(PAGShapeLayerTest, star_round_corner) {
  */
 PAG_TEST(PAGShapeLayerTest, track_matte_path_union) {
   auto pagFile = LoadPAGFile("resources/apitest/track_matte_path_union.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
@@ -96,7 +96,7 @@ PAG_TEST(PAGShapeLayerTest, track_matte_path_union) {
  */
 PAG_TEST(PAGShapeLayerTest, shape_transform_round_corner) {
   auto pagFile = LoadPAGFile("resources/apitest/shape_transform_round_corner.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);

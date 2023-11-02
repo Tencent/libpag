@@ -34,21 +34,21 @@ class PAGTest : public testing::Test {
   GTEST_TEST_(test_case_name, test_name, pag::PAGTest, \
               ::testing::internal::GetTypeId<pag::PAGTest>())
 
-#define PAG_SETUP(pagSurface, pagPlayer, pagFile)                                   \
-  auto pagFile = LoadPAGFile("resources/apitest/test.pag");                         \
-  ASSERT_TRUE(pagFile != nullptr);                                                  \
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height()); \
-  ASSERT_TRUE(pagSurface != nullptr);                                               \
-  auto pagPlayer = std::make_shared<PAGPlayer>();                                   \
-  pagPlayer->setSurface(pagSurface);                                                \
+#define PAG_SETUP(pagSurface, pagPlayer, pagFile)                                \
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");                      \
+  ASSERT_TRUE(pagFile != nullptr);                                               \
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height()); \
+  ASSERT_TRUE(pagSurface != nullptr);                                            \
+  auto pagPlayer = std::make_shared<PAGPlayer>();                                \
+  pagPlayer->setSurface(pagSurface);                                             \
   pagPlayer->setComposition(pagFile);
 
-#define PAG_SETUP_WITH_PATH(pagSurface, pagPlayer, pagFile, pagPath)                \
-  auto pagFile = LoadPAGFile(pagPath);                                              \
-  ASSERT_TRUE(pagFile != nullptr);                                                  \
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height()); \
-  ASSERT_TRUE(pagSurface != nullptr);                                               \
-  auto pagPlayer = std::make_shared<PAGPlayer>();                                   \
-  pagPlayer->setSurface(pagSurface);                                                \
+#define PAG_SETUP_WITH_PATH(pagSurface, pagPlayer, pagFile, pagPath)             \
+  auto pagFile = LoadPAGFile(pagPath);                                           \
+  ASSERT_TRUE(pagFile != nullptr);                                               \
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height()); \
+  ASSERT_TRUE(pagSurface != nullptr);                                            \
+  auto pagPlayer = std::make_shared<PAGPlayer>();                                \
+  pagPlayer->setSurface(pagSurface);                                             \
   pagPlayer->setComposition(pagFile);
 }  // namespace pag
