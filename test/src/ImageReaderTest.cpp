@@ -32,7 +32,7 @@ namespace tgfx {
  * 用例描述: 测试使用 ImageReader 读取更新后的 Mask
  */
 PAG_TEST(ImageReaderTest, updateMask) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto mask = Mask::Make(100, 50, false);
@@ -70,7 +70,7 @@ PAG_TEST(ImageReaderTest, updateMask) {
  * 用例描述: 测试使用 ImageReader 读取更新后的 Bitmap
  */
 PAG_TEST(ImageReaderTest, updateBitmap) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   Bitmap bitmap(300, 150);

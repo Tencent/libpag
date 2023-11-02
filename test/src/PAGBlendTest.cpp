@@ -28,7 +28,7 @@ using namespace tgfx;
  */
 PAG_TEST(PAGBlendTest, Blend) {
   auto files = GetAllPAGFiles("resources/blend");
-  auto pagSurface = PAGSurface::MakeOffscreen(400, 400);
+  auto pagSurface = OffscreenSurface::Make(400, 400);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   for (auto& file : files) {
@@ -69,7 +69,7 @@ tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width
 PAG_TEST(PAGBlendTest, CopyDstTexture) {
   auto width = 400;
   auto height = 400;
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   tgfx::GLTextureInfo textureInfo;
@@ -98,7 +98,7 @@ PAG_TEST(PAGBlendTest, CopyDstTexture) {
 PAG_TEST(PAGBlendTest, TextureBottomLeft) {
   auto width = 720;
   auto height = 1280;
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -133,7 +133,7 @@ PAG_TEST(PAGBlendTest, TextureBottomLeft) {
 PAG_TEST(PAGBlendTest, BothBottomLeft) {
   auto width = 720;
   auto height = 1280;
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);

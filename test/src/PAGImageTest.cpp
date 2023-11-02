@@ -126,7 +126,7 @@ PAG_TEST(PAGImageTest, image3) {
   auto pagFile = LoadPAGFile("resources/apitest/replace2.pag");
   ASSERT_TRUE(pagFile != nullptr);
   pagFile->replaceImage(0, pagImage);
-  auto surface = PAGSurface::MakeOffscreen(720, 720);
+  auto surface = OffscreenSurface::Make(720, 720);
   ASSERT_TRUE(surface != nullptr);
   auto player = std::make_unique<PAGPlayer>();
   player->setComposition(pagFile);
@@ -142,7 +142,7 @@ PAG_TEST(PAGImageTest, image3) {
 PAG_TEST(PAGImageTest, BottomLeftMask) {
   int width = 110;
   int height = 110;
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, width, height);

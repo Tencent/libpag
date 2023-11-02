@@ -46,7 +46,7 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
     array = stretchArray;
   }
 
-  auto pagSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
+  auto pagSurface = OffscreenSurface::Make(TestPAGFile->width(), TestPAGFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

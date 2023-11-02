@@ -29,7 +29,7 @@ using nlohmann::json;
 PAG_TEST(PAGFilterTest, CornerPin) {
   auto pagFile = LoadPAGFile("resources/filter/cornerpin.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -46,7 +46,7 @@ PAG_TEST(PAGFilterTest, CornerPin) {
 PAG_TEST(PAGFilterTest, Bulge) {
   auto pagFile = LoadPAGFile("resources/filter/bulge.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -63,7 +63,7 @@ PAG_TEST(PAGFilterTest, Bulge) {
 PAG_TEST(PAGFilterTest, MotionTile) {
   auto pagFile = LoadPAGFile("resources/filter/motiontile.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -80,7 +80,7 @@ PAG_TEST(PAGFilterTest, MotionTile) {
 PAG_TEST(PAGFilterTest, MotionBlur) {
   auto pagFile = LoadPAGFile("resources/filter/MotionBlur.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -101,7 +101,7 @@ PAG_TEST(PAGFilterTest, MotionBlur) {
 PAG_TEST(PAGFilterTest, GaussBlur) {
   auto pagFile = LoadPAGFile("resources/filter/fastblur.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -113,7 +113,7 @@ PAG_TEST(PAGFilterTest, GaussBlur) {
 
   pagFile = LoadPAGFile("resources/filter/fastblur_norepeat.pag");
   ASSERT_NE(pagFile, nullptr);
-  pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -130,7 +130,7 @@ PAG_TEST(PAGFilterTest, GaussBlur) {
 PAG_TEST(PAGFilterTest, Glow) {
   auto pagFile = LoadPAGFile("resources/filter/Glow.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -148,7 +148,7 @@ PAG_TEST(PAGFilterTest, Glow) {
 PAG_TEST(PAGFilterTest, DropShadow) {
   auto pagFile = LoadPAGFile("resources/filter/DropShadow.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -165,7 +165,7 @@ PAG_TEST(PAGFilterTest, DropShadow) {
 PAG_TEST(PAGFilterTest, DisplacementMap) {
   auto pagFile = LoadPAGFile("resources/filter/DisplacementMap.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -182,7 +182,7 @@ PAG_TEST(PAGFilterTest, DisplacementMap) {
 PAG_TEST(PAGFilterTest, DisplacementMap_Scale) {
   auto pagFile = LoadPAGFile("resources/filter/displement_map_video_scale.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -199,7 +199,7 @@ PAG_TEST(PAGFilterTest, DisplacementMap_Scale) {
 PAG_TEST(PAGFilterTest, GaussBlur_Static) {
   auto pagFile = LoadPAGFile("resources/filter/GaussBlur_Static.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -216,7 +216,7 @@ PAG_TEST(PAGFilterTest, GaussBlur_Static) {
 PAG_TEST(PAGFilterTest, GaussianBlur_NoRepeat_Clip) {
   auto pagFile = LoadPAGFile("resources/filter/GaussianBlur_NoRepeat_Clip.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -233,7 +233,7 @@ PAG_TEST(PAGFilterTest, GaussianBlur_NoRepeat_Clip) {
 PAG_TEST(PAGFilterTest, RadialBlur) {
   auto pagFile = LoadPAGFile("resources/filter/RadialBlur.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -250,7 +250,7 @@ PAG_TEST(PAGFilterTest, RadialBlur) {
 PAG_TEST(PAGFilterTest, Mosaic) {
   auto pagFile = LoadPAGFile("resources/filter/MosaicChange.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -267,7 +267,7 @@ PAG_TEST(PAGFilterTest, Mosaic) {
 PAG_TEST(PAGFilterTest, MultiFilter) {
   auto pagFile = LoadPAGFile("resources/filter/cornerpin-bulge.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -279,7 +279,7 @@ PAG_TEST(PAGFilterTest, MultiFilter) {
 
   pagFile = LoadPAGFile("resources/filter/motiontile_blur.pag");
   ASSERT_NE(pagFile, nullptr);
-  pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -297,7 +297,7 @@ PAG_TEST(PAGFilterTest, LevelsIndividualFilter) {
   auto pagFile = LoadPAGFile("resources/filter/LevelsIndividualFilter.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->replaceImage(0, MakePAGImage("assets/rotation.jpg"));
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -313,7 +313,7 @@ PAG_TEST(PAGFilterTest, LevelsIndividualFilter) {
 PAG_TEST(PAGFilterTest, GradientOverlayFilter) {
   auto pagFile = LoadPAGFile("resources/filter/GradientOverlay.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -329,7 +329,7 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter) {
 PAG_TEST(PAGFilterTest, GradientOverlayFilter_Star) {
   auto pagFile = LoadPAGFile("resources/filter/GradientOverlayStar.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -345,7 +345,7 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter_Star) {
 PAG_TEST(PAGFilterTest, FeatherMask) {
   auto pagFile = LoadPAGFile("resources/filter/FeatherMask.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -362,7 +362,7 @@ PAG_TEST(PAGFilterTest, CornerPinScale) {
   auto pagFile = LoadPAGFile("resources/filter/corner_pin_scale.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->replaceImage(0, MakePAGImage("resources/apitest/rotation.jpg"));
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -377,7 +377,7 @@ PAG_TEST(PAGFilterTest, CornerPinScale) {
 PAG_TEST(PAGFilterTest, HueSaturation) {
   auto pagFile = LoadPAGFile("resources/filter/HueSaturation.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -393,7 +393,7 @@ PAG_TEST(PAGFilterTest, HueSaturation) {
 PAG_TEST(PAGFilterTest, BrightnessContrast) {
   auto pagFile = LoadPAGFile("resources/filter/BrightnessContrast.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -409,7 +409,7 @@ PAG_TEST(PAGFilterTest, BrightnessContrast) {
 PAG_TEST(PAGFilterTest, LogoMipmap) {
   auto pagFile = LoadPAGFile("resources/filter/LogoMipmap.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -425,7 +425,7 @@ PAG_TEST(PAGFilterTest, LogoMipmap) {
 PAG_TEST(PAGFilterTest, OuterGlow) {
   auto pagFile = LoadPAGFile("resources/filter/outerglow.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -441,7 +441,7 @@ PAG_TEST(PAGFilterTest, OuterGlow) {
 PAG_TEST(PAGFilterTest, Stroke) {
   auto pagFile = LoadPAGFile("resources/filter/stroke.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -457,7 +457,7 @@ PAG_TEST(PAGFilterTest, Stroke) {
 PAG_TEST(PAGFilterTest, DefaultFeatherMask) {
   auto pagFile = LoadPAGFile("resources/filter/DefaultFeatherMask.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

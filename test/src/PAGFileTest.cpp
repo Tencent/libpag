@@ -472,7 +472,7 @@ PAG_TEST(PAGFileContainerTest, ContainerEditing) {
  */
 PAG_TEST(PAGFileTimeStretchTest, Repeat) {
   auto pagFile = LoadPAGFile("resources/apitest/test_repeat.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);
@@ -492,7 +492,7 @@ PAG_TEST(PAGFileTimeStretchTest, Repeat) {
  */
 PAG_TEST(PAGFileTimeStretchTest, RepeatInverted) {
   auto pagFile = LoadPAGFile("resources/apitest/test_repeatInverted.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);
@@ -513,7 +513,7 @@ PAG_TEST(PAGFileTimeStretchTest, RepeatInverted) {
  */
 PAG_TEST(PAGFileTimeStretchTest, Scale) {
   auto pagFile = LoadPAGFile("resources/apitest/test_scale.pag");
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);

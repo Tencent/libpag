@@ -34,7 +34,7 @@ namespace pag {
 //  tgfx::Pixmap pixmap(bitmap);
 //  auto pagPlayer = std::make_shared<PAGPlayer>();
 //  pagPlayer->setComposition(pagFile);
-//  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+//  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
 //  pagPlayer->setSurface(pagSurface);
 //  auto info =
 //      tgfx::ImageInfo::Make(pagFile->width(), pagFile->height(), tgfx::ColorType::RGBA_8888);
@@ -54,7 +54,7 @@ namespace pag {
 //  pixmap.reset();
 //  bitmap.allocPixels(info.width(), info.height());
 //  pixmap.reset(bitmap);
-//  pagSurface = PAGSurface::MakeOffscreen(info.width(), info.height());
+//  pagSurface = OffscreenSurface::Make(info.width(), info.height());
 //  pagPlayer->setSurface(pagSurface);
 //  sequenceFile =
 //      DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", info, 30, pagFile->frameRate());
@@ -121,7 +121,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
 
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
   pagPlayer->setSurface(pagSurface);
   auto initialFileSize = sequenceFile->fileSize();
   for (auto i = 0; i < 30; i++) {
@@ -165,7 +165,7 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
   halfSequenceFile = nullptr;
 
   info = tgfx::ImageInfo::Make(540, 960, tgfx::ColorType::RGBA_8888);
-  pagSurface = PAGSurface::MakeOffscreen(info.width(), info.height());
+  pagSurface = OffscreenSurface::Make(info.width(), info.height());
   pagPlayer->setSurface(pagSurface);
   pixmap.reset();
   bitmap.allocPixels(info.width(), info.height(), false, false);

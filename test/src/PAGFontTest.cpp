@@ -33,7 +33,7 @@ PAG_TEST(PAGFontTest, TestFont) {
                         "TTTGBMedium", "Regular");
   auto TestPAGFile = LoadPAGFile("resources/apitest/test_font.pag");
   ASSERT_NE(TestPAGFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
+  auto pagSurface = OffscreenSurface::Make(TestPAGFile->width(), TestPAGFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

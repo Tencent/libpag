@@ -32,7 +32,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
   int height = pagFile->height();
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
@@ -85,7 +85,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto pagFile = LoadPAGFile("assets/test2.pag");
   auto width = pagFile->width();
   auto height = pagFile->height();
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   tgfx::GLTextureInfo textureInfo;
@@ -116,7 +116,7 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
   auto pagFile = LoadPAGFile("assets/test.pag");
   auto width = pagFile->width();
   auto height = pagFile->height() * 2;
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   tgfx::GLTextureInfo textureInfo;
@@ -141,7 +141,7 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 }
 
 PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   tgfx::GLTextureInfo textureInfo;

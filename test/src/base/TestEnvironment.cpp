@@ -19,6 +19,7 @@
 #include "TestEnvironment.h"
 #include "ffavc.h"
 #include "utils/Baseline.h"
+#include "utils/DevicePool.h"
 #include "utils/ProjectPath.h"
 
 namespace pag {
@@ -40,6 +41,7 @@ void TestEnvironment::SetUp() {
 
 void TestEnvironment::TearDown() {
   Baseline::TearDown();
+  DevicePool::CleanAll();
 }
 
 }  // namespace pag

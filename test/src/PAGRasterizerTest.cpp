@@ -46,7 +46,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   auto maskBuffer = std::static_pointer_cast<PixelBuffer>(mask->makeBuffer());
   EXPECT_TRUE(Baseline::Compare(maskBuffer, "PAGRasterizerTest/rasterizer_path"));
 
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
