@@ -11,7 +11,6 @@ project(PAG)
 #set(VENDOR_DEBUG ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tgfx)
 
 include(./third_party/vendor_tools/vendor.cmake)
 
@@ -112,6 +111,11 @@ while (VERSION_FILE)
     endif ()
 endwhile ()
 
+if (NOT TGFX_DIR)
+    set(TGFX_DIR third_party/tgfx)
+endif ()
+get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
 message("PAG_VERSION: ${PAG_VERSION}")
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
 message("PAG_USE_RTTR: ${PAG_USE_RTTR}")
@@ -119,6 +123,7 @@ message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
 message("PAG_USE_C: ${PAG_USE_C}")
+message("TGFX_DIR: ${TGFX_DIR}")
 
 set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
 set(TGFX_USE_QT ${PAG_USE_QT})
@@ -132,7 +137,7 @@ set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
 set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-add_subdirectory(${TGFX_DIR} EXCLUDE_FROM_ALL)
+add_subdirectory(${TGFX_DIR} tgfx EXCLUDE_FROM_ALL)
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
 
 if (PAG_USE_C)
