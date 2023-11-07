@@ -175,7 +175,7 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 ### 编译环境
 
 - Xcode 11.0 版本及以上
-- GCC 7.0 版本及以上
+- GCC 8.0 版本及以上
 - CMake 3.10.2 版本及以上
 - Visual Studio 2019
 - NDK 19.2.5345600 （**其他 NDK 版本可能会存在编译报错**)
