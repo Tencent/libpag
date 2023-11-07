@@ -520,7 +520,7 @@ PAG_TEST(PAGTextLayerTest, TextPathBoxReversed) {
  */
 PAG_TEST(PAGTextLayerTest, TextRangeSelectorTriangleEarseHighAndLow) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
-  auto pagFile = LoadPAGFile("assets/RangeSelectorTriangleHighLow.pag");
+  auto pagFile = LoadPAGFile("assets/RangeSelectorTriangleEaseHighAndLow.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/RangeSelectorTriangleHighLow"));
