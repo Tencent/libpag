@@ -27,17 +27,17 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/opengl/GLDevice.h"
-#include "utils/ProjectPath.h"
+#include "utils/TestDir.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
 
-static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
+static const std::string BASELINE_ROOT = TestDir::GetRoot() + "/baseline";
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
 static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache/md5.json";
 static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.json";
-static const std::string OUT_ROOT = ProjectPath::Absolute("test/out");
+static const std::string OUT_ROOT = TestDir::GetRoot() + "/out";
 static const std::string OUT_MD5_PATH = OUT_ROOT + "/md5.json";
 static const std::string OUT_VERSION_PATH = OUT_ROOT + "/version.json";
 static const std::string GIT_HEAD_PATH = "./HEAD";
