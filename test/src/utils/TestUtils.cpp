@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestUtils.h"
-#include <dirent.h>
 #include <fstream>
 #include "base/utils/TGFXCast.h"
 #include "rendering/utils/Directory.h"
@@ -25,6 +24,7 @@
 #include "tgfx/utils/Buffer.h"
 #include "tgfx/utils/Stream.h"
 #include "utils/ProjectPath.h"
+#include "utils/TestDir.h"
 
 namespace pag {
 using namespace tgfx;
@@ -131,17 +131,8 @@ std::shared_ptr<tgfx::Data> ReadFile(const std::string& path) {
 }
 
 std::string GetOutputFile(const std::string& key) {
-  static const std::string OUT_ROOT = ProjectPath::Absolute("test/out");
+  static const std::string OUT_ROOT = TestDir::GetRoot() + "/out";
   return OUT_ROOT + "/" + key + ".webp";
-}
-
-void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {
-  std::filesystem::path path = GetOutputFile(key);
-  std::filesystem::create_directories(path.parent_path());
-  std::ofstream out(path);
-  out.write(reinterpret_cast<const char*>(data->data()),
-            static_cast<std::streamsize>(data->size()));
-  out.close();
 }
 
 void SaveImage(const tgfx::Bitmap& bitmap, const std::string& key) {
@@ -156,7 +147,12 @@ void SaveImage(const Pixmap& pixmap, const std::string& key) {
   if (data == nullptr) {
     return;
   }
-  SaveFile(data, key);
+  std::filesystem::path path = GetOutputFile(key);
+  std::filesystem::create_directories(path.parent_path());
+  std::ofstream out(path);
+  out.write(reinterpret_cast<const char*>(data->data()),
+            static_cast<std::streamsize>(data->size()));
+  out.close();
 }
 
 void RemoveImage(const std::string& key) {
