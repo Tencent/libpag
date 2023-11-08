@@ -16,7 +16,6 @@
 
   ./install_tools.sh
   depsync
-  git-lfs pull
 
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
@@ -64,6 +63,8 @@
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
     git stash pop --index --quiet
   fi
+
+  depsync
 
   if [ "$COMPLIE_RESULT" == false ]; then
     mkdir -p result
