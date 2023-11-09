@@ -55,8 +55,6 @@ cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
 cd ..
 
-rm -rf build
-
 cp -r $WORKSPACE/test/out $WORKSPACE/result
 
 if [ "$COMPLIE_RESULT" == false ]; then
