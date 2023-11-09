@@ -295,9 +295,13 @@ jobs:
           depsync
         shell: bash
 
+      - uses: TheMrMilchmann/setup-msvc-dev@v3
+        with:
+          arch: x64
+
       - name: Build Windows
         run: |
-          node build_pag -p win -a x64 -v
+          msbuild win\Win32Demo.sln
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
