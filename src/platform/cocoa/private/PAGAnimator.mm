@@ -112,10 +112,9 @@ class AnimatorListener : public pag::PAGAnimator::Listener {
   }
 
   void onAnimationWillUpdate(PAGAnimator*) override {
-    // [updaterTable.anyObject retain] is non-atomic and 
-    //  may lead to a wild pointer issue if the object
-    //  is released after obtaining anyObject.
-    //  Therefore, it is necessary to increment the reference count in the main thread before using.
+    // [updaterTable.anyObject retain] is non-atomic and may lead to a wild pointer issue
+    // if the object is released after obtaining anyObject.
+    // Therefore, it is necessary to increment the reference count in the main thread before using.
     [updaterTable.anyObject retain];
   };
 
