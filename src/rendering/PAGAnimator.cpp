@@ -271,6 +271,10 @@ void PAGAnimator::doUpdate(bool setStartTime) {
   }
   auto isSync = _isSync;
   locker.unlock();
+  auto listener = weakListener.lock();
+  if (listener) {
+    listener->onAnimationWillUpdate(this);
+  }
   if (isSync) {
     onFlush(setStartTime);
   } else {
@@ -319,7 +323,6 @@ void PAGAnimator::resetStartTime() {
 
 void PAGAnimator::resetTask() {
   if (task != nullptr) {
-    task->cancel();
     task->wait();
     task = nullptr;
   }
