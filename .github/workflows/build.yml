@@ -295,9 +295,14 @@ jobs:
           depsync
         shell: bash
 
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+        arch: x64
+
       - name: Build Windows
         run: |
-          node build_pag -p win -a x64
+          set VSCMD_SKIP_SENDTELEMETRY=1
+          msbuild win\Win32Demo.sln
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
