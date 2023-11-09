@@ -63,7 +63,6 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-
   auto drawable = OffscreenDrawable::Make(width, height);
   return MakeFrom(drawable);
 }

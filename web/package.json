@@ -5,7 +5,7 @@
   "main": "lib/libpag.cjs.js",
   "module": "lib/libpag.esm.js",
   "browser": "lib/libpag.umd.js",
-  "typings": "types/pag.d.ts",
+  "typings": "types/web/pag.d.ts",
   "scripts": {
     "build": "rimraf lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
     "build:wx": "rimraf wechat/lib/*.js wechat/lib/*.map wechat/lib/*.br wechat/types/* && rollup -c ./script/rollup.config.wx.js && tsc -p ./wechat/tsconfig.type.json && brotli ./wechat/lib/libpag.wasm",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@babel/core": "~7.20.2",
     "@babel/preset-env": "~7.20.2",
+    "@rollup/plugin-alias": "^5.0.0",
     "@rollup/plugin-babel": "~6.0.2",
     "@rollup/plugin-commonjs": "~23.0.2",
     "@rollup/plugin-json": "~5.0.1",

@@ -1,6 +1,6 @@
 import { PAGModule } from '../pag-module';
 import { ctor, Point, Vector } from '../types';
-import { ScalerContext } from './scaler-context';
+import { ScalerContext } from '@tgfx/core/scaler-context';
 import { Matrix } from './matrix';
 
 export interface WebFont {

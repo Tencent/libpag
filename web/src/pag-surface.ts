@@ -1,6 +1,6 @@
 import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
-import { readBufferFromWasm } from './utils/buffer';
+import { readBufferFromWasm } from '@tgfx/utils/buffer';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
 @destroyVerify

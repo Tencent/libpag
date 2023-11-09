@@ -9,6 +9,10 @@
     "experimentalDecorators": true,
     "strict": true,
     "outDir": "./lib",
+    "baseUrl": ".", 
+    "paths": {
+      "@tgfx/*": ["../third_party/tgfx/web/src/*"],
+    },
     "resolveJsonModule": true
   },
   "include": ["src/**/*.ts", "demo/**/*.ts"]

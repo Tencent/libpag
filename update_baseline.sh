@@ -14,6 +14,9 @@
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
+  ./install_tools.sh
+  depsync
+
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
   else
@@ -39,13 +42,21 @@
   echo $CMAKE_COMMAND
 
   if [[ $1 == "1" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
-    $CMAKE_COMMAND -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
-  $CMAKE_COMMAND --build . --target PAGBaseline -- -j 12
-  ./PAGBaseline
+  $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
+  ./UpdateBaseline
+
+  if test $? -eq 0; then
+    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
+  else
+    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Failed~~~~~~~~~~~~~~~~~~"
+    COMPLIE_RESULT=false
+  fi
+
   cd ..
 
   git switch $CURRENT_BRANCH --quiet
@@ -53,6 +64,11 @@
     git stash pop --index --quiet
   fi
 
-  echo "~~~~~~~~~~~~~~~~~~~Update Baseline END~~~~~~~~~~~~~~~~~~~~~"
-  exit
+  depsync
+
+  if [ "$COMPLIE_RESULT" == false ]; then
+    mkdir -p result
+    cp -r test/out result
+    exit 1
+  fi
 }

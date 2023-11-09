@@ -6,7 +6,7 @@
 [![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-[English](./README.md) | 简体中文 | [官网](https://pag.art) | [官方论坛](https://bbs.pag.art)
+[English](./README.md) | 简体中文 | [官网](https://pag.art)
 
 ## 介绍
 
@@ -175,14 +175,14 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 ### 编译环境
 
 - Xcode 11.0 版本及以上
-- GCC 7.0 版本及以上
+- GCC 8.0 版本及以上
 - CMake 3.10.2 版本及以上
 - Visual Studio 2019
 - NDK 19.2.5345600 （**其他 NDK 版本可能会存在编译报错**)
 
 ### 依赖管理
 
-libpag 使用 depsync 命令行工具管理第三方依赖项。
+libpag 使用 [depsync](https://github.com/domchen/depsync) 命令行工具管理第三方依赖项。
 
 **macOS 平台：**
 

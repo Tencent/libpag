@@ -57,13 +57,17 @@ LayerCache::LayerCache(Layer* layer) : layer(layer) {
   }
   contentCache->update();
   transformCache = new TransformCache(layer);
+  bool hasFeatherMask = false;
   for (auto mask : layer->masks) {
     if (mask->maskFeather != nullptr ||
         (mask->maskOpacity->animatable() || mask->maskOpacity->value != 255)) {
-      featherMaskCache = new FeatherMaskCache(layer);
+      hasFeatherMask = true;
+      break;
     }
   }
-  if (!layer->masks.empty() && featherMaskCache == nullptr) {
+  if (hasFeatherMask) {
+    featherMaskCache = new FeatherMaskCache(layer);
+  } else if (!layer->masks.empty()) {
     maskCache = new MaskCache(layer);
   }
   updateStaticTimeRanges();
@@ -75,6 +79,7 @@ LayerCache::~LayerCache() {
   delete transformCache;
   delete maskCache;
   delete contentCache;
+  delete featherMaskCache;
 }
 
 Transform* LayerCache::getTransform(Frame contentFrame) {

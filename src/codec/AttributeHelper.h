@@ -390,7 +390,7 @@ void WriteTimeEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyfra
     }
   }
   auto count = static_cast<uint32_t>(bezierList.size());
-  stream->writeFloatList(&bezierList[0], count, BEZIER_PRECISION);
+  stream->writeFloatList(bezierList.data(), count, BEZIER_PRECISION);
 }
 
 template <typename T>
@@ -411,7 +411,7 @@ void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& key
     }
   }
   auto count = static_cast<uint32_t>(spatialList.size());
-  stream->writeFloatList(&spatialList[0], count, SPATIAL_PRECISION);
+  stream->writeFloatList(spatialList.data(), count, SPATIAL_PRECISION);
 }
 
 template <typename T>

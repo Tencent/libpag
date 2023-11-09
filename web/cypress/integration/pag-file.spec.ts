@@ -64,7 +64,7 @@ describe('PAGFile', () => {
   });
 
   it('Get maxSupportedTagLevel', () => {
-    expect(PAG.PAGFile.maxSupportedTagLevel()).to.be.eq(83);
+    expect(PAG.PAGFile.maxSupportedTagLevel()).to.be.greaterThan(83);
   });
 
   let pagFile: PAGFile;

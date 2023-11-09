@@ -4,6 +4,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) 
 [![codecov](https://codecov.io/gh/Tencent/libpag/branch/main/graph/badge.svg)](https://codecov.io/gh/Tencent/libpag)
 [![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
+[![build](https://github.com/Tencent/libpag/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
 English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
@@ -176,7 +177,7 @@ We recommend using CLion IDE on the macOS platform for development.
 - The `main` branch is our active developing branch which contains the latest features and bugfixes. 
 - The branches under `release/` are our stable milestone branches which are fully tested. We will 
 periodically cut a `release/{version}` branch from the `main` branch. After one `release/{version}` 
-branch is cut, only high priority fixes are checked into it.
+branch is cut, only high-priority fixes are checked into it.
 
 **Note: This repository only contains the latest code since PAG 4.0. To use the legacy PAG 3.0 
 versions, you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
@@ -184,24 +185,24 @@ versions, you can download the precompiled libraries from [here](https://github.
 ### Build Prerequisites
 
 - Xcode 11.0+
-- GCC 7.0+
+- GCC 8.0+
 - CMake 3.10.2+
 - Visual Studio 2019
 - NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
 
 ### Dependency Management
 
-libpag uses `depsync` tool to manage third-party dependencies.
+libpag uses [depsync](https://github.com/domchen/depsync) tool to manage third-party dependencies.
 
 **For macOS platform：**
 
-Just simply run the script in the root of libpag project:
+Run the script in the root of the project:
 
 ```
 ./sync_deps.sh
 ```
 
-This script will automatically install necessary tools and synchronize all third-party repositories.
+This script will automatically install the necessary tools and synchronize all third-party repositories.
 
 **For other platforms：**
 
@@ -212,7 +213,7 @@ computer after this step). And then run the following command to install depsync
 npm install -g depsync
 ```
 
-And then run `depsync` in the root directory of libpag project.
+And then run `depsync` in the root directory of the project.
 
 ```
 depsync

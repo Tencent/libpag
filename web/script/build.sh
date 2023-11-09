@@ -35,15 +35,15 @@ if [[ $@ == *debug* ]]; then
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
 fi
 
-emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
+emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" -DTGFX_USE_BIND_FOR_WEB="OFF"
 
 cmake --build $BUILD_DIR --target pag
 
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
-  -I$SOURCE_DIR/tgfx/include/ \
-  -I$SOURCE_DIR/tgfx/src/ \
+  -I$SOURCE_DIR/third_party/tgfx/include/ \
+  -I$SOURCE_DIR/third_party/tgfx/src/ \
   -DPAG_BUILD_FOR_WEB \
   -Wl,--whole-archive $BUILD_DIR/libpag.a \
   --no-entry \

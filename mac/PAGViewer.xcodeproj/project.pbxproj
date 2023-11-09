@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		14A1C3A0D1F6C577289F66C1 /* libPods-PAGViewer.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DD1EA514E38456948659573 /* libPods-PAGViewer.a */; };
 		27815BAA255A79400086594A /* text_matte.pag in Resources */ = {isa = PBXBuildFile; fileRef = 27815BA9255A79400086594A /* text_matte.pag */; };
+		51317B945151CCD171EEA1FA /* Pods_PAGViewer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0694879C7283A6AA46DF40B4 /* Pods_PAGViewer.framework */; };
 		7785F05225ADB58D004D5CE9 /* WindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7785F05125ADB58D004D5CE9 /* WindowController.m */; };
 		7785F05525ADB630004D5CE9 /* red.pag in Resources */ = {isa = PBXBuildFile; fileRef = 7785F05425ADB630004D5CE9 /* red.pag */; };
 		857B02A82455D81100E533CF /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02A72455D81100E533CF /* AppDelegate.m */; };
@@ -68,6 +68,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0694879C7283A6AA46DF40B4 /* Pods_PAGViewer.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_PAGViewer.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		27815BA9255A79400086594A /* text_matte.pag */ = {isa = PBXFileReference; lastKnownFileType = file; path = text_matte.pag; sourceTree = "<group>"; };
 		6E097EDDF5BF083DFCB0CBB0 /* Pods-PAGViewer.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PAGViewer.debug.xcconfig"; path = "Target Support Files/Pods-PAGViewer/Pods-PAGViewer.debug.xcconfig"; sourceTree = "<group>"; };
 		7785F05025ADB58D004D5CE9 /* WindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WindowController.h; sourceTree = "<group>"; };
@@ -133,7 +134,6 @@
 		857B02ED2455DA7C00E533CF /* Bulge-unpin-s.pag */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Bulge-unpin-s.pag"; sourceTree = "<group>"; };
 		85C9A3D925309D7C00B2CA8C /* DragFilePAGView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DragFilePAGView.h; sourceTree = "<group>"; };
 		85C9A3DA25309D7C00B2CA8C /* DragFilePAGView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DragFilePAGView.m; sourceTree = "<group>"; };
-		8DD1EA514E38456948659573 /* libPods-PAGViewer.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-PAGViewer.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		949348D34F56C006A7678170 /* Pods-PAGViewer.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PAGViewer.release.xcconfig"; path = "Target Support Files/Pods-PAGViewer/Pods-PAGViewer.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -142,7 +142,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				14A1C3A0D1F6C577289F66C1 /* libPods-PAGViewer.a in Frameworks */,
+				51317B945151CCD171EEA1FA /* Pods_PAGViewer.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -282,7 +282,7 @@
 		EBC250D9EF61A8E129790DCC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				8DD1EA514E38456948659573 /* libPods-PAGViewer.a */,
+				0694879C7283A6AA46DF40B4 /* Pods_PAGViewer.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -298,6 +298,7 @@
 				857B029F2455D81100E533CF /* Sources */,
 				857B02A02455D81100E533CF /* Frameworks */,
 				857B02A12455D81100E533CF /* Resources */,
+				F8C195E5F614458D028161BF /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -423,6 +424,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		F8C195E5F614458D028161BF /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PAGViewer/Pods-PAGViewer-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-PAGViewer/Pods-PAGViewer-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-PAGViewer/Pods-PAGViewer-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

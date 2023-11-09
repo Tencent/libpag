@@ -812,7 +812,7 @@ class PAG_API MosaicEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-class BrightnessContrastEffect : public Effect {
+class PAG_API BrightnessContrastEffect : public Effect {
  public:
   ~BrightnessContrastEffect() override;
 
@@ -852,7 +852,7 @@ class PAG_API ChannelControlType {
   static const int Count = 7;
 };
 
-class HueSaturationEffect : public Effect {
+class PAG_API HueSaturationEffect : public Effect {
  public:
   ~HueSaturationEffect() override;
 

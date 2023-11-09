@@ -54,6 +54,8 @@ ColorType ToPAG(tgfx::ColorType colorType);
 
 tgfx::BackendTexture ToTGFX(const BackendTexture& texture);
 
+BackendTexture ToPAG(const tgfx::BackendTexture& texture);
+
 tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget);
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore);

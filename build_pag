@@ -1,0 +1,2 @@
+#!/usr/bin/env node
+require("./third_party/vendor_tools/lib-build");

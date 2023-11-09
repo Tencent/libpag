@@ -10,7 +10,9 @@ project(PAG)
 # Uncomment the next line to enable debug mode for third-party libraries.
 #set(VENDOR_DEBUG ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-include(./vendor_tools/vendor.cmake)
+
+
+include(./third_party/vendor_tools/vendor.cmake)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "allow use of OpenGL as GPU backend" ON)
@@ -18,6 +20,7 @@ option(PAG_USE_SWIFTSHADER "allow build with SwiftShader library" OFF)
 option(PAG_USE_QT "allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "enable HarfBuzz support" OFF)
+option(PAG_USE_C "enable c API" OFF)
 
 if (NOT APPLE AND NOT WEB)
     option(PAG_USE_FREETYPE "Allow use of embedded freetype library" ON)
@@ -41,7 +44,9 @@ if (NOT WEB)
     option(PAG_BUILD_SHARED "Build shared library" ON)
 endif ()
 
-if (MACOS)
+string(FIND ${CMAKE_COMMAND} "/CLion.app/" CLionPosition)
+get_directory_property(HasParent PARENT_DIRECTORY)
+if (CLionPosition GREATER -1 AND NOT HasParent)
     # CLion project needs test targets.
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
@@ -91,13 +96,35 @@ endif ()
 if (PAG_BUILD_TESTS)
     set(PAG_USE_FREETYPE ON)
     set(PAG_USE_HARFBUZZ ON)
+    set(PAG_BUILD_SHARED OFF)
 endif ()
 
+file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
+set(PAG_VERSION "")
+while (VERSION_FILE)
+    list(POP_FRONT VERSION_FILE LINE)
+    if (LINE MATCHES "\\sdkVersion[^ $]+")
+        string(REGEX MATCH "\\\"[^ $]+" VERSION ${LINE})
+        string(LENGTH ${VERSION} VERSION_LENGTH)
+        MATH(EXPR VERSION_LENGTH "${VERSION_LENGTH}-2")
+        string(SUBSTRING ${VERSION} 1 ${VERSION_LENGTH} PAG_VERSION)
+        break()
+    endif ()
+endwhile ()
+
+if (NOT TGFX_DIR)
+    set(TGFX_DIR third_party/tgfx)
+endif ()
+get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
+message("PAG_VERSION: ${PAG_VERSION}")
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
 message("PAG_USE_RTTR: ${PAG_USE_RTTR}")
 message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
+message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
+message("TGFX_DIR: ${TGFX_DIR}")
 
 set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
 set(TGFX_USE_QT ${PAG_USE_QT})
@@ -111,8 +138,13 @@ set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
 set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-add_subdirectory(tgfx/ EXCLUDE_FROM_ALL)
-list(APPEND PAG_INCLUDES tgfx/include)
+add_subdirectory(${TGFX_DIR} tgfx EXCLUDE_FROM_ALL)
+list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
+
+if (PAG_USE_C)
+    file(GLOB PAG_C_FILES src/c/*.* src/c/ext/*.*)
+    list(APPEND PAG_FILES ${PAG_C_FILES})
+endif ()
 
 if (PAG_USE_LIBAVC)
     add_definitions(-DPAG_USE_LIBAVC)
@@ -134,9 +166,9 @@ if (PAG_USE_QT)
         list(APPEND PAG_PLATFORM_FILES ${CGL_PLATFORM_FILES})
     endif ()
 elseif (PAG_USE_SWIFTSHADER)
-    file(GLOB SWIFTSHADER_LIBRARIES vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
+    file(GLOB SWIFTSHADER_LIBRARIES ${TGFX_DIR}/vendor/swiftshader/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND PAG_PLATFORM_SHARED_LIBS ${SWIFTSHADER_LIBRARIES})
-    list(APPEND PAG_PLATFORM_INCLUDES vendor/swiftshader/include)
+    list(APPEND PAG_PLATFORM_INCLUDES ${TGFX_DIR}/vendor/swiftshader/include)
     file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/swiftshader/*.*)
 endif ()
 
@@ -204,6 +236,8 @@ elseif (IOS)
         endif ()
 
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
+        file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
+        list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
                 src/platform/ios/*.h
                 src/platform/ios/private/*.h
@@ -240,6 +274,8 @@ elseif (MACOS)
         endif ()
 
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
+        file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
+        list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
                 src/platform/mac/*.h
                 src/platform/mac/private/*.h
@@ -278,8 +314,8 @@ elseif (WIN32)
     add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES)
 
     if (USE_NATIVE_PLATFORM)
-        list(APPEND PAG_PLATFORM_INCLUDES vendor/angle/include)
-        file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
+        list(APPEND PAG_PLATFORM_INCLUDES ${TGFX_DIR}/vendor/angle/include)
+        file(GLOB ANGLE_LIBS ${TGFX_DIR}/vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
         list(APPEND PAG_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/win/*.*)
     endif ()
@@ -310,6 +346,12 @@ else ()
     list(APPEND PAG_PLATFORM_FILES third_party/lz4/lib/lz4.c)
 endif ()
 
+if (PAG_USE_C)
+    if (ANDROID OR WIN32)
+        list(APPEND PAG_PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
+    endif ()
+endif ()
+
 add_vendor_target(PAG STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_SHARED_VENDORS})
 list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
@@ -326,6 +368,16 @@ else ()
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 endif ()
 
+if (MACOS OR IOS)
+    set_target_properties(pag PROPERTIES
+            FRAMEWORK TRUE
+            PUBLIC_HEADER "${PAG_PLATFORM_HEADERS}"
+            MACOSX_FRAMEWORK_IDENTIFIER "com.tencent.libpag"
+            MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
+            MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
+    set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
+endif ()
+
 if (PAG_BUILD_TESTS)
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
@@ -339,67 +391,48 @@ if (PAG_BUILD_TESTS)
         message(WARNING "The local md5 cache is out of date! Please run the 'update_baseline.sh' to regenerate the cache.")
     endif ()
 
-    add_library(pag-static STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} $<TARGET_OBJECTS:tgfx>)
-    merge_libraries_into(pag-static ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
-    target_include_directories(pag-static PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
-    target_link_libraries(pag-static tgfx ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
+    file(GLOB_RECURSE PAG_TEST_FILES test/src/*.*)
+    list(APPEND TEST_PLATFORM_LIBS pag ${PAG_PLATFORM_SHARED_LIBS})
+    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} test/src ${TGFX_DIR}/third_party/json/include)
 
-    list(APPEND TEST_STATIC_VENDORS googletest)
-    add_vendor_target(Test STATIC_VENDORS ${TEST_STATIC_VENDORS} SHARED_VENDORS ${TEST_SHARED_VENDORS})
-    list(APPEND TEST_PLATFORM_LIBS ${Test_VENDOR_STATIC_LIBRARIES})
-    list(APPEND TEST_PLATFORM_LIBS ${Test_VENDOR_SHARED_LIBRARIES})
-    list(APPEND TEST_PLATFORM_LIBS pag-static ${PAG_PLATFORM_SHARED_LIBS})
-    set(TEST_INCLUDES third_party/googletest/googletest third_party/googletest/googletest/include third_party/json/include)
-    list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
-
-    file(GLOB PAG_TEST_FILES
-            test/*.*
-            test/framework/*.*
-            test/framework/utils/*.*)
-
-    file(GLOB PAG_SMOKE_TEST_FILES
-            test/PAGSmokeTest.cpp
-            test/TestUtils.cpp
-            test/framework/*.cpp
-            test/framework/utils/*.cpp)
-
-    file(GLOB PAG_PERFORMANCE_TEST_FILES
-            test/PAGPerformanceTest.cpp
-            test/TestUtils.cpp
-            test/framework/*.cpp
-            test/framework/utils/*.cpp)
+    set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
+    list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
+    list(APPEND PAG_TEST_FILES ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
-    list(APPEND TEST_INCLUDES tgfx/src vendor/ffavc/include)
+    list(APPEND TEST_INCLUDES vendor/ffavc/include)
+
+    if (MACOS AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
+        list(APPEND TEST_LINK_OPTIONS "-ld_classic")
+    endif ()
 
     # used to update the local md5 data for baseline testing.
-    add_executable(PAGBaseline ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
-    target_include_directories(PAGBaseline PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGBaseline PUBLIC UPDATE_BASELINE)
-    target_link_libraries(PAGBaseline ${TEST_PLATFORM_LIBS})
-    set_target_properties(PAGBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+    add_executable(UpdateBaseline ${PAG_TEST_FILES})
+    target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
+    target_link_options(UpdateBaseline PRIVATE ${TEST_LINK_OPTIONS})
+    target_link_libraries(UpdateBaseline ${TEST_PLATFORM_LIBS})
+    set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(PAGGenerateImages ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
-    target_include_directories(PAGGenerateImages PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGGenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
-    target_link_libraries(PAGGenerateImages ${TEST_PLATFORM_LIBS})
-    set_target_properties(PAGGenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+    add_executable(GenerateImages ${PAG_TEST_FILES})
+    target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
+    target_link_options(GenerateImages PRIVATE ${TEST_LINK_OPTIONS})
+    target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
+    set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
+    add_executable(PAGUnitTest ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
+    target_link_options(PAGUnitTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGFullTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
+    add_executable(PAGFullTest ${PAG_TEST_FILES})
     target_include_directories(PAGFullTest PUBLIC ${TEST_INCLUDES})
+    target_link_options(PAGFullTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGFullTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
-
-    add_executable(PAGPerformanceTest ${Test_VENDOR_TARGET} ${PAG_PERFORMANCE_TEST_FILES})
-    target_include_directories(PAGPerformanceTest PUBLIC ${TEST_INCLUDES})
-    target_compile_definitions(PAGPerformanceTest PUBLIC PERFORMANCE_TEST)
-    target_link_libraries(PAGPerformanceTest ${TEST_PLATFORM_LIBS})
 endif ()

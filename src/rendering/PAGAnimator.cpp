@@ -19,6 +19,7 @@
 #include "PAGAnimator.h"
 #include "base/utils/TimeUtil.h"
 #include "platform/Platform.h"
+#include "rendering/utils/DisplayLinkWrapper.h"
 #include "tgfx/utils/Clock.h"
 #include "tgfx/utils/Task.h"
 
@@ -35,7 +36,11 @@ class AnimationTicker {
   }
 
   AnimationTicker() {
-    displayLink = Platform::Current()->createDisplayLink([this] { onFrameAvailable(); });
+    auto callback = [this] { onFrameAvailable(); };
+    displayLink = DisplayLinkWrapper::Make(callback);
+    if (displayLink == nullptr) {
+      displayLink = Platform::Current()->createDisplayLink(callback);
+    }
   }
 
   bool available() {
