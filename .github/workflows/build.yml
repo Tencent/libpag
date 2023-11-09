@@ -297,7 +297,7 @@ jobs:
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
-        arch: x64
+          arch: x64
 
       - name: Build Windows
         run: |
