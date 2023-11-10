@@ -297,7 +297,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node third_party/vendor_tools/ms-build win/Win32Demo.sln /p:Configuration=Debug;Platform=x64
+          node third_party/vendor_tools/ms-build win/Win32Demo.sln /p:Configuration=Debug /p:Platform=x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
