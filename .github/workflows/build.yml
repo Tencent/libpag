@@ -273,7 +273,7 @@ jobs:
           path: out
 
   win:
-    runs-on: windows-latest
+    runs-on: windows-2019
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
