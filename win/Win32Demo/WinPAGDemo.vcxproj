@@ -106,7 +106,7 @@
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm update -g depsync --silent
+call npm install -g depsync --silent
 call depsync
 node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
@@ -140,7 +140,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm update -g depsync --silent
+call npm install -g depsync --silent
 call depsync
 node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
@@ -164,7 +164,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </Link>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm update -g depsync --silent
+call npm install -g depsync --silent
 call depsync
 node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
@@ -205,7 +205,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm update -g depsync --silent
+call npm install -g depsync --silent
 call depsync
 node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
