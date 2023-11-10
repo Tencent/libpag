@@ -101,7 +101,7 @@ endif ()
 
 file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
 set(PAG_VERSION "")
-foreach(LINE IN LISTS VERSION_FILE)
+foreach (LINE IN LISTS VERSION_FILE)
     if (LINE MATCHES "\\sdkVersion[^ $]+")
         string(REGEX MATCH "\\\"[^ $]+" VERSION ${LINE})
         string(LENGTH ${VERSION} VERSION_LENGTH)
@@ -109,7 +109,7 @@ foreach(LINE IN LISTS VERSION_FILE)
         string(SUBSTRING ${VERSION} 1 ${VERSION_LENGTH} PAG_VERSION)
         break()
     endif ()
-endforeach()
+endforeach ()
 
 if (NOT TGFX_DIR)
     set(TGFX_DIR third_party/tgfx)
@@ -123,6 +123,16 @@ message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
 message("PAG_USE_C: ${PAG_USE_C}")
 message("PAG_BUILD_SHARED: ${PAG_BUILD_SHARED}")
 message("PAG_BUILD_TESTS: ${PAG_BUILD_TESTS}")
+message("PAG_USE_OPENGL: ${PAG_USE_OPENGL}")
+message("PAG_USE_SWIFTSHADER: ${PAG_USE_SWIFTSHADER}")
+message("PAG_USE_QT: ${PAG_USE_QT}")
+message("PAG_USE_FREETYPE: ${PAG_USE_FREETYPE}")
+message("PAG_USE_PNG_DECODE: ${PAG_USE_PNG_DECODE}")
+message("PAG_USE_PNG_ENCODE: ${PAG_USE_PNG_ENCODE}")
+message("PAG_USE_JPEG_DECODE: ${PAG_USE_JPEG_DECODE}")
+message("PAG_USE_JPEG_ENCODE: ${PAG_USE_JPEG_ENCODE}")
+message("PAG_USE_WEBP_DECODE: ${PAG_USE_WEBP_DECODE}")
+message("PAG_USE_WEBP_ENCODE: ${PAG_USE_WEBP_ENCODE}")
 message("TGFX_DIR: ${TGFX_DIR}")
 
 set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
@@ -136,8 +146,29 @@ set(TGFX_USE_JPEG_ENCODE ${PAG_USE_JPEG_ENCODE})
 set(TGFX_USE_WEBP_DECODE ${PAG_USE_WEBP_DECODE})
 set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
 
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-add_subdirectory(${TGFX_DIR} tgfx EXCLUDE_FROM_ALL)
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_OPENGL=${TGFX_USE_OPENGL}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_QT=${TGFX_USE_QT}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_SWIFTSHADER=${TGFX_USE_SWIFTSHADER}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_FREETYPE=${TGFX_USE_FREETYPE}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_PNG_DECODE=${TGFX_USE_PNG_DECODE}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_PNG_ENCODE=${TGFX_USE_PNG_ENCODE}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_JPEG_DECODE=${TGFX_USE_JPEG_DECODE}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_JPEG_ENCODE=${TGFX_USE_JPEG_ENCODE}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBP_DECODE=${TGFX_USE_WEBP_DECODE}")
+list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBP_ENCODE=${TGFX_USE_WEBP_ENCODE}")
+
+string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(TGFX_DEBUG_FLAG "-d")
+endif ()
+set(TGFX_OUTPUT_LIB ${TGFX_DIR}/out/${TGFX_BUILD_TYPE}/${PLATFORM}/${ARCH}/tgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
+add_custom_command(OUTPUT tgfx-lib
+        COMMAND node build_tgfx ${TGFX_OPTIONS} -p ${PLATFORM} -a ${ARCH} ${TGFX_DEBUG_FLAG}
+        WORKING_DIRECTORY ${TGFX_DIR}
+        BYPRODUCTS ${TGFX_OUTPUT_LIB}
+        VERBATIM USES_TERMINAL)
+list(APPEND PAG_PLATFORM_STATIC_LIBS ${TGFX_OUTPUT_LIB})
+
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
 
 if (PAG_USE_C)
@@ -356,16 +387,19 @@ list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 
 if (PAG_BUILD_SHARED)
-    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag SHARED tgfx-lib ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
     target_compile_definitions(pag PUBLIC PAG_DLL)
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
-    target_link_libraries(pag tgfx ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
+    target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 else ()
-    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} $<TARGET_OBJECTS:tgfx>)
-    merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
+    add_library(pag STATIC tgfx-lib ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
-    target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
+    target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 endif ()
+
+set_target_properties(pag PROPERTIES PREFIX "")
+set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 
 if (MACOS OR IOS)
     set_target_properties(pag PROPERTIES
@@ -374,7 +408,6 @@ if (MACOS OR IOS)
             MACOSX_FRAMEWORK_IDENTIFIER "com.tencent.libpag"
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
-    set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 endif ()
 
 if (PAG_BUILD_TESTS)
@@ -396,7 +429,15 @@ if (PAG_BUILD_TESTS)
 
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
-    list(APPEND PAG_TEST_FILES ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
+
+    set(TEST_VENDOR_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test-vendor.dir)
+    set(TEST_VENDOR_OUTPUT_LIB ${TEST_VENDOR_OUTPUT_DIR}/${ARCH}/libtest-vendor${CMAKE_STATIC_LIBRARY_SUFFIX})
+    add_custom_command(OUTPUT test-vendor
+            COMMAND node ${VENDOR_TOOLS_DIR}/vendor-build googletest -p ${PLATFORM} -v ${VENDOR_DEBUG_FLAG} -o ${TEST_VENDOR_OUTPUT_DIR}
+            WORKING_DIRECTORY ${TGFX_DIR}
+            BYPRODUCTS ${TEST_VENDOR_OUTPUT_LIB}
+            VERBATIM USES_TERMINAL)
+    list(APPEND TEST_PLATFORM_LIBS ${TEST_VENDOR_OUTPUT_LIB})
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
@@ -407,7 +448,7 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     # used to update the local md5 data for baseline testing.
-    add_executable(UpdateBaseline ${PAG_TEST_FILES})
+    add_executable(UpdateBaseline test-vendor ${PAG_TEST_FILES})
     target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
     target_link_options(UpdateBaseline PRIVATE ${TEST_LINK_OPTIONS})
@@ -415,21 +456,21 @@ if (PAG_BUILD_TESTS)
     set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(GenerateImages ${PAG_TEST_FILES})
+    add_executable(GenerateImages test-vendor ${PAG_TEST_FILES})
     target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
     target_link_options(GenerateImages PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
     set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGUnitTest ${PAG_TEST_FILES})
+    add_executable(PAGUnitTest test-vendor ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_options(PAGUnitTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGFullTest ${PAG_TEST_FILES})
+    add_executable(PAGFullTest test-vendor ${PAG_TEST_FILES})
     target_include_directories(PAGFullTest PUBLIC ${TEST_INCLUDES})
     target_link_options(PAGFullTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
