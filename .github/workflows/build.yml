@@ -36,7 +36,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ios-
 
       - name: Install Build Tools
@@ -75,7 +75,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
@@ -103,7 +103,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-android-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
@@ -132,7 +132,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
@@ -200,7 +200,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
       - name: Run depsync
@@ -258,7 +258,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
@@ -286,7 +286,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-windows-
 
       - name: Run depsync
@@ -305,7 +305,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
@@ -333,7 +333,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-linux-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
@@ -354,7 +354,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
@@ -382,7 +382,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-qt-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
@@ -413,7 +413,7 @@ jobs:
         with:
           path: |
             third_party
-          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
