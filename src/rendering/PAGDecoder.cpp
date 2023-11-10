@@ -194,7 +194,7 @@ bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitm
   if (sequenceFile->isComplete() && composition != nullptr) {
     if (reader != nullptr) {
       reader = nullptr;
-      if (!composition.unique()) {
+      if (composition.use_count() != 1) {
         container->addLayer(composition);
       }
     } else if (composition.use_count() <= 2) {
