@@ -161,8 +161,8 @@ string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(TGFX_DEBUG_FLAG "-d")
 endif ()
-set(TGFX_OUTPUT_LIB ${TGFX_DIR}/out/${TGFX_BUILD_TYPE}/${PLATFORM}/${ARCH}/libtgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
-add_custom_command(OUTPUT libtgfx
+set(TGFX_OUTPUT_LIB ${TGFX_DIR}/out/${TGFX_BUILD_TYPE}/${PLATFORM}/${ARCH}/tgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
+add_custom_command(OUTPUT tgfx-lib
         COMMAND node build_tgfx ${TGFX_OPTIONS} -p ${PLATFORM} -a ${ARCH} ${TGFX_DEBUG_FLAG}
         WORKING_DIRECTORY ${TGFX_DIR}
         BYPRODUCTS ${TGFX_OUTPUT_LIB}
@@ -387,16 +387,19 @@ list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 
 if (PAG_BUILD_SHARED)
-    add_library(pag SHARED libtgfx ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag SHARED tgfx-lib ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
     target_compile_definitions(pag PUBLIC PAG_DLL)
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 else ()
-    add_library(pag STATIC libtgfx ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag STATIC tgfx-lib ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
     merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 endif ()
+
+set_target_properties(pag PROPERTIES PREFIX "")
+set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 
 if (MACOS OR IOS)
     set_target_properties(pag PROPERTIES
@@ -405,7 +408,6 @@ if (MACOS OR IOS)
             MACOSX_FRAMEWORK_IDENTIFIER "com.tencent.libpag"
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
-    set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 endif ()
 
 if (PAG_BUILD_TESTS)

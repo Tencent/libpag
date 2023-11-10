@@ -99,7 +99,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
@@ -129,7 +129,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
@@ -159,7 +159,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
@@ -195,7 +195,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
