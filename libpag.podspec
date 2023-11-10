@@ -128,7 +128,13 @@ Pod::Spec.new do |s|
 
   armv7CFlags = commonCFlags + ["-fno-aligned-allocation"]
   s.xcconfig = {'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17','CLANG_CXX_LIBRARY' => 'libc++',"HEADER_SEARCH_PATHS" => "#{PAG_ROOT}/src #{PAG_ROOT}/include #{TGFX_ROOT}/src #{TGFX_ROOT}/include #{TGFX_ROOT}/third_party/pathkit #{TGFX_ROOT}/third_party/skcms #{TGFX_ROOT}/third_party/freetype/include #{TGFX_ROOT}/third_party/libwebp/src #{PAG_ROOT}/third_party/libavc/common #{PAG_ROOT}/third_party/libavc/decoder"}
-  s.ios.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" "),"OTHER_CFLAGS[sdk=iphoneos*][arch=armv7]" => armv7CFlags.join(" "),"EXPORTED_SYMBOLS_FILE" => "${PODS_ROOT}/../libpag.lds","OTHER_LDFLAGS" => "-w -ld_classic","VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS" => "OpenGLES"}
+  
+  if Gem::Version.new(`xcodebuild -version -sdk`.match(/Xcode (\d+(\.\d+)?)/)[1]) >= Gem::Version.new('15.0')
+      LDFLAGS_VALUE = "-w -ld_classic"
+    else
+      LDFLAGS_VALUE = "-w"
+  end
+  s.ios.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" "),"OTHER_CFLAGS[sdk=iphoneos*][arch=armv7]" => armv7CFlags.join(" "),"EXPORTED_SYMBOLS_FILE" => "${PODS_ROOT}/../libpag.lds","OTHER_LDFLAGS" => LDFLAGS_VALUE,"VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS" => "OpenGLES"}
   s.osx.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" ")}
   s.ios.vendored_frameworks = ios_vendored_frameworks
   s.osx.vendored_frameworks = mac_vendored_frameworks
