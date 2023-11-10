@@ -162,7 +162,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(TGFX_DEBUG_FLAG "-d")
 endif ()
 set(TGFX_OUTPUT_LIB ${TGFX_DIR}/out/${TGFX_BUILD_TYPE}/${PLATFORM}/${ARCH}/libtgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
-add_custom_command(OUTPUT tgfx
+add_custom_command(OUTPUT libtgfx
         COMMAND node build_tgfx ${TGFX_OPTIONS} -p ${PLATFORM} -a ${ARCH} ${TGFX_DEBUG_FLAG}
         WORKING_DIRECTORY ${TGFX_DIR}
         BYPRODUCTS ${TGFX_OUTPUT_LIB}
@@ -387,12 +387,12 @@ list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 
 if (PAG_BUILD_SHARED)
-    add_library(pag SHARED tgfx ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag SHARED libtgfx ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
     target_compile_definitions(pag PUBLIC PAG_DLL)
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 else ()
-    add_library(pag STATIC tgfx ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag STATIC libtgfx ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
     merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
@@ -427,7 +427,15 @@ if (PAG_BUILD_TESTS)
 
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
-    list(APPEND PAG_TEST_FILES ${GOOGLE_TEST_DIR}/src/gtest-all.cc)
+
+    set(TEST_VENDOR_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test-vendor.dir)
+    set(TEST_VENDOR_OUTPUT_LIB ${TEST_VENDOR_OUTPUT_DIR}/${ARCH}/libtest-vendor${CMAKE_STATIC_LIBRARY_SUFFIX})
+    add_custom_command(OUTPUT test-vendor
+            COMMAND node ${VENDOR_TOOLS_DIR}/vendor-build googletest -p ${PLATFORM} -v ${VENDOR_DEBUG_FLAG} -o ${TEST_VENDOR_OUTPUT_DIR}
+            WORKING_DIRECTORY ${TGFX_DIR}
+            BYPRODUCTS ${TEST_VENDOR_OUTPUT_LIB}
+            VERBATIM USES_TERMINAL)
+    list(APPEND TEST_PLATFORM_LIBS ${TEST_VENDOR_OUTPUT_LIB})
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
@@ -438,7 +446,7 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     # used to update the local md5 data for baseline testing.
-    add_executable(UpdateBaseline ${PAG_TEST_FILES})
+    add_executable(UpdateBaseline test-vendor ${PAG_TEST_FILES})
     target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
     target_link_options(UpdateBaseline PRIVATE ${TEST_LINK_OPTIONS})
@@ -446,21 +454,21 @@ if (PAG_BUILD_TESTS)
     set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(GenerateImages ${PAG_TEST_FILES})
+    add_executable(GenerateImages test-vendor ${PAG_TEST_FILES})
     target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
     target_link_options(GenerateImages PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
     set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGUnitTest ${PAG_TEST_FILES})
+    add_executable(PAGUnitTest test-vendor ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_options(PAGUnitTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGFullTest ${PAG_TEST_FILES})
+    add_executable(PAGFullTest test-vendor ${PAG_TEST_FILES})
     target_include_directories(PAGFullTest PUBLIC ${TEST_INCLUDES})
     target_link_options(PAGFullTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
