@@ -18,7 +18,7 @@ if (MSVC)
 endif (MSVC)
 
 # Sets flags
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-DDEBUG)
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
 endif ()
