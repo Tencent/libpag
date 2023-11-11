@@ -425,19 +425,13 @@ if (PAG_BUILD_TESTS)
 
     file(GLOB_RECURSE PAG_TEST_FILES test/src/*.*)
     list(APPEND TEST_PLATFORM_LIBS pag ${PAG_PLATFORM_SHARED_LIBS})
-    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} test/src ${TGFX_DIR}/third_party/json/include)
-
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
-    list(APPEND TEST_INCLUDES ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include)
+    list(APPEND TEST_INCLUDES ${PAG_INCLUDES} test/src
+            ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
+            ${TGFX_DIR}/third_party/json/include)
 
-    set(TEST_VENDOR_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/test-vendor.dir)
-    set(TEST_VENDOR_OUTPUT_LIB ${TEST_VENDOR_OUTPUT_DIR}/${ARCH}/libtest-vendor${CMAKE_STATIC_LIBRARY_SUFFIX})
-    add_custom_command(OUTPUT test-vendor
-            COMMAND node ${VENDOR_TOOLS_DIR}/vendor-build googletest -p ${PLATFORM} -v ${VENDOR_DEBUG_FLAG} -o ${TEST_VENDOR_OUTPUT_DIR}
-            WORKING_DIRECTORY ${TGFX_DIR}
-            BYPRODUCTS ${TEST_VENDOR_OUTPUT_LIB}
-            VERBATIM USES_TERMINAL)
-    list(APPEND TEST_PLATFORM_LIBS ${TEST_VENDOR_OUTPUT_LIB})
+    add_vendor_target(TEST STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
+    list(APPEND TEST_PLATFORM_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
 
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
