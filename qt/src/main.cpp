@@ -43,11 +43,7 @@ int main(int argc, char* argv[]) {
   app.setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   auto rootPath = QApplication::applicationDirPath();
-#ifdef WIN32
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
-#else
-  rootPath = QFileInfo(rootPath + "/../../../../../").absolutePath();
-#endif
   app.OpenFile(rootPath + "/assets/test2.pag");
   return app.exec();
 }

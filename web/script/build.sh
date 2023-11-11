@@ -1,51 +1,31 @@
 #!/bin/bash -e
 
 SOURCE_DIR=../..
-BUILD_DIR=../../build
 
 echo "-----begin-----"
-
-chmod +x ./get-emscripten-version.sh
-./get-emscripten-version.sh
-USER_EM_VERSION="$(cat emscripten_version.txt | grep "emcc" | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+")"
-rm -rf emscripten_version.txt
-
-if [ -d "../../build" ]; then
-  if [ -f "../../build/emscripten_version.txt" ]; then
-    CACHE_EM_VERSION="$(cat ../../build/emscripten_version.txt)"
-    if [ ! "$CACHE_EM_VERSION" == "$USER_EM_VERSION" ]; then
-      rm -rf "../../build"
-      echo "-----emscripten version mismatch-----"
-    fi
-  else
-    rm -rf "../../build"
-    echo "-----emscripten_version.txt does not exist-----"
-  fi
-fi
 
 if [ ! -d "../src/wasm" ]; then
   mkdir ../src/wasm
 fi
 
 RELEASE_CONF="-Oz -s"
-CMAKE_BUILD_TYPE=Relese
+PAG_BUILD_OPTION=""
+PAG_BUILD_TYPE="release"
 
 if [[ $@ == *debug* ]]; then
-  CMAKE_BUILD_TYPE=Debug
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
+  PAG_BUILD_OPTION="-d"
+  PAG_BUILD_TYPE="debug"
 fi
 
-emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" -DTGFX_USE_BIND_FOR_WEB="OFF"
-
-cmake --build $BUILD_DIR --target pag
+../../build_pag -p web $PAG_BUILD_OPTION
 
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
   -I$SOURCE_DIR/third_party/tgfx/include/ \
-  -I$SOURCE_DIR/third_party/tgfx/src/ \
   -DPAG_BUILD_FOR_WEB \
-  -Wl,--whole-archive $BUILD_DIR/libpag.a \
+  -Wl,--whole-archive ../../out/$PAG_BUILD_TYPE/web/wasm/libpag.a \
   --no-entry \
   --bind \
   -s WASM=1 \
@@ -69,9 +49,6 @@ else
   exit 1
 fi
 
-echo $USER_EM_VERSION >../../build/emscripten_version.txt
-echo "-----add emscripten_version.txt-----"
-
 if [ ! -d "../lib" ]; then
   mkdir ../lib
 fi
@@ -83,9 +60,7 @@ fi
 cp -f ../src/wasm/libpag.wasm ../lib
 cp -f ../src/wasm/libpag.wasm ../wechat/lib
 
-if [ ! -d "../node_modules" ]; then
-  npm install
-fi
+npm install --silent
 
 if [[ ! $@ == *debug* ]]; then
   npm run build
