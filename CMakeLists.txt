@@ -442,7 +442,7 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     # used to update the local md5 data for baseline testing.
-    add_executable(UpdateBaseline test-vendor ${PAG_TEST_FILES})
+    add_executable(UpdateBaseline ${TEST_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
     target_link_options(UpdateBaseline PRIVATE ${TEST_LINK_OPTIONS})
@@ -450,21 +450,21 @@ if (PAG_BUILD_TESTS)
     set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(GenerateImages test-vendor ${PAG_TEST_FILES})
+    add_executable(GenerateImages ${TEST_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
     target_link_options(GenerateImages PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
     set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGUnitTest test-vendor ${PAG_TEST_FILES})
+    add_executable(PAGUnitTest ${TEST_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_options(PAGUnitTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
-    add_executable(PAGFullTest test-vendor ${PAG_TEST_FILES})
+    add_executable(PAGFullTest ${TEST_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGFullTest PUBLIC ${TEST_INCLUDES})
     target_link_options(PAGFullTest PRIVATE ${TEST_LINK_OPTIONS})
     target_link_libraries(PAGFullTest ${TEST_PLATFORM_LIBS})
