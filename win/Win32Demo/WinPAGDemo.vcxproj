@@ -108,7 +108,7 @@
       <Command>cd "$(SolutionDir).."
 call npm install -g depsync --silent
 call depsync
-node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -i -a x86 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -142,7 +142,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
       <Command>cd "$(SolutionDir).."
 call npm install -g depsync --silent
 call depsync
-node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -i -a x86 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -166,7 +166,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
       <Command>cd "$(SolutionDir).."
 call npm install -g depsync --silent
 call depsync
-node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -i -a x64 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -207,7 +207,7 @@ node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
       <Command>cd "$(SolutionDir).."
 call npm install -g depsync --silent
 call depsync
-node .\build_pag -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -i -a x64 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
