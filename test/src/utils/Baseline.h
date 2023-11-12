@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "nlohmann/json.hpp"
 #include "pag/pag.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -34,7 +35,39 @@ class Baseline {
 
   static bool Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key);
 
+  Baseline(const std::string& baselinePath, const std::string& cachePath,
+           const std::string& outputPath, const std::string& prefix = "");
+
+  bool compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key);
+
+  bool compare(const tgfx::Bitmap& bitmap, const std::string& key);
+
+  bool compare(const tgfx::Pixmap& pixmap, const std::string& key);
+
+  bool compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
+
+  bool compare(const std::shared_ptr<ByteData>& byteData, const std::string& key);
+
+  void saveData();
+
  private:
+  std::mutex locker = {};
+  std::string currentVersion;
+  nlohmann::json baselineVersions = {};
+  nlohmann::json cacheVersions = {};
+  nlohmann::json outputVersions = {};
+  nlohmann::json cacheMD5 = {};
+  nlohmann::json outputMD5 = {};
+  std::string baselineVersionPath;
+  std::string cacheVersionPath;
+  std::string outVersionPath;
+  std::string cacheMD5Path;
+  std::string outMD5Path;
+
+  bool compareMd5(const std::string& key, const std::string& md5);
+  std::string getJSONValue(nlohmann::json& target, const std::string& key);
+  void setJSONValue(nlohmann::json& target, const std::string& key, const std::string& value);
+
   static void SetUp();
 
   static void TearDown();

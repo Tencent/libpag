@@ -200,6 +200,7 @@ jobs:
         with:
           path: |
             third_party
+            web/node_modules
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
@@ -211,7 +212,9 @@ jobs:
 
       - name: Build Web
         run: |
-          node build_pag -p web
+          cd web/script
+          chmod +x build.sh
+          ./build.sh
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -405,7 +408,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_pag -DPAG_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -p linux
+          node build_pag -s ./qt PAGViewer -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake" -o ./out/release/viewer -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
