@@ -100,6 +100,20 @@ message("PAG_USE_JPEG_ENCODE: ${PAG_USE_JPEG_ENCODE}")
 message("PAG_USE_WEBP_DECODE: ${PAG_USE_WEBP_DECODE}")
 message("PAG_USE_WEBP_ENCODE: ${PAG_USE_WEBP_ENCODE}")
 
+if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    if (DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
+    elseif (MACOS)
+        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+        else ()
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+        endif ()
+    elseif (IOS)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+    endif ()
+endif ()
+
 file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
 set(PAG_VERSION "")
 foreach (LINE IN LISTS VERSION_FILE)
@@ -419,6 +433,13 @@ list(APPEND PAG_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 list(APPEND PAG_TARGETS ${PAG_VENDOR_TARGET})
 
+foreach (FILE_PATH ${PAG_FILES})
+    get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
+    if (NOT FILE_NAME)
+        list(APPEND PAG_EXCLUDE_FILES ${FILE_PATH})
+    endif ()
+endforeach ()
+
 if (PAG_EXCLUDE_FILES)
     list(REMOVE_ITEM PAG_FILES ${PAG_EXCLUDE_FILES})
 endif ()
@@ -438,12 +459,14 @@ set_target_properties(pag PROPERTIES PREFIX "")
 set_target_properties(pag PROPERTIES OUTPUT_NAME libpag)
 
 if (PAG_BUILD_FRAMEWORK)
+    set(PAG_IDENTIFIER "com.tencent.libpag")
     set_target_properties(pag PROPERTIES
             FRAMEWORK TRUE
             PUBLIC_HEADER "${PAG_PLATFORM_HEADERS}"
-            MACOSX_FRAMEWORK_IDENTIFIER "com.tencent.libpag"
+            MACOSX_FRAMEWORK_IDENTIFIER ${PAG_IDENTIFIER}
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
+    set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${PAG_IDENTIFIER})
 endif ()
 
 if (PAG_BUILD_TESTS)
@@ -479,9 +502,13 @@ if (PAG_BUILD_TESTS)
 
     list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES})
-    if (MACOS AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
-        list(APPEND PAG_TEST_LINK_OPTIONS "-ld_classic")
-    endif ()
+
+    foreach (FILE_PATH ${PAG_TEST_FILES})
+        get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
+        if (NOT FILE_NAME)
+            list(APPEND PAG_TEST_EXCLUDE_FILES ${FILE_PATH})
+        endif ()
+    endforeach ()
 
     if (PAG_TEST_EXCLUDE_FILES)
         list(REMOVE_ITEM PAG_TEST_FILES ${PAG_TEST_EXCLUDE_FILES})

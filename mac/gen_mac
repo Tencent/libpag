@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+process.chdir(__dirname);
+
+const Utils = require('../third_party/vendor_tools/lib/Utils');
+Utils.exec("depsync");
+Utils.exec("node ../build_vendor -p mac -v");
+
+process.argv.push("../");
+process.argv.push("-w");
+let args = process.argv.slice(2);
+if (args.indexOf("-p") === -1 && args.indexOf("--platform") === -1) {
+    process.argv.push("-p");
+    process.argv.push("mac");
+}
+require("../third_party/vendor_tools/xcode-gen");

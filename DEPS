@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "5192001eb4789b114f381e035c840af9bfeb69a6",
+        "commit": "09c35d13cb8c0db2dabd4d0e3e864388c6c24868",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "d8302851bbd64d058605a12fe4005f6695874912",
+        "commit": "089c928678ee3d27d9d2e88c82eef7ffd69b70c2",
         "dir": "third_party/tgfx",
         "keeps": [
           "third_party",
@@ -46,10 +46,6 @@
       {
         "command": "depsync --clean",
         "dir": "third_party"
-      },
-      {
-        "command": "git lfs pull",
-        "dir": "./"
       }
     ]
   }
