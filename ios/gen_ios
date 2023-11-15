@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+const path = require('path');
+
+process.argv.push(path.resolve(__dirname, "../"));
+let args = process.argv.slice(2);
+if (args.indexOf("-p") === -1 && args.indexOf("--platform") === -1) {
+    process.argv.push("-p");
+    process.argv.push("ios");
+}
+if (args.indexOf("-o") === -1 && args.indexOf("--output") === -1) {
+    process.argv.push("-o");
+    process.argv.push(__dirname);
+}
+require("../third_party/vendor_tools/xcode-gen");
