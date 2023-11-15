@@ -1,2 +1,4 @@
 #!/usr/bin/env node
+const Utils = require('./third_party/vendor_tools/lib/Utils');
+Utils.exec("depsync");
 require("./third_party/vendor_tools/lib-build");
