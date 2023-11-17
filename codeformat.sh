@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-if [ $(uname) == 'Darwin' ]; then
+if [[ $(uname) == 'Darwin' ]]; then
   MAC_REQUIRED_TOOLS="python3"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
     if [ ! $(which $TOOL) ]; then
@@ -13,7 +13,7 @@ if [ $(uname) == 'Darwin' ]; then
     fi
   done
   clangformat=`clang-format --version`
-  if [ $clangformat =~ "14." ]
+  if [[ $clangformat =~ "14." ]]
   then
       echo "----$clangformat----"
   else
@@ -31,7 +31,7 @@ find test \( -path test/framework/lzma \) -prune -o -name "*.cpp" -print  -o -na
 
 git diff
 result=`git diff`
-if [ $result =~ "diff" ]
+if [[ $result =~ "diff" ]]
 then
     echo "----Failed to pass coding specification----"
     exit 1

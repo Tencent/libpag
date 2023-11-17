@@ -3,7 +3,7 @@ cd $(dirname $0)
 
 sh ./install_tools.sh
 
-if [ `uname` == 'Darwin' ]; then
+if [[ `uname` == 'Darwin' ]]; then
   if [ ! $(which emcc) ]; then
       echo "emscripten not found. Trying to install..."
       sh ./web/script/install-emscripten.sh  || exit 1
