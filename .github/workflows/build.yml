@@ -349,7 +349,10 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_pag -DPAG_USE_SWIFTSHADER=ON -p linux
+          cd linux
+          ./build.sh
+          cmake -B ./build -DCMAKE_BUILD_TYPE=Release
+          cmake --build ./build -- -j 12
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -364,12 +367,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: libpag_linux_x64
-          path: out
+          path: linux/vendor/libpag
 
       - uses: actions/upload-artifact@v3
         with:
           name: libpag_linux_x64
-          path: out
+          path: linux/vendor/libpag
 
   qt:
     runs-on: ubuntu-latest

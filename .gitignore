@@ -76,3 +76,4 @@ test/baseline/.cache
 .vscode
 ios/PAG
 mac/PAG
+linux/vendor/

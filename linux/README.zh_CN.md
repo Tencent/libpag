@@ -1,17 +1,17 @@
-English | [简体中文](./README.zh_CN.md)
+[English](./README.md) | 简体中文
 
 # Linux Demo
 
-## Build Prerequisites
+## 编译环境要求
 
 - GCC 8.0+
 - CMake 3.10.2+
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
 
-## Install NodeJS
+## 安装 NodeJS
 
-1) download
+1) 下载
 
 ```
 wget https://nodejs.org/dist/v17.3.1/node-v17.3.1-linux-x64.tar.xz
@@ -19,15 +19,15 @@ sudo mkdir -p /usr/local/lib/nodejs
 sudo tar -xJvf node-v17.3.1-linux-x64.tar.xz -C /usr/local/lib/nodejs
 ```
 
-2) Set the environment variable
+2) 设置环境变量
 
-Go to ~/.profile, add the following line to the end:
+进入 ~/.profile，添加以下行到末尾：
 
 ```
 export PATH=/usr/local/lib/nodejs/node-v17.3.1-linux-x64/bin:$PATH
 ```
 
-3) Test installation
+3) 测试安装
 
 ```
 $ node -v
@@ -35,7 +35,7 @@ $ npm version
 $ npx -v
 ```
 
-## Install Ninja
+## 安装 Ninja
 
 ```
 yum install re2c
@@ -45,34 +45,31 @@ cd ninja
 cp ninja /usr/bin/
 ```
 
-## Install X11
+## 安装 X11
 
-swiftshader depends on some header files.
+swiftshader 依赖一些头文件。
 
 ```
 yum install libX11-devel --nogpg
 ```
 
-## Build PAG
+## 编译 PAG
 
-Execute the following script in the linux/ directory:
+在 linux/ 目录下执行以下脚本：
 
 ```
 ./build_pag.sh 
 ```
 
-You will get the library files in the vendor/libpag directory
+库文件将会编译到 vendor/libpag 目录中。
 
-## Build Demo
+## 编译 Demo
 
-Execute the following commands in the linux/ directory:
+在 linux/ 目录下执行以下脚本：
 
 ```
 cmake -B ./build -DCMAKE_BUILD_TYPE=Release
 cmake --build ./build -- -j 12
 ```
 
-You will get the demo executable file in the build directory.
-     
-  
- 
+然后可以在 build 目录中找到可执行文件。
