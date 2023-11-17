@@ -1,5 +1,5 @@
 {
-  "version": "1.3.9",
+  "version": "1.3.11",
   "vars": {
     "PAG_GROUP": "https://github.com/libpag"
   },
@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "493929f3c215375b40ddad9fd57d7dd155667e65",
+        "commit": "a66df78cf55bbda9b180e2465aae94fc0fb1f810",
         "dir": "third_party/tgfx"
       },
       {

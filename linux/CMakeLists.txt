@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
-message("--begin complie---")
 project(pag-linux)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 if (APPLE AND NOT IOS)
     SET(CMAKE_SYSTEM_PROCESSOR x86_64)
@@ -14,12 +13,10 @@ add_definitions(-DEGL_EGLEXT_PROTOTYPES)
 
 add_executable(pag-linux src/main.cpp)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/include
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/vendor/libpag/include
         src)
 
 if (APPLE)
-    set(CMAKE_CXX_FLAGS "-stdlib=libc++")
-
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
     list(APPEND libs ${APPLICATION_SERVICES_FRAMEWORK})
     find_library(QUARTZ_CORE QuartzCore REQUIRED)
@@ -30,12 +27,14 @@ if (APPLE)
     list(APPEND libs ${FOUNDATION})
     find_library(VIDEOTOOLBOX VideoToolbox)
     list(APPEND libs ${VIDEOTOOLBOX})
+    find_library(COMPRESSION_LIBRARIES NAMES compression)
+    list(APPEND libs ${COMPRESSION_LIBRARIES})
 
-    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/x64/libpag.a)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/libpag/mac/x64/libpag.a)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/mac/x64/libEGL.dylib)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/mac/x64/libGLESv2.dylib)
 
-else()
+else ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cppFlags} -pthread")
     add_compile_options(-fPIC)
     add_definitions(-D__STDC_FORMAT_MACROS)
@@ -48,15 +47,15 @@ else()
     list(APPEND libs ${ZLIB_LIBRARIES})
     list(APPEND libs dl)
 
-    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/linux/x64/libpag.a)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/libpag/linux/x64/libpag.a)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/linux/x64/libEGL.so)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/linux/x64/libGLESv2.so)
 
-endif()
+endif ()
 
 target_link_libraries(pag-linux ${libs})
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
-endif()
+endif ()
 
