@@ -12,7 +12,7 @@ RELEASE_CONF="-Oz -s"
 PAG_BUILD_OPTION=""
 PAG_BUILD_TYPE="release"
 
-if [[ $@ == *debug* ]]; then
+if [ $@ == *debug* ]; then
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
   PAG_BUILD_OPTION="-d"
   PAG_BUILD_TYPE="debug"
@@ -62,7 +62,7 @@ cp -f ../src/wasm/libpag.wasm ../wechat/lib
 
 npm install --silent
 
-if [[ ! $@ == *debug* ]]; then
+if [ ! $@ == *debug* ]; then
   npm run build
   npm run build:wx
 fi

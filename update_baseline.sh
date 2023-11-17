@@ -3,7 +3,7 @@
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
   if [ -f "$CACHE_VERSION_FILE" ]; then
     HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
-    if [[ ${HAS_DIFF} == "" ]]; then
+    if [ ${HAS_DIFF} == "" ]; then
       exit 0
     fi
   fi
@@ -17,7 +17,7 @@
   ./install_tools.sh
   depsync
 
-  if [[ $1 == "1" ]]; then
+  if [ $1 == "1" ]; then
     BUILD_DIR=build
   else
     BUILD_DIR=cmake-build-debug
@@ -41,7 +41,7 @@
   fi
   echo $CMAKE_COMMAND
 
-  if [[ $1 == "1" ]]; then
+  if [ $1 == "1" ]; then
     $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
     $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
@@ -60,7 +60,7 @@
   cd ..
 
   git switch $CURRENT_BRANCH --quiet
-  if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
+  if [ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]; then
     git stash pop --index --quiet
   fi
 

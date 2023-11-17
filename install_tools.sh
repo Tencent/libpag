@@ -1,7 +1,7 @@
 #!/bin/bash -e
 cd $(dirname $0)
 
-if [[ `uname` == 'Darwin' ]]; then
+if [ `uname` == 'Darwin' ]; then
   MAC_REQUIRED_TOOLS="node cmake ninja yasm git-lfs"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
   if [ ! $(which $TOOL) ]; then

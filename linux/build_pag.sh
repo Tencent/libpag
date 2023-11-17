@@ -8,9 +8,9 @@ function make_dir() {
 
 sh ../install_tools.sh
 
-if [[ $(uname) == 'Darwin' ]]; then
+if [ $(uname) == 'Darwin' ]; then
   PLATFORM="mac"
-elif [[ $(uname) == 'Linux' ]]; then
+elif [ $(uname) == 'Linux' ]; then
   PLATFORM="linux"
 fi
 

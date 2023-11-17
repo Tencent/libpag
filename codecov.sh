@@ -1,7 +1,7 @@
 #!/bin/bash -e
 cd $(dirname $0)
 
-if [[ `uname` == 'Darwin' ]]; then
+if [ `uname` == 'Darwin' ]; then
   if [ ! $(which gcovr) ]; then
     if [ ! $(which brew) ]; then
       echo "Homebrew not found. Trying to install..."
