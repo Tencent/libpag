@@ -27,7 +27,7 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: libpag-environment-ios-20231025
+          key: libpag-environment-ios-20231117
           restore-keys: libpag-environment-ios-
 
       - name: Get Third-Party Cache
@@ -67,7 +67,7 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: libpag-environment-ios-20231025
+          key: libpag-environment-ios-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -191,7 +191,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-web-20231025
+          key: libpag-environment-web-20231117
           restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
@@ -253,7 +253,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-web-20231025
+          key: libpag-environment-web-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
