@@ -6,7 +6,7 @@ function make_dir() {
   mkdir -p $1
 }
 
-sh ../install_tools.sh
+../install_tools.sh
 
 if [[ $(uname) == 'Darwin' ]]; then
   PLATFORM="mac"
