@@ -139,7 +139,7 @@ int main() {
 
   delete pagPlayer;
 
-  printf("----timeCost--:%lld \n", GetTimer() - startTime);
+  printf("----timeCost--:%ld \n", static_cast<long>(GetTimer() - startTime));
 
   return 0;
 }
