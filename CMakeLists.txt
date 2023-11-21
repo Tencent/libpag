@@ -454,7 +454,6 @@ endif ()
 
 target_compile_definitions(pag PUBLIC ${PAG_DEFINES})
 target_compile_options(pag PUBLIC ${PAG_COMPILE_OPTIONS})
-target_link_options(pag PUBLIC ${PAG_LINK_OPTIONS})
 target_include_directories(pag PUBLIC include PRIVATE ${PAG_INCLUDES})
 target_link_libraries(pag ${PAG_STATIC_LIBS} ${PAG_SHARED_LIBS})
 set_target_properties(pag PROPERTIES PREFIX "")
@@ -507,7 +506,6 @@ if (PAG_BUILD_TESTS)
 
     list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES})
-    list(APPEND PAG_TEST_LINK_OPTIONS ${PAG_LINK_OPTIONS})
 
     foreach (FILE_PATH ${PAG_TEST_FILES})
         get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
