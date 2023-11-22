@@ -1,5 +1,5 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.11",
   "vars": {
     "PAG_GROUP": "https://github.com/libpag"
   },
@@ -7,17 +7,13 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "5192001eb4789b114f381e035c840af9bfeb69a6",
+        "commit": "97b5973058b1b5ce948321d17855ce3220d8aa20",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "d8302851bbd64d058605a12fe4005f6695874912",
-        "dir": "third_party/tgfx",
-        "keeps": [
-          "third_party",
-          "out"
-        ]
+        "commit": "a99a94b11128e6569514198a62be921fdf8f9c24",
+        "dir": "third_party/tgfx"
       },
       {
         "url": "${PAG_GROUP}/libavc.git",
@@ -46,10 +42,6 @@
       {
         "command": "depsync --clean",
         "dir": "third_party"
-      },
-      {
-        "command": "git lfs pull",
-        "dir": "./"
       }
     ]
   }

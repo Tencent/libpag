@@ -35,7 +35,7 @@ jobs:
             /usr/local/Cellar/python-markupsafe
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
-          key: libpag-environment-autotest-20231029
+          key: libpag-environment-autotest-20231117
           restore-keys: libpag-environment-autotest-
 
       - name: Get Third-Party Cache
@@ -94,7 +94,7 @@ jobs:
             /usr/local/Cellar/python-markupsafe
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
-          key: libpag-environment-autotest-20231029
+          key: libpag-environment-autotest-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

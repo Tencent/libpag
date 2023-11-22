@@ -27,7 +27,7 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: libpag-environment-ios-20231025
+          key: libpag-environment-ios-20231117
           restore-keys: libpag-environment-ios-
 
       - name: Get Third-Party Cache
@@ -53,7 +53,9 @@ jobs:
 
       - name: Build iOS
         run: |
-          node build_pag -p ios -a arm64
+          cd ios
+          node gen_ios
+          xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -67,7 +69,7 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: libpag-environment-ios-20231025
+          key: libpag-environment-ios-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -81,13 +83,8 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: libpag_ios_arm64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libpag_ios_arm64
-          path: out
+          name: ios_build
+          path: ios
 
   android:
     runs-on: ubuntu-latest
@@ -120,9 +117,16 @@ jobs:
           ndk-version: r19c
           local-cache: true
 
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
       - name: Build Android
         run: |
-          node build_pag -p android -a arm64
+          cd android
+          ./gradlew assembleRelease -Parm64-only
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
@@ -138,13 +142,8 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: libpag_android_arm64v8a
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libpag_android_arm64v8a
-          path: out
+          name: android_build
+          path: android/app/build
 
   web:
     runs-on: macos-latest
@@ -191,7 +190,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-web-20231025
+          key: libpag-environment-web-20231117
           restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
@@ -253,7 +252,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-web-20231025
+          key: libpag-environment-web-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -267,12 +266,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: libpag_web_wasm
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libpag_web_wasm
+          name: web_build
           path: out
 
   win:
@@ -314,12 +308,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: libpag_win_x64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libpag_win_x64
+          name: win_build
           path: out
 
   linux:
@@ -349,7 +338,10 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_pag -DPAG_USE_SWIFTSHADER=ON -p linux
+          cd linux
+          ./build_pag.sh
+          cmake -B ./build -DCMAKE_BUILD_TYPE=Release
+          cmake --build ./build -- -j 12
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -363,13 +355,8 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: libpag_linux_x64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libpag_linux_x64
-          path: out
+          name: linux_build
+          path: linux
 
   qt:
     runs-on: ubuntu-latest
@@ -422,10 +409,5 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: libpag_qt_x64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: libpag_qt_x64
+          name: qt_build
           path: out
