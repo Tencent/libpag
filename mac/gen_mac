@@ -3,7 +3,6 @@ process.chdir(__dirname);
 
 const childProcess = require("child_process");
 childProcess.execSync("depsync");
-childProcess.execSync("node ../build_vendor -p mac -v");
 
 process.argv.push("../");
 process.argv.push("-w");

@@ -58,8 +58,8 @@ class RenderThread : public QThread {
 
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
-  connect(this, SIGNAL(windowChanged(QQuickWindow* )), this,
-          SLOT(handleWindowChanged(QQuickWindow* )));
+  connect(this, SIGNAL(windowChanged(QQuickWindow*)), this,
+          SLOT(handleWindowChanged(QQuickWindow*)));
   renderThread = new RenderThread(this);
   renderThread->moveToThread(renderThread);
 }
@@ -75,18 +75,28 @@ void PAGView::handleWindowChanged(QQuickWindow* window) {
   if (drawable != nullptr || window == nullptr) {
     return;
   }
-  if (window->openglContext() != nullptr) {
-    onCreateDrawable(window->openglContext());
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  auto openglContext = reinterpret_cast<QOpenGLContext*>(window->rendererInterface()->getResource(
+      window, QSGRendererInterface::OpenGLContextResource));
+#else
+  auto openglContext = window->openglContext();
+#endif
+  if (openglContext != nullptr) {
+    onCreateDrawable(openglContext);
   } else {
-    connect(window, SIGNAL(openglContextCreated(QOpenGLContext* )), this,
-            SLOT(handleOpenglContextCreated(QOpenGLContext* )));
+    connect(window, SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
   }
 }
 
-void PAGView::handleOpenglContextCreated(QOpenGLContext* context) {
-  disconnect(window(), SIGNAL(openglContextCreated(QOpenGLContext* )), this,
-             SLOT(handleOpenglContextCreated(QOpenGLContext* )));
-  onCreateDrawable(context);
+void PAGView::handleOpenglContextCreated() {
+  disconnect(window(), SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  auto openglContext = reinterpret_cast<QOpenGLContext*>(window()->rendererInterface()->getResource(
+      window(), QSGRendererInterface::OpenGLContextResource));
+#else
+  auto openglContext = window()->openglContext();
+#endif
+  onCreateDrawable(openglContext);
 }
 
 void PAGView::onCreateDrawable(QOpenGLContext* context) {
@@ -96,6 +106,18 @@ void PAGView::onCreateDrawable(QOpenGLContext* context) {
   }
 }
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+
+void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
+  if (newGeometry == oldGeometry) {
+    return;
+  }
+  QQuickItem::geometryChange(newGeometry, oldGeometry);
+  onSizeChanged();
+}
+
+#else
+
 void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) {
   if (newGeometry == oldGeometry) {
     return;
@@ -103,6 +125,8 @@ void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeomet
   QQuickItem::geometryChanged(newGeometry, oldGeometry);
   onSizeChanged();
 }
+
+#endif
 
 void PAGView::setFile(const std::shared_ptr<PAGFile> pagFile) {
   pagPlayer->setComposition(pagFile);

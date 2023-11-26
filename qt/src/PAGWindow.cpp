@@ -39,7 +39,11 @@ void PAGWindow::Open() {
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
   window = static_cast<QQuickWindow*>(engine->rootObjects().at(0));
   pagView = window->findChild<pag::PAGView*>("pagView");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  window->setPersistentGraphics(true);
+#else
   window->setPersistentOpenGLContext(true);
+#endif
   window->setPersistentSceneGraph(true);
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);

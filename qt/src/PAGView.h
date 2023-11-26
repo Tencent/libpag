@@ -38,7 +38,11 @@ class PAGView : public QQuickItem {
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
  protected:
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
+#else
   void geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) override;
+#endif
 
  private:
   int64_t startTime = 0;
@@ -56,7 +60,7 @@ class PAGView : public QQuickItem {
   void handleWindowChanged(QQuickWindow* window);
 
   Q_SLOT
-  void handleOpenglContextCreated(QOpenGLContext* context);
+  void handleOpenglContextCreated();
 
   friend class RenderThread;
 };
