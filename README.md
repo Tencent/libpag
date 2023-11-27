@@ -162,9 +162,9 @@ Check out the following projects to learn how to use the APIs of libpag:
 
 ### Documentation
 
-- [iOS API Reference](https://pag.art/api.html#/apis/ios/)
-- [Android API Reference](https://pag.art/api.html#/apis/android/org/libpag/package-summary.html)
-- [Web API Reference](https://pag.art/api.html#/apis/web/)
+- [iOS API Reference](https://pag.art/apis/ios/)
+- [Android API Reference](https://pag.art/apis/android/)
+- [Web API Reference](https://pag.art/apis/web/)
 
 You can find other docs on [pag.art](https://pag.art/docs/mobile-sdk-guide.html)
 
