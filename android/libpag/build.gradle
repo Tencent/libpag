@@ -49,8 +49,8 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version rootProject.cmakeVersion
             path '../../CMakeLists.txt'
+            version = "3.22.1"
         }
     }
     namespace 'org.libpag'
