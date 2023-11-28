@@ -186,11 +186,13 @@ versions, you can download the precompiled libraries from [here](https://github.
 
 - Xcode 11.0+
 - GCC 8.0+
-- Visual Studio 2019
+- Visual Studio 2019+
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
-- CMake 3.13.0+ (**Recommended to always use the latest version to avoid building errors.**)
-- NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
+- CMake 3.13.0+
+- QT 5.13.0+
+- NDK 19+ (**19.2.5345600 recommended**)
+- Emscripten 3.1.20+ (**3.1.20 recommended**)
 
 ### Dependency Management
 
