@@ -1,16 +1,15 @@
-#!/bin/bash -e
-cd $(dirname $0)
-
+#!/usr/bin/env bash
 if [[ $(uname) == 'Darwin' ]]; then
   MAC_REQUIRED_TOOLS="python3"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
     if [ ! $(which $TOOL) ]; then
       if [ ! $(which brew) ]; then
         echo "Homebrew not found. Trying to install..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ||
+          exit 1
       fi
       echo "$TOOL not found. Trying to install..."
-      brew install $TOOL
+      brew install $TOOL || exit 1
     fi
   done
   clangformat=`clang-format --version`
@@ -41,3 +40,4 @@ else
 fi
 
 echo "----Complete the scan code format-----"
+
