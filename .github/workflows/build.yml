@@ -25,9 +25,7 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
-          key: libpag-environment-ios-20231117
+          key: libpag-environment-ios-20231129
           restore-keys: libpag-environment-ios-
 
       - name: Get Third-Party Cache
@@ -67,9 +65,7 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
-          key: libpag-environment-ios-20231117
+          key: libpag-environment-ios-20231129
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -163,13 +159,7 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
-            /usr/local/Cellar/gcovr
-            /usr/local/bin/gcovr
             /usr/local/Cellar/emsdk
-            /usr/local/Cellar/emsdk/upstream/emscripten
-            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
             /usr/local/bin/em++
             /usr/local/bin/em-config
             /usr/local/bin/emar
@@ -190,7 +180,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-web-20231117
+          key: libpag-environment-web-20231129
           restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
@@ -225,13 +215,7 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
-            /usr/local/Cellar/gcovr
-            /usr/local/bin/gcovr
             /usr/local/Cellar/emsdk
-            /usr/local/Cellar/emsdk/upstream/emscripten
-            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
             /usr/local/bin/em++
             /usr/local/bin/em-config
             /usr/local/bin/emar
@@ -252,7 +236,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: libpag-environment-web-20231117
+          key: libpag-environment-web-20231129
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
