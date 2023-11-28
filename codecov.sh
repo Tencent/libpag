@@ -5,11 +5,10 @@ if [[ `uname` == 'Darwin' ]]; then
   if [ ! $(which gcovr) ]; then
     if [ ! $(which brew) ]; then
       echo "Homebrew not found. Trying to install..."
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ||
-        exit 1
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     echo "gcovr not found. Trying to install..."
-    brew install gcovr || exit 1
+    brew install gcovr
   fi
 fi
 
