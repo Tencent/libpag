@@ -204,17 +204,6 @@ Chrome 浏览器打开 `http://localhost:8081/demo/index.html` 即可看到效�
 
 需要断点调试时，可以安装 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)，并打开 Chrome DevTools > 设置 > 实验 > 勾选「WebAssembly Debugging: Enable DWARF support」选项启用 SourceMap 支持。现在就可以在 Chrome DevTools 中对 C++ 文件进行断点调试了。
 
-#### 注意点
-
-在使用  `build.sh` 编译 `libpag.wasm` 时，因为 `emscripten` 与系统的 std 库有兼容问题，所以屏蔽了 undefined symbols 报错。
-
-```shell
-# build.sh
-emcc -s ERROR_ON_UNDEFINED_SYMBOLS=0
-```
-
-编译过程中需要留意是否有std库兼容外的 warning 信息，避免 undefined symbols 的错误在运行时才暴露出来。
-
 ### 生产流程
 
 执行 `build.sh` 脚本
