@@ -20,6 +20,7 @@
 #include <emscripten/val.h>
 #include "HardwareDecoder.h"
 #include "NativeTextShaper.h"
+#include "PAGWasmBindings.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "base/utils/USE.h"
 #endif
@@ -27,6 +28,9 @@
 using namespace emscripten;
 
 namespace pag {
+// Force PAGBindInit to be linked.
+static bool initialized = PAGBindInit();
+
 class HardwareDecoderFactory : public VideoDecoderFactory {
  public:
   bool isHardwareBacked() const override {

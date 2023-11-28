@@ -1,4 +1,4 @@
-import type { WebFont } from './core/web-mask';
+import type { WebFont } from '@tgfx/core/web-mask';
 import type { ctor, Point, Rect, Vector } from './types';
 
 export interface TimeRange {

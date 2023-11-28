@@ -27,15 +27,13 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
-          key: libpag-environment-autotest-20231117
+          key: libpag-environment-autotest-202311129
           restore-keys: libpag-environment-autotest-
 
       - name: Get Third-Party Cache
@@ -86,15 +84,13 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
-          key: libpag-environment-autotest-20231117
+          key: libpag-environment-autotest-202311129
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

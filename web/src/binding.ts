@@ -15,16 +15,15 @@ import { PAGTextLayer } from './pag-text-layer';
 import { PAGImageLayer } from './pag-image-layer';
 import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix } from './core/matrix';
-import { WebMask } from './core/web-mask';
 import { RenderCanvas } from './core/render-canvas';
 import { setMixin } from './utils/mixin';
-import * as tgfx from '@tgfx/tgfx'
-import { ScalerContext } from '@tgfx/core/scaler-context';
+import { TGFXBind } from '@tgfx/binding';
 
 /**
  * Binding pag js module on pag webassembly module.
  */
-export const binding = (module: PAG) => {
+export const PAGBind = (module: PAG) => {
+  TGFXBind(module);
   setPAGModule(module);
   module.module = module;
   module.PAGFile = PAGFile;
@@ -39,12 +38,9 @@ export const binding = (module: PAG) => {
   module.PAGImageLayer = PAGImageLayer;
   module.PAGSolidLayer = PAGSolidLayer;
   module.VideoReader = VideoReader;
-  module.ScalerContext = ScalerContext;
-  module.WebMask = WebMask;
   module.GlobalCanvas = GlobalCanvas;
   module.BackendContext = BackendContext;
   module.Matrix = Matrix;
   module.RenderCanvas = RenderCanvas;
   setMixin(module);
-  module.tgfx = { ...tgfx };
 };
