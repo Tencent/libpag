@@ -1,4 +1,4 @@
-import { ArrayBufferImage } from './array-buffer-image';
+import { ArrayBufferImage } from '@tgfx/wechat/array-buffer-image';
 import { PAGImage as NativePAGImage } from '../pag-image';
 import { PAGModule } from '../pag-module';
 import { wasmAwaitRewind } from '../utils/decorators';
