@@ -31,6 +31,7 @@ jobs:
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
+            /usr/local/lib/python3.12/site-packages/gcovr
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
           key: libpag-environment-autotest-202311129
@@ -88,6 +89,7 @@ jobs:
             /usr/local/bin/gcovr
             /usr/local/Cellar/python-lxml
             /usr/local/Cellar/python-markupsafe
+            /usr/local/lib/python3.12/site-packages/gcovr
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
           key: libpag-environment-autotest-202311129
