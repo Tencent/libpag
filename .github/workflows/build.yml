@@ -84,7 +84,7 @@ jobs:
           path: ios
 
   android:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
@@ -99,8 +99,6 @@ jobs:
             third_party
           key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-android-
-
-      - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Run depsync
         run: |
@@ -124,9 +122,11 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           cd android
+          NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
+          NDK_PATH="${NDK_PATH//\\//}"
+          echo "ndk.dir=$NDK_PATH" >> local.properties
           ./gradlew assembleRelease -Parm64-only
-        env:
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        shell: bash
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -141,7 +141,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: android_build
-          path: android/app/build
+          path: android
 
   web:
     runs-on: macos-latest
