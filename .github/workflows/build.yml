@@ -122,7 +122,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
           cd android
-          ./gradlew assembleRelease -Parm64-only
+          ./gradlew assembleRelease -Parm64-only -Pandroid.native.buildOutput=verbose
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
