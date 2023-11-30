@@ -104,12 +104,12 @@ jobs:
         run: |
           npm install depsync -g
           depsync
-        shell: bash
 
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r19c
+          link-to-sdk: true
           local-cache: true
 
       - uses: actions/setup-java@v3
@@ -122,11 +122,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           cd android
-          NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
-          NDK_PATH="${NDK_PATH//\\//}"
-          echo "ndk.dir=$NDK_PATH" >> local.properties
           ./gradlew assembleRelease -Parm64-only
-        shell: bash
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
