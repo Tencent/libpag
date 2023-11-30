@@ -1,5 +1,5 @@
 {
-  "version": "1.3.11",
+  "version": "1.3.12",
   "vars": {
     "PAG_GROUP": "https://github.com/libpag"
   },
@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "46eb9e91897055bc42e8b86b50cf8d7232f02dc4",
+        "commit": "2250e9dadc86680ce4fb1c763b58995768040037",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "5fcc51362a5fe18a5a02e0839fb8f2d9540e5964",
+        "commit": "079c2e27a21ed13ceba2d6b2958a4b009475b512",
         "dir": "third_party/tgfx"
       },
       {

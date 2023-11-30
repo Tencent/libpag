@@ -84,7 +84,7 @@ jobs:
           path: ios
 
   android:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
@@ -100,18 +100,16 @@ jobs:
           key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-android-
 
-      - uses: seanmiddleditch/gha-setup-ninja@master
-
       - name: Run depsync
         run: |
           npm install depsync -g
           depsync
-        shell: bash
 
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
           ndk-version: r19c
+          link-to-sdk: true
           local-cache: true
 
       - uses: actions/setup-java@v3
@@ -122,11 +120,9 @@ jobs:
 
       - name: Build Android
         run: |
-          mkdir -p third_party/tgfx/out/cache
+          New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
           cd android
           ./gradlew assembleRelease -Parm64-only
-        env:
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -141,7 +137,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: android_build
-          path: android/app/build
+          path: android
 
   web:
     runs-on: macos-latest
@@ -281,7 +277,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          mkdir third_party/tgfx/out/cache
+          New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
           node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln
 
       - name: Save Third-Party Cache
