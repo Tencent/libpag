@@ -112,7 +112,7 @@ jobs:
           link-to-sdk: true
           local-cache: true
 
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -122,7 +122,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
           cd android
-          ./gradlew assembleRelease -Parm64-only
+          ./gradlew assembleRelease -Parm64-only --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
