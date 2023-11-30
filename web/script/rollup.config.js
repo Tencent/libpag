@@ -119,4 +119,14 @@ export default [
     ],
     plugins: [...plugins],
   },
+  {
+    input: 'demo/index.ts',
+    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
+    plugins: plugins,
+  },
+  {
+    input: 'demo/worker.ts',
+    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
+    plugins: plugins,
+  },
 ];

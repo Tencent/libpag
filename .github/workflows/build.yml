@@ -140,7 +140,7 @@ jobs:
           path: android
 
   web:
-    runs-on: macos-latest
+    runs-on: windows-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
@@ -152,33 +152,9 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-            /usr/local/Cellar/emsdk
-            /usr/local/bin/em++
-            /usr/local/bin/em-config
-            /usr/local/bin/emar
-            /usr/local/bin/embuilder
-            /usr/local/bin/emcc
-            /usr/local/bin/emcmake
-            /usr/local/bin/emconfigure
-            /usr/local/bin/emdump
-            /usr/local/bin/emdwp
-            /usr/local/bin/emmake
-            /usr/local/bin/emnm
-            /usr/local/bin/emrun
-            /usr/local/bin/emprofile
-            /usr/local/bin/emscons
-            /usr/local/bin/emsize
-            /usr/local/bin/emstrip
-            /usr/local/bin/emsymbolizer
-            /usr/local/bin/emcc.py
-            /usr/local/bin/emcmake.py
-            /usr/local/bin/emar.py
-          key: libpag-environment-web-20231129
+            web/emsdk
+            web/node_modules
+          key: libpag-environment-web-20231130
           restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
@@ -187,55 +163,40 @@ jobs:
         with:
           path: |
             third_party
-            web/node_modules
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
+      - name: Install Build Tools
+        if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install 3.1.20
+          ./emsdk activate 3.1.20
+        shell: bash
+
       - name: Run depsync
         run: |
-          chmod +x sync_deps.sh
-          ./sync_deps.sh
+          npm install depsync -g
+          depsync
         shell: bash
 
       - name: Build Web
         run: |
-          mkdir -p third_party/tgfx/out/cache
-          cd web/script
-          chmod +x build.sh
-          ./build.sh
+          cd web
+          emsdk/emsdk_env
+          npm run build
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:
           path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-            /usr/local/Cellar/emsdk
-            /usr/local/bin/em++
-            /usr/local/bin/em-config
-            /usr/local/bin/emar
-            /usr/local/bin/embuilder
-            /usr/local/bin/emcc
-            /usr/local/bin/emcmake
-            /usr/local/bin/emconfigure
-            /usr/local/bin/emdump
-            /usr/local/bin/emdwp
-            /usr/local/bin/emmake
-            /usr/local/bin/emnm
-            /usr/local/bin/emrun
-            /usr/local/bin/emprofile
-            /usr/local/bin/emscons
-            /usr/local/bin/emsize
-            /usr/local/bin/emstrip
-            /usr/local/bin/emsymbolizer
-            /usr/local/bin/emcc.py
-            /usr/local/bin/emcmake.py
-            /usr/local/bin/emar.py
-          key: libpag-environment-web-20231129
+            web/emsdk
+            web/node_modules
+          key: libpag-environment-web-20231130
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -250,7 +211,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: web_build
-          path: out
+          path: |
+            web
+            !web/node_modules
 
   win:
     runs-on: windows-latest
