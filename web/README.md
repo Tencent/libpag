@@ -120,16 +120,14 @@ $ npm install
 Execute `build.sh debug` to get `libpag.wasm` file.
 
 ```bash
-# ./web/script/
-$ cd script
-$ chmod +x ./build.sh
-$ ./build.sh debug
+# ./web
+$ npm run build:debug
 ```
 
-Build Typescript file.
+Start TypeScript compiler watcher (Optional).
 
 ```bash
-# ./web/
+# ./web
 $ npm run dev
 ```
 
@@ -139,17 +137,15 @@ Start HTTP server.
 # ./
 $ npm run server
 ```
-Use Chrome to open `http://localhost:8081/web/demo/index.html` to see the demo.
+Use Chrome to open `http://localhost:8081/demo/index.html` to see the demo.
 
 If you need to debug, you can install [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb), and open Chrome DevTools > Settings > Experiments > Check the "WebAssembly Debugging: Enable DWARF support" option to enable SourceMap support. Now you can debug C++ files in Chrome DevTools.
 
 ### Build (Release)
 
 ```bash
-# ./web/script
-$ cd script
-$ chmod +x ./build.sh
-$ ./build.sh
+# ./web
+$ npm run build
 ```
 
 ### Build with CLion
@@ -165,7 +161,7 @@ Create a new build target in CLion, and use the following **CMake options**（fi
 Build release version
 
 ```bash
-$ cd script & ./build.sh
+$ npm run build
 ```
 
 Start test HTTP server.

@@ -178,15 +178,11 @@ $ npm install
 执行 `build.sh debug` 来获得 `libpag.wasm` 文件
 
 ```bash
-# web/script目录下
-$ cd script
-# 添加执行权限
-$ chmod +x ./build.sh
-# 打包
-$ ./build.sh debug
+# ./web 目录下
+$ npm run build:debug
 ```
 
-打包 Typescript 文件，修改 Typescript 文件会自动打包到 Javascript 文件
+开启 Typescript 自动编译(可选)，修改 Typescript 文件会自动打包到 Javascript 文件
 
 ```bash
 # web目录下
@@ -209,12 +205,8 @@ Chrome 浏览器打开 `http://localhost:8081/demo/index.html` 即可看到效�
 执行 `build.sh` 脚本
 
 ```bash
-# web/script目录下
-$ cd script
-# 添加执行权限
-$ chmod +x ./build.sh
-# 打包
-$ ./build.sh
+# ./web 目录下
+$ npm run build
 ```
 
 ### CLion 编译
@@ -230,7 +222,7 @@ $ ./build.sh
 打包生产版本
 
 ```bash
-$ cd script & ./build.sh
+$ npm run build
 ```
 
 启动测试 HTTP 服务
