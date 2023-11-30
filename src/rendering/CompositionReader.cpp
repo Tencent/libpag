@@ -39,11 +39,12 @@ CompositionReader::CompositionReader(std::shared_ptr<BitmapDrawable> bitmapDrawa
 
 CompositionReader::~CompositionReader() {
   tgfx::Context* context = nullptr;
-  auto device = drawable->getDevice();
+  auto device = drawable->device;
   if (device != nullptr) {
     context = device->lockContext();
   }
   delete pagPlayer;
+  drawable->freeSurface();
   if (context != nullptr) {
     device->unlock();
   }

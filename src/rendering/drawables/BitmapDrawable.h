@@ -40,10 +40,6 @@ class BitmapDrawable : public Drawable {
     return pixelCopied;
   }
 
-  std::shared_ptr<tgfx::Device> getDevice() {
-    return device;
-  }
-
  protected:
   std::shared_ptr<tgfx::Device> onCreateDevice() override {
     return device;
@@ -62,5 +58,7 @@ class BitmapDrawable : public Drawable {
   BitmapDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
   void present(tgfx::Context* context) override;
+
+  friend class CompositionReader;
 };
 }  // namespace pag
