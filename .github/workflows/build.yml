@@ -120,7 +120,7 @@ jobs:
 
       - name: Build Android
         run: |
-          if (not exist third_party/tgfx/out/cache) {
+          if (-Not exist third_party/tgfx/out/cache) {
               mkdir third_party/tgfx/out/cache
           }
           cd android
@@ -279,7 +279,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          if (not exist third_party/tgfx/out/cache) {
+          if (-Not exist third_party/tgfx/out/cache) {
               mkdir third_party/tgfx/out/cache
           }
           node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln
