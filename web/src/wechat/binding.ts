@@ -4,7 +4,6 @@ import { PAGView } from './pag-view';
 import { PAGFile } from './pag-file';
 import { PAGImage } from './pag-image';
 import { PAGFont } from './pag-font';
-
 import { PAG } from '../types';
 import { setPAGModule } from '../pag-module';
 import { PAGSurface } from '../pag-surface';
@@ -19,7 +18,7 @@ import { PAGImageLayer } from '../pag-image-layer';
 import { PAGSolidLayer } from '../pag-solid-layer';
 import { RenderCanvas } from '../core/render-canvas';
 import { setMixin } from '../utils/mixin';
-import { TGFXBind } from '@tgfx/binding';
+import { TGFXBind } from '@tgfx/wechat/binding';
 
 /**
  * Binding pag js module on pag webassembly module.

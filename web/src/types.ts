@@ -18,9 +18,9 @@ import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
 
 import type { ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
-import type { ArrayBufferImage } from './wechat/array-buffer-image';
 
-import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect } from '@tgfx/types';
+import type { ArrayBufferImage } from '@tgfx//wechat/array-buffer-image';
+import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect, } from '@tgfx/types';
 export type { EmscriptenGL, ctor, Point, Vector, Rect };
 
 declare global {
