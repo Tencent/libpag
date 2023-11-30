@@ -38,7 +38,11 @@ void BitmapDrawable::setBitmap(std::shared_ptr<BitmapBuffer> buffer) {
     return;
   }
   bitmap = buffer;
+  auto context = device->lockContext();
   freeSurface();
+  if (context != nullptr) {
+    device->unlock();
+  }
 }
 
 void BitmapDrawable::present(tgfx::Context* context) {

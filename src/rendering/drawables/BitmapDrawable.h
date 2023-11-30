@@ -58,5 +58,7 @@ class BitmapDrawable : public Drawable {
   BitmapDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
   void present(tgfx::Context* context) override;
+
+  friend class CompositionReader;
 };
 }  // namespace pag
