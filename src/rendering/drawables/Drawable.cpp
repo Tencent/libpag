@@ -60,7 +60,11 @@ std::shared_ptr<tgfx::Surface> Drawable::getSurface(tgfx::Context* context, bool
 }
 
 void Drawable::freeSurface() {
+  auto context = lockContext(false);
   surface = nullptr;
+  if (context != nullptr) {
+    device->unlock();
+  }
 }
 
 }  // namespace pag

@@ -40,6 +40,10 @@ class BitmapDrawable : public Drawable {
     return pixelCopied;
   }
 
+  std::shared_ptr<tgfx::Device> getDevice() {
+    return device;
+  }
+
  protected:
   std::shared_ptr<tgfx::Device> onCreateDevice() override {
     return device;
