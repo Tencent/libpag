@@ -4,9 +4,13 @@ project(PAGViewer)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
-#endif ()
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif ()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
@@ -15,7 +19,6 @@ endif (MSVC)
 # Sets flags
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-DDEBUG)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
 endif ()
 
 add_definitions(-DQT_NO_KEYWORDS)
@@ -28,7 +31,7 @@ set(CMAKE_AUTORCC ON)
 if (NOT CMAKE_PREFIX_PATH)
     if (NOT EXISTS ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg)
         file(WRITE ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg
-                "set(CMAKE_PREFIX_PATH /Users/username/Qt5.13.0/5.13.0/clang_64/lib/cmake)  #put your own QT path here")
+                "set(CMAKE_PREFIX_PATH /Users/[username]/Qt/6.6.1/macos/lib/cmake)  #put your own QT path here")
     endif ()
     include("./QTCMAKE.cfg")
 endif ()
@@ -58,16 +61,6 @@ if (${QT_VERSION} VERSION_LESS "5.15")
 endif ()
 
 qt_add_resources(QT_RESOURCES res.qrc)
-
-if (MSVC)
-    string(TOLOWER ${MSVC_C_ARCHITECTURE_ID} ARCH)
-elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR $CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
-    set(ARCH x64)
-elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-    set(ARCH arm64)
-else ()
-    set(ARCH x86)
-endif ()
 
 if (APPLE)
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
@@ -99,25 +92,13 @@ endif ()
 set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
 
-list(APPEND PAG_OPTIONS "-DPAG_USE_QT=ON")
-list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=OFF")
-list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=OFF")
-list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
+set(PAG_USE_QT ON)
+set(PAG_BUILD_SHARED OFF)
+set(PAG_BUILD_FRAMEWORK OFF)
 
-string(TOLOWER ${CMAKE_BUILD_TYPE} PAG_BUILD_TYPE)
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    list(APPEND PAG_OPTIONS "-d")
-endif ()
-set(PAG_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../out/${PAG_BUILD_TYPE}/qt)
-set(PAG_OUTPUT_LIB ${PAG_OUTPUT_DIR}/${ARCH}/libpag${CMAKE_STATIC_LIBRARY_SUFFIX})
-set(PAG_OUTPUT_MD5 ${PAG_OUTPUT_DIR}/.pag.${ARCH}.md5)
-add_custom_command(OUTPUT libpag
-        COMMAND node build_pag ${PAG_OPTIONS} -a ${ARCH} -o ${PAG_OUTPUT_DIR}
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../"
-        BYPRODUCTS ${PAG_OUTPUT_LIB} ${PAG_OUTPUT_MD5}
-        VERBATIM USES_TERMINAL)
-list(APPEND PAG_VIEWER_PLATFORM_LIBS ${PAG_OUTPUT_LIB})
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
-add_executable(PAGViewer libpag ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
+add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
-target_link_libraries(PAGViewer ${PAG_VIEWER_PLATFORM_LIBS})
+target_link_libraries(PAGViewer pag ${PAG_VIEWER_PLATFORM_LIBS})

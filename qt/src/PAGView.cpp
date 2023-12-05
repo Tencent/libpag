@@ -132,7 +132,7 @@ void PAGView::setFile(const std::shared_ptr<PAGFile> pagFile) {
   pagPlayer->setComposition(pagFile);
 }
 
-QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) {
+QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (drawable == nullptr) {
     return nullptr;
   }
