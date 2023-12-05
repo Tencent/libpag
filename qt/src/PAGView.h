@@ -59,8 +59,13 @@ class PAGView : public QQuickItem {
   Q_SLOT
   void handleWindowChanged(QQuickWindow* window);
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   Q_SLOT
   void handleOpenglContextCreated();
+#else
+  Q_SLOT
+  void handleOpenglContextCreated(QOpenGLContext* context);
+#endif
 
   friend class RenderThread;
 };

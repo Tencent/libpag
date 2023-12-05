@@ -71,34 +71,6 @@ PAGView::~PAGView() {
   delete pagPlayer;
 }
 
-void PAGView::handleWindowChanged(QQuickWindow* window) {
-  if (drawable != nullptr || window == nullptr) {
-    return;
-  }
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  auto openglContext = reinterpret_cast<QOpenGLContext*>(window->rendererInterface()->getResource(
-      window, QSGRendererInterface::OpenGLContextResource));
-#else
-  auto openglContext = window->openglContext();
-#endif
-  if (openglContext != nullptr) {
-    onCreateDrawable(openglContext);
-  } else {
-    connect(window, SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
-  }
-}
-
-void PAGView::handleOpenglContextCreated() {
-  disconnect(window(), SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  auto openglContext = reinterpret_cast<QOpenGLContext*>(window()->rendererInterface()->getResource(
-      window(), QSGRendererInterface::OpenGLContextResource));
-#else
-  auto openglContext = window()->openglContext();
-#endif
-  onCreateDrawable(openglContext);
-}
-
 void PAGView::onCreateDrawable(QOpenGLContext* context) {
   if (drawable == nullptr) {
     drawable = GPUDrawable::MakeFrom(this, context);
@@ -116,6 +88,26 @@ void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometr
   onSizeChanged();
 }
 
+void PAGView::handleWindowChanged(QQuickWindow* window) {
+  if (drawable != nullptr || window == nullptr) {
+    return;
+  }
+  auto openglContext = reinterpret_cast<QOpenGLContext*>(window->rendererInterface()->getResource(
+      window, QSGRendererInterface::OpenGLContextResource));
+  if (openglContext != nullptr) {
+    onCreateDrawable(openglContext);
+  } else {
+    connect(window, SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
+  }
+}
+
+void PAGView::handleOpenglContextCreated() {
+  disconnect(window(), SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
+  auto openglContext = reinterpret_cast<QOpenGLContext*>(window()->rendererInterface()->getResource(
+      window(), QSGRendererInterface::OpenGLContextResource));
+  onCreateDrawable(openglContext);
+}
+
 #else
 
 void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) {
@@ -124,6 +116,24 @@ void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeomet
   }
   QQuickItem::geometryChanged(newGeometry, oldGeometry);
   onSizeChanged();
+}
+
+void PAGView::handleWindowChanged(QQuickWindow* window) {
+  if (drawable != nullptr || window == nullptr) {
+    return;
+  }
+  if (window->openglContext() != nullptr) {
+    onCreateDrawable(window->openglContext());
+  } else {
+    connect(window, SIGNAL(openglContextCreated(QOpenGLContext*)), this,
+            SLOT(handleOpenglContextCreated(QOpenGLContext*)));
+  }
+}
+
+void PAGView::handleOpenglContextCreated(QOpenGLContext* context) {
+  disconnect(window(), SIGNAL(openglContextCreated(QOpenGLContext*)), this,
+             SLOT(handleOpenglContextCreated(QOpenGLContext*)));
+  onCreateDrawable(context);
 }
 
 #endif
