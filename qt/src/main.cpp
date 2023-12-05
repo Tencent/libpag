@@ -28,10 +28,10 @@
 #include "qobject.h"
 
 int main(int argc, char* argv[]) {
+  PAGViewer app(argc, argv);
   QApplication::setApplicationName("PAGViewer");
   QApplication::setOrganizationName("pag.art");
-  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+  QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
 
   QSurfaceFormat defaultFormat = QSurfaceFormat();
   defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
@@ -40,13 +40,14 @@ int main(int argc, char* argv[]) {
   QSurfaceFormat::setDefaultFormat(defaultFormat);
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+#else
+  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
-  PAGViewer app(argc, argv);
-  app.setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   app.OpenFile(rootPath + "/assets/test2.pag");
-  return app.exec();
+  return QApplication::exec();
 }
