@@ -122,7 +122,7 @@ jobs:
 
       - name: Build Android
         run: |
-          New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
+          mkdir -p third_party/tgfx/out/cache
           cd android
           ./gradlew assembleRelease -Parm64-only --no-daemon
 
