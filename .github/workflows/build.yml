@@ -84,7 +84,7 @@ jobs:
           path: ios
 
   android:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
@@ -104,6 +104,8 @@ jobs:
         run: |
           npm install depsync -g
           depsync
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
 
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
