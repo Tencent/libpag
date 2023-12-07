@@ -338,6 +338,7 @@ jobs:
         with:
           host: 'linux'
           target: 'desktop'
+          version: '6.6.1'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
           cache: 'true'
@@ -346,7 +347,7 @@ jobs:
       - name: Build QT
         run: |
           mkdir -p third_party/tgfx/out/cache
-          node build_pag -s ./qt PAGViewer -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake" -o ./out/release/viewer -a x64
+          node build_pag -s ./qt PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

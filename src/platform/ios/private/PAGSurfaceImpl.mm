@@ -71,7 +71,7 @@
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext {
-  auto device = tgfx::EAGLDevice::MakeAdopted(eaglContext);
+  auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
   auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
