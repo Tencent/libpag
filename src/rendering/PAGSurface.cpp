@@ -28,8 +28,8 @@
 
 namespace pag {
 
-PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted)
-    : drawable(std::move(drawable)), contextAdopted(contextAdopted) {
+PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
+    : drawable(std::move(drawable)), externalContext(externalContext) {
   rootLocker = std::make_shared<std::mutex>();
 }
 
@@ -276,7 +276,7 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
 
 tgfx::Context* PAGSurface::lockContext(bool force) {
   auto context = drawable->lockContext(force);
-  if (context != nullptr && contextAdopted) {
+  if (context != nullptr && externalContext) {
 #ifndef PAG_BUILD_FOR_WEB
     glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
 #endif
@@ -286,7 +286,7 @@ tgfx::Context* PAGSurface::lockContext(bool force) {
 }
 
 void PAGSurface::unlockContext() {
-  if (contextAdopted) {
+  if (externalContext) {
     delete glRestorer;
     glRestorer = nullptr;
   }

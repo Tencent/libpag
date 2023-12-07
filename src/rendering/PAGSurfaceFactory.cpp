@@ -46,20 +46,20 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& rend
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
   std::shared_ptr<tgfx::Device> device = nullptr;
-  bool isAdopted = false;
+  bool externalContext = false;
   if (forAsyncThread) {
     auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
     device = tgfx::GLDevice::Make(sharedContext);
   }
   if (device == nullptr) {
     device = tgfx::GLDevice::Current();
-    isAdopted = true;
+    externalContext = true;
   }
   auto drawable = TextureDrawable::MakeFrom(device, ToTGFX(texture), ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), isAdopted));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {

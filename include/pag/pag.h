@@ -1248,7 +1248,7 @@ class PAG_API PAGSurface {
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
  protected:
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);
 
   virtual void onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> surface,
                       RenderCache* cache);
@@ -1259,7 +1259,7 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  bool contextAdopted = false;
+  bool externalContext = false;
   GLRestorer* glRestorer = nullptr;
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
