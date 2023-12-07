@@ -154,6 +154,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     auto pagSurface = PAGSurface::MakeFrom(drawable);
     pagPlayer->setSurface(pagSurface);
     lastDevicePixelRatio = window()->devicePixelRatio();
+    onSizeChanged();
     renderThread->start();
   }
 
