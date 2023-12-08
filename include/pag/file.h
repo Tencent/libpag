@@ -1937,7 +1937,16 @@ class PAG_API ShapeLayer : public Layer {
 
   Rect getBounds() const override;
 
+  std::shared_ptr<Color> getTintColor() const;
+
+  void setTintColor(pag::Color color);
+
+  void clearTintColor();
+
   RTTR_ENABLE(Layer)
+
+  private:
+    std::shared_ptr<pag::Color> _shapeColor = nullptr;
 };
 
 class PAG_API ImageFillRule {

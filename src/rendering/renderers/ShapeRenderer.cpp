@@ -880,7 +880,7 @@ std::shared_ptr<Graphic> RenderShape(ID assetID, PaintElement* paint, tgfx::Path
   return Graphic::MakeCompose(shape, modifier);
 }
 
-std::shared_ptr<Graphic> RenderShape(ID assetID, GroupElement* group, tgfx::Path* path) {
+std::shared_ptr<Graphic> RenderShape(ID assetID, GroupElement* group, tgfx::Path* path, tgfx::Color* color) {
   std::vector<std::shared_ptr<Graphic>> contents = {};
   for (auto& element : group->elements) {
     switch (element->type()) {
@@ -890,6 +890,9 @@ std::shared_ptr<Graphic> RenderShape(ID assetID, GroupElement* group, tgfx::Path
       } break;
       case ElementDataType::Paint: {
         auto paint = reinterpret_cast<PaintElement*>(element);
+        if (color != nullptr) {
+          paint->color = *color;
+        }
         auto shape = RenderShape(assetID, paint, path);
         if (shape) {
           if (paint->compositeOrder == CompositeOrder::AbovePreviousInSameGroup) {
@@ -901,7 +904,7 @@ std::shared_ptr<Graphic> RenderShape(ID assetID, GroupElement* group, tgfx::Path
       } break;
       case ElementDataType::Group: {
         tgfx::Path tempPath = {};
-        auto shape = RenderShape(assetID, static_cast<GroupElement*>(element), &tempPath);
+        auto shape = RenderShape(assetID, static_cast<GroupElement*>(element), &tempPath, color);
         path->addPath(tempPath);
         if (shape) {
           contents.insert(contents.begin(), shape);
@@ -914,12 +917,13 @@ std::shared_ptr<Graphic> RenderShape(ID assetID, GroupElement* group, tgfx::Path
   return Graphic::MakeCompose(shape, modifier);
 }
 
-std::shared_ptr<Graphic> RenderShapes(ID assetID, const std::vector<ShapeElement*>& contents,
-                                      Frame layerFrame) {
+std::shared_ptr<Graphic>
+RenderShapes(ID assetID, const std::vector<ShapeElement *> &contents,
+             Frame layerFrame, tgfx::Color* tgfxColor) {
   GroupElement rootGroup;
   auto matrix = tgfx::Matrix::I();
   RenderElements(contents, matrix, &rootGroup, layerFrame);
   tgfx::Path tempPath = {};
-  return RenderShape(assetID, &rootGroup, &tempPath);
+  return RenderShape(assetID, &rootGroup, &tempPath, tgfxColor);
 }
 }  // namespace pag

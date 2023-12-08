@@ -661,6 +661,12 @@ class ShapeLayer;
 class PAG_API PAGShapeLayer : public PAGLayer {
  public:
   PAGShapeLayer(std::shared_ptr<File> file, ShapeLayer* layer);
+
+  std::shared_ptr<Color> getTintColor() const;
+
+  void setTintColor(pag::Color value);
+
+  void clearTintColor();
 };
 
 /**

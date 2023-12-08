@@ -23,6 +23,7 @@
 #include "rendering/utils/Transform.h"
 
 namespace pag {
-std::shared_ptr<Graphic> RenderShapes(ID assetID, const std::vector<ShapeElement*>& contents,
-                                      Frame layerFrame);
+std::shared_ptr<Graphic>
+RenderShapes(ID assetID, const std::vector<ShapeElement *> &contents, Frame layerFrame,
+             tgfx::Color* tgfxColor = nullptr);
 }

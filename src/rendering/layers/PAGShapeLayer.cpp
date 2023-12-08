@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <rendering/utils/LockGuard.h>
+#include <rendering/renderers/ShapeRenderer.h>
 #include "pag/pag.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/layers/PAGStage.h"
@@ -24,4 +26,25 @@ namespace pag {
 PAGShapeLayer::PAGShapeLayer(std::shared_ptr<pag::File> file, ShapeLayer* layer)
     : PAGLayer(std::move(file), layer) {
 }
+
+std::shared_ptr<Color> PAGShapeLayer::getTintColor() const {
+    LockGuard autoLock(rootLocker);
+    auto shapeLayer = static_cast<ShapeLayer*>(layer);
+    return shapeLayer->getTintColor();
+}
+
+void PAGShapeLayer::setTintColor(pag::Color value) {
+    LockGuard autoLock(rootLocker);
+
+    auto shapeLayer = static_cast<ShapeLayer*>(layer);
+    shapeLayer->setTintColor(value);
+}
+
+void PAGShapeLayer::clearTintColor() {
+    LockGuard autoLock(rootLocker);
+
+    auto shapeLayer = static_cast<ShapeLayer*>(layer);
+    shapeLayer->clearTintColor();
+}
+
 }  // namespace pag
