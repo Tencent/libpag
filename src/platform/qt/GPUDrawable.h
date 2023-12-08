@@ -33,8 +33,7 @@ class QGLWindow;
 namespace pag {
 class GPUDrawable : public DoubleBufferedDrawable {
  public:
-  static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
-                                               QOpenGLContext* sharedContext = nullptr);
+  static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem);
 
   void updateSize() override;
 

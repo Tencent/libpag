@@ -49,21 +49,11 @@ class PAGView : public QQuickItem {
   bool isPlaying = true;
   qreal lastDevicePixelRatio = 1;
   QString filePath = "";
-  PAGPlayer* pagPlayer = new PAGPlayer();
+  PAGPlayer* pagPlayer = nullptr;
   RenderThread* renderThread = nullptr;
-  QOpenGLContext* shareContext = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
 
   void onSizeChanged();
-
-  Q_SLOT
-  void handleWindowChanged(QQuickWindow* window);
-
-  Q_SLOT
-  void handleOpenglContextCreated();
-
-  Q_SLOT
-  void createDrawable();
 
   friend class RenderThread;
 };
