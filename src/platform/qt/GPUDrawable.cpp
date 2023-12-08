@@ -21,9 +21,8 @@
 #include "tgfx/opengl/qt/QGLWindow.h"
 
 namespace pag {
-std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem,
-                                                   QOpenGLContext* sharedContext) {
-  auto window = tgfx::QGLWindow::MakeFrom(quickItem, sharedContext);
+std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem) {
+  auto window = tgfx::QGLWindow::MakeFrom(quickItem);
   if (window == nullptr) {
     return nullptr;
   }

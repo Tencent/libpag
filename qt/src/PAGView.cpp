@@ -58,65 +58,20 @@ class RenderThread : public QThread {
 
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
-  connect(this, SIGNAL(windowChanged(QQuickWindow*)), this,
-          SLOT(handleWindowChanged(QQuickWindow*)));
+  drawable = GPUDrawable::MakeFrom(this);
+  pagPlayer = new PAGPlayer();
+  auto pagSurface = PAGSurface::MakeFrom(drawable);
+  pagPlayer->setSurface(pagSurface);
   renderThread = new RenderThread(this);
   renderThread->moveToThread(renderThread);
+  drawable->moveToThread(renderThread);
 }
 
 PAGView::~PAGView() {
   QMetaObject::invokeMethod(renderThread, "shutDown", Qt::QueuedConnection);
   renderThread->wait();
   delete renderThread;
-  delete shareContext;
   delete pagPlayer;
-}
-
-void PAGView::handleWindowChanged(QQuickWindow* window) {
-  if (drawable != nullptr || window == nullptr) {
-    return;
-  }
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  auto openglContext = reinterpret_cast<QOpenGLContext*>(window->rendererInterface()->getResource(
-      window, QSGRendererInterface::OpenGLContextResource));
-#else
-  auto openglContext = window->openglContext();
-#endif
-  if (openglContext != nullptr) {
-    QMetaObject::invokeMethod(this, "createDrawable");
-  } else {
-    connect(window, SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()),
-            Qt::DirectConnection);
-  }
-}
-
-void PAGView::handleOpenglContextCreated() {
-  disconnect(window(), SIGNAL(sceneGraphInitialized()), this, SLOT(handleOpenglContextCreated()));
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  auto context = reinterpret_cast<QOpenGLContext*>(window()->rendererInterface()->getResource(
-      window(), QSGRendererInterface::OpenGLContextResource));
-#else
-  auto context = window()->openglContext();
-#endif
-  if (shareContext == nullptr) {
-    // Creating a context that shares with a context that is current on another thread is not safe,
-    // some drivers on windows can reject this.
-    // We work this around by introducing an additional context that lives on the same thread as the
-    // SceneGraph's context, shares with it, but is never current. The main thread's context will
-    // then share with this extra context.
-    shareContext = new QOpenGLContext();
-    shareContext->setFormat(context->format());
-    shareContext->setShareContext(context);
-    shareContext->create();
-  }
-  QMetaObject::invokeMethod(this, "createDrawable");
-}
-
-void PAGView::createDrawable() {
-  if (drawable == nullptr) {
-    drawable = GPUDrawable::MakeFrom(this, shareContext);
-    drawable->moveToThread(renderThread);
-  }
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -146,15 +101,8 @@ void PAGView::setFile(const std::shared_ptr<PAGFile> pagFile) {
 }
 
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
-  if (drawable == nullptr) {
-    return nullptr;
-  }
-
-  if (pagPlayer->getSurface() == nullptr) {
-    auto pagSurface = PAGSurface::MakeFrom(drawable);
-    pagPlayer->setSurface(pagSurface);
+  if (!renderThread->isRunning()) {
     lastDevicePixelRatio = window()->devicePixelRatio();
-    onSizeChanged();
     renderThread->start();
   }
 
