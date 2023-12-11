@@ -19,6 +19,25 @@
 #include "Drawable.h"
 
 namespace pag {
+std::shared_ptr<tgfx::Surface> Drawable::getSurface(tgfx::Context* context, bool queryOnly) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  if (!queryOnly && surface == nullptr) {
+    surface = onCreateSurface(context);
+  }
+  return surface;
+}
+
+std::shared_ptr<tgfx::Surface> Drawable::getFrontSurface(tgfx::Context* context, bool queryOnly) {
+  return getSurface(context, queryOnly);
+}
+
+void Drawable::freeSurface() {
+  surface = nullptr;
+  onFreeSurface();
+}
+
 void Drawable::updateSize() {
 }
 
@@ -28,39 +47,6 @@ void Drawable::present(tgfx::Context*) {
 void Drawable::setTimeStamp(int64_t) {
 }
 
-tgfx::Context* Drawable::lockContext(bool force) {
-  if (force && device == nullptr) {
-    device = onCreateDevice();
-  }
-  if (device == nullptr) {
-    return nullptr;
-  }
-  return device->lockContext();
+void Drawable::onFreeSurface() {
 }
-
-void Drawable::unlockContext() {
-  if (device == nullptr) {
-    return;
-  }
-  device->unlock();
-}
-
-void Drawable::freeDevice() {
-  device = nullptr;
-}
-
-std::shared_ptr<tgfx::Surface> Drawable::getSurface(tgfx::Context* context, bool force) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  if (force && surface == nullptr) {
-    surface = onCreateSurface(context);
-  }
-  return surface;
-}
-
-void Drawable::freeSurface() {
-  surface = nullptr;
-}
-
 }  // namespace pag

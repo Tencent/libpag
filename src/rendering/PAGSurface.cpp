@@ -50,7 +50,6 @@ void PAGSurface::updateSize() {
     pagPlayer->renderCache->releaseAll();
   }
   drawable->freeSurface();
-  drawable->freeDevice();
   drawable->updateSize();
 }
 
@@ -65,21 +64,20 @@ void PAGSurface::onFreeCache() {
     pagPlayer->renderCache->releaseAll();
   }
   drawable->freeSurface();
-  auto context = drawable->lockContext();
+  auto context = lockContext();
   if (context) {
     context->purgeResourcesNotUsedSince(0);
-    drawable->unlockContext();
+    unlockContext();
   }
-  drawable->freeDevice();
 }
 
 bool PAGSurface::clearAll() {
   LockGuard autoLock(rootLocker);
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (!context) {
     return false;
   }
-  auto surface = drawable->getSurface(context, true);
+  auto surface = drawable->getSurface(context, false);
   if (surface == nullptr) {
     unlockContext();
     return false;
@@ -100,7 +98,7 @@ HardwareBufferRef PAGSurface::getHardwareBuffer() {
   if (context == nullptr) {
     return nullptr;
   }
-  auto surface = drawable->getSurface(context);
+  auto surface = drawable->getSurface(context, false);
   if (surface == nullptr) {
     unlockContext();
     return nullptr;
@@ -112,60 +110,64 @@ HardwareBufferRef PAGSurface::getHardwareBuffer() {
 
 BackendTexture PAGSurface::getFrontTexture() {
   LockGuard autoLock(rootLocker);
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (context == nullptr) {
     return {};
   }
-  if (drawable->getSurface(context, true) == nullptr) {
+  auto surface = drawable->getFrontSurface(context, false);
+  if (surface == nullptr) {
     unlockContext();
     return {};
   }
-  auto texture = drawable->getFrontSurface()->getBackendTexture();
+  auto texture = surface->getBackendTexture();
   unlockContext();
   return ToPAG(texture);
 }
 
 BackendTexture PAGSurface::getBackTexture() {
   LockGuard autoLock(rootLocker);
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (context == nullptr) {
     return {};
   }
-  if (drawable->getSurface(context, true) == nullptr) {
+  auto surface = drawable->getSurface(context, false);
+  if (surface == nullptr) {
     unlockContext();
     return {};
   }
-  auto texture = drawable->getBackSurface()->getBackendTexture();
+  auto texture = surface->getBackendTexture();
   unlockContext();
   return ToPAG(texture);
 }
 
 HardwareBufferRef PAGSurface::getFrontHardwareBuffer() {
   LockGuard autoLock(rootLocker);
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (context == nullptr) {
     return nullptr;
   }
-  if (drawable->getSurface(context, true) == nullptr) {
+  auto surface = drawable->getFrontSurface(context, false);
+  if (surface == nullptr) {
     unlockContext();
     return nullptr;
   }
-  auto buffer = drawable->getFrontSurface()->getHardwareBuffer();
+  auto buffer = surface->getHardwareBuffer();
   unlockContext();
   return buffer;
 }
 
 HardwareBufferRef PAGSurface::getBackHardwareBuffer() {
   LockGuard autoLock(rootLocker);
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (context == nullptr) {
     return nullptr;
   }
-  if (drawable->getSurface(context, true) == nullptr) {
+  auto surface = drawable->getSurface(context, false);
+  if (surface == nullptr) {
     unlockContext();
     return nullptr;
   }
-  auto buffer = drawable->getBackSurface()->getHardwareBuffer();
+  auto buffer = surface->getHardwareBuffer();
   unlockContext();
   return buffer;
 }
@@ -177,7 +179,7 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   if (context == nullptr) {
     return false;
   }
-  auto surface = drawable->getSurface(context);
+  auto surface = drawable->getSurface(context, true);
   if (surface == nullptr) {
     unlockContext();
     return false;
@@ -191,18 +193,18 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (!context) {
     return false;
   }
   cache->prepareLayers();
-  auto surface = drawable->getSurface(context);
+  auto surface = drawable->getSurface(context, true);
   if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
     return false;
   }
   if (surface == nullptr) {
-    surface = drawable->getSurface(context, true);
+    surface = drawable->getSurface(context, false);
   }
   if (surface == nullptr) {
     unlockContext();
@@ -234,7 +236,7 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
   if (!waitSemaphore.isInitialized()) {
     return false;
   }
-  auto context = lockContext(true);
+  auto context = lockContext();
   if (!context) {
     return false;
   }
@@ -274,8 +276,12 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   return result;
 }
 
-tgfx::Context* PAGSurface::lockContext(bool force) {
-  auto context = drawable->lockContext(force);
+tgfx::Context* PAGSurface::lockContext() {
+  auto device = drawable->getDevice();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto context = device->lockContext();
   if (context != nullptr && externalContext) {
 #ifndef PAG_BUILD_FOR_WEB
     glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
@@ -290,7 +296,10 @@ void PAGSurface::unlockContext() {
     delete glRestorer;
     glRestorer = nullptr;
   }
-  drawable->unlockContext();
+  auto device = drawable->getDevice();
+  if (device != nullptr) {
+    device->unlock();
+  }
 }
 
 void PAGSurface::onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> target,
