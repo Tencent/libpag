@@ -79,7 +79,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
   auto nativeHandle = GLDevice::CurrentNativeHandle();
   device->unlock();
-  auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->onCreateDevice());
+  auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->getDevice());
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
 
   auto drawable =

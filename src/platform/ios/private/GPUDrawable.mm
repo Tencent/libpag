@@ -44,7 +44,7 @@ void GPUDrawable::tryCreateSurface() {
   if (window != nullptr) {
     auto device = window->getDevice();
     auto context = device->lockContext();
-    surface = window->createSurface(context);
+    surface = window->getSurface(context);
     device->unlock();
   }
 }
@@ -62,10 +62,12 @@ void GPUDrawable::updateSize() {
   auto height = layer.bounds.size.height * layer.contentsScale;
   _width = static_cast<int>(roundf(width));
   _height = static_cast<int>(roundf(height));
-  surface = nullptr;
+  if (window) {
+    window->invalidSize();
+  }
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -79,7 +81,13 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
   if (window == nullptr) {
     return nullptr;
   }
-  return window->createSurface(context);
+  return window->getSurface(context);
+}
+
+void GPUDrawable::onFreeSurface() {
+  if (window) {
+    window->freeSurface();
+  }
 }
 
 void GPUDrawable::present(tgfx::Context* context) {

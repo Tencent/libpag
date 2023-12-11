@@ -21,8 +21,9 @@
 #include "tgfx/opengl/qt/QGLWindow.h"
 
 namespace pag {
-std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem) {
-  auto window = tgfx::QGLWindow::MakeFrom(quickItem);
+std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem,
+                                                   QOpenGLContext* sharedContext) {
+  auto window = tgfx::QGLWindow::MakeFrom(quickItem, sharedContext);
   if (window == nullptr) {
     return nullptr;
   }
@@ -30,7 +31,7 @@ std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem) {
 }
 
 GPUDrawable::GPUDrawable(QQuickItem* quickItem, std::shared_ptr<tgfx::QGLWindow> window)
-    : DoubleBufferedDrawable(std::move(window)), quickItem(quickItem) {
+    : quickItem(quickItem), window(std::move(window)) {
   GPUDrawable::updateSize();
 }
 
@@ -39,17 +40,38 @@ void GPUDrawable::updateSize() {
   auto pixelRatio = nativeWindow ? nativeWindow->devicePixelRatio() : 1.0f;
   _width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
   _height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
+  window->invalidSize();
 }
 
-std::shared_ptr<tgfx::QGLWindow> GPUDrawable::qGLWindow() const {
-  return std::static_pointer_cast<tgfx::QGLWindow>(window);
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
+  if (_width <= 0 || _height <= 0) {
+    return nullptr;
+  }
+  return window->getDevice();
+}
+
+std::shared_ptr<tgfx::Surface> GPUDrawable::getSurface(tgfx::Context* context, bool queryOnly) {
+  surface = window->getSurface(context, queryOnly);
+  return surface;
+}
+
+std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
+  return window->getSurface(context);
+}
+
+void GPUDrawable::onFreeSurface() {
+  window->freeSurface();
+}
+
+void GPUDrawable::present(tgfx::Context* context) {
+  window->present(context);
 }
 
 void GPUDrawable::moveToThread(QThread* targetThread) {
-  qGLWindow()->moveToThread(targetThread);
+  window->moveToThread(targetThread);
 }
 
 QSGTexture* GPUDrawable::getTexture() {
-  return qGLWindow()->getTexture();
+  return window->getQSGTexture();
 }
 }  // namespace pag

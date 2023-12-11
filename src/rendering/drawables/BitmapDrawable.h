@@ -34,6 +34,12 @@ class BitmapDrawable : public Drawable {
     return _height;
   }
 
+  std::shared_ptr<tgfx::Device> getDevice() override {
+    return device;
+  }
+
+  void present(tgfx::Context* context) override;
+
   void setBitmap(std::shared_ptr<BitmapBuffer> buffer);
 
   bool isPixelCopied() const {
@@ -41,10 +47,6 @@ class BitmapDrawable : public Drawable {
   }
 
  protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override {
-    return device;
-  }
-
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
  private:
@@ -56,8 +58,6 @@ class BitmapDrawable : public Drawable {
   bool pixelCopied = false;
 
   BitmapDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
-
-  void present(tgfx::Context* context) override;
 
   friend class CompositionReader;
 };

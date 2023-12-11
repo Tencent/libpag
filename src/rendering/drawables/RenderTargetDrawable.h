@@ -36,11 +36,11 @@ class RenderTargetDrawable : public Drawable {
     return renderTarget.height();
   }
 
- protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override {
+  std::shared_ptr<tgfx::Device> getDevice() override {
     return device;
   }
 
+ protected:
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
  private:

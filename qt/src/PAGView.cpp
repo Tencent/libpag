@@ -20,7 +20,6 @@
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <QSGImageNode>
-#include <QScreen>
 #include <QThread>
 #include "pag/file.h"
 #include "platform/qt/GPUDrawable.h"
@@ -74,41 +73,24 @@ PAGView::~PAGView() {
   delete pagPlayer;
 }
 
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-
-void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
-  if (newGeometry == oldGeometry) {
-    return;
-  }
-  QQuickItem::geometryChange(newGeometry, oldGeometry);
-  onSizeChanged();
-}
-
-#else
-
-void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) {
-  if (newGeometry == oldGeometry) {
-    return;
-  }
-  QQuickItem::geometryChanged(newGeometry, oldGeometry);
-  onSizeChanged();
-}
-
-#endif
-
 void PAGView::setFile(const std::shared_ptr<PAGFile> pagFile) {
   pagPlayer->setComposition(pagFile);
 }
 
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!renderThread->isRunning()) {
-    lastDevicePixelRatio = window()->devicePixelRatio();
     renderThread->start();
   }
 
-  if (lastDevicePixelRatio != window()->devicePixelRatio()) {
-    lastDevicePixelRatio = window()->devicePixelRatio();
-    onSizeChanged();
+  if (lastWidth != width() || lastHeight != height() ||
+      lastPixelRatio != window()->devicePixelRatio()) {
+    lastWidth = width();
+    lastHeight = height();
+    lastPixelRatio = window()->devicePixelRatio();
+    auto pagSurface = pagPlayer->getSurface();
+    if (pagSurface) {
+      pagSurface->updateSize();
+    }
   }
 
   auto node = static_cast<QSGImageNode*>(oldNode);
@@ -132,13 +114,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
   }
   return node;
-}
-
-void PAGView::onSizeChanged() {
-  auto pagSurface = pagPlayer->getSurface();
-  if (pagSurface) {
-    pagSurface->updateSize();
-  }
 }
 }  // namespace pag
 

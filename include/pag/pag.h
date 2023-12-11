@@ -1266,7 +1266,7 @@ class PAG_API PAGSurface {
             bool autoClear = true);
   bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  tgfx::Context* lockContext(bool force = false);
+  tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
 
