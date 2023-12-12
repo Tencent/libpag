@@ -4,10 +4,7 @@ English | [简体中文](./README.zh_CN.md)
 
 ## Build Prerequisites
 
-- GCC 8.0+
-- CMake 3.10.2+
-- NodeJS 14.14.0+
-- Ninja 1.9.0+
+Please refer to [README.md](../README.md)
 
 ## Install NodeJS
 

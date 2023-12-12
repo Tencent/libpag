@@ -175,7 +175,7 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 ### 编译环境
 
 - Xcode 11.0+
-- GCC 8.0+
+- GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+
 - Ninja 1.9.0+

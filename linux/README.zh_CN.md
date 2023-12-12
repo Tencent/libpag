@@ -4,10 +4,7 @@
 
 ## 编译环境要求
 
-- GCC 8.0+
-- CMake 3.10.2+
-- NodeJS 14.14.0+
-- Ninja 1.9.0+
+请参考根目录下的 [README.md](../README.md)
 
 ## 安装 NodeJS
 

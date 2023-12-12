@@ -185,7 +185,7 @@ versions, you can download the precompiled libraries from [here](https://github.
 ### Build Prerequisites
 
 - Xcode 11.0+
-- GCC 8.0+
+- GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
