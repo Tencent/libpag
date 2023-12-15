@@ -256,54 +256,46 @@ export class VideoReader {
   }
 
   private seek(targetTime: number, play = true) {
-    return new Promise<void>((resolve) => {
-      let isCallback = false;
-      let timer: any = null;
-      const setVideoState = async () => {
-        if (play && this.videoEl!.paused) {
-          try {
-            await this.play();
-          } catch (e) {
-            this.setError(e);
-          }
-        } else if (!play && !this.videoEl!.paused) {
-          this.videoEl?.pause();
-        }
-      };
-      const seekCallback = async () => {
-        if (!this.videoEl) {
-          this.setError(new Error("Video element doesn't exist!"));
-          resolve();
-          return;
-        }
-        removeListener(this.videoEl, 'seeked', seekCallback);
-        await setVideoState();
-        isCallback = true;
-        clearTimeout(timer);
-        timer = null;
-        resolve();
-      };
+    return new Promise<void>((resolve, reject) => {
       if (!this.videoEl) {
-        this.setError(new Error("Video element doesn't exist!"));
-        resolve();
+        reject(new Error('Video element is not initialized.'));
         return;
       }
-      addListener(this.videoEl, 'seeked', seekCallback);
-      this.videoEl!.currentTime = targetTime;
-      // Timeout
-      timer = setTimeout(() => {
-        if (!isCallback) {
-          if (!this.videoEl) {
-            this.setError(new Error("Video element doesn't exist!"));
-            resolve();
-            return;
-          } else {
-            removeListener(this.videoEl, 'seeked', seekCallback);
-            setVideoState();
-            resolve();
-          }
+
+      const onSeeked = () => {
+        removeListener(this.videoEl!, 'seeked', onSeeked);
+        clearTimeout(seekTimeout);
+        if (play) {
+          this.videoEl?.play().catch((e) => {
+            this.setError(e);
+          });
+        } else {
+          this.videoEl?.pause();
         }
+        resolve();
+      };
+  
+      const onCanPlay = () => {
+        removeListener(this.videoEl!, 'canplay', onCanPlay);
+        // Now that we have enough data, perform the seek.
+        this.videoEl!.currentTime = targetTime;
+        addListener(this.videoEl!, 'seeked', onSeeked);
+      };
+  
+      const seekTimeout = setTimeout(() => {
+        removeListener(this.videoEl!, 'canplay', onCanPlay);
+        removeListener(this.videoEl!, 'seeked', onSeeked);
+        reject(new Error('Seek operation timed out.'));
       }, (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME);
+  
+      // Check if we need to wait for 'canplay' event before seeking.
+      if (this.videoEl.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+        addListener(this.videoEl, 'canplay', onCanPlay);
+      } else {
+        // We already have enough data to perform the seek.
+        this.videoEl!.currentTime = targetTime;
+        addListener(this.videoEl, 'seeked', onSeeked);
+      }
     });
   }
 
