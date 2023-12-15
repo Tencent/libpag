@@ -269,7 +269,7 @@ export class VideoReader {
           this.videoEl?.play().catch((e) => {
             this.setError(e);
           });
-        } else {
+        } else if (!play && !this.videoEl!.paused)  {
           this.videoEl?.pause();
         }
         resolve();
