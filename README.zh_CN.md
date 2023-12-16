@@ -152,9 +152,9 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 
 ### API 手册：
 
-- [iOS API 参考](https://pag.art/api.html#/apis/ios/)
-- [Android API 参考](https://pag.art/api.html#/apis/android/org/libpag/package-summary.html)
-- [Web API 参考](https://pag.art/api.html#/apis/web/)
+- [iOS API 参考](https://pag.art/apis/ios/index.html)
+- [Android API 参考](https://pag.art/apis/android/index.html)
+- [Web API 参考](https://pag.art/apis/web/index.html)
 
 更多的其他文档可以访问官网  [pag.art](https://pag.art/docs/mobile-sdk-guide.html) 获得。
 
