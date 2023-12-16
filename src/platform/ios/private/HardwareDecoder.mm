@@ -94,8 +94,8 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
     if (mimeType == "video/hevc") {
       if (@available(iOS 11.0, *)) {
         status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
-            kCFAllocatorDefault, size, &parameterSetPointers[0], &parameterSetSizes[0], 4, NULL,
-            &videoFormatDescription);
+            kCFAllocatorDefault, size, parameterSetPointers.data(), parameterSetSizes.data(), 4,
+            NULL, &videoFormatDescription);
       } else {
         status = -1;
       }
@@ -107,8 +107,8 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
       // create video format description
       status = CMVideoFormatDescriptionCreateFromH264ParameterSets(kCFAllocatorDefault,
                                                                    size,  // param count
-                                                                   &parameterSetPointers[0],
-                                                                   &parameterSetSizes[0],
+                                                                   parameterSetPointers.data(),
+                                                                   parameterSetSizes.data(),
                                                                    4,  // nal start code size
                                                                    &videoFormatDescription);
       if (status != noErr) {

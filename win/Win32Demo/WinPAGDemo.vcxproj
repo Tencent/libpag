@@ -89,7 +89,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NOMINMAX;DEBUG;_CRT_SECURE_NO_WARNINGS;__gl_h_;CFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CPPFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CXXFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\src\platform\win;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\third_party\tgfx\include;$(SolutionDir)..\src;$(SolutionDir)..\third_party\tgfx\vendor\angle\include;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
@@ -98,16 +98,17 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\win\paglib\win\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /Y "$(SolutionDir)..\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
+      <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
+call npm install -g depsync --silent
 call depsync
-node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -118,7 +119,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;NOMINMAX;__gl_h_;CFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CPPFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CXXFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\src\platform\win;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\third_party\tgfx\include;$(SolutionDir)..\src;$(SolutionDir)..\third_party\tgfx\vendor\angle\include;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
@@ -128,19 +129,20 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\win\paglib\win\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy /Y "$(SolutionDir)..\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
+      <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
+call npm install -g depsync --silent
 call depsync
-node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -149,7 +151,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_WINDOWS;NOMINMAX;__gl_h_;CFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CPPFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CXXFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\src;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\tgfx\include;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\third_party\tgfx\include;$(SolutionDir)..\src;$(SolutionDir)..\third_party\tgfx\vendor\angle\include;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
@@ -157,19 +159,20 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\win\paglib\win\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
+call npm install -g depsync --silent
 call depsync
-node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy /Y "$(SolutionDir)..\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
+      <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -181,7 +184,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;NOMINMAX;__gl_h_;CFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CPPFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CXXFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\src\platform\win;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\third_party\tgfx\include;$(SolutionDir)..\src;$(SolutionDir)..\third_party\tgfx\vendor\angle\include;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
@@ -191,19 +194,20 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\win\paglib\win\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libpag.lib;Bcrypt.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy /Y "$(SolutionDir)..\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
+      <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
+call npm install -g depsync --silent
 call depsync
-node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

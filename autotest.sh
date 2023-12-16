@@ -19,6 +19,9 @@ make_dir result
 make_dir build
 
 ./update_baseline.sh 1
+if test $? -ne 0; then
+   exit 1
+fi
 cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 cd build
@@ -51,8 +54,6 @@ fi
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
 cd ..
-
-rm -rf build
 
 cp -r $WORKSPACE/test/out $WORKSPACE/result
 

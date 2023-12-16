@@ -19,7 +19,6 @@
 #pragma once
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/gpu/DoubleBufferedWindow.h"
 
 namespace pag {
 class DoubleBufferedDrawable : public Drawable {
@@ -35,28 +34,29 @@ class DoubleBufferedDrawable : public Drawable {
     return _height;
   }
 
+  std::shared_ptr<tgfx::Device> getDevice() override {
+    return device;
+  }
+
+  std::shared_ptr<tgfx::Surface> getFrontSurface(tgfx::Context* context, bool queryOnly) override;
+
   void present(tgfx::Context* context) override;
 
  protected:
-  explicit DoubleBufferedDrawable(std::shared_ptr<tgfx::DoubleBufferedWindow> window);
-
-  std::shared_ptr<tgfx::Surface> getFrontSurface() const override {
-    return window->getFrontSurface();
-  }
-
-  std::shared_ptr<tgfx::Surface> getBackSurface() const override {
-    return window->getBackSurface();
-  }
-
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
-  std::shared_ptr<tgfx::Device> onCreateDevice() override;
-
-  int _width = 0;
-  int _height = 0;
-  std::shared_ptr<tgfx::DoubleBufferedWindow> window;
+  void onFreeSurface() override;
 
  private:
-  DoubleBufferedDrawable(int width, int height, std::shared_ptr<tgfx::DoubleBufferedWindow> window);
+  int _width;
+  int _height;
+  bool tryHardware;
+  std::shared_ptr<tgfx::Device> device = nullptr;
+  std::shared_ptr<tgfx::Surface> frontSurface;
+
+  DoubleBufferedDrawable(int width, int height, bool tryHardware,
+                         std::shared_ptr<tgfx::Device> device);
+
+  std::shared_ptr<tgfx::Surface> makeSurface(tgfx::Context* context) const;
 };
 }  // namespace pag

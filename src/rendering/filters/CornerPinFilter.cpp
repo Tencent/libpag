@@ -144,7 +144,7 @@ void CornerPinFilter::bindVertices(tgfx::Context* context, const FilterSource* s
     gl->bindVertexArray(filterProgram->vertexArray);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STREAM_DRAW);
+  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STREAM_DRAW);
   gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
                           5 * sizeof(float), static_cast<void*>(0));
   gl->enableVertexAttribArray(static_cast<unsigned>(positionHandle));

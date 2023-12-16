@@ -31,40 +31,25 @@ class Drawable {
 
   virtual int height() const = 0;
 
- protected:
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+
+  virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context, bool queryOnly);
+
+  virtual std::shared_ptr<tgfx::Surface> getFrontSurface(tgfx::Context* context, bool queryOnly);
 
   void freeSurface();
 
-  virtual std::shared_ptr<tgfx::Device> onCreateDevice() = 0;
-
-  virtual std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) = 0;
-
-  virtual std::shared_ptr<tgfx::Surface> getFrontSurface() const {
-    return surface;
-  }
-
-  virtual std::shared_ptr<tgfx::Surface> getBackSurface() const {
-    return surface;
-  }
-
- private:
-  std::shared_ptr<tgfx::Device> device = nullptr;
-
-  virtual void updateSize();
+  virtual void setTimeStamp(int64_t timestamp);
 
   virtual void present(tgfx::Context* context);
 
-  virtual void setTimeStamp(int64_t timestamp);
+  virtual void updateSize();
 
-  virtual tgfx::Context* lockContext(bool force = false);
+ protected:
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
 
-  virtual void unlockContext();
+  virtual std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) = 0;
 
-  std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context, bool force = false);
-
-  void freeDevice();
-
-  friend class PAGSurface;
+  virtual void onFreeSurface();
 };
 }  // namespace pag

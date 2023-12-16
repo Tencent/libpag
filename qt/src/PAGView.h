@@ -37,26 +37,16 @@ class PAGView : public QQuickItem {
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
- protected:
-  void geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) override;
-
  private:
   int64_t startTime = 0;
   bool isPlaying = true;
-  qreal lastDevicePixelRatio = 1;
+  qreal lastPixelRatio = 1;
+  qreal lastWidth = 0;
+  qreal lastHeight = 0;
   QString filePath = "";
-  PAGPlayer* pagPlayer = new PAGPlayer();
+  PAGPlayer* pagPlayer = nullptr;
   RenderThread* renderThread = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
-
-  void onSizeChanged();
-  void onCreateDrawable(QOpenGLContext* context);
-
-  Q_SLOT
-  void handleWindowChanged(QQuickWindow* window);
-
-  Q_SLOT
-  void handleOpenglContextCreated(QOpenGLContext* context);
 
   friend class RenderThread;
 };

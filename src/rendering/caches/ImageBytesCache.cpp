@@ -27,7 +27,7 @@ ImageBytesCache* ImageBytesCache::Get(ImageBytes* imageBytes) {
   }
   auto cache = new ImageBytesCache();
   auto fileBytes =
-      tgfx::Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
+      tgfx::Data::MakeWithCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
   auto image = tgfx::Image::MakeFromEncoded(std::move(fileBytes));
   auto picture = Picture::MakeFrom(imageBytes->uniqueID, image);
   auto matrix = tgfx::Matrix::MakeScale(1 / imageBytes->scaleFactor);

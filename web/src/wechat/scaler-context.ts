@@ -1,5 +1,5 @@
-import { ScalerContext as NativeScaleContext }from '@tgfx/core/scaler-context';
-import { getCanvas2D } from './canvas';
+import { ScalerContext as NativeScaleContext } from '@tgfx/core/scaler-context';
+import { getCanvas2D } from '@tgfx/wechat/canvas';
 
 import type { Rect } from '../types';
 

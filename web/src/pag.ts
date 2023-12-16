@@ -1,5 +1,5 @@
 import './utils/polyfills';
-import { binding } from './binding';
+import { PAGBind } from './binding';
 import * as types from './types';
 import createPAG from './wasm/libpag';
 import { WebAssemblyQueue } from './utils/queue';
@@ -19,7 +19,7 @@ export interface ModuleOption {
 const PAGInit = (moduleOption: ModuleOption = {}): Promise<types.PAG> =>
   createPAG(moduleOption)
     .then((module: types.PAG) => {
-      binding(module);
+      PAGBind(module);
       module.webAssemblyQueue = new WebAssemblyQueue();
       module.globalCanvas = new module.GlobalCanvas();
       module.PAGFont.registerFallbackFontNames();

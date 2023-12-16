@@ -63,7 +63,7 @@ features like video templates.
 
 - iOS 9.0 or later
 - Android 4.4 or later
-- macOS 10.13 or later
+- macOS 10.15 or later
 - Windows 7.0 or later
 - Chrome 69.0 or later (Web)
 - Safari 11.3 or later (Web)
@@ -185,10 +185,14 @@ versions, you can download the precompiled libraries from [here](https://github.
 ### Build Prerequisites
 
 - Xcode 11.0+
-- GCC 7.0+
-- CMake 3.10.2+
-- Visual Studio 2019
-- NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
+- GCC 9.0+
+- Visual Studio 2019+
+- NodeJS 14.14.0+
+- Ninja 1.9.0+
+- CMake 3.13.0+
+- QT 5.13.0+
+- NDK 19.2+ (**19.2.5345600 recommended**)
+- Emscripten 3.1.20+ (**3.1.20 recommended**)
 
 ### Dependency Management
 

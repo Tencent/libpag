@@ -16,7 +16,6 @@
 
   ./install_tools.sh
   depsync
-  git-lfs pull
 
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
@@ -43,9 +42,9 @@
   echo $CMAKE_COMMAND
 
   if [[ $1 == "1" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
-    $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
   $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
@@ -64,6 +63,8 @@
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
     git stash pop --index --quiet
   fi
+
+  depsync
 
   if [ "$COMPLIE_RESULT" == false ]; then
     mkdir -p result

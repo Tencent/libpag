@@ -37,9 +37,12 @@ void GPUDrawable::updateSize() {
   CGSize size = [view convertSizeToBacking:view.bounds.size];
   _width = static_cast<int>(roundf(size.width));
   _height = static_cast<int>(roundf(size.height));
+  if (window) {
+    window->invalidSize();
+  }
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -53,7 +56,13 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
   if (window == nullptr) {
     return nullptr;
   }
-  return window->createSurface(context);
+  return window->getSurface(context);
+}
+
+void GPUDrawable::onFreeSurface() {
+  if (window) {
+    window->freeSurface();
+  }
 }
 
 void GPUDrawable::present(tgfx::Context* context) {

@@ -24,29 +24,49 @@
 #include <QQuickItem>
 #include <QSGTexture>
 #pragma clang diagnostic pop
-#include "rendering/drawables/DoubleBufferedDrawable.h"
+#include "rendering/drawables/Drawable.h"
 
 namespace tgfx {
 class QGLWindow;
 }
 
 namespace pag {
-class GPUDrawable : public DoubleBufferedDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
                                                QOpenGLContext* sharedContext = nullptr);
 
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<tgfx::Device> getDevice() override;
+
+  std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context, bool queryOnly) override;
+
   void updateSize() override;
+
+  void present(tgfx::Context* context) override;
 
   void moveToThread(QThread* targetThread);
 
   QSGTexture* getTexture();
 
+ protected:
+  std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+
+  void onFreeSurface() override;
+
  private:
+  int _width = 0;
+  int _height = 0;
   QQuickItem* quickItem = nullptr;
+  std::shared_ptr<tgfx::QGLWindow> window = nullptr;
 
   GPUDrawable(QQuickItem* quickItem, std::shared_ptr<tgfx::QGLWindow> window);
-
-  std::shared_ptr<tgfx::QGLWindow> qGLWindow() const;
 };
 }  // namespace pag

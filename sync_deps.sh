@@ -1,17 +1,20 @@
-#!/bin/bash -e
+#!/bin/bash
 cd $(dirname $0)
 
-sh ./install_tools.sh
+./install_tools.sh
 
 if [[ `uname` == 'Darwin' ]]; then
   if [ ! $(which emcc) ]; then
       echo "emscripten not found. Trying to install..."
-      sh ./web/script/install-emscripten.sh  || exit 1
-  fi
-  if [ ! $(which gcovr) ]; then
-      echo "gcovr not found. Trying to install..."
-      brew install gcovr || exit 1
+      ./web/script/install-emscripten.sh
   fi
 fi
 
-depsync
+if [ ! $(which depsync) ]; then
+  echo "depsync not found. Trying to install..."
+  npm install -g depsync > /dev/null
+else
+  npm update -g depsync > /dev/null
+fi
+
+depsync || exit 1

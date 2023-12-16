@@ -111,7 +111,7 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
 
     if (mimeType == "video/hevc") {
       status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
-          kCFAllocatorDefault, size, &parameterSetPointers[0], &parameterSetSizes[0], 4, NULL,
+          kCFAllocatorDefault, size, parameterSetPointers.data(), parameterSetSizes.data(), 4, NULL,
           &videoFormatDescription);
 
       if (status != noErr) {
@@ -122,8 +122,8 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
       // create video format description
       status = CMVideoFormatDescriptionCreateFromH264ParameterSets(kCFAllocatorDefault,
                                                                    size,  // param count
-                                                                   &parameterSetPointers[0],
-                                                                   &parameterSetSizes[0],
+                                                                   parameterSetPointers.data(),
+                                                                   parameterSetSizes.data(),
                                                                    4,  // nal start code size
                                                                    &videoFormatDescription);
 

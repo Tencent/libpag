@@ -20,7 +20,6 @@
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <QSGImageNode>
-#include <QScreen>
 #include <QThread>
 #include "pag/file.h"
 #include "platform/qt/GPUDrawable.h"
@@ -58,10 +57,13 @@ class RenderThread : public QThread {
 
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
-  connect(this, SIGNAL(windowChanged(QQuickWindow* )), this,
-          SLOT(handleWindowChanged(QQuickWindow* )));
+  drawable = GPUDrawable::MakeFrom(this);
+  pagPlayer = new PAGPlayer();
+  auto pagSurface = PAGSurface::MakeFrom(drawable);
+  pagPlayer->setSurface(pagSurface);
   renderThread = new RenderThread(this);
   renderThread->moveToThread(renderThread);
+  drawable->moveToThread(renderThread);
 }
 
 PAGView::~PAGView() {
@@ -71,58 +73,24 @@ PAGView::~PAGView() {
   delete pagPlayer;
 }
 
-void PAGView::handleWindowChanged(QQuickWindow* window) {
-  if (drawable != nullptr || window == nullptr) {
-    return;
-  }
-  if (window->openglContext() != nullptr) {
-    onCreateDrawable(window->openglContext());
-  } else {
-    connect(window, SIGNAL(openglContextCreated(QOpenGLContext* )), this,
-            SLOT(handleOpenglContextCreated(QOpenGLContext* )));
-  }
-}
-
-void PAGView::handleOpenglContextCreated(QOpenGLContext* context) {
-  disconnect(window(), SIGNAL(openglContextCreated(QOpenGLContext* )), this,
-             SLOT(handleOpenglContextCreated(QOpenGLContext* )));
-  onCreateDrawable(context);
-}
-
-void PAGView::onCreateDrawable(QOpenGLContext* context) {
-  if (drawable == nullptr) {
-    drawable = GPUDrawable::MakeFrom(this, context);
-    drawable->moveToThread(renderThread);
-  }
-}
-
-void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) {
-  if (newGeometry == oldGeometry) {
-    return;
-  }
-  QQuickItem::geometryChanged(newGeometry, oldGeometry);
-  onSizeChanged();
-}
-
 void PAGView::setFile(const std::shared_ptr<PAGFile> pagFile) {
   pagPlayer->setComposition(pagFile);
 }
 
-QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) {
-  if (drawable == nullptr) {
-    return nullptr;
-  }
-
-  if (pagPlayer->getSurface() == nullptr) {
-    auto pagSurface = PAGSurface::MakeFrom(drawable);
-    pagPlayer->setSurface(pagSurface);
-    lastDevicePixelRatio = window()->devicePixelRatio();
+QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
+  if (!renderThread->isRunning()) {
     renderThread->start();
   }
 
-  if (lastDevicePixelRatio != window()->devicePixelRatio()) {
-    lastDevicePixelRatio = window()->devicePixelRatio();
-    onSizeChanged();
+  if (lastWidth != width() || lastHeight != height() ||
+      lastPixelRatio != window()->devicePixelRatio()) {
+    lastWidth = width();
+    lastHeight = height();
+    lastPixelRatio = window()->devicePixelRatio();
+    auto pagSurface = pagPlayer->getSurface();
+    if (pagSurface) {
+      pagSurface->updateSize();
+    }
   }
 
   auto node = static_cast<QSGImageNode*>(oldNode);
@@ -146,13 +114,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) {
     QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
   }
   return node;
-}
-
-void PAGView::onSizeChanged() {
-  auto pagSurface = pagPlayer->getSurface();
-  if (pagSurface) {
-    pagSurface->updateSize();
-  }
 }
 }  // namespace pag
 
