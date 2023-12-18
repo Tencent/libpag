@@ -148,6 +148,7 @@ void PAGAnimator::setRepeatCount(int repeatCount) {
     repeatCount = 0;
   }
   _repeatCount = repeatCount;
+  playedCount = 0;
 }
 
 double PAGAnimator::progress() {
