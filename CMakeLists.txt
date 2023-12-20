@@ -45,7 +45,9 @@ else ()
 endif ()
 
 if (NOT WEB)
-    option(PAG_USE_LIBAVC "Allow use of embedded libavc as fallback video decoder" ON)
+    if (NOT IOS OR SDK_NAME STREQUAL iphonesimulator)
+        option(PAG_USE_LIBAVC "Allow use of embedded libavc as fallback video decoder" ON)
+    endif ()
     option(PAG_BUILD_SHARED "Allow build shared library" ON)
 endif ()
 
