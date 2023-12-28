@@ -19,8 +19,7 @@
 #include "GPUDrawable.h"
 
 namespace pag {
-NSString* const kAsyncSurfacePreparedNotification =
-    @"pag.art.AsyncSurfacePrepared";
+NSString* const kAsyncSurfacePreparedNotification = @"pag.art.AsyncSurfacePrepared";
 
 std::shared_ptr<GPUDrawable> GPUDrawable::FromLayer(CAEAGLLayer* layer) {
   if (layer == nil) {
@@ -107,10 +106,9 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* conte
       strongThis->bufferPreparing = false;
       strongThis->window->getDevice()->unlock();
       if (strongThis->surface) {
-        [[NSNotificationCenter defaultCenter]
-            postNotificationName:kAsyncSurfacePreparedNotification
-                          object:strongThis->layer
-                        userInfo:nil];
+        [[NSNotificationCenter defaultCenter] postNotificationName:kAsyncSurfacePreparedNotification
+                                                            object:strongThis->layer
+                                                          userInfo:nil];
       }
       [strongThis->layer release];
     });

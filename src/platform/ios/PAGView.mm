@@ -54,10 +54,10 @@
                                            selector:@selector(applicationDidReceiveMemoryWarning:)
                                                name:UIApplicationDidReceiveMemoryWarningNotification
                                              object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(AsyncSurfacePrepared:)
-    name:pag::kAsyncSurfacePreparedNotification
-  object:self.layer];
-
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(AsyncSurfacePrepared:)
+                                               name:pag::kAsyncSurfacePreparedNotification
+                                             object:self.layer];
 }
 
 - (void)dealloc {
