@@ -177,10 +177,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (CVPixelBufferRef)getDiskCacheCVPixelBuffer {
   if (diskBufferPool == nil) {
     NSDictionary* options = @{
-      (id)kCVPixelBufferIOSurfacePropertiesKey: @{},
-      (id)kCVPixelBufferWidthKey: @([[self getPAGDecoder] width]),
-      (id)kCVPixelBufferHeightKey: @([[self getPAGDecoder] height]),
-      (id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA)
+      (id)kCVPixelBufferIOSurfacePropertiesKey : @{},
+      (id)kCVPixelBufferWidthKey : @([[self getPAGDecoder] width]),
+      (id)kCVPixelBufferHeightKey : @([[self getPAGDecoder] height]),
+      (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA)
     };
     CVReturn status = CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, (CFDictionaryRef)options,
                                               &diskBufferPool);
