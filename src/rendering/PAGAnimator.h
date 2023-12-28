@@ -176,7 +176,6 @@ class PAGAnimator {
   void startAnimation();
   void cancelAnimation();
   void resetStartTime();
-  void resetTask();
 
   friend class AnimationTicker;
 };

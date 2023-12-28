@@ -19,6 +19,8 @@
 #include "GPUDrawable.h"
 
 namespace pag {
+NSString* const kAsyncSurfacePreparedNotification = @"pag.art.AsyncSurfacePrepared";
+
 std::shared_ptr<GPUDrawable> GPUDrawable::FromLayer(CAEAGLLayer* layer) {
   if (layer == nil) {
     return nullptr;
@@ -78,10 +80,40 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  if (window == nullptr) {
+  if (window == nullptr || bufferPreparing) {
     return nullptr;
   }
-  return window->getSurface(context);
+  if (surface) {
+    return surface;
+  }
+  // https://github.com/Tencent/libpag/issues/1870
+  // Creating a surface in a non-main thread may lead to a crash.
+  if (NSThread.isMainThread) {
+    surface = window->getSurface(context);
+    return surface;
+  } else {
+    bufferPreparing = true;
+    auto strongThis = weakThis.lock();
+    [layer retain];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      auto context = strongThis->window->getDevice()->lockContext();
+      if (context == nullptr) {
+        strongThis->bufferPreparing = false;
+        [strongThis->layer release];
+        return;
+      }
+      strongThis->surface = strongThis->window->getSurface(context);
+      strongThis->bufferPreparing = false;
+      strongThis->window->getDevice()->unlock();
+      if (strongThis->surface) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:kAsyncSurfacePreparedNotification
+                                                            object:strongThis->layer
+                                                          userInfo:nil];
+      }
+      [strongThis->layer release];
+    });
+    return nullptr;
+  }
 }
 
 void GPUDrawable::onFreeSurface() {
