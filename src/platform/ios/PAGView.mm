@@ -20,6 +20,7 @@
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/ios/private/GPUDrawable.h"
 
 @implementation PAGView {
   PAGPlayer* pagPlayer;
@@ -53,6 +54,10 @@
                                            selector:@selector(applicationDidReceiveMemoryWarning:)
                                                name:UIApplicationDidReceiveMemoryWarningNotification
                                              object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(AsyncSurfacePrepared:)
+    name:pag::kAsyncSurfacePreparedNotification
+  object:self.layer];
+
 }
 
 - (void)dealloc {
@@ -348,5 +353,9 @@
     return [pagPlayer getBounds:pagLayer];
   }
   return CGRectNull;
+}
+
+- (void)AsyncSurfacePrepared:(NSNotification*)notification {
+  [animator update];
 }
 @end

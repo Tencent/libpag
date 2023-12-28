@@ -23,6 +23,8 @@
 
 namespace pag {
 
+extern NSString* const kAsyncSurfacePreparedNotification;
+
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
@@ -48,6 +50,7 @@ class GPUDrawable : public Drawable {
   int _height = 0;
   CAEAGLLayer* layer = nil;
   std::shared_ptr<tgfx::EAGLWindow> window = nullptr;
+  std::atomic<bool> bufferPreparing = false;
 
   explicit GPUDrawable(CAEAGLLayer* layer);
 
