@@ -107,13 +107,17 @@ bool PAGAnimator::isSync() {
 }
 
 void PAGAnimator::setSync(bool value) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  locker.lock();
   if (_isSync == value) {
+    locker.unlock();
     return;
   }
   _isSync = value;
-  if (_isSync) {
-    resetTask();
+  auto tempTask = task;
+  task = nullptr;
+  locker.unlock();
+  if (tempTask) {
+    tempTask->wait();
   }
 }
 
@@ -327,10 +331,4 @@ void PAGAnimator::resetStartTime() {
   _startTime = INT64_MIN;
 }
 
-void PAGAnimator::resetTask() {
-  if (task != nullptr) {
-    task->wait();
-    task = nullptr;
-  }
-}
 }  // namespace pag
