@@ -64,7 +64,7 @@ class PAGAnimator {
 
     /**
      * Notifies another frame of the animation will occur. It will be called from main thread.
-     * Note: onAnimationWillUpdate and onAnimationUpdate will always appear in pairs, unless the listener is destructed.
+     * Note: onAnimationWillUpdate and onAnimationUpdate will always appear in pairs.
      */
     virtual void onAnimationWillUpdate(PAGAnimator*) {
     }
