@@ -1,3 +1,0 @@
-#!/usr/bin/env node
-// run 'node gen_xcode -h" to print help message
-require("./third_party/vendor_tools/xcode-gen");
