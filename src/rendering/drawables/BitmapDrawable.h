@@ -58,7 +58,5 @@ class BitmapDrawable : public Drawable {
   bool pixelCopied = false;
 
   BitmapDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
-
-  friend class CompositionReader;
 };
 }  // namespace pag
