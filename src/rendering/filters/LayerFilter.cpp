@@ -90,17 +90,18 @@ std::shared_ptr<const FilterProgram> FilterProgram::Make(tgfx::Context* context,
   if (program == 0) {
     return nullptr;
   }
-  auto filterProgram = new FilterProgram();
+  auto filterProgram = std::shared_ptr<FilterProgram>(new FilterProgram());
   filterProgram->program = program;
   if (gl->bindVertexArray != nullptr) {
     gl->genVertexArrays(1, &filterProgram->vertexArray);
   }
   gl->genBuffers(1, &filterProgram->vertexBuffer);
-  return Resource::Wrap(context, filterProgram);
+  tgfx::GLResource::AttachToContext(context, filterProgram);
+  return filterProgram;
 }
 
 void FilterProgram::onReleaseGPU() {
-  auto gl = tgfx::GLFunctions::Get(context);
+  auto gl = tgfx::GLFunctions::Get(getContext());
   if (program > 0) {
     gl->deleteProgram(program);
     program = 0;

@@ -22,30 +22,27 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/gpu/Resource.h"
+#include "tgfx/opengl/GLResource.h"
 
 namespace pag {
 std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
                                                               const tgfx::Rect& outputBounds);
 
-class FilterProgram : public tgfx::Resource {
+class FilterProgram : public tgfx::GLResource {
  public:
   static std::shared_ptr<const FilterProgram> Make(tgfx::Context* context,
                                                    const std::string& vertex,
                                                    const std::string& fragment);
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
   unsigned program = 0;
   unsigned int vertexArray = 0;
   unsigned int vertexBuffer = 0;
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   FilterProgram() = default;
-
-  void onReleaseGPU() override;
 };
 
 class LayerFilter : public Filter {
