@@ -191,7 +191,7 @@ class SnapshotPicture : public Picture {
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-    tgfx::SurfaceOptions options(tgfx::SurfaceOptions::DisableCacheFlag);
+    tgfx::SurfaceOptions options(tgfx::RenderFlags::DisableCache);
     auto surface =
         tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped, &options);
     if (surface == nullptr) {
