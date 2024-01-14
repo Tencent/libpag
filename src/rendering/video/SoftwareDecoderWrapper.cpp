@@ -43,11 +43,11 @@ class SoftwareI420Data : public tgfx::YUVData {
     return data.size();
   }
 
-  const void* getBaseAddressAt(int planeIndex) const override {
+  const void* getBaseAddressAt(size_t planeIndex) const override {
     return data[planeIndex];
   }
 
-  size_t getRowBytesAt(int planeIndex) const override {
+  size_t getRowBytesAt(size_t planeIndex) const override {
     return rowBytes[planeIndex];
   }
 

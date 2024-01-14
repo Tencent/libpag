@@ -214,7 +214,7 @@ void RenderCache::detachFromContext() {
   clearExpiredDecodedImages();
   clearExpiredSnapshots();
   if (!timestamps.empty()) {
-    // Always purge scratch resources that haven't been used in 1 frame.
+    // Always purge recyclable resources that haven't been used in 1 frame.
     context->purgeResourcesNotUsedSince(timestamps.back(), true);
   }
   if (context->memoryUsage() + graphicsMemory > PURGEABLE_GRAPHICS_MEMORY &&
