@@ -121,7 +121,7 @@ class ImageProxyPicture : public Picture {
       return nullptr;
     }
     bool needRescale = !image->isTextureBacked() && scaleFactor != 1.0f;
-    if (needRescale || image->isRGBAAA()) {
+    if (needRescale) {
       image = RescaleImage(cache->getContext(), image, scaleFactor, mipMapped);
     } else {
       image = image->makeTextureImage(cache->getContext());
