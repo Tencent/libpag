@@ -21,25 +21,14 @@
 #include <unordered_map>
 
 namespace pag {
-static std::mutex threadCacheLocker = {};
-static std::unordered_map<std::thread::id, std::shared_ptr<tgfx::GLDevice>> threadCacheMap = {};
+thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
 
 std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
-  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
-  auto threadID = std::this_thread::get_id();
-  auto result = threadCacheMap.find(threadID);
-  if (result != threadCacheMap.end()) {
-    return result->second;
-  }
-  auto device = tgfx::GLDevice::Make();
-  if (device != nullptr) {
-    threadCacheMap[threadID] = device;
+  auto device = cachedDevice;
+  if (device == nullptr) {
+    device = tgfx::GLDevice::Make();
+    cachedDevice = device;
   }
   return device;
-}
-
-void DevicePool::CleanAll() {
-  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
-  threadCacheMap = {};
 }
 }  // namespace pag
