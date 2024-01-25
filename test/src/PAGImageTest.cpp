@@ -106,7 +106,7 @@ PAG_TEST(PAGImageTest, image2) {
   ASSERT_EQ(codec->height(), 110);
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->origin(), tgfx::EncodedOrigin::TopLeft);
+  ASSERT_EQ(codec->orientation(), tgfx::Orientation::TopLeft);
   Bitmap bitmap(codec->width(), codec->height(), false, false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
@@ -149,7 +149,7 @@ PAG_TEST(PAGImageTest, BottomLeftMask) {
   auto image1 = MakeImage("resources/apitest/imageReplacement.webp");
   auto imageAsMask = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
-  auto image2 = imageAsMask->applyOrigin(tgfx::EncodedOrigin::BottomLeft);
+  auto image2 = imageAsMask->makeOriented(tgfx::Orientation::BottomLeft);
   ASSERT_TRUE(image2 != nullptr);
   auto canvas = surface->getCanvas();
   tgfx::Paint paint;
