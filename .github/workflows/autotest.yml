@@ -12,14 +12,14 @@ jobs:
     runs-on: macos-13
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             /usr/local/Cellar/ninja
@@ -39,7 +39,7 @@ jobs:
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -78,7 +78,7 @@ jobs:
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             /usr/local/Cellar/ninja
@@ -97,7 +97,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
@@ -106,12 +106,12 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: result
           path: result
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: result
           path: result
