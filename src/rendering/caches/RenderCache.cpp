@@ -223,7 +223,7 @@ void RenderCache::detachFromContext() {
     // is over 20M.
     context->purgeResourcesNotUsedSince(timestamps.front(), false);
   }
-  timestamps.push(tgfx::Clock::Now());
+  timestamps.push(std::chrono::steady_clock::now());
   while (timestamps.size() > PURGEABLE_EXPIRED_FRAME) {
     timestamps.pop();
   }

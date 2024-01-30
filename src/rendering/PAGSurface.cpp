@@ -66,7 +66,7 @@ void PAGSurface::onFreeCache() {
   drawable->freeSurface();
   auto context = lockContext();
   if (context) {
-    context->purgeResourcesNotUsedSince(0);
+    context->purgeResourcesUntilMemoryTo(0);
     unlockContext();
   }
 }

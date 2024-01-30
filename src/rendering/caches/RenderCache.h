@@ -182,7 +182,7 @@ class RenderCache : public Performance {
   PAGStage* stage = nullptr;
   uint32_t deviceID = 0;
   tgfx::Context* context = nullptr;
-  std::queue<int64_t> timestamps = {};
+  std::queue<std::chrono::steady_clock::time_point> timestamps = {};
   bool isDrawingFrame = false;
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
