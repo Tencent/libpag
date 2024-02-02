@@ -53,6 +53,9 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
   horizontalInfo->originPosition.set(horizontalInfo->advance / 2, 0);
   horizontalInfo->bounds = _font.getBounds(_glyphId);
   auto metrics = _font.getMetrics();
+  if (horizontalInfo->bounds.isEmpty() && horizontalInfo->advance > 0) {
+    horizontalInfo->bounds.setLTRB(0, metrics.ascent, horizontalInfo->advance, metrics.descent);
+  }
   horizontalInfo->ascent = metrics.ascent;
   horizontalInfo->descent = metrics.descent;
   if (_name == " ") {
