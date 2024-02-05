@@ -533,7 +533,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   filePath = [path retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* pagFile) {
-        [self setComposition:pagComposition maxFrameRate:maxFrameRate];
+        [self setComposition:pagFile maxFrameRate:maxFrameRate];
         callback(pagFile);
       }];
 }
