@@ -141,7 +141,7 @@ class RenderCache : public Performance {
   void prepareAssetImage(ID assetID, const ImageProxy* proxy);
 
   /**
-   * Returns an image of the specified assetID.Returns a decoded or mipMapped image if available.
+   * Returns an image of the specified assetID.Returns a decoded or mipmapped image if available.
    * Otherwise, returns the original Image.
    */
   std::shared_ptr<tgfx::Image> getAssetImage(ID assetID, const ImageProxy* proxy);
