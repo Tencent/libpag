@@ -115,14 +115,14 @@ class ImageProxyPicture : public Picture {
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
-                                         bool mipMapped) const override {
+                                         bool mipmapped) const override {
     auto image = proxy->getImage(cache);
     if (image == nullptr) {
       return nullptr;
     }
     bool needRescale = !image->isTextureBacked() && scaleFactor != 1.0f;
     if (needRescale) {
-      image = RescaleImage(cache->getContext(), image, scaleFactor, mipMapped);
+      image = RescaleImage(cache->getContext(), image, scaleFactor, mipmapped);
     } else {
       image = image->makeTextureImage(cache->getContext());
       scaleFactor = 1.0f;
@@ -186,14 +186,14 @@ class SnapshotPicture : public Picture {
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
-                                         bool mipMapped) const override {
+                                         bool mipmapped) const override {
     tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
     tgfx::SurfaceOptions options(tgfx::RenderFlags::DisableCache);
     auto surface =
-        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped, &options);
+        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipmapped, &options);
     if (surface == nullptr) {
       return nullptr;
     }

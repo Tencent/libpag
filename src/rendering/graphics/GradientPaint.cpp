@@ -155,7 +155,7 @@ std::shared_ptr<tgfx::Shader> GradientPaint::getShader() const {
         tgfx::Shader::MakeLinearGradient(startPoint, endPoint, reflectedColors, reflectedPositions);
   }
   if (shader) {
-    shader = shader->makeWithPreLocalMatrix(matrix);
+    shader = shader->makeWithMatrix(matrix);
   } else {
     shader = tgfx::Shader::MakeColorShader(colors.back());
   }

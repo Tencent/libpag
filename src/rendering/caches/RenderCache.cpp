@@ -263,8 +263,8 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture) {
     return nullptr;
   }
   auto minScaleFactor = stage->getAssetMinScale(picture->assetID);
-  bool enableMipMap = minScaleFactor / scaleFactor < MIPMAP_ENABLED_THRESHOLD;
-  auto newSnapshot = picture->makeSnapshot(this, scaleFactor, enableMipMap);
+  bool enableMipmap = minScaleFactor / scaleFactor < MIPMAP_ENABLED_THRESHOLD;
+  auto newSnapshot = picture->makeSnapshot(this, scaleFactor, enableMipmap);
   if (newSnapshot == nullptr) {
     return nullptr;
   }
@@ -468,7 +468,7 @@ std::shared_ptr<tgfx::Image> RenderCache::getAssetImageInternal(ID assetID,
   }
   auto scaleFactor = stage->getAssetMinScale(assetID);
   if (scaleFactor < MIPMAP_ENABLED_THRESHOLD) {
-    image = image->makeMipMapped();
+    image = image->makeMipmapped(true);
   }
   assetImages[assetID] = image;
   return image;

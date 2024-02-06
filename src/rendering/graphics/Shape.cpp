@@ -74,7 +74,7 @@ void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
     return;
   }
   auto matrix = tgfx::Matrix::MakeScale(shape->resolutionScale());
-  paint.setShader(shader->makeWithPostLocalMatrix(matrix));
+  paint.setShader(shader->makeWithMatrix(matrix));
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(tgfx::Matrix::MakeScale(1 / shape->resolutionScale()));
   canvas->drawShape(shape, paint);
