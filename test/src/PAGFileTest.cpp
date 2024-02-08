@@ -29,7 +29,7 @@ using nlohmann::json;
 /**
  * 用例描述: PAGFile基础信息获取
  */
-PAG_TEST(PAGFileBaseTest, TestPAGFileBase) {
+PAG_TEST(PAGFileTest, TestPAGFileBase) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   ASSERT_NE(TestPAGFile, nullptr);
   auto TestFile = TestPAGFile->getFile();
@@ -51,7 +51,7 @@ PAG_TEST(PAGFileBaseTest, TestPAGFileBase) {
 /**
  * 用例描述: PAGFile getImageAt接口校验
  */
-PAG_TEST(PAGFileBaseTest, TestPAGFileImage) {
+PAG_TEST(PAGFileTest, TestPAGFileImage) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   ASSERT_NE(TestPAGFile, nullptr);
   auto TestFile = TestPAGFile->getFile();
@@ -73,7 +73,7 @@ PAG_TEST(PAGFileBaseTest, TestPAGFileImage) {
 /**
  * 用例描述: PAGFile getTextAt校验
  */
-PAG_TEST(PAGFileBaseTest, TestPAGFileText) {
+PAG_TEST(PAGFileTest, TestPAGFileText) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   ASSERT_NE(TestPAGFile, nullptr);
   auto TestFile = TestPAGFile->getFile();
@@ -92,7 +92,7 @@ PAG_TEST(PAGFileBaseTest, TestPAGFileText) {
 /**
  * 用例描述: PAGFile getTextData校验
  */
-PAG_TEST(PAGFileBaseTest, TestPAGFileTextData) {
+PAG_TEST(PAGFileTest, TestPAGFileTextData) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   ASSERT_NE(TestPAGFile, nullptr);
   auto TestFile = TestPAGFile->getFile();
@@ -109,7 +109,7 @@ PAG_TEST(PAGFileBaseTest, TestPAGFileTextData) {
 /**
  * 用例描述: PAGFile编解码校验
  */
-PAG_TEST(PAGFileBaseTest, TestPAGFileEncodeDecode) {
+PAG_TEST(PAGFileTest, TestPAGFileEncodeDecode) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   ASSERT_NE(TestPAGFile, nullptr);
   auto TestFile = TestPAGFile->getFile();
@@ -578,20 +578,20 @@ PAG_TEST(PAGFileVerticalTextCodec, VerticalTextCodec) {
 /**
  * 用例描述: ShapeType测试
  */
-PAG_TEST(PAGFileBaseTest, ShapeType) {
+PAG_TEST(PAGFileTest, ShapeType) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
   TestPAGPlayer->setComposition(testFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/ShapeType"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileTest/ShapeType"));
 }
 
 /**
  * 用例描述: ChildFrameToLocal接口测试，不改变时长
  */
-PAG_TEST(PAGFileBaseTest, ChildFrameToLocal) {
+PAG_TEST(PAGFileTest, ChildFrameToLocal) {
   auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
 
@@ -613,7 +613,7 @@ PAG_TEST(PAGFileBaseTest, ChildFrameToLocal) {
 /**
  * 用例描述: ChildFrameToLocal进阶测试，改变时长
  */
-PAG_TEST(PAGFileBaseTest, ChildFrameToLocalAdvanced) {
+PAG_TEST(PAGFileTest, ChildFrameToLocalAdvanced) {
   auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
 
@@ -644,53 +644,53 @@ PAG_TEST(PAGFileBaseTest, ChildFrameToLocalAdvanced) {
 /**
  * 用例描述: 测试椭圆转path，iOS14圆角badcase
  */
-PAG_TEST(PAGFileBaseTest, EllipseToPath_ID80701969) {
+PAG_TEST(PAGFileTest, EllipseToPath_ID80701969) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/ellipse_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/EllipseToPath"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileTest/EllipseToPath"));
 }
 
 /**
  * 用例描述: 测试矩形转path，iOS14badcase
  */
-PAG_TEST(PAGFileBaseTest, RectToPath) {
+PAG_TEST(PAGFileTest, RectToPath) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/RectToPath"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileTest/RectToPath"));
 }
 
 /**
  * 用例描述: 测试圆角矩形转path,iOS14badCase
  */
-PAG_TEST(PAGFileBaseTest, RoundRectToPath) {
+PAG_TEST(PAGFileTest, RoundRectToPath) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/round_rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/RoundRectToPath"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileTest/RoundRectToPath"));
 }
 
 /**
  * 用例描述: PAGFile设置开始时间
  */
-PAG_TEST(PAGFileBaseTest, SetStartTime) {
+PAG_TEST(PAGFileTest, SetStartTime) {
   PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/replacement.pag");
   TestPAGPlayer->setComposition(pagFile);
   pagFile->setStartTime(2000000);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/SetStartTime"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileTest/SetStartTime"));
 }
 
-PAG_TEST(PAGFileBaseTest, EditableIndices) {
+PAG_TEST(PAGFileTest, EditableIndices) {
   auto pagFile = LoadPAGFile("resources/apitest/texture_bottom_left.pag");
   auto editableImages = pagFile->getEditableIndices(LayerType::Image);
   ASSERT_EQ(editableImages.size(), 6lu);
