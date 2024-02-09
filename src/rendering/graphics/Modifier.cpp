@@ -298,9 +298,9 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   canvas->concat(matrix);
   tgfx::Paint paint;
   if (useLuma) {
-    shader = shader->makeWithColorFilter(tgfx::ColorFilter::MakeLumaColorFilter());
+    shader = shader->makeWithColorFilter(tgfx::ColorFilter::Luma());
   }
-  paint.setMaskFilter(tgfx::MaskFilter::Make(std::move(shader), inverted));
+  paint.setMaskFilter(tgfx::MaskFilter::MakeShader(std::move(shader), inverted));
   canvas->drawImage(image, &paint);
   canvas->restore();
 }

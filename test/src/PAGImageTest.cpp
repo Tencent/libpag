@@ -153,7 +153,7 @@ PAG_TEST(PAGImageTest, BottomLeftMask) {
   ASSERT_TRUE(image2 != nullptr);
   auto canvas = surface->getCanvas();
   tgfx::Paint paint;
-  paint.setMaskFilter(tgfx::MaskFilter::Make(tgfx::Shader::MakeImageShader(image2)));
+  paint.setMaskFilter(tgfx::MaskFilter::MakeShader(tgfx::Shader::MakeImageShader(image2)));
   canvas->drawImage(image1, &paint);
   Bitmap bitmap(width, height);
   ASSERT_FALSE(bitmap.isEmpty());
