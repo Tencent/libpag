@@ -19,10 +19,14 @@
 #include "UniqueID.h"
 
 namespace pag {
-
-static std::atomic_uint32_t IDCount = {1};
+static constexpr uint32_t InvalidUniqueID = 0;
 
 uint32_t UniqueID::Next() {
-  return IDCount++;
+  static std::atomic<uint32_t> nextID{1};
+  uint32_t id;
+  do {
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id == InvalidUniqueID);
+  return id;
 }
 }  // namespace pag

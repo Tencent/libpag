@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 cd $(dirname $0)
 
 if [[ `uname` == 'Darwin' ]]; then
@@ -14,3 +14,6 @@ fi
 
 mkdir -p result
 gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
+if test $? -ne 0; then
+   exit 1
+fi
