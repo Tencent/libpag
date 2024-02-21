@@ -8,7 +8,7 @@ if [[ `uname` == 'Darwin' ]]; then
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     echo "gcovr not found. Trying to install..."
-    brew install gcovr
+    brew install gcovr --overwrite
   fi
 fi
 
