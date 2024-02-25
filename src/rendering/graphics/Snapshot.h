@@ -21,7 +21,6 @@
 #include "pag/types.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shape.h"
 
 namespace pag {
 class RenderCache;

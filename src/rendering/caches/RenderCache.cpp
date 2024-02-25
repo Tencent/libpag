@@ -183,7 +183,6 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
     removeTextAtlas(assetID);
-    shapeCaches.erase(assetID);
   }
 }
 
@@ -276,50 +275,6 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture) {
   snapshotPositions[snapshot] = snapshotLRU.begin();
   snapshotCaches[picture->assetID] = snapshot;
   return snapshot;
-}
-
-std::shared_ptr<tgfx::Shape> RenderCache::getShape(ID assetID, const tgfx::Path& path) {
-  usedAssets.insert(assetID);
-  auto scaleFactor = stage->getAssetMaxScale(assetID);
-  auto shape = findShape(assetID, path);
-  if (shape && fabsf(shape->resolutionScale() - scaleFactor) > SCALE_FACTOR_PRECISION) {
-    removeShape(assetID, path);
-    shape = nullptr;
-  }
-  if (shape != nullptr) {
-    return shape;
-  }
-  shape = tgfx::Shape::MakeFromFill(path, scaleFactor);
-  if (shape != nullptr) {
-    shapeCaches[assetID][path] = shape;
-  }
-  return shape;
-}
-
-std::shared_ptr<tgfx::Shape> RenderCache::findShape(ID assetID, const tgfx::Path& path) {
-  auto result = shapeCaches.find(assetID);
-  if (result != shapeCaches.end()) {
-    auto iter = result->second.find(path);
-    if (iter != result->second.end()) {
-      return iter->second;
-    }
-  }
-  return nullptr;
-}
-
-void RenderCache::removeShape(ID assetID, const tgfx::Path& path) {
-  auto shapeMap = shapeCaches.find(assetID);
-  if (shapeMap == shapeCaches.end()) {
-    return;
-  }
-  auto shape = shapeMap->second.find(path);
-  if (shape == shapeMap->second.end()) {
-    return;
-  }
-  shapeMap->second.erase(shape);
-  if (shapeMap->second.empty()) {
-    shapeCaches.erase(assetID);
-  }
 }
 
 void RenderCache::removeSnapshot(ID assetID) {
