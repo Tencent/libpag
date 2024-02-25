@@ -22,7 +22,6 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Shape.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
@@ -65,19 +64,9 @@ bool Shape::getPath(tgfx::Path* result) const {
 void Shape::prepare(RenderCache*) const {
 }
 
-void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
+void Shape::draw(tgfx::Canvas* canvas, RenderCache*) const {
   tgfx::Paint paint;
-  auto shape = renderCache->getShape(assetID, path);
-  if (shape == nullptr) {
-    paint.setShader(shader);
-    canvas->drawPath(path, paint);
-    return;
-  }
-  auto matrix = tgfx::Matrix::MakeScale(shape->resolutionScale());
-  paint.setShader(shader->makeWithMatrix(matrix));
-  auto oldMatrix = canvas->getMatrix();
-  canvas->concat(tgfx::Matrix::MakeScale(1 / shape->resolutionScale()));
-  canvas->drawShape(shape, paint);
-  canvas->setMatrix(oldMatrix);
+  paint.setShader(shader);
+  canvas->drawPath(path, paint);
 }
 }  // namespace pag

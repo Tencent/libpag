@@ -35,27 +35,9 @@ float GetMaxScaleFactor(const tgfx::Matrix& matrix) {
 }
 
 tgfx::Point GetScaleFactor(const tgfx::Matrix& matrix, float contentScale, bool inverted) {
-  tgfx::Point scale = {};
-  auto a = matrix.get(0);
-  auto c = matrix.get(1);
-  auto b = matrix.get(3);
-  auto d = matrix.get(4);
-  float determinant = a * d - b * c;
-  if (a == 1 && b == 0) {
-    scale.x = 1;
-  } else {
-    auto result = sqrtf(a * a + b * b);
-    scale.x = determinant < 0 ? -result : result;
-  }
-  if (c == 0 && d == 1) {
-    scale.y = 1;
-  } else {
-    auto result = sqrtf(c * c + d * d);
-    scale.y = determinant < 0 ? -result : result;
-  }
+  auto scale = matrix.getAxisScales();
   scale.x *= contentScale;
   scale.y *= contentScale;
-
   if (inverted) {
     scale.x = scale.x == 0 ? 0 : 1 / scale.x;
     scale.y = scale.y == 0 ? 0 : 1 / scale.y;

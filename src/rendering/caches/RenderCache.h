@@ -41,8 +41,6 @@
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
-using ShapeMap = std::unordered_map<tgfx::Path, std::shared_ptr<tgfx::Shape>, PathHasher>;
-
 class RenderCache : public Performance {
  public:
   explicit RenderCache(PAGStage* stage);
@@ -130,13 +128,11 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
-  std::shared_ptr<tgfx::Shape> getShape(ID assetID, const tgfx::Path& path);
-
   TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
   /**
-   * Prepares an image for next getAssetImage() call, which may schedule an asynchronous decoding
-   * task immediately.
+   * Prepares an image for the next getAssetImage() call, which may schedule an asynchronous
+   * decoding task immediately.
    */
   void prepareAssetImage(ID assetID, const ImageProxy* proxy);
 
@@ -193,7 +189,6 @@ class RenderCache : public Performance {
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
-  std::unordered_map<ID, ShapeMap> shapeCaches = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> assetImages = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
   std::unordered_map<ID, std::vector<SequenceImageQueue*>> sequenceCaches = {};
@@ -230,10 +225,6 @@ class RenderCache : public Performance {
   void clearAllTextAtlas();
   void removeTextAtlas(ID assetID);
   TextAtlas* getTextAtlas(ID assetID) const;
-
-  // shape caches:
-  std::shared_ptr<tgfx::Shape> findShape(ID assetID, const tgfx::Path& path);
-  void removeShape(ID assetID, const tgfx::Path& path);
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
