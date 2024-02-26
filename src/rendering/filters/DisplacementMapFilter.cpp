@@ -133,21 +133,21 @@ void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* 
     mapSurface = tgfx::Surface::Make(cache->getContext(), static_cast<int>(displacementSize.width),
                                      static_cast<int>(displacementSize.height));
   }
-  auto canvas = mapSurface->getCanvas();
-  canvas->clear();
+  Canvas canvas(mapSurface.get(), cache);
+  canvas.clear();
   if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
-    canvas->save();
+    canvas.save();
     auto bounds = contentBounds;
     layerMatrix.mapRect(&bounds);
     tgfx::Path path;
     path.addRect(bounds);
-    canvas->clipPath(path);
+    canvas.clipPath(path);
   }
-  mapGraphic->draw(canvas, cache);
+  mapGraphic->draw(&canvas);
   if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
-    canvas->restore();
+    canvas.restore();
   }
-  canvas->flush();
+  mapSurface->flush();
 }
 
 struct SelectorCoeffs {

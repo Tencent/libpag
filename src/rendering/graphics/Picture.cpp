@@ -82,7 +82,8 @@ class ImageProxyPicture : public Picture {
     proxy->prepareImage(cache);
   }
 
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
+  void draw(Canvas* canvas) const override {
+    auto cache = canvas->getCache();
     // Do not call proxy->getImage() here, which will clear the decoded image in the render cache.
     if (proxy->isTemporary()) {
       auto image = proxy->getImage(cache);
@@ -166,15 +167,15 @@ class SnapshotPicture : public Picture {
     graphic->prepare(cache);
   }
 
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
+  void draw(Canvas* canvas) const override {
     auto options = canvas->surfaceOptions();
     if (options && options->cacheDisabled()) {
-      graphic->draw(canvas, cache);
+      graphic->draw(canvas);
       return;
     }
-    auto snapshot = cache->getSnapshot(this);
+    auto snapshot = canvas->getCache()->getSnapshot(this);
     if (snapshot == nullptr) {
-      graphic->draw(canvas, cache);
+      graphic->draw(canvas);
       return;
     }
     canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
@@ -197,11 +198,11 @@ class SnapshotPicture : public Picture {
     if (surface == nullptr) {
       return nullptr;
     }
-    auto canvas = surface->getCanvas();
+    Canvas canvas(surface.get(), cache);
     auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
     matrix.preTranslate(-bounds.x(), -bounds.y());
-    canvas->setMatrix(matrix);
-    graphic->draw(canvas, cache);
+    canvas.setMatrix(matrix);
+    graphic->draw(&canvas);
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
     auto image = surface->makeImageSnapshot();

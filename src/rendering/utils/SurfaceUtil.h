@@ -18,12 +18,13 @@
 
 #pragma once
 
+#include "rendering/graphics/Canvas.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
 class SurfaceUtil {
  public:
-  static std::shared_ptr<tgfx::Surface> MakeContentSurface(tgfx::Canvas* parentCanvas,
+  static std::shared_ptr<tgfx::Surface> MakeContentSurface(Canvas* parentCanvas,
                                                            const tgfx::Rect& bounds,
                                                            float scaleFactorLimit = FLT_MAX,
                                                            float scale = 1.f,

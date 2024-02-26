@@ -68,6 +68,6 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   targetCanvas->setMatrix(ToMatrix(target));
   targetCanvas->drawImage(std::move(image), offset.x, offset.y);
   targetCanvas->restore();
-  targetCanvas->flush();
+  targetSurface->flush();
 }
 }  // namespace pag

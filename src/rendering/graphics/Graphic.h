@@ -20,6 +20,7 @@
 
 #include "Glyph.h"
 #include "Modifier.h"
+#include "rendering/graphics/Canvas.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -95,6 +96,6 @@ class Graphic {
   /**
    * Draw this Graphic into specified Canvas.
    */
-  virtual void draw(tgfx::Canvas* canvas, RenderCache* cache) const = 0;
+  virtual void draw(Canvas* canvas) const = 0;
 };
 }  // namespace pag

@@ -51,8 +51,7 @@ class BlendModifier : public Modifier {
     return alpha == 1.0f;  // blendMode 只影响颜色，不改变形状或透明度，不影响 getPath 结果。
   }
 
-  void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                      std::shared_ptr<Graphic> graphic) const override;
+  void applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const override;
 
   std::shared_ptr<Modifier> mergeWith(const Modifier* modifier) const override;
 
@@ -86,8 +85,7 @@ class ClipModifier : public Modifier {
 
   bool applyToPath(tgfx::Path* path) const override;
 
-  void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                      std::shared_ptr<Graphic> graphic) const override;
+  void applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const override;
 
   std::shared_ptr<Modifier> mergeWith(const Modifier* modifier) const override;
 
@@ -120,8 +118,7 @@ class MaskModifier : public Modifier {
     return false;
   }
 
-  void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                      std::shared_ptr<Graphic> graphic) const override;
+  void applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const override;
 
   std::shared_ptr<Modifier> mergeWith(const Modifier*) const override {
     return nullptr;
@@ -173,15 +170,14 @@ bool BlendModifier::hitTest(RenderCache*, float, float) const {
   return alpha != 0.0f;
 }
 
-void BlendModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                                   std::shared_ptr<Graphic> graphic) const {
+void BlendModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const {
   canvas->save();
   auto newAlpha = canvas->getAlpha() * alpha;
   canvas->setAlpha(newAlpha);
   if (blendMode != tgfx::BlendMode::SrcOver) {
     canvas->setBlendMode(blendMode);
   }
-  graphic->draw(canvas, cache);
+  graphic->draw(canvas);
   canvas->restore();
 }
 
@@ -207,11 +203,10 @@ bool ClipModifier::applyToPath(tgfx::Path* path) const {
   return true;
 }
 
-void ClipModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                                  std::shared_ptr<Graphic> graphic) const {
+void ClipModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const {
   canvas->save();
   canvas->clipPath(clip);
-  graphic->draw(canvas, cache);
+  graphic->draw(canvas);
   canvas->restore();
 }
 
@@ -250,8 +245,7 @@ void MaskModifier::applyToBounds(tgfx::Rect* bounds) const {
   }
 }
 
-void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                                  std::shared_ptr<Graphic> graphic) const {
+void MaskModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const {
   if (mask == nullptr) {
     return;
   }
@@ -271,9 +265,9 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   if (contentSurface == nullptr) {
     return;
   }
-  auto contentCanvas = contentSurface->getCanvas();
-  auto contentMatrix = contentCanvas->getMatrix();
-  graphic->draw(contentCanvas, cache);
+  Canvas contentCanvas(contentSurface.get(), canvas->getCache());
+  auto contentMatrix = contentCanvas.getMatrix();
+  graphic->draw(&contentCanvas);
   auto maskSurface = tgfx::Surface::Make(contentSurface->getContext(), contentSurface->width(),
                                          contentSurface->height(), !useLuma);
   if (maskSurface == nullptr) {
@@ -283,9 +277,9 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   if (maskSurface == nullptr) {
     return;
   }
-  auto maskCanvas = maskSurface->getCanvas();
-  maskCanvas->setMatrix(contentMatrix);
-  mask->draw(maskCanvas, cache);
+  Canvas maskCanvas(maskSurface.get(), canvas->getCache());
+  maskCanvas.setMatrix(contentMatrix);
+  mask->draw(&maskCanvas);
   auto shader = tgfx::Shader::MakeImageShader(maskSurface->makeImageSnapshot());
   if (shader == nullptr) {
     return;

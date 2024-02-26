@@ -85,7 +85,7 @@ bool PAGSurface::clearAll() {
   contentVersion = 0;  // 清空画布后 contentVersion 还原为初始值 0.
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->flush();
+  surface->flush();
   drawable->setTimeStamp(0);
   drawable->present(context);
   unlockContext();
@@ -304,10 +304,10 @@ void PAGSurface::unlockContext() {
 
 void PAGSurface::onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> target,
                         RenderCache* cache) {
-  auto canvas = target->getCanvas();
+  Canvas canvas(target.get(), cache);
   if (graphic) {
     graphic->prepare(cache);
-    graphic->draw(canvas, cache);
+    graphic->draw(&canvas);
   }
 }
 

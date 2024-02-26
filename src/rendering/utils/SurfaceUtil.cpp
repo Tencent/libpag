@@ -23,7 +23,7 @@ namespace pag {
 // 1/20 is the minimum precision for rendering pixels on most platforms.
 #define CONTENT_SCALE_STEP 20.0f
 
-std::shared_ptr<tgfx::Surface> SurfaceUtil::MakeContentSurface(tgfx::Canvas* parentCanvas,
+std::shared_ptr<tgfx::Surface> SurfaceUtil::MakeContentSurface(Canvas* parentCanvas,
                                                                const tgfx::Rect& bounds,
                                                                float scaleFactorLimit, float scale,
                                                                bool usesMSAA) {

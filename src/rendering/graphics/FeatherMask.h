@@ -39,7 +39,7 @@ class FeatherMask : public Graphic {
   bool hitTest(RenderCache* cache, float x, float y) override;
   bool getPath(tgfx::Path* result) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(tgfx::Canvas* parentCanvas, RenderCache* cache) const override;
+  void draw(Canvas* parentCanvas) const override;
 
  private:
   FeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame);
