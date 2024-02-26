@@ -47,7 +47,7 @@ class MatrixGraphic : public ComposeGraphic {
   bool hitTest(RenderCache* cache, float x, float y) override;
   bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  void draw(Canvas* canvas) const override;
   std::shared_ptr<Graphic> mergeWith(const tgfx::Matrix& matrix) const override;
 
  protected:
@@ -99,10 +99,10 @@ void MatrixGraphic::prepare(RenderCache* cache) const {
   graphic->prepare(cache);
 }
 
-void MatrixGraphic::draw(tgfx::Canvas* canvas, RenderCache* cache) const {
+void MatrixGraphic::draw(Canvas* canvas) const {
   canvas->save();
   canvas->concat(matrix);
-  graphic->draw(canvas, cache);
+  graphic->draw(canvas);
   canvas->restore();
 }
 
@@ -127,7 +127,7 @@ class LayerGraphic : public ComposeGraphic {
   bool hitTest(RenderCache* cache, float x, float y) override;
   bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  void draw(Canvas* canvas) const override;
   std::shared_ptr<Graphic> mergeWith(const tgfx::Matrix& matrix) const override;
 
  private:
@@ -185,10 +185,10 @@ void LayerGraphic::prepare(RenderCache* cache) const {
   }
 }
 
-void LayerGraphic::draw(tgfx::Canvas* canvas, RenderCache* cache) const {
+void LayerGraphic::draw(Canvas* canvas) const {
   for (auto& content : contents) {
     canvas->save();
-    content->draw(canvas, cache);
+    content->draw(canvas);
     canvas->restore();
   }
 }
@@ -220,7 +220,7 @@ class ModifierGraphic : public ComposeGraphic {
   bool hitTest(RenderCache* cache, float x, float y) override;
   bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  void draw(Canvas* canvas) const override;
   std::shared_ptr<Graphic> mergeWith(const Modifier* target) const override;
 
  private:
@@ -274,9 +274,9 @@ void ModifierGraphic::prepare(RenderCache* cache) const {
   graphic->prepare(cache);
 }
 
-void ModifierGraphic::draw(tgfx::Canvas* canvas, RenderCache* cache) const {
+void ModifierGraphic::draw(Canvas* canvas) const {
   canvas->save();
-  modifier->applyToGraphic(canvas, cache, graphic);
+  modifier->applyToGraphic(canvas, graphic);
   canvas->restore();
 }
 

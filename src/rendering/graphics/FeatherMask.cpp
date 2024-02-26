@@ -80,9 +80,10 @@ std::shared_ptr<tgfx::Surface> MakeAlphaSurface(tgfx::Context* context, int widt
   return surface;
 }
 
-void FeatherMask::draw(tgfx::Canvas* parentCanvas, RenderCache* cache) const {
-  auto surface = MakeAlphaSurface(cache->getContext(), static_cast<int>(ceilf(bounds.width())),
-                                  static_cast<int>(ceilf(bounds.height())));
+void FeatherMask::draw(Canvas* parentCanvas) const {
+  auto surface =
+      MakeAlphaSurface(parentCanvas->getContext(), static_cast<int>(ceilf(bounds.width())),
+                       static_cast<int>(ceilf(bounds.height())));
   if (surface == nullptr) {
     return;
   }
@@ -113,7 +114,7 @@ void FeatherMask::draw(tgfx::Canvas* parentCanvas, RenderCache* cache) const {
     if (width == 0 || height == 0) {
       continue;
     }
-    auto maskSurface = MakeAlphaSurface(cache->getContext(), width, height);
+    auto maskSurface = MakeAlphaSurface(parentCanvas->getContext(), width, height);
     if (maskSurface == nullptr) {
       return;
     }

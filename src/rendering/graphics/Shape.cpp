@@ -64,7 +64,7 @@ bool Shape::getPath(tgfx::Path* result) const {
 void Shape::prepare(RenderCache*) const {
 }
 
-void Shape::draw(tgfx::Canvas* canvas, RenderCache*) const {
+void Shape::draw(Canvas* canvas) const {
   tgfx::Paint paint;
   paint.setShader(shader);
   canvas->drawPath(path, paint);
