@@ -88,13 +88,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   return self;
 }
 
-- (instancetype)init {
-  if (self = [super init]) {
-    [self initPAG];
-  }
-  return self;
-}
-
 - (void)initPAG {
   pagDecoder = nil;
   self.currentFrameIndex = -1;
