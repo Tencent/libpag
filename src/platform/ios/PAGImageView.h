@@ -111,7 +111,7 @@ PAG_API @interface PAGImageView : UIImageView
  * Asynchronously load a PAG file from the specific path, a block with PAGFile will be called
  * when loading is complete. If loading fails, PAGFile will be set to nil.
  */
-- (void)setPathAsync:(NSString*)filePath completionBlock:(void (^)(PAGFile*))callback;
+- (void)setPathAsync:(NSString*)filePath completionBlock:(void (^)(PAGFile* __nullable))callback;
 
 /**
  * Asynchronously load a PAG file from the specific path with the maxFrameRate limit, a block
@@ -120,7 +120,7 @@ PAG_API @interface PAGImageView : UIImageView
  */
 - (void)setPathAsync:(NSString*)filePath
         maxFrameRate:(float)maxFrameRate
-     completionBlock:(void (^)(PAGFile*))callback;
+     completionBlock:(void (^)(PAGFile* __nullable))callback;
 
 /**
  * If set to true, the PAGImageView loads all image frames into the memory, which will significantly
