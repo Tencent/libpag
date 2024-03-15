@@ -99,15 +99,23 @@
 
 + (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
   if (path == nil) {
-    callback(nil);
+    [self executeOnMainThread:^{
+      callback(nil);
+    }];
     return;
   }
   void (^copyCallback)(PAGFile*) = Block_copy(callback);
   tgfx::Task::Run([callBack = copyCallback, path]() {
     PAGFile* file = [PAGFileImpl Load:path];
-    callBack(file);
-    Block_release(callBack);
+    [self executeOnMainThread:^{
+      callBack(file);
+      Block_release(callBack);
+    }];
   });
+}
+
++ (void)executeOnMainThread:(void(^)(void))block {
+  dispatch_async(dispatch_get_main_queue(), block);
 }
 
 - (uint16_t)tagLevel {
