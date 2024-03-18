@@ -46,11 +46,12 @@ PAG_TEST(PAGFontTest, TestFont) {
   while (currentFrame < totalFrames) {
     //添加0.1帧目的是保证progress不会由于精度问题帧数计算错误，frame应该使用totalFrames作为总体帧数。因为对于file来说总时长为[0,totalFrames],对应于[0,1]，因此归一化时，分母应该为totalFrames
     pagPlayer->setProgress((currentFrame + 0.1) * 1.0 / totalFrames);
-    pagPlayer->flush();
-
-    bool same = Baseline::Compare(pagSurface, "PAGFontTest/TestFont/" + ToString(currentFrame));
-    if (!same) {
-      errorMsg += (std::to_string(currentFrame) + ";");
+    auto changed = pagPlayer->flush();
+    if (changed) {
+      bool same = Baseline::Compare(pagSurface, "PAGFontTest/TestFont/" + ToString(currentFrame));
+      if (!same) {
+        errorMsg += (std::to_string(currentFrame) + ";");
+      }
     }
     currentFrame++;
   }

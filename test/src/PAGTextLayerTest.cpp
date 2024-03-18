@@ -403,17 +403,18 @@ PAG_TEST(PAGTextLayerTest, TrackMatteTextBounds) {
 }
 
 PAG_TEST(PAGTextLayerTest, SmallFontSizeScale) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  auto pagSurface = OffscreenSurface::Make(720, 1080);
   auto pagFile = LoadPAGFile("assets/tougao.pag");
-  TestPAGPlayer->setComposition(pagFile);
-  TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/SmallFontSizeScale"));
+  auto pagPlayer = std::make_unique<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale"));
 
-  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
-  TestPAGPlayer->setSurface(pagSurface);
-  TestPAGPlayer->flush();
+  pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
-  TestPAGPlayer->setSurface(TestPAGSurface);
 }
 
 /**
