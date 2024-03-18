@@ -174,8 +174,8 @@ PAG_TEST(PAGDiskCacheTest, SequenceFile) {
 
   const auto lastTotalDiskSize = diskCache->totalDiskSize;
 
-  PAGDiskCache::SetMaxDiskSize(1800000u);
-  EXPECT_EQ(PAGDiskCache::MaxDiskSize(), 1800000u);
+  PAGDiskCache::SetMaxDiskSize(1500000u);
+  EXPECT_EQ(PAGDiskCache::MaxDiskSize(), 1500000u);
   sequenceFile =
       DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30, pagFile->frameRate());
   pagPlayer->setProgress(0);
