@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Canvas.h"
+#include "rendering/caches/RenderCache.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
@@ -30,8 +31,21 @@ Canvas::Canvas(tgfx::Surface* surface, RenderCache* cache)
   state = std::make_shared<CanvasState>();
 }
 
-Canvas::Canvas(tgfx::Canvas* canvas, pag::RenderCache* cache) : canvas(canvas), cache(cache) {
+Canvas::Canvas(tgfx::Canvas* canvas, RenderCache* cache) : canvas(canvas), cache(cache) {
   state = std::make_shared<CanvasState>();
+}
+
+tgfx::Context* Canvas::getContext() const {
+  return cache->getContext();
+}
+
+tgfx::Surface* Canvas::getSurface() const {
+  return canvas->getSurface();
+}
+
+const tgfx::SurfaceOptions* Canvas::surfaceOptions() const {
+  auto surface = canvas->getSurface();
+  return surface ? surface->options() : nullptr;
 }
 
 void Canvas::save() {

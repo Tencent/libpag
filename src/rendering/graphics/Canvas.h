@@ -34,17 +34,11 @@ class Canvas {
     return cache;
   }
 
-  tgfx::Context* getContext() const {
-    return canvas->getContext();
-  }
+  tgfx::Context* getContext() const;
 
-  tgfx::Surface* getSurface() const {
-    return canvas->getSurface();
-  }
+  tgfx::Surface* getSurface() const;
 
-  const tgfx::SurfaceOptions* surfaceOptions() const {
-    return canvas->surfaceOptions();
-  }
+  const tgfx::SurfaceOptions* surfaceOptions() const;
 
   void save();
 
@@ -106,8 +100,12 @@ class Canvas {
     canvas->clipPath(path);
   }
 
-  void clear(const tgfx::Color& color = tgfx::Color::Transparent()) {
-    canvas->clear(color);
+  void clear() {
+    canvas->clear();
+  }
+
+  void clearRect(const tgfx::Rect& rect, const tgfx::Color& color) {
+    canvas->clearRect(rect, color);
   }
 
   void drawLine(float x0, float y0, float x1, float y1, const tgfx::Paint& paint) {
@@ -137,6 +135,10 @@ class Canvas {
   void drawRoundRect(const tgfx::Rect& rect, float radiusX, float radiusY,
                      const tgfx::Paint& paint) {
     canvas->drawRoundRect(rect, radiusX, radiusY, createPaint(paint));
+  }
+
+  void drawRRect(const tgfx::RRect& rRect, const tgfx::Paint& paint) {
+    canvas->drawRRect(rRect, paint);
   }
 
   /**
