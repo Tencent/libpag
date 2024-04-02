@@ -54,7 +54,8 @@ jint MakeColorInt(JNIEnv*, uint32_t red, uint32_t green, uint32_t blue) {
   return static_cast<int>(color);
 }
 
-jobject MakePAGFontObject(JNIEnv* env, const char* familyName, const char* familyStyle) {
+jobject MakePAGFontObject(JNIEnv* env, const std::string& familyName,
+                          const std::string& familyStyle) {
   static Global<jclass> PAGFontClass = env->FindClass("org/libpag/PAGFont");
   if (PAGFontClass.get() == nullptr) {
     env->ExceptionClear();
@@ -276,7 +277,7 @@ jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker) {
   static Global<jclass> PAGMarker_Class = env->FindClass("org/libpag/PAGMarker");
   static auto PAGMarker_Construct =
       env->GetMethodID(PAGMarker_Class.get(), "<init>", "(JJLjava/lang/String;)V");
-  auto comment = SafeConvertToJString(env, marker->comment.c_str());
+  auto comment = SafeConvertToJString(env, marker->comment);
   auto result = env->NewObject(PAGMarker_Class.get(), PAGMarker_Construct, marker->startTime,
                                marker->duration, comment);
   env->DeleteLocalRef(comment);

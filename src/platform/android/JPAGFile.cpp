@@ -137,7 +137,7 @@ PAG_API jstring Java_org_libpag_PAGFile_path(JNIEnv* env, jobject thiz) {
     return 0;
   }
   auto path = pagFile->path();
-  return SafeConvertToJString(env, path.c_str());
+  return SafeConvertToJString(env, path);
 }
 
 PAG_API jobject Java_org_libpag_PAGFile_getTextData(JNIEnv* env, jobject thiz, jint index) {
