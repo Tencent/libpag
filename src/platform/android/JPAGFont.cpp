@@ -59,7 +59,7 @@ Java_org_libpag_PAGFont_RegisterFont__Ljava_lang_String_2ILjava_lang_String_2Lja
   if (font.fontFamily.empty()) {
     return nullptr;
   }
-  return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
+  return MakePAGFontObject(env, font.fontFamily, font.fontStyle);
 }
 
 PAG_API jobject JNICALL
@@ -77,7 +77,7 @@ Java_org_libpag_PAGFont_RegisterFont__Landroid_content_res_AssetManager_2Ljava_l
   if (font.fontFamily.empty()) {
     return nullptr;
   }
-  return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
+  return MakePAGFontObject(env, font.fontFamily, font.fontStyle);
 }
 
 PAG_API jobject Java_org_libpag_PAGFont_RegisterFontBytes(JNIEnv* env, jclass, jbyteArray bytes,
@@ -91,6 +91,6 @@ PAG_API jobject Java_org_libpag_PAGFont_RegisterFontBytes(JNIEnv* env, jclass, j
   if (font.fontFamily.empty()) {
     return nullptr;
   }
-  return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
+  return MakePAGFontObject(env, font.fontFamily, font.fontStyle);
 }
 }

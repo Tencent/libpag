@@ -53,8 +53,7 @@ PAG_API jobject Java_org_libpag_PAGTextLayer_font(JNIEnv* env, jobject thiz) {
   if (pagLayer == nullptr) {
     return nullptr;
   }
-  return MakePAGFontObject(env, pagLayer->font().fontFamily.c_str(),
-                           pagLayer->font().fontStyle.c_str());
+  return MakePAGFontObject(env, pagLayer->font().fontFamily, pagLayer->font().fontStyle);
 }
 
 PAG_API jint Java_org_libpag_PAGTextLayer_fillColor(JNIEnv* env, jobject thiz) {
@@ -111,9 +110,9 @@ PAG_API jstring Java_org_libpag_PAGTextLayer_text(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     std::string empty = "";
-    return SafeConvertToJString(env, empty.c_str());
+    return SafeConvertToJString(env, empty);
   }
-  return SafeConvertToJString(env, pagLayer->text().c_str());
+  return SafeConvertToJString(env, pagLayer->text());
 }
 
 PAG_API void Java_org_libpag_PAGTextLayer_setFontSize(JNIEnv* env, jobject thiz, jfloat fontSize) {

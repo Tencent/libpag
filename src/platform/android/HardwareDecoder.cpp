@@ -107,12 +107,12 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
     LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
     return false;
   }
-  auto mimeType = SafeConvertToJString(env, format.mimeType.c_str());
+  auto mimeType = SafeConvertToJString(env, format.mimeType);
   auto mediaFormat = env->CallStaticObjectMethod(
       MediaFormatClass.get(), MediaFormat_createVideoFormat, mimeType, format.width, format.height);
   if (format.mimeType == "video/hevc") {
     if (!format.headers.empty()) {
-      char keyString[] = "csd-0";
+      std::string keyString = "csd-0";
       auto key = SafeConvertToJString(env, keyString);
       int dataLength = 0;
       for (auto& header : format.headers) {
@@ -132,13 +132,13 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
     for (auto& header : format.headers) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
-      auto key = SafeConvertToJString(env, keyString);
+      auto key = SafeConvertToJString(env, std::string(keyString, 6));
       auto bytes = env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size());
       env->CallVoidMethod(mediaFormat, MediaFormat_setByteBuffer, key, bytes);
       index++;
     }
   }
-  char frameRateKeyString[] = "frame-rate";
+  std::string frameRateKeyString = "frame-rate";
   auto frameRateKey = SafeConvertToJString(env, frameRateKeyString);
   env->CallVoidMethod(mediaFormat, MediaFormat_setFloat, frameRateKey, format.frameRate);
   auto decoder =
