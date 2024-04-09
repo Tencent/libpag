@@ -144,7 +144,7 @@ std::unique_ptr<ByteData> DecodeStream::readByteData() {
   auto length = readEncodedUint32();
   auto bytes = readBytes(length);
   // must check whether the byte data is valid. otherwise, memcpy() will crash.
-  if (length == 0 || context->hasException()) {
+  if (length == 0 || length > bytes.length() || context->hasException()) {
     return nullptr;
   }
   return ByteData::MakeCopy(bytes.data(), length);
@@ -153,17 +153,14 @@ std::unique_ptr<ByteData> DecodeStream::readByteData() {
 std::string DecodeStream::readUTF8String() {
   if (_position < dataView.size()) {
     auto text = reinterpret_cast<const char*>(dataView.bytes() + _position);
-    auto textLength = strlen(text);
-    if (textLength > dataView.size() - _position) {
-      textLength = dataView.size() - _position;
-      positionChanged(static_cast<off_t>(textLength));
-    } else {
+    auto maxLength = dataView.size() - _position;
+    auto textLength = strnlen(text, maxLength);
+    if (textLength < maxLength) {
       positionChanged(static_cast<off_t>(textLength + 1));
+      return {text, textLength};
     }
-    return {text, textLength};
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
   }
+  PAGThrowError(context, "End of file was encountered.");
   return "";
 }
 

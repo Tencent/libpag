@@ -24,13 +24,12 @@ namespace pag {
  * There is a known bug in env->NewStringUTF which will lead to crash in some devices.
  * So we use this method instead.
  */
-jstring SafeConvertToJString(JNIEnv* env, const char* text) {
+jstring SafeConvertToJString(JNIEnv* env, const std::string& text) {
   static Global<jclass> StringClass = env->FindClass("java/lang/String");
   static jmethodID StringConstructID =
       env->GetMethodID(StringClass.get(), "<init>", "([BLjava/lang/String;)V");
-  int length = strlen(text);
-  auto array = env->NewByteArray(length);
-  env->SetByteArrayRegion(array, 0, length, reinterpret_cast<const jbyte*>(text));
+  auto array = env->NewByteArray(text.size());
+  env->SetByteArrayRegion(array, 0, text.size(), reinterpret_cast<const jbyte*>(text.data()));
   auto stringUTF = env->NewStringUTF("UTF-8");
   auto result = (jstring)env->NewObject(StringClass.get(), StringConstructID, array, stringUTF);
   env->DeleteLocalRef(array);

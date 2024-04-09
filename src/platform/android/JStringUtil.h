@@ -23,7 +23,7 @@
 #include "JNIHelper.h"
 
 namespace pag {
-jstring SafeConvertToJString(JNIEnv* env, const char* text);
+jstring SafeConvertToJString(JNIEnv* env, const std::string& text);
 
 std::string SafeConvertToStdString(JNIEnv* env, jstring jText);
 }  // namespace pag
