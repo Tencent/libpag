@@ -144,7 +144,7 @@ std::unique_ptr<ByteData> DecodeStream::readByteData() {
   auto length = readEncodedUint32();
   auto bytes = readBytes(length);
   // must check whether the byte data is valid. otherwise, memcpy() will crash.
-  if (length == 0 || !checkEndOfFile(length) || context->hasException()) {
+  if (length == 0 || length > bytes.length() || context->hasException()) {
     return nullptr;
   }
   return ByteData::MakeCopy(bytes.data(), length);
