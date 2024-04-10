@@ -60,7 +60,7 @@ class EncodeStream final {
    * The length of the EncodeStream object.
    */
   uint32_t length() const {
-    return _length;
+    return static_cast<uint32_t>(_length);
   }
 
   /**
@@ -68,7 +68,7 @@ class EncodeStream final {
    * is the point at which the next call to a write method starts writing.
    */
   uint32_t position() const {
-    return static_cast<size_t>(_position);
+    return static_cast<uint32_t>(_position);
   }
 
   void setPosition(uint32_t value);
