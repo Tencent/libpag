@@ -127,7 +127,7 @@ void EncodeStream::writeBytes(EncodeStream* stream, uint32_t length, uint32_t of
     return;
   }
   if (length == 0) {
-    length = stream->_length - offset;
+    length = static_cast<uint32_t>(stream->_length) - offset;
   }
   writeBytes(stream->bytes, length, offset);
 }
@@ -307,17 +307,17 @@ void EncodeStream::writePoint3DList(const Point3D* points, uint32_t count, float
   delete[] list;
 }
 
-bool EncodeStream::checkCapacity(uint32_t bytesToWrite) {
+bool EncodeStream::checkCapacity(size_t bytesToWrite) {
   if (_position + bytesToWrite > capacity) {
     return expandCapacity(_position + bytesToWrite);
   }
   return true;
 }
 
-bool EncodeStream::expandCapacity(uint32_t length) {
-  uint32_t newCapacity = capacity == 0 ? 128 : capacity;
+bool EncodeStream::expandCapacity(size_t length) {
+  size_t newCapacity = capacity == 0 ? 128 : capacity;
   while (newCapacity < length) {
-    newCapacity = static_cast<uint32_t>(newCapacity * 1.5);
+    newCapacity = newCapacity / 2 * 3;
   }
   auto newBytes = new (std::nothrow) uint8_t[newCapacity];
   if (newBytes == nullptr) {

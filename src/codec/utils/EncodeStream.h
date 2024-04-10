@@ -235,8 +235,8 @@ class EncodeStream final {
   size_t _position = 0;
   size_t _bitPosition = 0;
 
-  bool checkCapacity(uint32_t bytesToWrite);
-  bool expandCapacity(uint32_t length);
+  bool checkCapacity(size_t bytesToWrite);
+  bool expandCapacity(size_t length);
   void bitPositionChanged(size_t offset);
   void positionChanged(size_t offset);
 };
