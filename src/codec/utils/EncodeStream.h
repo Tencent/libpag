@@ -60,7 +60,7 @@ class EncodeStream final {
    * The length of the EncodeStream object.
    */
   uint32_t length() const {
-    return _length;
+    return static_cast<uint32_t>(_length);
   }
 
   /**
@@ -68,13 +68,13 @@ class EncodeStream final {
    * is the point at which the next call to a write method starts writing.
    */
   uint32_t position() const {
-    return _position;
+    return static_cast<uint32_t>(_position);
   }
 
   void setPosition(uint32_t value);
 
   void alignWithBytes() {
-    _bitPosition = static_cast<uint64_t>(_position) * 8;
+    _bitPosition = _position * 8;
   }
 
   /**
@@ -230,14 +230,14 @@ class EncodeStream final {
  private:
   tgfx::DataView dataView = {};
   uint8_t* bytes = nullptr;
-  uint32_t capacity = 0;
-  uint32_t _length = 0;
-  uint32_t _position = 0;
-  uint64_t _bitPosition = 0;
+  size_t capacity = 0;
+  size_t _length = 0;
+  size_t _position = 0;
+  size_t _bitPosition = 0;
 
-  bool checkCapacity(uint32_t bytesToWrite);
-  bool expandCapacity(uint32_t length);
-  void bitPositionChanged(off_t offset);
-  void positionChanged(off_t offset);
+  bool checkCapacity(size_t bytesToWrite);
+  bool expandCapacity(size_t length);
+  void bitPositionChanged(size_t offset);
+  void positionChanged(size_t offset);
 };
 }  // namespace pag

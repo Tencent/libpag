@@ -127,7 +127,7 @@ void EncodeStream::writeBytes(EncodeStream* stream, uint32_t length, uint32_t of
     return;
   }
   if (length == 0) {
-    length = stream->_length - offset;
+    length = static_cast<uint32_t>(stream->_length) - offset;
   }
   writeBytes(stream->bytes, length, offset);
 }
@@ -149,10 +149,10 @@ void EncodeStream::writeByteData(const pag::ByteData* byteData) {
 }
 
 void EncodeStream::writeUTF8String(const std::string& text) {
-  auto textLength = static_cast<uint32_t>(text.size());
+  auto textLength = text.size();
   if (checkCapacity(textLength + 1)) {
     memcpy(bytes + _position, text.c_str(), textLength + 1);
-    positionChanged(static_cast<off_t>(textLength) + 1);
+    positionChanged(textLength + 1);
   }
 }
 
@@ -307,17 +307,17 @@ void EncodeStream::writePoint3DList(const Point3D* points, uint32_t count, float
   delete[] list;
 }
 
-bool EncodeStream::checkCapacity(uint32_t bytesToWrite) {
+bool EncodeStream::checkCapacity(size_t bytesToWrite) {
   if (_position + bytesToWrite > capacity) {
     return expandCapacity(_position + bytesToWrite);
   }
   return true;
 }
 
-bool EncodeStream::expandCapacity(uint32_t length) {
-  uint32_t newCapacity = capacity == 0 ? 128 : capacity;
+bool EncodeStream::expandCapacity(size_t length) {
+  size_t newCapacity = capacity == 0 ? 128 : capacity;
   while (newCapacity < length) {
-    newCapacity = static_cast<uint32_t>(newCapacity * 1.5);
+    newCapacity = newCapacity / 2 * 3;
   }
   auto newBytes = new (std::nothrow) uint8_t[newCapacity];
   if (newBytes == nullptr) {
@@ -334,7 +334,7 @@ bool EncodeStream::expandCapacity(uint32_t length) {
   return true;
 }
 
-void EncodeStream::bitPositionChanged(off_t offset) {
+void EncodeStream::bitPositionChanged(size_t offset) {
   _bitPosition += offset;
   _position = BitsToBytes(_bitPosition);
   if (_position > _length) {
@@ -342,9 +342,9 @@ void EncodeStream::bitPositionChanged(off_t offset) {
   }
 }
 
-void EncodeStream::positionChanged(off_t offset) {
+void EncodeStream::positionChanged(size_t offset) {
   _position += offset;
-  _bitPosition = static_cast<uint64_t>(_position) * 8;
+  _bitPosition = _position * 8;
   if (_position > _length) {
     _length = _position;
   }
