@@ -60,7 +60,7 @@ class DecodeStream final {
    * the end of the stream.
    */
   uint32_t bytesAvailable() const {
-    return static_cast<uint32_t>(dataView.size()) - _position;
+    return static_cast<uint32_t>(dataView.size() - _position);
   }
 
   const uint8_t* data() const {
@@ -79,7 +79,7 @@ class DecodeStream final {
    * is the point at which the next call to a read method starts reading.
    */
   uint32_t position() const {
-    return _position;
+    return static_cast<uint32_t>(_position);
   }
 
   void setPosition(uint32_t value);
@@ -237,9 +237,9 @@ class DecodeStream final {
   size_t _position = 0;
   size_t _bitPosition = 0;
 
-  void bitPositionChanged(off_t offset);
+  void bitPositionChanged(size_t offset);
 
-  void positionChanged(off_t offset);
+  void positionChanged(size_t offset);
 
   bool checkEndOfFile(uint32_t bytesToRead);
 };

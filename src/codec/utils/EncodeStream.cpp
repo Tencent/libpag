@@ -149,10 +149,10 @@ void EncodeStream::writeByteData(const pag::ByteData* byteData) {
 }
 
 void EncodeStream::writeUTF8String(const std::string& text) {
-  auto textLength = static_cast<uint32_t>(text.size());
+  auto textLength = text.size();
   if (checkCapacity(textLength + 1)) {
     memcpy(bytes + _position, text.c_str(), textLength + 1);
-    positionChanged(static_cast<off_t>(textLength) + 1);
+    positionChanged(textLength + 1);
   }
 }
 
@@ -334,7 +334,7 @@ bool EncodeStream::expandCapacity(uint32_t length) {
   return true;
 }
 
-void EncodeStream::bitPositionChanged(off_t offset) {
+void EncodeStream::bitPositionChanged(size_t offset) {
   _bitPosition += offset;
   _position = BitsToBytes(_bitPosition);
   if (_position > _length) {
@@ -342,9 +342,9 @@ void EncodeStream::bitPositionChanged(off_t offset) {
   }
 }
 
-void EncodeStream::positionChanged(off_t offset) {
+void EncodeStream::positionChanged(size_t offset) {
   _position += offset;
-  _bitPosition = static_cast<uint64_t>(_position) * 8;
+  _bitPosition = _position * 8;
   if (_position > _length) {
     _length = _position;
   }

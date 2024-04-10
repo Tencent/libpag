@@ -41,8 +41,8 @@ class StreamContext {
   std::vector<std::string> errorMessages;
 };
 
-inline uint32_t BitsToBytes(uint64_t capacity) {
-  return static_cast<uint32_t>(ceil(capacity * 0.125));
+inline size_t BitsToBytes(size_t capacity) {
+  return static_cast<size_t>(ceil(capacity * 0.125));
 }
 
 #ifdef DEBUG

@@ -68,13 +68,13 @@ class EncodeStream final {
    * is the point at which the next call to a write method starts writing.
    */
   uint32_t position() const {
-    return _position;
+    return static_cast<size_t>(_position);
   }
 
   void setPosition(uint32_t value);
 
   void alignWithBytes() {
-    _bitPosition = static_cast<uint64_t>(_position) * 8;
+    _bitPosition = _position * 8;
   }
 
   /**
@@ -237,7 +237,7 @@ class EncodeStream final {
 
   bool checkCapacity(uint32_t bytesToWrite);
   bool expandCapacity(uint32_t length);
-  void bitPositionChanged(off_t offset);
-  void positionChanged(off_t offset);
+  void bitPositionChanged(size_t offset);
+  void positionChanged(size_t offset);
 };
 }  // namespace pag
