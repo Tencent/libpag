@@ -230,10 +230,10 @@ class EncodeStream final {
  private:
   tgfx::DataView dataView = {};
   uint8_t* bytes = nullptr;
-  uint32_t capacity = 0;
-  uint32_t _length = 0;
-  uint32_t _position = 0;
-  uint64_t _bitPosition = 0;
+  size_t capacity = 0;
+  size_t _length = 0;
+  size_t _position = 0;
+  size_t _bitPosition = 0;
 
   bool checkCapacity(uint32_t bytesToWrite);
   bool expandCapacity(uint32_t length);

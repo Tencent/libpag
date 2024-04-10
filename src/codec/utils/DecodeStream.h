@@ -234,8 +234,8 @@ class DecodeStream final {
 
  private:
   tgfx::DataView dataView = {};
-  uint32_t _position = 0;
-  uint64_t _bitPosition = 0;
+  size_t _position = 0;
+  size_t _bitPosition = 0;
 
   void bitPositionChanged(off_t offset);
 

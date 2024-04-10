@@ -299,6 +299,7 @@ void DecodeStream::positionChanged(off_t offset) {
 }
 
 bool DecodeStream::checkEndOfFile(uint32_t bytesToRead) {
+  // The _position must not use the uint32_t type, otherwise it will overflow.
   if (_position + bytesToRead > dataView.size()) {
     PAGThrowError(context, "End of file was encountered.");
     return true;
