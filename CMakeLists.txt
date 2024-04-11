@@ -154,7 +154,6 @@ endif (MSVC)
 # Sets flags
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     list(APPEND PAG_DEFINES DEBUG)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
 endif ()
 
 if (PAG_BUILD_SHARED)
@@ -495,6 +494,8 @@ if (PAG_BUILD_FRAMEWORK)
 endif ()
 
 if (PAG_BUILD_TESTS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined -fno-omit-frame-pointer")
+
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
     file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/HEAD "${HEAD_COMMIT}")
     if (NOT PAG_SKIP_BASELINE_CHECK)
