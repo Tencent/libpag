@@ -495,6 +495,7 @@ if (PAG_BUILD_FRAMEWORK)
 endif ()
 
 if (PAG_BUILD_TESTS)
+
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
     file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/HEAD "${HEAD_COMMIT}")
     if (NOT PAG_SKIP_BASELINE_CHECK)

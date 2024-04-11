@@ -30,8 +30,12 @@ class StreamContext {
  public:
   virtual ~StreamContext() = default;
 
-  void throwException(const std::string& message) {
+  bool throwException(const std::string& message) {
+    if (!errorMessages.empty() && errorMessages.back() == message) {
+      return false;
+    }
     errorMessages.push_back(message);
+    return true;
   }
 
   bool hasException() {
@@ -47,10 +51,11 @@ inline size_t BitsToBytes(size_t capacity) {
 
 #ifdef DEBUG
 
-#define PAGThrowError(context, message)                                        \
-  do {                                                                         \
-    (context)->throwException(message);                                        \
-    LOGE("PAG Decoding Failed: \"%s\" at %s:%d", message, __FILE__, __LINE__); \
+#define PAGThrowError(context, message)                                          \
+  do {                                                                           \
+    if ((context)->throwException(message)) {                                    \
+      LOGE("PAG Decoding Failed: \"%s\" at %s:%d", message, __FILE__, __LINE__); \
+    }                                                                            \
   } while (false)
 
 #else
