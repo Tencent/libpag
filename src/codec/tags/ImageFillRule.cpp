@@ -41,15 +41,15 @@ void ReadImageFillRule(pag::DecodeStream* stream, pag::ImageLayer* layer, TagCod
   layer->imageFillRule = new ImageFillRule();
 
   if (code == TagCode::ImageFillRule) {
-    ReadTagBlock(stream, layer->imageFillRule, ImageFillRuleTagV1);
-
-    // The interpolation type should be linear in v1 tag, but we store it as hold, so we need to fix
-    // it here.
-    auto timeRemap = layer->imageFillRule->timeRemap;
-    if (timeRemap != nullptr && timeRemap->animatable()) {
-      auto AnimatableTimeRemap = static_cast<AnimatableProperty<Frame>*>(timeRemap);
-      for (auto& keyFrame : AnimatableTimeRemap->keyframes) {
-        keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
+    if (ReadTagBlock(stream, layer->imageFillRule, ImageFillRuleTagV1)) {
+      // The interpolation type should be linear in v1 tag, but we store it as hold, so we need to fix
+      // it here.
+      auto timeRemap = layer->imageFillRule->timeRemap;
+      if (timeRemap != nullptr && timeRemap->animatable()) {
+        auto AnimatableTimeRemap = static_cast<AnimatableProperty<Frame>*>(timeRemap);
+        for (auto& keyFrame : AnimatableTimeRemap->keyframes) {
+          keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
+        }
       }
     }
   } else {

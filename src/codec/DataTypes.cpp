@@ -273,22 +273,25 @@ static std::unique_ptr<BlockConfig> TextDocumentBlockV3(TextDocument* textDocume
   return TextDocumentBlockCore(textDocument, TagCode::TextSourceV3);
 }
 
+TextDocumentHandle ReadTextDocument(DecodeStream* stream,
+                                    std::unique_ptr<BlockConfig> (*ConfigMaker)(TextDocument*)) {
+  auto value = std::make_shared<TextDocument>();
+  if (!ReadBlock(stream, value.get(), ConfigMaker)) {
+    return nullptr;
+  };
+  return value;
+}
+
 TextDocumentHandle ReadTextDocument(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlock);
-  return TextDocumentHandle(value);
+  return ReadTextDocument(stream, TextDocumentBlock);
 }
 
 TextDocumentHandle ReadTextDocumentV2(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlockV2);
-  return TextDocumentHandle(value);
+  return ReadTextDocument(stream, TextDocumentBlockV2);
 }
 
 TextDocumentHandle ReadTextDocumentV3(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlockV3);
-  return TextDocumentHandle(value);
+  return ReadTextDocument(stream, TextDocumentBlockV3);
 }
 
 GradientColorHandle ReadGradientColor(DecodeStream* stream) {

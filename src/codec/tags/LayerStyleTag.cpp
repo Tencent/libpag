@@ -29,9 +29,11 @@ bool ReadLayerStyles(DecodeStream* stream, TagCode code, Layer* layer) {
   switch (code) {
     case TagCode::DropShadowStyle: {
       auto dropShadowStyle = ReadTagBlock(stream, DropShadowStyleTag);
-      dropShadowStyle->spread = new Property<Percent>();
-      dropShadowStyle->spread->value = 0.0f;  // set default value
-      style = dropShadowStyle;
+      if (dropShadowStyle) {
+        dropShadowStyle->spread = new Property<Percent>();
+        dropShadowStyle->spread->value = 0.0f;  // set default value
+        style = dropShadowStyle;
+      }
     } break;
     case TagCode::DropShadowStyleV2:
       style = ReadTagBlock(stream, DropShadowStyleTagV2);
