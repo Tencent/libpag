@@ -291,8 +291,8 @@ void ReadAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target
 }
 
 template <class T>
-T* ReadTagBlock(DecodeStream* stream, T* parameter,
-                std::unique_ptr<BlockConfig> (*ConfigMaker)(T*)) {
+bool ReadTagBlock(DecodeStream* stream, T* parameter,
+                  std::unique_ptr<BlockConfig> (*ConfigMaker)(T*)) {
   auto tagConfig = ConfigMaker(parameter);
 
   std::vector<AttributeFlag> flags;
@@ -308,21 +308,23 @@ T* ReadTagBlock(DecodeStream* stream, T* parameter,
     config->readAttribute(stream, flag, target);
     index++;
   }
-
-  return parameter;
+  return !stream->context->hasException();
 }
 
 template <class T>
 T* ReadTagBlock(DecodeStream* stream, std::unique_ptr<BlockConfig> (*ConfigMaker)(T*)) {
-  auto parameter = new T();
-  return ReadTagBlock(stream, parameter, ConfigMaker);
+  auto parameter = std::make_unique<T>();
+  if (!ReadTagBlock(stream, parameter.get(), ConfigMaker)) {
+    return nullptr;
+  }
+  return parameter.release();
 }
 
 template <class T>
-void ReadBlock(DecodeStream* stream, T* parameter,
+bool ReadBlock(DecodeStream* stream, T* parameter,
                std::unique_ptr<BlockConfig> (*ConfigMaker)(T*)) {
   stream->alignWithBytes();
-  ReadTagBlock(stream, parameter, ConfigMaker);
+  return ReadTagBlock(stream, parameter, ConfigMaker);
 }
 
 void WriteAttributeFlag(EncodeStream* stream, const AttributeFlag& flag,

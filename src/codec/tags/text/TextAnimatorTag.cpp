@@ -93,15 +93,17 @@ static void CheckColorProperties(TextAnimator* animator) {
 }
 
 static void ReadTag_TextRangeSelector(DecodeStream* stream, TextAnimator* animator) {
-  auto selector = new TextRangeSelector();
-  ReadTagBlock(stream, selector, TextRangeSelectorTag);
-  animator->selectors.push_back(selector);
+  auto selector = ReadTagBlock(stream, TextRangeSelectorTag);
+  if (selector) {
+    animator->selectors.push_back(selector);
+  }
 }
 
 static void ReadTag_TextWigglySelector(DecodeStream* stream, TextAnimator* animator) {
-  auto selector = new TextWigglySelector();
-  ReadTagBlock(stream, selector, TextWigglySelectorTag);
-  animator->selectors.push_back(selector);
+  auto selector = ReadTagBlock(stream, TextWigglySelectorTag);
+  if (selector) {
+    animator->selectors.push_back(selector);
+  }
 }
 
 static void ReadTag_TextAnimatorPropertiesTrackingType(DecodeStream* stream,

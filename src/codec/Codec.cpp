@@ -210,6 +210,9 @@ std::shared_ptr<File> Codec::Decode(const void* bytes, uint32_t byteLength,
     return nullptr;
   }
   ReadTags(&bodyBytes, &context, ReadTagsOfFile);
+  if (context.hasException()) {
+    return nullptr;
+  }
   InstallReferences(context.compositions);
   if (context.hasException()) {
     return nullptr;
