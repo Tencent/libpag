@@ -126,8 +126,9 @@ void Codec::InstallReferences(const std::vector<Composition*>& compositions) {
     if (item->type() == CompositionType::Vector) {
       for (auto layer : static_cast<VectorComposition*>(item)->layers) {
         layer->containingComposition = static_cast<VectorComposition*>(item);
-        auto preComposeLayer = static_cast<PreComposeLayer*>(layer);
-        if (layer->type() == LayerType::PreCompose && preComposeLayer->composition) {
+        if (layer->type() == LayerType::PreCompose &&
+            static_cast<PreComposeLayer*>(layer)->composition) {
+          auto preComposeLayer = static_cast<PreComposeLayer*>(layer);
           auto id = preComposeLayer->composition->id;
           delete preComposeLayer->composition;
           preComposeLayer->composition = nullptr;
