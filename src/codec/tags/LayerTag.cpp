@@ -44,27 +44,28 @@ namespace pag {
     expression;                          \
   }
 
+static void CheckLayerDuration(Layer* layer) {
+  if (layer->duration <= 0) {
+    // The duration cannot be zero, fix it when the value is parsed from an old file format.
+    layer->duration = 1;
+  }
+}
+
 void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
   switch (code) {
     case TagCode::LayerAttributes:
-      ReadTagBlock(stream, layer, LayerAttributesTag);
-      if (layer->duration <= 0) {
-        layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
-                              // an old file format.
+      if (ReadTagBlock(stream, layer, LayerAttributesTag)) {
+        CheckLayerDuration(layer);
       }
       break;
     case TagCode::LayerAttributesV2:
-      ReadTagBlock(stream, layer, LayerAttributesTagV2);
-      if (layer->duration <= 0) {
-        layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
-                              // an old file format.
+      if (ReadTagBlock(stream, layer, LayerAttributesTagV2)) {
+        CheckLayerDuration(layer);
       }
       break;
     case TagCode::LayerAttributesV3:
-      ReadTagBlock(stream, layer, LayerAttributesTagV3);
-      if (layer->duration <= 0) {
-        layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
-                              // an old file format.
+      if (ReadTagBlock(stream, layer, LayerAttributesTagV3)) {
+        CheckLayerDuration(layer);
       }
       break;
     case TagCode::LayerAttributesExtra:
@@ -72,11 +73,15 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       break;
     case TagCode::MaskBlock: {
       auto mask = ReadTagBlock(stream, MaskTag);
-      layer->masks.push_back(mask);
+      if (mask) {
+        layer->masks.push_back(mask);
+      }
     } break;
     case TagCode::MaskBlockV2: {
       auto mask = ReadTagBlock(stream, MaskTagV2);
-      layer->masks.push_back(mask);
+      if (mask) {
+        layer->masks.push_back(mask);
+      }
     } break;
     case TagCode::MarkerList: {
       ReadMarkerList(stream, &layer->markers);
@@ -84,45 +89,48 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
     case TagCode::Transform2D: {
       layer->transform = new Transform2D();
       auto transform = layer->transform;
-      ReadTagBlock(stream, transform, Transform2DTag);
-      auto hasPosition = (transform->position->animatable() ||
-                          transform->position->getValueAt(0) != Point::Zero());
-      auto hasXPosition =
-          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
-      auto hasYPosition =
-          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
-      if (hasPosition || (!hasXPosition && !hasYPosition)) {
-        delete transform->xPosition;
-        transform->xPosition = nullptr;
-        delete transform->yPosition;
-        transform->yPosition = nullptr;
-      } else {
-        delete transform->position;
-        transform->position = nullptr;
+      if (ReadTagBlock(stream, transform, Transform2DTag)) {
+
+        auto hasPosition = (transform->position->animatable() ||
+                            transform->position->getValueAt(0) != Point::Zero());
+        auto hasXPosition =
+            (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+        auto hasYPosition =
+            (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+        if (hasPosition || (!hasXPosition && !hasYPosition)) {
+          delete transform->xPosition;
+          transform->xPosition = nullptr;
+          delete transform->yPosition;
+          transform->yPosition = nullptr;
+        } else {
+          delete transform->position;
+          transform->position = nullptr;
+        }
       }
     } break;
     case TagCode::Transform3D: {
       layer->transform3D = new Transform3D();
       auto transform = layer->transform3D;
-      ReadTagBlock(stream, transform, Transform3DTag);
-      auto hasPosition = (transform->position->animatable() ||
-                          transform->position->getValueAt(0) != Point3D::Zero());
-      auto hasXPosition =
-          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
-      auto hasYPosition =
-          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
-      auto hasZPosition =
-          (transform->zPosition->animatable() || transform->zPosition->getValueAt(0) != 0);
-      if (hasPosition || (!hasXPosition && !hasYPosition && !hasZPosition)) {
-        delete transform->xPosition;
-        transform->xPosition = nullptr;
-        delete transform->yPosition;
-        transform->yPosition = nullptr;
-        delete transform->zPosition;
-        transform->zPosition = nullptr;
-      } else {
-        delete transform->position;
-        transform->position = nullptr;
+      if (ReadTagBlock(stream, transform, Transform3DTag)) {
+        auto hasPosition = (transform->position->animatable() ||
+                            transform->position->getValueAt(0) != Point3D::Zero());
+        auto hasXPosition =
+            (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+        auto hasYPosition =
+            (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+        auto hasZPosition =
+            (transform->zPosition->animatable() || transform->zPosition->getValueAt(0) != 0);
+        if (hasPosition || (!hasXPosition && !hasYPosition && !hasZPosition)) {
+          delete transform->xPosition;
+          transform->xPosition = nullptr;
+          delete transform->yPosition;
+          transform->yPosition = nullptr;
+          delete transform->zPosition;
+          transform->zPosition = nullptr;
+        } else {
+          delete transform->position;
+          transform->position = nullptr;
+        }
       }
     } break;
     case TagCode::CachePolicy:
