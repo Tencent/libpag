@@ -463,7 +463,6 @@ public class PAGImageView extends View {
 
     private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
         freezeDraw.set(true);
-        decoderInfo.reset();
         _maxFrameRate = maxFrameRate;
         _matrix = null;
         releaseBitmap();
@@ -581,7 +580,6 @@ public class PAGImageView extends View {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         freezeDraw.set(true);
-        decoderInfo.reset();
         viewWidth = w;
         viewHeight = h;
         width = (int) (_renderScale * w);
@@ -668,6 +666,7 @@ public class PAGImageView extends View {
 
     private void releaseBitmap() {
         synchronized (bitmapLock) {
+            decoderInfo.reset();
             renderBitmap = null;
         }
     }
