@@ -48,6 +48,11 @@ uint16_t Codec::MaxSupportedTagLevel() {
   return static_cast<uint16_t>(TagCode::Count) - 1;
 }
 
+template <typename T>
+ID GetReferenceID(T* item) {
+  return item ? item->id : 0;
+}
+
 void Codec::InstallReferences(Layer* layer) {
   std::unordered_map<ID, MaskData*> maskMap;
   for (auto mask : layer->masks) {
@@ -56,7 +61,7 @@ void Codec::InstallReferences(Layer* layer) {
   for (auto effect : layer->effects) {
     if (!effect->maskReferences.empty()) {
       for (auto i = static_cast<int>(effect->maskReferences.size() - 1); i >= 0; i--) {
-        auto id = effect->maskReferences[i]->id;
+        auto id = GetReferenceID(effect->maskReferences[i]);
         delete effect->maskReferences[i];
         auto result = maskMap.find(id);
         if (result != maskMap.end()) {
@@ -70,7 +75,7 @@ void Codec::InstallReferences(Layer* layer) {
   if (layer->type() == LayerType::Text) {
     auto pathOption = static_cast<TextLayer*>(layer)->pathOption;
     if (pathOption && pathOption->path) {
-      auto id = pathOption->path->id;
+      auto id = GetReferenceID(pathOption->path);
       delete pathOption->path;
       pathOption->path = nullptr;
       auto result = maskMap.find(id);
@@ -90,7 +95,7 @@ void Codec::InstallReferences(const std::vector<Layer*>& layers) {
   int index = 0;
   for (auto layer : layers) {
     if (layer->parent) {
-      auto id = layer->parent->id;
+      auto id = GetReferenceID(layer->parent);
       delete layer->parent;
       layer->parent = nullptr;
       auto result = layerMap.find(id);
@@ -104,7 +109,7 @@ void Codec::InstallReferences(const std::vector<Layer*>& layers) {
     for (auto effect : layer->effects) {
       auto displacementMap = static_cast<DisplacementMapEffect*>(effect);
       if (effect->type() == EffectType::DisplacementMap && displacementMap->displacementMapLayer) {
-        auto id = displacementMap->displacementMapLayer->id;
+        auto id = GetReferenceID(displacementMap->displacementMapLayer);
         delete displacementMap->displacementMapLayer;
         displacementMap->displacementMapLayer = nullptr;
         auto result = layerMap.find(id);
@@ -129,7 +134,7 @@ void Codec::InstallReferences(const std::vector<Composition*>& compositions) {
         if (layer->type() == LayerType::PreCompose &&
             static_cast<PreComposeLayer*>(layer)->composition) {
           auto preComposeLayer = static_cast<PreComposeLayer*>(layer);
-          auto id = preComposeLayer->composition->id;
+          auto id = GetReferenceID(preComposeLayer->composition);
           delete preComposeLayer->composition;
           preComposeLayer->composition = nullptr;
           auto result = compositionMap.find(id);
