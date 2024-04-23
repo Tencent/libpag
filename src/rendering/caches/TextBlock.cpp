@@ -59,7 +59,7 @@ TextBlock::TextBlock(ID assetID, std::vector<std::vector<GlyphHandle>> lines, fl
   for (const auto& line : this->lines()) {
     for (const auto& tempGlyph : line) {
       auto glyph = tempGlyph->makeHorizontalGlyph();
-      auto hasColor = glyph->getFont().getTypeface()->hasColor();
+      auto hasColor = glyph->getFont().hasColor();
       auto style = glyph->getStyle();
       if (hasColor && (style == TextStyle::Stroke || style == TextStyle::StrokeAndFill)) {
         glyph->setStrokeWidth(0);

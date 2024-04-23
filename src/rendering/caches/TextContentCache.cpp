@@ -137,8 +137,7 @@ std::pair<std::vector<GlyphHandle>, std::vector<GlyphHandle>> GetGlyphs(
   for (auto& line : glyphLines) {
     for (auto& glyph : line) {
       simpleGlyphs.push_back(glyph);
-      auto typeface = glyph->getFont().getTypeface();
-      if (typeface->hasColor()) {
+      if (glyph->getFont().hasColor()) {
         colorGlyphs.push_back(glyph);
       }
     }

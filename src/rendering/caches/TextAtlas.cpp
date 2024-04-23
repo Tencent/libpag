@@ -145,7 +145,8 @@ static AtlasTextRun CreateTextRun(const GlyphHandle& glyph) {
 static void ComputeStyleKey(tgfx::BytesKey* styleKey, const GlyphHandle& glyph) {
   styleKey->write(static_cast<uint32_t>(glyph->getStyle()));
   styleKey->write(glyph->getStrokeWidth());
-  styleKey->write(glyph->getFont().getTypeface()->uniqueID());
+  auto typeface = glyph->getFont().getTypeface();
+  styleKey->write(typeface ? typeface->uniqueID() : 0);
 }
 
 struct Page {
