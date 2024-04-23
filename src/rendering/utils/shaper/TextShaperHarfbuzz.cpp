@@ -45,7 +45,10 @@ hb_blob_t* HBGetTable(hb_face_t*, hb_tag_t tag, void* userData) {
                         [](void* ctx) { delete reinterpret_cast<PtrWrapper<tgfx::Data>*>(ctx); });
 }
 
-std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typeface>& typeface) {
+std::shared_ptr<hb_face_t> CreateHBFace(std::shared_ptr<tgfx::Typeface> typeface) {
+  if (typeface == nullptr) {
+    return nullptr;
+  }
   std::shared_ptr<hb_face_t> hbFace;
   auto data = typeface->getBytes();
   if (data && !data->empty()) {
@@ -142,7 +145,10 @@ static HBLockedFontCache GetHBFontCache() {
   return {HBFontLRU, HBFontCache, HBFontCacheMutex};
 }
 
-static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typeface>& typeface) {
+static std::shared_ptr<hb_font_t> CreateHBFont(std::shared_ptr<tgfx::Typeface> typeface) {
+  if (typeface == nullptr) {
+    return nullptr;
+  }
   auto cache = GetHBFontCache();
   auto hbFont = cache.find(typeface->uniqueID());
   if (hbFont == nullptr) {
@@ -157,7 +163,7 @@ static std::shared_ptr<hb_font_t> CreateHBFont(const std::shared_ptr<tgfx::Typef
 }
 
 static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) {
+    const std::string& text, std::shared_ptr<tgfx::Typeface> typeface) {
   auto hbFont = CreateHBFont(typeface);
   if (hbFont == nullptr) {
     return {};

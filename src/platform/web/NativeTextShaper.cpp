@@ -116,7 +116,7 @@ PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
       continue;
     }
     auto str = text.substr(infos[i].cluster, length);
-    auto glyphID = typeface->getGlyphID(str);
+    auto glyphID = typeface ? typeface->getGlyphID(str) : 0;
     if (glyphID == 0) {
       for (const auto& faceHolder : fallbackTypefaces) {
         auto face = faceHolder->getTypeface();

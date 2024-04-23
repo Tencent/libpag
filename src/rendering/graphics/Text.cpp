@@ -328,7 +328,7 @@ void Text::draw(Canvas* canvas, const TextAtlas* textAtlas) const {
       }
       parameters.matrices.emplace_back(matrix);
       parameters.rects.emplace_back(locator.location);
-      if (glyph->getFont().getTypeface()->hasColor()) {
+      if (glyph->getFont().hasColor()) {
         auto alpha = canvas->getAlpha();
         canvas->setAlpha(alpha * glyph->getAlpha());
         Draw(canvas, textAtlas, parameters);

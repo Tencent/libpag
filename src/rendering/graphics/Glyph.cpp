@@ -112,7 +112,8 @@ void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
                             static_cast<uint8_t>(textStyle)};
   styleKey->write(strokeValues);
   styleKey->write(strokeWidth);
-  styleKey->write(getFont().getTypeface()->uniqueID());
+  auto typeface = getFont().getTypeface();
+  styleKey->write(typeface ? typeface->uniqueID() : 0);
 }
 
 bool Glyph::isVisible() const {
@@ -129,7 +130,7 @@ tgfx::Matrix Glyph::getTotalMatrix() const {
 }
 
 void Glyph::computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const {
-  bytesKey->write(static_cast<uint32_t>(getFont().getTypeface()->hasColor()));
+  bytesKey->write(static_cast<uint32_t>(getFont().hasColor()));
   bytesKey->write(static_cast<uint32_t>(getGlyphID()));
   bytesKey->write(static_cast<uint32_t>(style));
 }
