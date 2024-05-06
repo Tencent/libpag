@@ -314,26 +314,27 @@ class AnimatableProperty : public Property<T> {
 
   T getValueAt(Frame frame) override {
     T result;
-    Keyframe<T>* lastKeyframe = keyframes[lastKeyframeIndex];
+    size_t lastKeyframeIndexInternal = lastKeyframeIndex;
+    Keyframe<T>* lastKeyframe = keyframes[lastKeyframeIndexInternal];
     if (lastKeyframe->containsTime(frame)) {
       return lastKeyframe->getValueAt(frame);
     }
     if (frame < lastKeyframe->startTime) {
-      while (lastKeyframeIndex > 0) {
-        lastKeyframeIndex--;
-        if (keyframes[lastKeyframeIndex]->containsTime(frame)) {
+      while (lastKeyframeIndexInternal > 0) {
+        lastKeyframeIndexInternal--;
+        if (keyframes[lastKeyframeIndexInternal]->containsTime(frame)) {
           break;
         }
       }
     } else {
-      while (lastKeyframeIndex < keyframes.size() - 1) {
-        lastKeyframeIndex++;
-        if (keyframes[lastKeyframeIndex]->containsTime(frame)) {
+      while (lastKeyframeIndexInternal < keyframes.size() - 1) {
+        lastKeyframeIndexInternal++;
+        if (keyframes[lastKeyframeIndexInternal]->containsTime(frame)) {
           break;
         }
       }
     }
-    lastKeyframe = keyframes[lastKeyframeIndex];
+    lastKeyframe = keyframes[lastKeyframeIndexInternal];
     if (frame <= lastKeyframe->startTime) {
       result = lastKeyframe->startValue;
     } else if (frame >= lastKeyframe->endTime) {
@@ -341,6 +342,7 @@ class AnimatableProperty : public Property<T> {
     } else {
       result = lastKeyframe->getValueAt(frame);
     }
+    lastKeyframeIndex = lastKeyframeIndexInternal;
     return result;
   }
 
