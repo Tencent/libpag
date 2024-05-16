@@ -132,7 +132,7 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
     for (auto& header : format.headers) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
-      auto key = SafeConvertToJString(env, std::string(keyString, 6));
+      auto key = SafeConvertToJString(env, std::string(keyString, 5));
       auto bytes = env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size());
       env->CallVoidMethod(mediaFormat, MediaFormat_setByteBuffer, key, bytes);
       index++;
