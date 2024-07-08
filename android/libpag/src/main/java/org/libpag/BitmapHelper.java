@@ -36,7 +36,7 @@ class BitmapHelper {
         if (width > 0 && height > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 return HardwareBuffer.create(width, height, HardwareBuffer.RGBA_8888, 1,
-                        HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
+                        HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN | HardwareBuffer.USAGE_GPU_COLOR_OUTPUT);
             } catch (Exception e) {
                 e.printStackTrace();
             }
