@@ -20,11 +20,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.libpag.PAGDecoder;
 import org.libpag.PAGDiskCache;
 import org.libpag.PAGFile;
 import org.libpag.PAGImage;
@@ -47,6 +49,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private EGLSurface eglSurface = null;
     private EGLContext eglContext = null;
     private int textureID = 0;
+
+    private ImageView testImageView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,6 +111,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             });
             containerView.addView(pagView);
             pagView.play();
+        }
+    }
+
+    private void addImageView() {
+        if (testImageView == null) {
+            testImageView = new ImageView(this);
+            testImageView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            containerView.addView(testImageView);
+            PAGFile pagFile = PAGFile.Load(getAssets(), "replacement.pag");
+            PAGDecoder pagDecoder = PAGDecoder.Make(pagFile);
+            Bitmap bitmap = pagDecoder.frameAtIndex(30);
+            testImageView.setImageBitmap(bitmap);
         }
     }
 
@@ -179,7 +195,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 pagView = null;
             }
             if (pagImageViewGroup == null) {
-                addPAGImageViewsAndPlay();
+//                addPAGImageViewsAndPlay();
+                addImageView();
             }
             activatedView(R.id.play_second);
         } else {
