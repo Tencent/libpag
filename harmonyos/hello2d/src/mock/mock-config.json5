@@ -1,0 +1,5 @@
+{
+  "libhello2d.so": {
+    "source": "src/mock/Libhello2d.mock.ets"
+  }
+}

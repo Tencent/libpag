@@ -1,0 +1,1 @@
+export const draw: (index: number) => void;

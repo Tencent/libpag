@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "Hello2dAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "Hello2dAbility_label",
+      "value": "Hello2D"
+    }
+  ]
+}

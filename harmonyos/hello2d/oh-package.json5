@@ -1,0 +1,11 @@
+{
+  "name": "hello2d",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "libhello2d.so": "file:./src/main/cpp/types/libhello2d"
+  }
+}
