@@ -78,8 +78,11 @@ class HardwareDecoder : public VideoDecoder {
     bool isValid = false;
     OH_AVCodec *videoDec = nullptr;
     CodecUserData *codecUserData = nullptr;
+    CodecBufferInfo codecBufferInfo = {nullptr};
+    VideoFormat videoFormat{};
     explicit HardwareDecoder(const VideoFormat& format);
     bool initDecoder(const VideoFormat& format);
+    bool start();
     
     friend class HardwareDecoderFactory;
     
