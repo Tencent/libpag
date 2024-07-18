@@ -158,6 +158,7 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
 }
 
 DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
+    LOGI("------------HardwareDecoder::onSendBytes--lenth:%d, time:%d", length, time);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -176,7 +177,8 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     LOGE("HardwareDecoder: Error on decoding frame.\n");
     return pag::DecodingResult::Error;
   }
-  return static_cast<pag::DecodingResult>(
+    LOGI("------------HHardwareDecoder::onDecodeFrame()--");
+    return static_cast<pag::DecodingResult>(
       env->CallIntMethod(videoDecoder, HardwareDecoder_onDecodeFrame));
 }
 
@@ -219,6 +221,7 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (!result) {
     return nullptr;
   }
+    LOGI("------------HHardwareDecoder::onRenderFrame()--:%d", presentationTime());
   return imageReader->acquireNextBuffer();
 }
 }  // namespace pag

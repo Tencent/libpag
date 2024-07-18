@@ -116,6 +116,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
         codecUserData = nullptr;
         return false;
     }
+    
     videoFormat = format;
 //     if (!start()) {
 //          OH_LOG_ERROR(LOG_APP,"hardware decoder start failed!, ret:%{public}d", ret);

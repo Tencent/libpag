@@ -12,5 +12,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./libpag)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./libpag)
 
 add_library(entry SHARED napi_init.cpp)
-target_link_libraries(entry PUBLIC libace_napi.z.so pag
+target_link_libraries(entry PUBLIC libace_napi.z.so libnative_media_codecbase.so libnative_media_core.so
+                      libnative_media_vdec.so libhilog_ndk.z.so pag
                       )
