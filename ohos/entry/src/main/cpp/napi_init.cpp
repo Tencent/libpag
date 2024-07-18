@@ -126,8 +126,8 @@ static void OnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *bu
 
 static void OutputFunc() {
    LOGI("--------------- OutputFunc ---------------------");
-   std::string outPath = "/storage/media/100/local/files/Docs/Documents/test.yuv";
-   auto file = fopen(outPath.c_str(), "wb");
+//    std::string outPath = "/data/storage/el1/bundle/entry/resources/resfile/test.yuv";
+//    auto file = fopen(outPath.c_str(), "wb");
    size_t currentIndex = 0;
    while (true) {
        std::unique_lock<std::mutex> lock(codecUserData->outputMutex_);
@@ -147,9 +147,9 @@ static void OutputFunc() {
        } else {
              LOGI("---------------OH_VideoDecoder_FreeOutputBuffer---success---currentIndex:%{public}d， timestamp:%{public}d, size:%{public}d", currentIndex ++, bufferInfo.attr.pts, bufferInfo.attr.size);
              if (bufferInfo.attr.size > 0) {
-                fwrite(OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(bufferInfo.buffer)), 1, bufferInfo.attr.size, file);
+//                 fwrite(OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(bufferInfo.buffer)), 1, bufferInfo.attr.size, file);
              } else {
-                fclose(file);
+//                 fclose(file);
                 break;
              }
        }
