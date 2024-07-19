@@ -39,19 +39,12 @@ static bool bStarted = false;
 
 struct CodecBufferInfo {
     uint32_t bufferIndex = 0;
-    uintptr_t *buffer = nullptr;
+    OH_AVBuffer *buffer = nullptr;
     uint8_t *bufferAddr = nullptr;
     OH_AVCodecBufferAttr attr = {0, 0, 0, AVCODEC_BUFFER_FLAGS_NONE};
 
-    CodecBufferInfo(uint8_t *addr) : bufferAddr(addr){};
-    CodecBufferInfo(uint8_t *addr, int32_t bufferSize)
-        : bufferAddr(addr), attr({0, bufferSize, 0, AVCODEC_BUFFER_FLAGS_NONE}){};
-    CodecBufferInfo(uint32_t argBufferIndex, OH_AVMemory *argBuffer, OH_AVCodecBufferAttr argAttr)
-        : bufferIndex(argBufferIndex), buffer(reinterpret_cast<uintptr_t *>(argBuffer)), attr(argAttr){};
-    CodecBufferInfo(uint32_t argBufferIndex, OH_AVMemory *argBuffer)
-        : bufferIndex(argBufferIndex), buffer(reinterpret_cast<uintptr_t *>(argBuffer)){};
     CodecBufferInfo(uint32_t argBufferIndex, OH_AVBuffer *argBuffer)
-        : bufferIndex(argBufferIndex), buffer(reinterpret_cast<uintptr_t *>(argBuffer)) {
+        : bufferIndex(argBufferIndex), buffer(argBuffer) {
         OH_AVBuffer_GetBufferAttr(argBuffer, &attr);
     };
 };
@@ -140,13 +133,15 @@ static void OutputFunc() {
        uint32_t index = codecUserData->outputBufferInfoQueue_.front().bufferIndex;
        CodecBufferInfo bufferInfo = codecUserData->outputBufferInfoQueue_.front();
        lock.unlock();
-       int ret = OH_VideoDecoder_FreeOutputBuffer(avCodec, index);
+       OH_AVCodecBufferAttr attr = {0, 0, 0, AVCODEC_BUFFER_FLAGS_NONE};
+       int ret = OH_AVBuffer_GetBufferAttr(bufferInfo.buffer, &attr); 
+       ret = OH_VideoDecoder_FreeOutputBuffer(avCodec, index);
        if (ret != AV_ERR_OK) {
               OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_FreeOutputBuffer failed!, ret:%{public}d", ret);
               break;
        } else {
-             LOGI("---------------OH_VideoDecoder_FreeOutputBuffer---success---currentIndex:%{public}d， timestamp:%{public}d, size:%{public}d", currentIndex ++, bufferInfo.attr.pts, bufferInfo.attr.size);
-             if (bufferInfo.attr.size > 0) {
+             LOGI("---------------OH_VideoDecoder_FreeOutputBuffer---success---currentIndex:%{public}d， timestamp:%{public}d, size:%{public}d", currentIndex ++, attr.pts, attr.size);
+             if (attr.size > 0) {
 //                 fwrite(OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(bufferInfo.buffer)), 1, bufferInfo.attr.size, file);
              } else {
 //                 fclose(file);
@@ -227,9 +222,10 @@ static void pagVideoSequenceDecodeTest() {
            }
            
            CodecBufferInfo codecBufferInfo = codecUserData->inputBufferInfoQueue_.front();
+           lock.unlock();
+            
            int index = codecBufferInfo.bufferIndex;
            auto buffer = codecBufferInfo.buffer;
-           lock.unlock();
 
            OH_AVCodecBufferAttr info;
            if (currentIndex < 2) {
@@ -244,7 +240,7 @@ static void pagVideoSequenceDecodeTest() {
               info.size = frames[currentIndex - 2]->fileBytes->length();
               info.offset = 0;
               info.pts = frames[currentIndex - 2]->frame * 1000000 / videoSequence->frameRate;
-              info.flags = frames[currentIndex - 2]->isKeyframe ? AVCODEC_BUFFER_FLAGS_SYNC_FRAME : AVCODEC_BUFFER_FLAGS_NONE;
+              info.flags = AVCODEC_BUFFER_FLAGS_NONE;
               memcpy( OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(buffer)), frames[currentIndex - 2]->fileBytes->data(), 
                                             frames[currentIndex - 2]->fileBytes->length());
           } else {
@@ -297,21 +293,23 @@ static void PAGDrawTest()
     auto pagPlayer = new PAGPlayer();
     pagPlayer->setComposition(pagFile);
     pagPlayer->setSurface(pagSurface);
-    pagPlayer->setProgress(0);
-    auto status = pagPlayer->flush();
-    if (status) {
-        printf("-------- pag flush success !!!");
-    } else {
-        printf("-------- pag flush failed !!!");
+    int numFrames = pagFile->frameRate() * pagFile->duration() / 1000000;
+    for (int i = 0; i < 1; i++) {
+        pagPlayer->setProgress((i + 0.1)/ numFrames);
+        auto status = pagPlayer->flush();
+        if (status) {
+            OH_LOG_INFO(LOG_APP,"pag flush success!, frame:%{public}d", i);
+         } else {
+            OH_LOG_ERROR(LOG_APP,"pag flush failed!");
+        }
     }
-    
     delete pagPlayer;
 }
 
 
 static napi_value Add(napi_env env, napi_callback_info info)
 {
-    pagVideoSequenceDecodeTest();
+//     pagVideoSequenceDecodeTest();
     size_t argc = 2;
     napi_value args[2] = {nullptr};
 
@@ -320,7 +318,7 @@ static napi_value Add(napi_env env, napi_callback_info info)
     auto version = pag::PAG::SDKVersion();
 //     LOGE("--------test--------!");
 //     OH_LOG_ERROR(LOG_APP,"OH_AVBuffer_SetBufferAttr failed!");
-//     PAGDrawTest();
+    PAGDrawTest();
 
     napi_valuetype valuetype0;
     napi_typeof(env, args[0], &valuetype0);

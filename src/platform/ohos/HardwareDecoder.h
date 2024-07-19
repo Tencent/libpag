@@ -14,45 +14,35 @@
 namespace pag {
 struct CodecBufferInfo {
     uint32_t bufferIndex = 0;
-    uintptr_t *buffer = nullptr;
-    uint8_t *bufferAddr = nullptr;
+    OH_AVBuffer *buffer = nullptr;
     OH_AVCodecBufferAttr attr = {0, 0, 0, AVCODEC_BUFFER_FLAGS_NONE};
-
-    CodecBufferInfo(uint8_t *addr) : bufferAddr(addr){};
-    CodecBufferInfo(uint8_t *addr, int32_t bufferSize)
-        : bufferAddr(addr), attr({0, bufferSize, 0, AVCODEC_BUFFER_FLAGS_NONE}){};
-    CodecBufferInfo(uint32_t argBufferIndex, OH_AVMemory *argBuffer, OH_AVCodecBufferAttr argAttr)
-        : bufferIndex(argBufferIndex), buffer(reinterpret_cast<uintptr_t *>(argBuffer)), attr(argAttr){};
-    CodecBufferInfo(uint32_t argBufferIndex, OH_AVMemory *argBuffer)
-        : bufferIndex(argBufferIndex), buffer(reinterpret_cast<uintptr_t *>(argBuffer)){};
+    
     CodecBufferInfo(uint32_t argBufferIndex, OH_AVBuffer *argBuffer)
-        : bufferIndex(argBufferIndex), buffer(reinterpret_cast<uintptr_t *>(argBuffer)) {
+        : bufferIndex(argBufferIndex), buffer(argBuffer) {
         OH_AVBuffer_GetBufferAttr(argBuffer, &attr);
     };
 };
 
 class CodecUserData {
 public:
-    uint32_t inputFrameCount_ = 0;
-    std::mutex inputMutex_;
-    std::condition_variable inputCond_;
-    std::queue<CodecBufferInfo> inputBufferInfoQueue_;
+    std::mutex inputMutex;
+    std::condition_variable inputCondition;
+    std::queue<CodecBufferInfo> inputBufferInfoQueue;
 
-    uint32_t outputFrameCount_ = 0;
-    std::mutex outputMutex_;
-    std::condition_variable outputCond_;
-    std::queue<CodecBufferInfo> outputBufferInfoQueue_;
+    std::mutex outputMutex;
+    std::condition_variable outputCondition;
+    std::queue<CodecBufferInfo> outputBufferInfoQueue;
 
-    void ClearQueue() {
+    void clearQueue() {
         {
-            std::unique_lock<std::mutex> lock(inputMutex_);
+            std::unique_lock<std::mutex> lock(inputMutex);
             auto emptyQueue = std::queue<CodecBufferInfo>();
-            inputBufferInfoQueue_.swap(emptyQueue);
+            inputBufferInfoQueue.swap(emptyQueue);
         }
         {
-            std::unique_lock<std::mutex> lock(outputMutex_);
+            std::unique_lock<std::mutex> lock(outputMutex);
             auto emptyQueue = std::queue<CodecBufferInfo>();
-            outputBufferInfoQueue_.swap(emptyQueue);
+            outputBufferInfoQueue.swap(emptyQueue);
         }
     }
 };
@@ -78,7 +68,7 @@ class HardwareDecoder : public VideoDecoder {
     bool isValid = false;
     OH_AVCodec *videoDec = nullptr;
     CodecUserData *codecUserData = nullptr;
-    CodecBufferInfo codecBufferInfo = {nullptr};
+    CodecBufferInfo codecBufferInfo = {0, nullptr};
     VideoFormat videoFormat{};
     explicit HardwareDecoder(const VideoFormat& format);
     bool initDecoder(const VideoFormat& format);

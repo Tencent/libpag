@@ -11,14 +11,15 @@
 #include <multimedia/player_framework/native_avcodec_base.h>
 #include <multimedia/player_framework/native_avformat.h>
 #include <multimedia/player_framework/native_avbuffer.h>
-#include <native_buffer/native_buffer.h>
 #include "hilog/log.h"
 #include <mutex>
 
 #include "base/utils/Log.h"
-#include "pag/pag.h"
 
-#define LOG_TAG "PAG" 
+#undef LOG_DOMAIN
+#undef LOG_TAG
+#define LOG_DOMAIN 0x3200  // 全局domain宏，标识业务领域
+#define LOG_TAG "PAG"   // 全局tag宏，标识模块日志tag
 
 namespace pag {
 
@@ -41,9 +42,9 @@ void OH_AVCodecOnNeedInputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer 
     (void)codec;
     OH_LOG_INFO(LOG_APP, "------OH_AVCodecOnNeedInputBuffer---------");
     CodecUserData *codecUserData = static_cast<CodecUserData*>(userData);
-    std::unique_lock<std::mutex> lock(codecUserData->inputMutex_);
-    codecUserData->inputBufferInfoQueue_.emplace(index, buffer);
-    codecUserData->inputCond_.notify_all();
+    std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
+    codecUserData->inputBufferInfoQueue.emplace(index, buffer);
+    codecUserData->inputCondition.notify_all();
 }
 
 void OH_AVCodecOnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *buffer, void *userData) {
@@ -51,11 +52,12 @@ void OH_AVCodecOnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer 
         return;
     }
     (void)codec;
+    (void)index;
     OH_LOG_INFO(LOG_APP, "------OH_AVCodecOnNewOutputBuffer---------");
     CodecUserData *codecUserData = static_cast<CodecUserData*>(userData);
-    std::unique_lock<std::mutex> lock(codecUserData->outputMutex_);
-    codecUserData->outputBufferInfoQueue_.emplace(index, buffer);
-    codecUserData->outputCond_.notify_all();
+    std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
+    codecUserData->outputBufferInfoQueue.emplace(index, buffer);
+    codecUserData->outputCondition.notify_all();
 }
 
 
@@ -118,23 +120,22 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     }
     
     videoFormat = format;
-//     if (!start()) {
-//          OH_LOG_ERROR(LOG_APP,"hardware decoder start failed!, ret:%{public}d", ret);
-//         delete codecUserData;
-//         codecUserData = nullptr;
-//         return false;
-//     }
+    if (!start()) {
+         OH_LOG_ERROR(LOG_APP,"hardware decoder start failed!, ret:%{public}d", ret);
+        delete codecUserData;
+        codecUserData = nullptr;
+        return false;
+    }
     return true;
 }
 
 DecodingResult HardwareDecoder::onSendBytes(void *bytes, size_t length, int64_t time) {
     OH_LOG_INFO(LOG_APP, "------ onSendBytes --------length:%{public}ld", length);
-    std::unique_lock<std::mutex> lock(codecUserData->inputMutex_);
-    codecUserData->inputCond_.wait(lock, [this](){
-        return codecUserData->inputBufferInfoQueue_.size() > 0 ;
+    std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
+    codecUserData->inputCondition.wait(lock, [this](){
+        return codecUserData->inputBufferInfoQueue.size() > 0 ;
     });
-    CodecBufferInfo codecBufferInfo = codecUserData->inputBufferInfoQueue_.front();
-    int index = codecBufferInfo.bufferIndex;
+    CodecBufferInfo codecBufferInfo = codecUserData->inputBufferInfoQueue.front();
     lock.unlock();
     
     OH_AVCodecBufferAttr bufferAttr;
@@ -142,34 +143,22 @@ DecodingResult HardwareDecoder::onSendBytes(void *bytes, size_t length, int64_t 
     bufferAttr.offset = 0;
     bufferAttr.pts = time;
     bufferAttr.flags = length == 0 ? AVCODEC_BUFFER_FLAGS_EOS : AVCODEC_BUFFER_FLAGS_NONE;
-    if (length > 100) {
-         OH_LOG_INFO(LOG_APP, "------ onSendBytes -----data----");
-        bufferAttr.flags = AVCODEC_BUFFER_FLAGS_SYNC_FRAME;
-    }
-    
-    OH_AVBuffer *buffer = nullptr;
+
     if (length > 0 && bytes != nullptr) {
-        buffer = OH_AVBuffer_Create(length);
-        if (buffer == nullptr) {
-            OH_LOG_ERROR(LOG_APP,"OH_AVBuffer_Create failed!");
-        }
-        memcpy(OH_AVBuffer_GetAddr(buffer), bytes, length);
+        memcpy(OH_AVBuffer_GetAddr(codecBufferInfo.buffer), bytes, length);
     }
-    
-    int ret = OH_AVBuffer_SetBufferAttr(buffer, &bufferAttr);
+    int ret = OH_AVBuffer_SetBufferAttr(codecBufferInfo.buffer, &bufferAttr);
     if (ret == AV_ERR_OK) {
         OH_LOG_INFO(LOG_APP,"Set BufferAttr attr success!, ret:%{public}d", ret);
-        ret = OH_VideoDecoder_PushInputBuffer(videoDec, index);
+        ret = OH_VideoDecoder_PushInputBuffer(videoDec, codecBufferInfo.bufferIndex);
         if (ret != AV_ERR_OK) {
             OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_PushInputBuffer failed, ret:%{public}d", ret);
         }
     }
     OH_LOG_INFO(LOG_APP,"onSendBytes：, ret:%{public}d", ret);
-    if (buffer) {
-        OH_AVBuffer_Destroy(buffer);
-    }
+    
     lock.lock();
-    codecUserData->inputBufferInfoQueue_.pop();
+    codecUserData->inputBufferInfoQueue.pop();
     lock.unlock();
     
     if (ret != AV_ERR_OK) {
@@ -179,48 +168,32 @@ DecodingResult HardwareDecoder::onSendBytes(void *bytes, size_t length, int64_t 
 }
 
 DecodingResult HardwareDecoder::onEndOfStream() {
-    OH_AVCodecBufferAttr bufferAttr;
-    bufferAttr.size = 0;
-    bufferAttr.offset = 0;
-    bufferAttr.pts = 0;
-    bufferAttr.flags = AVCODEC_BUFFER_FLAGS_NONE;
-    int ret = OH_AVBuffer_SetBufferAttr(nullptr, &bufferAttr);
-    if (ret != AV_ERR_OK) {
-        OH_LOG_ERROR(LOG_APP,"Set BufferAttr attr failed!, ret:%{public}d", ret);
-        return DecodingResult::Error;
-    }
-    ret = OH_VideoDecoder_PushInputBuffer(videoDec, 0);
-    if (ret != AV_ERR_OK) {
-        OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_PushInputBuffer failed, ret:%{public}d", ret);
-    }
-    OH_LOG_INFO(LOG_APP,"onSendBytes：, ret:%{public}d", ret);
-    return DecodingResult::Success;
+    return onSendBytes(nullptr, 0, 0);
 }
 
 DecodingResult HardwareDecoder::onDecodeFrame() {
-    std::unique_lock<std::mutex> lock(codecUserData->outputMutex_);
-    codecUserData->outputCond_.wait(lock,[this](){
-        return codecUserData->outputBufferInfoQueue_.size() > 0;
+    std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
+    codecUserData->outputCondition.wait(lock,[this](){
+        return codecUserData->outputBufferInfoQueue.size() > 0;
     });
     
-    codecBufferInfo = codecUserData->outputBufferInfoQueue_.front();
-    codecUserData->outputBufferInfoQueue_.pop();
+    codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
+    codecUserData->outputBufferInfoQueue.pop();
     lock.unlock();
-    
-    
+    OH_LOG_INFO(LOG_APP, "------ HardwareDecoder::onDecodeFrame() --------pts:%{public}d", codecBufferInfo.attr.pts);
+    if (codecBufferInfo.attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
+        return DecodingResult::EndOfStream;
+    }
     return DecodingResult::Success;
 }
 
 void HardwareDecoder::onFlush() {
     OH_LOG_INFO(LOG_APP, "------ HardwareDecoder::onFlush --------");
-//     int ret = OH_VideoDecoder_Flush(videoDec);
-//     if (ret != AV_ERR_OK) {
-//          return;
-//     }
-//     ret = OH_VideoDecoder_Stop(videoDec);
-//     if (ret != AV_ERR_OK) {
-//         return;
-//     }
+    int ret = OH_VideoDecoder_Flush(videoDec);
+    if (ret != AV_ERR_OK) {
+         return;
+    }
+    codecUserData->clearQueue();
     start();
 }
 
@@ -239,16 +212,16 @@ bool HardwareDecoder::start() {
 }
 
 int64_t HardwareDecoder::presentationTime() {
-    return codecBufferInfo.bufferIndex;
+    return codecBufferInfo.attr.pts;
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-    auto yuvData = codecBufferInfo.bufferAddr;
+    // Get data
     
+    OH_LOG_INFO(LOG_APP,"onRenderFrame, pts:%{public}d, size:%{public}d", codecBufferInfo.attr.pts, codecBufferInfo.attr.size);
     int ret = OH_VideoDecoder_FreeOutputBuffer(videoDec, codecBufferInfo.bufferIndex);
     if (ret != AV_ERR_OK) {
         OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_FreeOutputBuffer, ret:%{public}d", ret);
-         return nullptr;
     }
     return nullptr;
 }
