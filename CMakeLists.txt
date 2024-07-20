@@ -379,6 +379,18 @@ elseif(OHOS)
         list(APPEND PAG_SHARED_LIBS ${GLESV3_LIB})
         find_library(EGL_LIB EGL)
         list(APPEND PAG_SHARED_LIBS ${EGL_LIB})
+        find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z)
+        find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z)
+        find_library(PIXELMAP_LIB pixelmap)
+        find_library(IMAGE_SOURCE_LIB image_source)
+        find_library(ACE_NDK_LIB ace_ndk.z)
+        find_library(HILOG_NDK_LIB hilog_ndk.z)
+        find_library(ACE_NAPI_LIB ace_napi.z)
+        find_library(NATIVE_BUFFER_LIB native_buffer)
+        find_library(NATIVE_WINDOW_LIB native_window)
+        list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
+                    ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
+                    ${NATIVE_WINDOW_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})

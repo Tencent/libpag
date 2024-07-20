@@ -16,22 +16,13 @@
 
 
 #include "hilog/log.h"
+#include "third_party/tgfx/include/tgfx/platform/Print.h"
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
 #define LOG_DOMAIN 0x3200  // 全局domain宏，标识业务领域
 #define LOG_TAG "MY_TAG"   // 全局tag宏，标识模块日志tag
 
-#define SAMPLE_LOG(func, fmt, args...)                 \
-    do {                                                       \
-        (void)func(LOG_APP, "{%{public}s():%{public}d} " fmt, __FUNCTION__, __LINE__, ##args);   \
-    } while (0)
-
-#define LOGF(fmt, ...) SAMPLE_LOG(OH_LOG_FATAL, fmt, ##__VA_ARGS__)
-#define LOGE(fmt, ...) SAMPLE_LOG(OH_LOG_ERROR, fmt, ##__VA_ARGS__)
-#define LOGW(fmt, ...) SAMPLE_LOG(OH_LOG_WARN,  fmt, ##__VA_ARGS__)
-#define LOGI(fmt, ...) SAMPLE_LOG(OH_LOG_INFO,  fmt, ##__VA_ARGS__)
-#define LOGD(fmt, ...) SAMPLE_LOG(OH_LOG_DEBUG, fmt, ##__VA_ARGS__)
 
 using namespace pag;
 static OH_AVCodec *avCodec = nullptr;
@@ -97,7 +88,7 @@ static void OnNeedInputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *bu
         return;
     }
     (void)codec;
-    LOGI("---------------OnNeedInputBuffer--index:%{public}d", index);
+    OH_LOG_INFO(LOG_APP,"---------------OnNeedInputBuffer--index:%{public}d", index);
     CodecUserData *codecUserData = static_cast<CodecUserData *>(userData);
     std::unique_lock<std::mutex> lock(codecUserData->inputMutex_);
     codecUserData->inputBufferInfoQueue_.emplace(index, buffer);
@@ -110,7 +101,7 @@ static void OnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *bu
         return;
     }
     (void)codec;
-    LOGI("---------------OnNewOutputBuffer--index:%{public}d", index);
+    OH_LOG_INFO(LOG_APP,"---------------OnNewOutputBuffer--index:%{public}d", index);
     CodecUserData *codecUserData = static_cast<CodecUserData *>(userData);
     std::unique_lock<std::mutex> lock(codecUserData->outputMutex_);
     codecUserData->outputBufferInfoQueue_.emplace(index, buffer);
@@ -118,7 +109,7 @@ static void OnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *bu
 }
 
 static void OutputFunc() {
-   LOGI("--------------- OutputFunc ---------------------");
+   OH_LOG_INFO(LOG_APP,"--------------- OutputFunc ---------------------");
 //    std::string outPath = "/data/storage/el1/bundle/entry/resources/resfile/test.yuv";
 //    auto file = fopen(outPath.c_str(), "wb");
    size_t currentIndex = 0;
@@ -140,7 +131,7 @@ static void OutputFunc() {
               OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_FreeOutputBuffer failed!, ret:%{public}d", ret);
               break;
        } else {
-             LOGI("---------------OH_VideoDecoder_FreeOutputBuffer---success---currentIndex:%{public}d， timestamp:%{public}d, size:%{public}d", currentIndex ++, attr.pts, attr.size);
+             OH_LOG_INFO(LOG_APP,"---------------OH_VideoDecoder_FreeOutputBuffer---success---currentIndex:%{public}d， timestamp:%{public}d, size:%{public}d", currentIndex ++, attr.pts, attr.size);
              if (attr.size > 0) {
 //                 fwrite(OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(bufferInfo.buffer)), 1, bufferInfo.attr.size, file);
              } else {
@@ -174,7 +165,7 @@ static void pagVideoSequenceDecodeTest() {
 //         avCodec = OH_VideoDecoder_CreateByName(name);
 
         OH_AVFormat *format = OH_AVFormat_Create();
-        LOGI("---------------videoSequence->width:%{public}d, height:%{public}d", videoSequence->width, videoSequence->height);
+        OH_LOG_INFO(LOG_APP,"---------------videoSequence->width:%{public}d, height:%{public}d", videoSequence->width, videoSequence->height);
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_WIDTH, videoSequence->width);
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_HEIGHT, videoSequence->height);
         OH_AVFormat_SetDoubleValue(format, OH_MD_KEY_FRAME_RATE, videoSequence->frameRate);
@@ -254,7 +245,7 @@ static void pagVideoSequenceDecodeTest() {
               OH_LOG_ERROR(LOG_APP,"OH_AVBuffer_SetBufferAttr failed!");
               break;
           }
-          LOGI("---------------OH_VideoDecoder_PushInputBuffer--index:%{public}d, length:%{public}d, currentIndex:%{public}d", index, info.size, currentIndex);
+          OH_LOG_INFO(LOG_APP,"---------------OH_VideoDecoder_PushInputBuffer--index:%{public}d, length:%{public}d, currentIndex:%{public}d", index, info.size, currentIndex);
           ret = OH_VideoDecoder_PushInputBuffer(avCodec, index);
           if (ret != AV_ERR_OK) {
               OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_PushInputBuffer failed!");
@@ -274,7 +265,7 @@ static void pagVideoSequenceDecodeTest() {
         work.join();
         bStarted = false;
         ret = OH_VideoDecoder_Destroy(avCodec);   
-        LOGI("---------------OH_VideoDecoder_Destroy--ret:%{public}d", ret);
+        OH_LOG_INFO(LOG_APP,"---------------OH_VideoDecoder_Destroy--ret:%{public}d", ret);
         delete codecUserData;
     }
 }
