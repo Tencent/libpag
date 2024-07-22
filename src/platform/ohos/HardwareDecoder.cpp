@@ -11,7 +11,6 @@
 #include <multimedia/player_framework/native_avcodec_base.h>
 #include <multimedia/player_framework/native_avformat.h>
 #include <multimedia/player_framework/native_avbuffer.h>
-#include "hilog/log.h"
 #include <mutex>
 
 #include "base/utils/Log.h"
@@ -40,7 +39,6 @@ void OH_AVCodecOnNeedInputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer 
         return;
     }
     (void)codec;
-    OH_LOG_INFO(LOG_APP, "------OH_AVCodecOnNeedInputBuffer---------");
     CodecUserData *codecUserData = static_cast<CodecUserData*>(userData);
     std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
     codecUserData->inputBufferInfoQueue.emplace(index, buffer);
@@ -53,18 +51,14 @@ void OH_AVCodecOnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer 
     }
     (void)codec;
     (void)index;
-    OH_LOG_INFO(LOG_APP, "------OH_AVCodecOnNewOutputBuffer---------");
     CodecUserData *codecUserData = static_cast<CodecUserData*>(userData);
     std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
     codecUserData->outputBufferInfoQueue.emplace(index, buffer);
     codecUserData->outputCondition.notify_all();
 }
 
-
-
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
     isValid = initDecoder(format);
-    
 }
 
 HardwareDecoder::~HardwareDecoder()
@@ -84,7 +78,7 @@ HardwareDecoder::~HardwareDecoder()
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     videoDec = OH_VideoDecoder_CreateByMime(format.mimeType.c_str());
     if (videoDec == nullptr) {
-        OH_LOG_ERROR(LOG_APP,"create hardware decoder failed!");
+        LOGE("create hardware decoder failed!");
         return false;
     }
     
@@ -93,9 +87,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
         OH_AVCodecOnNewOutputBuffer};
     int ret = OH_VideoDecoder_RegisterCallback(videoDec, callback, codecUserData);
     if (ret != AV_ERR_OK) {
-        OH_LOG_ERROR(LOG_APP,"hardware decoder register callback failed!, ret:%{public}d", ret);
-        delete codecUserData;
-        codecUserData = nullptr;
+        LOGE("hardware decoder register callback failed!, ret:%d", ret);
         return false;
     }
     
@@ -106,31 +98,33 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     ret = OH_VideoDecoder_Configure(videoDec, ohFormat);
     OH_AVFormat_Destroy(ohFormat);
     if (ret != AV_ERR_OK) {
-        OH_LOG_ERROR(LOG_APP,"config hardware decoder failed!, ret:%{public}d", ret);
-        delete codecUserData;
-        codecUserData = nullptr;
+        LOGE("config hardware decoder failed!, ret:%d", ret);
+        return false;
+    }
+    imageReader = tgfx::SurfaceTextureReader::Make(format.width, format.height);
+    if (imageReader == nullptr) {
+        LOGE("SurfaceTextureReader create failed!");
+        return false;
+    }
+    ret = OH_VideoDecoder_SetSurface(videoDec, imageReader->getInputSurface());
+    if (ret != AV_ERR_OK) {
+        LOGE("hardware decoder setSurface failed!, ret:%d", ret);
         return false;
     }
     ret = OH_VideoDecoder_Prepare(videoDec);
     if (ret != AV_ERR_OK) {
-        OH_LOG_ERROR(LOG_APP,"hardware decoder prepare failed!, ret:%{public}d", ret);
-        delete codecUserData;
-        codecUserData = nullptr;
+        LOGE("hardware decoder prepare failed!, ret:%d", ret);
         return false;
     }
-    
     videoFormat = format;
-    if (!start()) {
-         OH_LOG_ERROR(LOG_APP,"hardware decoder start failed!, ret:%{public}d", ret);
-        delete codecUserData;
-        codecUserData = nullptr;
-        return false;
-    }
+//     if (!start()) {
+//          LOGE("hardware decoder start failed!, ret:%d", ret);
+//         return false;
+//     }
     return true;
 }
 
 DecodingResult HardwareDecoder::onSendBytes(void *bytes, size_t length, int64_t time) {
-    OH_LOG_INFO(LOG_APP, "------ onSendBytes --------length:%{public}ld", length);
     std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
     codecUserData->inputCondition.wait(lock, [this](){
         return codecUserData->inputBufferInfoQueue.size() > 0 ;
@@ -149,13 +143,13 @@ DecodingResult HardwareDecoder::onSendBytes(void *bytes, size_t length, int64_t 
     }
     int ret = OH_AVBuffer_SetBufferAttr(codecBufferInfo.buffer, &bufferAttr);
     if (ret == AV_ERR_OK) {
-        OH_LOG_INFO(LOG_APP,"Set BufferAttr attr success!, ret:%{public}d", ret);
+        LOGI("Set BufferAttr attr success!, ret:%d", ret);
         ret = OH_VideoDecoder_PushInputBuffer(videoDec, codecBufferInfo.bufferIndex);
         if (ret != AV_ERR_OK) {
-            OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_PushInputBuffer failed, ret:%{public}d", ret);
+            LOGE("OH_VideoDecoder_PushInputBuffer failed, ret:%d", ret);
         }
     }
-    OH_LOG_INFO(LOG_APP,"onSendBytes：, ret:%{public}d", ret);
+    LOGI("onSendBytes：, ret:%d", ret);
     
     lock.lock();
     codecUserData->inputBufferInfoQueue.pop();
@@ -180,7 +174,6 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
     codecUserData->outputBufferInfoQueue.pop();
     lock.unlock();
-    OH_LOG_INFO(LOG_APP, "------ HardwareDecoder::onDecodeFrame() --------pts:%{public}d", codecBufferInfo.attr.pts);
     if (codecBufferInfo.attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
         return DecodingResult::EndOfStream;
     }
@@ -188,26 +181,23 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
 }
 
 void HardwareDecoder::onFlush() {
-    OH_LOG_INFO(LOG_APP, "------ HardwareDecoder::onFlush --------");
-    int ret = OH_VideoDecoder_Flush(videoDec);
-    if (ret != AV_ERR_OK) {
-         return;
-    }
-    codecUserData->clearQueue();
+//     int ret = OH_VideoDecoder_Flush(videoDec);
+//     if (ret != AV_ERR_OK) {
+//          return;
+//     }
+//     codecUserData->clearQueue();
     start();
 }
 
 bool HardwareDecoder::start() {
-    OH_LOG_INFO(LOG_APP, "------ HardwareDecoder::start --------");
     int ret = OH_VideoDecoder_Start(videoDec);
     if (ret != AV_ERR_OK) {
-        OH_LOG_INFO(LOG_APP,"hardware decoder start failed!, ret:%d", ret);
+        LOGE("hardware decoder start failed!, ret:%d", ret);
         return false;
     }
     for (auto& header : videoFormat.headers) {
         onSendBytes(const_cast<void*>(header->data()), header->size(), 0);
     }
-    OH_LOG_INFO(LOG_APP, "------ start finish --------");
     return true;
 }
 
@@ -216,14 +206,13 @@ int64_t HardwareDecoder::presentationTime() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-    // Get data
-    
-    OH_LOG_INFO(LOG_APP,"onRenderFrame, pts:%{public}d, size:%{public}d", codecBufferInfo.attr.pts, codecBufferInfo.attr.size);
+    auto imageBuffer = imageReader->acquireNextBuffer();
+    LOGI("onRenderFrame, pts:%d, size:%d", codecBufferInfo.attr.pts, codecBufferInfo.attr.size);
     int ret = OH_VideoDecoder_FreeOutputBuffer(videoDec, codecBufferInfo.bufferIndex);
     if (ret != AV_ERR_OK) {
-        OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_FreeOutputBuffer, ret:%{public}d", ret);
+        LOGE("OH_VideoDecoder_FreeOutputBuffer, ret:%d", ret);
     }
-    return nullptr;
+    return imageBuffer;
 }
 
 

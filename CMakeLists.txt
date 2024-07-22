@@ -388,9 +388,10 @@ elseif(OHOS)
         find_library(ACE_NAPI_LIB ace_napi.z)
         find_library(NATIVE_BUFFER_LIB native_buffer)
         find_library(NATIVE_WINDOW_LIB native_window)
+        find_library(NATIVE_IMAGE_LIB native_image)
         list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
                     ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
-                    ${NATIVE_WINDOW_LIB})
+                    ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})

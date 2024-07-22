@@ -11,6 +11,8 @@
 
 #include "rendering/video/DecodingResult.h"
 #include "rendering/video/VideoDecoder.h"
+#include "tgfx/platform/ohos/SurfaceTextureReader.h"
+
 namespace pag {
 struct CodecBufferInfo {
     uint32_t bufferIndex = 0;
@@ -70,6 +72,7 @@ class HardwareDecoder : public VideoDecoder {
     CodecUserData *codecUserData = nullptr;
     CodecBufferInfo codecBufferInfo = {0, nullptr};
     VideoFormat videoFormat{};
+    std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
     explicit HardwareDecoder(const VideoFormat& format);
     bool initDecoder(const VideoFormat& format);
     bool start();
