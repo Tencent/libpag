@@ -106,11 +106,11 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
         LOGE("SurfaceTextureReader create failed!");
         return false;
     }
-    ret = OH_VideoDecoder_SetSurface(videoDec, imageReader->getInputSurface());
-    if (ret != AV_ERR_OK) {
-        LOGE("hardware decoder setSurface failed!, ret:%d", ret);
-        return false;
-    }
+//     ret = OH_VideoDecoder_SetSurface(videoDec, imageReader->getInputSurface());
+//     if (ret != AV_ERR_OK) {
+//         LOGE("hardware decoder setSurface failed!, ret:%d", ret);
+//         return false;
+//     }
     ret = OH_VideoDecoder_Prepare(videoDec);
     if (ret != AV_ERR_OK) {
         LOGE("hardware decoder prepare failed!, ret:%d", ret);

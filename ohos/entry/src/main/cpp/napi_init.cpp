@@ -3,6 +3,9 @@
 #include "pag/pag.h"
 #include "pag/file.h"
 
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES3/gl3.h>
 #include <cstdint>
 #include <multimedia/player_framework/native_avcodec_videodecoder.h>
 #include <multimedia/player_framework/native_avcapability.h>
@@ -10,6 +13,7 @@
 #include <multimedia/player_framework/native_avformat.h>
 #include <multimedia/player_framework/native_avbuffer.h>
 #include <native_buffer/native_buffer.h>
+#include <native_image/native_image.h>
 #include <queue>
 #include <thread>
 #include <fstream>
@@ -23,10 +27,107 @@
 #define LOG_DOMAIN 0x3200  // 全局domain宏，标识业务领域
 #define LOG_TAG "MY_TAG"   // 全局tag宏，标识模块日志tag
 
+#define GL_TEXTURE_EXTERNAL_OES 0x8D65
 
 using namespace pag;
 static OH_AVCodec *avCodec = nullptr;
 static bool bStarted = false;
+
+
+using GetPlatformDisplayExt = PFNEGLGETPLATFORMDISPLAYEXTPROC;
+
+bool CheckEglExtension(const char *extensions, const char *extension) {
+    size_t extlen = strlen(extension);
+    const char *end = extensions + strlen(extensions);
+
+    while (extensions < end) {
+        size_t n = 0;
+        if (*extensions == ' ') {
+            extensions++;
+            continue;
+        }
+        n = strcspn(extensions, " ");
+        if (n == extlen && strncmp(extension, extensions, n) == 0) {
+            return true;
+        }
+        extensions += n;
+    }
+    return false;
+}
+
+// 获取当前的显示设备
+static EGLDisplay GetPlatformEglDisplay(EGLenum platform, void *native_display, const EGLint *attrib_list) {
+    static GetPlatformDisplayExt eglGetPlatformDisplayExt = NULL;
+
+    if (!eglGetPlatformDisplayExt) {
+        const char *extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+        if (extensions && (CheckEglExtension(extensions, "EGL_EXT_platform_wayland") ||
+                           CheckEglExtension(extensions, "EGL_KHR_platform_wayland"))) {
+            eglGetPlatformDisplayExt = (GetPlatformDisplayExt)eglGetProcAddress("eglGetPlatformDisplayEXT");
+        }
+    }
+
+    if (eglGetPlatformDisplayExt) {
+        return eglGetPlatformDisplayExt(platform, native_display, attrib_list);
+    }
+
+    return eglGetDisplay((EGLNativeDisplayType)native_display);
+}
+
+void InitEGLEnv() {
+    // 获取当前的显示设备
+    EGLDisplay eglDisplay_ = GetPlatformEglDisplay(EGL_PLATFORM_OHOS_KHR, EGL_DEFAULT_DISPLAY, NULL);
+    if (eglDisplay_ == EGL_NO_DISPLAY) {
+    }
+
+    EGLint major, minor;
+    // 初始化EGLDisplay
+    if (eglInitialize(eglDisplay_, &major, &minor) == EGL_FALSE) {
+    }
+
+    // 绑定图形绘制的API为OpenGLES
+    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
+    }
+
+    unsigned int ret;
+    EGLint count;
+    EGLint config_attribs[] = {EGL_SURFACE_TYPE,
+                               EGL_WINDOW_BIT,
+                               EGL_RED_SIZE,
+                               8,
+                               EGL_GREEN_SIZE,
+                               8,
+                               EGL_BLUE_SIZE,
+                               8,
+                               EGL_ALPHA_SIZE,
+                               8,
+                               EGL_RENDERABLE_TYPE,
+                               EGL_OPENGL_ES3_BIT,
+                               EGL_NONE};
+
+    // 获取一个有效的系统配置信息
+    EGLConfig config_;
+    ret = eglChooseConfig(eglDisplay_, config_attribs, &config_, 1, &count);
+    if (!(ret && static_cast<unsigned int>(count) >= 1)) {
+    }
+
+    static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+
+    // 创建上下文
+    EGLContext eglContext_ = eglCreateContext(eglDisplay_, config_, EGL_NO_CONTEXT, context_attribs);
+    if (eglContext_ == EGL_NO_CONTEXT) {
+    }
+
+    // 创建eglSurface
+    OHNativeWindow *eglNativeWindow_ = nullptr;
+    EGLSurface eglSurface_ = eglCreateWindowSurface(eglDisplay_, config_, eglNativeWindow_, context_attribs);
+    if (eglSurface_ == EGL_NO_SURFACE) {
+    }
+
+    // 关联上下文
+    eglMakeCurrent(eglDisplay_, eglSurface_, eglSurface_, eglContext_);
+
+}
 
 struct CodecBufferInfo {
     uint32_t bufferIndex = 0;
@@ -286,7 +387,7 @@ static void PAGDrawTest()
     pagPlayer->setSurface(pagSurface);
     int numFrames = pagFile->frameRate() * pagFile->duration() / 1000000;
     for (int i = 0; i < 1; i++) {
-        pagPlayer->setProgress((i + 0.1)/ numFrames);
+        pagPlayer->setProgress((2 + 0.1)/ numFrames);
         auto status = pagPlayer->flush();
         if (status) {
             OH_LOG_INFO(LOG_APP,"pag flush success!, frame:%{public}d", i);
