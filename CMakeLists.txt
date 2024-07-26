@@ -143,7 +143,7 @@ file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND PAG_COMPILE_OPTIONS -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-error=unused-command-line-argument)
+    list(APPEND PAG_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-error=unused-command-line-argument)
 endif ()
 
 if (MSVC)

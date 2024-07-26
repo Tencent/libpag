@@ -27,37 +27,26 @@
 
 namespace pag {
 
-void OH_AVCodecOnError(OH_AVCodec* codec, int32_t errorCode, void* userData) {
-  (void)codec;
-  (void)errorCode;
-  (void)userData;
+void OH_AVCodecOnError(OH_AVCodec*, int32_t, void*) {
 }
 
-void OH_AVCodecOnStreamChanged(OH_AVCodec* codec, OH_AVFormat* format, void* userData) {
-  (void)codec;
-  (void)format;
-  (void)userData;
+void OH_AVCodecOnStreamChanged(OH_AVCodec*, OH_AVFormat*, void*) {
 }
 
-void OH_AVCodecOnNeedInputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer,
-                                 void* userData) {
+void OH_AVCodecOnNeedInputBuffer(OH_AVCodec*, uint32_t index, OH_AVBuffer* buffer, void* userData) {
   if (userData == nullptr) {
     return;
   }
-  (void)codec;
   CodecUserData* codecUserData = static_cast<CodecUserData*>(userData);
   std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
   codecUserData->inputBufferInfoQueue.emplace(index, buffer);
   codecUserData->inputCondition.notify_all();
 }
 
-void OH_AVCodecOnNewOutputBuffer(OH_AVCodec* codec, uint32_t index, OH_AVBuffer* buffer,
-                                 void* userData) {
+void OH_AVCodecOnNewOutputBuffer(OH_AVCodec*, uint32_t index, OH_AVBuffer* buffer, void* userData) {
   if (userData == nullptr) {
     return;
   }
-  (void)codec;
-  (void)index;
   CodecUserData* codecUserData = static_cast<CodecUserData*>(userData);
   std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
   codecUserData->outputBufferInfoQueue.emplace(index, buffer);
