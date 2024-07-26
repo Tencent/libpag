@@ -143,7 +143,7 @@ file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND PAG_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-error=unused-command-line-argument)
+    list(APPEND PAG_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
 if (MSVC)
@@ -380,10 +380,13 @@ elseif (OHOS)
         find_library(NATIVE_BUFFER_LIB native_buffer)
         find_library(NATIVE_WINDOW_LIB native_window)
         find_library(NATIVE_IMAGE_LIB native_image)
+        find_library(NATIVE_MEDIA_CODECBASE_LIB native_media_codecbase)
+        find_library(NATIVE_MEDIA_CORE_LIB native_media_core)
+        find_library(NATIVE_MEDIA_VDEC_LIB native_media_vdec)
         list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
-                ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
-                ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB} libnative_media_codecbase.so libnative_media_core.so
-                libnative_media_vdec.so)
+                ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB}
+                ${NATIVE_BUFFER_LIB} ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB}
+                ${NATIVE_MEDIA_CODECBASE_LIB} ${NATIVE_MEDIA_CORE_LIB} ${NATIVE_MEDIA_VDEC_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})

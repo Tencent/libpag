@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <native_window/external_window.h>
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
 
@@ -25,7 +26,7 @@ namespace pag {
 
 class GPUDrawable : public Drawable {
  public:
-  static std::shared_ptr<GPUDrawable> FromWindow(EGLNativeWindowType nativeWindow,
+  static std::shared_ptr<GPUDrawable> FromWindow(NativeWindow* nativeWindow,
                                                  EGLContext sharedContext = EGL_NO_CONTEXT);
 
   ~GPUDrawable() override;
@@ -54,11 +55,11 @@ class GPUDrawable : public Drawable {
  private:
   int _width = 0;
   int _height = 0;
-  EGLNativeWindowType nativeWindow;
+  NativeWindow* nativeWindow = nullptr;
   EGLContext sharedContext = nullptr;
   int64_t currentTimeStamp = 0;
   std::shared_ptr<tgfx::EGLWindow> window = nullptr;
 
-  explicit GPUDrawable(EGLNativeWindowType nativeWindow, EGLContext eglContext = EGL_NO_CONTEXT);
+  explicit GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext = EGL_NO_CONTEXT);
 };
 }  // namespace pag
