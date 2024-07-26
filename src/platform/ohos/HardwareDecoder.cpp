@@ -129,7 +129,6 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
   }
   int ret = OH_AVBuffer_SetBufferAttr(codecBufferInfo.buffer, &bufferAttr);
   if (ret == AV_ERR_OK) {
-    LOGI("Set BufferAttr attr success!, ret:%d, time:%ld", ret, time);
     ret = OH_VideoDecoder_PushInputBuffer(videoCodec, codecBufferInfo.bufferIndex);
     if (ret != AV_ERR_OK) {
       LOGE("OH_VideoDecoder_PushInputBuffer failed, ret:%d", ret);
