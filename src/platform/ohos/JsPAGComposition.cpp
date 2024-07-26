@@ -1,0 +1,414 @@
+//
+// Created on 2024/7/16.
+//
+// Node APIs are not fully supported. To solve the compilation error of the interface cannot be found,
+// please include "napi/native_api.h".
+
+#include <cstddef>
+#include <cstdint>
+#include "JsPAGLayerHandle.h"
+#include "JsHelper.h"
+
+namespace pag {
+
+static std::shared_ptr<PAGComposition> FromJs(napi_env env, napi_value value) {
+  auto layer = JsPAGLayerHandle::FromJs(env, value);
+  if (layer && layer->layerType() == LayerType::PreCompose) {
+    return std::static_pointer_cast<PAGComposition>(layer);
+  }
+  return nullptr;
+}
+
+static napi_value Make(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  int width = 0;
+  int height = 0;
+  napi_get_value_int32(env, args[0], &width);
+  napi_get_value_int32(env, args[1], &height);
+  return JsPAGLayerHandle::ToJs(env, PAGComposition::Make(width, height));
+}
+
+static napi_value Width(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    napi_value value;
+    napi_create_int32(env, 0, &value);
+    return value;
+  }
+  napi_value value;
+  napi_create_int32(env, composition->width(), &value);
+  return value;
+}
+
+static napi_value Height(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  napi_value value;
+  napi_create_int32(env, composition->height(), &value);
+  return value;
+}
+
+static napi_value SetContentSize(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 2;
+  napi_value args[2] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  int32_t width = 0;
+  napi_get_value_int32(env, args[0], &width);
+  int32_t height = 0;
+  napi_get_value_int32(env, args[1], &height);
+  composition->setContentSize(width, height);
+  return {};
+}
+
+static napi_value NumChildren(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  napi_value value;
+  napi_create_int32(env, composition->numChildren(), &value);
+  return value;
+}
+
+static napi_value GetLayerAt(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  int32_t index = -1;
+  napi_get_value_int32(env, args[0], &index);
+  return JsPAGLayerHandle::ToJs(env, composition->getLayerAt(index));
+}
+
+static napi_value GetLayerIndex(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  napi_value value;
+  napi_create_int32(env, composition->getLayerIndex(layer), &value);
+  return value;
+}
+
+static napi_value SetLayerIndex(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 2;
+  napi_value args[2] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (!layer) {
+    return {};
+  }
+  int32_t index = -1;
+  napi_get_value_int32(env, args[1], &index);
+  if (index < 0) {
+    return {};
+  }
+  composition->setLayerIndex(layer, index);
+  return {};
+}
+
+static napi_value AddLayer(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  napi_value value;
+  if (!composition) {
+    napi_get_boolean(env, false, &value);
+    return value;
+  }
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (!layer) {
+    napi_get_boolean(env, false, &value);
+  } else {
+    napi_get_boolean(env, composition->addLayer(layer), &value);
+  }
+  return value;
+}
+
+static napi_value AddLayerAt(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 2;
+  napi_value args[2] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  napi_value value;
+  if (!composition) {
+    napi_get_boolean(env, false, &value);
+    return value;
+  }
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (!layer) {
+    napi_get_boolean(env, false, &value);
+    return value;
+  }
+  int32_t index = -1;
+  napi_get_value_int32(env, args[1], &index);
+  if (index < 0) {
+    napi_get_boolean(env, false, &value);
+  } else {
+    napi_get_boolean(env, composition->addLayer(layer), &value);
+  }
+  return value;
+}
+
+static napi_value Contains(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  napi_value value;
+  if (!composition) {
+    napi_get_boolean(env, false, &value);
+    return value;
+  }
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (!layer) {
+    napi_get_boolean(env, false, &value);
+    return value;
+  }
+  napi_get_boolean(env, composition->contains(layer), &value);
+  return value;
+}
+
+static napi_value RemoveLayer(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (!layer) {
+    return {};
+  }
+  return JsPAGLayerHandle::ToJs(env, composition->removeLayer(layer));
+}
+
+static napi_value RemoveLayerAt(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  int32_t index = -1;
+  napi_get_value_int32(env, args[0], &index);
+  if (index < 0) {
+    return {};
+  }
+  return JsPAGLayerHandle::ToJs(env, composition->removeLayerAt(index));
+}
+
+static napi_value RemoveAllLayers(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  composition->removeAllLayers();
+  return {};
+}
+
+static napi_value SwapLayer(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 2;
+  napi_value args[2] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  auto layer1 = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (!layer1) {
+    return {};
+  }
+  auto layer2 = JsPAGLayerHandle::FromJs(env, args[1]);
+  if (!layer2) {
+    return {};
+  }
+  composition->swapLayer(layer1, layer2);
+  return {};
+}
+
+static napi_value SwapLayerAt(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 2;
+  napi_value args[2] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  int32_t index1 = -1;
+  napi_get_value_int32(env, args[1], &index1);
+  if (index1 < 0) {
+    return {};
+  }
+  int32_t index2 = -1;
+  napi_get_value_int32(env, args[1], &index2);
+  if (index2 < 0) {
+    return {};
+  }
+  composition->swapLayerAt(index1, index2);
+  return {};
+}
+
+static napi_value AudioBytes(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  // todo:partyhuang
+  return {};
+}
+
+static napi_value AudioMarkers(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  // todo:partyhuang
+  return {};
+}
+
+static napi_value AudioStartTime(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  napi_value value;
+  napi_create_int32(env, composition->audioStartTime(), &value);
+  return value;
+}
+
+static napi_value GetLayersByName(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  char name[1024] = {0};
+  size_t length = 0;
+  napi_get_value_string_utf8(env, args[0], name, 1024, &length);
+  auto layers = composition->getLayersByName(std::string(name, length));
+  napi_value array;
+  napi_create_array_with_length(env, layers.size(), &array);
+  for (size_t i = 0; i < layers.size(); i++) {
+    napi_set_element(env, array, i, JsPAGLayerHandle::ToJs(env, layers[i]));
+  }
+  return array;
+}
+
+static napi_value GetLayersUnderPoint(napi_env env, napi_callback_info info) {
+  napi_value jsComposition = nullptr;
+  size_t argc = 2;
+  napi_value args[2] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
+  auto composition = FromJs(env, jsComposition);
+  if (!composition) {
+    return {};
+  }
+  double x = 0;
+  napi_get_value_double(env, args[0], &x);
+  double y = 0;
+  napi_get_value_double(env, args[1], &y);
+  auto layers = composition->getLayersUnderPoint(x, y);
+  napi_value array;
+  napi_create_array_with_length(env, layers.size(), &array);
+  for (size_t i = 0; i < layers.size(); i++) {
+    napi_set_element(env, array, i, JsPAGLayerHandle::ToJs(env, layers[i]));
+  }
+  return array;
+}
+
+bool JsPAGLayerHandle::InitPAGCompositionLayerEnv(napi_env env, napi_value exports) {
+  napi_property_descriptor classProp[] = {
+      PAG_STATIC_METHOD_ENTRY(Make, Make),
+
+      PAG_DEFAULT_METHOD_ENTRY(width, Width),
+      PAG_DEFAULT_METHOD_ENTRY(height, Height),
+      PAG_DEFAULT_METHOD_ENTRY(setContentSize, SetContentSize),
+      PAG_DEFAULT_METHOD_ENTRY(numChildren, NumChildren),
+      PAG_DEFAULT_METHOD_ENTRY(getLayerAt, GetLayerAt),
+      PAG_DEFAULT_METHOD_ENTRY(getLayerIndex, GetLayerIndex),
+      PAG_DEFAULT_METHOD_ENTRY(setLayerIndex, SetLayerIndex),
+      PAG_DEFAULT_METHOD_ENTRY(addLayer, AddLayer),
+      PAG_DEFAULT_METHOD_ENTRY(contains, Contains),
+      PAG_DEFAULT_METHOD_ENTRY(removeLayer, RemoveLayer),
+      PAG_DEFAULT_METHOD_ENTRY(removeLayerAt, RemoveLayerAt),
+      PAG_DEFAULT_METHOD_ENTRY(removeAllLayers, RemoveAllLayers),
+      PAG_DEFAULT_METHOD_ENTRY(swapLayer, SwapLayer),
+      PAG_DEFAULT_METHOD_ENTRY(swapLayerAt, SwapLayerAt),
+      PAG_DEFAULT_METHOD_ENTRY(audioBytes, AudioBytes),
+      PAG_DEFAULT_METHOD_ENTRY(audioMarkers, AudioMarkers),
+      PAG_DEFAULT_METHOD_ENTRY(audioStartTime, AudioStartTime),
+      PAG_DEFAULT_METHOD_ENTRY(getLayersByName, GetLayersByName),
+      PAG_DEFAULT_METHOD_ENTRY(getLayersUnderPoint, GetLayersUnderPoint)};
+
+  auto status = DefineClass(env, exports, GetLayerClassName(LayerType::PreCompose),
+                            sizeof(classProp) / sizeof(classProp[0]), classProp,
+                            ConstructorWithHandler<JsPAGLayerHandle>, GetBaseClassName());
+  return status == napi_status::napi_ok;
+}
+
+}  // namespace pag

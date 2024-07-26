@@ -1,445 +1,73 @@
+
 #include "napi/native_api.h"
-
-#include "pag/pag.h"
-#include "pag/file.h"
-
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <GLES3/gl3.h>
-#include <cstdint>
-#include <multimedia/player_framework/native_avcodec_videodecoder.h>
-#include <multimedia/player_framework/native_avcapability.h>
-#include <multimedia/player_framework/native_avcodec_base.h>
-#include <multimedia/player_framework/native_avformat.h>
-#include <multimedia/player_framework/native_avbuffer.h>
-#include <native_buffer/native_buffer.h>
-#include <native_image/native_image.h>
-#include <queue>
-#include <thread>
-#include <fstream>
-
-
-#include "hilog/log.h"
-#include "third_party/tgfx/include/tgfx/platform/Print.h"
-
-#undef LOG_DOMAIN
-#undef LOG_TAG
-#define LOG_DOMAIN 0x3200  // 全局domain宏，标识业务领域
-#define LOG_TAG "MY_TAG"   // 全局tag宏，标识模块日志tag
-
-#define GL_TEXTURE_EXTERNAL_OES 0x8D65
-
-using namespace pag;
-static OH_AVCodec *avCodec = nullptr;
-static bool bStarted = false;
-
-
-using GetPlatformDisplayExt = PFNEGLGETPLATFORMDISPLAYEXTPROC;
-
-bool CheckEglExtension(const char *extensions, const char *extension) {
-    size_t extlen = strlen(extension);
-    const char *end = extensions + strlen(extensions);
-
-    while (extensions < end) {
-        size_t n = 0;
-        if (*extensions == ' ') {
-            extensions++;
-            continue;
-        }
-        n = strcspn(extensions, " ");
-        if (n == extlen && strncmp(extension, extensions, n) == 0) {
-            return true;
-        }
-        extensions += n;
-    }
-    return false;
-}
-
-// 获取当前的显示设备
-static EGLDisplay GetPlatformEglDisplay(EGLenum platform, void *native_display, const EGLint *attrib_list) {
-    static GetPlatformDisplayExt eglGetPlatformDisplayExt = NULL;
-
-    if (!eglGetPlatformDisplayExt) {
-        const char *extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
-        if (extensions && (CheckEglExtension(extensions, "EGL_EXT_platform_wayland") ||
-                           CheckEglExtension(extensions, "EGL_KHR_platform_wayland"))) {
-            eglGetPlatformDisplayExt = (GetPlatformDisplayExt)eglGetProcAddress("eglGetPlatformDisplayEXT");
-        }
-    }
-
-    if (eglGetPlatformDisplayExt) {
-        return eglGetPlatformDisplayExt(platform, native_display, attrib_list);
-    }
-
-    return eglGetDisplay((EGLNativeDisplayType)native_display);
-}
-
-void InitEGLEnv() {
-    // 获取当前的显示设备
-    EGLDisplay eglDisplay_ = GetPlatformEglDisplay(EGL_PLATFORM_OHOS_KHR, EGL_DEFAULT_DISPLAY, NULL);
-    if (eglDisplay_ == EGL_NO_DISPLAY) {
-    }
-
-    EGLint major, minor;
-    // 初始化EGLDisplay
-    if (eglInitialize(eglDisplay_, &major, &minor) == EGL_FALSE) {
-    }
-
-    // 绑定图形绘制的API为OpenGLES
-    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
-    }
-
-    unsigned int ret;
-    EGLint count;
-    EGLint config_attribs[] = {EGL_SURFACE_TYPE,
-                               EGL_WINDOW_BIT,
-                               EGL_RED_SIZE,
-                               8,
-                               EGL_GREEN_SIZE,
-                               8,
-                               EGL_BLUE_SIZE,
-                               8,
-                               EGL_ALPHA_SIZE,
-                               8,
-                               EGL_RENDERABLE_TYPE,
-                               EGL_OPENGL_ES3_BIT,
-                               EGL_NONE};
-
-    // 获取一个有效的系统配置信息
-    EGLConfig config_;
-    ret = eglChooseConfig(eglDisplay_, config_attribs, &config_, 1, &count);
-    if (!(ret && static_cast<unsigned int>(count) >= 1)) {
-    }
-
-    static const EGLint context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-
-    // 创建上下文
-    EGLContext eglContext_ = eglCreateContext(eglDisplay_, config_, EGL_NO_CONTEXT, context_attribs);
-    if (eglContext_ == EGL_NO_CONTEXT) {
-    }
-
-    // 创建eglSurface
-    OHNativeWindow *eglNativeWindow_ = nullptr;
-    EGLSurface eglSurface_ = eglCreateWindowSurface(eglDisplay_, config_, eglNativeWindow_, context_attribs);
-    if (eglSurface_ == EGL_NO_SURFACE) {
-    }
-
-    // 关联上下文
-    eglMakeCurrent(eglDisplay_, eglSurface_, eglSurface_, eglContext_);
-
-}
-
-struct CodecBufferInfo {
-    uint32_t bufferIndex = 0;
-    OH_AVBuffer *buffer = nullptr;
-    uint8_t *bufferAddr = nullptr;
-    OH_AVCodecBufferAttr attr = {0, 0, 0, AVCODEC_BUFFER_FLAGS_NONE};
-
-    CodecBufferInfo(uint32_t argBufferIndex, OH_AVBuffer *argBuffer)
-        : bufferIndex(argBufferIndex), buffer(argBuffer) {
-        OH_AVBuffer_GetBufferAttr(argBuffer, &attr);
-    };
-};
-
-class CodecUserData {
-public:
-
-    uint32_t inputFrameCount_ = 0;
-    std::mutex inputMutex_;
-    std::condition_variable inputCond_;
-    std::queue<CodecBufferInfo> inputBufferInfoQueue_;
-
-    uint32_t outputFrameCount_ = 0;
-    std::mutex outputMutex_;
-    std::condition_variable outputCond_;
-    std::queue<CodecBufferInfo> outputBufferInfoQueue_;
-
-    void ClearQueue() {
-        {
-            std::unique_lock<std::mutex> lock(inputMutex_);
-            auto emptyQueue = std::queue<CodecBufferInfo>();
-            inputBufferInfoQueue_.swap(emptyQueue);
-        }
-        {
-            std::unique_lock<std::mutex> lock(outputMutex_);
-            auto emptyQueue = std::queue<CodecBufferInfo>();
-            outputBufferInfoQueue_.swap(emptyQueue);
-        }
-    }
-};
-
-static CodecUserData* codecUserData = nullptr;
-
-// 解码异常回调OH_AVCodecOnError实现
-static void OnError(OH_AVCodec *codec, int32_t errorCode, void *userData) {
-    (void)codec;
-    (void)errorCode;
-    (void)userData;
-}
-
-// 解码数据流变化回调OH_AVCodecOnStreamChanged实现
-static void OnStreamChanged(OH_AVCodec *codec, OH_AVFormat *format, void *userData) {
-    (void)codec;
-    (void)format;
-    (void)userData;
-}
-
-static void OnNeedInputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *buffer, void *userData) {
-    if (userData == nullptr) {
-        return;
-    }
-    (void)codec;
-    OH_LOG_INFO(LOG_APP,"---------------OnNeedInputBuffer--index:%{public}d", index);
-    CodecUserData *codecUserData = static_cast<CodecUserData *>(userData);
-    std::unique_lock<std::mutex> lock(codecUserData->inputMutex_);
-    codecUserData->inputBufferInfoQueue_.emplace(index, buffer);
-    codecUserData->inputCond_.notify_all();
-}
-
-// 解码输出回调OH_AVCodecOnNewOutputBuffer实现
-static void OnNewOutputBuffer(OH_AVCodec *codec, uint32_t index, OH_AVBuffer *buffer, void *userData) {
-    if (userData == nullptr) {
-        return;
-    }
-    (void)codec;
-    OH_LOG_INFO(LOG_APP,"---------------OnNewOutputBuffer--index:%{public}d", index);
-    CodecUserData *codecUserData = static_cast<CodecUserData *>(userData);
-    std::unique_lock<std::mutex> lock(codecUserData->outputMutex_);
-    codecUserData->outputBufferInfoQueue_.emplace(index, buffer);
-    codecUserData->outputCond_.notify_all();
-}
-
-static void OutputFunc() {
-   OH_LOG_INFO(LOG_APP,"--------------- OutputFunc ---------------------");
-//    std::string outPath = "/data/storage/el1/bundle/entry/resources/resfile/test.yuv";
-//    auto file = fopen(outPath.c_str(), "wb");
-   size_t currentIndex = 0;
-   while (true) {
-       std::unique_lock<std::mutex> lock(codecUserData->outputMutex_);
-       codecUserData->outputCond_.wait(lock, [] {
-          return codecUserData->outputBufferInfoQueue_.size() > 0 || !bStarted;
-       });
-       if (!bStarted) {
-           break;
-       }
-       uint32_t index = codecUserData->outputBufferInfoQueue_.front().bufferIndex;
-       CodecBufferInfo bufferInfo = codecUserData->outputBufferInfoQueue_.front();
-       lock.unlock();
-       OH_AVCodecBufferAttr attr = {0, 0, 0, AVCODEC_BUFFER_FLAGS_NONE};
-       int ret = OH_AVBuffer_GetBufferAttr(bufferInfo.buffer, &attr); 
-       ret = OH_VideoDecoder_FreeOutputBuffer(avCodec, index);
-       if (ret != AV_ERR_OK) {
-              OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_FreeOutputBuffer failed!, ret:%{public}d", ret);
-              break;
-       } else {
-             OH_LOG_INFO(LOG_APP,"---------------OH_VideoDecoder_FreeOutputBuffer---success---currentIndex:%{public}d， timestamp:%{public}d, size:%{public}d", currentIndex ++, attr.pts, attr.size);
-             if (attr.size > 0) {
-//                 fwrite(OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(bufferInfo.buffer)), 1, bufferInfo.attr.size, file);
-             } else {
-//                 fclose(file);
-                break;
-             }
-       }
-       lock.lock();
-       codecUserData->outputBufferInfoQueue_.pop();
-       lock.unlock();
-   }
-}
-
-static void pagVideoSequenceDecodeTest() {
-    std::string filePath = "/data/storage/el1/bundle/entry/resources/resfile/particle_video.pag";
-    auto file = pag::File::Load(filePath);
-    if (file && file->compositions.size() > 0) {
-        VideoComposition *videoComposition = (VideoComposition*)(file->compositions[0]);
-        VideoSequence *videoSequence = videoComposition->sequences[0];
-        auto headers = videoSequence->headers;
-        auto frames = videoSequence->frames;
-        
-        avCodec = OH_VideoDecoder_CreateByMime("video/avc");
-        if (avCodec == nullptr) {
-            OH_LOG_ERROR(LOG_APP,"create hardware decoder failed!");
-            return;
-        }
-        
-//         OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_AVC, false, SOFTWARE);
-//         const char *name = OH_AVCapability_GetName(capability);
-//         avCodec = OH_VideoDecoder_CreateByName(name);
-
-        OH_AVFormat *format = OH_AVFormat_Create();
-        OH_LOG_INFO(LOG_APP,"---------------videoSequence->width:%{public}d, height:%{public}d", videoSequence->width, videoSequence->height);
-        OH_AVFormat_SetIntValue(format, OH_MD_KEY_WIDTH, videoSequence->width);
-        OH_AVFormat_SetIntValue(format, OH_MD_KEY_HEIGHT, videoSequence->height);
-        OH_AVFormat_SetDoubleValue(format, OH_MD_KEY_FRAME_RATE, videoSequence->frameRate);
-        OH_AVFormat_SetIntValue(format, OH_MD_KEY_PIXEL_FORMAT, AV_PIXEL_FORMAT_NV12);
-        int ret = OH_VideoDecoder_Configure(avCodec, format);
-        if (ret != AV_ERR_OK) {
-            OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_Configure failed!");
-            OH_AVFormat_Destroy(format);
-            format = nullptr;
-            return;
-        }
-        OH_AVFormat_Destroy(format);
-        format = nullptr;
-
-        codecUserData = new CodecUserData();
-        ret = OH_VideoDecoder_RegisterCallback(avCodec, { OnError, OnStreamChanged, OnNeedInputBuffer, OnNewOutputBuffer},
-                                         codecUserData);
-        if (ret != AV_ERR_OK) {
-            OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_RegisterCallback failed!");
-            delete codecUserData;
-            return;
-        }
-        ret = OH_VideoDecoder_Prepare(avCodec);
-        if (ret != AV_ERR_OK) {
-            OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_Prepare failed!");
-            delete codecUserData;
-            return;
-        }
-        ret = OH_VideoDecoder_Start(avCodec);
-        if (ret != AV_ERR_OK) {
-            OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_Start failed!");
-            delete codecUserData;
-            return;
-        }
-        bStarted = true;
-        std::thread work(OutputFunc);
-        size_t currentIndex = 0;
-        while(true) {
-           std::unique_lock<std::mutex> lock(codecUserData->inputMutex_);
-           codecUserData->inputCond_.wait(lock, []() {
-              return codecUserData->inputBufferInfoQueue_.size() > 0 || !bStarted;
-           });
-           if (!bStarted) {
-               break;
-           }
-           
-           CodecBufferInfo codecBufferInfo = codecUserData->inputBufferInfoQueue_.front();
-           lock.unlock();
-            
-           int index = codecBufferInfo.bufferIndex;
-           auto buffer = codecBufferInfo.buffer;
-
-           OH_AVCodecBufferAttr info;
-           if (currentIndex < 2) {
-              info.size = headers[currentIndex]->length();
-              info.offset = 0;
-              info.pts = 0;
-              info.flags = AVCODEC_BUFFER_FLAGS_NONE;
-              memcpy( OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(buffer)), headers[currentIndex]->data(), 
-                                            headers[currentIndex]->length());
-
-          } else if (currentIndex < (headers.size() + frames.size())) {
-              info.size = frames[currentIndex - 2]->fileBytes->length();
-              info.offset = 0;
-              info.pts = frames[currentIndex - 2]->frame * 1000000 / videoSequence->frameRate;
-              info.flags = AVCODEC_BUFFER_FLAGS_NONE;
-              memcpy( OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(buffer)), frames[currentIndex - 2]->fileBytes->data(), 
-                                            frames[currentIndex - 2]->fileBytes->length());
-          } else {
-              info.size = 0;
-              info.offset = 0;
-              info.pts = 0;
-              info.flags = AVCODEC_BUFFER_FLAGS_EOS;
-          }
-          ret = OH_AVBuffer_SetBufferAttr(reinterpret_cast<OH_AVBuffer *>(buffer), &info);
-          if (ret != AV_ERR_OK) {
-              OH_LOG_ERROR(LOG_APP,"OH_AVBuffer_SetBufferAttr failed!");
-              break;
-          }
-          OH_LOG_INFO(LOG_APP,"---------------OH_VideoDecoder_PushInputBuffer--index:%{public}d, length:%{public}d, currentIndex:%{public}d", index, info.size, currentIndex);
-          ret = OH_VideoDecoder_PushInputBuffer(avCodec, index);
-          if (ret != AV_ERR_OK) {
-              OH_LOG_ERROR(LOG_APP,"OH_VideoDecoder_PushInputBuffer failed!");
-              break;
-          }
-
-          if (currentIndex >= (headers.size() + frames.size())) {
-             break;
-          } else {
-             currentIndex ++;
-          }
-          lock.lock();
-          codecUserData->inputBufferInfoQueue_.pop();
-          lock.unlock();
-        }
-
-        work.join();
-        bStarted = false;
-        ret = OH_VideoDecoder_Destroy(avCodec);   
-        OH_LOG_INFO(LOG_APP,"---------------OH_VideoDecoder_Destroy--ret:%{public}d", ret);
-        delete codecUserData;
-    }
-}
-
-static void PAGDrawTest()
-{
-    std::string filePath = "/data/storage/el1/bundle/entry/resources/resfile/particle_video.pag";
-    auto pagFile = PAGFile::Load(filePath);
-    if (pagFile == nullptr) {
-        return;
-    }
-    auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
-    if (pagSurface == nullptr) {
-        return;
-    }
-    auto pagPlayer = new PAGPlayer();
-    pagPlayer->setComposition(pagFile);
-    pagPlayer->setSurface(pagSurface);
-    int numFrames = pagFile->frameRate() * pagFile->duration() / 1000000;
-    for (int i = 0; i < 1; i++) {
-        pagPlayer->setProgress((2 + 0.1)/ numFrames);
-        auto status = pagPlayer->flush();
-        if (status) {
-            OH_LOG_INFO(LOG_APP,"pag flush success!, frame:%{public}d", i);
-         } else {
-            OH_LOG_ERROR(LOG_APP,"pag flush failed!");
-        }
-    }
-    delete pagPlayer;
-}
-
-
-static napi_value Add(napi_env env, napi_callback_info info)
-{
-//     pagVideoSequenceDecodeTest();
-    size_t argc = 2;
-    napi_value args[2] = {nullptr};
-
-    napi_get_cb_info(env, info, &argc, args , nullptr, nullptr);
-    
-    auto version = pag::PAG::SDKVersion();
-//     LOGE("--------test--------!");
-//     OH_LOG_ERROR(LOG_APP,"OH_AVBuffer_SetBufferAttr failed!");
-    PAGDrawTest();
-
-    napi_valuetype valuetype0;
-    napi_typeof(env, args[0], &valuetype0);
-
-    napi_valuetype valuetype1;
-    napi_typeof(env, args[1], &valuetype1);
-
-    double value0;
-    napi_get_value_double(env, args[0], &value0);
-
-    double value1;
-    napi_get_value_double(env, args[1], &value1);
-
-    napi_value sum;
-    napi_create_double(env, value0 + value1, &sum);
-
-    return sum;
-
-}
-
-
+#include <ace/xcomponent/native_interface_xcomponent.h>
 EXTERN_C_START
-static napi_value Init(napi_env env, napi_value exports)
-{
-    napi_property_descriptor desc[] = {
-        { "add", nullptr, Add, nullptr, nullptr, nullptr, napi_default, nullptr }
-    };
-    napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
-    return exports;
+
+void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* window) {
+  if ((component == nullptr) || (window == nullptr)) {
+    return;
+  }
+
+  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
+  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
+  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
+      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
+    return;
+  }
+
+  
+}
+
+void OnSurfaceChangedCB(OH_NativeXComponent* component, void* window) {
+  if ((component == nullptr) || (window == nullptr)) {
+    return;
+  }
+
+  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
+  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
+  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
+      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
+    return;
+  }
+    
+}
+
+void OnSurfaceDestroyedCB(OH_NativeXComponent* component, void* window) {
+  if ((component == nullptr) || (window == nullptr)) {
+    return;
+  }
+
+  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
+  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
+  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
+      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
+    return;
+  }
+    
+}
+
+static napi_value Init(napi_env env, napi_value exports) {
+
+  napi_value exportInstance = nullptr;
+  if (napi_get_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &exportInstance) != napi_ok) {
+    return nullptr;
+  }
+
+  OH_NativeXComponent* nativeXComponent = nullptr;
+  auto temp = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
+  if (temp != napi_ok) {
+    return nullptr;
+  }
+
+  OH_NativeXComponent_Callback renderCallback;
+  renderCallback.OnSurfaceCreated = OnSurfaceCreatedCB;
+  renderCallback.OnSurfaceChanged = OnSurfaceChangedCB;
+  renderCallback.OnSurfaceDestroyed = OnSurfaceDestroyedCB;
+
+  OH_NativeXComponent_RegisterCallback(nativeXComponent, &renderCallback);
+
+  
+  return exports;
 }
 EXTERN_C_END
 
@@ -448,12 +76,11 @@ static napi_module demoModule = {
     .nm_flags = 0,
     .nm_filename = nullptr,
     .nm_register_func = Init,
-    .nm_modname = "entry",
+    .nm_modname = "testnative",
     .nm_priv = ((void*)0),
-    .reserved = { 0 },
+    .reserved = {0},
 };
 
-extern "C" __attribute__((constructor)) void RegisterEntryModule(void)
-{
-    napi_module_register(&demoModule);
+extern "C" __attribute__((constructor)) void RegisterEntryModule(void) {
+  napi_module_register(&demoModule);
 }

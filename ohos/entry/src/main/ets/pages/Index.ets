@@ -1,34 +1,34 @@
-import { hilog } from '@kit.PerformanceAnalysisKit';
-import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit';
-import fs, { ReadOptions } from '@ohos.file.fs';
+import { PAGView } from 'libpag';
+import { PAGFile } from 'libpag'
+import { PAGComposition } from 'libpag/src/main/ets/PAGComposition';
 
 @Entry
 @Component
 struct Index {
   @State message: string = 'PAG Test'
+  @State composition: PAGComposition | null = null;
+
+  onDidBuild(): void {
+    let manager = getContext(this).resourceManager;
+    let file = PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
+    this.composition = file as PAGComposition;
+  }
   build() {
     Row() {
       Column() {
+        PAGView({composition:this.composition})
+          .height('50%')
+
         Text(this.message)
           .fontSize(50)
           .fontWeight(FontWeight.Bold)
           .onClick(() => {
-            let context = getContext(this) as common.UIAbilityContext;
-            let filesDir = context.resourceDir;
-            let filePath = filesDir + '/particle_video.pag';
-            if (fs.accessSync(filePath)) {
-              console.info("---------- filePath exist, path:" + filePath);
-            } else
-            {
-              console.error("---------- filePath not exist, path:" + filePath);
-            }
-
-
-            hilog.info(0x0000, 'testTag', 'Test NAPI 2 + 3 = %{public}d', testNapi.add(2, 3));
           })
+          .height('50%')
       }
       .width('100%')
+
     }
     .height('100%')
   }

@@ -1,9 +1,11 @@
 {
   "module": {
-    "name": "entry_test",
+    "name": "libpag_test",
     "type": "feature",
     "deviceTypes": [
-      "phone"
+      "phone",
+      "tablet",
+      "2in1"
     ],
     "deliveryWithInstall": true,
     "installationFree": false

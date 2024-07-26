@@ -6,6 +6,7 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "libentry.so": "file:./src/main/cpp/types/libentry"
+    "libpag" : "file:../libpag",
+//    "libtestnative.so": "file:./src/main/cpp/types/libtestnative"
   }
 }

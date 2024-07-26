@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "/Users/kevingpqi/.ohos/config/default_ohos_ZSR4XqUzX9QnKyw52IpFcbB3_LpgyYrgyOeWfc5_hWY=.cer",
-          "storePassword": "0000001B62B9B90CF7B07657B40F1332808C66F1E6AED62A51D210288CF615314EE0812CD28C0B99E13A04",
+          "certpath": "/Users/partyhuang/.ohos/config/default_ohos_M_dUFYv3hKqf8mgZLJpVzRURJnYHisyMcVdsuIpuN_o=.cer",
+          "storePassword": "0000001BDC107D5094C5C7A547443A7AB565789E1182C6371F922BFE7542C6202622C07D061D59D9F4E59A",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BC5E9B4DA06DEF749150443550BC2BA61E5DCFA4F014DCC640D84FE7FEC53D8B99D54CDC4E1845F",
-          "profile": "/Users/kevingpqi/.ohos/config/default_ohos_ZSR4XqUzX9QnKyw52IpFcbB3_LpgyYrgyOeWfc5_hWY=.p7b",
+          "keyPassword": "0000001B5FA40DCA164B010EAF4720E71D4E2CFE7094C628A15810F50220118BBDAF81F3A441556E8097F4",
+          "profile": "/Users/partyhuang/.ohos/config/default_ohos_M_dUFYv3hKqf8mgZLJpVzRURJnYHisyMcVdsuIpuN_o=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/kevingpqi/.ohos/config/default_ohos_ZSR4XqUzX9QnKyw52IpFcbB3_LpgyYrgyOeWfc5_hWY=.p12"
+          "storeFile": "/Users/partyhuang/.ohos/config/default_ohos_M_dUFYv3hKqf8mgZLJpVzRURJnYHisyMcVdsuIpuN_o=.p12"
         }
       }
     ],
@@ -36,6 +36,18 @@
     {
       "name": "entry",
       "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "libpag",
+      "srcPath": "./libpag",
       "targets": [
         {
           "name": "default",
