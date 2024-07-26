@@ -115,6 +115,10 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
   videoFormat = format;
+  if (!start()) {
+    LOGE("video decoder start failed!, ret:%d", ret);
+    return false;
+  }
   return true;
 }
 
