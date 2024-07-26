@@ -25,6 +25,8 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
+#elif defined(__OHOS__)
+struct OH_NativeBuffer;
 #elif defined(__APPLE__)
 struct __CVBuffer;
 #endif
@@ -35,6 +37,8 @@ typedef AHardwareBuffer* HardwareBufferRef;
 #elif defined(__APPLE__)
 // __CVBuffer == CVPixelBufferRef
 typedef __CVBuffer* HardwareBufferRef;
+#elif defined(__OHOS__)
+typedef OH_NativeBuffer* HardwareBufferRef;
 #else
 typedef void* HardwareBufferRef;
 #endif
