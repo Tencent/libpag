@@ -24,6 +24,7 @@
 #include "pag/decoder.h"
 #include "pag/gpu.h"
 #include "pag/types.h"
+#include "tgfx/gpu/Device.h"
 
 namespace tgfx {
 struct Rect;
@@ -1711,6 +1712,36 @@ class PAG_API PAG {
    * Get SDK version information.
    */
   static std::string SDKVersion();
+};
+
+class PAG_API Drawable {
+ public:
+  virtual ~Drawable() = default;
+
+  virtual int width() const = 0;
+
+  virtual int height() const = 0;
+
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+
+  virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context, bool queryOnly);
+
+  virtual std::shared_ptr<tgfx::Surface> getFrontSurface(tgfx::Context* context, bool queryOnly);
+
+  void freeSurface();
+
+  virtual void setTimeStamp(int64_t timestamp);
+
+  virtual void present(tgfx::Context* context);
+
+  virtual void updateSize();
+
+ protected:
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
+
+  virtual std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) = 0;
+
+  virtual void onFreeSurface();
 };
 
 }  // namespace pag

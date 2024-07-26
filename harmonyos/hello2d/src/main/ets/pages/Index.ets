@@ -1,5 +1,6 @@
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import hello2d from 'libhello2d.so';
+import display from '@ohos.display';
+import { common } from '@kit.AbilityKit';
 
 @Entry
 @Component

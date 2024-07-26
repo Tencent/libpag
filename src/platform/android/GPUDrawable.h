@@ -20,6 +20,7 @@
 
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
+#include <pag/pag.h>
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
 

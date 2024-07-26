@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pag/pag.h"
 #include "rendering/drawables/Drawable.h"
 
 namespace pag {
