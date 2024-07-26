@@ -189,7 +189,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
         return;
     }
     
-    auto drawable = pag::GPUDrawable::FromWindow(reinterpret_cast<EGLNativeWindowType>(nativeWindow));
+    auto drawable = pag::GPUDrawable::FromWindow(reinterpret_cast<NativeWindow*>(nativeWindow));
     if (drawable == nullptr) {
         return;
     }
@@ -200,7 +200,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
     pagPlayer = new pag::PAGPlayer();
     pagPlayer->setComposition(pagFile);
     pagPlayer->setSurface(pagSurface);
-    pagPlayer->setProgress(0.3);
+    pagPlayer->setProgress(0.5);
     bool status = pagPlayer->flush();
     if (status) {
         

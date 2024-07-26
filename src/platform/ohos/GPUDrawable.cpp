@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 20214 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,7 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
-std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(EGLNativeWindowType nativeWindow,
+std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(NativeWindow* nativeWindow,
                                                      EGLContext sharedContext) {
   if (!nativeWindow) {
     LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
@@ -31,7 +31,7 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(EGLNativeWindowType nativeW
   return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
 }
 
-GPUDrawable::GPUDrawable(EGLNativeWindowType nativeWindow, EGLContext eglContext)
+GPUDrawable::GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext)
     : nativeWindow(nativeWindow), sharedContext(eglContext) {
   updateSize();
 }
@@ -52,7 +52,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (!window) {
-    window = tgfx::EGLWindow::MakeFrom(nativeWindow, sharedContext);
+    window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow), sharedContext);
   }
   return window ? window->getDevice() : nullptr;
 }

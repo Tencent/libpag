@@ -170,7 +170,7 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
     codecUserData->outputCondition.wait(lock,[this](){
         return codecUserData->outputBufferInfoQueue.size() > 0 || 
-        pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize);
+        pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) + 1;
     });
     if (codecUserData->outputBufferInfoQueue.size() > 0) {
         codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
@@ -181,6 +181,7 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
         lock.unlock();
         return DecodingResult::TryAgainLater;
     }
+    LOGI("HardwareDecoder::onDecodeFrame success!, time:%ld", codecBufferInfo.attr.pts); 
     if (codecBufferInfo.attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
         return DecodingResult::EndOfStream;
     }
