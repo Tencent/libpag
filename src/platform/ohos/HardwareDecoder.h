@@ -17,10 +17,12 @@
 
 #pragma once
 
+#include <multimedia/player_framework/native_avcapability.h>
 #include <multimedia/player_framework/native_avcodec_videodecoder.h>
 #include <cstdint>
 #include <list>
 #include <queue>
+#include "pag/decoder.h"
 #include "rendering/video/DecodingResult.h"
 #include "rendering/video/VideoDecoder.h"
 
@@ -83,8 +85,14 @@ class HardwareDecoder : public VideoDecoder {
   CodecBufferInfo codecBufferInfo = {0, nullptr};
   VideoFormat videoFormat{};
   std::list<int64_t> pendingFrames{};
+  OH_AVCodecCategory codecCategory = HARDWARE;
+  int videoStride = 0;
+  int videoSliceHeight = 0;
+  int yBufferSize = 0;
+  int uvBufferSize = 0;
+  YUVBuffer yuvBuffer{};
   explicit HardwareDecoder(const VideoFormat& format);
-  bool initDecoder(const VideoFormat& format);
+  bool initDecoder(const OH_AVCodecCategory avCodecCategory);
   bool start();
 
   friend class HardwareDecoderFactory;
