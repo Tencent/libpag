@@ -6,7 +6,8 @@ set(NATIVERENDER_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions(-DOHOS_PLATFORM)
 
 include_directories(${NATIVERENDER_ROOT_PATH}
-                              ${NATIVERENDER_ROOT_PATH}/include)
+                    ${NATIVERENDER_ROOT_PATH}/include
+                    ${NATIVERENDER_ROOT_PATH}/third_party/tgfx/include)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./libpag)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./libpag)
@@ -14,5 +15,5 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./libpag)
 add_library(entry SHARED napi_init.cpp)
 target_link_libraries(entry PUBLIC libace_napi.z.so libnative_media_codecbase.so libnative_media_core.so
                       libnative_media_vdec.so libhilog_ndk.z.so libnative_window.so libnative_image.so libnative_buffer.so
-                      libEGL.so libGLESv3.so pag
+                      libEGL.so libGLESv3.so tgfx-drawers tgfx ${TGFX_SHARED_LIBS} pag
                       )

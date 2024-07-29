@@ -160,15 +160,15 @@ static void pagVideoSequenceDecodeTest() {
         auto headers = videoSequence->headers;
         auto frames = videoSequence->frames;
         
-        avCodec = OH_VideoDecoder_CreateByMime("video/avc");
-        if (avCodec == nullptr) {
-            OH_LOG_ERROR(LOG_APP,"create hardware decoder failed!");
-            return;
-        }
+//         avCodec = OH_VideoDecoder_CreateByMime("video/avc");
+//         if (avCodec == nullptr) {
+//             OH_LOG_ERROR(LOG_APP,"create hardware decoder failed!");
+//             return;
+//         }
         
-//         OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_AVC, false, SOFTWARE);
-//         const char *name = OH_AVCapability_GetName(capability);
-//         avCodec = OH_VideoDecoder_CreateByName(name);
+        OH_AVCapability *capability = OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_AVC, false, SOFTWARE);
+        const char *name = OH_AVCapability_GetName(capability);
+        avCodec = OH_VideoDecoder_CreateByName(name);
 
         OH_AVFormat *format = OH_AVFormat_Create();
         OH_LOG_INFO(LOG_APP,"---------------videoSequence->width:%{public}d, height:%{public}d", videoSequence->width, videoSequence->height);
@@ -306,7 +306,7 @@ static void PAGDrawTest()
 
 static napi_value Add(napi_env env, napi_callback_info info)
 {
-//     pagVideoSequenceDecodeTest();
+    pagVideoSequenceDecodeTest();
     size_t argc = 2;
     napi_value args[2] = {nullptr};
 
@@ -315,7 +315,7 @@ static napi_value Add(napi_env env, napi_callback_info info)
     auto version = pag::PAG::SDKVersion();
 //     LOGE("--------test--------!");
 //     OH_LOG_ERROR(LOG_APP,"OH_AVBuffer_SetBufferAttr failed!");
-    PAGDrawTest();
+//     PAGDrawTest();
 
     napi_valuetype valuetype0;
     napi_typeof(env, args[0], &valuetype0);
