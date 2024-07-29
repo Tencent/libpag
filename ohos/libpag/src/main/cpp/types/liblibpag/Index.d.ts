@@ -30,6 +30,8 @@ export declare class JsPAGPlayer {
 
   setSurface(surface: JsPAGSurface | null): void;
 
+  setProgress(progress: number): void;
+
   videoEnabled(): boolean;
 
   flush(): void;

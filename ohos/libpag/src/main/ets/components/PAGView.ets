@@ -15,15 +15,15 @@ function generateUUID() {
 
 @Component
 export struct PAGView {
-  @Link composition: PAGComposition | null;
+  @Link @Watch("onCompositionChange") composition: PAGComposition | null;
+  @Link @Watch("onProgressChange") progress: number;
+  @Link @Watch("onPlayStateChange") isPlaying: boolean;
+  @Prop frameRate: number = 60.0;
+  @Prop repeatCount: number = 0;
 
   aboutToAppear(): void {
-    if (this.composition) {
-      this.player.setComposition(this.composition);
-      this.flush();
-    }
+    this.flush();
   }
-
 
   build() {
     XComponent({
@@ -34,30 +34,60 @@ export struct PAGView {
       .onLoad((context) => {
         this.player.setSurface(PAGSurface.GetSurface(this.xId));
         this.player.setComposition(this.composition);
-        this.flush()
+        this.player.setProgress(this.progress);
+        if (this.isPlaying) {
+          this.play();
+        }
       })
       .onDestroy(() => {
         this.player.setSurface(null);
       })
+      .backgroundColor(Color.Transparent)
   }
 
-  // setComposition(composition: PAGComposition | null): PAGView {
-  //   this.composition = composition;
-  //   this.player.setComposition(composition);
-  //   this.flush();
-  //   return this;
-  // }
-
-  flush(): PAGView {
+  onCompositionChange() {
     this.player.setComposition(this.composition);
+    this.flush();
+  }
+
+  play(): void {
+    this.timerId = setTimeout(PAGView.TickFlush, 1000.0 / this.frameRate, this);
+  }
+
+  pause(): void {
+    clearTimeout(this.timerId);
+    this.timerId = -1;
+  }
+
+  onProgressChange() {
+    this.player.setProgress(this.progress);
+  }
+
+  flush(): void {
     this.player.flush();
-    return this;
+  }
+
+  onPlayStateChange() {
+    if (this.isPlaying) {
+      this.play();
+    } else {
+      this.pause();
+    }
+  }
+
+  static TickFlush(view: PAGView): void {
+    view.progress += 1.0 / view.frameRate;
+    if (view.progress > 1) {
+      view.progress = 0;
+    }
+    view.flush();
+    if (view.isPlaying) {
+      view.timerId = setTimeout(PAGView.TickFlush, 1000.0 / view.frameRate, view);
+    }
   }
 
   private player: PAGPlayer = new PAGPlayer();
   private xId: string = generateUUID();
-}
-
-declare class PAGViewAttribute extends CommonMethod<XComponentAttribute> {
-  composition(): PAGViewAttribute;
+  private timerId: number = -1;
+  private startTime: number = 0;
 }

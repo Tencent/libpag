@@ -32,6 +32,10 @@ export class PAGPlayer {
     }
   }
 
+  setProgress(progress: number): void {
+    this.nativePlayer.setProgress(progress);
+  }
+
   private nativePlayer: JsPAGPlayer;
 }
 
