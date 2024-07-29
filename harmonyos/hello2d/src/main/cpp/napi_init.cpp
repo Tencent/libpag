@@ -290,12 +290,12 @@ static void pagVideoSequenceDecodeTest_1() {
         auto frames = videoSequence->frames;
 
         OH_AVCapability *capability =
-            OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_AVC, false, HARDWARE);
+            OH_AVCodec_GetCapabilityByCategory(OH_AVCODEC_MIMETYPE_VIDEO_AVC, false, SOFTWARE);
         const char *name = OH_AVCapability_GetName(capability);
         videoCodec = OH_VideoDecoder_CreateByName(name);
 
         OH_AVFormat *format = OH_AVFormat_Create();
-        LOGI("---------------videoSequence->width:%d, height:%d", videoSequence->width, videoSequence->height);
+        LOGI("---------11------videoSequence->width:%d, height:%d", videoSequence->width, videoSequence->height);
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_WIDTH, videoSequence->width);
         OH_AVFormat_SetIntValue(format, OH_MD_KEY_HEIGHT, videoSequence->height);
         OH_AVFormat_SetDoubleValue(format, OH_MD_KEY_FRAME_RATE, videoSequence->frameRate);
@@ -331,7 +331,7 @@ static void pagVideoSequenceDecodeTest_1() {
             return;
         }
         size_t startFrame = 0; // keyFrame: 0, 23, 46
-        size_t endFrame = frames.size() + 2;
+        size_t endFrame = 13 + 2;
         size_t currentIndex = 0;
         while (true) {
             std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
@@ -357,8 +357,7 @@ static void pagVideoSequenceDecodeTest_1() {
                 memcpy(OH_AVBuffer_GetAddr(reinterpret_cast<OH_AVBuffer *>(buffer)), headers[currentIndex]->data(),
                        headers[currentIndex]->length());
 
-            } else if (currentIndex + startFrame < (headers.size() + frames.size()) &&
-                       currentIndex + startFrame <= endFrame) {
+            } else if (currentIndex + startFrame < (headers.size() + frames.size())) {
                 info.size = static_cast<int32_t>(frames[currentIndex - 2 + startFrame]->fileBytes->length());
                 info.offset = 0;
                 pts = static_cast<int64_t>(static_cast<float>(frames[currentIndex - 2 + startFrame]->frame) * 1000000 /
@@ -402,7 +401,7 @@ static void pagVideoSequenceDecodeTest_1() {
             std::unique_lock<std::mutex> outLock(codecUserData->outputMutex);
             codecUserData->outputCondition.wait(outLock, [] {
                 LOGI("--------------- OutputFunc wait, size:%d", codecUserData->outputBufferInfoQueue.size());
-                return codecUserData->outputBufferInfoQueue.size() > 0 || true;
+                return codecUserData->outputBufferInfoQueue.size() > 0 || pendingFrames.size() <= 3;
             });
             if (codecUserData->outputBufferInfoQueue.size() > 0) {
                 uint32_t indexOut = codecUserData->outputBufferInfoQueue.front().bufferIndex;
@@ -429,7 +428,6 @@ static void pagVideoSequenceDecodeTest_1() {
                     break;
                 }
             }
-
             currentIndex++;
         }
 
@@ -603,7 +601,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent *component, void *nativeWindo
     //   Draw(0);
     if (component && nativeWindow) {
     }
-    bool videoTest = true;
+    bool videoTest = false;
     if (videoTest) {
         if (1) {
             pagVideoSequenceDecodeTest_1();
@@ -631,7 +629,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent *component, void *nativeWindo
     pagPlayer = new pag::PAGPlayer();
     pagPlayer->setComposition(pagFile);
     pagPlayer->setSurface(pagSurface);
-    pagPlayer->setProgress(0.15);
+    pagPlayer->setProgress(0.9);
     bool status = pagPlayer->flush();
     if (status) {
     }

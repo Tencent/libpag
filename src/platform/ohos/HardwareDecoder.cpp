@@ -181,7 +181,7 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     // retesting is necessary.       
     LOGI("------ HardwareDecoder::onDecodeFrame wait, pendingFrames.size:%d", pendingFrames.size());  
     return codecUserData->outputBufferInfoQueue.size() > 0 ||
-           pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) + 100;    
+           pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) + 1;    
 //     return codecUserData->outputBufferInfoQueue.size() > 0 ||
 //            pendingFrames.size() <=
 //                (static_cast<size_t>(videoFormat.maxReorderSize) + codecCategory == SOFTWARE ? 1
@@ -198,6 +198,10 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
      LOGI("------ HardwareDecoder::onDecodeFrame TryAgainLater");     
     return DecodingResult::TryAgainLater;
   }
+  int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
+    if (ret != AV_ERR_OK) {
+      LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
+    }    
   if (codecBufferInfo.attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
     return DecodingResult::EndOfStream;
   }
@@ -261,10 +265,10 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
         std::shared_ptr<HardwareDecoder>(this));
     imageBuffer = tgfx::ImageBuffer::MakeNV12(yuvData, videoFormat.colorSpace);
   }
-  int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
-  if (ret != AV_ERR_OK) {
-    LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
-  }
+//   int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
+//   if (ret != AV_ERR_OK) {
+//     LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
+//   }
   return imageBuffer;
 }
 
