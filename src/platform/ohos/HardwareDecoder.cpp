@@ -180,12 +180,10 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     // data before obtaining the decoded data. If compatibility with user video decoding is desired,
     // retesting is necessary.       
     LOGI("------ HardwareDecoder::onDecodeFrame wait, pendingFrames.size:%d", pendingFrames.size());  
-    return codecUserData->outputBufferInfoQueue.size() > 0 ||
-           pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) + 1;    
 //     return codecUserData->outputBufferInfoQueue.size() > 0 ||
-//            pendingFrames.size() <=
-//                (static_cast<size_t>(videoFormat.maxReorderSize) + codecCategory == SOFTWARE ? 1
-//                                                                                             : 0);
+//            pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) + 1;    
+    return codecUserData->outputBufferInfoQueue.size() > 0 ||
+           pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) + (codecCategory == SOFTWARE ? 1 : 0);
   });
   if (codecUserData->outputBufferInfoQueue.size() > 0) {
     codecBufferInfo = codecUserData->outputBufferInfoQueue.front();

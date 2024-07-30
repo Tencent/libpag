@@ -629,7 +629,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent *component, void *nativeWindo
     pagPlayer = new pag::PAGPlayer();
     pagPlayer->setComposition(pagFile);
     pagPlayer->setSurface(pagSurface);
-    pagPlayer->setProgress(0.9);
+    pagPlayer->setProgress(0.3);
     bool status = pagPlayer->flush();
     if (status) {
     }
