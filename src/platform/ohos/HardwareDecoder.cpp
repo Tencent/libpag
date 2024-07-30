@@ -172,9 +172,8 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     // data before obtaining the decoded data. If compatibility with user video decoding is desired,
     // retesting is necessary.
     return codecUserData->outputBufferInfoQueue.size() > 0 ||
-           pendingFrames.size() <=
-               (static_cast<size_t>(videoFormat.maxReorderSize) + codecCategory == SOFTWARE ? 1
-                                                                                            : 0);
+           pendingFrames.size() <= static_cast<size_t>(videoFormat.maxReorderSize) +
+                                       (codecCategory == SOFTWARE ? 1 : 0);
   });
   if (codecUserData->outputBufferInfoQueue.size() > 0) {
     codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
@@ -184,6 +183,11 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
   } else {
     lock.unlock();
     return DecodingResult::TryAgainLater;
+  }
+  int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
+  if (ret != AV_ERR_OK) {
+    LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
+    return DecodingResult::Error;
   }
   if (codecBufferInfo.attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
     return DecodingResult::EndOfStream;
@@ -235,6 +239,8 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
       uvBufferSize = codecBufferInfo.attr.size - yBufferSize;
       yuvBuffer.data[0] = new uint8_t[yBufferSize];
       yuvBuffer.data[1] = new uint8_t[uvBufferSize];
+      yuvBuffer.lineSize[0] = videoStride;
+      yuvBuffer.lineSize[1] = videoStride;
       OH_AVFormat_Destroy(format);
     }
     uint8_t* yuvAddress = OH_AVBuffer_GetAddr(codecBufferInfo.buffer);
@@ -244,10 +250,6 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
         videoFormat.width, videoFormat.height, yuvBuffer.data, yuvBuffer.lineSize, NV12_PLANE_COUNT,
         std::shared_ptr<HardwareDecoder>(this));
     imageBuffer = tgfx::ImageBuffer::MakeNV12(yuvData, videoFormat.colorSpace);
-  }
-  int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
-  if (ret != AV_ERR_OK) {
-    LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
   }
   return imageBuffer;
 }
