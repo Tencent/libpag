@@ -13,8 +13,13 @@
  * limitations under the License.
  */
 
-import abilityTest from './XComponentAbility.test'
+export default interface XComponentContext {
+  drawPattern(): void;
 
-export default function testsuite() {
-  abilityTest()
-}
+  getStatus(): XComponentContextStatus;
+};
+
+type XComponentContextStatus = {
+  hasDraw: boolean,
+  hasChangeColor: boolean,
+};

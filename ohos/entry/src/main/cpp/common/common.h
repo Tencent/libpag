@@ -4,7 +4,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,8 +13,19 @@
  * limitations under the License.
  */
 
-import abilityTest from './XComponentAbility.test'
+#ifndef NATIVE_XCOMPONENT_COMMON_H
+#define NATIVE_XCOMPONENT_COMMON_H
 
-export default function testsuite() {
-  abilityTest()
-}
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <EGL/eglplatform.h>
+#include <GLES3/gl3.h>
+#include <napi/native_api.h>
+
+namespace NativeXComponentSample {
+/**
+ * Log print domain.
+ */
+const unsigned int LOG_PRINT_DOMAIN = 0xFF00;
+} // namespace NativeXComponentSample
+#endif // NATIVE_XCOMPONENT_COMMON_H

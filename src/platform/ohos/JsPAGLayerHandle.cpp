@@ -11,7 +11,7 @@ namespace pag {
 std::shared_ptr<PAGLayer> JsPAGLayerHandle::FromJs(napi_env env, napi_value value) {
   JsPAGLayerHandle* cLayerHandler = nullptr;
   auto status = napi_unwrap(env, value, (void**)&cLayerHandler);
-  if (status == napi_ok) {
+  if (status == napi_ok && cLayerHandler) {
     return cLayerHandler->get();
   } else {
     return nullptr;

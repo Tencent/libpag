@@ -52,9 +52,7 @@ if (NOT WEB)
     if (NOT IOS OR SDK_NAME STREQUAL iphonesimulator)
         option(PAG_USE_LIBAVC "Allow use of embedded libavc as fallback video decoder" OFF)
     endif ()
-    if (NOT OHOS)
         option(PAG_BUILD_SHARED "Allow build shared library" ON)
-    endif ()
 endif ()
 
 if (MACOS OR IOS)
@@ -393,9 +391,10 @@ elseif(OHOS)
         find_library(NATIVE_BUFFER_LIB native_buffer)
         find_library(NATIVE_WINDOW_LIB native_window)
         find_library(NATIVE_IMAGE_LIB native_image)
+        find_library(NATIVE_VSYNC_LIB native_vsync)
         list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
                     ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
-                    ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB})
+                    ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB} ${NATIVE_VSYNC_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})

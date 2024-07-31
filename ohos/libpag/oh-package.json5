@@ -8,5 +8,5 @@
   "packageType": "InterfaceHar",
   "dependencies": {
     "liblibpag.so": "file:./src/main/cpp/types/liblibpag"
-  }
+  },
 }

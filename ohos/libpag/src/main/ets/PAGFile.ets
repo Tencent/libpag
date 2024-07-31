@@ -1,6 +1,5 @@
 import { JsPAGFile } from 'liblibpag.so'
 import { PAGComposition } from './PAGComposition'
-import { PAGLayer } from './PAGLayer'
 import { resourceManager } from '@kit.LocalizationKit';
 
 export class PAGFile extends PAGComposition {

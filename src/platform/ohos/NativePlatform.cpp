@@ -6,7 +6,7 @@
 
 #include "NativePlatform.h"
 #include "platform/ohos/HardwareDecoder.h"
-
+#include "platform/ohos/NativeDisplayLink.h"
 
 namespace pag {
 class HardwareDecoderFactory : public VideoDecoderFactory {
@@ -34,7 +34,6 @@ const Platform* Platform::Current() {
 }
 
 void NativePlatform::InitJNI() {
-  
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
@@ -48,8 +47,8 @@ bool NativePlatform::registerFallbackFonts() const {
 
 void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
-  if (info.isEmpty() || pixels || tag.c_str()) {}
-    
+  if (info.isEmpty() || pixels || tag.c_str()) {
+  }
 }
 
 std::string NativePlatform::getCacheDir() const {
@@ -58,10 +57,10 @@ std::string NativePlatform::getCacheDir() const {
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
     std::function<void()> callback) const {
-    if (callback) {
-        return nullptr;
-    }
-  return nullptr;
+  if (!callback) {
+    return nullptr;
+  }
+  return std::make_shared<NativeDisplayLink>(callback);
 }
 
-}
+}  // namespace pag

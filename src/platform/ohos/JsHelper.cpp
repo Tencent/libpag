@@ -9,6 +9,7 @@
 #include "JsPAGPlayer.h"
 #include "JsPAGSurface.h"
 #include "base/utils/Log.h"
+#include "platform/ohos/JsPAGView.h"
 
 namespace pag {
 
@@ -16,7 +17,7 @@ static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
 
 bool Init(napi_env env, napi_value exports) {
   return JsPAGLayerHandle::Init(env, exports) && JsPAGPlayer::Init(env, exports) &&
-         JsPAGSurface::Init(env, exports);
+         JsPAGSurface::Init(env, exports) && JsPAGView::Init(env, exports);
 }
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {

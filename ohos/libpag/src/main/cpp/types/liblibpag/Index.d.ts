@@ -42,3 +42,21 @@ export declare class JsPAGSurface {
 
   static GetSurface(xComponentId: string): JsPAGSurface | null;
 }
+
+export declare class JsPAGView {
+  uniqueID(): string;
+
+  flush(): void;
+
+  setProgress(progress: number): void;
+
+  setComposition(composition: JsPAGComposition | null): void;
+
+  play(): void;
+
+  pause(): void;
+
+  setPlayingChangeCallback(callback: (boolean) => void): void;
+
+  setProgressCallback(callback: (double) => void): void;
+}
