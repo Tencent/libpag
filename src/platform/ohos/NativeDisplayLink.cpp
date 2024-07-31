@@ -10,8 +10,8 @@ namespace pag {
 
 void NativeDisplayLink::PAGVSyncCallback(long long, void* data) {
   auto displayLink = static_cast<NativeDisplayLink*>(data);
-  std::lock_guard lock_guard(displayLink->locker);
   displayLink->callback();
+  std::lock_guard lock_guard(displayLink->locker);
   if (displayLink->playing) {
     OH_NativeVSync_RequestFrame(displayLink->vSync, &PAGVSyncCallback, displayLink);
   }

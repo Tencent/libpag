@@ -1,3 +1,5 @@
+export { PAGViewState } from './src/main/ets/PAGView';
+
 export { PAGView } from './src/main/ets/PAGView'
 
 export { PAGPlayer } from './src/main/ets/PAGPlayer'

@@ -52,11 +52,13 @@ export declare class JsPAGView {
 
   setComposition(composition: JsPAGComposition | null): void;
 
+  setRepeatCount(repeatCount: number): void;
+
   play(): void;
 
   pause(): void;
 
-  setPlayingChangeCallback(callback: (boolean) => void): void;
+  setStateChangeCallback(callback: (number) => void): void;
 
-  setProgressCallback(callback: (double) => void): void;
+  setProgressUpdateCallback(callback: (double) => void): void;
 }

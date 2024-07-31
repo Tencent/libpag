@@ -7,6 +7,7 @@
 #include "JsPAGView.h"
 
 #include <ace/xcomponent/native_interface_xcomponent.h>
+#include <cstdint>
 
 #include "base/utils/Log.h"
 #include "base/utils/UniqueID.h"
@@ -16,10 +17,7 @@
 
 namespace pag {
 
-struct PAGListenerCallbackData {
-  std::string methodName;
-  double progress = 0.0f;
-};
+enum PAGViewState { PAGViewStatePlay = 0, PAGViewStateCancel, PAGViewStateEnd };
 
 static std::unordered_map<std::string, std::shared_ptr<JsPAGView>> ViewMap = {};
 
@@ -151,6 +149,24 @@ static napi_value SetComposition(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value SetRepeatCount(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  int repeatCount = 0;
+  napi_get_value_int32(env, args[0], &repeatCount);
+  JsPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->animator->setRepeatCount(repeatCount);
+  }
+  return nullptr;
+}
+
 static napi_value Play(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
@@ -210,18 +226,18 @@ static napi_value ViewConstructor(napi_env env, napi_callback_info info) {
   return jsView;
 }
 
-static void PlayingStateCallback(napi_env env, napi_value callback, void*, void* data) {
-  bool* boolPtr = static_cast<bool*>(data);
+static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
+  uint32_t* uint32Ptr = static_cast<uint32_t*>(data);
   size_t argc = 1;
   napi_value argv[1] = {0};
-  napi_get_boolean(env, *boolPtr, &argv[0]);
+  napi_create_uint32(env, *uint32Ptr, &argv[0]);
   napi_value undefined;
   napi_get_undefined(env, &undefined);
   napi_call_function(env, undefined, callback, argc, argv, nullptr);
-  delete boolPtr;
+  delete uint32Ptr;
 }
 
-static napi_value SetPlayingChangeCallback(napi_env env, napi_callback_info info) {
+static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 1;
   napi_value args[1] = {0};
@@ -233,11 +249,11 @@ static napi_value SetPlayingChangeCallback(napi_env env, napi_callback_info info
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
 
   napi_value resourceName = nullptr;
-  napi_create_string_utf8(env, "PAGViewPlayingChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
+  napi_create_string_utf8(env, "PAGViewStateChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
 
   auto state =
       napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                      view, PlayingStateCallback, &view->playingStateCallback);
+                                      view, StateChangeCallback, &view->playingStateCallback);
   return nullptr;
 }
 
@@ -252,7 +268,7 @@ static void ProgressCallback(napi_env env, napi_value callback, void*, void* dat
   delete progressPtr;
 }
 
-static napi_value setProgressCallback(napi_env env, napi_callback_info info) {
+static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 1;
   napi_value args[1] = {0};
@@ -275,10 +291,11 @@ bool JsPAGView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(flush, Flush),
       PAG_DEFAULT_METHOD_ENTRY(setProgress, SetProgress),
       PAG_DEFAULT_METHOD_ENTRY(setComposition, SetComposition),
+      PAG_DEFAULT_METHOD_ENTRY(setRepeatCount, SetRepeatCount),
       PAG_DEFAULT_METHOD_ENTRY(play, Play),
       PAG_DEFAULT_METHOD_ENTRY(pause, Pause),
-      PAG_DEFAULT_METHOD_ENTRY(setPlayingChangeCallback, SetPlayingChangeCallback),
-      PAG_DEFAULT_METHOD_ENTRY(setProgressCallback, setProgressCallback),
+      PAG_DEFAULT_METHOD_ENTRY(setStateChangeCallback, SetStateChangeCallback),
+      PAG_DEFAULT_METHOD_ENTRY(setProgressUpdateCallback, SetProgressUpdateCallback),
       PAG_DEFAULT_METHOD_ENTRY(uniqueID, UniqueID)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, ViewConstructor, "");
@@ -305,17 +322,17 @@ bool JsPAGView::Init(napi_env env, napi_value exports) {
 
 void JsPAGView::onAnimationStart(PAGAnimator*) {
 
-  napi_call_threadsafe_function(playingStateCallback, new bool(true),
+  napi_call_threadsafe_function(playingStateCallback, new uint32_t(PAGViewStatePlay),
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationCancel(PAGAnimator*) {
-  napi_call_threadsafe_function(playingStateCallback, new bool(false),
+  napi_call_threadsafe_function(playingStateCallback, new uint32_t(PAGViewStateCancel),
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationEnd(PAGAnimator*) {
-  napi_call_threadsafe_function(playingStateCallback, new bool(false),
+  napi_call_threadsafe_function(playingStateCallback, new uint32_t(PAGViewStateEnd),
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
