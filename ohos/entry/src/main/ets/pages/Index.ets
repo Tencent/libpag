@@ -4,21 +4,37 @@ import * as pag from 'libpag';
 @Entry
 @Component
 struct Index {
-  @State message: string = "PAG Test"
+  @State message: string = "";
+  @State @Watch("updateMessage") stateString: string = "";
   @State composition: pag.PAGComposition | null = null;
   @State @Watch("updateMessage") progress: number = 0;
-  @State @Watch("updateMessage") viewState: pag.PAGViewState = pag.PAGViewState.Pause;
+  @State isPlaying: boolean = false;
   @State repeatCount: number = 1;
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
     let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
     this.composition = file as pag.PAGComposition;
-    this.viewState = pag.PAGViewState.Play;
+    this.isPlaying = true;
   }
 
-  updateMessage(): void {
-    this.message = `PAG state: ${this.viewState} progress:${this.progress.toFixed(2)}`;
+  onAnimationStart = (view: pag.PAGView) => {
+    this.stateString = 'PAG start';
+  }
+  onAnimationEnd = (view: pag.PAGView) => {
+    this.stateString = `PAG end`;
+  }
+  onAnimationRepeat = (view: pag.PAGView) => {
+    this.stateString = `PAG repeat`;
+  }
+  onAnimationCancel = (view: pag.PAGView) => {
+    this.stateString = `PAG cancel`;
+  }
+  onAnimationUpdate = (view: pag.PAGView) => {
+  }
+
+  updateMessage() {
+    this.message = this.stateString + ` progress ${this.progress.toFixed(2)}`;
   }
 
   build() {
@@ -27,16 +43,13 @@ struct Index {
         pag.PAGView({
           composition: this.composition,
           progress: this.progress,
-          state: this.viewState,
-          repeatCount: this.repeatCount
+          isPlaying: this.isPlaying,
+          repeatCount: this.repeatCount,
+          listener: this as pag.PAGViewListener
         })
           .height('50%')
           .onClick(() => {
-            if (this.viewState == pag.PAGViewState.Play) {
-              this.viewState = pag.PAGViewState.Pause;
-            } else {
-              this.viewState = pag.PAGViewState.Play;
-            }
+            this.isPlaying = !this.isPlaying
           })
 
         Text(this.message)

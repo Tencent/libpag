@@ -16,8 +16,10 @@
 #include "platform/ohos/JsPAGLayerHandle.h"
 
 namespace pag {
-
-enum PAGViewState { PAGViewStatePlay = 0, PAGViewStateCancel, PAGViewStateEnd };
+static int PAGViewStateStart = 0;
+static int PAGViewStateCancel = 1;
+static int PAGViewStateEnd = 2;
+static int PAGViewStateRepeat = 3;
 
 static std::unordered_map<std::string, std::shared_ptr<JsPAGView>> ViewMap = {};
 
@@ -227,14 +229,13 @@ static napi_value ViewConstructor(napi_env env, napi_callback_info info) {
 }
 
 static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
-  uint32_t* uint32Ptr = static_cast<uint32_t*>(data);
+  int state = *static_cast<int*>(data);
   size_t argc = 1;
   napi_value argv[1] = {0};
-  napi_create_uint32(env, *uint32Ptr, &argv[0]);
+  napi_create_uint32(env, state, &argv[0]);
   napi_value undefined;
   napi_get_undefined(env, &undefined);
   napi_call_function(env, undefined, callback, argc, argv, nullptr);
-  delete uint32Ptr;
 }
 
 static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) {
@@ -322,21 +323,23 @@ bool JsPAGView::Init(napi_env env, napi_value exports) {
 
 void JsPAGView::onAnimationStart(PAGAnimator*) {
 
-  napi_call_threadsafe_function(playingStateCallback, new uint32_t(PAGViewStatePlay),
+  napi_call_threadsafe_function(playingStateCallback, &PAGViewStateStart,
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationCancel(PAGAnimator*) {
-  napi_call_threadsafe_function(playingStateCallback, new uint32_t(PAGViewStateCancel),
+  napi_call_threadsafe_function(playingStateCallback, &PAGViewStateCancel,
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationEnd(PAGAnimator*) {
-  napi_call_threadsafe_function(playingStateCallback, new uint32_t(PAGViewStateEnd),
+  napi_call_threadsafe_function(playingStateCallback, &PAGViewStateEnd,
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationRepeat(PAGAnimator*) {
+  napi_call_threadsafe_function(playingStateCallback, &PAGViewStateRepeat,
+                               napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationUpdate(PAGAnimator* animator) {
