@@ -9,7 +9,7 @@
 #include <memory>
 #include "pag/pag.h"
 namespace pag {
-class JsPAGImage {
+class JPAGImage {
  public:
   static std::shared_ptr<PAGImage> FromJs(napi_env env, napi_value value);
 };

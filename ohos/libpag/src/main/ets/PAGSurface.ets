@@ -1,15 +1,15 @@
-import { JsPAGSurface } from 'libpag.so'
+import { JPAGSurface } from 'libpag.so'
 import { PAGInit } from './PAGInit';
 import { image } from '@kit.ImageKit';
 
 export class PAGSurface {
-  private constructor(nativeSurface: JsPAGSurface) {
+  private constructor(nativeSurface: JPAGSurface) {
     PAGInit.Init();
     this.nativeSurface = nativeSurface;
   }
 
   static MakeOffscreen(width: number, height: number): PAGSurface | null {
-    let nativeSurface = JsPAGSurface.MakeOffscreen(width, height);
+    let nativeSurface = JPAGSurface.MakeOffscreen(width, height);
     if (nativeSurface == null) {
       return null;
     } else {
@@ -53,5 +53,5 @@ export class PAGSurface {
     return null;
   }
 
-  readonly nativeSurface: JsPAGSurface;
+  readonly nativeSurface: JPAGSurface;
 }

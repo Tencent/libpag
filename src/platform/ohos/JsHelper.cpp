@@ -5,19 +5,19 @@
 // please include "napi/native_api.h".
 
 #include "JsHelper.h"
-#include "JsPAGLayerHandle.h"
-#include "JsPAGPlayer.h"
-#include "JsPAGSurface.h"
+#include "JPAGLayerHandle.h"
+#include "JPAGPlayer.h"
+#include "JPAGSurface.h"
 #include "base/utils/Log.h"
-#include "platform/ohos/JsPAGView.h"
+#include "platform/ohos/JPAGView.h"
 
 namespace pag {
 
 static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
 
 bool Init(napi_env env, napi_value exports) {
-  return JsPAGLayerHandle::Init(env, exports) && JsPAGPlayer::Init(env, exports) &&
-         JsPAGSurface::Init(env, exports) && JsPAGView::Init(env, exports);
+  return JPAGLayerHandle::Init(env, exports) && JPAGPlayer::Init(env, exports) &&
+         JPAGSurface::Init(env, exports) && JPAGView::Init(env, exports);
 }
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {

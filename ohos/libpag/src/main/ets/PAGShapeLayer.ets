@@ -1,8 +1,8 @@
-import { JsPAGLayer, JsPAGShapeLayer } from 'libpag.so';
+import { JPAGLayer, JPAGShapeLayer } from 'libpag.so';
 import { PAGLayer } from './PAGLayer';
 
 export class PAGShapeLayer extends PAGLayer {
-  constructor(nativeLayer: JsPAGLayer) {
+  constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
   }
 }

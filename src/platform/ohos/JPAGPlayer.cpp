@@ -4,45 +4,24 @@
 // Node APIs are not fully supported. To solve the compilation error of the interface cannot be found,
 // please include "napi/native_api.h".
 
-#include "JsPAGPlayer.h"
+#include "JPAGPlayer.h"
 #include <cstdint>
-#include "JsPAGLayerHandle.h"
+#include "JPAGLayerHandle.h"
 #include "JsHelper.h"
-#include "JsPAGSurface.h"
+#include "JPAGSurface.h"
 
 namespace pag {
-
-static napi_value PlayerConstructor(napi_env env, napi_callback_info info) {
-  napi_value jsPlayer = nullptr;
-  size_t argc = 1;
-  napi_value args[1] = {0};
-  napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  void* cPlayer = nullptr;
-  if (argc == 0) {
-    cPlayer = new JsPAGPlayer(std::make_shared<PAGPlayer>());
-  } else {
-    napi_get_value_external(env, args[0], &cPlayer);
-  }
-  napi_wrap(
-      env, jsPlayer, cPlayer,
-      [](napi_env, void* finalize_data, void*) {
-        JsPAGPlayer* player = static_cast<JsPAGPlayer*>(finalize_data);
-        delete player;
-      },
-      nullptr, nullptr);
-  return jsPlayer;
-}
 
 static napi_value GetComposition(napi_env env, napi_callback_info info) {
   napi_value jsPlayer = nullptr;
   size_t argc = 0;
   napi_value args[1] = {0};
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
-  return JsPAGLayerHandle::ToJs(env, player->getComposition());
+  return JPAGLayerHandle::ToJs(env, player->getComposition());
 }
 
 static napi_value SetComposition(napi_env env, napi_callback_info info) {
@@ -50,11 +29,11 @@ static napi_value SetComposition(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
-  auto composition = JsPAGLayerHandle::FromJs(env, args[0]);
+  auto composition = JPAGLayerHandle::FromJs(env, args[0]);
   if (!composition || composition->layerType() != LayerType::PreCompose) {
     return nullptr;
   }
@@ -70,11 +49,11 @@ static napi_value GetSurface(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[1] = {0};
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
-  return JsPAGSurface::ToJs(env, player->getSurface());
+  return JPAGSurface::ToJs(env, player->getSurface());
 }
 
 static napi_value SetSurface(napi_env env, napi_callback_info info) {
@@ -82,11 +61,11 @@ static napi_value SetSurface(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
-  player->setSurface(JsPAGSurface::FromJs(env, args[0]));
+  player->setSurface(JPAGSurface::FromJs(env, args[0]));
   return nullptr;
 }
 
@@ -95,7 +74,7 @@ static napi_value VideoEnabled(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -110,7 +89,7 @@ static napi_value SetVideoEnabled(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -127,7 +106,7 @@ static napi_value CacheEnabled(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -142,7 +121,7 @@ static napi_value SetCacheEnabled(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -159,7 +138,7 @@ static napi_value UseDiskCache(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -174,7 +153,7 @@ static napi_value SetUseDiskCache(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -191,7 +170,7 @@ static napi_value CacheScale(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -205,7 +184,7 @@ static napi_value SetCacheScale(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -222,7 +201,7 @@ static napi_value MaxFrameRate(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -236,7 +215,7 @@ static napi_value SetMaxFrameRate(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -253,7 +232,7 @@ static napi_value ScaleMode(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -267,7 +246,7 @@ static napi_value SetScaleMode(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -284,7 +263,7 @@ static napi_value GetMatrix(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -296,7 +275,7 @@ static napi_value SetMatrix(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -309,7 +288,7 @@ static napi_value Duration(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -323,7 +302,7 @@ static napi_value NextFrame(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -336,7 +315,7 @@ static napi_value PreFrame(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -349,7 +328,7 @@ static napi_value GetProgress(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -363,7 +342,7 @@ static napi_value SetProgress(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -380,7 +359,7 @@ static napi_value CurrentFrame(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -394,7 +373,7 @@ static napi_value AutoClear(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -408,7 +387,7 @@ static napi_value SetAutoClear(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -425,7 +404,7 @@ static napi_value Prepare(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -438,7 +417,7 @@ static napi_value Flush(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -452,11 +431,11 @@ static napi_value GetBounds(napi_env env, napi_callback_info info) {
   napi_value args[1] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
-  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  auto layer = JPAGLayerHandle::FromJs(env, args[0]);
   if (layer == nullptr) {
     return nullptr;
   }
@@ -469,7 +448,7 @@ static napi_value GetLayersUnderPoint(napi_env env, napi_callback_info info) {
   napi_value args[2] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     return nullptr;
   }
@@ -481,7 +460,7 @@ static napi_value GetLayersUnderPoint(napi_env env, napi_callback_info info) {
   napi_value result;
   napi_create_array_with_length(env, layers.size(), &result);
   for (uint32_t i = 0; i < layers.size(); i++) {
-    auto layer = JsPAGLayerHandle::ToJs(env, layers[i]);
+    auto layer = JPAGLayerHandle::ToJs(env, layers[i]);
     if (!layer) {
       break;
     }
@@ -495,13 +474,13 @@ static napi_value HitTestPoint(napi_env env, napi_callback_info info) {
   napi_value args[3] = {nullptr};
   napi_value jsPlayer = nullptr;
   napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
+  auto player = JPAGPlayer::FromJs(env, jsPlayer);
   if (!player) {
     napi_value jsResult;
     napi_get_boolean(env, false, &jsResult);
     return jsResult;
   }
-  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  auto layer = JPAGLayerHandle::FromJs(env, args[0]);
   if (layer == nullptr) {
     napi_value jsResult;
     napi_get_boolean(env, false, &jsResult);
@@ -517,7 +496,28 @@ static napi_value HitTestPoint(napi_env env, napi_callback_info info) {
   return jsResult;
 }
 
-bool JsPAGPlayer::Init(napi_env env, napi_value exports) {
+napi_value JPAGPlayer::Constructor(napi_env env, napi_callback_info info) {
+  napi_value jsPlayer = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
+  void* cPlayer = nullptr;
+  if (argc == 0) {
+    cPlayer = new JPAGPlayer(std::make_shared<PAGPlayer>());
+  } else {
+    napi_get_value_external(env, args[0], &cPlayer);
+  }
+  napi_wrap(
+      env, jsPlayer, cPlayer,
+      [](napi_env, void* finalize_data, void*) {
+        JPAGPlayer* player = static_cast<JPAGPlayer*>(finalize_data);
+        delete player;
+      },
+      nullptr, nullptr);
+  return jsPlayer;
+}
+
+bool JPAGPlayer::Init(napi_env env, napi_value exports) {
   napi_property_descriptor classProp[] = {
       PAG_DEFAULT_METHOD_ENTRY(getComposition, GetComposition),
       PAG_DEFAULT_METHOD_ENTRY(setComposition, SetComposition),
@@ -552,12 +552,12 @@ bool JsPAGPlayer::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(hitTestPoint, HitTestPoint)};
 
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
-                            classProp, PlayerConstructor, "");
+                            classProp, Constructor, "");
   return status == napi_ok;
 }
 
-std::shared_ptr<PAGPlayer> JsPAGPlayer::FromJs(napi_env env, napi_value value) {
-  JsPAGPlayer* cPlayer = nullptr;
+std::shared_ptr<PAGPlayer> JPAGPlayer::FromJs(napi_env env, napi_value value) {
+  JPAGPlayer* cPlayer = nullptr;
   auto status = napi_unwrap(env, value, (void**)&cPlayer);
   if (status == napi_ok) {
     return cPlayer->get();
@@ -566,11 +566,11 @@ std::shared_ptr<PAGPlayer> JsPAGPlayer::FromJs(napi_env env, napi_value value) {
   }
 }
 
-napi_value JsPAGPlayer::ToJs(napi_env env, std::shared_ptr<PAGPlayer> player) {
+napi_value JPAGPlayer::ToJs(napi_env env, std::shared_ptr<PAGPlayer> player) {
   if (!player) {
     return nullptr;
   }
-  JsPAGPlayer* handler = new JsPAGPlayer(player);
+  JPAGPlayer* handler = new JPAGPlayer(player);
   napi_value result = NewInstance(env, ClassName(), handler);
   if (result == nullptr) {
     delete handler;

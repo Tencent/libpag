@@ -1,4 +1,4 @@
-import { JsPAGFile, JsPAGLayer } from 'libpag.so'
+import { JPAGFile, JPAGLayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition'
 import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';
@@ -33,7 +33,7 @@ export enum PAGTimeStretchMode {
 ;
 
 export class PAGFile extends PAGComposition {
-  constructor(nativeLayer: JsPAGLayer) {
+  constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
   }
 
@@ -41,7 +41,7 @@ export class PAGFile extends PAGComposition {
    * The maximum tag level current SDK supports.
    */
   static MaxSupportedTagLevel(): number {
-    return JsPAGFile.MaxSupportedTagLevel();
+    return JPAGFile.MaxSupportedTagLevel();
   };
 
   /**
@@ -52,7 +52,7 @@ export class PAGFile extends PAGComposition {
    * if you don't want to load a PAGFile from the intenal caches.
    */
   static LoadFromPath(filePath: string): PAGFile | null {
-    let native = JsPAGFile.LoadFromPath(filePath);
+    let native = JPAGFile.LoadFromPath(filePath);
     if (native == null) {
       return null;
     }
@@ -60,7 +60,7 @@ export class PAGFile extends PAGComposition {
   }
 
   static LoadFromBytes(data: Int8Array, filePath?: string): PAGFile | null {
-    let native = JsPAGFile.LoadFromBytes(data, filePath);
+    let native = JPAGFile.LoadFromBytes(data, filePath);
     if (native == null) {
       return null;
     }
@@ -74,7 +74,7 @@ export class PAGFile extends PAGComposition {
    * may be changed, please use 'Load(byte[])' instead
    */
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): PAGFile | null {
-    let native = JsPAGFile.LoadFromAssets(manager, name);
+    let native = JPAGFile.LoadFromAssets(manager, name);
     if (native == null) {
       return null;
     }
@@ -153,7 +153,7 @@ export class PAGFile extends PAGComposition {
    * Return an array of layers by specified editable index and layer type.
    */
   getLayersByEditableIndex(editableIndex: number, layerType: PAGLayerType): Array<PAGLayer> {
-    return PAGUtils.WarpJsPAGLayers(this.getNativeFile().getLayersByEditableIndex(editableIndex, layerType));
+    return PAGUtils.WarpJPAGLayers(this.getNativeFile().getLayersByEditableIndex(editableIndex, layerType));
   }
 
   /**
@@ -194,7 +194,7 @@ export class PAGFile extends PAGComposition {
     return new PAGFile(this.getNativeFile().copyOriginal());
   }
 
-  private getNativeFile(): JsPAGFile {
-    return this.nativeLayer as JsPAGFile;
+  private getNativeFile(): JPAGFile {
+    return this.nativeLayer as JPAGFile;
   }
 }

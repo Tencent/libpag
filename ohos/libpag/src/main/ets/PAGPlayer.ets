@@ -1,6 +1,6 @@
 import matrix4 from '@ohos.matrix4'
 import { Rect } from '@ohos.arkui.node';
-import { JsPAGPlayer } from 'libpag.so'
+import { JPAGPlayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
 import { PAGInit } from './PAGInit';
 import { PAGSurface } from './PAGSurface';
@@ -9,10 +9,10 @@ import { PAGUtils } from './private/PAGUtils';
 import { PAGScaleMode } from './PASScaleMode';
 
 export class PAGPlayer {
-  constructor(nativePlayer: JsPAGPlayer | null = null) {
+  constructor(nativePlayer: JPAGPlayer | null = null) {
     PAGInit.Init();
     if (nativePlayer == null) {
-      this.nativePlayer = new JsPAGPlayer();
+      this.nativePlayer = new JPAGPlayer();
     } else {
       this.nativePlayer = nativePlayer;
     }
@@ -222,7 +222,7 @@ export class PAGPlayer {
    * from the surface's coordinates.
    */
   public getLayersUnderPoint(surfaceX: number, surfaceY: number): Array<PAGLayer> {
-    return PAGUtils.WarpJsPAGLayers(this.nativePlayer.getLayersUnderPoint(surfaceX, surfaceY));
+    return PAGUtils.WarpJPAGLayers(this.nativePlayer.getLayersUnderPoint(surfaceX, surfaceY));
   }
 
   /**
@@ -238,7 +238,7 @@ export class PAGPlayer {
     return this.nativePlayer.hitTestPoint(pagLayer.nativeLayer, surfaceX, surfaceY, pixelHitTest);
   }
 
-  readonly nativePlayer: JsPAGPlayer;
+  readonly nativePlayer: JPAGPlayer;
   private composition: PAGComposition | null = null;
   private surface: PAGSurface | null = null;
 }

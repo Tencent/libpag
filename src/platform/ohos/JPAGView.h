@@ -10,16 +10,16 @@
 #include "rendering/PAGAnimator.h"
 
 namespace pag {
-class JsPAGView : public PAGAnimator::Listener {
+class JPAGView : public PAGAnimator::Listener {
  public:
   static bool Init(napi_env env, napi_value exports);
   static inline std::string ClassName() {
-    return "JsPAGView";
+    return "JPAGView";
   }
 
-  explicit JsPAGView(const std::string& id) : player(new PAGPlayer()), id(std::move(id)) {
+  explicit JPAGView(const std::string& id) : player(new PAGPlayer()), id(std::move(id)) {
   }
-  virtual ~JsPAGView() {
+  virtual ~JPAGView() {
     napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
     napi_release_threadsafe_function(playingStateCallback, napi_tsfn_abort);
   }
@@ -39,5 +39,8 @@ class JsPAGView : public PAGAnimator::Listener {
   std::shared_ptr<PAGAnimator> animator = nullptr;
   napi_threadsafe_function progressCallback;
   napi_threadsafe_function playingStateCallback;
+
+ private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
 };
 }  // namespace pag

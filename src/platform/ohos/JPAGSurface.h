@@ -12,15 +12,15 @@
 
 namespace pag {
 
-class JsPAGSurface {
+class JPAGSurface {
  public:
-  explicit JsPAGSurface(std::shared_ptr<pag::PAGSurface> pagSurface) : pagSurface(pagSurface) {
+  explicit JPAGSurface(std::shared_ptr<pag::PAGSurface> pagSurface) : pagSurface(pagSurface) {
   }
   static bool Init(napi_env env, napi_value exports);
   static std::shared_ptr<PAGSurface> FromJs(napi_env env, napi_value value);
   static napi_value ToJs(napi_env env, std::shared_ptr<PAGSurface> surface);
   static std::string ClassName() {
-    return "JsPAGSurface";
+    return "JPAGSurface";
   }
 
   std::shared_ptr<pag::PAGSurface> get() {
@@ -28,6 +28,7 @@ class JsPAGSurface {
   }
 
  private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
   std::shared_ptr<pag::PAGSurface> pagSurface;
 };
 

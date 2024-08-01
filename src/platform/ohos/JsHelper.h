@@ -36,25 +36,4 @@ napi_value CreateMatrix(napi_env env, const Matrix& matrix);
 
 Matrix GetMatrix(napi_env env, napi_value value);
 
-template <class T>
-static napi_value ConstructorWithHandler(napi_env env, napi_callback_info info) {
-  napi_value result = nullptr;
-  size_t argc = 1;
-  napi_value args[1];
-  napi_get_cb_info(env, info, &argc, args, &result, nullptr);
-  if (argc == 0) {
-    return nullptr;
-  }
-  void* handle = nullptr;
-  napi_get_value_external(env, args[0], &handle);
-  napi_wrap(
-      env, result, handle,
-      [](napi_env, void* finalize_data, void*) {
-        T* handler = static_cast<T*>(finalize_data);
-        delete handler;
-      },
-      nullptr, nullptr);
-  return result;
-}
-
 }  // namespace pag

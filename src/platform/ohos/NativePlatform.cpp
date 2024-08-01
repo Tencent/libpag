@@ -50,19 +50,18 @@ std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories
 }
 
 bool NativePlatform::registerFallbackFonts() const {
-  // to do, kevingpqi
   return false;
 }
 
 void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
-  // to do, kevingpqi
+  // todo: kevingpqi
   if (info.isEmpty() || pixels || tag.c_str()) {
   }
 }
 
 std::string NativePlatform::getCacheDir() const {
-  // to do, kevingpqi
+  // todo: kevingpqi
   return "";
 }
 

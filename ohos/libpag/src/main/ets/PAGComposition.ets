@@ -1,18 +1,18 @@
 import { PAGLayer } from "./PAGLayer"
-import { JsPAGLayer, JsPAGComposition } from "libpag.so"
+import { JPAGLayer, JPAGComposition } from "libpag.so"
 import { PAGMarker } from './PAGMarker';
 import { PAGUtils } from './private/PAGUtils';
 
 export class PAGComposition extends PAGLayer {
   static Make(width: number, height: number): PAGComposition | null {
-    let native = JsPAGComposition.Make(width, height);
+    let native = JPAGComposition.Make(width, height);
     if (native == null) {
       return null;
     }
     return new PAGComposition(native);
   }
 
-  constructor(nativeLayer: JsPAGLayer) {
+  constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
   }
 
@@ -50,7 +50,7 @@ export class PAGComposition extends PAGLayer {
    * @return The child layer at the specified index position.
    */
   getLayerAt(index: number): PAGLayer {
-    return PAGUtils.WarpJsPAGLayer(this.getNativeComposition().getLayerAt(index));
+    return PAGUtils.WarpJPAGLayer(this.getNativeComposition().getLayerAt(index));
   }
 
   /**
@@ -100,7 +100,7 @@ export class PAGComposition extends PAGLayer {
     if (result == null) {
       return null;
     }
-    return PAGUtils.WarpJsPAGLayer(result);
+    return PAGUtils.WarpJPAGLayer(result);
   }
 
   /**
@@ -111,7 +111,7 @@ export class PAGComposition extends PAGLayer {
     if (result == null) {
       return null;
     }
-    return PAGUtils.WarpJsPAGLayer(result);
+    return PAGUtils.WarpJPAGLayer(result);
   }
 
   /**
@@ -160,7 +160,7 @@ export class PAGComposition extends PAGLayer {
    * Returns an array of layers that match the specified layer name.
    */
   getLayersByName(layerName: string): Array<PAGLayer> {
-    return PAGUtils.WarpJsPAGLayers(this.getNativeComposition().getLayersByName(layerName));
+    return PAGUtils.WarpJPAGLayers(this.getNativeComposition().getLayersByName(layerName));
   }
 
   /**
@@ -168,11 +168,11 @@ export class PAGComposition extends PAGLayer {
    * PAGComposition's local coordinates.
    */
   getLayersUnderPoint(localX: number, localY: number): Array<PAGLayer> {
-    return PAGUtils.WarpJsPAGLayers(this.getNativeComposition().getLayersUnderPoint(localX, localY));
+    return PAGUtils.WarpJPAGLayers(this.getNativeComposition().getLayersUnderPoint(localX, localY));
   }
 
 
-  getNativeComposition(): JsPAGComposition {
-    return this.nativeLayer as JsPAGComposition;
+  getNativeComposition(): JPAGComposition {
+    return this.nativeLayer as JPAGComposition;
   }
 }

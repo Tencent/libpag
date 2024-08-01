@@ -3,7 +3,7 @@
 #include <napi/native_api.h>
 #include <pag/pag.h>
 namespace pag {
-class JsPAGLayerHandle {
+class JPAGLayerHandle {
  public:
   static bool Init(napi_env env, napi_value exports);
   static std::shared_ptr<PAGLayer> FromJs(napi_env env, napi_value);
@@ -12,7 +12,7 @@ class JsPAGLayerHandle {
   static std::string GetFileClassName();
   static std::string GetBaseClassName();
 
-  explicit JsPAGLayerHandle(std::shared_ptr<pag::PAGLayer> layer) : layer(layer) {
+  explicit JPAGLayerHandle(std::shared_ptr<pag::PAGLayer> layer) : layer(layer) {
   }
 
   std::shared_ptr<pag::PAGLayer> get() {
@@ -20,6 +20,7 @@ class JsPAGLayerHandle {
   }
 
  private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
   static bool InitPAGLayerEnv(napi_env env, napi_value exports);
   static bool InitPAGImageLayerEnv(napi_env env, napi_value exports);
   static bool InitPAGTextLayerEnv(napi_env env, napi_value exports);

@@ -1,4 +1,4 @@
-import { JsPAGLayer } from 'libpag.so'
+import { JPAGLayer } from 'libpag.so'
 import matrix4 from '@ohos.matrix4'
 import { PAGComposition } from './PAGComposition';
 import { PAGMarker } from './PAGMarker';
@@ -19,7 +19,7 @@ export enum PAGLayerType {
 }
 
 export class PAGLayer {
-  constructor(nativeLayer: JsPAGLayer) {
+  constructor(nativeLayer: JPAGLayer) {
     this.nativeLayer = nativeLayer;
   }
 
@@ -180,7 +180,7 @@ export class PAGLayer {
    * Returns trackMatte layer of this layer.
    */
   trackMatteLayer(): PAGLayer {
-    return PAGUtils.WarpJsPAGLayer(this.nativeLayer.trackMatteLayer());
+    return PAGUtils.WarpJPAGLayer(this.nativeLayer.trackMatteLayer());
   }
 
   /**
@@ -206,5 +206,5 @@ export class PAGLayer {
     this.nativeLayer.setExcludedFromTimeline(value);
   }
 
-  readonly nativeLayer: JsPAGLayer;
+  readonly nativeLayer: JPAGLayer;
 }

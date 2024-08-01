@@ -1,4 +1,4 @@
-import { JsPAGView } from 'libpag.so'
+import { JPAGView } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
 import { PAGInit } from "./PAGInit"
 
@@ -165,7 +165,7 @@ export struct PAGView {
   }
 
   private nativeProgress: number = 0.0;
-  private viewController: JsPAGView = new JsPAGView();
+  private viewController: JPAGView = new JPAGView();
   private onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case 0:

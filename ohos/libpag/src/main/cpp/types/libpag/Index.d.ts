@@ -1,9 +1,9 @@
 import resourceManager from "@ohos.resourceManager";
 
-export declare class JsPAGImage {
+export declare class JPAGImage {
 }
 
-export declare class JsPAGLayer {
+export declare class JPAGLayer {
   layerType(): number;
 
   layerName(): string;
@@ -24,7 +24,7 @@ export declare class JsPAGLayer {
 
   editableIndex(): number;
 
-  parent(): JsPAGComposition;
+  parent(): JPAGComposition;
 
   markers(): Array<object>;
 
@@ -48,7 +48,7 @@ export declare class JsPAGLayer {
 
   setProgress(value: number): void;
 
-  trackMatteLayer(): JsPAGLayer;
+  trackMatteLayer(): JPAGLayer;
 
   getBounds(): Float32Array;
 
@@ -57,20 +57,20 @@ export declare class JsPAGLayer {
   setExcludedFromTimeline(value: boolean);
 }
 
-export declare class JsPAGSolidLayer extends JsPAGLayer {
+export declare class JPAGSolidLayer extends JPAGLayer {
 }
 
-export declare class JsPAGImageLayer extends JsPAGLayer {
+export declare class JPAGImageLayer extends JPAGLayer {
 }
 
-export declare class JsPAGTextLayer extends JsPAGLayer {
+export declare class JPAGTextLayer extends JPAGLayer {
 }
 
-export declare class JsPAGShapeLayer extends JsPAGLayer {
+export declare class JPAGShapeLayer extends JPAGLayer {
 }
 
-export declare class JsPAGComposition extends JsPAGLayer {
-  static Make(width: number, height: number): JsPAGComposition | null;
+export declare class JPAGComposition extends JPAGLayer {
+  static Make(width: number, height: number): JPAGComposition | null;
 
   width(): number;
 
@@ -80,25 +80,25 @@ export declare class JsPAGComposition extends JsPAGLayer {
 
   numChildren(): number;
 
-  getLayerAt(index: number): JsPAGLayer;
+  getLayerAt(index: number): JPAGLayer;
 
-  getLayerIndex(layer: JsPAGLayer): number;
+  getLayerIndex(layer: JPAGLayer): number;
 
-  setLayerIndex(layer: JsPAGLayer, index: number): void;
+  setLayerIndex(layer: JPAGLayer, index: number): void;
 
-  addLayer(pagLayer: JsPAGLayer): void;
+  addLayer(pagLayer: JPAGLayer): void;
 
-  addLayerAt(pagLayer: JsPAGLayer, index: number): void;
+  addLayerAt(pagLayer: JPAGLayer, index: number): void;
 
-  contains(pagLayer: JsPAGLayer): boolean;
+  contains(pagLayer: JPAGLayer): boolean;
 
-  removeLayer(pagLayer: JsPAGLayer): JsPAGLayer | null;
+  removeLayer(pagLayer: JPAGLayer): JPAGLayer | null;
 
-  removeLayerAt(index: number): JsPAGLayer | null;
+  removeLayerAt(index: number): JPAGLayer | null;
 
   removeAllLayers(): void;
 
-  swapLayer(pagLayer1: JsPAGLayer, pagLayer2: JsPAGLayer): void;
+  swapLayer(pagLayer1: JPAGLayer, pagLayer2: JPAGLayer): void;
 
   swapLayerAt(index1: number, index2: number);
 
@@ -108,19 +108,19 @@ export declare class JsPAGComposition extends JsPAGLayer {
 
   audioMarkers(): Array<object>;
 
-  getLayersByName(layerName: string): Array<JsPAGLayer>;
+  getLayersByName(layerName: string): Array<JPAGLayer>;
 
-  getLayersUnderPoint(localX: number, localY: number): Array<JsPAGLayer>
+  getLayersUnderPoint(localX: number, localY: number): Array<JPAGLayer>
 }
 
-export declare class JsPAGFile extends JsPAGComposition {
+export declare class JPAGFile extends JPAGComposition {
   static MaxSupportedTagLevel(): number;
 
-  static LoadFromPath(filePath: string): JsPAGFile | null;
+  static LoadFromPath(filePath: string): JPAGFile | null;
 
-  static LoadFromBytes(data: Int8Array, filePath?: string): JsPAGFile | null;
+  static LoadFromBytes(data: Int8Array, filePath?: string): JPAGFile | null;
 
-  static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): JsPAGFile | null;
+  static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): JPAGFile | null;
 
   tagLevel(): number;
 
@@ -136,11 +136,11 @@ export declare class JsPAGFile extends JsPAGComposition {
 
   replaceText(editableTextIndex: number, textData: object);
 
-  replaceImage(editableImageIndex: number, image: JsPAGImage);
+  replaceImage(editableImageIndex: number, image: JPAGImage);
 
-  replaceImageByName(layerName: string, image: JsPAGImage);
+  replaceImageByName(layerName: string, image: JPAGImage);
 
-  getLayersByEditableIndex(editableIndex: number, layerType: number): Array<JsPAGLayer>;
+  getLayersByEditableIndex(editableIndex: number, layerType: number): Array<JPAGLayer>;
 
   getEditableIndices(layerType: number): Array<number>;
 
@@ -150,17 +150,17 @@ export declare class JsPAGFile extends JsPAGComposition {
 
   setDuration(duration: number);
 
-  copyOriginal(): JsPAGFile;
+  copyOriginal(): JPAGFile;
 }
 
-export declare class JsPAGPlayer {
-  setComposition(composition: JsPAGComposition | null): void;
+export declare class JPAGPlayer {
+  setComposition(composition: JPAGComposition | null): void;
 
-  getComposition(): JsPAGComposition | null;
+  getComposition(): JPAGComposition | null;
 
-  getSurface(): JsPAGSurface | null;
+  getSurface(): JPAGSurface | null;
 
-  setSurface(surface: JsPAGSurface | null): void;
+  setSurface(surface: JPAGSurface | null): void;
 
   setProgress(progress: number): void;
 
@@ -204,16 +204,16 @@ export declare class JsPAGPlayer {
 
   flush(): void;
 
-  getBounds(pagLayer: JsPAGLayer): Float32Array;
+  getBounds(pagLayer: JPAGLayer): Float32Array;
 
-  getLayersUnderPoint(surfaceX: number, surfaceY: number): Array<JsPAGLayer>;
+  getLayersUnderPoint(surfaceX: number, surfaceY: number): Array<JPAGLayer>;
 
-  hitTestPoint(pagLayer: JsPAGLayer, surfaceX: number,
+  hitTestPoint(pagLayer: JPAGLayer, surfaceX: number,
     surfaceY: number, pixelHitTest: boolean): boolean;
 }
 
-export declare class JsPAGSurface {
-  static MakeOffscreen(width: number, height: number): JsPAGSurface | null;
+export declare class JPAGSurface {
+  static MakeOffscreen(width: number, height: number): JPAGSurface | null;
 
   width(): number;
 
@@ -224,14 +224,14 @@ export declare class JsPAGSurface {
   freeCache(): void;
 }
 
-export declare class JsPAGView {
+export declare class JPAGView {
   uniqueID(): string;
 
   flush(): void;
 
   setProgress(progress: number): void;
 
-  setComposition(composition: JsPAGComposition | null): void;
+  setComposition(composition: JPAGComposition | null): void;
 
   setRepeatCount(repeatCount: number): void;
 

@@ -1,8 +1,8 @@
-import { JsPAGLayer, JsPAGSolidLayer } from 'libpag.so';
+import { JPAGLayer, JPAGSolidLayer } from 'libpag.so';
 import { PAGLayer } from './PAGLayer';
 
 export class PAGSolidLayer extends PAGLayer {
-  constructor(nativeLayer: JsPAGLayer) {
+  constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
   }
 }

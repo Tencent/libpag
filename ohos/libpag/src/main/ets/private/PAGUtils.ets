@@ -1,6 +1,6 @@
 import { matrix4 } from '@kit.ArkUI';
 import { Rect } from '@ohos.arkui.node';
-import { JsPAGLayer } from 'libpag.so';
+import { JPAGLayer } from 'libpag.so';
 import { PAGComposition } from '../PAGComposition';
 import { PAGFile } from '../PAGFile';
 import { PAGImageLayer } from '../PAGImageLayer';
@@ -31,7 +31,7 @@ export namespace PAGUtils {
     };
   }
 
-  export function WarpJsPAGLayer(nativeLayer: JsPAGLayer): PAGLayer {
+  export function WarpJPAGLayer(nativeLayer: JPAGLayer): PAGLayer {
     if (nativeLayer.isPAGFile()) {
       return new PAGFile(nativeLayer);
     }
@@ -50,10 +50,10 @@ export namespace PAGUtils {
     return new PAGLayer(nativeLayer);
   }
 
-  export function WarpJsPAGLayers(nativeLayers: Array<JsPAGLayer>): Array<PAGLayer> {
+  export function WarpJPAGLayers(nativeLayers: Array<JPAGLayer>): Array<PAGLayer> {
     let result = new Array<PAGLayer>(nativeLayers.length);
     for (let i = 0; i < nativeLayers.length; i++) {
-      result[i] = PAGUtils.WarpJsPAGLayer(nativeLayers[i]);
+      result[i] = PAGUtils.WarpJPAGLayer(nativeLayers[i]);
     }
     return result;
   }

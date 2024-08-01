@@ -1,4 +1,4 @@
-import { JsPAGLayer, JsPAGTextLayer } from 'libpag.so';
+import { JPAGLayer, JPAGTextLayer } from 'libpag.so';
 import { PAGLayer } from './PAGLayer';
 
 export class PAGText {
@@ -6,7 +6,7 @@ export class PAGText {
 }
 
 export class PAGTextLayer extends PAGLayer {
-  constructor(nativeLayer: JsPAGLayer) {
+  constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
   }
 }
