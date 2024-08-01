@@ -288,16 +288,7 @@ static napi_value GetMatrix(napi_env env, napi_callback_info info) {
   if (!player) {
     return nullptr;
   }
-  uint32_t length = 0;
-  napi_value array;
-  auto status = napi_create_array_with_length(env, 9, &array);
-  for (uint32_t i = 0; i < 9; i++) {
-    napi_value ele;
-    double value = player->matrix().get(i);
-    status = napi_create_double(env, value, &ele);
-    auto status = napi_set_element(env, array, i, ele);
-  }
-  return array;
+  return CreateMatrix(env, player->matrix());
 }
 
 static napi_value SetMatrix(napi_env env, napi_callback_info info) {
@@ -309,19 +300,7 @@ static napi_value SetMatrix(napi_env env, napi_callback_info info) {
   if (!player) {
     return nullptr;
   }
-  uint32_t length = 0;
-  auto status = napi_get_array_length(env, args[0], &length);
-  float array[9] = {0};
-  for (uint32_t i = 0; i < length; i++) {
-    napi_value ele;
-    double value;
-    auto status = napi_get_element(env, args[0], i, &ele);
-    status = napi_get_value_double(env, ele, &value);
-    array[i] = value;
-  }
-  Matrix matrix;
-  matrix.set9(array);
-  player->setMatrix(matrix);
+  player->setMatrix(GetMatrix(env, args[0]));
   return nullptr;
 }
 
@@ -335,7 +314,7 @@ static napi_value Duration(napi_env env, napi_callback_info info) {
     return nullptr;
   }
   napi_value value;
-  auto status = napi_create_double(env, player->duration(), &value);
+  napi_create_double(env, player->duration(), &value);
   return value;
 }
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <ace/xcomponent/native_interface_xcomponent.h>
+#include <native_window/external_window.h>
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
 
@@ -26,7 +26,8 @@ namespace pag {
 
 class GPUDrawable : public Drawable {
  public:
-  static std::shared_ptr<GPUDrawable> FromXComponent(OH_NativeXComponent* xComponent, void* window);
+  static std::shared_ptr<GPUDrawable> FromWindow(NativeWindow* nativeWindow,
+                                                 EGLContext sharedContext = EGL_NO_CONTEXT);
 
   ~GPUDrawable() override;
 
@@ -54,12 +55,11 @@ class GPUDrawable : public Drawable {
  private:
   int _width = 0;
   int _height = 0;
-
-  OH_NativeXComponent* xComponent = nullptr;
-  void* nativeWindow = nullptr;
+  NativeWindow* nativeWindow = nullptr;
+  EGLContext sharedContext = nullptr;
   int64_t currentTimeStamp = 0;
   std::shared_ptr<tgfx::EGLWindow> window = nullptr;
 
-  explicit GPUDrawable(OH_NativeXComponent* xComponent, void* window);
+  explicit GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext = EGL_NO_CONTEXT);
 };
 }  // namespace pag

@@ -40,7 +40,7 @@ void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* window) {
     LOGE("Could not find PAGView on Surface Created id:%s", id.c_str());
     return;
   }
-  auto drawable = pag::GPUDrawable::FromXComponent(component, window);
+  auto drawable = pag::GPUDrawable::FromWindow(static_cast<NativeWindow*>(window));
   auto view = ViewMap[id];
   view->player->setSurface(pag::PAGSurface::MakeFrom(drawable));
   view->animator->update();
@@ -252,9 +252,8 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
   napi_value resourceName = nullptr;
   napi_create_string_utf8(env, "PAGViewStateChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
 
-  auto state =
-      napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                      view, StateChangeCallback, &view->playingStateCallback);
+  napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr, view,
+                                  StateChangeCallback, &view->playingStateCallback);
   return nullptr;
 }
 
@@ -281,9 +280,8 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   napi_value resourceName = nullptr;
   napi_create_string_utf8(env, "PAGViewProgressCallback", NAPI_AUTO_LENGTH, &resourceName);
-  auto state =
-      napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                      nullptr, ProgressCallback, &view->progressCallback);
+  napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
+                                  nullptr, ProgressCallback, &view->progressCallback);
   return nullptr;
 }
 
@@ -339,7 +337,7 @@ void JsPAGView::onAnimationEnd(PAGAnimator*) {
 
 void JsPAGView::onAnimationRepeat(PAGAnimator*) {
   napi_call_threadsafe_function(playingStateCallback, &PAGViewStateRepeat,
-                               napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+                                napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
 }
 
 void JsPAGView::onAnimationUpdate(PAGAnimator* animator) {

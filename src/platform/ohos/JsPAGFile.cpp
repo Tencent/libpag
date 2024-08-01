@@ -21,6 +21,12 @@ static std::shared_ptr<PAGFile> FromJs(napi_env env, napi_value value) {
   return nullptr;
 }
 
+static napi_value MaxSupportedTagLevel(napi_env env, napi_callback_info) {
+  napi_value result;
+  napi_create_uint32(env, PAGFile::MaxSupportedTagLevel(), &result);
+  return result;
+}
+
 static napi_value LoadFromPath(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value args[1] = {nullptr};
@@ -70,11 +76,29 @@ static napi_value LoadFromAssets(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value TagLevel(napi_env env, napi_callback_info info) {
+  size_t argc = 0;
+  napi_value args[1] = {nullptr};
+  napi_value jsFile;
+  napi_get_cb_info(env, info, &argc, args, &jsFile, nullptr);
+  auto file = FromJs(env, jsFile);
+  if (file == nullptr) {
+    return nullptr;
+  }
+  napi_value result;
+  napi_create_uint32(env, file->tagLevel(), &result);
+  return result;
+}
+
 bool JsPAGLayerHandle::InitPAGFileEnv(napi_env env, napi_value exports) {
 
-  napi_property_descriptor classProp[] = {PAG_STATIC_METHOD_ENTRY(LoadFromPath, LoadFromPath),
-                                          PAG_STATIC_METHOD_ENTRY(LoadFromBytes, LoadFromBytes),
-                                          PAG_STATIC_METHOD_ENTRY(LoadFromAssets, LoadFromAssets)};
+  napi_property_descriptor classProp[] = {
+      PAG_STATIC_METHOD_ENTRY(MaxSupportedTagLevel, MaxSupportedTagLevel),
+      PAG_STATIC_METHOD_ENTRY(LoadFromPath, LoadFromPath),
+      PAG_STATIC_METHOD_ENTRY(LoadFromBytes, LoadFromBytes),
+      PAG_STATIC_METHOD_ENTRY(LoadFromAssets, LoadFromAssets),
+
+      PAG_DEFAULT_METHOD_ENTRY(tagLevel, TagLevel)};
   auto status = DefineClass(
       env, exports, GetFileClassName(), sizeof(classProp) / sizeof(classProp[0]), classProp,
       ConstructorWithHandler<JsPAGLayerHandle>, GetLayerClassName(LayerType::PreCompose));

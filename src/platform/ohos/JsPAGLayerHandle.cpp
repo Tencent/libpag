@@ -179,6 +179,22 @@ static napi_value LocalTimeToGlobal(napi_env env, napi_callback_info info) {
   return result;
 }
 
+static napi_value GlobalToLocalTime(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1] = {nullptr};
+  napi_value jsLayer = nullptr;
+  napi_get_cb_info(env, info, &argc, args, &jsLayer, nullptr);
+  auto layer = JsPAGLayerHandle::FromJs(env, jsLayer);
+  if (!layer) {
+    return nullptr;
+  }
+  int64_t globalTime = 0;
+  napi_get_value_int64(env, args[0], &globalTime);
+  napi_value result;
+  napi_create_int64(env, layer->globalToLocalTime(globalTime), &result);
+  return result;
+}
+
 static napi_value Duration(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[1] = {nullptr};
@@ -263,6 +279,21 @@ static napi_value SetCurrentTime(napi_env env, napi_callback_info info) {
   napi_get_value_int64(env, args[0], &currentTime);
   layer->setCurrentTime(currentTime);
   return nullptr;
+}
+
+static napi_value GetProgress(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1] = {nullptr};
+  napi_value jsLayer = nullptr;
+  napi_get_cb_info(env, info, &argc, args, &jsLayer, nullptr);
+  auto layer = JsPAGLayerHandle::FromJs(env, jsLayer);
+  if (!layer) {
+    return nullptr;
+  }
+
+  napi_value result;
+  napi_create_double(env, layer->getProgress(), &result);
+  return result;
 }
 
 static napi_value SetProgress(napi_env env, napi_callback_info info) {
@@ -386,21 +417,47 @@ std::string JsPAGLayerHandle::GetBaseClassName() {
   return "JsPAGLayer";
 }
 
-bool JsPAGLayerHandle::InitPAGImageLayerEnv(napi_env env, napi_value exports) {
+bool JsPAGLayerHandle::InitPAGImageLayerEnv(napi_env, napi_value) {
   return true;
 }
-bool JsPAGLayerHandle::InitPAGTextLayerEnv(napi_env env, napi_value exports) {
+bool JsPAGLayerHandle::InitPAGTextLayerEnv(napi_env, napi_value) {
   return true;
 }
-bool JsPAGLayerHandle::InitPAGShapeLayerEnv(napi_env env, napi_value exports) {
+bool JsPAGLayerHandle::InitPAGShapeLayerEnv(napi_env, napi_value) {
   return true;
 }
-bool JsPAGLayerHandle::InitPAGSolidLayerEnv(napi_env env, napi_value exports) {
+bool JsPAGLayerHandle::InitPAGSolidLayerEnv(napi_env, napi_value) {
   return true;
 }
 
 bool JsPAGLayerHandle::InitPAGLayerEnv(napi_env env, napi_value exports) {
-  napi_property_descriptor classProp[] = {PAG_DEFAULT_METHOD_ENTRY(layerType, LayerType)};
+  napi_property_descriptor classProp[] = {
+      PAG_DEFAULT_METHOD_ENTRY(layerType, LayerType),
+      PAG_DEFAULT_METHOD_ENTRY(layerName, LayerName),
+      PAG_DEFAULT_METHOD_ENTRY(matrix, Matrix),
+      PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
+      PAG_DEFAULT_METHOD_ENTRY(resetMatrix, ResetMatrix),
+      PAG_DEFAULT_METHOD_ENTRY(getTotalMatrix, GetTotalMatrix),
+      PAG_DEFAULT_METHOD_ENTRY(visible, Visible),
+      PAG_DEFAULT_METHOD_ENTRY(setVisible, SetVisible),
+      PAG_DEFAULT_METHOD_ENTRY(editableIndex, EditableIndex),
+      PAG_DEFAULT_METHOD_ENTRY(parent, Parent),
+      PAG_DEFAULT_METHOD_ENTRY(markers, Markers),
+      PAG_DEFAULT_METHOD_ENTRY(localTimeToGlobal, LocalTimeToGlobal),
+      PAG_DEFAULT_METHOD_ENTRY(globalToLocalTime, GlobalToLocalTime),
+      PAG_DEFAULT_METHOD_ENTRY(duration, Duration),
+      PAG_DEFAULT_METHOD_ENTRY(frameRate, FrameRate),
+      PAG_DEFAULT_METHOD_ENTRY(startTime, StartTime),
+      PAG_DEFAULT_METHOD_ENTRY(setStartTime, SetStartTime),
+      PAG_DEFAULT_METHOD_ENTRY(currentTime, CurrentTime),
+      PAG_DEFAULT_METHOD_ENTRY(setCurrentTime, SetCurrentTime),
+      PAG_DEFAULT_METHOD_ENTRY(getProgress, GetProgress),
+      PAG_DEFAULT_METHOD_ENTRY(setProgress, SetProgress),
+      PAG_DEFAULT_METHOD_ENTRY(trackMatteLayer, TrackMatteLayer),
+      PAG_DEFAULT_METHOD_ENTRY(getBounds, GetBounds),
+      PAG_DEFAULT_METHOD_ENTRY(excludedFromTimeline, ExcludedFromTimeline),
+      PAG_DEFAULT_METHOD_ENTRY(setExcludedFromTimeline, SetExcludedFromTimeline),
+  };
   auto status = DefineClass(env, exports, GetBaseClassName(), 0, classProp,
                             ConstructorWithHandler<JsPAGLayerHandle>, "");
   return status == napi_ok;

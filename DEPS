@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "cd27501c80ece814683771a946e733b1c847f6c8",
+        "commit": "ce1f4d55330727eb3f02595999c1a1b4fab23ebf",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "e785d073869b79f81200964b9481547621331d83",
+        "commit": "730e2d3b0ebeb49214d20cd36c4a27cd2b607f84",
         "dir": "third_party/tgfx"
       },
       {

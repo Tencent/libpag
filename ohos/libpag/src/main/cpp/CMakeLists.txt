@@ -18,7 +18,4 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../src ${CMAKE_CURRE
 
 file(GLOB_RECURSE LIBPAG_OHOS_SRC_FILES *.cpp)
 add_library(libpag SHARED ${LIBPAG_OHOS_SRC_FILES})
-target_link_libraries(libpag PUBLIC libace_napi.z.so libnative_media_codecbase.so libnative_media_core.so
-                      libnative_media_vdec.so libhilog_ndk.z.so libnative_window.so libnative_image.so libnative_buffer.so
-                      libEGL.so libGLESv3.so libuv.so pag
-                      )
+target_link_libraries(libpag PUBLIC pag)

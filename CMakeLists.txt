@@ -49,10 +49,10 @@ endif ()
 message("PAG_USE_PNG_DECODE: ${PAG_USE_PNG_DECODE}")
 
 if (NOT WEB)
-    if (NOT IOS OR SDK_NAME STREQUAL iphonesimulator)
-        option(PAG_USE_LIBAVC "Allow use of embedded libavc as fallback video decoder" OFF)
+    if (NOT IOS AND NOT OHOS OR SDK_NAME STREQUAL iphonesimulator)
+        option(PAG_USE_LIBAVC "Allow use of embedded libavc as fallback video decoder" ON)
     endif ()
-        option(PAG_BUILD_SHARED "Allow build shared library" ON)
+    option(PAG_BUILD_SHARED "Allow build shared library" ON)
 endif ()
 
 if (MACOS OR IOS)
@@ -147,7 +147,7 @@ file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND PAG_COMPILE_OPTIONS -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-error=unused-command-line-argument)
+    list(APPEND PAG_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
 if (MSVC)
@@ -368,14 +368,7 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
         file(GLOB_RECURSE PLATFORM_FILES src/platform/linux/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
-elseif(OHOS)
-    message("USE_NATIVE_PLATFORM: ${USE_NATIVE_PLATFORM}")
-    list(APPEND PAG_SHARED_LIBS libnative_media_codecbase.so)
-    list(APPEND PAG_SHARED_LIBS libnative_media_core.so)
-    list(APPEND PAG_SHARED_LIBS libnative_media_vdec.so)
-    list(APPEND PAG_SHARED_LIBS libhilog_ndk.z.so)
-    list(APPEND PAG_SHARED_LIBS librawfile.z.so)
-    list(APPEND PAG_SHARED_LIBS libace_napi.z.so)
+elseif (OHOS)
     if (USE_NATIVE_PLATFORM)
         find_library(GLESV3_LIB GLESv3)
         list(APPEND PAG_SHARED_LIBS ${GLESV3_LIB})
@@ -392,14 +385,19 @@ elseif(OHOS)
         find_library(NATIVE_WINDOW_LIB native_window)
         find_library(NATIVE_IMAGE_LIB native_image)
         find_library(NATIVE_VSYNC_LIB native_vsync)
+        find_library(NATIVE_MEDIA_CODECBASE_LIB native_media_codecbase)
+        find_library(NATIVE_MEDIA_CORE_LIB native_media_core)
+        find_library(NATIVE_MEDIA_VDEC_LIB native_media_vdec)
+        find_library(NATIVE_RAWFILE_Z_LIB rawfile.z)
         list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
-                    ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
-                    ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB} ${NATIVE_VSYNC_LIB})
+                ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB}
+                ${NATIVE_BUFFER_LIB} ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB}
+                ${NATIVE_MEDIA_CODECBASE_LIB} ${NATIVE_MEDIA_CORE_LIB} ${NATIVE_MEDIA_VDEC_LIB}
+                ${NATIVE_VSYNC_LIB} ${NATIVE_RAWFILE_Z_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
-
 endif ()
 
 if (MACOS OR IOS)

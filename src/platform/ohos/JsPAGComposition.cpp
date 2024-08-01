@@ -398,6 +398,7 @@ bool JsPAGLayerHandle::InitPAGCompositionLayerEnv(napi_env env, napi_value expor
       PAG_DEFAULT_METHOD_ENTRY(getLayerIndex, GetLayerIndex),
       PAG_DEFAULT_METHOD_ENTRY(setLayerIndex, SetLayerIndex),
       PAG_DEFAULT_METHOD_ENTRY(addLayer, AddLayer),
+      PAG_DEFAULT_METHOD_ENTRY(addLayerAt, AddLayerAt),
       PAG_DEFAULT_METHOD_ENTRY(contains, Contains),
       PAG_DEFAULT_METHOD_ENTRY(removeLayer, RemoveLayer),
       PAG_DEFAULT_METHOD_ENTRY(removeLayerAt, RemoveLayerAt),
