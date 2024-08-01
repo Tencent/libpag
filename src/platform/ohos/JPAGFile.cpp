@@ -70,9 +70,12 @@ static napi_value LoadFromAssets(napi_env env, napi_callback_info info) {
   RawFile* rawFile = OH_ResourceManager_OpenRawFile(mNativeResMgr, srcBuf);
   if (rawFile != NULL) {
     long len = OH_ResourceManager_GetRawFileSize(rawFile);
-    uint8_t* data = static_cast<uint8_t*>(malloc(len));
-    OH_ResourceManager_ReadRawFile(rawFile, data, len);
-    return JPAGLayerHandle::ToJs(env, PAGFile::Load(data, len, "asset://" + fileName));
+    auto data = ByteData::Make(len);
+    if (!data) {
+      return nullptr;
+    }
+    OH_ResourceManager_ReadRawFile(rawFile, data->data(), len);
+    return JPAGLayerHandle::ToJs(env, PAGFile::Load(data->data(), len, "asset://" + fileName));
   }
   return nullptr;
 }

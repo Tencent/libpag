@@ -243,3 +243,21 @@ export declare class JPAGView {
 
   setProgressUpdateCallback(callback: (double) => void): void;
 }
+
+export declare class JPAGFont {
+  static RegisterFontFromPath(fontPath: string, ttcIndex?: number,
+    fontFamily?: string, fontStyle?: string): JPAGFont;
+
+  static RegisterFontFromAsset(manager: resourceManager.ResourceManager, fileName: string, ttcIndex?: number,
+    fontFamily?: string, fontStyle?: string): JPAGFont;
+
+  static UnregisterFont(font: JPAGFont);
+
+  static SetFallbackFontPaths(fontPath: Array<string>): void;
+
+  constructor(fontFamily?: string, fontStyle?: string);
+
+  fontFamily: string;
+
+  fontStyle: string;
+}
