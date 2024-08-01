@@ -1,4 +1,4 @@
-import { JsPAGImage } from 'liblibpag.so'
+import { JsPAGImage } from 'libpag.so'
 
 export class PAGImage {
   constructor(nativeImage: JsPAGImage) {

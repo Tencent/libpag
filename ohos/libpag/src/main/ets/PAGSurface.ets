@@ -1,4 +1,4 @@
-import { JsPAGSurface } from 'liblibpag.so'
+import { JsPAGSurface } from 'libpag.so'
 import { PAGInit } from './PAGInit';
 import { image } from '@kit.ImageKit';
 

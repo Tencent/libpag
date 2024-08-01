@@ -7,6 +7,6 @@
   "license": "Apache-2.0",
   "packageType": "InterfaceHar",
   "dependencies": {
-    "liblibpag.so": "file:./src/main/cpp/types/liblibpag"
+    "libpag.so": "file:./src/main/cpp/types/libpag"
   },
 }

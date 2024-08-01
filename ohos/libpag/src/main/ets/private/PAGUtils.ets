@@ -1,6 +1,6 @@
 import { matrix4 } from '@kit.ArkUI';
 import { Rect } from '@ohos.arkui.node';
-import { JsPAGLayer } from 'liblibpag.so';
+import { JsPAGLayer } from 'libpag.so';
 import { PAGComposition } from '../PAGComposition';
 import { PAGImageLayer } from '../PAGImageLayer';
 import { PAGLayer, PAGLayerType } from '../PAGLayer';

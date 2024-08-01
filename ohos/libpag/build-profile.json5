@@ -2,7 +2,7 @@
   "apiType": "stageMode",
   "buildOption": {
     "externalNativeOptions": {
-      "path": "./src/main/cpp/CMakeLists.txt",
+      "path": "../../CMakeLists.txt",
       "arguments": "",
       "cppFlags": ""
     }

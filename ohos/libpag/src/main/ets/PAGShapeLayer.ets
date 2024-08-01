@@ -1,4 +1,4 @@
-import { JsPAGLayer, JsPAGShapeLayer } from 'liblibpag.so';
+import { JsPAGLayer, JsPAGShapeLayer } from 'libpag.so';
 import { PAGLayer } from './PAGLayer';
 
 export class PAGShapeLayer extends PAGLayer {

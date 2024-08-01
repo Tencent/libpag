@@ -1,4 +1,4 @@
-import { JsPAGLayer, JsPAGTextLayer } from 'liblibpag.so';
+import { JsPAGLayer, JsPAGTextLayer } from 'libpag.so';
 import { PAGLayer } from './PAGLayer';
 
 export class PAGText {

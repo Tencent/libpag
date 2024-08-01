@@ -1,4 +1,4 @@
-import { JsPAGLayer } from 'liblibpag.so'
+import { JsPAGLayer } from 'libpag.so'
 import matrix4 from '@ohos.matrix4'
 import { PAGComposition } from './PAGComposition';
 import { PAGMarker } from './PAGMarker';

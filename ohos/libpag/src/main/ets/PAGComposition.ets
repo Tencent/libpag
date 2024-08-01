@@ -1,5 +1,5 @@
 import { PAGLayer } from "./PAGLayer"
-import { JsPAGLayer, JsPAGComposition } from "liblibpag.so"
+import { JsPAGLayer, JsPAGComposition } from "libpag.so"
 import { PAGMarker } from './PAGMarker';
 import { PAGUtils } from './private/PAGUtils';
 

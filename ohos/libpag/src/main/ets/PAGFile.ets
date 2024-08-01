@@ -1,4 +1,4 @@
-import { JsPAGFile, JsPAGLayer } from 'liblibpag.so'
+import { JsPAGFile, JsPAGLayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition'
 import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';

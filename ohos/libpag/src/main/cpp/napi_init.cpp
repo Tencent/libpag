@@ -10,7 +10,7 @@ static napi_value Init(napi_env env, napi_value exports) {
 EXTERN_C_END
 
 static napi_module demoModule = {
-    1, 0, nullptr, Init, "libpag", ((void*)0), {0},
+    1, 0, nullptr, Init, "pag", ((void*)0), {0},
 };
 
 extern "C" __attribute__((constructor)) void RegisterEntryModule(void) {

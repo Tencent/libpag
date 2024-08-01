@@ -1,6 +1,6 @@
 import matrix4 from '@ohos.matrix4'
 import { Rect } from '@ohos.arkui.node';
-import { JsPAGPlayer } from 'liblibpag.so'
+import { JsPAGPlayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
 import { PAGInit } from './PAGInit';
 import { PAGSurface } from './PAGSurface';

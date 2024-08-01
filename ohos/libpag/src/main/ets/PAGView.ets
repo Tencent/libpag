@@ -1,4 +1,4 @@
-import { JsPAGView } from 'liblibpag.so'
+import { JsPAGView } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
 import { PAGInit } from "./PAGInit"
 
@@ -65,7 +65,7 @@ export struct PAGView {
     XComponent({
       id: this.viewController.uniqueID(),
       type: "surface",
-      libraryname: "libpag",
+      libraryname: "pag",
     })
       .onLoad(() => {
         this.viewController.setComposition(this.composition?.getNativeComposition());
