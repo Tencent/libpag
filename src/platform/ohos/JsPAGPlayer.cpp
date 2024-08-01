@@ -454,20 +454,6 @@ static napi_value Prepare(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value Wait(napi_env env, napi_callback_info info) {
-  size_t argc = 1;
-  napi_value args[1] = {nullptr};
-  napi_value jsPlayer = nullptr;
-  napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
-  if (!player) {
-    return nullptr;
-  }
-  // todo:partyhuang
-  //  player->wait();
-  return nullptr;
-}
-
 static napi_value Flush(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[1] = {nullptr};
@@ -482,21 +468,6 @@ static napi_value Flush(napi_env env, napi_callback_info info) {
   return value;
 }
 
-static napi_value FlushAndSignalSemaphore(napi_env env, napi_callback_info info) {
-  size_t argc = 1;
-  napi_value args[1] = {nullptr};
-  napi_value jsPlayer = nullptr;
-  napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
-  auto player = JsPAGPlayer::FromJs(env, jsPlayer);
-  if (!player) {
-    return nullptr;
-  }
-  // todo:partyhuang
-  napi_value value;
-  napi_get_boolean(env, player->flush(), &value);
-  return value;
-}
-
 static napi_value GetBounds(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value args[1] = {nullptr};
@@ -506,8 +477,12 @@ static napi_value GetBounds(napi_env env, napi_callback_info info) {
   if (!player) {
     return nullptr;
   }
-  // todo:partyhuang
-  return nullptr;
+  auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  auto rect = player->getBounds(layer);
+  return CreateRect(env, rect);
 }
 
 static napi_value GetLayersUnderPoint(napi_env env, napi_callback_info info) {
@@ -592,8 +567,6 @@ bool JsPAGPlayer::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(autoClear, AutoClear),
       PAG_DEFAULT_METHOD_ENTRY(setAutoClear, SetAutoClear),
       PAG_DEFAULT_METHOD_ENTRY(prepare, Prepare),
-      PAG_DEFAULT_METHOD_ENTRY(wait, Wait),
-      PAG_DEFAULT_METHOD_ENTRY(flushAndSignalSemaphore, FlushAndSignalSemaphore),
       PAG_DEFAULT_METHOD_ENTRY(flush, Flush),
       PAG_DEFAULT_METHOD_ENTRY(getBounds, GetBounds),
       PAG_DEFAULT_METHOD_ENTRY(getLayersUnderPoint, GetLayersUnderPoint),

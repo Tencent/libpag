@@ -1,6 +1,5 @@
 import * as pag from 'libpag';
 
-
 @Entry
 @Component
 struct Index {
@@ -45,7 +44,7 @@ struct Index {
           progress: this.progress,
           isPlaying: this.isPlaying,
           repeatCount: this.repeatCount,
-          listener: this as pag.PAGViewListener
+          listener: this
         })
           .height('50%')
           .onClick(() => {

@@ -109,13 +109,171 @@ napi_value NewInstance(napi_env env, const std::string& name, void* handler) {
   napi_value external[1];
   auto status = napi_create_external(env, handler, nullptr, nullptr, &external[0]);
   if (status != napi_ok) {
-    tgfx::PrintLog("JsPAGLayerHandle::ToJs napi_create_external failed :%d", status);
+    tgfx::PrintLog("NewInstance napi_create_external failed :%d", status);
     return nullptr;
   }
   status = napi_new_instance(env, constructor, 1, external, &result);
   if (status != napi_ok) {
-    tgfx::PrintLog("JsPAGLayerHandle::ToJs napi_new_instance failed :%d", status);
+    tgfx::PrintLog("NewInstance napi_new_instance failed :%d", status);
     return nullptr;
+  }
+  return result;
+}
+
+napi_value CreateMarker(napi_env env, const Marker* marker) {
+  if (env == nullptr || marker == nullptr) {
+    return nullptr;
+  }
+  napi_value result = nullptr;
+  auto status = napi_create_object(env, &result);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_create_object failed :%d", status);
+    return nullptr;
+  }
+  napi_value startTime;
+  status = napi_create_int64(env, marker->startTime, &startTime);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_create_int64 failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "startTime", startTime);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  napi_value duration;
+  status = napi_create_int64(env, marker->duration, &duration);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_create_int64 failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "duration", duration);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  napi_value comment;
+  status =
+      napi_create_string_utf8(env, marker->comment.c_str(), marker->comment.length(), &comment);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_create_string_utf8 failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "comment", comment);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMarker napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  return result;
+}
+
+napi_value CreateMarkers(napi_env env, const std::vector<const Marker*>& markers) {
+  napi_value result;
+  auto status = napi_create_array_with_length(env, markers.size(), &result);
+  if (status != napi_ok) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < markers.size(); i++) {
+    auto jsMarker = CreateMarker(env, markers[i]);
+    if (jsMarker == nullptr) {
+      return nullptr;
+    }
+    napi_set_element(env, result, i, jsMarker);
+  }
+  return result;
+}
+
+napi_value CreateRect(napi_env env, const Rect& rect) {
+  if (env == nullptr) {
+    return nullptr;
+  }
+  napi_value result = nullptr;
+  auto status = napi_create_array_with_length(env, 4, &result);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateRect napi_create_array_with_length failed :%d", status);
+    return nullptr;
+  }
+  napi_value l;
+  status = napi_create_double(env, rect.left, &l);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateRect napi_create_int64 failed :%d", status);
+    return nullptr;
+  }
+  napi_value t;
+  status = napi_create_double(env, rect.top, &t);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateRect napi_create_double failed :%d", status);
+    return nullptr;
+  }
+  napi_value r;
+  status = napi_create_double(env, rect.right, &r);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateRect napi_create_double failed :%d", status);
+    return nullptr;
+  }
+
+  napi_value b;
+  status = napi_create_double(env, rect.bottom, &b);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateRect napi_create_double failed :%d", status);
+    return nullptr;
+  }
+
+  napi_set_element(env, result, 0, l);
+  napi_set_element(env, result, 1, t);
+  napi_set_element(env, result, 2, r);
+  napi_set_element(env, result, 3, b);
+  return result;
+}
+
+napi_value CreateMatrix(napi_env env, const Matrix& matrix) {
+  if (env == nullptr) {
+    return nullptr;
+  }
+  float buffer[9];
+  matrix.get9(buffer);
+  napi_value result = nullptr;
+  auto status = napi_create_array_with_length(env, 9, &result);
+  if (status != napi_ok) {
+    tgfx::PrintLog("CreateMatrix napi_create_array_with_length failed :%d", status);
+    return nullptr;
+  }
+  for (size_t i = 0; i < 9; i++) {
+    napi_value ele;
+    status = napi_create_double(env, buffer[i], &ele);
+    if (status != napi_ok) {
+      tgfx::PrintLog("CreateMatrix napi_create_int64 failed :%d", status);
+      return nullptr;
+    }
+    status = napi_set_element(env, result, i, ele);
+    if (status != napi_ok) {
+      tgfx::PrintLog("CreateMatrix napi_set_element failed :%d", status);
+      return nullptr;
+    }
+  }
+  return result;
+}
+
+Matrix GetMatrix(napi_env env, napi_value value) {
+  if (env == nullptr || value == nullptr) {
+    return {};
+  }
+
+  Matrix result;
+  for (size_t i = 0; i < 9; i++) {
+    napi_value ele;
+    auto status = napi_get_element(env, value, i, &ele);
+    if (status != napi_ok) {
+      tgfx::PrintLog("GetMatrix napi_get_element failed :%d", status);
+      return {};
+    }
+    double val = 0;
+    status = napi_get_value_double(env, ele, &val);
+    if (status != napi_ok) {
+      tgfx::PrintLog("GetMatrix napi_get_value_double failed :%d", status);
+      return {};
+    }
+    result.set(i, val);
   }
   return result;
 }

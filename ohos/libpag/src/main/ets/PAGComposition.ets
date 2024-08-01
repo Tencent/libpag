@@ -1,12 +1,9 @@
 import { PAGLayer } from "./PAGLayer"
 import { JsPAGLayer, JsPAGComposition } from "liblibpag.so"
+import { PAGMarker } from './PAGMarker';
+import { PAGUtils } from './private/PAGUtils';
 
 export class PAGComposition extends PAGLayer {
-  constructor(nativeComposition: JsPAGComposition) {
-    super(nativeComposition);
-    this.nativeComposition = nativeComposition;
-  }
-
   static Make(width: number, height: number): PAGComposition | null {
     let native = JsPAGComposition.Make(width, height);
     if (native == null) {
@@ -15,17 +12,167 @@ export class PAGComposition extends PAGLayer {
     return new PAGComposition(native);
   }
 
+  constructor(nativeLayer: JsPAGLayer) {
+    super(nativeLayer);
+  }
+
+  /**
+   * The width of Composition.
+   */
   width(): number {
-    return this.nativeComposition.width();
+    return this.getNativeComposition().width();
   }
 
+  /**
+   * Returns the height of Composition.
+   */
   height(): number {
-    return this.nativeComposition.height();
+    return this.getNativeComposition().height();
   }
 
+  /**
+   * Set the size of the Composition.
+   */
   setContentSize(width: number, height: number): void {
-    this.nativeComposition.setContentSize(width, height);
+    this.getNativeComposition().setContentSize(width, height);
   }
 
-  readonly nativeComposition: JsPAGComposition;
+  /**
+   * Returns the number of child layers of this composition.
+   */
+  numChildren(): number {
+    return this.getNativeComposition().numChildren();
+  }
+
+  /**
+   * Returns the child layer that exists at the specified index.
+   * @param index The index position of the child layer.
+   * @return The child layer at the specified index position.
+   */
+  getLayerAt(index: number): PAGLayer {
+    return PAGUtils.WarpJsPAGLayer(this.getNativeComposition().getLayerAt(index));
+  }
+
+  /**
+   * Returns the index position of a child layer.
+   * @param layer The layer instance to identify.
+   * @return The index position of the child layer to identify.
+   */
+  getLayerIndex(layer: PAGLayer): number {
+    return this.getNativeComposition().getLayerIndex(layer.nativeLayer);
+  }
+
+  /**
+   * Changes the position of an existing child in the container. This affects the layering of child layers.
+   * @param layer The child layer for which you want to change the index number.
+   * @param index The resulting index number for the child layer.
+   */
+  setLayerIndex(layer: PAGLayer, index: number): void {
+    this.getNativeComposition().setLayerIndex(layer.nativeLayer, index);
+  }
+
+  /**
+   * Add PAGLayer to current PAGComposition at the top.
+   */
+  addLayer(pagLayer: PAGLayer): void {
+    this.getNativeComposition().addLayer(pagLayer.nativeLayer);
+  }
+
+  /**
+   * Add PAGLayer to current PAGComposition at the specified index.
+   */
+  addLayerAt(pagLayer: PAGLayer, index: number): void {
+    this.getNativeComposition().addLayerAt(pagLayer.nativeLayer, index);
+  }
+
+  /**
+   * Check whether current PAGComposition contains the specified pagLayer.
+   */
+  contains(pagLayer: PAGLayer): boolean {
+    return this.getNativeComposition().contains(pagLayer.nativeLayer);
+  }
+
+  /**
+   * Remove the specified PAGLayer from current PAGComposition.
+   */
+  removeLayer(pagLayer: PAGLayer): PAGLayer | null {
+    let result = this.getNativeComposition().removeLayer(pagLayer.nativeLayer);
+    if (result == null) {
+      return null;
+    }
+    return PAGUtils.WarpJsPAGLayer(result);
+  }
+
+  /**
+   * Remove the PAGLayer at specified index from current PAGComposition.
+   */
+  removeLayerAt(index: number): PAGLayer | null {
+    let result = this.getNativeComposition().removeLayerAt(index);
+    if (result == null) {
+      return null;
+    }
+    return PAGUtils.WarpJsPAGLayer(result);
+  }
+
+  /**
+   * Remove all PAGLayers from current PAGComposition.
+   */
+  removeAllLayers(): void {
+    this.getNativeComposition().removeAllLayers();
+  }
+
+  /**
+   * Swap the layers.
+   */
+  swapLayer(pagLayer1: PAGLayer, pagLayer2: PAGLayer): void {
+    this.getNativeComposition().swapLayer(pagLayer1.nativeLayer, pagLayer2.nativeLayer);
+  }
+
+  /**
+   * Swap the layers at the specified index.
+   */
+  swapLayerAt(index1: number, index2: number) {
+    this.getNativeComposition().swapLayerAt(index1, index2);
+  }
+
+  /**
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container.
+   */
+  audioBytes(): ArrayBuffer | null {
+    return this.getNativeComposition().audioBytes();
+  }
+
+  /**
+   * Indicates when the first frame of the audio plays in the composition's timeline.
+   */
+  audioStartTime(): number {
+    return this.getNativeComposition().audioStartTime();
+  }
+
+  /**
+   * Returns the audio markers of this composition.
+   */
+  audioMarkers(): Array<PAGMarker> {
+    return this.getNativeComposition().audioMarkers() as Array<PAGMarker>;
+  }
+
+  /**
+   * Returns an array of layers that match the specified layer name.
+   */
+  getLayersByName(layerName: string): Array<PAGLayer> {
+    return PAGUtils.WarpJsPAGLayers(this.getNativeComposition().getLayersByName(layerName));
+  }
+
+  /**
+   * Returns an array of layers that lie under the specified point. The point is in pixels and from this
+   * PAGComposition's local coordinates.
+   */
+  getLayersUnderPoint(localX: number, localY: number): Array<PAGLayer> {
+    return PAGUtils.WarpJsPAGLayers(this.getNativeComposition().getLayersUnderPoint(localX, localY));
+  }
+
+
+  getNativeComposition(): JsPAGComposition {
+    return this.nativeLayer as JsPAGComposition;
+  }
 }

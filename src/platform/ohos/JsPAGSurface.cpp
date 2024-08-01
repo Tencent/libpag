@@ -60,10 +60,13 @@ static napi_value ClearAll(napi_env env, napi_callback_info info) {
   napi_value args[1];
   napi_get_cb_info(env, info, &argc, args, &jSurface, nullptr);
   auto surface = JsPAGSurface::FromJs(env, jSurface);
+  bool success = false;
   if (surface) {
-    surface->clearAll();
+    success = surface->clearAll();
   }
-  return nullptr;
+  napi_value result;
+  napi_get_boolean(env, success, &result);
+  return result;
 }
 
 static napi_value FreeCache(napi_env env, napi_callback_info info) {
@@ -78,8 +81,7 @@ static napi_value FreeCache(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value SetupOffscreen(napi_env env, napi_callback_info info) {
-  napi_value jSurface = nullptr;
+static napi_value MakeOffscreen(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2];
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
@@ -92,8 +94,7 @@ static napi_value SetupOffscreen(napi_env env, napi_callback_info info) {
 
 bool JsPAGSurface::Init(napi_env env, napi_value exports) {
   static const napi_property_descriptor classProp[] = {
-      PAG_STATIC_METHOD_ENTRY(SetupOffscreen, SetupOffscreen),
-
+      PAG_STATIC_METHOD_ENTRY(MakeOffscreen, MakeOffscreen),
       PAG_DEFAULT_METHOD_ENTRY(width, Width),
       PAG_DEFAULT_METHOD_ENTRY(height, Height),
       PAG_DEFAULT_METHOD_ENTRY(updateSize, UpdateSize),

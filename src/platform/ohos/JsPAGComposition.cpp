@@ -53,7 +53,7 @@ static napi_value Height(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   napi_value value;
   napi_create_int32(env, composition->height(), &value);
@@ -67,14 +67,14 @@ static napi_value SetContentSize(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   int32_t width = 0;
   napi_get_value_int32(env, args[0], &width);
   int32_t height = 0;
   napi_get_value_int32(env, args[1], &height);
   composition->setContentSize(width, height);
-  return {};
+  return nullptr;
 }
 
 static napi_value NumChildren(napi_env env, napi_callback_info info) {
@@ -84,7 +84,7 @@ static napi_value NumChildren(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   napi_value value;
   napi_create_int32(env, composition->numChildren(), &value);
@@ -98,7 +98,7 @@ static napi_value GetLayerAt(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   int32_t index = -1;
   napi_get_value_int32(env, args[0], &index);
@@ -112,7 +112,7 @@ static napi_value GetLayerIndex(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
   napi_value value;
@@ -127,19 +127,19 @@ static napi_value SetLayerIndex(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
   if (!layer) {
-    return {};
+    return nullptr;
   }
   int32_t index = -1;
   napi_get_value_int32(env, args[1], &index);
   if (index < 0) {
-    return {};
+    return nullptr;
   }
   composition->setLayerIndex(layer, index);
-  return {};
+  return nullptr;
 }
 
 static napi_value AddLayer(napi_env env, napi_callback_info info) {
@@ -215,11 +215,11 @@ static napi_value RemoveLayer(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   auto layer = JsPAGLayerHandle::FromJs(env, args[0]);
   if (!layer) {
-    return {};
+    return nullptr;
   }
   return JsPAGLayerHandle::ToJs(env, composition->removeLayer(layer));
 }
@@ -231,12 +231,12 @@ static napi_value RemoveLayerAt(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   int32_t index = -1;
   napi_get_value_int32(env, args[0], &index);
   if (index < 0) {
-    return {};
+    return nullptr;
   }
   return JsPAGLayerHandle::ToJs(env, composition->removeLayerAt(index));
 }
@@ -248,10 +248,10 @@ static napi_value RemoveAllLayers(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   composition->removeAllLayers();
-  return {};
+  return nullptr;
 }
 
 static napi_value SwapLayer(napi_env env, napi_callback_info info) {
@@ -261,18 +261,18 @@ static napi_value SwapLayer(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   auto layer1 = JsPAGLayerHandle::FromJs(env, args[0]);
   if (!layer1) {
-    return {};
+    return nullptr;
   }
   auto layer2 = JsPAGLayerHandle::FromJs(env, args[1]);
   if (!layer2) {
-    return {};
+    return nullptr;
   }
   composition->swapLayer(layer1, layer2);
-  return {};
+  return nullptr;
 }
 
 static napi_value SwapLayerAt(napi_env env, napi_callback_info info) {
@@ -282,20 +282,20 @@ static napi_value SwapLayerAt(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   int32_t index1 = -1;
   napi_get_value_int32(env, args[1], &index1);
   if (index1 < 0) {
-    return {};
+    return nullptr;
   }
   int32_t index2 = -1;
   napi_get_value_int32(env, args[1], &index2);
   if (index2 < 0) {
-    return {};
+    return nullptr;
   }
   composition->swapLayerAt(index1, index2);
-  return {};
+  return nullptr;
 }
 
 static napi_value AudioBytes(napi_env env, napi_callback_info info) {
@@ -305,10 +305,14 @@ static napi_value AudioBytes(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
-  // todo:partyhuang
-  return {};
+  napi_value arraybuffer;
+  void* data = nullptr;
+  auto audio = composition->audioBytes();
+  napi_create_arraybuffer(env, audio->length(), &data, &arraybuffer);
+  memcpy(data, audio, audio->length());
+  return arraybuffer;
 }
 
 static napi_value AudioMarkers(napi_env env, napi_callback_info info) {
@@ -318,10 +322,9 @@ static napi_value AudioMarkers(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
-  // todo:partyhuang
-  return {};
+  return CreateMarkers(env, composition->audioMarkers());
 }
 
 static napi_value AudioStartTime(napi_env env, napi_callback_info info) {
@@ -331,7 +334,9 @@ static napi_value AudioStartTime(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    napi_value value;
+    napi_create_int32(env, 0, &value);
+    return value;
   }
   napi_value value;
   napi_create_int32(env, composition->audioStartTime(), &value);
@@ -345,7 +350,7 @@ static napi_value GetLayersByName(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   char name[1024] = {0};
   size_t length = 0;
@@ -366,7 +371,7 @@ static napi_value GetLayersUnderPoint(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsComposition, nullptr);
   auto composition = FromJs(env, jsComposition);
   if (!composition) {
-    return {};
+    return nullptr;
   }
   double x = 0;
   napi_get_value_double(env, args[0], &x);
