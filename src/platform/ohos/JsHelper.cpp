@@ -278,4 +278,12 @@ Matrix GetMatrix(napi_env env, napi_value value) {
   return result;
 }
 
+napi_value CreateTextDocument(napi_env, TextDocumentHandle) {
+  return nullptr;
+}
+
+TextDocumentHandle GetTextDocument(napi_env, napi_value) {
+  return nullptr;
+}
+
 }  // namespace pag

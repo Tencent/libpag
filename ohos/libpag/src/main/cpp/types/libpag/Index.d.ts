@@ -8,6 +8,8 @@ export declare class JsPAGLayer {
 
   layerName(): string;
 
+  isPAGFile(): boolean;
+
   matrix(): Float32Array;
 
   setMatrix(matrix: Float32Array);
@@ -69,25 +71,45 @@ export declare class JsPAGShapeLayer extends JsPAGLayer {
 
 export declare class JsPAGComposition extends JsPAGLayer {
   static Make(width: number, height: number): JsPAGComposition | null;
+
   width(): number;
+
   height(): number;
+
   setContentSize(width: number, height: number): void;
+
   numChildren(): number;
+
   getLayerAt(index: number): JsPAGLayer;
+
   getLayerIndex(layer: JsPAGLayer): number;
+
   setLayerIndex(layer: JsPAGLayer, index: number): void;
+
   addLayer(pagLayer: JsPAGLayer): void;
+
   addLayerAt(pagLayer: JsPAGLayer, index: number): void;
+
   contains(pagLayer: JsPAGLayer): boolean;
+
   removeLayer(pagLayer: JsPAGLayer): JsPAGLayer | null;
+
   removeLayerAt(index: number): JsPAGLayer | null;
+
   removeAllLayers(): void;
+
   swapLayer(pagLayer1: JsPAGLayer, pagLayer2: JsPAGLayer): void;
+
   swapLayerAt(index1: number, index2: number);
+
   audioBytes(): ArrayBuffer | null;
+
   audioStartTime(): number;
+
   audioMarkers(): Array<object>;
+
   getLayersByName(layerName: string): Array<JsPAGLayer>;
+
   getLayersUnderPoint(localX: number, localY: number): Array<JsPAGLayer>
 }
 

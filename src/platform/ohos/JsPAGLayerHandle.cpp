@@ -26,6 +26,20 @@ static napi_value LayerType(napi_env env, napi_callback_info info) {
   return result;
 }
 
+static napi_value IsPAGFile(napi_env env, napi_callback_info info) {
+  size_t argc = 0;
+  napi_value args[1] = {nullptr};
+  napi_value jsLayer = nullptr;
+  napi_get_cb_info(env, info, &argc, args, &jsLayer, nullptr);
+  auto layer = JsPAGLayerHandle::FromJs(env, jsLayer);
+  if (!layer) {
+    return nullptr;
+  }
+  napi_value result;
+  napi_get_boolean(env, layer->isPAGFile(), &result);
+  return result;
+}
+
 static napi_value LayerName(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[1] = {nullptr};
@@ -434,6 +448,7 @@ bool JsPAGLayerHandle::InitPAGLayerEnv(napi_env env, napi_value exports) {
   napi_property_descriptor classProp[] = {
       PAG_DEFAULT_METHOD_ENTRY(layerType, LayerType),
       PAG_DEFAULT_METHOD_ENTRY(layerName, LayerName),
+      PAG_DEFAULT_METHOD_ENTRY(isPAGFile, IsPAGFile),
       PAG_DEFAULT_METHOD_ENTRY(matrix, Matrix),
       PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
       PAG_DEFAULT_METHOD_ENTRY(resetMatrix, ResetMatrix),
@@ -458,8 +473,9 @@ bool JsPAGLayerHandle::InitPAGLayerEnv(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(excludedFromTimeline, ExcludedFromTimeline),
       PAG_DEFAULT_METHOD_ENTRY(setExcludedFromTimeline, SetExcludedFromTimeline),
   };
-  auto status = DefineClass(env, exports, GetBaseClassName(), 0, classProp,
-                            ConstructorWithHandler<JsPAGLayerHandle>, "");
+  auto status =
+      DefineClass(env, exports, GetBaseClassName(), sizeof(classProp) / sizeof(classProp[0]),
+                  classProp, ConstructorWithHandler<JsPAGLayerHandle>, "");
   return status == napi_ok;
 }
 

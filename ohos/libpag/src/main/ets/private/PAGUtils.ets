@@ -2,6 +2,7 @@ import { matrix4 } from '@kit.ArkUI';
 import { Rect } from '@ohos.arkui.node';
 import { JsPAGLayer } from 'libpag.so';
 import { PAGComposition } from '../PAGComposition';
+import { PAGFile } from '../PAGFile';
 import { PAGImageLayer } from '../PAGImageLayer';
 import { PAGLayer, PAGLayerType } from '../PAGLayer';
 import { PAGShapeLayer } from '../PAGShapeLayer';
@@ -31,6 +32,9 @@ export namespace PAGUtils {
   }
 
   export function WarpJsPAGLayer(nativeLayer: JsPAGLayer): PAGLayer {
+    if (nativeLayer.isPAGFile()) {
+      return new PAGFile(nativeLayer);
+    }
     switch (nativeLayer.layerType()) {
       case PAGLayerType.Solid:
         return new PAGSolidLayer(nativeLayer);
@@ -48,9 +52,9 @@ export namespace PAGUtils {
 
   export function WarpJsPAGLayers(nativeLayers: Array<JsPAGLayer>): Array<PAGLayer> {
     let result = new Array<PAGLayer>(nativeLayers.length);
-    nativeLayers.forEach((value: JsPAGLayer, index: number) => {
-      result[index] = PAGUtils.WarpJsPAGLayer(value);
-    });
+    for (let i = 0; i < nativeLayers.length; i++) {
+      result[i] = PAGUtils.WarpJsPAGLayer(nativeLayers[i]);
+    }
     return result;
   }
 }

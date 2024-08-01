@@ -28,6 +28,10 @@ napi_value CreateMarkers(napi_env env, const std::vector<const Marker*>& markers
 
 napi_value CreateRect(napi_env env, const Rect& rect);
 
+napi_value CreateTextDocument(napi_env env, TextDocumentHandle textdocument);
+
+TextDocumentHandle GetTextDocument(napi_env env, napi_value value);
+
 napi_value CreateMatrix(napi_env env, const Matrix& matrix);
 
 Matrix GetMatrix(napi_env env, napi_value value);
