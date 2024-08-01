@@ -131,7 +131,6 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
       lock, [this]() { return codecUserData->inputBufferInfoQueue.size() > 0; });
   CodecBufferInfo codecBufferInfo = codecUserData->inputBufferInfoQueue.front();
   lock.unlock();
-
   OH_AVCodecBufferAttr bufferAttr;
   bufferAttr.size = length;
   bufferAttr.offset = 0;
@@ -182,7 +181,7 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
     pendingFrames.remove(codecBufferInfo.attr.pts);
   } else {
     lock.unlock();
-    return DecodingResult::TryAgainLater;
+    return DecodingResult::Success;
   }
   int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
   if (ret != AV_ERR_OK) {
@@ -218,7 +217,10 @@ bool HardwareDecoder::start() {
 }
 
 int64_t HardwareDecoder::presentationTime() {
-  return codecBufferInfo.attr.pts;
+  if (codecBufferInfo.buffer) {
+      return codecBufferInfo.attr.pts;  
+  }  
+  return -1;
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {

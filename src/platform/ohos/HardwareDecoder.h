@@ -88,8 +88,8 @@ class HardwareDecoder : public VideoDecoder {
   OH_AVCodecCategory codecCategory = HARDWARE;
   int videoStride = 0;
   int videoSliceHeight = 0;
-  int yBufferSize = 0;
-  int uvBufferSize = 0;
+  int64_t yBufferSize = 0;
+  int64_t uvBufferSize = 0;
   YUVBuffer yuvBuffer{};
   explicit HardwareDecoder(const VideoFormat& format);
   bool initDecoder(const OH_AVCodecCategory avCodecCategory);
