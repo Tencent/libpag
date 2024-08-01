@@ -1,5 +1,4 @@
 import * as pag from 'libpag';
-import { PAGLayerType } from 'libpag';
 
 @Entry
 @Component
@@ -13,7 +12,7 @@ struct Index {
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
-    let file = pag.PAGFile.LoadFromAssets(manager, "test.pag");
+    let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
     this.composition = file as pag.PAGComposition;
     this.isPlaying = true;
   }
