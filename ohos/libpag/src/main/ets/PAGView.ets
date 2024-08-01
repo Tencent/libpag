@@ -59,7 +59,7 @@ export struct PAGView {
    * listener will be sent events through the life of an animation,
    * such as start, repeat, and end. PAGView only holds a weak reference to the listener.
    */
-  @Prop listener: PAGViewListener;
+  @State listeners: Array<WeakRef<PAGViewListener>> = [];
 
   build() {
     XComponent({
@@ -68,16 +68,7 @@ export struct PAGView {
       libraryname: "pag",
     })
       .onLoad(() => {
-        this.viewController.setComposition(this.composition?.getNativeComposition());
-        this.viewController.setProgress(this.progress);
-        this.viewController.setRepeatCount(this.repeatCount)
-        if (this.isPlaying) {
-          this.viewController.play();
-        } else {
-          this.viewController.flush();
-        }
-      })
-      .onDestroy(() => {
+        this.initView();
       })
       .backgroundColor(Color.Transparent)
   }
@@ -86,14 +77,23 @@ export struct PAGView {
     this.viewController.flush();
   }
 
-  aboutToAppear(): void {
+  onPageShow(): void {
+    this.flush();
+  }
+
+  private initView() {
     PAGInit.Init();
     this.viewController.setStateChangeCallback(this.onAnimatorStateChange);
     this.viewController.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
-  }
 
-  onPageShow(): void {
-    this.flush();
+    this.viewController.setComposition(this.composition?.getNativeComposition());
+    this.viewController.setProgress(this.progress);
+    this.viewController.setRepeatCount(this.repeatCount)
+    if (this.isPlaying) {
+      this.viewController.play();
+    } else {
+      this.viewController.flush();
+    }
   }
 
   private onCompositionChange() {
@@ -125,9 +125,42 @@ export struct PAGView {
     }
   }
 
-  private notifyListener(callback: (listener: PAGViewListener) => void) {
-    if (this.listener) {
-      callback(this.listener);
+  private onAnimationStart() {
+    this.isPlaying = true;
+    for (const weakListener of this.listeners) {
+      const listener = weakListener.deref();
+      if (listener && listener.onAnimationStart) {
+        listener.onAnimationStart(this);
+      }
+    }
+  }
+
+  private onAnimationEnd() {
+    this.isPlaying = false;
+    for (const weakListener of this.listeners) {
+      const listener = weakListener.deref();
+      if (listener && listener.onAnimationEnd) {
+        listener.onAnimationEnd(this);
+      }
+    }
+  }
+
+  private onAnimationCancel() {
+    this.isPlaying = false;
+    for (const weakListener of this.listeners) {
+      const listener = weakListener.deref();
+      if (listener && listener.onAnimationCancel) {
+        listener.onAnimationCancel(this);
+      }
+    }
+  }
+
+  private onAnimationRepeat() {
+    for (const weakListener of this.listeners) {
+      const listener = weakListener.deref();
+      if (listener && listener.onAnimationRepeat) {
+        listener.onAnimationRepeat(this);
+      }
     }
   }
 
@@ -136,45 +169,23 @@ export struct PAGView {
   private onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case 0:
-        this.notifyListener((listener: PAGViewListener) => {
-          if (listener.onAnimationStart) {
-            listener.onAnimationStart(this);
-          }
-        });
-        this.isPlaying = true;
-        break;
+        return this.onAnimationStart();
       case 1:
-        this.notifyListener((listener: PAGViewListener) => {
-          if (listener.onAnimationCancel) {
-            listener.onAnimationCancel(this);
-          }
-        });
-        this.isPlaying = false;
-        break;
+        return this.onAnimationCancel();
       case 2:
-        this.notifyListener((listener: PAGViewListener) => {
-          if (listener.onAnimationEnd) {
-            listener.onAnimationEnd(this);
-          }
-        });
-        this.isPlaying = false;
-        break;
+        return this.onAnimationEnd();
       case 3:
-        this.notifyListener((listener: PAGViewListener) => {
-          if (listener.onAnimationRepeat) {
-            listener.onAnimationRepeat(this);
-          }
-        });
-        break;
+        return this.onAnimationRepeat();
     }
   }
   private onAnimatorProgressUpdate = (progress: number): void => {
     this.nativeProgress = progress;
     this.progress = progress;
-    this.notifyListener((listener: PAGViewListener) => {
-      if (listener.onAnimationUpdate) {
+    for (const weakListener of this.listeners) {
+      const listener = weakListener.deref();
+      if (listener && listener.onAnimationUpdate) {
         listener.onAnimationUpdate(this);
       }
-    });
+    }
   }
 }

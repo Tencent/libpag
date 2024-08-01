@@ -44,7 +44,7 @@ struct Index {
           progress: this.progress,
           isPlaying: this.isPlaying,
           repeatCount: this.repeatCount,
-          listener: this
+          listeners: [new WeakRef(this)]
         })
           .height('50%')
           .onClick(() => {
