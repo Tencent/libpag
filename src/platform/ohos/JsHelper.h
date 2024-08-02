@@ -8,10 +8,14 @@
 #include "pag/pag.h"
 #include "pag/types.h"
 
-#define PAG_DEFAULT_METHOD_ENTRY(name, func) \
-  { #name, nullptr, func, nullptr, nullptr, nullptr, napi_default, nullptr }
-#define PAG_STATIC_METHOD_ENTRY(name, func) \
-  { #name, nullptr, func, nullptr, nullptr, nullptr, napi_static, nullptr }
+#define PAG_DEFAULT_METHOD_ENTRY(name, func)                               \
+  {                                                                        \
+#name, nullptr, func, nullptr, nullptr, nullptr, napi_default, nullptr \
+  }
+#define PAG_STATIC_METHOD_ENTRY(name, func)                               \
+  {                                                                       \
+#name, nullptr, func, nullptr, nullptr, nullptr, napi_static, nullptr \
+  }
 
 namespace pag {
 
@@ -42,5 +46,7 @@ napi_value MakeSnapshot(napi_env env, PAGSurface* surface);
 int MakeColorInt(uint32_t red, uint32_t green, uint32_t blue);
 
 Color ToColor(int value);
+
+napi_value CreateVideoRanges(napi_env env, const std::vector<PAGVideoRange>& videoRanges);
 
 }  // namespace pag

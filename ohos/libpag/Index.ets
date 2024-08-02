@@ -23,3 +23,5 @@ export { PAGShapeLayer } from './src/main/ets/PAGShapeLayer'
 export { PAGSolidLayer } from './src/main/ets/PAGSolidLayer'
 
 export { PAGTextLayer } from './src/main/ets/PAGTextLayer'
+
+export { PAGVideoRange } from './src/main/ets/PAGVideoRange'

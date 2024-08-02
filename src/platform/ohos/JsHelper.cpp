@@ -5,11 +5,9 @@
 // please include "napi/native_api.h".
 
 #include "JsHelper.h"
-
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 #include <tgfx/core/ImageInfo.h>
-
 #include "JPAGLayerHandle.h"
 #include "JPAGPlayer.h"
 #include "JPAGSurface.h"
@@ -334,6 +332,79 @@ Color ToColor(int value) {
   auto green = (((color) >> 8) & 0xFF);
   auto blue = (((color) >> 0) & 0xFF);
   return {static_cast<uint8_t>(red), static_cast<uint8_t>(green), static_cast<uint8_t>(blue)};
+}
+
+napi_value CreateVideoRange(napi_env env, const PAGVideoRange& videoRange) {
+  if (env == nullptr) {
+    return nullptr;
+  }
+  napi_value result = nullptr;
+  auto status = napi_create_object(env, &result);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_create_object failed :%d", status);
+    return nullptr;
+  }
+  napi_value startTime;
+  status = napi_create_int64(env, videoRange.startTime(), &startTime);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_create_int64 failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "startTime", startTime);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  napi_value endTime;
+  status = napi_create_int64(env, videoRange.endTime(), &endTime);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_create_int64 failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "endTime", endTime);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  napi_value playDuration;
+  status = napi_create_int64(env, videoRange.playDuration(), &playDuration);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_create_int64 failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "playDuration", playDuration);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  napi_value reversed;
+  status = napi_get_boolean(env, videoRange.reversed(), &reversed);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_get_boolean failed :%d", status);
+    return nullptr;
+  }
+  status = napi_set_named_property(env, result, "reversed", reversed);
+  if (status != napi_ok) {
+    LOGI("CreateVideoRange napi_set_named_property failed :%d", status);
+    return nullptr;
+  }
+  return result;
+}
+
+napi_value CreateVideoRanges(napi_env env, const std::vector<PAGVideoRange>& videoRanges) {
+  napi_value result;
+  auto status = napi_create_array_with_length(env, videoRanges.size(), &result);
+  if (status != napi_ok) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < videoRanges.size(); i++) {
+    auto jsVideoRange = CreateVideoRange(env, videoRanges[i]);
+    if (jsVideoRange == nullptr) {
+      return nullptr;
+    }
+    napi_set_element(env, result, i, jsVideoRange);
+  }
+  return result;
 }
 
 }  // namespace pag

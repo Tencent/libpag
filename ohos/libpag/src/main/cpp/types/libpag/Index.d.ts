@@ -65,6 +65,15 @@ export declare class JPAGSolidLayer extends JPAGLayer {
 }
 
 export declare class JPAGImageLayer extends JPAGLayer {
+  static Make(width: number, height: number, duration: number): JPAGImageLayer | null;
+
+  contentDuration(): number;
+
+  getVideoRanges(): Array<object>;
+
+  setImage(image: JPAGImage);
+
+  imageBytes(): ArrayBuffer | null;
 }
 
 export declare class JPAGTextLayer extends JPAGLayer {

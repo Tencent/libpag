@@ -4,8 +4,8 @@
 // Node APIs are not fully supported. To solve the compilation error of the interface cannot be found,
 // please include "napi/native_api.h".
 
-#include "JPAGLayerHandle.h"
 #include <cstdint>
+#include "JPAGLayerHandle.h"
 #include "JsHelper.h"
 #include "base/utils/Log.h"
 #include "pag/file.h"
@@ -451,9 +451,6 @@ napi_value JPAGLayerHandle::Constructor(napi_env env, napi_callback_info info) {
   return result;
 }
 
-bool JPAGLayerHandle::InitPAGImageLayerEnv(napi_env, napi_value) {
-  return true;
-}
 bool JPAGLayerHandle::InitPAGTextLayerEnv(napi_env, napi_value) {
   return true;
 }
@@ -487,9 +484,8 @@ bool JPAGLayerHandle::InitPAGLayerEnv(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(excludedFromTimeline, ExcludedFromTimeline),
       PAG_DEFAULT_METHOD_ENTRY(setExcludedFromTimeline, SetExcludedFromTimeline),
   };
-  auto status =
-      DefineClass(env, exports, GetBaseClassName(), sizeof(classProp) / sizeof(classProp[0]),
-                  classProp, Constructor, "");
+  auto status = DefineClass(env, exports, GetBaseClassName(),
+                            sizeof(classProp) / sizeof(classProp[0]), classProp, Constructor, "");
   return status == napi_ok;
 }
 
