@@ -20,9 +20,25 @@
 #include <napi/native_api.h>
 #include <memory>
 #include "pag/pag.h"
+
 namespace pag {
 class JPAGImage {
  public:
+  explicit JPAGImage(std::shared_ptr<PAGImage> pagImage) : pagImage(pagImage) {
+  }  
+  static bool Init(napi_env env, napi_value exports);
+  static napi_value ToJs(napi_env env, std::shared_ptr<PAGImage> pagImage);
   static std::shared_ptr<PAGImage> FromJs(napi_env env, napi_value value);
+  static std::string ClassName() {
+    return "JPAGImage";
+  }
+    
+  std::shared_ptr<PAGImage> get() {
+    return pagImage;
+  }  
+
+ private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<PAGImage> pagImage;
 };
 }  // namespace pag

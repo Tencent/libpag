@@ -2,6 +2,23 @@ import resourceManager from "@ohos.resourceManager";
 import { image } from "@kit.ImageKit";
 
 export declare class JPAGImage {
+  static FromPath(path: string): JPAGImage | null;
+
+  static FromBytes(data: Int8Array): JPAGImage | null;
+
+  static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): JPAGImage | null;
+
+  width(): number;
+
+  height(): number;
+
+  matrix(): Array<number>;
+
+  setMatrix(matrix: Array<number>);
+
+  scaleMode(): number;
+
+  setScaleMode(mode: number)
 }
 
 export declare class JPAGLayer {
