@@ -59,6 +59,9 @@ export declare class JPAGLayer {
 }
 
 export declare class JPAGSolidLayer extends JPAGLayer {
+  solidColor(): number;
+
+  setSolidColor(solidColor: number);
 }
 
 export declare class JPAGImageLayer extends JPAGLayer {

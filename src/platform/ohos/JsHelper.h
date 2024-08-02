@@ -39,4 +39,8 @@ Matrix GetMatrix(napi_env env, napi_value value);
 
 napi_value MakeSnapshot(napi_env env, PAGSurface* surface);
 
+int MakeColorInt(uint32_t red, uint32_t green, uint32_t blue);
+
+Color ToColor(int value);
+
 }  // namespace pag

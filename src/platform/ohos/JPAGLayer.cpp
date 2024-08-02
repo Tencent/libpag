@@ -457,12 +457,6 @@ bool JPAGLayerHandle::InitPAGImageLayerEnv(napi_env, napi_value) {
 bool JPAGLayerHandle::InitPAGTextLayerEnv(napi_env, napi_value) {
   return true;
 }
-bool JPAGLayerHandle::InitPAGShapeLayerEnv(napi_env, napi_value) {
-  return true;
-}
-bool JPAGLayerHandle::InitPAGSolidLayerEnv(napi_env, napi_value) {
-  return true;
-}
 
 bool JPAGLayerHandle::InitPAGLayerEnv(napi_env env, napi_value exports) {
   napi_property_descriptor classProp[] = {
