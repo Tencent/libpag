@@ -22,7 +22,6 @@ class NativeDisplayLink : public DisplayLink {
   static void PAGVSyncCallback(long long timestamp, void* data);
   OH_NativeVSync* vSync = nullptr;
   std::function<void()> callback = nullptr;
-  bool playing = false;
-  std::mutex locker;
+  std::atomic<bool> playing = false;
 };
 }  // namespace pag

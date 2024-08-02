@@ -1,8 +1,7 @@
 import { JPAGLayer } from 'libpag.so'
-import matrix4 from '@ohos.matrix4'
 import { PAGComposition } from './PAGComposition';
 import { PAGMarker } from './PAGMarker';
-import { Rect } from '@ohos.arkui.node';
+import { Matrix4, Rect } from '@ohos.arkui.node';
 import { PAGUtils } from './private/PAGUtils';
 
 /**
@@ -42,7 +41,7 @@ export class PAGLayer {
    * Altering it does not change the animation matrix, and it will be concatenated to current animation matrix for
    * displaying.
    */
-  matrix(): matrix4.Matrix4Transit {
+  matrix(): Matrix4 {
     return PAGUtils.ToTsMatrix(this.nativeLayer.matrix());
   }
 
@@ -51,7 +50,7 @@ export class PAGLayer {
    * Altering it does not change the animation matrix, and it will be concatenated to current animation matrix for
    * displaying.
    */
-  setMatrix(matrix: matrix4.Matrix4Transit) {
+  setMatrix(matrix: Matrix4) {
     this.nativeLayer.setMatrix(PAGUtils.ToNativeMatrix(matrix));
   }
 
@@ -65,7 +64,7 @@ export class PAGLayer {
   /**
    * The final matrix for displaying, it is the combination of the matrix property and current matrix from animation.
    */
-  getTotalMatrix(): matrix4.Matrix4Transit {
+  getTotalMatrix(): Matrix4 {
     return PAGUtils.ToTsMatrix(this.nativeLayer.getTotalMatrix());
   }
 

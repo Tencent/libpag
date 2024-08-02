@@ -177,6 +177,7 @@ static napi_value Play(napi_env env, napi_callback_info info) {
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   if (view != nullptr) {
+    view->player->prepare();
     view->animator->start();
   }
   return nullptr;
@@ -264,6 +265,203 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
   return nullptr;
 }
 
+static napi_value SetSync(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool value = false;
+  napi_get_value_bool(env, args[0], &value);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->animator->setSync(value);
+  }
+  return nullptr;
+}
+
+static napi_value SetVideoEnabled(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool value = false;
+  napi_get_value_bool(env, args[0], &value);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->player->setVideoEnabled(value);
+  }
+  return nullptr;
+}
+
+static napi_value SetCacheEnabled(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool value = false;
+  napi_get_value_bool(env, args[0], &value);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->player->setCacheEnabled(value);
+  }
+  return nullptr;
+}
+
+static napi_value SetCacheScale(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  double value = 1.0f;
+  napi_get_value_double(env, args[0], &value);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->player->setCacheScale(value);
+  }
+  return nullptr;
+}
+
+static napi_value SetMaxFrameRate(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  double value = 60.0f;
+  napi_get_value_double(env, args[0], &value);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->player->setMaxFrameRate(value);
+  }
+  return nullptr;
+}
+
+static napi_value SetScaleMode(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  int value = 0;
+  napi_get_value_int32(env, args[0], &value);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->player->setScaleMode(value);
+  }
+  return nullptr;
+}
+
+static napi_value SetMatrix(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->player->setMatrix(GetMatrix(env, args[0]));
+  }
+  return nullptr;
+}
+
+static napi_value CurrentFrame(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+  napi_value result;
+  napi_create_int32(env, view->player->currentFrame(), &result);
+  return result;
+}
+
+static napi_value GetLayersUnderPoint(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr};
+  napi_value jsView = nullptr;
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (!view) {
+    return nullptr;
+  }
+  double surfaceX = 0;
+  napi_get_value_double(env, args[0], &surfaceX);
+  double surfaceY = 0;
+  napi_get_value_double(env, args[1], &surfaceY);
+  auto layers = view->player->getLayersUnderPoint(surfaceX, surfaceY);
+  napi_value result;
+  napi_create_array_with_length(env, layers.size(), &result);
+  for (uint32_t i = 0; i < layers.size(); i++) {
+    auto layer = JPAGLayerHandle::ToJs(env, layers[i]);
+    if (!layer) {
+      break;
+    }
+    napi_set_element(env, result, i, layer);
+  }
+  return result;
+}
+
+static napi_value FreeCache(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+  auto surface = view->player->getSurface();
+  if (surface) {
+    surface->freeCache();
+  }
+  return nullptr;
+}
+
+static napi_value MakeSnapshot(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+  auto surface = view->player->getSurface();
+  return MakeSnapshot(env, surface.get());
+}
+
 napi_value JPAGView::Constructor(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
@@ -295,7 +493,18 @@ bool JPAGView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(pause, Pause),
       PAG_DEFAULT_METHOD_ENTRY(setStateChangeCallback, SetStateChangeCallback),
       PAG_DEFAULT_METHOD_ENTRY(setProgressUpdateCallback, SetProgressUpdateCallback),
-      PAG_DEFAULT_METHOD_ENTRY(uniqueID, UniqueID)};
+      PAG_DEFAULT_METHOD_ENTRY(uniqueID, UniqueID),
+      PAG_DEFAULT_METHOD_ENTRY(setSync, SetSync),
+      PAG_DEFAULT_METHOD_ENTRY(setVideoEnabled, SetVideoEnabled),
+      PAG_DEFAULT_METHOD_ENTRY(setCacheEnabled, SetCacheEnabled),
+      PAG_DEFAULT_METHOD_ENTRY(setCacheScale, SetCacheScale),
+      PAG_DEFAULT_METHOD_ENTRY(setMaxFrameRate, SetMaxFrameRate),
+      PAG_DEFAULT_METHOD_ENTRY(setScaleMode, SetScaleMode),
+      PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
+      PAG_DEFAULT_METHOD_ENTRY(currentFrame, CurrentFrame),
+      PAG_DEFAULT_METHOD_ENTRY(getLayersUnderPoint, GetLayersUnderPoint),
+      PAG_DEFAULT_METHOD_ENTRY(freeCache, FreeCache),
+      PAG_DEFAULT_METHOD_ENTRY(makeSnapshot, MakeSnapshot)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
   napi_value exportInstance = nullptr;
@@ -343,9 +552,7 @@ void JPAGView::onAnimationRepeat(PAGAnimator*) {
 void JPAGView::onAnimationUpdate(PAGAnimator* animator) {
   napi_call_threadsafe_function(progressCallback, new double(animator->progress()),
                                 napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
-
   player->setProgress(animator->progress());
-
   player->flush();
 }
 

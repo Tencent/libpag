@@ -1,6 +1,11 @@
 import { JPAGView } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
 import { PAGInit } from "./PAGInit"
+import { PAGScaleMode } from './PAGScaleMode';
+import { PAGLayer } from './PAGLayer';
+import { image } from '@kit.ImageKit';
+import { PAGUtils } from './private/PAGUtils';
+import { Matrix4 } from '@ohos.arkui.node';
 
 export interface PAGViewListener {
   /**
@@ -56,6 +61,43 @@ export struct PAGView {
    */
   @Prop @Watch("onRepeatCountChange") repeatCount: number = 0;
   /**
+   * Set true to make PAGView playing in the main thread. The default value is false.
+   */
+  @Prop @Watch("OnSyncChange") isSync: boolean = false;
+  /**
+   * If set to false, PAGView skips rendering for video composition.
+   */
+  @Prop @Watch("OnVideoEnabledChange") videoEnabled: boolean = true;
+  /**
+   * If set to true, PAG renderer caches an internal bitmap representation of the static content
+   * for each layer. This caching can increase performance for layers that contain complex vector
+   * content. The execution speed can be significantly faster depending on the complexity of the
+   * content, but it requires extra graphics memory. The default value is true.
+   */
+  @Prop @Watch("OnCacheEnabledChange") cacheEnabled: boolean = true;
+  /**
+   * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
+   * scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
+   * graphics memory which leads to better performance. The default value is 1.0.
+   */
+  @Prop @Watch("OnCacheScaleChange") cacheScale: number = 1.0;
+  /**
+   * The maximum frame rate for rendering. If set to a value less than the actual frame rate from
+   * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
+   * value is 60.
+   */
+  @Prop @Watch("OnMaxFrameRateChange") maxFrameRate: number = 60.0;
+  /**
+   * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
+   * changes when this method is called.
+   */
+  @Prop @Watch("OnScaleModeChange") scaleMode: PAGScaleMode = PAGScaleMode.LetterBox;
+  /**
+   * Sets the transformation which will be applied to the composition. The scaleMode property
+   * will be set to PAGScaleMode::None when this method is called.
+   */
+  @Prop @Watch("OnMatrixChange") matrix: Matrix4 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  /**
    * listener will be sent events through the life of an animation,
    * such as start, repeat, and end. PAGView only holds a weak reference to the listener.
    */
@@ -63,7 +105,7 @@ export struct PAGView {
 
   build() {
     XComponent({
-      id: this.viewController.uniqueID(),
+      id: this.controller.uniqueID(),
       type: "surface",
       libraryname: "pag",
     })
@@ -74,30 +116,91 @@ export struct PAGView {
   }
 
   flush(): void {
-    this.viewController.flush();
+    this.controller.flush();
+  }
+
+  /**
+   * Adds a listener to the set of listeners that are sent events through the life of an
+   * animation, such as start, repeat, and end.
+   */
+  addListener(listener: WeakRef<PAGViewListener>) {
+    this.listeners.push(listener);
+  }
+
+  /**
+   * Removes a listener from the set listening to this animation.
+   */
+  removeListener(listener: WeakRef<PAGViewListener>) {
+    const index = this.listeners.indexOf(listener);
+    if (index > -1) {
+      this.listeners.splice(index, 1);
+    }
+  }
+
+  /**
+   * Returns the current frame.
+   */
+  currentFrame(): number {
+    return this.composition ? this.composition.currentTime() : 0;
+  }
+
+  /**
+   * Returns an array of layers that lie under the specified point.
+   * The point is in pixels not dp.
+   */
+  getLayersUnderPoint(x: number, y: number): Array<PAGLayer> {
+    return PAGUtils.WarpJPAGLayers(this.controller.getLayersUnderPoint(x, y));
+  }
+
+  /**
+   * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
+   */
+  freeCache(): void {
+    this.controller.freeCache();
+  }
+
+  /**
+   * Returns a bitmap capturing the contents of the PAGView. Subsequent rendering of the
+   * PAGView will not be captured. Returns null if the PAGView hasn't been presented yet.
+   */
+  makeSnapshot(): image.PixelMap | null {
+    return this.controller.makeSnapshot();
   }
 
   onPageShow(): void {
+    if (super.onPageShow) {
+      super.onPageShow();
+    }
     this.flush();
   }
 
   private initView() {
     PAGInit.Init();
-    this.viewController.setStateChangeCallback(this.onAnimatorStateChange);
-    this.viewController.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
+    this.controller.setStateChangeCallback(this.onAnimatorStateChange);
+    this.controller.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
 
-    this.viewController.setComposition(this.composition?.getNativeComposition());
-    this.viewController.setProgress(this.progress);
-    this.viewController.setRepeatCount(this.repeatCount)
-    if (this.isPlaying) {
-      this.viewController.play();
+    this.controller.setComposition(this.composition?.getNativeComposition());
+    this.controller.setProgress(this.progress);
+    this.controller.setRepeatCount(this.repeatCount)
+    this.controller.setSync(this.isSync);
+    this.controller.setVideoEnabled(this.videoEnabled);
+    this.controller.setCacheEnabled(this.cacheEnabled);
+    this.controller.setCacheScale(this.cacheScale);
+    this.controller.setMaxFrameRate(this.maxFrameRate);
+    if (PAGUtils.IsEmptyMatrix(this.matrix)) {
+      this.controller.setScaleMode(this.scaleMode);
     } else {
-      this.viewController.flush();
+      this.controller.setMatrix(PAGUtils.ToNativeMatrix(this.matrix));
+    }
+    if (this.isPlaying) {
+      this.controller.play();
+    } else {
+      this.controller.flush();
     }
   }
 
   private onCompositionChange() {
-    this.viewController.setComposition(this.composition?.getNativeComposition());
+    this.controller.setComposition(this.composition?.getNativeComposition());
     if (!this.isPlaying) {
       this.flush()
     }
@@ -105,24 +208,52 @@ export struct PAGView {
 
   private onPlayStateChange() {
     if (this.isPlaying) {
-      this.viewController.play();
+      this.controller.play();
     } else {
-      this.viewController.pause();
+      this.controller.pause();
     }
   }
 
   private onRepeatCountChange() {
-    this.viewController.setRepeatCount(this.repeatCount);
+    this.controller.setRepeatCount(this.repeatCount);
   }
 
   private onProgressChange() {
     if (this.progress == this.nativeProgress) {
       return;
     }
-    this.viewController.setProgress(this.progress);
+    this.controller.setProgress(this.progress);
     if (!this.isPlaying) {
       this.flush()
     }
+  }
+
+  private OnSyncChange() {
+    this.controller.setSync(this.isSync);
+  }
+
+  private OnVideoEnabledChange() {
+    this.controller.setVideoEnabled(this.videoEnabled);
+  }
+
+  private OnCacheEnabledChange() {
+    this.controller.setCacheEnabled(this.cacheEnabled);
+  }
+
+  private OnCacheScaleChange() {
+    this.controller.setCacheScale(this.cacheScale);
+  }
+
+  private OnMaxFrameRateChange() {
+    this.controller.setMaxFrameRate(this.maxFrameRate);
+  }
+
+  private OnScaleModeChange() {
+    this.controller.setScaleMode(this.scaleMode);
+  }
+
+  private OnMatrixChange() {
+    this.controller.setMatrix(PAGUtils.ToNativeMatrix(this.matrix))
   }
 
   private onAnimationStart() {
@@ -165,16 +296,16 @@ export struct PAGView {
   }
 
   private nativeProgress: number = 0.0;
-  private viewController: JPAGView = new JPAGView();
+  private controller: JPAGView = new JPAGView();
   private onAnimatorStateChange = (state: number): void => {
     switch (state) {
-      case 0:
+      case PAGAnimatorState.Start:
         return this.onAnimationStart();
-      case 1:
+      case PAGAnimatorState.Cancel:
         return this.onAnimationCancel();
-      case 2:
+      case PAGAnimatorState.End:
         return this.onAnimationEnd();
-      case 3:
+      case PAGAnimatorState.Repeat:
         return this.onAnimationRepeat();
     }
   }
@@ -188,4 +319,11 @@ export struct PAGView {
       }
     }
   }
+}
+
+enum PAGAnimatorState {
+  Start = 0,
+  Cancel = 1,
+  End = 2,
+  Repeat = 3
 }

@@ -1,5 +1,4 @@
-import { matrix4 } from '@kit.ArkUI';
-import { Rect } from '@ohos.arkui.node';
+import { Matrix4, Rect } from '@ohos.arkui.node';
 import { JPAGLayer } from 'libpag.so';
 import { PAGComposition } from '../PAGComposition';
 import { PAGFile } from '../PAGFile';
@@ -10,14 +9,15 @@ import { PAGSolidLayer } from '../PAGSolidLayer';
 import { PAGTextLayer } from '../PAGTextLayer';
 
 export namespace PAGUtils {
-  export function ToTsMatrix(matrix: Float32Array): matrix4.Matrix4Transit {
-    return matrix4.init([matrix[0], matrix[1], matrix[2], 0,
+  export function ToTsMatrix(matrix: Float32Array): Matrix4 {
+
+    return [matrix[0], matrix[1], matrix[2], 0,
       matrix[3], matrix[4], matrix[5], 0,
       matrix[6], matrix[7], matrix[8], 0,
-      0, 0, 0, 1]);
+      0, 0, 0, 1];
   }
 
-  export function ToNativeMatrix(matrix: matrix4.Matrix4Transit): Float32Array {
+  export function ToNativeMatrix(matrix: Matrix4): Float32Array {
     return Float32Array.of(matrix[0], matrix[1], matrix[2], matrix[4], matrix[5], matrix[6], matrix[8], matrix[9],
       matrix[10]);
   }
@@ -56,5 +56,14 @@ export namespace PAGUtils {
       result[i] = PAGUtils.WarpJPAGLayer(nativeLayers[i]);
     }
     return result;
+  }
+
+  export function IsEmptyMatrix(matrix: Matrix4) {
+    for (let index = 0; index < 16; index++) {
+      if (matrix[index] != 0) {
+        return false;
+      }
+    }
+    return true;
   }
 }

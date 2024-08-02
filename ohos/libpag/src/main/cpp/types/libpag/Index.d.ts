@@ -1,4 +1,5 @@
 import resourceManager from "@ohos.resourceManager";
+import { image } from "@kit.ImageKit";
 
 export declare class JPAGImage {
 }
@@ -222,11 +223,11 @@ export declare class JPAGSurface {
   clearAll(): boolean;
 
   freeCache(): void;
+
+  makeSnapshot(): image.PixelMap | null;
 }
 
 export declare class JPAGView {
-  uniqueID(): string;
-
   flush(): void;
 
   setProgress(progress: number): void;
@@ -242,6 +243,30 @@ export declare class JPAGView {
   setStateChangeCallback(callback: (number) => void): void;
 
   setProgressUpdateCallback(callback: (double) => void): void;
+
+  uniqueID(): string;
+
+  setSync(isSync: boolean): void;
+
+  setVideoEnabled(videoEnabled: boolean): void;
+
+  setCacheEnabled(cacheEnabled: boolean): void;
+
+  setCacheScale(cacheScale: number): void;
+
+  setMaxFrameRate(maxFrameRate: number): void;
+
+  setScaleMode(scaleMode: number): void;
+
+  setMatrix(matrix: Float32Array);
+
+  currentFrame(): number;
+
+  getLayersUnderPoint(x: number, y: number): Array<JPAGLayer>;
+
+  freeCache();
+
+  makeSnapshot(): image.PixelMap | null;
 }
 
 export declare class JPAGFont {

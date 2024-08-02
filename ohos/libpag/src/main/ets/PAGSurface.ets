@@ -50,7 +50,7 @@ export class PAGSurface {
    * PAGSurface will not be captured.
    */
   public makeSnapshot(): image.PixelMap | null {
-    return null;
+    return this.nativeSurface.makeSnapshot();
   }
 
   readonly nativeSurface: JPAGSurface;

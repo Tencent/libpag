@@ -5,6 +5,7 @@
 // please include "napi/native_api.h".
 #include <napi/native_api.h>
 #include <string>
+#include "pag/pag.h"
 #include "pag/types.h"
 
 #define PAG_DEFAULT_METHOD_ENTRY(name, func) \
@@ -35,5 +36,7 @@ TextDocumentHandle GetTextDocument(napi_env env, napi_value value);
 napi_value CreateMatrix(napi_env env, const Matrix& matrix);
 
 Matrix GetMatrix(napi_env env, napi_value value);
+
+napi_value MakeSnapshot(napi_env env, PAGSurface* surface);
 
 }  // namespace pag

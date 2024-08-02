@@ -7,7 +7,6 @@
 #include "JPAGSurface.h"
 
 #include <cstdint>
-
 #include "JsHelper.h"
 
 namespace pag {
@@ -92,6 +91,15 @@ static napi_value MakeOffscreen(napi_env env, napi_callback_info info) {
   return JPAGSurface::ToJs(env, PAGSurface::MakeOffscreen(x, y));
 }
 
+static napi_value MakeSnapshot(napi_env env, napi_callback_info info) {
+  napi_value jSurface = nullptr;
+  size_t argc = 0;
+  napi_value args[1];
+  napi_get_cb_info(env, info, &argc, args, &jSurface, nullptr);
+  auto surface = JPAGSurface::FromJs(env, jSurface);
+  return MakeSnapshot(env, surface.get());
+}
+
 napi_value JPAGSurface::Constructor(napi_env env, napi_callback_info info) {
   napi_value result = nullptr;
   size_t argc = 1;
@@ -119,7 +127,8 @@ bool JPAGSurface::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(height, Height),
       PAG_DEFAULT_METHOD_ENTRY(updateSize, UpdateSize),
       PAG_DEFAULT_METHOD_ENTRY(clearAll, ClearAll),
-      PAG_DEFAULT_METHOD_ENTRY(freeCache, FreeCache)};
+      PAG_DEFAULT_METHOD_ENTRY(freeCache, FreeCache),
+      PAG_DEFAULT_METHOD_ENTRY(makeSnapshot, MakeSnapshot)};
 
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");

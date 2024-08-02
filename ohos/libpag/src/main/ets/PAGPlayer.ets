@@ -1,12 +1,11 @@
-import matrix4 from '@ohos.matrix4'
-import { Rect } from '@ohos.arkui.node';
+import { Matrix4, Rect } from '@ohos.arkui.node';
 import { JPAGPlayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
 import { PAGInit } from './PAGInit';
 import { PAGSurface } from './PAGSurface';
 import { PAGLayer } from './PAGLayer';
 import { PAGUtils } from './private/PAGUtils';
-import { PAGScaleMode } from './PASScaleMode';
+import { PAGScaleMode } from './PAGScaleMode';
 
 export class PAGPlayer {
   constructor(nativePlayer: JPAGPlayer | null = null) {
@@ -155,7 +154,7 @@ export class PAGPlayer {
   /**
    * Returns a copy of current matrix.
    */
-  matrix(): matrix4.Matrix4Transit {
+  matrix(): Matrix4 {
     return PAGUtils.ToTsMatrix(this.nativePlayer.matrix());
   }
 
@@ -163,7 +162,7 @@ export class PAGPlayer {
    * Sets the transformation which will be applied to the composition. The scaleMode property
    * will be set to PAGScaleMode::None when this method is called.
    */
-  public setMatrix(matrix: matrix4.Matrix4Transit) {
+  public setMatrix(matrix: Matrix4) {
     this.nativePlayer.setMatrix(PAGUtils.ToNativeMatrix(matrix));
   }
 

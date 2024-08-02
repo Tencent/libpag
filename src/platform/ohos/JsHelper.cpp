@@ -5,6 +5,11 @@
 // please include "napi/native_api.h".
 
 #include "JsHelper.h"
+
+#include <multimedia/image_framework/image/pixelmap_native.h>
+#include <multimedia/image_framework/image_pixel_map_mdk.h>
+#include <tgfx/core/ImageInfo.h>
+
 #include "JPAGLayerHandle.h"
 #include "JPAGPlayer.h"
 #include "JPAGSurface.h"
@@ -285,6 +290,36 @@ napi_value CreateTextDocument(napi_env, TextDocumentHandle) {
 }
 
 TextDocumentHandle GetTextDocument(napi_env, napi_value) {
+  return nullptr;
+}
+
+napi_value MakeSnapshot(napi_env env, PAGSurface* surface) {
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  tgfx::ImageInfo imageInfo =
+      tgfx::ImageInfo::Make(surface->width(), surface->height(), tgfx::ColorType::BGRA_8888);
+  uint8_t* pixels = new (std::nothrow) uint8_t[imageInfo.byteSize()];
+  if (pixels == nullptr) {
+    return nullptr;
+  }
+  if (!surface->readPixels(ColorType::BGRA_8888, AlphaType::Premultiplied, pixels,
+                           imageInfo.rowBytes())) {
+    delete[] pixels;
+    return nullptr;
+  }
+
+  OhosPixelMapCreateOps ops;
+  ops.width = imageInfo.width();
+  ops.height = imageInfo.height();
+  ops.pixelFormat = PIXEL_FORMAT_BGRA_8888;
+  ops.alphaType = OHOS_PIXEL_MAP_ALPHA_TYPE_PREMUL;
+  ops.editable = true;
+  napi_value pixelMap;
+  auto status = OH_PixelMap_CreatePixelMap(env, ops, pixels, imageInfo.byteSize(), &pixelMap);
+  if (status == napi_ok) {
+    return pixelMap;
+  }
   return nullptr;
 }
 
