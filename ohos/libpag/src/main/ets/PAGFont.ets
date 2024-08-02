@@ -1,19 +1,18 @@
 import { resourceManager } from '@kit.LocalizationKit';
 import { JPAGFont } from 'libpag.so';
+import { PAGUtils } from './private/PAGUtils';
 
 export class PAGFont {
   static RegisterFontFromPath(fontPath: string, ttcIndex?: number,
     fontFamily?: string, fontStyle?: string): PAGFont {
     let jFont = JPAGFont.RegisterFontFromPath(fontPath, ttcIndex, fontFamily, fontStyle);
-    let result = new PAGFont(jFont.fontFamily, jFont.fontStyle);
-    return result;
+    return PAGUtils.ToPAGFont(jFont);
   }
 
   static RegisterFontFromAsset(manager: resourceManager.ResourceManager, fileName: string, ttcIndex?: number,
     fontFamily?: string, fontStyle?: string): PAGFont {
     let jFont = JPAGFont.RegisterFontFromAsset(manager, fileName, ttcIndex, fontFamily, fontStyle);
-    let result = new PAGFont(jFont.fontFamily, jFont.fontStyle);
-    return result;
+    return PAGUtils.ToPAGFont(jFont);
   }
 
   static UnregisterFont(font: PAGFont): void {

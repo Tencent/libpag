@@ -2,7 +2,7 @@ import { JPAGFile, JPAGLayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition'
 import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';
-import { PAGText } from './PAGTextLayer';
+import { PAGText } from './PAGText';
 import { PAGImage } from './PAGImage';
 import { PAGUtils } from './private/PAGUtils';
 
@@ -121,16 +121,25 @@ export class PAGFile extends PAGComposition {
    * Get a text data of the specified index. The index ranges from 0 to numTexts - 1.
    * Note: It always returns the default text data.
    */
-  getTextData(index: number): PAGText {
-    return this.getNativeFile().getTextData(index) as PAGText;
+  getTextData(index: number): PAGText | null {
+    let nativeFile = this.getNativeFile();
+    let result = nativeFile.getTextData(index);
+    if (result == null) {
+      return null;
+    }
+    return PAGUtils.ToPAGText(result);
   }
 
   /**
    * Replace the text data of the specified index. The index ranges from 0 to PAGFile.numTexts - 1. Passing in null
    * for the textData parameter will reset it to default text data.
    */
-  replaceText(editableTextIndex: number, textData: PAGText) {
-    this.getNativeFile().replaceText(editableTextIndex, textData);
+  replaceText(editableTextIndex: number, textData: PAGText | null) {
+    if (textData == null) {
+      this.getNativeFile().replaceText(editableTextIndex, null);
+    } else {
+      this.getNativeFile().replaceText(editableTextIndex, PAGUtils.ToJPAGText(textData));
+    }
   }
 
   /**

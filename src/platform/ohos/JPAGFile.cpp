@@ -11,6 +11,7 @@
 #include "JPAGLayerHandle.h"
 #include "JsHelper.h"
 #include "platform/ohos/JPAGImage.h"
+#include "platform/ohos/JPAGText.h"
 
 namespace pag {
 
@@ -162,7 +163,7 @@ static napi_value GetTextData(napi_env env, napi_callback_info info) {
   }
   int index = 0;
   napi_get_value_int32(env, args[0], &index);
-  return CreateTextDocument(env, file->getTextData(index));
+  return JPAGText::ToJs(env, file->getTextData(index));
 }
 
 static napi_value ReplaceText(napi_env env, napi_callback_info info) {
@@ -176,7 +177,7 @@ static napi_value ReplaceText(napi_env env, napi_callback_info info) {
   }
   int index = 0;
   napi_get_value_int32(env, args[0], &index);
-  auto textData = GetTextDocument(env, args[1]);
+  auto textData = JPAGText::FromJs(env, args[1]);
   file->replaceText(index, textData);
   return nullptr;
 }

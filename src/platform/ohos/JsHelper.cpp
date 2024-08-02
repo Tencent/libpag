@@ -13,6 +13,7 @@
 #include "JPAGSurface.h"
 #include "base/utils/Log.h"
 #include "platform/ohos/JPAGFont.h"
+#include "platform/ohos/JPAGText.h"
 #include "platform/ohos/JPAGView.h"
 
 namespace pag {
@@ -22,7 +23,7 @@ static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
 bool Init(napi_env env, napi_value exports) {
   return JPAGLayerHandle::Init(env, exports) && JPAGPlayer::Init(env, exports) &&
          JPAGSurface::Init(env, exports) && JPAGFont::Init(env, exports) &&
-         JPAGView::Init(env, exports);
+         JPAGText::Init(env, exports) && JPAGView::Init(env, exports);
 }
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
@@ -56,20 +57,20 @@ napi_status ExtendClass(napi_env env, napi_value constructor, const std::string&
   }
   napi_value baseConstructor = GetConstructor(env, parentName);
   if (baseConstructor == nullptr) {
-    tgfx::PrintLog("ExtendClass get baseConstructor failed status");
+    LOGE("ExtendClass get baseConstructor failed status");
     return napi_status::napi_invalid_arg;
   }
   napi_value basePrototype;
   napi_status statusCode =
       napi_get_named_property(env, baseConstructor, "prototype", &basePrototype);
   if (statusCode != napi_status::napi_ok) {
-    tgfx::PrintLog("ExtendClass get baseConstructor's prototype  failed status :%d", statusCode);
+    LOGE("ExtendClass get baseConstructor's prototype  failed status :%d", statusCode);
     return statusCode;
   }
   napi_value derivedPrototype;
   statusCode = napi_get_named_property(env, constructor, "prototype", &derivedPrototype);
   if (statusCode != napi_status::napi_ok) {
-    tgfx::PrintLog("ExtendClass get constructor's prototype  failed status :%d", statusCode);
+    LOGE("ExtendClass get constructor's prototype  failed status :%d", statusCode);
     return statusCode;
   }
   return napi_set_named_property(env, derivedPrototype, "__proto__", basePrototype);
@@ -82,12 +83,12 @@ napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf
   auto status = napi_define_class(env, utf8name.c_str(), utf8name.length(), constructor, nullptr,
                                   propertyCount, properties, &classConstructor);
   if (status != napi_status::napi_ok) {
-    tgfx::PrintLog("DefineClass napi_define_class failed:%d", status);
+    LOGE("DefineClass napi_define_class failed:%d", status);
     return status;
   }
   status = napi_set_named_property(env, exports, utf8name.c_str(), classConstructor);
   if (status != napi_status::napi_ok) {
-    tgfx::PrintLog("DefineClass napi_set_named_property failed:%d", status);
+    LOGE("DefineClass napi_set_named_property failed:%d", status);
     return status;
   }
   SetConstructor(env, classConstructor, utf8name);
@@ -96,7 +97,7 @@ napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf
   }
   status = ExtendClass(env, classConstructor, parentName);
   if (status != napi_status::napi_ok) {
-    tgfx::PrintLog("DefineClass ExtendClass failed:%d", status);
+    LOGE("DefineClass ExtendClass failed:%d", status);
     return status;
   }
   return status;
@@ -114,12 +115,12 @@ napi_value NewInstance(napi_env env, const std::string& name, void* handler) {
   napi_value external[1];
   auto status = napi_create_external(env, handler, nullptr, nullptr, &external[0]);
   if (status != napi_ok) {
-    tgfx::PrintLog("NewInstance napi_create_external failed :%d", status);
+    LOGE("NewInstance napi_create_external failed :%d", status);
     return nullptr;
   }
   status = napi_new_instance(env, constructor, 1, external, &result);
   if (status != napi_ok) {
-    tgfx::PrintLog("NewInstance napi_new_instance failed :%d", status);
+    LOGE("NewInstance napi_new_instance failed :%d", status);
     return nullptr;
   }
   return result;
@@ -132,41 +133,41 @@ napi_value CreateMarker(napi_env env, const Marker* marker) {
   napi_value result = nullptr;
   auto status = napi_create_object(env, &result);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_create_object failed :%d", status);
+    LOGE("CreateMarker napi_create_object failed :%d", status);
     return nullptr;
   }
   napi_value startTime;
   status = napi_create_int64(env, marker->startTime, &startTime);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_create_int64 failed :%d", status);
+    LOGE("CreateMarker napi_create_int64 failed :%d", status);
     return nullptr;
   }
   status = napi_set_named_property(env, result, "startTime", startTime);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_set_named_property failed :%d", status);
+    LOGE("CreateMarker napi_set_named_property failed :%d", status);
     return nullptr;
   }
   napi_value duration;
   status = napi_create_int64(env, marker->duration, &duration);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_create_int64 failed :%d", status);
+    LOGE("CreateMarker napi_create_int64 failed :%d", status);
     return nullptr;
   }
   status = napi_set_named_property(env, result, "duration", duration);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_set_named_property failed :%d", status);
+    LOGE("CreateMarker napi_set_named_property failed :%d", status);
     return nullptr;
   }
   napi_value comment;
   status =
       napi_create_string_utf8(env, marker->comment.c_str(), marker->comment.length(), &comment);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_create_string_utf8 failed :%d", status);
+    LOGE("CreateMarker napi_create_string_utf8 failed :%d", status);
     return nullptr;
   }
   status = napi_set_named_property(env, result, "comment", comment);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMarker napi_set_named_property failed :%d", status);
+    LOGE("CreateMarker napi_set_named_property failed :%d", status);
     return nullptr;
   }
   return result;
@@ -195,32 +196,32 @@ napi_value CreateRect(napi_env env, const Rect& rect) {
   napi_value result = nullptr;
   auto status = napi_create_array_with_length(env, 4, &result);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateRect napi_create_array_with_length failed :%d", status);
+    LOGE("CreateRect napi_create_array_with_length failed :%d", status);
     return nullptr;
   }
   napi_value l;
   status = napi_create_double(env, rect.left, &l);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateRect napi_create_int64 failed :%d", status);
+    LOGE("CreateRect napi_create_int64 failed :%d", status);
     return nullptr;
   }
   napi_value t;
   status = napi_create_double(env, rect.top, &t);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateRect napi_create_double failed :%d", status);
+    LOGE("CreateRect napi_create_double failed :%d", status);
     return nullptr;
   }
   napi_value r;
   status = napi_create_double(env, rect.right, &r);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateRect napi_create_double failed :%d", status);
+    LOGE("CreateRect napi_create_double failed :%d", status);
     return nullptr;
   }
 
   napi_value b;
   status = napi_create_double(env, rect.bottom, &b);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateRect napi_create_double failed :%d", status);
+    LOGE("CreateRect napi_create_double failed :%d", status);
     return nullptr;
   }
 
@@ -229,6 +230,73 @@ napi_value CreateRect(napi_env env, const Rect& rect) {
   napi_set_element(env, result, 2, r);
   napi_set_element(env, result, 3, b);
   return result;
+}
+
+Rect GetRect(napi_env env, napi_value value) {
+  uint32_t length = 0;
+  Rect rect;
+  auto status = napi_get_array_length(env, value, &length);
+  if (status != napi_ok) {
+    LOGE("GetRect napi_get_array_length failed :%d", status);
+    return {};
+  }
+  if (length != 4) {
+    LOGE("GetRect array length != 4");
+    return {};
+  }
+  double temp = 0;
+  napi_value l;
+  status = napi_get_element(env, value, 0, &l);
+  if (status != napi_ok) {
+    LOGE("GetRect get l failed :%d", status);
+    return {};
+  }
+  status = napi_get_value_double(env, l, &temp);
+  rect.left = temp;
+  if (status != napi_ok) {
+    LOGE("GetRect get l value failed :%d", status);
+    return {};
+  }
+
+  napi_value t;
+  status = napi_get_element(env, value, 0, &t);
+  if (status != napi_ok) {
+    LOGE("GetRect get t failed :%d", status);
+    return {};
+  }
+  status = napi_get_value_double(env, t, &temp);
+  if (status != napi_ok) {
+    LOGE("GetRect get t value failed :%d", status);
+    return {};
+  }
+  rect.top = temp;
+
+  napi_value r;
+  status = napi_get_element(env, value, 0, &r);
+  if (status != napi_ok) {
+    LOGE("GetRect get r failed :%d", status);
+    return {};
+  }
+  status = napi_get_value_double(env, r, &temp);
+  rect.right = temp;
+  if (status != napi_ok) {
+    LOGE("GetRect get r value failed :%d", status);
+    return {};
+  }
+
+  napi_value b;
+  status = napi_get_element(env, value, 0, &b);
+  if (status != napi_ok) {
+    LOGE("GetRect get b failed :%d", status);
+    return {};
+  }
+  status = napi_get_value_double(env, b, &temp);
+  rect.bottom = temp;
+  if (status != napi_ok) {
+    LOGE("GetRect get b value failed :%d", status);
+    return {};
+  }
+  return rect;
 }
 
 napi_value CreateMatrix(napi_env env, const Matrix& matrix) {
@@ -240,19 +308,19 @@ napi_value CreateMatrix(napi_env env, const Matrix& matrix) {
   napi_value result = nullptr;
   auto status = napi_create_array_with_length(env, 9, &result);
   if (status != napi_ok) {
-    tgfx::PrintLog("CreateMatrix napi_create_array_with_length failed :%d", status);
+    LOGE("CreateMatrix napi_create_array_with_length failed :%d", status);
     return nullptr;
   }
   for (size_t i = 0; i < 9; i++) {
     napi_value ele;
     status = napi_create_double(env, buffer[i], &ele);
     if (status != napi_ok) {
-      tgfx::PrintLog("CreateMatrix napi_create_int64 failed :%d", status);
+      LOGE("CreateMatrix napi_create_int64 failed :%d", status);
       return nullptr;
     }
     status = napi_set_element(env, result, i, ele);
     if (status != napi_ok) {
-      tgfx::PrintLog("CreateMatrix napi_set_element failed :%d", status);
+      LOGE("CreateMatrix napi_set_element failed :%d", status);
       return nullptr;
     }
   }
@@ -269,13 +337,13 @@ Matrix GetMatrix(napi_env env, napi_value value) {
     napi_value ele;
     auto status = napi_get_element(env, value, i, &ele);
     if (status != napi_ok) {
-      tgfx::PrintLog("GetMatrix napi_get_element failed :%d", status);
+      LOGE("GetMatrix napi_get_element failed :%d", status);
       return {};
     }
     double val = 0;
     status = napi_get_value_double(env, ele, &val);
     if (status != napi_ok) {
-      tgfx::PrintLog("GetMatrix napi_get_value_double failed :%d", status);
+      LOGE("GetMatrix napi_get_value_double failed :%d", status);
       return {};
     }
     result.set(i, val);

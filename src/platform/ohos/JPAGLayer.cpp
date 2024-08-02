@@ -451,10 +451,6 @@ napi_value JPAGLayerHandle::Constructor(napi_env env, napi_callback_info info) {
   return result;
 }
 
-bool JPAGLayerHandle::InitPAGTextLayerEnv(napi_env, napi_value) {
-  return true;
-}
-
 bool JPAGLayerHandle::InitPAGLayerEnv(napi_env env, napi_value exports) {
   napi_property_descriptor classProp[] = {
       PAG_DEFAULT_METHOD_ENTRY(layerType, LayerType),

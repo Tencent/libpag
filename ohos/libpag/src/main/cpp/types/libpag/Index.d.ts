@@ -11,13 +11,13 @@ export declare class JPAGLayer {
 
   isPAGFile(): boolean;
 
-  matrix(): Float32Array;
+  matrix(): Array<number>;
 
-  setMatrix(matrix: Float32Array);
+  setMatrix(matrix: Array<number>);
 
   resetMatrix();
 
-  getTotalMatrix(): Float32Array;
+  getTotalMatrix(): Array<number>;
 
   visible(): boolean;
 
@@ -51,7 +51,7 @@ export declare class JPAGLayer {
 
   trackMatteLayer(): JPAGLayer;
 
-  getBounds(): Float32Array;
+  getBounds(): Array<number>;
 
   excludedFromTimeline(): boolean;
 
@@ -77,6 +77,27 @@ export declare class JPAGImageLayer extends JPAGLayer {
 }
 
 export declare class JPAGTextLayer extends JPAGLayer {
+  fillColor(): number;
+
+  setFillColor(color: number): void;
+
+  font(): JPAGFont;
+
+  setFont(font: JPAGFont);
+
+  fontSize(): number;
+
+  setFontSize(fontSize: number): void;
+
+  strokeColor(): number;
+
+  setStrokeColor(color: number): void;
+
+  text(): string;
+
+  setText(text: string): void;
+
+  reset(): void;
 }
 
 export declare class JPAGShapeLayer extends JPAGLayer {
@@ -145,13 +166,13 @@ export declare class JPAGFile extends JPAGComposition {
 
   path(): string;
 
-  getTextData(index: number): object;
+  getTextData(index: number): JPAGText | null;
 
-  replaceText(editableTextIndex: number, textData: object);
+  replaceText(editableTextIndex: number, textData: JPAGText | null);
 
-  replaceImage(editableImageIndex: number, image: JPAGImage);
+  replaceImage(editableImageIndex: number, image: JPAGImage | null);
 
-  replaceImageByName(layerName: string, image: JPAGImage);
+  replaceImageByName(layerName: string, image: JPAGImage | null);
 
   getLayersByEditableIndex(editableIndex: number, layerType: number): Array<JPAGLayer>;
 
@@ -201,9 +222,9 @@ export declare class JPAGPlayer {
 
   setScaleMode(mode: number)
 
-  matrix(): Float32Array;
+  matrix(): Array<number>;
 
-  setMatrix(matrix: Float32Array);
+  setMatrix(matrix: Array<number>);
 
   duration(): number;
 
@@ -217,7 +238,7 @@ export declare class JPAGPlayer {
 
   flush(): void;
 
-  getBounds(pagLayer: JPAGLayer): Float32Array;
+  getBounds(pagLayer: JPAGLayer): Array<number>;
 
   getLayersUnderPoint(surfaceX: number, surfaceY: number): Array<JPAGLayer>;
 
@@ -270,7 +291,7 @@ export declare class JPAGView {
 
   setScaleMode(scaleMode: number): void;
 
-  setMatrix(matrix: Float32Array);
+  setMatrix(matrix: Array<number>);
 
   currentFrame(): number;
 
@@ -297,4 +318,48 @@ export declare class JPAGFont {
   fontFamily: string;
 
   fontStyle: string;
+}
+
+export declare class JPAGText {
+  applyFill: boolean;
+
+  applyStroke: boolean;
+
+  baselineShift: number;
+
+  boxText: boolean;
+
+  boxTextRect: Array<number>;
+
+  firstBaseLine: number;
+
+  fauxBold: boolean;
+
+  fauxItalic: boolean;
+
+  fillColor: number;
+
+  fontFamily: string;
+
+  fontStyle: string;
+
+  fontSize: number;
+
+  strokeColor: number;
+
+  strokeOverFill: boolean;
+
+  strokeWidth: number;
+
+  text: string;
+
+  justification: number;
+
+  leading: number;
+
+  tracking: number;
+
+  backgroundColor: number;
+
+  backgroundAlpha: number;
 }
