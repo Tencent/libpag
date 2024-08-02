@@ -14,6 +14,7 @@
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGImage.h"
 #include "JPAGLayerHandle.h"
