@@ -34,10 +34,10 @@ namespace pag {
 static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
 
 bool Init(napi_env env, napi_value exports) {
-  return JPAGLayerHandle::Init(env, exports) && JPAGPlayer::Init(env, exports) &&
-         JPAGSurface::Init(env, exports) && JPAGFont::Init(env, exports) &&
-         JPAGText::Init(env, exports) && JPAGView::Init(env, exports) && 
-         JPAGImage::Init(env, exports);
+  return JPAGLayerHandle::Init(env, exports) && JPAGImage::Init(env, exports) &&
+         JPAGPlayer::Init(env, exports) && JPAGSurface::Init(env, exports) &&
+         JPAGFont::Init(env, exports) && JPAGText::Init(env, exports) && 
+         JPAGView::Init(env, exports);
 }
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {

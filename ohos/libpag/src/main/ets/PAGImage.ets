@@ -17,28 +17,28 @@ export class PAGImage {
    * @param path
    * @returns
    */
-  // static FromPath(path: string): PAGImage | null {
-  //   let nativeImage = JPAGImage.FromPath(path);
-  //   if (nativeImage == null) {
-  //     return null;
-  //   } else {
-  //     return new PAGImage(nativeImage);
-  //   }
-  // }
+  static FromPath(path: string): PAGImage | null {
+    let nativeImage = JPAGImage.FromPath(path);
+    if (nativeImage == null) {
+      return null;
+    } else {
+      return new PAGImage(nativeImage);
+    }
+  }
 
-  // /**
-  //  * Creates a PAGImage object from the specified byte data, return null if the bytes is empty or it's not a valid image file.
-  //  * @param data
-  //  * @returns
-  //  */
-  // static FromBytes(data: Int8Array): PAGImage | null {
-  //   let nativeImage = JPAGImage.FromBytes(data);
-  //   if (nativeImage == null) {
-  //     return null;
-  //   } else {
-  //     return new PAGImage(nativeImage);
-  //   }
-  // }
+  /**
+   * Creates a PAGImage object from the specified byte data, return null if the bytes is empty or it's not a valid image file.
+   * @param data
+   * @returns
+   */
+  static FromBytes(data: Int8Array): PAGImage | null {
+    let nativeImage = JPAGImage.FromBytes(data);
+    if (nativeImage == null) {
+      return null;
+    } else {
+      return new PAGImage(nativeImage);
+    }
+  }
 
   /**
    * Load a pag file from assets, returns null if the file does not exist or the data is not a valid image file.
@@ -47,13 +47,12 @@ export class PAGImage {
    * @returns
    */
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): PAGImage | null {
-    // let nativeImage = JPAGImage.LoadFromAssets(manager, name);
-    // if (nativeImage == null) {
-    //   return null;
-    // } else {
-    //   return new PAGImage(nativeImage);
-    // }
-    return null;
+    let nativeImage = JPAGImage.LoadFromAssets(manager, name);
+    if (nativeImage == null) {
+      return null;
+    } else {
+      return new PAGImage(nativeImage);
+    }
   }
 
   /**

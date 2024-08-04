@@ -181,12 +181,12 @@ bool JPAGImage::Init(napi_env env, napi_value exports) {
       PAG_STATIC_METHOD_ENTRY(FromPath, FromPath),
       PAG_STATIC_METHOD_ENTRY(FromBytes, FromBytes),
       PAG_STATIC_METHOD_ENTRY(LoadFromAssets, LoadFromAssets),
-      PAG_STATIC_METHOD_ENTRY(width, Width),
-      PAG_STATIC_METHOD_ENTRY(height, Height),
-      PAG_STATIC_METHOD_ENTRY(matrix, Matrix),
-      PAG_STATIC_METHOD_ENTRY(setMatrix, SetMatrix),
-      PAG_STATIC_METHOD_ENTRY(scaleMode, ScaleMode),
-      PAG_STATIC_METHOD_ENTRY(setScaleMode, SetScaleMode)
+      PAG_DEFAULT_METHOD_ENTRY(width, Width),
+      PAG_DEFAULT_METHOD_ENTRY(height, Height),
+      PAG_DEFAULT_METHOD_ENTRY(matrix, Matrix),
+      PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
+      PAG_DEFAULT_METHOD_ENTRY(scaleMode, ScaleMode),
+      PAG_DEFAULT_METHOD_ENTRY(setScaleMode, SetScaleMode)
     };
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
