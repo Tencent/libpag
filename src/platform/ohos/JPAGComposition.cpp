@@ -195,7 +195,7 @@ static napi_value AddLayerAt(napi_env env, napi_callback_info info) {
   if (index < 0) {
     napi_get_boolean(env, false, &value);
   } else {
-    napi_get_boolean(env, composition->addLayer(layer), &value);
+    napi_get_boolean(env, composition->addLayerAt(layer, index), &value);
   }
   return value;
 }
@@ -297,7 +297,7 @@ static napi_value SwapLayerAt(napi_env env, napi_callback_info info) {
     return nullptr;
   }
   int32_t index1 = -1;
-  napi_get_value_int32(env, args[1], &index1);
+  napi_get_value_int32(env, args[0], &index1);
   if (index1 < 0) {
     return nullptr;
   }

@@ -90,8 +90,13 @@ export class PAGLayer {
   /**
    * Indicates the Container instance that contains this Node instance.
    */
-  parent(): PAGComposition {
-    return new PAGComposition(this.nativeLayer.parent());
+  parent(): PAGComposition | null {
+    let native = this.nativeLayer.parent();
+    if (native) {
+      return new PAGComposition(native);
+    } else {
+      return null;
+    }
   }
 
   /**
@@ -178,8 +183,13 @@ export class PAGLayer {
   /**
    * Returns trackMatte layer of this layer.
    */
-  trackMatteLayer(): PAGLayer {
-    return PAGUtils.WarpJPAGLayer(this.nativeLayer.trackMatteLayer());
+  trackMatteLayer(): PAGLayer | null {
+    let native = this.nativeLayer.trackMatteLayer();
+    if (native) {
+      return PAGUtils.WarpJPAGLayer(native);
+    } else  {
+      return null;
+    }
   }
 
   /**

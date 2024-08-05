@@ -42,7 +42,7 @@ export declare class JPAGLayer {
 
   editableIndex(): number;
 
-  parent(): JPAGComposition;
+  parent(): JPAGComposition | null;
 
   markers(): Array<object>;
 
@@ -66,7 +66,7 @@ export declare class JPAGLayer {
 
   setProgress(value: number): void;
 
-  trackMatteLayer(): JPAGLayer;
+  trackMatteLayer(): JPAGLayer | null;
 
   getBounds(): Array<number>;
 
