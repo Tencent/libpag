@@ -36,7 +36,7 @@ static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
 bool Init(napi_env env, napi_value exports) {
   return JPAGLayerHandle::Init(env, exports) && JPAGImage::Init(env, exports) &&
          JPAGPlayer::Init(env, exports) && JPAGSurface::Init(env, exports) &&
-         JPAGFont::Init(env, exports) && JPAGText::Init(env, exports) && 
+         JPAGFont::Init(env, exports) && JPAGText::Init(env, exports) &&
          JPAGView::Init(env, exports);
 }
 
@@ -404,8 +404,8 @@ napi_value MakeSnapshot(napi_env env, PAGSurface* surface) {
 }
 
 int MakeColorInt(uint32_t red, uint32_t green, uint32_t blue) {
-  uint32_t color = (255 << 24) | (red << 16) | (green << 8) | (blue << 0);
-  return static_cast<int>(color);
+  int color = (255 << 24) | (red << 16) | (green << 8) | (blue << 0);
+  return color;
 }
 
 Color ToColor(int value) {

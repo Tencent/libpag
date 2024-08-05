@@ -91,8 +91,7 @@ static napi_value FontSize(napi_env env, napi_callback_info info) {
   }
   auto textLayer = std::static_pointer_cast<PAGTextLayer>(layer);
   napi_value result;
-  auto color = textLayer->fillColor();
-  napi_create_int32(env, MakeColorInt(color.red, color.green, color.blue), &result);
+  napi_create_double(env, textLayer->fontSize(), &result);
   return result;
 }
 
