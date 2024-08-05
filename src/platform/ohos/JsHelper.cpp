@@ -37,7 +37,7 @@ bool Init(napi_env env, napi_value exports) {
   return JPAGLayerHandle::Init(env, exports) && JPAGImage::Init(env, exports) &&
          JPAGPlayer::Init(env, exports) && JPAGSurface::Init(env, exports) &&
          JPAGFont::Init(env, exports) && JPAGText::Init(env, exports) &&
-         JPAGView::Init(env, exports);
+         JPAGImage::Init(env, exports) && JPAGView::Init(env, exports);
 }
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
@@ -239,16 +239,15 @@ napi_value CreateRect(napi_env env, const Rect& rect) {
     return nullptr;
   }
 
-  napi_set_element(env, result, 0, l);
-  napi_set_element(env, result, 1, t);
-  napi_set_element(env, result, 2, r);
-  napi_set_element(env, result, 3, b);
+  napi_value valueArray[] = {l, t, r, b};
+  for (uint32_t i = 0; i < 4; i++) {
+    napi_set_element(env, result, i, valueArray[i]);
+  }
   return result;
 }
 
 Rect GetRect(napi_env env, napi_value value) {
   uint32_t length = 0;
-  Rect rect;
   auto status = napi_get_array_length(env, value, &length);
   if (status != napi_ok) {
     LOGE("GetRect napi_get_array_length failed :%d", status);
@@ -258,59 +257,21 @@ Rect GetRect(napi_env env, napi_value value) {
     LOGE("GetRect array length != 4");
     return {};
   }
-  double temp = 0;
-  napi_value l;
-  status = napi_get_element(env, value, 0, &l);
-  if (status != napi_ok) {
-    LOGE("GetRect get l failed :%d", status);
-    return {};
+  double array[] = {0.0, 0.0, 0.0, 0.0};
+  for (uint32_t i = 0; i < 4; i++) {
+    napi_value jsValue = nullptr;
+    status = napi_get_element(env, value, i, &jsValue);
+    if (status != napi_ok) {
+      LOGE("GetRect get values[%u] failed :%d", i, status);
+      return {};
+    }
+    status = napi_get_value_double(env, jsValue, &array[i]);
+    if (status != napi_ok) {
+      LOGE("GetRect get values[%u] value failed :%d", i, status);
+      return {};
+    }
   }
-  status = napi_get_value_double(env, l, &temp);
-  rect.left = temp;
-  if (status != napi_ok) {
-    LOGE("GetRect get l value failed :%d", status);
-    return {};
-  }
-
-  napi_value t;
-  status = napi_get_element(env, value, 0, &t);
-  if (status != napi_ok) {
-    LOGE("GetRect get t failed :%d", status);
-    return {};
-  }
-  status = napi_get_value_double(env, t, &temp);
-  if (status != napi_ok) {
-    LOGE("GetRect get t value failed :%d", status);
-    return {};
-  }
-  rect.top = temp;
-
-  napi_value r;
-  status = napi_get_element(env, value, 0, &r);
-  if (status != napi_ok) {
-    LOGE("GetRect get r failed :%d", status);
-    return {};
-  }
-  status = napi_get_value_double(env, r, &temp);
-  rect.right = temp;
-  if (status != napi_ok) {
-    LOGE("GetRect get r value failed :%d", status);
-    return {};
-  }
-
-  napi_value b;
-  status = napi_get_element(env, value, 0, &b);
-  if (status != napi_ok) {
-    LOGE("GetRect get b failed :%d", status);
-    return {};
-  }
-  status = napi_get_value_double(env, b, &temp);
-  rect.bottom = temp;
-  if (status != napi_ok) {
-    LOGE("GetRect get b value failed :%d", status);
-    return {};
-  }
-  return rect;
+  return Rect::MakeXYWH(array[0], array[1], array[2], array[3]);
 }
 
 napi_value CreateMatrix(napi_env env, const Matrix& matrix) {
