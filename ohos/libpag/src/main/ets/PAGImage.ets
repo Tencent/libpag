@@ -41,8 +41,8 @@ export class PAGImage {
   }
 
   /**
-   * Creates a PAGImage object from the specified byte data, return null if the bytes is empty or it's not a valid image file.
-   * @param data
+   * Creates a PAGImage object from pixelMap, return null if the pixelMap is empty or it's not valid.
+   * @param pixelMap
    * @returns
    */
   static FromPixelMap(pixelMap: PixelMap): PAGImage | null {
