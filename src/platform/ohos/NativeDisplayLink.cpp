@@ -16,22 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "platform/Platform.h"
+#include "NativeDisplayLink.h"
 
 namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 
-  bool registerFallbackFonts() const override;
+void NativeDisplayLink::PAGVSyncCallback(long long, void* data) {
+  auto displayLink = static_cast<NativeDisplayLink*>(data);
+  displayLink->callback();
+  if (displayLink->playing) {
+    OH_NativeVSync_RequestFrame(displayLink->vSync, &PAGVSyncCallback, displayLink);
+  }
+}
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
+NativeDisplayLink::NativeDisplayLink(std::function<void()> callback) : callback(callback) {
+  char name[] = "pag_vsync";
+  vSync = OH_NativeVSync_Create(name, strlen(name));
+}
 
-  std::string getCacheDir() const override;
+void NativeDisplayLink::start() {
+  if (playing == false) {
+    playing = true;
+    OH_NativeVSync_RequestFrame(vSync, &PAGVSyncCallback, this);
+  }
+}
 
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
+void NativeDisplayLink::stop() {
+  playing = false;
+}
+
+NativeDisplayLink::~NativeDisplayLink() {
+  OH_NativeVSync_Destroy(vSync);
+}
+
 }  // namespace pag

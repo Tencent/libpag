@@ -14,9 +14,11 @@
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
 #include "platform/ohos/HardwareDecoder.h"
+#include "platform/ohos/NativeDisplayLink.h"
 
 namespace pag {
 class HardwareDecoderFactory : public VideoDecoderFactory {
@@ -49,29 +51,27 @@ std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories
 }
 
 bool NativePlatform::registerFallbackFonts() const {
-  // to do, kevingpqi
   return false;
 }
 
 void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
-  // to do, kevingpqi
+  // todo: kevingpqi
   if (info.isEmpty() || pixels || tag.c_str()) {
   }
 }
 
 std::string NativePlatform::getCacheDir() const {
-  // to do, kevingpqi
+  // todo: kevingpqi
   return "";
 }
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
     std::function<void()> callback) const {
-  // to do, kevingpqi
-  if (callback) {
+  if (!callback) {
     return nullptr;
   }
-  return nullptr;
+  return std::make_shared<NativeDisplayLink>(callback);
 }
 
 }  // namespace pag

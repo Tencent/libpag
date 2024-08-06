@@ -18,20 +18,18 @@
 
 #pragma once
 
-#include "platform/Platform.h"
+#include <string>
+#include "napi/native_api.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+class JPAG {
  public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  static bool Init(napi_env env, napi_value exports);
+  static std::string ClassName() {
+    return "JPAG";
+  }
 
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+ private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
 };
 }  // namespace pag

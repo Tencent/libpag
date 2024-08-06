@@ -17,21 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "platform/Platform.h"
+#include <cstddef>
+#include <cstdint>
+#include <rawfile/raw_file.h>
+#include <rawfile/raw_file_manager.h>
+#include "pag/pag.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+
+class JPAGSurface {
  public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  explicit JPAGSurface(std::shared_ptr<pag::PAGSurface> pagSurface) : pagSurface(pagSurface) {
+  }
+  static bool Init(napi_env env, napi_value exports);
+  static std::shared_ptr<PAGSurface> FromJs(napi_env env, napi_value value);
+  static napi_value ToJs(napi_env env, std::shared_ptr<PAGSurface> surface);
+  static std::string ClassName() {
+    return "JPAGSurface";
+  }
 
-  bool registerFallbackFonts() const override;
+  std::shared_ptr<pag::PAGSurface> get() {
+    return pagSurface;
+  }
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+ private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<pag::PAGSurface> pagSurface;
 };
+
 }  // namespace pag

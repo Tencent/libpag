@@ -380,13 +380,16 @@ elseif (OHOS)
         find_library(NATIVE_BUFFER_LIB native_buffer)
         find_library(NATIVE_WINDOW_LIB native_window)
         find_library(NATIVE_IMAGE_LIB native_image)
+        find_library(NATIVE_VSYNC_LIB native_vsync)
         find_library(NATIVE_MEDIA_CODECBASE_LIB native_media_codecbase)
         find_library(NATIVE_MEDIA_CORE_LIB native_media_core)
         find_library(NATIVE_MEDIA_VDEC_LIB native_media_vdec)
+        find_library(NATIVE_RAWFILE_Z_LIB rawfile.z)
         list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
                 ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB}
                 ${NATIVE_BUFFER_LIB} ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB}
-                ${NATIVE_MEDIA_CODECBASE_LIB} ${NATIVE_MEDIA_CORE_LIB} ${NATIVE_MEDIA_VDEC_LIB})
+                ${NATIVE_MEDIA_CODECBASE_LIB} ${NATIVE_MEDIA_CORE_LIB} ${NATIVE_MEDIA_VDEC_LIB}
+                ${NATIVE_VSYNC_LIB} ${NATIVE_RAWFILE_Z_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
