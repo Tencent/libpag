@@ -146,16 +146,24 @@ export class PAGFile extends PAGComposition {
    * Replace the image data of the specified index. The index ranges from 0 to PAGFile.numImages - 1. Passing in null
    * for the image parameter will reset it to default image data.
    */
-  replaceImage(editableImageIndex: number, image: PAGImage) {
-    this.getNativeFile().replaceImage(editableImageIndex, image.nativeImage);
+  replaceImage(editableImageIndex: number, image: PAGImage | null) {
+    if (image == null) {
+      this.getNativeFile().replaceImage(editableImageIndex, null);
+    } else {
+      this.getNativeFile().replaceImage(editableImageIndex, image.nativeImage);
+    }
   }
 
   /**
    * Replace the image data of the specified layer name. Passing in null
    * for the image parameter will reset it to default image data.
    */
-  replaceImageByName(layerName: string, image: PAGImage) {
-    this.getNativeFile().replaceImageByName(layerName, image.nativeImage);
+  replaceImageByName(layerName: string, image: PAGImage | null) {
+    if (image == null) {
+      this.getNativeFile().replaceImageByName(layerName, null);
+    } else {
+      this.getNativeFile().replaceImageByName(layerName, image.nativeImage);
+    }
   }
 
   /**

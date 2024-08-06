@@ -6,6 +6,8 @@ export declare class JPAGImage {
 
   static FromBytes(data: Int8Array): JPAGImage | null;
 
+  static FromPixelMap(pixelMap: image.PixelMap): JPAGImage | null;
+
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): JPAGImage | null;
 
   width(): number;

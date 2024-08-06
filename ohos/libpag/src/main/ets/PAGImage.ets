@@ -41,6 +41,20 @@ export class PAGImage {
   }
 
   /**
+   * Creates a PAGImage object from the specified byte data, return null if the bytes is empty or it's not a valid image file.
+   * @param data
+   * @returns
+   */
+  static FromPixelMap(pixelMap: PixelMap): PAGImage | null {
+    let nativeImage = JPAGImage.FromPixelMap(pixelMap);
+    if (nativeImage == null) {
+      return null;
+    } else {
+      return new PAGImage(nativeImage);
+    }
+  }
+
+  /**
    * Load a pag file from assets, returns null if the file does not exist or the data is not a valid image file.
    * @param manager
    * @param name

@@ -19,7 +19,9 @@
 #include <js_native_api.h>
 #include <rawfile/raw_file.h>
 #include <rawfile/raw_file_manager.h>
+#include <tgfx/platform/ohos/OHOSPixelMap.h>
 #include "JsHelper.h"
+#include "rendering/editing/StillImage.h"
 
 namespace pag {
 
@@ -43,7 +45,21 @@ static napi_value FromBytes(napi_env env, napi_callback_info info) {
   if (code != napi_ok) {
     return nullptr;
   }
-  return JPAGImage::ToJs(env, PAGImage::FromBytes(data, length));;
+  return JPAGImage::ToJs(env, PAGImage::FromBytes(data, length));
+  ;
+}
+
+static napi_value FromPixelMap(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  auto bitmap = tgfx::OHOSPixelMap::CopyBitmap(env, args[0]);
+  auto image = tgfx::Image::MakeFrom(bitmap);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  auto pagImage = pag::StillImage::MakeFrom(std::move(image));
+  return JPAGImage::ToJs(env, pagImage);
 }
 
 static napi_value LoadFromAssets(napi_env env, napi_callback_info info) {
@@ -54,7 +70,6 @@ static napi_value LoadFromAssets(napi_env env, napi_callback_info info) {
   size_t strSize;
   char srcBuf[1024];
   napi_get_value_string_utf8(env, args[1], srcBuf, sizeof(srcBuf), &strSize);
-  std::string fileName(srcBuf, strSize);
   RawFile* rawFile = OH_ResourceManager_OpenRawFile(mNativeResMgr, srcBuf);
   if (rawFile != NULL) {
     long len = OH_ResourceManager_GetRawFileSize(rawFile);
@@ -177,17 +192,16 @@ napi_value JPAGImage::Constructor(napi_env env, napi_callback_info info) {
 }
 
 bool JPAGImage::Init(napi_env env, napi_value exports) {
-  napi_property_descriptor classProp[] = {
-      PAG_STATIC_METHOD_ENTRY(FromPath, FromPath),
-      PAG_STATIC_METHOD_ENTRY(FromBytes, FromBytes),
-      PAG_STATIC_METHOD_ENTRY(LoadFromAssets, LoadFromAssets),
-      PAG_DEFAULT_METHOD_ENTRY(width, Width),
-      PAG_DEFAULT_METHOD_ENTRY(height, Height),
-      PAG_DEFAULT_METHOD_ENTRY(matrix, Matrix),
-      PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
-      PAG_DEFAULT_METHOD_ENTRY(scaleMode, ScaleMode),
-      PAG_DEFAULT_METHOD_ENTRY(setScaleMode, SetScaleMode)
-    };
+  napi_property_descriptor classProp[] = {PAG_STATIC_METHOD_ENTRY(FromPath, FromPath),
+                                          PAG_STATIC_METHOD_ENTRY(FromBytes, FromBytes),
+                                          PAG_STATIC_METHOD_ENTRY(FromPixelMap, FromPixelMap),
+                                          PAG_STATIC_METHOD_ENTRY(LoadFromAssets, LoadFromAssets),
+                                          PAG_DEFAULT_METHOD_ENTRY(width, Width),
+                                          PAG_DEFAULT_METHOD_ENTRY(height, Height),
+                                          PAG_DEFAULT_METHOD_ENTRY(matrix, Matrix),
+                                          PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
+                                          PAG_DEFAULT_METHOD_ENTRY(scaleMode, ScaleMode),
+                                          PAG_DEFAULT_METHOD_ENTRY(setScaleMode, SetScaleMode)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
   return status == napi_ok;
