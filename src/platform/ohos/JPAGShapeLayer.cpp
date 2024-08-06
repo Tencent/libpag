@@ -16,15 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pag/pag.h"
 #include "JPAGLayerHandle.h"
 #include "JsHelper.h"
+#include "pag/pag.h"
 
 namespace pag {
 bool JPAGLayerHandle::InitPAGShapeLayerEnv(napi_env env, napi_value exports) {
-  auto status = DefineClass(env, exports, GetLayerClassName(LayerType::Shape),
-                            0, nullptr, Constructor,
-                            GetBaseClassName());
+  auto status = DefineClass(env, exports, GetLayerClassName(LayerType::Shape), 0, nullptr,
+                            Constructor, GetBaseClassName());
   return status == napi_status::napi_ok;
 }
 

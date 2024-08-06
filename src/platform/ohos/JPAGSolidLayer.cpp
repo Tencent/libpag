@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pag/pag.h"
 #include "JPAGLayerHandle.h"
 #include "JsHelper.h"
+#include "pag/pag.h"
 
 namespace pag {
 static std::shared_ptr<PAGSolidLayer> FromJs(napi_env env, napi_value value) {
@@ -40,7 +40,7 @@ static napi_value SolidColor(napi_env env, napi_callback_info info) {
   }
 
   napi_value result;
-  Color color = solidLayer->solidColor();  
+  Color color = solidLayer->solidColor();
   napi_create_int32(env, MakeColorInt(color.red, color.green, color.blue), &result);
   return result;
 }
@@ -61,10 +61,8 @@ static napi_value SetSolidColor(napi_env env, napi_callback_info info) {
 }
 
 bool JPAGLayerHandle::InitPAGSolidLayerEnv(napi_env env, napi_value exports) {
-  napi_property_descriptor classProp[] = {
-      PAG_DEFAULT_METHOD_ENTRY(solidColor, SolidColor),
-      PAG_DEFAULT_METHOD_ENTRY(setSolidColor, SetSolidColor)
-    };
+  napi_property_descriptor classProp[] = {PAG_DEFAULT_METHOD_ENTRY(solidColor, SolidColor),
+                                          PAG_DEFAULT_METHOD_ENTRY(setSolidColor, SetSolidColor)};
 
   auto status = DefineClass(env, exports, GetLayerClassName(LayerType::Solid),
                             sizeof(classProp) / sizeof(classProp[0]), classProp, Constructor,

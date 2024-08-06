@@ -19,8 +19,8 @@
 #include "JPAGPlayer.h"
 #include <cstdint>
 #include "JPAGLayerHandle.h"
-#include "JsHelper.h"
 #include "JPAGSurface.h"
+#include "JsHelper.h"
 
 namespace pag {
 

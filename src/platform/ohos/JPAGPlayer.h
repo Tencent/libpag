@@ -18,7 +18,6 @@
 
 #pragma once
 #include <napi/native_api.h>
-
 #include "pag/pag.h"
 
 namespace pag {

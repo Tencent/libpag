@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <native_vsync/native_vsync.h>
 #include <functional>
 #include <mutex>
-#include <native_vsync/native_vsync.h>
 #include "rendering/utils/DisplayLink.h"
 namespace pag {
 

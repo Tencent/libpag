@@ -22,11 +22,11 @@
 #include "platform/ohos/JPAG.h"
 #include "platform/ohos/JPAGFont.h"
 #include "platform/ohos/JPAGImage.h"
-#include "platform/ohos/JPAGText.h"
-#include "platform/ohos/JPAGView.h"
 #include "platform/ohos/JPAGLayerHandle.h"
 #include "platform/ohos/JPAGPlayer.h"
 #include "platform/ohos/JPAGSurface.h"
+#include "platform/ohos/JPAGText.h"
+#include "platform/ohos/JPAGView.h"
 #include "platform/ohos/JsHelper.h"
 
 namespace pag {

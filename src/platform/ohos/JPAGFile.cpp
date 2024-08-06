@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <cstddef>
-#include <cstdint>
 #include <rawfile/raw_file.h>
 #include <rawfile/raw_file_manager.h>
+#include <cstddef>
+#include <cstdint>
 #include "JPAGLayerHandle.h"
 #include "JsHelper.h"
 #include "platform/ohos/JPAGImage.h"

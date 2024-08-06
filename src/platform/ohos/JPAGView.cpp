@@ -17,15 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGView.h"
-
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include <cstdint>
-
 #include "base/utils/Log.h"
 #include "base/utils/UniqueID.h"
 #include "platform/ohos/GPUDrawable.h"
-#include "platform/ohos/JsHelper.h"
 #include "platform/ohos/JPAGLayerHandle.h"
+#include "platform/ohos/JsHelper.h"
 
 namespace pag {
 static int PAGViewStateStart = 0;
