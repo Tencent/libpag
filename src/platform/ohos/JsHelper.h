@@ -29,8 +29,6 @@
 
 namespace pag {
 
-bool Init(napi_env env, napi_value exports);
-
 napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf8name,
                         size_t propertyCount, const napi_property_descriptor* properties,
                         napi_callback constructor, const std::string& parentName);

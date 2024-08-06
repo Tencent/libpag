@@ -519,15 +519,18 @@ bool JPAGView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(makeSnapshot, MakeSnapshot)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
+  if (status != napi_ok) {
+    return false;
+  }
   napi_value exportInstance = nullptr;
   if (napi_get_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &exportInstance) != napi_ok) {
-    return false;
+    return true;
   }
 
   OH_NativeXComponent* nativeXComponent = nullptr;
   auto temp = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
   if (temp != napi_ok) {
-    return false;
+    return true;
   }
 
   static OH_NativeXComponent_Callback renderCallback;
@@ -537,7 +540,7 @@ bool JPAGView::Init(napi_env env, napi_value exports) {
   renderCallback.DispatchTouchEvent = DispatchTouchEventCB;
 
   OH_NativeXComponent_RegisterCallback(nativeXComponent, &renderCallback);
-  return status == napi_ok;
+  return true;
 }
 
 void JPAGView::onAnimationStart(PAGAnimator*) {

@@ -30,7 +30,6 @@ export enum PAGTimeStretchMode {
    */
   RepeatInverted = 3
 }
-;
 
 export class PAGFile extends PAGComposition {
   constructor(nativeLayer: JPAGLayer) {

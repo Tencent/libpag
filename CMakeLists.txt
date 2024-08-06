@@ -395,7 +395,7 @@ elseif (OHOS)
                 ${NATIVE_MEDIA_CODECBASE_LIB} ${NATIVE_MEDIA_CORE_LIB} ${NATIVE_MEDIA_VDEC_LIB}
                 ${NATIVE_VSYNC_LIB} ${NATIVE_RAWFILE_Z_LIB})
 
-        file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.* ohos/libpag/src/main/cpp/*.cpp)
+        file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
 endif ()

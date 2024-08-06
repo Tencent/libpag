@@ -20,26 +20,11 @@
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 #include <tgfx/core/ImageInfo.h>
-#include "JPAGLayerHandle.h"
-#include "JPAGPlayer.h"
-#include "JPAGSurface.h"
 #include "base/utils/Log.h"
-#include "platform/ohos/JPAGFont.h"
-#include "platform/ohos/JPAGText.h"
-#include "platform/ohos/JPAGImage.h"
-#include "platform/ohos/JPAGView.h"
-#include "platform/ohos/JPAG.h"
 
 namespace pag {
 
 static std::unordered_map<std::string, napi_ref> ConstructorRefMap;
-
-bool Init(napi_env env, napi_value exports) {
-  return JPAGLayerHandle::Init(env, exports) && JPAGImage::Init(env, exports) &&
-         JPAGPlayer::Init(env, exports) && JPAGSurface::Init(env, exports) &&
-         JPAGFont::Init(env, exports) && JPAGText::Init(env, exports) &&
-         JPAG::Init(env, exports) && JPAGView::Init(env, exports);
-}
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
   if (env == nullptr || constructor == nullptr || name.empty()) {

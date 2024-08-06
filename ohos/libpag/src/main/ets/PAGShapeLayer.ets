@@ -1,4 +1,4 @@
-import { JPAGLayer, JPAGShapeLayer } from 'libpag.so';
+import { JPAGLayer } from 'libpag.so';
 import { PAGLayer } from './PAGLayer';
 
 export class PAGShapeLayer extends PAGLayer {

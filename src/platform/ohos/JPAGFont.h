@@ -18,7 +18,7 @@
 
 #pragma once
 #include <string>
-#include "napi/native_api.h"
+#include <napi/native_api.h>
 #include "pag/pag.h"
 
 namespace pag {
@@ -33,6 +33,5 @@ class JPAGFont {
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
-
 };
 }  // namespace pag

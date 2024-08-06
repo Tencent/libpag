@@ -17,8 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAG.h"
-#include "JsHelper.h"
+#include "base/utils/Log.h"
 #include "pag/pag.h"
+#include "platform/ohos/JPAG.h"
+#include "platform/ohos/JPAGFont.h"
+#include "platform/ohos/JPAGImage.h"
+#include "platform/ohos/JPAGText.h"
+#include "platform/ohos/JPAGView.h"
+#include "platform/ohos/JPAGLayerHandle.h"
+#include "platform/ohos/JPAGPlayer.h"
+#include "platform/ohos/JPAGSurface.h"
+#include "platform/ohos/JsHelper.h"
 
 namespace pag {
 static napi_value SDKVersion(napi_env env, napi_callback_info) {
@@ -46,3 +55,26 @@ bool JPAG::Init(napi_env env, napi_value exports) {
   return status == napi_ok;
 }
 }  // namespace pag
+
+EXTERN_C_START
+
+static napi_value Init(napi_env env, napi_value exports) {
+  bool result = pag::JPAG::Init(env, exports) && pag::JPAGLayerHandle::Init(env, exports) &&
+                pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
+                pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
+                pag::JPAGText::Init(env, exports) && pag::JPAGImage::Init(env, exports) &&
+                pag::JPAGView::Init(env, exports);
+  if (!result) {
+    LOGE("PAG InitFailed");
+  }
+  return exports;
+}
+EXTERN_C_END
+
+static napi_module demoModule = {
+    1, 0, nullptr, Init, "pag", ((void*)0), {0},
+};
+
+extern "C" __attribute__((constructor)) void RegisterEntryModule(void) {
+  napi_module_register(&demoModule);
+}
