@@ -28,6 +28,7 @@
 #include "platform/ohos/JPAGText.h"
 #include "platform/ohos/JPAGImage.h"
 #include "platform/ohos/JPAGView.h"
+#include "platform/ohos/JPAG.h"
 
 namespace pag {
 
@@ -37,7 +38,7 @@ bool Init(napi_env env, napi_value exports) {
   return JPAGLayerHandle::Init(env, exports) && JPAGImage::Init(env, exports) &&
          JPAGPlayer::Init(env, exports) && JPAGSurface::Init(env, exports) &&
          JPAGFont::Init(env, exports) && JPAGText::Init(env, exports) &&
-         JPAGImage::Init(env, exports) && JPAGView::Init(env, exports);
+         JPAG::Init(env, exports) && JPAGView::Init(env, exports);
 }
 
 bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {

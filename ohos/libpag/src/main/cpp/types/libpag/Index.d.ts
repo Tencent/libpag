@@ -382,3 +382,7 @@ export declare class JPAGText {
 
   backgroundAlpha: number;
 }
+
+export declare class JPAG {
+  static SDKVersion(): string;
+}
