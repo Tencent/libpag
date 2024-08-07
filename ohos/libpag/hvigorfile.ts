@@ -16,22 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+import { hspTasks } from '@ohos/hvigor-ohos-plugin';
 
-#include "platform/Platform.h"
-
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
-
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+export default {
+  system: hspTasks, /* Built-in plugin of Hvigor. It cannot be modified. */
+  plugins: []         /* Custom plugin to extend the functionality of Hvigor. */
+}

@@ -16,22 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+export { PAGView, PAGViewListener } from './src/main/ets/PAGView'
 
-#include "platform/Platform.h"
+export { PAGPlayer } from './src/main/ets/PAGPlayer'
 
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+export { PAGSurface } from './src/main/ets/PAGSurface'
 
-  bool registerFallbackFonts() const override;
+export { PAGLayer, PAGLayerType } from './src/main/ets/PAGLayer'
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
+export { PAGComposition } from './src/main/ets/PAGComposition'
 
-  std::string getCacheDir() const override;
+export { PAGFile } from './src/main/ets/PAGFile'
 
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+export { PAGFont } from './src/main/ets/PAGFont'
+
+export { PAGImage } from './src/main/ets/PAGImage'
+
+export { PAGImageLayer } from './src/main/ets/PAGImageLayer'
+
+export { PAGMarker } from './src/main/ets/PAGMarker'
+
+export { PAGShapeLayer } from './src/main/ets/PAGShapeLayer'
+
+export { PAGSolidLayer } from './src/main/ets/PAGSolidLayer'
+
+export { PAGTextLayer } from './src/main/ets/PAGTextLayer'
+
+export { PAGVideoRange } from './src/main/ets/PAGVideoRange'
+
+export { PAG } from './src/main/ets/PAG'

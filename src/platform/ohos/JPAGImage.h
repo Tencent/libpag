@@ -15,23 +15,30 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include "platform/Platform.h"
+#include <napi/native_api.h>
+#include <memory>
+#include "pag/pag.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+class JPAGImage {
  public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  explicit JPAGImage(std::shared_ptr<PAGImage> pagImage) : pagImage(pagImage) {
+  }
+  static bool Init(napi_env env, napi_value exports);
+  static napi_value ToJs(napi_env env, std::shared_ptr<PAGImage> pagImage);
+  static std::shared_ptr<PAGImage> FromJs(napi_env env, napi_value value);
+  static std::string ClassName() {
+    return "JPAGImage";
+  }
 
-  bool registerFallbackFonts() const override;
+  std::shared_ptr<PAGImage> get() {
+    return pagImage;
+  }
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+ private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<PAGImage> pagImage;
 };
 }  // namespace pag

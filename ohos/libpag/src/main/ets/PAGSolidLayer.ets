@@ -16,22 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+import { JPAGLayer, JPAGSolidLayer } from 'libpag.so';
+import { PAGLayer } from './PAGLayer';
 
-#include "platform/Platform.h"
+export class PAGSolidLayer extends PAGLayer {
+  constructor(nativeLayer: JPAGLayer) {
+    super(nativeLayer);
+  }
 
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  solidColor(): number {
+    return this.getNativeSolidColor().solidColor();
+  }
 
-  bool registerFallbackFonts() const override;
+  setSolidColor(color: number) {
+    this.getNativeSolidColor().setSolidColor(color);
+  }
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+  getNativeSolidColor(): JPAGSolidLayer {
+    return this.nativeLayer as JPAGSolidLayer;
+  }
+}

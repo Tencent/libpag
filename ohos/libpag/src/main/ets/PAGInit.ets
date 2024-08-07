@@ -16,22 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+import { font } from '@kit.ArkUI';
+import { JPAGFont } from 'libpag.so';
 
-#include "platform/Platform.h"
+export class PAGInit {
+  static Init() {
+    if (PAGInit.hasInit) {
+      return;
+    }
+    PAGInit.InitFontFallback();
+    PAGInit.hasInit = true;
+  }
 
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  private static hasInit: boolean = false;
 
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+  private static InitFontFallback() {
+    let fontConfig = font.getUIFontConfig();
+    for (let index = 0; index < fontConfig.fallbackGroups.length; index++) {
+      const element = fontConfig.fallbackGroups[index];
+      let paths = new Array<string>();
+      for (let j = 0; j < element.fallback.length; j++) {
+        let fontInfo = font.getFontByName(element.fallback[j].family)
+        if (fontInfo == null) {
+          fontInfo = font.getFontByName(element.fallback[j].family + " Regular")
+        }
+        if (fontInfo != null) {
+          paths.push(fontInfo.path);
+        }
+      }
+      JPAGFont.SetFallbackFontPaths(paths);
+    }
+  }
+}

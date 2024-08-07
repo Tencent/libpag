@@ -16,22 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "platform/Platform.h"
+#include "JPAGLayerHandle.h"
+#include "JsHelper.h"
+#include "pag/pag.h"
 
 namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+bool JPAGLayerHandle::InitPAGShapeLayerEnv(napi_env env, napi_value exports) {
+  auto status = DefineClass(env, exports, GetLayerClassName(LayerType::Shape), 0, nullptr,
+                            Constructor, GetBaseClassName());
+  return status == napi_status::napi_ok;
+}
 
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
 }  // namespace pag

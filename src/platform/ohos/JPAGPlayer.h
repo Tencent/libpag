@@ -17,21 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "platform/Platform.h"
+#include <napi/native_api.h>
+#include "pag/pag.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+
+class JPAGPlayer {
  public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  explicit JPAGPlayer(std::shared_ptr<pag::PAGPlayer> pagPlayer) : pagPlayer(pagPlayer) {
+  }
+  static bool Init(napi_env env, napi_value exports);
+  static std::shared_ptr<PAGPlayer> FromJs(napi_env env, napi_value value);
+  static napi_value ToJs(napi_env env, std::shared_ptr<PAGPlayer> player);
+  static std::string ClassName() {
+    return "JPAGPlayer";
+  }
+  std::shared_ptr<pag::PAGPlayer> get() {
+    return pagPlayer;
+  }
 
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+ private:
+  static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<pag::PAGPlayer> pagPlayer;
 };
 }  // namespace pag

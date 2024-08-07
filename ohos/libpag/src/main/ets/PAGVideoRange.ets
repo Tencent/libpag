@@ -16,22 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+/**
+ * Represents a time range from the content of PAGImageLayer.
+ */
+export interface PAGVideoRange {
+  /**
+   * The start time of the source video, in microseconds.
+   */
+  startTime: number;
 
-#include "platform/Platform.h"
+  /**
+   * The end time of the source video (not included), in microseconds.
+   */
+  endTime: number;
 
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  /**
+   * The duration for playing after applying speed.
+   */
+  playDuration: number;
 
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+  /**
+   * Indicates whether the video should play backward.
+   */
+  reversed: boolean;
+}

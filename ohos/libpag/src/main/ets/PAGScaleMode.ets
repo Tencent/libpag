@@ -16,22 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "platform/Platform.h"
-
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
-
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-};
-}  // namespace pag
+export enum PAGScaleMode {
+  /**
+   * The content is not scaled.
+   */
+  None = 0,
+  /**
+   * The content is stretched to fit.
+   */
+  Stretch = 1,
+  /**
+   * The content is scaled with respect to the original unscaled image's aspect ratio.
+   * This is the default value.
+   */
+  LetterBox = 2,
+  /**
+   * The content is scaled to fit with respect to the original unscaled image's aspect ratio.
+   * This results in cropping on one axis.
+   */
+  Zoom = 3
+}

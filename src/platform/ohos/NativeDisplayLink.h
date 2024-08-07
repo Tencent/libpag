@@ -17,21 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "platform/Platform.h"
-
+#include <native_vsync/native_vsync.h>
+#include <functional>
+#include <mutex>
+#include "rendering/utils/DisplayLink.h"
 namespace pag {
-class NativePlatform : public Platform {
+
+class NativeDisplayLink : public DisplayLink {
  public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  explicit NativeDisplayLink(std::function<void()> callback);
+  ~NativeDisplayLink() override;
 
-  bool registerFallbackFonts() const override;
+  void start() override;
+  void stop() override;
 
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
+ private:
+  static void PAGVSyncCallback(long long timestamp, void* data);
+  OH_NativeVSync* vSync = nullptr;
+  std::function<void()> callback = nullptr;
+  std::atomic<bool> playing = false;
 };
 }  // namespace pag

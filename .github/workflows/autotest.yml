@@ -75,6 +75,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: result/coverage.xml
+          version: 'v0.7.3'
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
