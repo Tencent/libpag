@@ -1,6 +1,6 @@
 {
   "name": "@tencent/libpag",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both vector-based and raster-based animations across most platforms, such as iOS, Android, macOS, Windows, Linux, Web and Harmony.",
   "main": "Index.ets",
   "author": "libpag",
