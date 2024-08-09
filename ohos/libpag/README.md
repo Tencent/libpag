@@ -5,13 +5,13 @@
 [![build](https://github.com/Tencent/libpag/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
+[Homepage](https://pag.art)
 
 ## Introduction
 
 libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
-vector-based and raster-based animations across most platforms, such as iOS, Android, macOS,
-Windows, Linux, Web and Harmony.
+vector-based and raster-based animations across most platforms, such as iOS, Android, OpenHarmony, macOS,
+Windows, Linux, and Web.
 
 PAG is an open-source file format for recording animations. PAG files can be created and exported
 from Adobe After Effects with the PAGExporter plugin and previewed in the PAGViewer app, which you
@@ -63,13 +63,24 @@ features like video templates.
 
 ## Getting Started
 
-You can use the har downloaded from the release page, or add libpag to your project by
+You can use the har downloaded from the [release](https://github.com/Tencent/libpag/releases) page, or add libpag to your project by
 OHPM:
 
 ```
 ohpm install @tencent/libpag
 ```
 
+Or, you can add it to your project manually.
+Add the following lines to oh-package.json5 on your app module.
+```
+"dependencies": {
+"@tencent/libpag": "^1.0.1",
+}
+```
+Then run
+```
+ohpm install
+```
 
 ## Development
 

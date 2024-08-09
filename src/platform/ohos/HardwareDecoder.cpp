@@ -60,6 +60,7 @@ void OH_AVCodecOnNewOutputBuffer(OH_AVCodec*, uint32_t index, OH_AVBuffer* buffe
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   videoFormat = format;
   isValid = initDecoder(codecCategory);
+  // We currently have some unresolved issues with enabling software decoding, so we should disable it for now.
   //   if (!isValid) {
   //     codecCategory = SOFTWARE;
   //     LOGI("Fall back to the software decoder!");

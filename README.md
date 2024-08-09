@@ -12,7 +12,7 @@ English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
 ## Introduction
 
 libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
-vector-based and raster-based animations across most platforms, such as iOS, Android, macOS,
+vector-based and raster-based animations across most platforms, such as iOS, Android, OpenHarmony, macOS,
 Windows, Linux, and Web.
 
 PAG is an open-source file format for recording animations. PAG files can be created and exported
@@ -63,6 +63,7 @@ features like video templates.
 
 - iOS 9.0 or later
 - Android 4.4 or later
+- HarmonyOS Next 5.0.0(12) or later
 - macOS 10.15 or later
 - Windows 7.0 or later
 - Chrome 69.0 or later (Web)
@@ -129,6 +130,26 @@ Add the following rule to your proguard rules to avoid the wrong obfuscation.
 ```
 
 Finally, run gradle sync and then build the project.
+
+### OpenHarmony Integration
+You can use the har downloaded from the [release](https://github.com/Tencent/libpag/releases) page, or add libpag to your project by
+OHPM:
+
+```
+ohpm install @tencent/libpag
+```
+
+Or, you can add it to your project manually.
+Add the following lines to oh-package.json5 on your app module.
+```
+"dependencies": {
+"@tencent/libpag": "^1.0.1",
+}
+```
+Then run
+```
+ohpm install
+```
 
 ### Web Integration
 
