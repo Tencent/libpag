@@ -1,5 +1,3 @@
-<img src="resources/readme/logo.png" alt="PAG Logo" width="553"/>
-
 [![license](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/Tencent/libpag/blob/master/LICENSE.txt) 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) 
 [![codecov](https://codecov.io/gh/Tencent/libpag/branch/main/graph/badge.svg)](https://codecov.io/gh/Tencent/libpag)
@@ -7,7 +5,7 @@
 [![build](https://github.com/Tencent/libpag/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
+[Homepage](https://pag.art)
 
 ## Introduction
 
@@ -26,7 +24,7 @@ Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
 
 - **Highly efficient file format**
 
-<img src="resources/readme/intro_1.png" alt="intro_1" width="282"/>
+<img src="https://pag.art/pag/1.apng" alt="intro_1" width="282"/>
 
 Benefiting from the highly efficient binary format design, PAG files can be decoded 10x faster than
 JSON files but also are about 50% smaller in file size when exporting the same animations. Designers
@@ -35,7 +33,7 @@ easily without other attachments.
 
 - **All AE features supported**
 
-<img src="resources/readme/intro_2.png" alt="intro_2" width="282"/>
+<img src="https://pag.art/pag/2.apng" alt="intro_2" width="282"/>
 
 While other solutions may only support exporting limited vector-based AE features, PAG supports
 exporting all AE animations into a single file by combining vector-based exporting with raster-based
@@ -43,7 +41,7 @@ exporting techniques. Therefore, third-party plugin effects in AE can be exporte
 
 - **Measurable performance**
 
-<img src="resources/readme/intro_4.png" alt="intro_4" width="282"/>
+<img src="https://pag.art/pag/4.apng" alt="intro_4" width="282"/>
 
 PAG provides a monitoring panel in PAGViewer that shows normalized performance data for PAG files,
 which helps designers to examine and optimize performance easily without developers. Along with
@@ -52,7 +50,7 @@ effects and excellent performance now can be created more effectively.
 
 - **Runtime editable animations**
 
-<img src="resources/readme/intro_5.png" alt="intro_5" width="282"/>
+<img src="https://pag.art/pag/5.apng" alt="intro_5" width="282"/>
 
 With the flexible editing APIs from PAG SDK, developers can easily change the layer structure of a
 single PAG file, mix multiple PAG files into one composition, or replace texts and images with all
@@ -61,77 +59,10 @@ features like video templates.
 
 ## System Requirements
 
-- iOS 9.0 or later
-- Android 4.4 or later
-- HarmonyOS Next 5.0.0(12) or later
-- macOS 10.15 or later
-- Windows 7.0 or later
-- Chrome 69.0 or later (Web)
-- Safari 11.3 or later (Web)
+- HarmonyOS Next 5.0.0(12) or later.
 
 ## Getting Started
 
-We currently only publish precompiled libraries for iOS, Android, and Web. You can build libraries of
-other platforms from the source code. The latest releases can be downloaded
-from [here](https://github.com/Tencent/libpag/releases).
-
-### iOS Integration
-
-You can use the framework downloaded from the release page, or add libpag to your project by
-CocoaPods:
-Add the pod to your Podfile:
-
-```
-pod 'libpag'
-```
-
-And then run:
-
-```
-pod install
-```
-
-After installing the cocoapod into your project import libpag with
-
-```
-#import <libpag/xxx.h>
-```
-
-### Android Integration
-
-You can use the aar downloaded from the release page, or add libpag to your project by Maven:
-
-Edit the `build.gradle` file in the root of your project, add `mavenCentral()` to `repositories`:
-
-```
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:3.2.1'
-    }
-}
-```
-
-Add libpag to `app/build.gradle` (*`4.0.5.10` should be replaced with the latest release version*):
-
-```
-dependencies {
-    implementation 'com.tencent.tav:libpag:4.0.5.10'
-}
-```
-
-Add the following rule to your proguard rules to avoid the wrong obfuscation.
-
-```
-  -keep class org.libpag.** {*;}
-  -keep class androidx.exifinterface.** {*;}
-```
-
-Finally, run gradle sync and then build the project.
-
-### OpenHarmony Integration
 You can use the har downloaded from the [release](https://github.com/Tencent/libpag/releases) page, or add libpag to your project by
 OHPM:
 
@@ -150,44 +81,6 @@ Then run
 ```
 ohpm install
 ```
-
-### Web Integration
-
-Simply copy the following code into an HTML file and open it in your browser:
-
-```html
-<canvas class="canvas" id="pag"></canvas>
-<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
-<script>
-  window.libpag.PAGInit().then((PAG) => {
-    const url = 'https://pag.art/file/like.pag';
-    fetch(url)
-      .then((response) => response.blob())
-      .then(async (blob) => {
-        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-        // Do Something.
-      });
-  });
-</script>
-```
-More information：[Web SDK Guide](./web/README.md)
-
-
-### Example
-
-Check out the following projects to learn how to use the APIs of libpag:
-
-- [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
-- [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
-- [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)
-
-### Documentation
-
-- [iOS API Reference](https://pag.art/apis/ios/index.html)
-- [Android API Reference](https://pag.art/apis/android/index.html)
-- [Web API Reference](https://pag.art/apis/web/index.html)
-
-You can find other docs on [pag.art](https://pag.art/docs/mobile-sdk-guide.html)
 
 ## Development
 

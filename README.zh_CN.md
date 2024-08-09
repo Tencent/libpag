@@ -10,7 +10,7 @@
 
 ## 介绍
 
-libpag 是 PAG (Portable Animated Graphics) 动效文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, macOS,
+libpag 是 PAG (Portable Animated Graphics) 动效文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, OpenHarmony, macOS,
 Windows, Linux, 以及 Web 端。
 
 PAG 方案是一套完善的动效工作流。提供从 AE（Adobe After Effects）导出插件，到桌面预览工具 PAGViewer，再到各端的跨平台渲染 SDK。
@@ -53,6 +53,7 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 - iOS 9.0 版本及以上
 - Android 4.4 版本及以上
+- HarmonyOS Next 5.0.0(12) 版本及以上
 - macOS 10.15 版本及以上
 - Windows 7.0 版本及以上
 - Chrome 69.0 版本及以上
@@ -120,6 +121,26 @@ dependencies {
 ```
 
 配置完以后，sync一下，再编译即可。
+
+### OpenHarmony 端接入
+可以从 [release](https://github.com/Tencent/libpag/releases) 页面下载预编译的 har，或者通过 OHPM 将 libpag 添加到您的项目中：
+
+```
+ohpm install @tencent/libpag
+```
+
+或者可以手动将其添加到您的项目中。
+将以下几行添加到应用模块上的 oh-package.json5
+
+```
+"dependencies": {
+"@tencent/libpag": "^1.0.1",
+}
+```
+Then run
+```
+ohpm install
+```
 
 ### Web 端接入
 

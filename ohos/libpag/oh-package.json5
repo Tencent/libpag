@@ -1,12 +1,21 @@
 {
-  "name": "libpag",
-  "version": "1.0.0",
-  "description": "Please describe the basic information.",
+  "name": "@tencent/libpag",
+  "version": "1.0.1",
+  "description": "libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both vector-based and raster-based animations across most platforms, such as iOS, Android, OpenHarmony, macOS, Windows, Linux, and Web.",
   "main": "Index.ets",
-  "author": "",
+  "author": "libpag",
   "license": "Apache-2.0",
   "packageType": "InterfaceHar",
   "dependencies": {
     "libpag.so": "file:./src/main/cpp/types/libpag"
   },
+  "repository": "https://github.com/Tencent/libpag",
+  "homepage": "https://pag.art",
+  "keywords": [
+    "libpag",
+    "pag",
+    "animation",
+    "after-effects",
+    "keyframes"
+  ]
 }
