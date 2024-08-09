@@ -16,27 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+import { JPAGDiskCache } from 'libpag.so';
 
-#include "platform/Platform.h"
+/**
+ * Defines methods to manage the disk cache capabilities.
+ */
+export class PAGDiskCache {
+  /**
+   * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
+   */
+  static MaxDiskSize(): number {
+    return JPAGDiskCache.MaxDiskSize();
+  }
 
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+  /**
+   * Sets the size limit of the disk cache in bytes, which will triggers the cache cleanup if the
+   * disk usage exceeds the limit. The opened files are not removed immediately, even if their
+   * disk usage exceeds the limit, and they will be rechecked after they are closed.
+   */
+  static SetMaxDiskSize(size: number): void {
+    JPAGDiskCache.SetMaxDiskSize(size);
+  }
 
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-  
-  void setCacheDir(const std::string& cacheDir);  
-  
- private:
-  std::string cacheDir = "";  
-};
-}  // namespace pag
+  /**
+   * Removes all cached files from the disk. All the opened files will be also removed after they
+   * are closed.
+   */
+  static RemoveAll(): void {
+    JPAGDiskCache.RemoveAll();
+  }
+}
