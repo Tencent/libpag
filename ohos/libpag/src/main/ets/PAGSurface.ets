@@ -35,6 +35,15 @@ export class PAGSurface {
     }
   }
 
+  static MakeSurface(surfaceId: number, width:number, height:number): PAGSurface | null {
+    let nativeSurface = JPAGSurface.MakeSurface(surfaceId, width, height);
+    if (nativeSurface == null) {
+      return null;
+    } else {
+      return new PAGSurface(nativeSurface);
+    }
+  }
+
   /**
    * The width of surface in pixels.
    */
