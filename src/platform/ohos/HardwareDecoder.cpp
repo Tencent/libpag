@@ -60,11 +60,11 @@ void OH_AVCodecOnNewOutputBuffer(OH_AVCodec*, uint32_t index, OH_AVBuffer* buffe
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   videoFormat = format;
   isValid = initDecoder(codecCategory);
-//   if (!isValid) {
-//     codecCategory = SOFTWARE;
-//     LOGI("Fall back to the software decoder!");
-//     isValid = initDecoder(codecCategory);
-//   }
+  //   if (!isValid) {
+  //     codecCategory = SOFTWARE;
+  //     LOGI("Fall back to the software decoder!");
+  //     isValid = initDecoder(codecCategory);
+  //   }
 }
 
 HardwareDecoder::~HardwareDecoder() {
