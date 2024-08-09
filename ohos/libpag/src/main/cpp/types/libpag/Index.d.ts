@@ -388,3 +388,11 @@ export declare class JPAGText {
 export declare class JPAG {
   static SDKVersion(): string;
 }
+
+export declare class JPAGDiskCache {
+  static MaxDiskSize(): number;
+
+  static SetMaxDiskSize(diskSize: number): void;
+
+  static RemoveAll(): void;
+}

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
+
 #include "platform/ohos/HardwareDecoder.h"
 #include "platform/ohos/NativeDisplayLink.h"
 
@@ -62,8 +63,7 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
 }
 
 std::string NativePlatform::getCacheDir() const {
-  // todo: kevingpqi
-  return "";
+  return this->cacheDir;
 }
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
@@ -72,6 +72,10 @@ std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
     return nullptr;
   }
   return std::make_shared<NativeDisplayLink>(callback);
+}
+
+void NativePlatform::setCacheDir(const std::string& cacheDir) {
+    this->cacheDir = cacheDir;
 }
 
 }  // namespace pag
