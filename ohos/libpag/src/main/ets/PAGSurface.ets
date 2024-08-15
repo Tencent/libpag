@@ -35,8 +35,8 @@ export class PAGSurface {
     }
   }
 
-  static MakeSurface(surfaceId: number, width:number, height:number): PAGSurface | null {
-    let nativeSurface = JPAGSurface.MakeSurface(surfaceId, width, height);
+  static FromSurfaceID(surfaceId: number, width:number, height:number): PAGSurface | null {
+    let nativeSurface = JPAGSurface.FromSurfaceID(surfaceId, width, height);
     if (nativeSurface == null) {
       return null;
     } else {

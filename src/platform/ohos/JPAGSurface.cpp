@@ -105,7 +105,7 @@ static napi_value MakeOffscreen(napi_env env, napi_callback_info info) {
   return JPAGSurface::ToJs(env, PAGSurface::MakeOffscreen(x, y));
 }
 
-static napi_value MakeSurface(napi_env env, napi_callback_info info) {
+static napi_value FromSurfaceID(napi_env env, napi_callback_info info) {
   size_t argc = 3;
   napi_value args[3];
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
@@ -162,7 +162,7 @@ napi_value JPAGSurface::Constructor(napi_env env, napi_callback_info info) {
 bool JPAGSurface::Init(napi_env env, napi_value exports) {
   static const napi_property_descriptor classProp[] = {
       PAG_STATIC_METHOD_ENTRY(MakeOffscreen, MakeOffscreen),
-      PAG_STATIC_METHOD_ENTRY(MakeSurface, MakeSurface),
+      PAG_STATIC_METHOD_ENTRY(FromSurfaceID, FromSurfaceID),
       PAG_DEFAULT_METHOD_ENTRY(width, Width),
       PAG_DEFAULT_METHOD_ENTRY(height, Height),
       PAG_DEFAULT_METHOD_ENTRY(updateSize, UpdateSize),
