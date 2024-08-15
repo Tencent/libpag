@@ -319,6 +319,8 @@ export declare class JPAGView {
   freeCache();
 
   makeSnapshot(): image.PixelMap | null;
+
+  release();
 }
 
 export declare class JPAGFont {
