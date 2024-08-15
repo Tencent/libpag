@@ -281,36 +281,6 @@ export declare class JPAGSurface {
   makeSnapshot(): image.PixelMap | null;
 }
 
-export declare class JPAGAnimator {
-
-  duration(): number;
-
-  setDuration(duration: number): void;
-
-  progress(): number;
-
-  setProgress(progress: number): void;
-
-  repeatCount(): number;
-
-  setRepeatCount(repeatCount: number): void;
-
-  isRunning(): boolean;
-
-  start(): void;
-
-  cancel(): void;
-
-  update(): void;
-
-  setStateChangeCallback(callback: (number) => void): void;
-
-  setProgressUpdateCallback(callback: (double) => void): void;
-
-  setSync(isSync: boolean): void;
-
-}
-
 export declare class JPAGView {
   flush(): void;
 

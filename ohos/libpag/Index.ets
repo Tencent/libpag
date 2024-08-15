@@ -18,8 +18,6 @@
 
 export { PAGView, PAGViewListener } from './src/main/ets/PAGView'
 
-export { PAGAnimator, PAGAnimatorListener } from './src/main/ets/PAGAnimator';
-
 export { PAGPlayer } from './src/main/ets/PAGPlayer'
 
 export { PAGSurface } from './src/main/ets/PAGSurface'
