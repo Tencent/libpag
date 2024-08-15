@@ -19,7 +19,7 @@
 #include "GPUDrawable.h"
 
 namespace pag {
-NSString* const kAsyncSurfacePreparedNotification = @"pag.art.AsyncSurfacePrepared";
+NSString* const kAsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
 
 std::shared_ptr<GPUDrawable> GPUDrawable::FromLayer(CAEAGLLayer* layer) {
   if (layer == nil) {

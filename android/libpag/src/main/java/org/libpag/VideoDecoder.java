@@ -6,7 +6,7 @@ public abstract class VideoDecoder {
 
     /**
      * Register a software decoder factory to implement the decoder fallback mechanism.
-     * For further info please visit : https://pag.art/docs/plugin-decoder.html
+     * For further info please visit : https://github.com/libpag/ffavc
      */
     public static native void RegisterSoftwareDecoderFactory(long factory);
 
