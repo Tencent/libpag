@@ -123,18 +123,22 @@ export struct PAGView {
 
   build() {
     XComponent({
-      id: this.controller.uniqueID(),
-      type: "surface",
+      id: this.controller?.uniqueID(),
+      type: XComponentType.SURFACE,
       libraryname: "pag",
     })
       .onLoad(() => {
-        this.initView();
+        if (this.isPlaying) {
+          this.controller?.play();
+        } else {
+          this.controller?.flush();
+        }
       })
       .backgroundColor(Color.Transparent)
   }
 
   flush(): void {
-    this.controller.flush();
+    this.controller?.flush();
   }
 
   /**
@@ -167,14 +171,14 @@ export struct PAGView {
    * The point is in pixels not dp.
    */
   getLayersUnderPoint(x: number, y: number): Array<PAGLayer> {
-    return PAGUtils.WarpJPAGLayers(this.controller.getLayersUnderPoint(x, y));
+    return this.controller ? PAGUtils.WarpJPAGLayers(this.controller.getLayersUnderPoint(x, y)) : [];
   }
 
   /**
    * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
    */
   freeCache(): void {
-    this.controller.freeCache();
+    this.controller?.freeCache();
   }
 
   /**
@@ -182,7 +186,7 @@ export struct PAGView {
    * PAGView will not be captured. Returns null if the PAGView hasn't been presented yet.
    */
   makeSnapshot(): image.PixelMap | null {
-    return this.controller.makeSnapshot();
+    return this.controller ? this.controller.makeSnapshot() : null;
   }
 
   onPageShow(): void {
@@ -192,33 +196,36 @@ export struct PAGView {
     this.flush();
   }
 
+  aboutToAppear(): void {
+    this.initView();
+  }
+
+  aboutToDisappear(): void {
+    this.controller?.release();
+    this.controller = null;
+  }
+
   private initView() {
     PAGInit.Init();
-    this.controller.setStateChangeCallback(this.onAnimatorStateChange);
-    this.controller.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
-
-    this.controller.setComposition(this.composition?.getNativeComposition());
-    this.controller.setProgress(this.progress);
-    this.controller.setRepeatCount(this.repeatCount)
-    this.controller.setSync(this.isSync);
-    this.controller.setVideoEnabled(this.videoEnabled);
-    this.controller.setCacheEnabled(this.cacheEnabled);
-    this.controller.setCacheScale(this.cacheScale);
-    this.controller.setMaxFrameRate(this.maxFrameRate);
+    this.controller?.setStateChangeCallback(this.onAnimatorStateChange);
+    this.controller?.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
+    this.controller?.setComposition(this.composition?.getNativeComposition());
+    this.controller?.setProgress(this.progress);
+    this.controller?.setRepeatCount(this.repeatCount)
+    this.controller?.setSync(this.isSync);
+    this.controller?.setVideoEnabled(this.videoEnabled);
+    this.controller?.setCacheEnabled(this.cacheEnabled);
+    this.controller?.setCacheScale(this.cacheScale);
+    this.controller?.setMaxFrameRate(this.maxFrameRate);
     if (PAGUtils.IsEmptyMatrix(this.matrix)) {
-      this.controller.setScaleMode(this.scaleMode);
+      this.controller?.setScaleMode(this.scaleMode);
     } else {
-      this.controller.setMatrix(PAGUtils.ToNativeMatrix(this.matrix));
-    }
-    if (this.isPlaying) {
-      this.controller.play();
-    } else {
-      this.controller.flush();
+      this.controller?.setMatrix(PAGUtils.ToNativeMatrix(this.matrix));
     }
   }
 
   private onCompositionChange() {
-    this.controller.setComposition(this.composition?.getNativeComposition());
+    this.controller?.setComposition(this.composition?.getNativeComposition());
     if (!this.isPlaying) {
       this.flush()
     }
@@ -226,52 +233,52 @@ export struct PAGView {
 
   private onPlayStateChange() {
     if (this.isPlaying) {
-      this.controller.play();
+      this.controller?.play();
     } else {
-      this.controller.pause();
+      this.controller?.pause();
     }
   }
 
   private onRepeatCountChange() {
-    this.controller.setRepeatCount(this.repeatCount);
+    this.controller?.setRepeatCount(this.repeatCount);
   }
 
   private onProgressChange() {
     if (this.progress == this.nativeProgress) {
       return;
     }
-    this.controller.setProgress(this.progress);
+    this.controller?.setProgress(this.progress);
     if (!this.isPlaying) {
       this.flush()
     }
   }
 
   private OnSyncChange() {
-    this.controller.setSync(this.isSync);
+    this.controller?.setSync(this.isSync);
   }
 
   private OnVideoEnabledChange() {
-    this.controller.setVideoEnabled(this.videoEnabled);
+    this.controller?.setVideoEnabled(this.videoEnabled);
   }
 
   private OnCacheEnabledChange() {
-    this.controller.setCacheEnabled(this.cacheEnabled);
+    this.controller?.setCacheEnabled(this.cacheEnabled);
   }
 
   private OnCacheScaleChange() {
-    this.controller.setCacheScale(this.cacheScale);
+    this.controller?.setCacheScale(this.cacheScale);
   }
 
   private OnMaxFrameRateChange() {
-    this.controller.setMaxFrameRate(this.maxFrameRate);
+    this.controller?.setMaxFrameRate(this.maxFrameRate);
   }
 
   private OnScaleModeChange() {
-    this.controller.setScaleMode(this.scaleMode);
+    this.controller?.setScaleMode(this.scaleMode);
   }
 
   private OnMatrixChange() {
-    this.controller.setMatrix(PAGUtils.ToNativeMatrix(this.matrix))
+    this.controller?.setMatrix(PAGUtils.ToNativeMatrix(this.matrix))
   }
 
   private onAnimationStart() {
@@ -314,7 +321,7 @@ export struct PAGView {
   }
 
   private nativeProgress: number = 0.0;
-  private controller: JPAGView = new JPAGView();
+  private controller: JPAGView | null = new JPAGView();
   private onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case PAGAnimatorState.Start:
