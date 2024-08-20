@@ -29,12 +29,10 @@ class JPAGView : public PAGAnimator::Listener {
     return "JPAGView";
   }
 
-  explicit JPAGView(const std::string& id) : player(new PAGPlayer()), id(std::move(id)) {
+  explicit JPAGView(const std::string& id) : id(std::move(id)), player(new PAGPlayer()) {
   }
-  virtual ~JPAGView() {
-    napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
-    napi_release_threadsafe_function(playingStateCallback, napi_tsfn_abort);
-  }
+
+  virtual ~JPAGView();
 
   void onAnimationStart(PAGAnimator*) override;
 
@@ -46,13 +44,21 @@ class JPAGView : public PAGAnimator::Listener {
 
   void onAnimationUpdate(PAGAnimator* animator) override;
 
-  std::unique_ptr<PAGPlayer> player = nullptr;
+  void release();
+
+  std::shared_ptr<PAGPlayer> getPlayer();
+
+  std::shared_ptr<PAGAnimator> getAnimator();
+
   std::string id;
-  std::shared_ptr<PAGAnimator> animator = nullptr;
-  napi_threadsafe_function progressCallback;
-  napi_threadsafe_function playingStateCallback;
+
+  napi_threadsafe_function progressCallback = nullptr;
+  napi_threadsafe_function playingStateCallback = nullptr;
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<PAGPlayer> player;
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::mutex locker;
 };
 }  // namespace pag
