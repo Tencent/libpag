@@ -23,6 +23,7 @@
 #include "platform/ohos/JPAGDiskCache.h"
 #include "platform/ohos/JPAGFont.h"
 #include "platform/ohos/JPAGImage.h"
+#include "platform/ohos/JPAGImageView.h"
 #include "platform/ohos/JPAGLayerHandle.h"
 #include "platform/ohos/JPAGPlayer.h"
 #include "platform/ohos/JPAGSurface.h"
@@ -64,7 +65,8 @@ static napi_value Init(napi_env env, napi_value exports) {
                 pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
                 pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
                 pag::JPAGText::Init(env, exports) && pag::JPAGImage::Init(env, exports) &&
-                pag::JPAGView::Init(env, exports) && pag::JPAGDiskCache::Init(env, exports);
+                pag::JPAGView::Init(env, exports) && pag::JPAGImageView::Init(env, exports) &&
+                pag::JPAGDiskCache::Init(env, exports);
   if (!result) {
     LOGE("PAG InitFailed");
   }

@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGSurface.h"
+#include <ace/xcomponent/native_interface_xcomponent.h>
 #include <cstdint>
 #include "JsHelper.h"
+#include "base/utils/Log.h"
+#include "platform/ohos/GPUDrawable.h"
+#include "platform/ohos/JPAGLayerHandle.h"
 
 namespace pag {
 

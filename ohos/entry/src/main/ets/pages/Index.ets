@@ -24,7 +24,7 @@ struct Index {
   @State message: string = "";
   @State @Watch("updateMessage") stateString: string = "";
   @State composition: pag.PAGComposition | null = null;
-  @State @Watch("updateMessage") progress: number = 0;
+  @State @Watch("updateMessage") currentFrame: number = 0;
   @State isPlaying: boolean = false;
   @State repeatCount: number = 1;
 
@@ -35,31 +35,31 @@ struct Index {
     this.isPlaying = true;
   }
 
-  onAnimationStart = (view: pag.PAGView) => {
+  onAnimationStart = (view: pag.PAGImageView) => {
     this.stateString = 'PAG start';
   }
-  onAnimationEnd = (view: pag.PAGView) => {
+  onAnimationEnd = (view: pag.PAGImageView) => {
     this.stateString = `PAG end`;
   }
-  onAnimationRepeat = (view: pag.PAGView) => {
+  onAnimationRepeat = (view: pag.PAGImageView) => {
     this.stateString = `PAG repeat`;
   }
-  onAnimationCancel = (view: pag.PAGView) => {
+  onAnimationCancel = (view: pag.PAGImageView) => {
     this.stateString = `PAG cancel`;
   }
-  onAnimationUpdate = (view: pag.PAGView) => {
+  onAnimationUpdate = (view: pag.PAGImageView) => {
   }
 
   updateMessage() {
-    this.message = this.stateString + ` progress ${this.progress.toFixed(2)}`;
+    this.message = this.stateString + ` currentFrame ${this.currentFrame}`;
   }
 
   build() {
     Row() {
       Column() {
-        pag.PAGView({
-          composition: this.composition,
-          progress: this.progress,
+        pag.PAGImageView({
+          content: this.composition,
+          currentFrame: this.currentFrame,
           isPlaying: this.isPlaying,
           repeatCount: this.repeatCount,
           listeners: [new WeakRef(this)]
@@ -73,7 +73,7 @@ struct Index {
           .fontSize(50)
           .fontWeight(FontWeight.Bold)
           .onClick(() => {
-            this.progress = 0.5;
+            this.currentFrame = 4;
             this.repeatCount = 0;
           })
           .height('50%')

@@ -47,3 +47,5 @@ export { PAGVideoRange } from './src/main/ets/PAGVideoRange'
 export { PAG } from './src/main/ets/PAG'
 
 export { PAGDiskCache } from './src/main/ets/PAGDiskCache'
+
+export {PAGImageView} from './src/main/ets/PAGImageView'

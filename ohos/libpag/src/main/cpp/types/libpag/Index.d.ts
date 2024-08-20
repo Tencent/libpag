@@ -396,3 +396,36 @@ export declare class JPAGDiskCache {
 
   static RemoveAll(): void;
 }
+
+export declare class JPAGImageView {
+  flush(): void;
+
+  setCurrentFrame(progress: number): void;
+
+  setComposition(composition: JPAGComposition | null): void;
+
+  setRepeatCount(repeatCount: number): void;
+
+  play(): void;
+
+  pause(): void;
+
+  setStateChangeCallback(callback: (number) => void): void;
+
+  setProgressUpdateCallback(callback: (double) => void): void;
+
+  uniqueID(): string;
+
+  setRenderScale(renderScale: number): void;
+
+  setMaxFrameRate(maxFrameRate: number): void;
+
+  setScaleMode(scaleMode: number): void;
+
+  setMatrix(matrix: Array<number>);
+
+  currentFrame(): number;
+
+  numFrames(): number;
+
+}
