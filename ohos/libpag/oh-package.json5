@@ -10,7 +10,7 @@
     "libpag.so": "file:./src/main/cpp/types/libpag"
   },
   "repository": "https://github.com/Tencent/libpag",
-  "homepage": "https://pag.art",
+  "homepage": "https://pag.io",
   "keywords": [
     "libpag",
     "pag",

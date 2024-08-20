@@ -7,7 +7,7 @@
 [![build](https://github.com/Tencent/libpag/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
+English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
 ## Introduction
 
@@ -17,7 +17,7 @@ Windows, Linux, and Web.
 
 PAG is an open-source file format for recording animations. PAG files can be created and exported
 from Adobe After Effects with the PAGExporter plugin and previewed in the PAGViewer app, which you
-can get from [pag.art](https://pag.art), and both of them are available on both macOS and Windows.
+can get from [pag.io](https://pag.io), and both of them are available on both macOS and Windows.
 
 PAG is now being used by 40+ Tencent apps, such as WeChat, Mobile QQ, Honor of Kings Mobile Game,
 Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
@@ -160,7 +160,7 @@ Simply copy the following code into an HTML file and open it in your browser:
 <script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
 <script>
   window.libpag.PAGInit().then((PAG) => {
-    const url = 'https://pag.art/file/like.pag';
+    const url = 'https://pag.io/file/like.pag';
     fetch(url)
       .then((response) => response.blob())
       .then(async (blob) => {
@@ -183,11 +183,11 @@ Check out the following projects to learn how to use the APIs of libpag:
 
 ### Documentation
 
-- [iOS API Reference](https://pag.art/apis/ios/index.html)
-- [Android API Reference](https://pag.art/apis/android/index.html)
-- [Web API Reference](https://pag.art/apis/web/index.html)
+- [iOS API Reference](https://pag.io/apis/ios/index.html)
+- [Android API Reference](https://pag.io/apis/android/index.html)
+- [Web API Reference](https://pag.io/apis/web/index.html)
 
-You can find other docs on [pag.art](https://pag.art/docs/mobile-sdk-guide.html)
+You can find other docs on [pag.io](https://pag.io/docs/mobile-sdk-guide.html)
 
 ## Development
 
