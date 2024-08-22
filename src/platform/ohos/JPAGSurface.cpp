@@ -106,24 +106,15 @@ static napi_value MakeOffscreen(napi_env env, napi_callback_info info) {
 }
 
 static napi_value FromSurfaceID(napi_env env, napi_callback_info info) {
-  size_t argc = 3;
-  napi_value args[3];
+  size_t argc = 1;
+  napi_value args[1];
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   int64_t surfaceId = 0;
   napi_get_value_int64(env, args[0], &surfaceId);
-  int32_t width = 0;
-  napi_get_value_int32(env, args[1], &width);
-  int32_t height = 0;
-  napi_get_value_int32(env, args[2], &height);
   OHNativeWindow* window = nullptr;
   int ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window);
   if (ret != 0) {
     LOGE("Could not Create Native Window From Surface Id:%lld", surfaceId);
-    return nullptr;
-  }
-  ret = OH_NativeWindow_NativeWindowHandleOpt(window, SET_BUFFER_GEOMETRY, width, height);
-  if (ret != 0) {
-    LOGE("Could not Set Native Window width:%ld, height:%ld", width, height);
     return nullptr;
   }
   auto drawable = pag::GPUDrawable::FromWindow(window);

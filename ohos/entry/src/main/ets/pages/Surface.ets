@@ -16,35 +16,28 @@ struct Surface {
 
   private initPlayer() {
     let file = PAGFile.LoadFromAssets(getContext(this).resourceManager, "PAG_LOGO.pag");
-    let surface = PAGSurface.FromSurfaceID(Number.parseInt(this.surfaceId), file!.width(), file!.height());
+    let surface = PAGSurface.FromSurfaceID(Number.parseInt(this.surfaceId));
     this.player.setSurface(surface);
     this.player.setComposition(file);
     this.player.prepare();
     this.isPlaying = true;
     this.animator = new ValueAnimator(0, 1, this.player.duration());
-    // this.animator.addListener(new WeakRef(this));
     this.animator.addAnimatorListener({
       onAnimationStart: () => {
         this.stateString = 'PAG start';
-
       },
       onAnimationEnd: () => {
         this.stateString = `PAG end`;
-
       },
       onAnimationCancel: () => {
         this.stateString = `PAG cancel`;
-
       },
       onAnimationRepeat: () => {
         this.stateString = `PAG repeat`;
-
       },
       onAnimationPause: () => {
-
       },
       onAnimationResume: () => {
-
       },
     });
     this.animator.addUpdateListener((progress:number) => {
@@ -113,14 +106,12 @@ class ValueAnimator {
   private startValue: number;
   private endValue: number;
   private startTime: number = 0;
-  private pauseTime: number = 0;
   private interpolator: (input: number) => number;
   private updateListener?: (animatedValue: number) => void;
   private animatorListener?: AnimatorListener;
 
   private repeatCount: number = 0;
   private currentRepeat: number = 0;
-  private paused: boolean = false;
   private running: boolean = false;
 
   backDisplaySync: displaySync.DisplaySync = displaySync.create();
@@ -177,30 +168,6 @@ class ValueAnimator {
     this.running = true;
   }
 
-  pause(): void {
-    if (!this.paused) {
-      this.paused = true;
-      this.pauseTime = Date.now();
-      this.backDisplaySync.stop();
-      if (this.animatorListener?.onAnimationPause) {
-        this.animatorListener.onAnimationPause();
-      }
-    }
-  }
-
-  resume(): void {
-    if (this.paused) {
-      this.paused = false;
-      if (this.pauseTime !== null && this.startTime !== null) {
-        this.startTime += Date.now() - this.pauseTime;
-      }
-      this.backDisplaySync.start();
-      if (this.animatorListener?.onAnimationResume) {
-        this.animatorListener.onAnimationResume();
-      }
-    }
-  }
-
   cancel(): void {
     if (this.animatorListener?.onAnimationCancel) {
       this.animatorListener.onAnimationCancel();
@@ -208,7 +175,6 @@ class ValueAnimator {
     this.backDisplaySync.stop();
     this.backDisplaySync.off("frame", this.animate.bind(this));
     this.startTime = 0;
-    this.paused = false;
   }
 
   private animate(frameInfo: displaySync.IntervalInfo): void {

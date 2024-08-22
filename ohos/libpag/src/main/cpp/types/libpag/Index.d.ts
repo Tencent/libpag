@@ -268,7 +268,7 @@ export declare class JPAGPlayer {
 export declare class JPAGSurface {
   static MakeOffscreen(width: number, height: number): JPAGSurface | null;
 
-  static FromSurfaceID(surfaceId:number, width:number, height:number): JPAGSurface | null;
+  static FromSurfaceID(surfaceId:number): JPAGSurface | null;
 
   width(): number;
 
