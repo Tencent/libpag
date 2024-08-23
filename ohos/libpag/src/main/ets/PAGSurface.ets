@@ -73,6 +73,13 @@ export class PAGSurface {
   }
 
   /**
+   * Update the size of the surface. This method should be called when the size of the surface is changed.
+   */
+  updateSize(): void {
+    this.nativeSurface.updateSize();
+  }
+
+  /**
    * Returns a bitmap capturing the contents of the PAGSurface. Subsequent rendering of the
    * PAGSurface will not be captured.
    */
