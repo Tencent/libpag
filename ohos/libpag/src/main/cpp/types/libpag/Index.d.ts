@@ -278,6 +278,8 @@ export declare class JPAGSurface {
 
   freeCache(): void;
 
+  updateSize(): void;
+
   makeSnapshot(): image.PixelMap | null;
 }
 
