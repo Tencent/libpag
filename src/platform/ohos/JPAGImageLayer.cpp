@@ -102,7 +102,7 @@ static napi_value ImageBytes(napi_env env, napi_callback_info info) {
 
 bool JPAGLayerHandle::InitPAGImageLayerEnv(napi_env env, napi_value exports) {
   napi_property_descriptor classProp[] = {
-      PAG_DEFAULT_METHOD_ENTRY(Make, Make),
+      PAG_STATIC_METHOD_ENTRY(Make, Make),
       PAG_DEFAULT_METHOD_ENTRY(getVideoRanges, GetVideoRanges),
       PAG_DEFAULT_METHOD_ENTRY(setImage, SetImage),
       PAG_DEFAULT_METHOD_ENTRY(contentDuration, ContentDuration),
