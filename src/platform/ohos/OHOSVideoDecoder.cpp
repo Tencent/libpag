@@ -260,7 +260,7 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       }
       yBufferSize = videoStride * videoSliceHeight;
       uvBufferSize = codecBufferInfo.attr.size - yBufferSize;
-      yuvBuffer = std::make_unique<pag::YUVBuffer>();
+      yuvBuffer = std::make_shared<pag::YUVBuffer>();
       yuvBuffer->data[0] = new uint8_t[yBufferSize];
       yuvBuffer->data[1] = new uint8_t[uvBufferSize];
       yuvBuffer->lineSize[0] = videoStride;
