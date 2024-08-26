@@ -63,9 +63,13 @@ class CodecUserData {
   }
 };
 
-class HardwareDecoder : public VideoDecoder {
+class OHOSVideoDecoder : public VideoDecoder {
  public:
-  ~HardwareDecoder() override;
+  static std::unique_ptr<OHOSVideoDecoder> MakeHardwareDecoder(const VideoFormat& format);
+
+  static std::shared_ptr<OHOSVideoDecoder> MakeSoftwareDecoder(const VideoFormat& format);
+
+  ~OHOSVideoDecoder() override;
 
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
@@ -89,13 +93,13 @@ class HardwareDecoder : public VideoDecoder {
   OH_AVCodecCategory codecCategory = HARDWARE;
   int videoStride = 0;
   int videoSliceHeight = 0;
+  std::shared_ptr<pag::YUVBuffer> yuvBuffer = nullptr;
   int64_t yBufferSize = 0;
   int64_t uvBufferSize = 0;
-  YUVBuffer yuvBuffer{};
-  explicit HardwareDecoder(const VideoFormat& format);
+  std::weak_ptr<OHOSVideoDecoder> weakThis;
+
+  explicit OHOSVideoDecoder(const VideoFormat& format, bool hardware);
   bool initDecoder(const OH_AVCodecCategory avCodecCategory);
   bool start();
-
-  friend class HardwareDecoderFactory;
 };
 }  // namespace pag

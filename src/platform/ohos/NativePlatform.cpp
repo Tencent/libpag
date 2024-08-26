@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-#include "platform/ohos/HardwareDecoder.h"
 #include "platform/ohos/NativeDisplayLink.h"
+#include "platform/ohos/OHOSSoftwareDecoderWrapper.h"
 
 namespace pag {
 class HardwareDecoderFactory : public VideoDecoderFactory {
@@ -29,16 +29,25 @@ class HardwareDecoderFactory : public VideoDecoderFactory {
 
  protected:
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
-    auto decoder = new HardwareDecoder(format);
-    if (!decoder->isValid) {
-      delete decoder;
-      return nullptr;
-    }
-    return std::unique_ptr<VideoDecoder>(decoder);
+    return OHOSVideoDecoder::MakeHardwareDecoder(format);
+  }
+};
+
+class OHOSSoftwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return false;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = OHOSVideoDecoder::MakeSoftwareDecoder(format);
+    return OHOSSoftwareDecoderWrapper::Wrap(decoder);
   }
 };
 
 static HardwareDecoderFactory hardwareDecoderFactory = {};
+static OHOSSoftwareDecoderFactory softwareDecoderFactory = {};
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
@@ -46,7 +55,8 @@ const Platform* Platform::Current() {
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
-  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+  return {&hardwareDecoderFactory, &softwareDecoderFactory,
+          VideoDecoderFactory::ExternalDecoderFactory(),
           VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
