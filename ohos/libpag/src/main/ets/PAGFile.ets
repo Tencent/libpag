@@ -51,7 +51,7 @@ export enum PAGTimeStretchMode {
 }
 
 export class PAGFile extends PAGComposition {
-  static hasRegistered: boolean = false;
+  private static hasRegistered: boolean = false;
 
   constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
