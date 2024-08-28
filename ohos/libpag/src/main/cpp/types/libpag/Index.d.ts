@@ -395,6 +395,8 @@ export declare class JPAGDiskCache {
   static SetMaxDiskSize(diskSize: number): void;
 
   static RemoveAll(): void;
+
+  static SetCacheDir(dir: string): void;
 }
 
 export declare class JPAGImageView {
@@ -420,12 +422,11 @@ export declare class JPAGImageView {
 
   setMaxFrameRate(maxFrameRate: number): void;
 
-  setScaleMode(scaleMode: number): void;
-
-  setMatrix(matrix: Array<number>);
-
   currentFrame(): number;
 
   numFrames(): number;
 
+  currentImage(): image.PixelMap | null;
+
+  release();
 }

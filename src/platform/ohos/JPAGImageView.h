@@ -33,6 +33,7 @@ class JPAGImageView : public PAGAnimator::Listener {
 
   explicit JPAGImageView(const std::string& id) : id(std::move(id)) {
   }
+
   virtual ~JPAGImageView() {
     napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
     napi_release_threadsafe_function(playingStateCallback, napi_tsfn_abort);
@@ -48,30 +49,36 @@ class JPAGImageView : public PAGAnimator::Listener {
 
   void onAnimationUpdate(PAGAnimator* animator) override;
 
+  void release();
+
   std::shared_ptr<PAGDecoder> getDecoder();
 
-  void updateDecoder();
-  void invalidSize();
+  std::shared_ptr<PAGAnimator> getAnimator();
 
-  HardwareBufferRef getRenderTarget();
+  void setTargetWindow(void* targetWindow);
+
+  void invalidDecoder();
+
+  void setCurrentFrame(Frame currentFrame);
+
+  void setComposition(std::shared_ptr<PAGComposition> composition);
 
   std::string id;
-  std::shared_ptr<PAGAnimator> animator = nullptr;
-  OHNativeWindow* window = nullptr;
-  std::shared_ptr<PAGComposition> composition = nullptr;
 
-  float cacheScale = 1.0f;
-  float frameRate = 30.0f;
   napi_threadsafe_function progressCallback = nullptr;
   napi_threadsafe_function playingStateCallback = nullptr;
 
-  Frame currentFrame = 0;
+  float cacheScale = 1.0f;
+  float frameRate = 30.0f;
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<PAGDecoder> getDecoderInternal();
+
   std::shared_ptr<PAGDecoder> _decoder = nullptr;
-  OHNativeWindowBuffer* windowBuffer = nullptr;
-  HardwareBufferRef buffer = nullptr;
-  int windowBufferFd = 0;
+  std::shared_ptr<PAGAnimator> _animator = nullptr;
+  OHNativeWindow* _window = nullptr;
+  std::shared_ptr<PAGComposition> _composition = nullptr;
+  std::mutex locker;
 };
 }  // namespace pag

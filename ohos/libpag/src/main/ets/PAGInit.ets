@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { font } from '@kit.ArkUI';
-import { JPAGFont } from 'libpag.so';
+import { JPAGDiskCache, JPAGFont } from 'libpag.so';
 
 export class PAGInit {
   static Init() {
@@ -25,6 +25,7 @@ export class PAGInit {
       return;
     }
     PAGInit.InitFontFallback();
+    PAGInit.InitCacheDir();
     PAGInit.hasInit = true;
   }
 
@@ -46,5 +47,10 @@ export class PAGInit {
       }
       JPAGFont.SetFallbackFontPaths(paths);
     }
+  }
+
+  private static InitCacheDir()
+  {
+    JPAGDiskCache.SetCacheDir(getContext().cacheDir);
   }
 }

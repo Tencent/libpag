@@ -61,7 +61,7 @@ export struct PAGImageView {
    * Note: If the composition is already added to another PAGView, it will be removed from the
    * previous PAGView.
    */
-  @Link @Watch("onContentChange") content: PAGComposition | string | null;
+  @Link @Watch("onCompositionChange") composition: PAGComposition | null;
   /**
    * Indicates whether this pag view is playing.
    */
@@ -90,35 +90,17 @@ export struct PAGImageView {
    */
   @Prop @Watch("OnMaxFrameRateChange") maxFrameRate: number = 60.0;
   /**
-   * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
-   * changes when this method is called.
-   */
-  @Prop @Watch("OnScaleModeChange") scaleMode: PAGScaleMode = PAGScaleMode.LetterBox;
-  /**
-   * Sets the transformation which will be applied to the composition. The scaleMode property
-   * will be set to PAGScaleMode::None when this method is called.
-   */
-  @Prop @Watch("OnMatrixChange") matrix: Matrix4 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  /**
    * listener will be sent events through the life of an animation,
    * such as start, repeat, and end. PAGView only holds a weak reference to the listener.
    */
   @State listeners: Array<WeakRef<PAGImageViewListener>> = [];
-  /**
-   * If set to true, the PAGImageView loads all image frames into the memory, which will
-   * significantly increase the rendering performance but may cost lots of additional memory. Set
-   * it to true if you prefer rendering speed over memory usage. If set to false, the PAGImageView
-   * loads only one image frame at a time into the memory. The default value is false.
-   */
-  @State cacheAllFramesInMemory: boolean = false;
-
 
   /**
    * Returns the number of frames in the PAGImageView in one loop. Note that the value may change
    * if the associated PAGComposition was modified.
    */
   numFrames(): number {
-    return this.controller.numFrames();
+    return this.controller ? this.controller.numFrames() : 0;
   }
 
   /**
@@ -126,11 +108,15 @@ export struct PAGImageView {
    * if the associated PAGComposition was modified.
    */
   currentImage(): PixelMap | null {
-    return null;
+    if (this.controller) {
+      return this.controller.currentImage();
+    } else {
+      return null;
+    }
   }
 
   flush() {
-    this.controller.flush();
+    this.controller?.flush();
   }
 
   getComposition(): PAGComposition | null {
@@ -146,84 +132,55 @@ export struct PAGImageView {
 
   private initView() {
     PAGInit.Init();
-    this.controller.setStateChangeCallback(this.onAnimatorStateChange);
-    this.controller.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
-    this.updateComposition();
-    this.controller.setCurrentFrame(this.currentFrame);
-    this.controller.setRepeatCount(this.repeatCount)
-    this.controller.setRenderScale(this.renderScale);
-    this.controller.setMaxFrameRate(this.maxFrameRate);
-    if (PAGUtils.IsEmptyMatrix(this.matrix)) {
-      this.controller.setScaleMode(this.scaleMode);
-    } else {
-      this.controller.setMatrix(PAGUtils.ToNativeMatrix(this.matrix));
-    }
+    this.controller?.setStateChangeCallback(this.onAnimatorStateChange);
+    this.controller?.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
+    this.controller?.setComposition(this.composition?.getNativeComposition());
+    this.controller?.setCurrentFrame(this.currentFrame);
+    this.controller?.setRepeatCount(this.repeatCount)
+    this.controller?.setRenderScale(this.renderScale);
+    this.controller?.setMaxFrameRate(this.maxFrameRate);
     if (this.isPlaying) {
-      this.controller.play();
+      this.controller?.play();
     } else {
-      this.controller.flush();
+      this.controller?.flush();
     }
   }
 
-  private onContentChange() {
-    this.updateComposition();
+  private onCompositionChange() {
+    this.controller?.setComposition(this.composition?.getNativeComposition());
     if (!this.isPlaying) {
       this.flush()
     }
   }
 
-  private updateComposition() {
-    if (this.content instanceof PAGComposition) {
-      this.composition = this.content;
-    } else if (this.content != null) {
-      this.composition = PAGFile.LoadFromPath(this.content)
-    } else {
-      this.composition = null;
-    }
-
-    if (this.composition != null) {
-      this.controller.setComposition(this.composition?.getNativeComposition());
-    } else {
-      this.controller.setComposition(null);
-    }
-  }
-
   private onPlayStateChange() {
     if (this.isPlaying) {
-      this.controller.play();
+      this.controller?.play();
     } else {
-      this.controller.pause();
+      this.controller?.pause();
     }
   }
 
   private onRepeatCountChange() {
-    this.controller.setRepeatCount(this.repeatCount);
+    this.controller?.setRepeatCount(this.repeatCount);
   }
 
   private onCurrentFrameChange() {
-    // if (this.currentFrame == this.nativeProgress) {
-    //   return;
-    // }
-    // this.controller.setProgress(this.progress);
-    // if (!this.isPlaying) {
-    //   this.flush()
-    // }
+    if (this.currentFrame == this.nativeFrame) {
+      return;
+    }
+    this.controller?.setCurrentFrame(this.currentFrame);
+    if (!this.isPlaying) {
+      this.flush()
+    }
   }
 
   private OnRenderScaleChange() {
-    this.controller.setRenderScale(this.renderScale);
+    this.controller?.setRenderScale(this.renderScale);
   }
 
   private OnMaxFrameRateChange() {
-    this.controller.setMaxFrameRate(this.maxFrameRate);
-  }
-
-  private OnScaleModeChange() {
-    this.controller.setScaleMode(this.scaleMode);
-  }
-
-  private OnMatrixChange() {
-    this.controller.setMatrix(PAGUtils.ToNativeMatrix(this.matrix))
+    this.controller?.setMaxFrameRate(this.maxFrameRate);
   }
 
   build() {
@@ -243,12 +200,13 @@ export struct PAGImageView {
   }
 
   aboutToAppear(): void {
+    this.controller = new JPAGImageView();
     this.initView();
   }
 
   aboutToDisappear(): void {
-    // this.controller?.release();
-    // this.controller = null;
+    this.controller?.release();
+    this.controller = null;
   }
 
   private onAnimationStart() {
@@ -289,10 +247,8 @@ export struct PAGImageView {
       }
     }
   }
-
-  private composition: PAGComposition | null = null;
-  private controller: JPAGImageView = new JPAGImageView();
-  private nativeProgress: number = 0;
+  private controller: JPAGImageView | null = null;
+  private nativeFrame: number = 0;
   private onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case PAGAnimatorState.Start:
@@ -305,9 +261,9 @@ export struct PAGImageView {
         return this.onAnimationRepeat();
     }
   }
-  private onAnimatorProgressUpdate = (progress: number): void => {
-    this.nativeProgress = progress;
-    this.currentFrame = progress;
+  private onAnimatorProgressUpdate = (frame: number): void => {
+    this.nativeFrame = frame;
+    this.currentFrame = frame;
     for (const weakListener of this.listeners) {
       const listener = weakListener.deref();
       if (listener && listener.onAnimationUpdate) {

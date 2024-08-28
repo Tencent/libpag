@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import * as pag from 'libpag';
+import { PAGDiskCache } from 'libpag';
 
 @Entry
 @Component
@@ -29,6 +30,7 @@ struct Index {
   @State repeatCount: number = 1;
 
   aboutToAppear(): void {
+    // PAGDiskCache.RemoveAll();
     let manager = getContext(this).resourceManager;
     let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
     this.composition = file as pag.PAGComposition;
@@ -58,12 +60,13 @@ struct Index {
     Row() {
       Column() {
         pag.PAGImageView({
-          content: this.composition,
+          composition: this.composition,
           currentFrame: this.currentFrame,
           isPlaying: this.isPlaying,
           repeatCount: this.repeatCount,
           listeners: [new WeakRef(this)]
         })
+          .width('100%')
           .height('50%')
           .onClick(() => {
             this.isPlaying = !this.isPlaying
