@@ -18,7 +18,6 @@
 
 import { JPAGView } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
-import { PAGInit } from "./PAGInit"
 import { PAGScaleMode } from './PAGScaleMode';
 import { PAGLayer } from './PAGLayer';
 import { image } from '@kit.ImageKit';
@@ -206,7 +205,6 @@ export struct PAGView {
   }
 
   private initView() {
-    PAGInit.Init();
     this.controller?.setStateChangeCallback(this.onAnimatorStateChange);
     this.controller?.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
     this.controller?.setComposition(this.composition?.getNativeComposition());

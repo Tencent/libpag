@@ -61,6 +61,8 @@ std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories
 }
 
 bool NativePlatform::registerFallbackFonts() const {
+  // Since it is not possible to call ArkTs code from C++, the registration of system fonts on the
+  // HarmonyOS platform is handled at the ArkTs code level.
   return false;
 }
 
