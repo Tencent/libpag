@@ -17,12 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { JPAGSurface } from 'libpag.so'
-import { PAGInit } from './PAGInit';
 import { image } from '@kit.ImageKit';
 
 export class PAGSurface {
   private constructor(nativeSurface: JPAGSurface) {
-    PAGInit.Init();
     this.nativeSurface = nativeSurface;
   }
 

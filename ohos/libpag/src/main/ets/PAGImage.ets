@@ -20,12 +20,10 @@ import { resourceManager } from '@kit.LocalizationKit';
 import { PAGUtils } from './private/PAGUtils';
 import { Matrix4 } from '@kit.ArkUI';
 import { PAGScaleMode } from './PAGScaleMode';
-import { PAGInit } from './PAGInit';
 import { JPAGImage } from 'libpag.so'
 
 export class PAGImage {
   private constructor(nativeImage: JPAGImage) {
-    PAGInit.Init();
     this.nativeImage = nativeImage;
   }
 
