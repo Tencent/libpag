@@ -20,6 +20,7 @@
 
 #include <multimedia/player_framework/native_avcapability.h>
 #include <multimedia/player_framework/native_avcodec_videodecoder.h>
+#include <native_buffer/native_buffer.h>
 #include <cstdint>
 #include <list>
 #include <queue>
@@ -97,6 +98,7 @@ class OHOSVideoDecoder : public VideoDecoder {
   int64_t yBufferSize = 0;
   int64_t uvBufferSize = 0;
   std::weak_ptr<OHOSVideoDecoder> weakThis;
+  OH_NativeBuffer_Config* config = nullptr;
 
   explicit OHOSVideoDecoder(const VideoFormat& format, bool hardware);
   bool initDecoder(const OH_AVCodecCategory avCodecCategory);

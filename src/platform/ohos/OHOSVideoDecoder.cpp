@@ -32,6 +32,8 @@
 namespace pag {
 #define NV12_PLANE_COUNT 2
 
+#define NativeBuffer_Copy true
+
 void OH_AVCodecOnError(OH_AVCodec*, int32_t, void*) {
 }
 
@@ -97,6 +99,9 @@ OHOSVideoDecoder::~OHOSVideoDecoder() {
   }
   if (codecUserData) {
     delete codecUserData;
+  }
+  if (config) {
+    delete config;
   }
 }
 
@@ -245,10 +250,48 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
   if (codecCategory == HARDWARE) {
     OH_NativeBuffer* hardwareBuffer = OH_AVBuffer_GetNativeBuffer(codecBufferInfo.buffer);
-    imageBuffer = tgfx::ImageBuffer::MakeFrom(hardwareBuffer, videoFormat.colorSpace);
+    if (NativeBuffer_Copy) {
+      if (config == nullptr) {
+        config = new OH_NativeBuffer_Config();
+        OH_NativeBuffer_GetConfig(hardwareBuffer, config);
+      }
+      OH_NativeBuffer* nativeBuffer = OH_NativeBuffer_Alloc(config);
+      void* dstPixels = nullptr;
+      auto result = OH_NativeBuffer_Map(nativeBuffer, &dstPixels);
+      if (result != 0) {
+        LOGE("-------OH_NativeBuffer_Map  failed--------");
+      }
+      void* srcPixels = nullptr;
+      result = OH_NativeBuffer_Map(hardwareBuffer, &srcPixels);
+      if (result != 0) {
+        LOGE("-------OH_NativeBuffer_Map  failed  11--------");
+      }
+      auto size = codecBufferInfo.attr.size;
+      if (size <= 0) {
+        return nullptr;
+      }
+      memcpy(dstPixels, srcPixels, size);
+      result = OH_NativeBuffer_Unmap(nativeBuffer);
+      if (result != 0) {
+        LOGE("-------OH_NativeBuffer_Unmap  failed  --------");
+      }
+      result = OH_NativeBuffer_Unmap(hardwareBuffer);
+      if (result != 0) {
+        LOGE("-------OH_NativeBuffer_Unmap  failed  11--------");
+      }
+
+      imageBuffer = tgfx::ImageBuffer::MakeFrom(nativeBuffer, videoFormat.colorSpace);
+
+      if (nativeBuffer) {
+        OH_NativeBuffer_Unreference(nativeBuffer);
+      }
+    } else {
+      imageBuffer = tgfx::ImageBuffer::MakeFrom(hardwareBuffer, videoFormat.colorSpace);
+    }
     if (hardwareBuffer) {
       OH_NativeBuffer_Unreference(hardwareBuffer);
     }
+
   } else {
     if (videoStride == 0) {
       OH_AVFormat* format = OH_VideoDecoder_GetOutputDescription(videoCodec);

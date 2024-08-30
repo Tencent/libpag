@@ -30,7 +30,7 @@ struct Index {
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
-    let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
+    let file = pag.PAGFile.LoadFromAssets(manager, "castle.pag");
     this.composition = file as pag.PAGComposition;
     this.isPlaying = true;
   }
