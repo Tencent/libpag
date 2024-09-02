@@ -21,7 +21,7 @@
 
 @class PAGImageView;
 
-@protocol PAGImageViewListener<NSObject>
+@protocol PAGImageViewListener <NSObject>
 
 @optional
 /**

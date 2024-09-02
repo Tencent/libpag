@@ -21,9 +21,7 @@
 #import "platform/cocoa/PAGComposition.h"
 #import "platform/ios/PAGDecoder.h"
 
-
 @interface PAGContentVersion : NSObject
 + (NSInteger)Get:(PAGComposition*)pagComposition;
 
 @end
-
