@@ -21,11 +21,7 @@
 #import "platform/cocoa/PAGComposition.h"
 #import "platform/ios/PAGDecoder.h"
 
-NS_ASSUME_NONNULL_BEGIN
-
 @interface PAGContentVersion : NSObject
 + (NSInteger)Get:(PAGComposition*)pagComposition;
 
 @end
-
-NS_ASSUME_NONNULL_END
