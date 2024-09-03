@@ -268,7 +268,7 @@ export declare class JPAGPlayer {
 export declare class JPAGSurface {
   static MakeOffscreen(width: number, height: number): JPAGSurface | null;
 
-  static FromSurfaceID(surfaceId:number): JPAGSurface | null;
+  static FromSurfaceID(surfaceId: number): JPAGSurface | null;
 
   width(): number;
 
@@ -391,4 +391,14 @@ export declare class JPAGText {
 
 export declare class JPAG {
   static SDKVersion(): string;
+}
+
+export declare class JPAGDiskCache {
+  static MaxDiskSize(): number;
+
+  static SetMaxDiskSize(size: number): void;
+
+  static RemoveAll(): void;
+
+  static SetCacheDir(path: string): void;
 }
