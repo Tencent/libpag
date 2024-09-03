@@ -32,7 +32,7 @@
 namespace pag {
 #define NV12_PLANE_COUNT 2
 
-#define NativeBuffer_Copy true
+#define NativeBuffer_Copy false
 
 void OH_AVCodecOnError(OH_AVCodec*, int32_t, void*) {
 }
