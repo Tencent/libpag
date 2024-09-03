@@ -112,7 +112,7 @@ ByteData* ReadMp4Header(DecodeStream* stream) {
   auto length = stream->readEncodedUint32();
   auto bytes = stream->readBytes(length);
   // must check whether the bytes is valid. otherwise memcpy will crash.
-  if (length == 0 || stream->context->hasException()) {
+  if (length == 0 || length > bytes.length() || stream->context->hasException()) {
     return nullptr;
   }
   auto data = new (std::nothrow) uint8_t[length];
