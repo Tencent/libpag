@@ -21,13 +21,20 @@
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 #include <native_buffer/native_buffer.h>
+#include <unistd.h>
 #include <cstdint>
+#include "base/utils/Log.h"
+#include "base/utils/TGFXCast.h"
 #include "base/utils/TimeUtil.h"
 #include "base/utils/UniqueID.h"
 #include "platform/ohos/GPUDrawable.h"
 #include "platform/ohos/JPAG.h"
 #include "platform/ohos/JPAGLayerHandle.h"
 #include "platform/ohos/JsHelper.h"
+#include "rendering/editing/StillImage.h"
+#include "rendering/utils/ApplyScaleMode.h"
+#include "tgfx/utils/Clock.h"
+#include "native_window/external_window.h"
 
 namespace pag {
 static int PAGViewStateStart = 0;
@@ -83,7 +90,7 @@ void OnImageViewSurfaceChangedCB(OH_NativeXComponent* component, void* window) {
   if (animator == nullptr) {
     return;
   }
-  view->invalidDecoder();
+  view->invalidSize(static_cast<OHNativeWindow*>(window));
 }
 
 void OnImageViewSurfaceDestroyedCB(OH_NativeXComponent* component, void* window) {
@@ -441,19 +448,16 @@ napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
 }
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoderInternal() {
-  if (_window == nullptr || _composition == nullptr) {
+  if (window == nullptr || _composition == nullptr) {
     _decoder = nullptr;
     return nullptr;
   }
   if (_decoder == nullptr) {
-    int width = 0;
-    int height = 0;
-    OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &height, &width);
     float scaleFactor = 1.0;
-    if (width >= height) {
-      scaleFactor = static_cast<float>(cacheScale * (width * 1.0 / _composition->width()));
+    if (_width >= _height) {
+      scaleFactor = static_cast<float>(cacheScale * (_width * 1.0 / _composition->width()));
     } else {
-      scaleFactor = static_cast<float>(cacheScale * (width * 1.0 / _composition->height()));
+      scaleFactor = static_cast<float>(cacheScale * (_height * 1.0 / _composition->height()));
     }
     _decoder = PAGDecoder::MakeFrom(_composition, frameRate, scaleFactor);
   }
@@ -547,16 +551,52 @@ void JPAGImageView::onAnimationUpdate(PAGAnimator* animator) {
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
   auto decoder = getDecoderInternal();
-  if (_window && decoder && decoder->checkFrameChanged(frame)) {
-    OHNativeWindowBuffer* windowBuffer = nullptr;
-    HardwareBufferRef buffer = nullptr;
-    int windowBufferFd = 0;
-    OH_NativeWindow_NativeWindowRequestBuffer(_window, &windowBuffer, &windowBufferFd);
-    OH_NativeBuffer_FromNativeWindowBuffer(windowBuffer, &buffer);
-    decoder->readFrame(frame, buffer);
-    Region region{nullptr, 0};
-    OH_NativeWindow_NativeWindowFlushBuffer(_window, windowBuffer, windowBufferFd, region);
-    OH_NativeWindow_NativeWindowAbortBuffer(_window, windowBuffer);
+  if (window && decoder && decoder->checkFrameChanged(frame)) {
+    if (decoder && decoder->checkFrameChanged(frame)) {
+
+      if (images.find(frame) == images.end()) {
+        tgfx::Bitmap bitmap;
+        tgfx::Clock clock;
+        bitmap.allocPixels(decoder->width(), decoder->height(), false, true);
+        auto pixels = bitmap.lockPixels();
+        if (pixels == nullptr) {
+          return;
+        }
+        decoder->readFrame(frame, pixels, bitmap.rowBytes());
+        bitmap.unlockPixels();
+        images[frame] = tgfx::Image::MakeFrom(bitmap);
+        LOGE("onAnimationUpdate createImage:%lld", clock.measure());
+      }
+      tgfx::Clock clock;
+      auto device = window->getDevice();
+      if (!device) {
+        return;
+      }
+      auto context = device->lockContext();
+      if (!context) {
+        return;
+      }
+      auto surface = window->getSurface(context, true);
+      if (surface == nullptr) {
+        surface = window->getSurface(context, false);
+      }
+      if (!surface) {
+        device->unlock();
+      }
+      auto canvas = surface->getCanvas();
+      if (!canvas) {
+        device->unlock();
+      }
+      canvas->clear();
+      auto matrix = ApplyScaleMode(PAGScaleMode::LetterBox, images[frame]->width(),
+                                      images[frame]->height(), _width, _height);
+      canvas->drawImage(images[frame], ToTGFX(matrix));
+      surface->flush();
+      context->submit();
+      window->present(context);
+      device->unlock();
+      LOGE("onAnimationUpdate draw:%lld", clock.measure());
+    }
   }
 }
 
@@ -567,7 +607,9 @@ std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
 
 void JPAGImageView::setTargetWindow(void* targetWindow) {
   std::lock_guard lock_guard(locker);
-  _window = static_cast<OHNativeWindow*>(targetWindow);
+  _window = targetWindow;
+  window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(targetWindow));
+  invalidSize(static_cast<OHNativeWindow*>(targetWindow));
 }
 
 void JPAGImageView::invalidDecoder() {
@@ -600,6 +642,14 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition) 
   }
   _decoder = nullptr;
   _composition = composition;
+}
+
+void JPAGImageView::invalidSize(OHNativeWindow* nativeWindow) {
+  _decoder = nullptr;
+  if (window) {
+    window->invalidSize();
+  }
+  OH_NativeWindow_NativeWindowHandleOpt(nativeWindow, GET_BUFFER_GEOMETRY, &_height, &_width);
 }
 
 void JPAGImageView::release() {

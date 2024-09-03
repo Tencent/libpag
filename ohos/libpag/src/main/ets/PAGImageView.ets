@@ -61,7 +61,7 @@ export struct PAGImageView {
    * Note: If the composition is already added to another PAGView, it will be removed from the
    * previous PAGView.
    */
-  @Link @Watch("onCompositionChange") composition: PAGComposition | null;
+  @State @Watch("onCompositionChange") composition: PAGComposition | null = null;
   /**
    * Indicates whether this pag view is playing.
    */
@@ -70,7 +70,7 @@ export struct PAGImageView {
    * The current progress of play position, the value is from 0.0 to 1.0. It is applied only
    * when the composition is not null.
    */
-  @Link @Watch("onCurrentFrameChange") currentFrame: number;
+  @State @Watch("onCurrentFrameChange") currentFrame: number = 0;
   /**
    * The total number of times the animation is set to play. The default is 1, which means the
    * animation will play only once. If the repeat count is set to 0 or a negative value, the

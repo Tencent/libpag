@@ -17,23 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import * as pag from 'libpag';
-import { PAGDiskCache } from 'libpag';
+import { PAGComposition, PAGDiskCache } from 'libpag';
+
+class Temp {
+  constructor(composition: PAGComposition | null) {
+    this.composition = composition;
+  }
+
+  public composition: pag.PAGComposition | null = null;
+  public currentFrame: number = 0;
+}
 
 @Entry
 @Component
 struct Index {
   @State message: string = "";
   @State @Watch("updateMessage") stateString: string = "";
-  @State composition: pag.PAGComposition | null = null;
+  @State compositions: Array<Temp> = Array<Temp>();
   @State @Watch("updateMessage") currentFrame: number = 0;
   @State isPlaying: boolean = false;
-  @State repeatCount: number = 1;
+  @State repeatCount: number = 0;
 
   aboutToAppear(): void {
     // PAGDiskCache.RemoveAll();
     let manager = getContext(this).resourceManager;
     let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
-    this.composition = file as pag.PAGComposition;
+    this.compositions.push(new Temp(file));
     this.isPlaying = true;
   }
 
@@ -59,31 +68,34 @@ struct Index {
   build() {
     Row() {
       Column() {
-        pag.PAGImageView({
-          composition: this.composition,
-          currentFrame: this.currentFrame,
-          isPlaying: this.isPlaying,
-          repeatCount: this.repeatCount,
-          listeners: [new WeakRef(this)]
-        })
-          .width('100%')
-          .height('50%')
-          .onClick(() => {
-            this.isPlaying = !this.isPlaying
+        Grid() {
+          ForEach(this.compositions, (composition: Temp) => {
+            GridItem() {
+              pag.PAGImageView({
+                composition: composition.composition,
+                currentFrame: composition.currentFrame,
+                isPlaying: this.isPlaying,
+                repeatCount: this.repeatCount,
+                listeners: [new WeakRef(this)]
+              })// TestComponent({ testProperty: composition.currentFrame })
+                .width('100%')
+                .height('100%')
+            }
           })
-
-        Text(this.message)
-          .fontSize(50)
-          .fontWeight(FontWeight.Bold)
-          .onClick(() => {
-            this.currentFrame = 4;
-            this.repeatCount = 0;
-          })
-          .height('50%')
+        }
       }
-      .width('100%')
 
+
+      //   Text(this.message)
+      //     .fontSize(50)
+      //     .fontWeight(FontWeight.Bold)
+      //     .onClick(() => {
+      //       this.currentFrame = 4;
+      //       this.repeatCount = 0;
+      //     })
+      //     .height('50%')
+      // }
+      // .width('100%')
     }
-    .height('100%')
   }
 }

@@ -21,6 +21,8 @@
 #include <native_window/external_window.h>
 #include "pag/pag.h"
 #include "rendering/PAGAnimator.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/gpu/Window.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
@@ -63,6 +65,7 @@ class JPAGImageView : public PAGAnimator::Listener {
 
   void setComposition(std::shared_ptr<PAGComposition> composition);
 
+  void invalidSize(OHNativeWindow* nativeWindow);
   std::string id;
 
   napi_threadsafe_function progressCallback = nullptr;
@@ -76,9 +79,15 @@ class JPAGImageView : public PAGAnimator::Listener {
   std::shared_ptr<PAGDecoder> getDecoderInternal();
 
   std::shared_ptr<PAGDecoder> _decoder = nullptr;
+  void* _window = nullptr;
+  std::shared_ptr<tgfx::Window> window = nullptr;
+  std::shared_ptr<PAGComposition> container = nullptr;
+  std::shared_ptr<PAGImageLayer> imageLayer = nullptr;
   std::shared_ptr<PAGAnimator> _animator = nullptr;
-  OHNativeWindow* _window = nullptr;
   std::shared_ptr<PAGComposition> _composition = nullptr;
   std::mutex locker;
+  int _width = 0;
+  int _height = 0;
+  std::unordered_map<Frame, std::shared_ptr<tgfx::Image>> images;
 };
 }  // namespace pag
