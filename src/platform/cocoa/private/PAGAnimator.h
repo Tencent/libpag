@@ -39,29 +39,29 @@
 
 @optional
 /**
- * Notifies the beginning of the animation. It can be called from either the UI thread or the thread
- * that calls the start method.
+ * Notifies the beginning of the animation. This may be called from any thread that invokes the
+ * start method.
  */
 - (void)onAnimationStart:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the end of the animation. It can only be called from the UI thread.
+ * Notifies the end of the animation. This will only be called from the UI thread.
  */
 - (void)onAnimationEnd:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the cancellation of the animation. It can be called from either the UI thread or the
- * thread that calls the cancel method.
+ * Notifies the cancellation of the animation. This may be called from any thread that invokes the
+ * cancel method.
  */
 - (void)onAnimationCancel:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies the repetition of the animation. It can only be called from the UI thread.
+ * Notifies the repetition of the animation. This will only be called from the UI thread.
  */
 - (void)onAnimationRepeat:(_Nullable id<PAGAnimatorUpdater>)updater;
 
 /**
- * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+ * Notifies another frame of the animation has occurred. This may be called from an arbitrary
  * thread if the animation is running asynchronously.
  */
 - (void)onAnimationUpdate:(_Nullable id<PAGAnimatorUpdater>)updater;
@@ -89,8 +89,6 @@
 
 /**
  * Indicates whether the animation is allowed to run in the UI thread. The default value is NO.
- * Regardless of whether the animation runs asynchronously, all listener callbacks will be called
- * on the UI thread.
  */
 - (BOOL)isSync;
 
