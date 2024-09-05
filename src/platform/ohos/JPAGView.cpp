@@ -171,8 +171,11 @@ static napi_value SetProgress(napi_env env, napi_callback_info info) {
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   if (view != nullptr) {
     auto animator = view->getAnimator();
-    if (animator != nullptr) {
+    auto player = view->getPlayer();
+    if (player != nullptr && animator != nullptr) {
+      player->setProgress(progress);
       animator->setProgress(progress);
+      animator->update();
     }
   }
   return nullptr;
@@ -366,15 +369,10 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
   return nullptr;
 }
 
-static void ProgressCallback(napi_env env, napi_value callback, void*, void* data) {
-  double* progressPtr = static_cast<double*>(data);
-  size_t argc = 1;
-  napi_value argv[1] = {0};
-  napi_create_double(env, *progressPtr, &argv[0]);
+static void ProgressCallback(napi_env env, napi_value callback, void*, void*) {
   napi_value undefined;
   napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, callback, argc, argv, nullptr);
-  delete progressPtr;
+  napi_call_function(env, undefined, callback, 0, nullptr, nullptr);
 }
 
 static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info info) {
@@ -962,7 +960,7 @@ void JPAGView::onAnimationRepeat(PAGAnimator*) {
 void JPAGView::onAnimationUpdate(PAGAnimator* animator) {
   std::lock_guard lock_guard(locker);
   if (progressCallback) {
-    napi_call_threadsafe_function(progressCallback, new double(animator->progress()),
+    napi_call_threadsafe_function(progressCallback, nullptr,
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 

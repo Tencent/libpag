@@ -433,7 +433,7 @@ export class PAGViewController {
         return this.onAnimationRepeat();
     }
   }
-  private onAnimatorProgressUpdate = (progress: number): void => {
+  private onAnimatorProgressUpdate = (): void => {
     for (const weakListener of this.listeners) {
       const listener = weakListener.deref();
       if (listener && listener.onAnimationUpdate) {

@@ -324,7 +324,7 @@ export declare class JPAGView {
 
   setStateChangeCallback(callback: (number) => void): void;
 
-  setProgressUpdateCallback(callback: (double) => void): void;
+  setProgressUpdateCallback(callback: () => void): void;
 
   uniqueID(): string;
 
