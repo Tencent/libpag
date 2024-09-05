@@ -46,7 +46,7 @@ export class PAGImage {
    * @param data
    * @returns
    */
-  static FromBytes(data: Int8Array): PAGImage | null {
+  static FromBytes(data: ArrayBuffer): PAGImage | null {
     let nativeImage = JPAGImage.FromBytes(data);
     if (nativeImage == null) {
       return null;
