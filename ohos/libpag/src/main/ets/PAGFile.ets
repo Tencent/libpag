@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { JPAGFile, JPAGFont, JPAGLayer } from 'libpag.so'
+import { JPAGDiskCache, JPAGFile, JPAGLayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition'
 import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';
@@ -24,7 +24,7 @@ import { PAGText } from './PAGText';
 import { PAGImage } from './PAGImage';
 import { PAGInit } from './PAGInit';
 import { PAGUtils } from './private/PAGUtils';
-import { font } from '@kit.ArkUI';
+import { http } from '@kit.NetworkKit';
 
 /**
  * Defines the rules on how to stretch the timeline of content to fit the specified duration.
@@ -52,7 +52,6 @@ export enum PAGTimeStretchMode {
 }
 
 export class PAGFile extends PAGComposition {
-  private static hasRegistered: boolean = false;
 
   constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
@@ -65,12 +64,20 @@ export class PAGFile extends PAGComposition {
     return JPAGFile.MaxSupportedTagLevel();
   };
 
+  private static IsNetWorkPath(filePath: string): boolean {
+    if (filePath == null) {
+      return false;
+    }
+    const regex = /^(http|https|ftp):\/\/[^\s/$.?#].[^\s]*$/i;
+    return regex.test(filePath);
+  }
+
   /**
-   * Load a pag file from the specified path, returns null if the file does not exist or the
+   * Load a pag file from the local path, returns null if the file does not exist or the
    * data is not a pag file.
    * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
-   * cache is alive until all PAGFiles are released. Use 'PAGFile.Load(byte[])' instead
-   * if you don't want to load a PAGFile from the intenal caches.
+   * cache is alive until all PAGFiles are released. Use 'PAGFile.LoadFromBytes()' instead
+   * if you don't want to load a PAGFile from the internal caches.
    */
   static LoadFromPath(filePath: string): PAGFile | null {
     PAGInit.Init();
@@ -81,7 +88,62 @@ export class PAGFile extends PAGComposition {
     return new PAGFile(native);
   }
 
-  static LoadFromBytes(data: Int8Array, filePath?: string): PAGFile | null {
+  /**
+   * Load a pag file from the specified path which can be a network path or a local path, returns null if the file does
+   * not exist or the data is not a pag file.
+   * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
+   * cache is alive until all PAGFiles are released. Use 'PAGFile.LoadFromBytes()' instead
+   * if you don't want to load a PAGFile from the internal caches.
+   */
+  static LoadAsyncFromPath(filePath: string): Promise<PAGFile | null>  {
+    PAGInit.Init();
+    return new Promise<PAGFile | null>((resolve, reject) => {
+      if (filePath == null) {
+        resolve(null);
+      }
+      if (PAGFile.IsNetWorkPath(filePath)) {
+        let cacheData = JPAGDiskCache.ReadFile(filePath);
+        if (cacheData) {
+          resolve(PAGFile.LoadFromBytes(cacheData, filePath));
+        } else {
+          let httpRequest = http.createHttp();
+          let opt: http.HttpRequestOptions = {
+            method: http.RequestMethod.GET,
+            expectDataType: http.HttpDataType.ARRAY_BUFFER
+          }
+          httpRequest.request(filePath, opt)
+            .then((resp) => {
+              if (resp.responseCode == http.ResponseCode.OK) {
+                let data = resp.result as ArrayBuffer;
+                JPAGDiskCache.WriteFile(filePath, data);
+                resolve(PAGFile.LoadFromBytes(data, filePath));
+              } else {
+                console.error(`download file failed! filePath: ${filePath}`);
+                resolve(null);
+              }
+            })
+            .catch((error: Error) => {
+              console.error(`download file failed! filePath: ${filePath}`);
+              reject(error);
+            })
+        }
+      } else {
+        let native = JPAGFile.LoadFromPath(filePath);
+        if (native == null) {
+          resolve(null);
+        }
+        resolve(new PAGFile(native as JPAGLayer));
+      }
+    })
+  }
+
+  /**
+   * Load a pag file from ArrayBuffer, return null if data is empty or it’s not a valid pag file.
+   * @param data
+   * @param filePath
+   * @returns
+   */
+  static LoadFromBytes(data: ArrayBuffer, filePath?: string): PAGFile | null {
     PAGInit.Init();
     let native = JPAGFile.LoadFromBytes(data, filePath);
     if (native == null) {
@@ -93,8 +155,8 @@ export class PAGFile extends PAGComposition {
   /**
    * Load a pag file from assets, returns null if the file does not exist or the data is not a
    * pag file.
-   * Note: The same path shares resource in memory untill the file is released. If the file
-   * may be changed, please use 'Load(byte[])' instead
+   * Note: The same path shares resource in memory until the file is released. If the file
+   * may be changed, please use 'PAGFile.LoadFromBytes()' instead
    */
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): PAGFile | null {
     PAGInit.Init();

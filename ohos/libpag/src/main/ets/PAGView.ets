@@ -23,6 +23,7 @@ import { PAGLayer } from './PAGLayer';
 import { image } from '@kit.ImageKit';
 import { PAGUtils } from './private/PAGUtils';
 import { Matrix4 } from '@ohos.arkui.node';
+import { PAGFile } from './PAGFile';
 
 export interface PAGViewListener {
   /**
@@ -120,6 +121,8 @@ export struct PAGView {
    */
   @State listeners: Array<WeakRef<PAGViewListener>> = [];
 
+  filePath: string = "";
+
   build() {
     XComponent({
       id: this.controller?.uniqueID(),
@@ -134,6 +137,41 @@ export struct PAGView {
         }
       })
       .backgroundColor(Color.Transparent)
+  }
+
+  /**
+   * The path string of a pag file set by setPath() or setPathAsync().
+   * @returns
+   */
+  getPath():string {
+    return this.filePath;
+  }
+
+  /**
+   * Loads a pag file from the local path, returns false if the file does not exist or the data is not a pag file.
+   * @param path
+   * @returns
+   */
+  setPath(path: string): boolean {
+    this.filePath = path;
+    let file = PAGFile.LoadFromPath(path);
+    this.composition = file;
+    return file != null;
+ }
+
+ /**
+  * Asynchronously load a pag file from the specific path which can be a network path or a local path.
+  * @param path
+  * @returns
+  */
+  setPathAsync(path: string): Promise<PAGFile | null> {
+     this.filePath = path;
+     return new Promise<PAGFile | null>((resolve) => {
+       PAGFile.LoadAsyncFromPath(path).then((pagFile) => {
+         this.composition = pagFile;
+         resolve(pagFile)
+       })
+     })
   }
 
   flush(): void {
