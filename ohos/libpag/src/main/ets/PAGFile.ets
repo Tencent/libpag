@@ -95,7 +95,7 @@ export class PAGFile extends PAGComposition {
    * cache is alive until all PAGFiles are released. Use 'PAGFile.LoadFromBytes()' instead
    * if you don't want to load a PAGFile from the internal caches.
    */
-  static LoadAsyncFromPath(filePath: string): Promise<PAGFile | null>  {
+  static LoadFromPathAsync(filePath: string): Promise<PAGFile | null>  {
     PAGInit.Init();
     return new Promise<PAGFile | null>((resolve, reject) => {
       if (filePath == null) {

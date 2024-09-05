@@ -167,7 +167,7 @@ export struct PAGView {
   setPathAsync(path: string): Promise<PAGFile | null> {
      this.filePath = path;
      return new Promise<PAGFile | null>((resolve) => {
-       PAGFile.LoadAsyncFromPath(path).then((pagFile) => {
+       PAGFile.LoadFromPathAsync(path).then((pagFile) => {
          this.composition = pagFile;
          resolve(pagFile)
        })
