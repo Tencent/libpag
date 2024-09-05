@@ -22,6 +22,7 @@ import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';
 import { PAGText } from './PAGText';
 import { PAGImage } from './PAGImage';
+import { PAGInit } from './PAGInit';
 import { PAGUtils } from './private/PAGUtils';
 import { font } from '@kit.ArkUI';
 
@@ -93,6 +94,7 @@ export class PAGFile extends PAGComposition {
    * if you don't want to load a PAGFile from the intenal caches.
    */
   static LoadFromPath(filePath: string): PAGFile | null {
+    PAGInit.Init();
     let native = JPAGFile.LoadFromPath(filePath);
     if (native == null) {
       return null;
@@ -101,6 +103,7 @@ export class PAGFile extends PAGComposition {
   }
 
   static LoadFromBytes(data: Int8Array, filePath?: string): PAGFile | null {
+    PAGInit.Init();
     let native = JPAGFile.LoadFromBytes(data, filePath);
     if (native == null) {
       return null;
@@ -115,6 +118,7 @@ export class PAGFile extends PAGComposition {
    * may be changed, please use 'Load(byte[])' instead
    */
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): PAGFile | null {
+    PAGInit.Init();
     let native = JPAGFile.LoadFromAssets(manager, name);
     if (native == null) {
       return null;
