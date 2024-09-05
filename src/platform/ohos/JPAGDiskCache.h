@@ -23,16 +23,13 @@
 
 namespace pag {
 class JPAGDiskCache {
-  public:
-    static bool Init(napi_env env, napi_value exports);
-    static std::string ClassName() {
-      return "JPAGDiskCache";
-    }
+ public:
+  static bool Init(napi_env env, napi_value exports);
+  static std::string ClassName() {
+    return "JPAGDiskCache";
+  }
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
 };
 }  // namespace pag
-
-
-
