@@ -19,9 +19,9 @@
 #include "JPAGDiskCache.h"
 #include <cstdint>
 
+#include "NativePlatform.h"
 #include "platform/ohos/JsHelper.h"
 #include "rendering/caches/DiskCache.h"
-#include "NativePlatform.h"
 
 namespace pag {
 static napi_value MaxDiskSize(napi_env env, napi_callback_info) {
