@@ -322,6 +322,9 @@ static napi_value AudioBytes(napi_env env, napi_callback_info info) {
   napi_value arraybuffer;
   void* data = nullptr;
   auto audio = composition->audioBytes();
+  if (audio == nullptr) {
+    return nullptr;
+  }
   napi_create_arraybuffer(env, audio->length(), &data, &arraybuffer);
   memcpy(data, audio->data(), audio->length());
   return arraybuffer;

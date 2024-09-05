@@ -57,7 +57,7 @@ static napi_value LoadFromBytes(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   size_t length;
   void* data;
-  auto code = napi_get_arraybuffer_info(env, args[1], &data, &length);
+  auto code = napi_get_arraybuffer_info(env, args[0], &data, &length);
   if (code != napi_ok) {
     return nullptr;
   }
@@ -65,8 +65,8 @@ static napi_value LoadFromBytes(napi_env env, napi_callback_info info) {
   if (argc == 2) {
     char filePath[1024] = {0};
     size_t pathLength = 0;
-    napi_get_value_string_utf8(env, args[0], filePath, 1024, &pathLength);
-    path = std::string(filePath, length);
+    napi_get_value_string_utf8(env, args[1], filePath, 1024, &pathLength);
+    path = std::string(filePath, pathLength);
   }
   return JPAGLayerHandle::ToJs(env, PAGFile::Load(data, length, path));
 }

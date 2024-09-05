@@ -36,12 +36,12 @@ static napi_value FromPath(napi_env env, napi_callback_info info) {
 }
 
 static napi_value FromBytes(napi_env env, napi_callback_info info) {
-  size_t argc = 2;
-  napi_value args[2] = {nullptr};
+  size_t argc = 1;
+  napi_value args[1] = {nullptr};
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   size_t length;
   void* data;
-  auto code = napi_get_arraybuffer_info(env, args[1], &data, &length);
+  auto code = napi_get_arraybuffer_info(env, args[0], &data, &length);
   if (code != napi_ok) {
     return nullptr;
   }

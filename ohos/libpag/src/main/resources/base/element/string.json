@@ -3,6 +3,10 @@
     {
       "name": "shared_desc",
       "value": "description"
+    },
+    {
+      "name": "internet_permission",
+      "value": "Allow access to the network"
     }
   ]
 }

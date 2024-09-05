@@ -4,7 +4,7 @@ import { image } from "@kit.ImageKit";
 export declare class JPAGImage {
   static FromPath(path: string): JPAGImage | null;
 
-  static FromBytes(data: Int8Array): JPAGImage | null;
+  static FromBytes(data: ArrayBuffer): JPAGImage | null;
 
   static FromPixelMap(pixelMap: image.PixelMap): JPAGImage | null;
 
@@ -171,7 +171,7 @@ export declare class JPAGFile extends JPAGComposition {
 
   static LoadFromPath(filePath: string): JPAGFile | null;
 
-  static LoadFromBytes(data: Int8Array, filePath?: string): JPAGFile | null;
+  static LoadFromBytes(data: ArrayBuffer, filePath?: string): JPAGFile | null;
 
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): JPAGFile | null;
 
@@ -401,4 +401,8 @@ export declare class JPAGDiskCache {
   static RemoveAll(): void;
 
   static SetCacheDir(path: string): void;
+
+  static ReadFile(key: string): ArrayBuffer;
+
+  static WriteFile(key: string, data: ArrayBuffer): boolean;
 }
