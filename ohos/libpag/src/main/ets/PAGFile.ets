@@ -93,7 +93,6 @@ export class PAGFile extends PAGComposition {
    * if you don't want to load a PAGFile from the intenal caches.
    */
   static LoadFromPath(filePath: string): PAGFile | null {
-    PAGFile.RegisterFallbackFonts();
     let native = JPAGFile.LoadFromPath(filePath);
     if (native == null) {
       return null;
@@ -102,7 +101,6 @@ export class PAGFile extends PAGComposition {
   }
 
   static LoadFromBytes(data: Int8Array, filePath?: string): PAGFile | null {
-    PAGFile.RegisterFallbackFonts();
     let native = JPAGFile.LoadFromBytes(data, filePath);
     if (native == null) {
       return null;
@@ -117,7 +115,6 @@ export class PAGFile extends PAGComposition {
    * may be changed, please use 'Load(byte[])' instead
    */
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): PAGFile | null {
-    PAGFile.RegisterFallbackFonts();
     let native = JPAGFile.LoadFromAssets(manager, name);
     if (native == null) {
       return null;

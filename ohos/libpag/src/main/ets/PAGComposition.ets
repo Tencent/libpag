@@ -20,6 +20,7 @@ import { PAGLayer } from "./PAGLayer"
 import { JPAGLayer, JPAGComposition } from "libpag.so"
 import { PAGMarker } from './PAGMarker';
 import { PAGUtils } from './private/PAGUtils';
+import { PAGInit } from './PAGInit';
 
 export class PAGComposition extends PAGLayer {
   static Make(width: number, height: number): PAGComposition | null {
@@ -32,6 +33,7 @@ export class PAGComposition extends PAGLayer {
 
   constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
+    PAGInit.Init();
   }
 
   /**
