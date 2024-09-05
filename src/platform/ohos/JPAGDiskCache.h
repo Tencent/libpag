@@ -18,25 +18,18 @@
 
 #pragma once
 
-#include "platform/Platform.h"
+#include <napi/native_api.h>
+#include <string>
 
 namespace pag {
-class NativePlatform : public Platform {
+class JPAGDiskCache {
  public:
-  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
-
-  bool registerFallbackFonts() const override;
-
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
-
-  std::string getCacheDir() const override;
-
-  std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-
-  void setCacheDir(const std::string& cacheDir);
+  static bool Init(napi_env env, napi_value exports);
+  static std::string ClassName() {
+    return "JPAGDiskCache";
+  }
 
  private:
-  std::string _cacheDir;
+  static napi_value Constructor(napi_env env, napi_callback_info info);
 };
 }  // namespace pag
