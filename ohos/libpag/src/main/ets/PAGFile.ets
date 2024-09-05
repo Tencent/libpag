@@ -22,6 +22,7 @@ import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';
 import { PAGText } from './PAGText';
 import { PAGImage } from './PAGImage';
+import { PAGInit } from './PAGInit';
 import { PAGUtils } from './private/PAGUtils';
 import { font } from '@kit.ArkUI';
 
@@ -64,27 +65,6 @@ export class PAGFile extends PAGComposition {
     return JPAGFile.MaxSupportedTagLevel();
   };
 
-  private static RegisterFallbackFonts() {
-    if (PAGFile.hasRegistered == false) {
-      let fontConfig = font.getUIFontConfig();
-      for (let index = 0; index < fontConfig.fallbackGroups.length; index++) {
-        const element = fontConfig.fallbackGroups[index];
-        let paths = new Array<string>();
-        for (let j = 0; j < element.fallback.length; j++) {
-          let fontInfo = font.getFontByName(element.fallback[j].family)
-          if (fontInfo == null) {
-            fontInfo = font.getFontByName(element.fallback[j].family + " Regular")
-          }
-          if (fontInfo != null) {
-            paths.push(fontInfo.path);
-          }
-        }
-        JPAGFont.SetFallbackFontPaths(paths);
-      }
-      PAGFile.hasRegistered = true
-    }
-  }
-
   /**
    * Load a pag file from the specified path, returns null if the file does not exist or the
    * data is not a pag file.
@@ -93,7 +73,7 @@ export class PAGFile extends PAGComposition {
    * if you don't want to load a PAGFile from the intenal caches.
    */
   static LoadFromPath(filePath: string): PAGFile | null {
-    PAGFile.RegisterFallbackFonts();
+    PAGInit.Init();
     let native = JPAGFile.LoadFromPath(filePath);
     if (native == null) {
       return null;
@@ -102,7 +82,7 @@ export class PAGFile extends PAGComposition {
   }
 
   static LoadFromBytes(data: Int8Array, filePath?: string): PAGFile | null {
-    PAGFile.RegisterFallbackFonts();
+    PAGInit.Init();
     let native = JPAGFile.LoadFromBytes(data, filePath);
     if (native == null) {
       return null;
@@ -117,7 +97,7 @@ export class PAGFile extends PAGComposition {
    * may be changed, please use 'Load(byte[])' instead
    */
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): PAGFile | null {
-    PAGFile.RegisterFallbackFonts();
+    PAGInit.Init();
     let native = JPAGFile.LoadFromAssets(manager, name);
     if (native == null) {
       return null;
