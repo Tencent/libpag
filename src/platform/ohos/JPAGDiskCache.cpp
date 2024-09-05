@@ -18,7 +18,6 @@
 
 #include "JPAGDiskCache.h"
 #include <cstdint>
-
 #include "NativePlatform.h"
 #include "platform/ohos/JsHelper.h"
 #include "rendering/caches/DiskCache.h"
