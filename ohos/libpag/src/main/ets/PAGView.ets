@@ -121,7 +121,7 @@ export struct PAGView {
    */
   @State listeners: Array<WeakRef<PAGViewListener>> = [];
 
-  filePath: string = "";
+  private filePath: string = "";
 
   build() {
     XComponent({

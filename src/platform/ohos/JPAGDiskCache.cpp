@@ -98,15 +98,8 @@ static napi_value WriteFile(napi_env env, napi_callback_info info) {
   return result;
 }
 
-napi_value JPAGDiskCache::Constructor(napi_env env, napi_callback_info info) {
-  napi_value result = nullptr;
-  size_t argc = 1;
-  napi_value args[1];
-  napi_get_cb_info(env, info, &argc, args, &result, nullptr);
-  if (argc == 0) {
-    return nullptr;
-  }
-  return result;
+napi_value JPAGDiskCache::Constructor(napi_env, napi_callback_info) {
+  return nullptr;
 }
 
 bool JPAGDiskCache::Init(napi_env env, napi_value exports) {
