@@ -221,6 +221,7 @@ static napi_value SetComposition(napi_env env, napi_callback_info info) {
     if (layer != nullptr) {
       if (layer->layerType() == LayerType::PreCompose) {
         player->setComposition(std::static_pointer_cast<PAGComposition>(layer));
+        animator->setProgress(player->getProgress());
         animator->setDuration(layer->duration());
       }
     } else {

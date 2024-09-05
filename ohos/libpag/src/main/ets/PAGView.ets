@@ -64,6 +64,7 @@ export class PAGViewController {
    * already added to another PAGView, it will be removed from the previous PAGView.
    */
   setComposition(composition: PAGComposition | null) {
+    this.filePath = null;
     this.composition = composition;
     this.jView.setComposition(composition?.getNativeComposition());
   }
@@ -79,7 +80,7 @@ export class PAGViewController {
    * The path string of a pag file set by setPath() or setPathAsync().
    * @returns
    */
-  getPath(): string {
+  getPath(): string | null {
     return this.filePath;
   }
 
@@ -92,6 +93,7 @@ export class PAGViewController {
     this.filePath = path;
     let file = PAGFile.LoadFromPath(path);
     this.composition = file;
+    this.jView.setComposition(file?.getNativeComposition());
     return file != null;
   }
 
@@ -105,6 +107,7 @@ export class PAGViewController {
     return new Promise<PAGFile | null>((resolve) => {
       PAGFile.LoadFromPathAsync(path).then((pagFile) => {
         this.composition = pagFile;
+        this.jView.setComposition(pagFile?.getNativeComposition());
         resolve(pagFile)
       })
     })
@@ -442,7 +445,7 @@ export class PAGViewController {
     }
   }
   private composition: PAGComposition | null = null;
-  private filePath: string = "";
+  private filePath: string | null = null;
   private listeners: Array<WeakRef<PAGViewListener>> = [];
   private jView: JPAGView = new JPAGView();
   private view: WeakRef<PAGView> | null = null;
@@ -458,9 +461,6 @@ export struct PAGView {
       type: XComponentType.SURFACE,
       libraryname: "pag",
     })
-      .onLoad(() => {
-        this.controller.update();
-      })
       .backgroundColor(Color.Transparent)
   }
 
