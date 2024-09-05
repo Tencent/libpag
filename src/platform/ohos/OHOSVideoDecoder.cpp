@@ -243,7 +243,9 @@ int64_t OHOSVideoDecoder::presentationTime() {
 
 std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
-  if (codecCategory == HARDWARE) {
+  // TODO(kevingpqi): We temporarily disable texture generation through NativeBuffer, as enabling asynchronous hardware
+  //  decoding will cause the jitter issue. We will re-enable it once HarmonyOS fixes this problem.
+  if (false && codecCategory == HARDWARE) {
     OH_NativeBuffer* hardwareBuffer = OH_AVBuffer_GetNativeBuffer(codecBufferInfo.buffer);
     imageBuffer = tgfx::ImageBuffer::MakeFrom(hardwareBuffer, videoFormat.colorSpace);
     if (hardwareBuffer) {
