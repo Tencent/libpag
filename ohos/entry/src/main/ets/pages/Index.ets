@@ -23,31 +23,32 @@ import * as pag from 'libpag';
 struct Index {
   @State message: string = "";
   @State @Watch("updateMessage") stateString: string = "";
-  @State composition: pag.PAGComposition | null = null;
   @State @Watch("updateMessage") progress: number = 0;
-  @State isPlaying: boolean = false;
-  @State repeatCount: number = 1;
+  @State viewController: pag.PAGViewController = new pag.PAGViewController();
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
     let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
-    this.composition = file as pag.PAGComposition;
-    this.isPlaying = true;
+    this.viewController.setComposition(file);
+    this.viewController.setRepeatCount(1);
+    this.viewController.addListener(new WeakRef(this));
+    this.viewController.play();
   }
 
-  onAnimationStart = (view: pag.PAGView) => {
-    this.stateString = 'PAG start';
+  onAnimationStart = (viewController: pag.PAGViewController) => {
+    this.stateString = viewController.uniqueID() + ` PAG start`;
   }
-  onAnimationEnd = (view: pag.PAGView) => {
-    this.stateString = `PAG end`;
+  onAnimationEnd = (viewController: pag.PAGViewController) => {
+    this.stateString = viewController.uniqueID() + ` PAG end`;
   }
-  onAnimationRepeat = (view: pag.PAGView) => {
-    this.stateString = `PAG repeat`;
+  onAnimationRepeat = (viewController: pag.PAGViewController) => {
+    this.stateString = viewController.uniqueID() + ` PAG repeat`;
   }
-  onAnimationCancel = (view: pag.PAGView) => {
-    this.stateString = `PAG cancel`;
+  onAnimationCancel = (viewController: pag.PAGViewController) => {
+    this.stateString = viewController.uniqueID() + ` PAG cancel`;
   }
-  onAnimationUpdate = (view: pag.PAGView) => {
+  onAnimationUpdate = (viewController: pag.PAGViewController) => {
+    this.progress = viewController.getProgress();
   }
 
   updateMessage() {
@@ -58,23 +59,23 @@ struct Index {
     Row() {
       Column() {
         pag.PAGView({
-          composition: this.composition,
-          progress: this.progress,
-          isPlaying: this.isPlaying,
-          repeatCount: this.repeatCount,
-          listeners: [new WeakRef(this)]
+          controller: this.viewController
         })
           .height('50%')
           .onClick(() => {
-            this.isPlaying = !this.isPlaying
+            if (this.viewController.isPlaying()) {
+              this.viewController.pause();
+            } else {
+              this.viewController.play();
+            }
           })
 
         Text(this.message)
           .fontSize(50)
           .fontWeight(FontWeight.Bold)
           .onClick(() => {
-            this.progress = 0.5;
-            this.repeatCount = 0;
+            this.viewController.setProgress(0.5);
+            this.viewController.setRepeatCount(0);
           })
           .height('50%')
       }
