@@ -29,7 +29,7 @@
 
 int main(int argc, char* argv[]) {
   QApplication::setApplicationName("PAGViewer");
-  QApplication::setOrganizationName("pag.art");
+  QApplication::setOrganizationName("Tencent");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
   defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
   defaultFormat.setVersion(3, 2);

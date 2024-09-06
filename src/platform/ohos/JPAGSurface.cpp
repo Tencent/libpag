@@ -17,12 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGSurface.h"
-#include <ace/xcomponent/native_interface_xcomponent.h>
+#include <native_window/external_window.h>
 #include <cstdint>
-#include "JsHelper.h"
 #include "base/utils/Log.h"
 #include "platform/ohos/GPUDrawable.h"
-#include "platform/ohos/JPAGLayerHandle.h"
+#include "platform/ohos/JsHelper.h"
 
 namespace pag {
 
@@ -106,6 +105,22 @@ static napi_value MakeOffscreen(napi_env env, napi_callback_info info) {
   return JPAGSurface::ToJs(env, PAGSurface::MakeOffscreen(x, y));
 }
 
+static napi_value FromSurfaceID(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1];
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  int64_t surfaceId = 0;
+  napi_get_value_int64(env, args[0], &surfaceId);
+  OHNativeWindow* window = nullptr;
+  int ret = OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window);
+  if (ret != 0) {
+    LOGE("Could not Create Native Window From Surface Id:%lld", surfaceId);
+    return nullptr;
+  }
+  auto drawable = pag::GPUDrawable::FromWindow(window);
+  return JPAGSurface::ToJs(env, pag::PAGSurface::MakeFrom(drawable));
+}
+
 static napi_value MakeSnapshot(napi_env env, napi_callback_info info) {
   napi_value jSurface = nullptr;
   size_t argc = 0;
@@ -138,6 +153,7 @@ napi_value JPAGSurface::Constructor(napi_env env, napi_callback_info info) {
 bool JPAGSurface::Init(napi_env env, napi_value exports) {
   static const napi_property_descriptor classProp[] = {
       PAG_STATIC_METHOD_ENTRY(MakeOffscreen, MakeOffscreen),
+      PAG_STATIC_METHOD_ENTRY(FromSurfaceID, FromSurfaceID),
       PAG_DEFAULT_METHOD_ENTRY(width, Width),
       PAG_DEFAULT_METHOD_ENTRY(height, Height),
       PAG_DEFAULT_METHOD_ENTRY(updateSize, UpdateSize),

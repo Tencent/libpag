@@ -49,8 +49,7 @@ export class PAGInit {
     }
   }
 
-  private static InitCacheDir()
-  {
+  private static InitCacheDir() {
     JPAGDiskCache.SetCacheDir(getContext().cacheDir);
   }
 }

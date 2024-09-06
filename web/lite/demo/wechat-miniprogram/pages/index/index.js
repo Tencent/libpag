@@ -38,7 +38,7 @@ Page({
       .exec(async (res) => {
         wx.showLoading({ title: '加载中' });
         const canvas = res[0].node;
-        const buffer = await loadFileByRequest('https://pag.art/file/frames.pag');
+        const buffer = await loadFileByRequest('https://pag.io/file/frames.pag');
         if (!buffer) throw '加载失败';
         const pagView = PAGView.init(buffer, canvas);
         this.setData({ pagView: pagView, pagLoaded: true });

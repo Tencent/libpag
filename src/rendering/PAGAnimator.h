@@ -37,40 +37,40 @@ class PAGAnimator {
 
    protected:
     /**
-     * Notifies the beginning of the animation. It can be called from either the UI thread or the
-     * thread that calls the start() method.
+     * Notifies the beginning of the animation. This may be called from any thread that invokes the
+     * start() method.
      */
     virtual void onAnimationStart(PAGAnimator*) {
     }
 
     /**
-     * Notifies the end of the animation. It can only be called from the UI thread.
+     * Notifies the end of the animation. This will only be called from the UI thread.
      */
     virtual void onAnimationEnd(PAGAnimator*) {
     }
 
     /**
-     * Notifies the cancellation of the animation. It can be called from either the UI thread or the
-     * thread that calls the cancel() method.
+     * Notifies the cancellation of the animation. This may be called from any thread that invokes
+     * the cancel() method.
      */
     virtual void onAnimationCancel(PAGAnimator*) {
     }
 
     /**
-     * Notifies the repetition of the animation. It can only be called only from the UI thread.
+     * Notifies the repetition of the animation. This will only be called from the UI thread.
      */
     virtual void onAnimationRepeat(PAGAnimator*) {
     }
 
     /**
-     * Notifies another frame of the animation will occur. It will be called from main thread.
-     * Note: onAnimationWillUpdate and onAnimationUpdate will always appear in pairs.
+     * Notifies another frame of the animation will occur. This will only be called from the UI
+     * thread. Note: onAnimationWillUpdate and onAnimationUpdate will always appear in pairs.
      */
     virtual void onAnimationWillUpdate(PAGAnimator*) {
     }
 
     /**
-     * Notifies another frame of the animation has occurred. It may be called from an arbitrary
+     * Notifies another frame of the animation has occurred. This may be called from an arbitrary
      * thread if the animation is running asynchronously.
      */
     virtual void onAnimationUpdate(PAGAnimator* animator) = 0;
@@ -85,8 +85,6 @@ class PAGAnimator {
 
   /**
    * Indicates whether the animation is allowed to run in the UI thread. The default value is false.
-   * Regardless of whether the animation runs asynchronously, all listener callbacks will be called
-   * on the UI thread.
    */
   bool isSync();
 

@@ -1,10 +1,28 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 import resourceManager from "@ohos.resourceManager";
 import { image } from "@kit.ImageKit";
 
 export declare class JPAGImage {
   static FromPath(path: string): JPAGImage | null;
 
-  static FromBytes(data: Int8Array): JPAGImage | null;
+  static FromBytes(data: ArrayBuffer): JPAGImage | null;
 
   static FromPixelMap(pixelMap: image.PixelMap): JPAGImage | null;
 
@@ -171,7 +189,7 @@ export declare class JPAGFile extends JPAGComposition {
 
   static LoadFromPath(filePath: string): JPAGFile | null;
 
-  static LoadFromBytes(data: Int8Array, filePath?: string): JPAGFile | null;
+  static LoadFromBytes(data: ArrayBuffer, filePath?: string): JPAGFile | null;
 
   static LoadFromAssets(manager: resourceManager.ResourceManager, name: string): JPAGFile | null;
 
@@ -268,6 +286,8 @@ export declare class JPAGPlayer {
 export declare class JPAGSurface {
   static MakeOffscreen(width: number, height: number): JPAGSurface | null;
 
+  static FromSurfaceID(surfaceId: number): JPAGSurface | null;
+
   width(): number;
 
   height(): number;
@@ -276,49 +296,79 @@ export declare class JPAGSurface {
 
   freeCache(): void;
 
+  updateSize(): void;
+
   makeSnapshot(): image.PixelMap | null;
 }
 
 export declare class JPAGView {
-  flush(): void;
+  flush(): boolean;
+
+  update(): void;
 
   setProgress(progress: number): void;
+
+  getProgress(): number;
 
   setComposition(composition: JPAGComposition | null): void;
 
   setRepeatCount(repeatCount: number): void;
 
+  repeatCount(): number;
+
   play(): void;
 
   pause(): void;
 
+  isPlaying(): boolean;
+
   setStateChangeCallback(callback: (number) => void): void;
 
-  setProgressUpdateCallback(callback: (double) => void): void;
+  setProgressUpdateCallback(callback: () => void): void;
 
   uniqueID(): string;
 
   setSync(isSync: boolean): void;
 
+  isSync(): boolean;
+
   setVideoEnabled(videoEnabled: boolean): void;
+
+  videoEnabled(): boolean;
 
   setCacheEnabled(cacheEnabled: boolean): void;
 
+  cacheEnabled(): boolean;
+
   setCacheScale(cacheScale: number): void;
+
+  cacheScale(): number;
 
   setMaxFrameRate(maxFrameRate: number): void;
 
+  maxFrameRate(): number;
+
   setScaleMode(scaleMode: number): void;
 
+  scaleMode(): number;
+
   setMatrix(matrix: Array<number>);
+
+  matrix(): Array<number>;
 
   currentFrame(): number;
 
   getLayersUnderPoint(x: number, y: number): Array<JPAGLayer>;
 
+  getBounds(pagLayer: JPAGLayer): Array<number>;
+
   freeCache();
 
   makeSnapshot(): image.PixelMap | null;
+
+  useDiskCache(): boolean;
+
+  setUseDiskCache(value: boolean);
 
   release();
 }
@@ -391,12 +441,15 @@ export declare class JPAG {
 
 export declare class JPAGDiskCache {
   static MaxDiskSize(): number;
-
-  static SetMaxDiskSize(diskSize: number): void;
+static SetMaxDiskSize(size: number): void;
 
   static RemoveAll(): void;
 
-  static SetCacheDir(dir: string): void;
+  static SetCacheDir(path: string): void;
+
+  static ReadFile(key: string): ArrayBuffer;
+
+  static WriteFile(key: string, data: ArrayBuffer): boolean;
 }
 
 export declare class JPAGImageView {

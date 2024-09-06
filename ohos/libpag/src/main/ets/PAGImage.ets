@@ -20,12 +20,10 @@ import { resourceManager } from '@kit.LocalizationKit';
 import { PAGUtils } from './private/PAGUtils';
 import { Matrix4 } from '@kit.ArkUI';
 import { PAGScaleMode } from './PAGScaleMode';
-import { PAGInit } from './PAGInit';
 import { JPAGImage } from 'libpag.so'
 
 export class PAGImage {
   private constructor(nativeImage: JPAGImage) {
-    PAGInit.Init();
     this.nativeImage = nativeImage;
   }
 
@@ -48,7 +46,7 @@ export class PAGImage {
    * @param data
    * @returns
    */
-  static FromBytes(data: Int8Array): PAGImage | null {
+  static FromBytes(data: ArrayBuffer): PAGImage | null {
     let nativeImage = JPAGImage.FromBytes(data);
     if (nativeImage == null) {
       return null;

@@ -419,7 +419,7 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
   pag::PAGDiskCache::RemoveAll();
   auto data = ReadFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(data != nullptr);
-  std::string cacheKey = "https://pag.art/resources/apitest/polygon.pag";
+  std::string cacheKey = "https://pag.io/resources/apitest/polygon.pag";
   auto success = DiskCache::WriteFile(cacheKey, data);
   EXPECT_TRUE(success);
   auto cacheData = DiskCache::ReadFile(cacheKey);

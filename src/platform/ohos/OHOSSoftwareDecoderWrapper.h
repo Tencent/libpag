@@ -18,18 +18,30 @@
 
 #pragma once
 
-#include <napi/native_api.h>
-#include <string>
+#include "platform/ohos/OHOSVideoDecoder.h"
+#include "rendering/video/VideoDecoder.h"
 
 namespace pag {
-class JPAGDiskCache {
+class OHOSSoftwareDecoderWrapper : public VideoDecoder {
  public:
-  static bool Init(napi_env env, napi_value exports);
-  static std::string ClassName() {
-    return "JPAGDiskCache";
-  }
+  static std::unique_ptr<VideoDecoder> Wrap(std::shared_ptr<OHOSVideoDecoder> ohosVideoDecoder);
+
+  ~OHOSSoftwareDecoderWrapper() override;
+
+  DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
+
+  DecodingResult onEndOfStream() override;
+
+  DecodingResult onDecodeFrame() override;
+
+  void onFlush() override;
+
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
+
+  int64_t presentationTime() override;
 
  private:
-  static napi_value Constructor(napi_env env, napi_callback_info info);
+  std::shared_ptr<OHOSVideoDecoder> ohosVideoDecoder = nullptr;
+  explicit OHOSSoftwareDecoderWrapper(std::shared_ptr<OHOSVideoDecoder> ohosVideoDecoder);
 };
 }  // namespace pag

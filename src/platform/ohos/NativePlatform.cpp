@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-
-#include "platform/ohos/HardwareDecoder.h"
 #include "platform/ohos/NativeDisplayLink.h"
+#include "platform/ohos/OHOSSoftwareDecoderWrapper.h"
 
 namespace pag {
 class HardwareDecoderFactory : public VideoDecoderFactory {
@@ -30,16 +29,25 @@ class HardwareDecoderFactory : public VideoDecoderFactory {
 
  protected:
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
-    auto decoder = new HardwareDecoder(format);
-    if (!decoder->isValid) {
-      delete decoder;
-      return nullptr;
-    }
-    return std::unique_ptr<VideoDecoder>(decoder);
+    return OHOSVideoDecoder::MakeHardwareDecoder(format);
+  }
+};
+
+class OHOSSoftwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return false;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = OHOSVideoDecoder::MakeSoftwareDecoder(format);
+    return OHOSSoftwareDecoderWrapper::Wrap(decoder);
   }
 };
 
 static HardwareDecoderFactory hardwareDecoderFactory = {};
+static OHOSSoftwareDecoderFactory softwareDecoderFactory = {};
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
@@ -47,11 +55,14 @@ const Platform* Platform::Current() {
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
-  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+  return {&hardwareDecoderFactory, &softwareDecoderFactory,
+          VideoDecoderFactory::ExternalDecoderFactory(),
           VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
 bool NativePlatform::registerFallbackFonts() const {
+  // Since it is not possible to call ArkTs code from C++, the registration of system fonts on the
+  // HarmonyOS platform is handled at the ArkTs code level.
   return false;
 }
 
@@ -63,7 +74,7 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
 }
 
 std::string NativePlatform::getCacheDir() const {
-  return this->cacheDir;
+  return _cacheDir;
 }
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
@@ -75,7 +86,7 @@ std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
 }
 
 void NativePlatform::setCacheDir(const std::string& cacheDir) {
-    this->cacheDir = cacheDir;
+  _cacheDir = cacheDir;
 }
 
 }  // namespace pag

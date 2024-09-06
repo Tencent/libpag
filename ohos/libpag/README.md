@@ -5,7 +5,7 @@
 [![build](https://github.com/Tencent/libpag/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-[Homepage](https://pag.art)
+[Homepage](https://pag.io)
 
 ## Introduction
 
@@ -15,7 +15,7 @@ Windows, Linux, and Web.
 
 PAG is an open-source file format for recording animations. PAG files can be created and exported
 from Adobe After Effects with the PAGExporter plugin and previewed in the PAGViewer app, which you
-can get from [pag.art](https://pag.art), and both of them are available on both macOS and Windows.
+can get from [pag.io](https://pag.io), and both of them are available on both macOS and Windows.
 
 PAG is now being used by 40+ Tencent apps, such as WeChat, Mobile QQ, Honor of Kings Mobile Game,
 Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
@@ -24,7 +24,7 @@ Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
 
 - **Highly efficient file format**
 
-<img src="https://pag.art/pag/1.apng" alt="intro_1" width="282"/>
+<img src="https://pag.io/pag/1.apng" alt="intro_1" width="282"/>
 
 Benefiting from the highly efficient binary format design, PAG files can be decoded 10x faster than
 JSON files but also are about 50% smaller in file size when exporting the same animations. Designers
@@ -33,7 +33,7 @@ easily without other attachments.
 
 - **All AE features supported**
 
-<img src="https://pag.art/pag/2.apng" alt="intro_2" width="282"/>
+<img src="https://pag.io/pag/2.apng" alt="intro_2" width="282"/>
 
 While other solutions may only support exporting limited vector-based AE features, PAG supports
 exporting all AE animations into a single file by combining vector-based exporting with raster-based
@@ -41,7 +41,7 @@ exporting techniques. Therefore, third-party plugin effects in AE can be exporte
 
 - **Measurable performance**
 
-<img src="https://pag.art/pag/4.apng" alt="intro_4" width="282"/>
+<img src="https://pag.io/pag/4.apng" alt="intro_4" width="282"/>
 
 PAG provides a monitoring panel in PAGViewer that shows normalized performance data for PAG files,
 which helps designers to examine and optimize performance easily without developers. Along with
@@ -50,7 +50,7 @@ effects and excellent performance now can be created more effectively.
 
 - **Runtime editable animations**
 
-<img src="https://pag.art/pag/5.apng" alt="intro_5" width="282"/>
+<img src="https://pag.io/pag/5.apng" alt="intro_5" width="282"/>
 
 With the flexible editing APIs from PAG SDK, developers can easily change the layer structure of a
 single PAG file, mix multiple PAG files into one composition, or replace texts and images with all

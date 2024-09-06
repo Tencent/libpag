@@ -169,6 +169,9 @@ napi_value JPAGText::ToJs(napi_env env, const std::shared_ptr<TextDocument>& tex
     LOGE("JPAGText::ToJs napi_new_instance failed :%d", status);
     return nullptr;
   }
+  if (text == nullptr) {
+    return nullptr;
+  }
 
   napi_value applyFill;
   napi_get_boolean(env, text->applyFill, &applyFill);

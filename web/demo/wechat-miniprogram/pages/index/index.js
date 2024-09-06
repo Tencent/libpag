@@ -48,7 +48,7 @@ Page({
       return;
     }
     const canvas = this.data.canvas;
-    const buffer = await loadFileByRequest('https://pag.art/file/test.pag');
+    const buffer = await loadFileByRequest('https://pag.io/file/test.pag');
     if (!buffer) throw '加载失败';
     const time = wx.getPerformance().now();
     this.pagFile = await this.PAG.PAGFile.load(buffer);
@@ -100,7 +100,7 @@ Page({
     const canvas = this.data.canvas;
     const image = await new Promise((resolve) => {
       wx.getImageInfo({
-        src: 'https://pag.art/img/ae.png',
+        src: 'https://pag.io/img/ae.png',
         success: async (res) => {
           console.log(res.path);
           const image = await new Promise((resolve) => {
@@ -120,7 +120,7 @@ Page({
   },
   async replaceVideo() {
     wx.downloadFile({
-      url: 'https://pag.art/file/circle.mp4',
+      url: 'https://pag.io/file/circle.mp4',
       success: (res) => {
         console.log(res.tempFilePath);
         this.videoDecoder = wx.createVideoDecoder();
@@ -160,7 +160,7 @@ Page({
     wx.loadFontFace({
       global: true,
       family: 'SourceHanSerifCN',
-      source: 'https://pag.art/file/SourceHanSerifCN-Regular.ttf',
+      source: 'https://pag.io/file/SourceHanSerifCN-Regular.ttf',
       scopes: ['webview', 'native'],
       success: (res) => {
         wx.hideLoading();

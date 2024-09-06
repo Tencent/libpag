@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <rawfile/raw_file.h>
-#include <rawfile/raw_file_manager.h>
-#include <cstddef>
-#include <cstdint>
+
+#include <napi/native_api.h>
 #include "pag/pag.h"
 
 namespace pag {

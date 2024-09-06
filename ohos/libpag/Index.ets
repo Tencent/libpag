@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-export { PAGView, PAGViewListener } from './src/main/ets/PAGView'
+export { PAGView, PAGViewListener, PAGViewController } from './src/main/ets/PAGView'
 
 export { PAGPlayer } from './src/main/ets/PAGPlayer'
 

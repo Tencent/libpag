@@ -1,6 +1,6 @@
-<img src="https://pag.art/img/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[官网](https://pag.art) | [English](../README.md) | [Web版本](../README.zh_CN.md) | [Weblite版本](../lite) | 小程序版本 | [小程序lite版本](../lite/wechat)
+[官网](https://pag.io) | [English](../README.md) | [Web版本](../README.zh_CN.md) | [Weblite版本](../lite) | 小程序版本 | [小程序lite版本](../lite/wechat)
 
 ## 介绍
 
@@ -51,7 +51,7 @@ wx.createSelectorQuery()
   .node()
   .exec(async (res) => {
     const canvas = res[0].node;
-    const buffer = await loadFileByRequest('https://pag.art/file/test.pag');
+    const buffer = await loadFileByRequest('https://pag.io/file/test.pag');
     const pagFile = await this.PAG.PAGFile.load(buffer);
     const pagView = await this.PAG.PAGView.init(pagFile, canvas);
     pagView.play();

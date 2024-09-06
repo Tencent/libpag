@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,12 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
-
-#import "platform/cocoa/PAGComposition.h"
-#import "platform/ios/PAGDecoder.h"
-
-@interface PAGContentVersion : NSObject
-+ (NSInteger)Get:(PAGComposition*)pagComposition;
-
-@end
+export enum PAGAnimatorState {
+  Start = 0,
+  Cancel = 1,
+  End = 2,
+  Repeat = 3
+}

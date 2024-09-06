@@ -19,7 +19,6 @@
 import { Matrix4, Rect } from '@ohos.arkui.node';
 import { JPAGPlayer } from 'libpag.so'
 import { PAGComposition } from './PAGComposition';
-import { PAGInit } from './PAGInit';
 import { PAGSurface } from './PAGSurface';
 import { PAGLayer } from './PAGLayer';
 import { PAGUtils } from './private/PAGUtils';
@@ -27,7 +26,6 @@ import { PAGScaleMode } from './PAGScaleMode';
 
 export class PAGPlayer {
   constructor(nativePlayer: JPAGPlayer | null = null) {
-    PAGInit.Init();
     if (nativePlayer == null) {
       this.nativePlayer = new JPAGPlayer();
     } else {

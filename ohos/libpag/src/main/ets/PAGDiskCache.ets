@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { JPAGDiskCache } from 'libpag.so';
+import { PAGInit } from './PAGInit';
 
 /**
  * Defines methods to manage the disk cache capabilities.
@@ -26,6 +27,7 @@ export class PAGDiskCache {
    * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
    */
   static MaxDiskSize(): number {
+    PAGInit.Init();
     return JPAGDiskCache.MaxDiskSize();
   }
 
@@ -35,6 +37,7 @@ export class PAGDiskCache {
    * disk usage exceeds the limit, and they will be rechecked after they are closed.
    */
   static SetMaxDiskSize(size: number): void {
+    PAGInit.Init();
     JPAGDiskCache.SetMaxDiskSize(size);
   }
 
@@ -43,6 +46,7 @@ export class PAGDiskCache {
    * are closed.
    */
   static RemoveAll(): void {
+    PAGInit.Init();
     JPAGDiskCache.RemoveAll();
   }
 }

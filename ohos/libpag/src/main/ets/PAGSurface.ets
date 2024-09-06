@@ -17,17 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { JPAGSurface } from 'libpag.so'
-import { PAGInit } from './PAGInit';
 import { image } from '@kit.ImageKit';
 
 export class PAGSurface {
   private constructor(nativeSurface: JPAGSurface) {
-    PAGInit.Init();
     this.nativeSurface = nativeSurface;
   }
 
   static MakeOffscreen(width: number, height: number): PAGSurface | null {
     let nativeSurface = JPAGSurface.MakeOffscreen(width, height);
+    if (nativeSurface == null) {
+      return null;
+    } else {
+      return new PAGSurface(nativeSurface);
+    }
+  }
+
+  static FromSurfaceID(surfaceId: number): PAGSurface | null {
+    let nativeSurface = JPAGSurface.FromSurfaceID(surfaceId);
     if (nativeSurface == null) {
       return null;
     } else {
@@ -61,6 +68,13 @@ export class PAGSurface {
    */
   freeCache(): void {
     return this.nativeSurface.freeCache();
+  }
+
+  /**
+   * Update the size of the surface. This method should be called when the size of the surface is changed.
+   */
+  updateSize(): void {
+    this.nativeSurface.updateSize();
   }
 
   /**
