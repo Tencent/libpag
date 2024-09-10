@@ -21,67 +21,80 @@ import * as pag from 'libpag';
 @Entry
 @Component
 struct Index {
-  @State message: string = "";
-  @State @Watch("updateMessage") stateString: string = "";
-  @State @Watch("updateMessage") progress: number = 0;
+  @State imageViewControllers: Array<pag.PAGImageViewController> = new Array<pag.PAGImageViewController>();
   @State viewController: pag.PAGViewController = new pag.PAGViewController();
+  @State pageIndex: number = 0;
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
     let file = pag.PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
     this.viewController.setComposition(file);
-    this.viewController.setRepeatCount(1);
-    this.viewController.addListener(new WeakRef(this));
+    this.viewController.setRepeatCount(-1);
     this.viewController.play();
-  }
 
-  onAnimationStart = (viewController: pag.PAGViewController) => {
-    this.stateString = viewController.uniqueID() + ` PAG start`;
-  }
-  onAnimationEnd = (viewController: pag.PAGViewController) => {
-    this.stateString = viewController.uniqueID() + ` PAG end`;
-  }
-  onAnimationRepeat = (viewController: pag.PAGViewController) => {
-    this.stateString = viewController.uniqueID() + ` PAG repeat`;
-  }
-  onAnimationCancel = (viewController: pag.PAGViewController) => {
-    this.stateString = viewController.uniqueID() + ` PAG cancel`;
-  }
-  onAnimationUpdate = (viewController: pag.PAGViewController) => {
-    this.progress = viewController.getProgress();
-  }
-
-  updateMessage() {
-    this.message = this.stateString + ` progress ${this.progress.toFixed(2)}`;
+    for (let index = 0; index < 20; index++) {
+      let imageViewController = new pag.PAGImageViewController();
+      let file = pag.PAGFile.LoadFromAssets(manager, "list/" + index + ".pag");
+      imageViewController.setComposition(file);
+      imageViewController.setRepeatCount(-1);
+      this.imageViewControllers.push(imageViewController);
+    }
   }
 
   build() {
-    Row() {
-      Column() {
-        pag.PAGView({
-          controller: this.viewController
-        })
-          .height('50%')
-          .onClick(() => {
+    Column() {
+      Row() {
+        if (this.pageIndex == 1) {
+          Grid() {
+            ForEach(this.imageViewControllers, (item: pag.PAGImageViewController) => {
+              GridItem() {
+                pag.PAGImageView({
+                  controller: item
+                })
+                  .onClick(() => {
+                    if (item.isPlaying()) {
+                      item.pause();
+                    } else {
+                      item.play();
+                    }
+                  })
+              }.width("25%").height(100)
+            })
+          }.width("100%")
+        } else {
+          pag.PAGView({
+            controller: this.viewController
+          }).onClick(() => {
             if (this.viewController.isPlaying()) {
               this.viewController.pause();
             } else {
               this.viewController.play();
             }
           })
+        }
+      }.height("70%")
 
-        Text(this.message)
-          .fontSize(50)
-          .fontWeight(FontWeight.Bold)
+
+      Row() {
+        Button("PAGView").width("40%").margin(10)
           .onClick(() => {
-            this.viewController.setProgress(0.5);
-            this.viewController.setRepeatCount(0);
+            this.pageIndex = 0;
+            this.viewController.play();
+            this.imageViewControllers.forEach((item: pag.PAGImageViewController) => {
+              item.pause();
+            })
           })
-          .height('50%')
+
+        Button("PAGImageView").width("40%")
+          .onClick(() => {
+            this.pageIndex = 1;
+            this.imageViewControllers.forEach((item: pag.PAGImageViewController) => {
+              item.play();
+            })
+            this.viewController.pause();
+          })
       }
-      .width('100%')
 
     }
-    .height('100%')
   }
 }

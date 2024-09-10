@@ -299,6 +299,8 @@ export declare class JPAGSurface {
   updateSize(): void;
 
   makeSnapshot(): image.PixelMap | null;
+
+  updateSize(): void;
 }
 
 export declare class JPAGView {
@@ -441,7 +443,8 @@ export declare class JPAG {
 
 export declare class JPAGDiskCache {
   static MaxDiskSize(): number;
-static SetMaxDiskSize(size: number): void;
+
+  static SetMaxDiskSize(size: number): void;
 
   static RemoveAll(): void;
 
@@ -453,33 +456,51 @@ static SetMaxDiskSize(size: number): void;
 }
 
 export declare class JPAGImageView {
-  flush(): void;
+  flush(): boolean;
 
-  setCurrentFrame(progress: number): void;
+  setComposition(composition: JPAGComposition | null, maxFrameRate: number): void;
 
-  setComposition(composition: JPAGComposition | null): void;
+  scaleMode(): number;
+
+  setScaleMode(scaleMode: number);
+
+  matrix(): Array<number>;
+
+  setMatrix(matrix: Array<number>);
+
+  cacheAllFramesInMemory(): boolean;
+
+  setCacheAllFramesInMemory(enable: boolean);
+
+  repeatCount(): number;
 
   setRepeatCount(repeatCount: number): void;
 
   play(): void;
 
+  isPlaying(): boolean;
+
   pause(): void;
 
   setStateChangeCallback(callback: (number) => void): void;
 
-  setProgressUpdateCallback(callback: (double) => void): void;
+  setProgressUpdateCallback(callback: () => void): void;
 
   uniqueID(): string;
 
   setRenderScale(renderScale: number): void;
 
-  setMaxFrameRate(maxFrameRate: number): void;
+  renderScale(): number;
 
   currentFrame(): number;
+
+  setCurrentFrame(progress: number): void;
 
   numFrames(): number;
 
   currentImage(): image.PixelMap | null;
+
+  update(): void;
 
   release();
 }

@@ -20,11 +20,12 @@
 #include <napi/native_api.h>
 #include <native_window/external_window.h>
 #include "pag/pag.h"
+#include "platform/ohos/XComponentHandler.h"
 #include "rendering/PAGAnimator.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#include "tgfx/gpu/Window.h"
 
 namespace pag {
-class JPAGImageView : public PAGAnimator::Listener {
+class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
  public:
   static bool Init(napi_env env, napi_value exports);
   static inline std::string ClassName() {
@@ -35,8 +36,7 @@ class JPAGImageView : public PAGAnimator::Listener {
   }
 
   virtual ~JPAGImageView() {
-    napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
-    napi_release_threadsafe_function(playingStateCallback, napi_tsfn_abort);
+    release();
   }
 
   void onAnimationStart(PAGAnimator*) override;
@@ -49,36 +49,81 @@ class JPAGImageView : public PAGAnimator::Listener {
 
   void onAnimationUpdate(PAGAnimator* animator) override;
 
-  void release();
+  void onSurfaceCreated(NativeWindow* window) override;
+
+  void onSurfaceSizeChanged() override;
+
+  void onSurfaceDestroyed() override;
 
   std::shared_ptr<PAGDecoder> getDecoder();
 
   std::shared_ptr<PAGAnimator> getAnimator();
 
-  void setTargetWindow(void* targetWindow);
-
-  void invalidDecoder();
-
   void setCurrentFrame(Frame currentFrame);
 
-  void setComposition(std::shared_ptr<PAGComposition> composition);
+  Frame currentFrame();
+
+  void setComposition(std::shared_ptr<PAGComposition> composition, float frameRate);
+
+  void setScaleMode(int scaleMode);
+
+  int scaleMode();
+
+  void setMatrix(const Matrix& matrix);
+
+  Matrix matrix();
+
+  void setRenderScale(float renderScale);
+
+  float renderScale();
+
+  void setCacheAllFramesInMemory(bool cacheAllFramesInMemory);
+
+  bool cacheAllFramesInMemory();
+
+  bool flush();
+
+  napi_value getCurrentPixelMap(napi_env env);
+
+  void release();
 
   std::string id;
 
   napi_threadsafe_function progressCallback = nullptr;
   napi_threadsafe_function playingStateCallback = nullptr;
 
-  float cacheScale = 1.0f;
-  float frameRate = 30.0f;
-
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
+
   std::shared_ptr<PAGDecoder> getDecoderInternal();
 
-  std::shared_ptr<PAGDecoder> _decoder = nullptr;
-  std::shared_ptr<PAGAnimator> _animator = nullptr;
-  OHNativeWindow* _window = nullptr;
-  std::shared_ptr<PAGComposition> _composition = nullptr;
+  void invalidSize();
+
+  void refreshMatrixFromScaleMode();
+
+  bool handleFrame(Frame frame);
+
+  bool drawImage(std::shared_ptr<tgfx::Image> image);
+
   std::mutex locker;
+  std::shared_ptr<PAGDecoder> _decoder = nullptr;
+  int _width = 0;
+  int _height = 0;
+  float _renderScale = 1.0f;
+  float _frameRate = 30.0f;
+  int _scaleMode = PAGScaleMode::LetterBox;
+  tgfx::Matrix _matrix = tgfx::Matrix::I();
+  bool _cacheAllFramesInMemory = false;
+
+  NativeWindow* _window = nullptr;
+  std::shared_ptr<tgfx::Window> window = nullptr;
+  std::shared_ptr<PAGComposition> container = nullptr;
+  std::shared_ptr<PAGImageLayer> imageLayer = nullptr;
+  std::shared_ptr<PAGAnimator> _animator = nullptr;
+  std::shared_ptr<PAGComposition> _composition = nullptr;
+  std::shared_ptr<tgfx::Image> currentImage = nullptr;
+  tgfx::Bitmap currentBitmap;
+
+  std::unordered_map<Frame, std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>>> images;
 };
 }  // namespace pag

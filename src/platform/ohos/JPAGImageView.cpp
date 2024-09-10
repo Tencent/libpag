@@ -22,12 +22,16 @@
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 #include <native_buffer/native_buffer.h>
 #include <cstdint>
+#include "base/utils/TGFXCast.h"
 #include "base/utils/TimeUtil.h"
 #include "base/utils/UniqueID.h"
 #include "platform/ohos/GPUDrawable.h"
 #include "platform/ohos/JPAG.h"
 #include "platform/ohos/JPAGLayerHandle.h"
 #include "platform/ohos/JsHelper.h"
+#include "rendering/utils/ApplyScaleMode.h"
+#include "tgfx/core/ColorType.h"
+#include "tgfx/platform/ohos/OHOSPixelMap.h"
 
 namespace pag {
 static int PAGViewStateStart = 0;
@@ -37,77 +41,21 @@ static int PAGViewStateRepeat = 3;
 
 static std::unordered_map<std::string, std::shared_ptr<JPAGImageView>> ViewMap = {};
 
-void OnImageViewSurfaceCreatedCB(OH_NativeXComponent* component, void* window) {
-  if ((component == nullptr) || (window == nullptr)) {
-    return;
-  }
-
-  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
-  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
-  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
-      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
-    return;
-  }
-
-  std::string id(idStr);
-  if (ViewMap.find(id) == ViewMap.end()) {
-    return;
-  }
-  auto view = ViewMap[id];
-  auto animator = view->getAnimator();
-  if (animator == nullptr) {
-    return;
-  }
-  view->setTargetWindow(window);
-  animator->update();
-}
-
-void OnImageViewSurfaceChangedCB(OH_NativeXComponent* component, void* window) {
-  if ((component == nullptr) || (window == nullptr)) {
-    return;
-  }
-
-  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
-  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
-  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
-      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
-    return;
-  }
-
-  std::string id(idStr);
-  if (ViewMap.find(id) == ViewMap.end()) {
-    return;
-  }
-  auto view = ViewMap[id];
-  auto animator = view->getAnimator();
-  if (animator == nullptr) {
-    return;
-  }
-  view->invalidDecoder();
-}
-
-void OnImageViewSurfaceDestroyedCB(OH_NativeXComponent* component, void* window) {
-  if ((component == nullptr) || (window == nullptr)) {
-    return;
-  }
-
-  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
-  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
-  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
-      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
-    return;
-  }
-  std::string id(idStr);
-  if (ViewMap.find(id) == ViewMap.end()) {
-    return;
-  }
-  ViewMap[id]->setTargetWindow(nullptr);
-}
-
-static void DispatchImageViewTouchEventCB(OH_NativeXComponent*, void*) {
-}
-
 static napi_value Flush(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->flush();
+  }
+  return nullptr;
+}
+
+static napi_value Update(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
   napi_value args[1] = {0};
@@ -122,43 +70,144 @@ static napi_value Flush(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value SetCurrentFrame(napi_env env, napi_callback_info info) {
-  napi_value jsView = nullptr;
-  size_t argc = 1;
-  napi_value args[1] = {0};
-  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
-  if (argc == 0) {
-    return nullptr;
-  }
-  int64_t currentFrame = 0;
-  napi_get_value_int64(env, args[0], &currentFrame);
-  JPAGImageView* view = nullptr;
-  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
-  if (view != nullptr) {
-    view->setCurrentFrame(currentFrame);
-  }
-  return nullptr;
-}
-
 static napi_value SetComposition(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
-  size_t argc = 1;
-  napi_value args[1] = {0};
+  size_t argc = 2;
+  napi_value args[2] = {0};
   napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
-  if (argc == 0) {
+  if (argc < 2) {
     return nullptr;
   }
   auto layer = JPAGLayerHandle::FromJs(env, args[0]);
+  double frameRate = 30.0f;
+  napi_get_value_double(env, args[1], &frameRate);
   JPAGImageView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   if (view != nullptr) {
     if (layer != nullptr && layer->layerType() == LayerType::PreCompose) {
-      view->setComposition(std::static_pointer_cast<PAGComposition>(layer));
+      view->setComposition(std::static_pointer_cast<PAGComposition>(layer), frameRate);
     } else {
-      view->setComposition(nullptr);
+      view->setComposition(nullptr, 30.0f);
     }
   }
   return nullptr;
+}
+
+static napi_value ScaleMode(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  int scaleMode = PAGScaleMode::LetterBox;
+  if (view != nullptr) {
+    scaleMode = view->scaleMode();
+  }
+  napi_value result;
+  napi_create_int32(env, scaleMode, &result);
+  return result;
+}
+
+static napi_value SetScaleMode(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  int scaleMode = 0;
+  napi_get_value_int32(env, args[0], &scaleMode);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setScaleMode(scaleMode);
+  }
+  return nullptr;
+}
+
+static napi_value Matrix(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  auto matrix = Matrix::I();
+  if (view != nullptr) {
+    matrix = view->matrix();
+  }
+  return CreateMatrix(env, matrix);
+}
+
+static napi_value SetMatrix(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setMatrix(GetMatrix(env, args[0]));
+  }
+  return nullptr;
+}
+
+static napi_value CacheAllFramesInMemory(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  bool cacheAllFramesInMemory = false;
+  if (view != nullptr) {
+    cacheAllFramesInMemory = view->cacheAllFramesInMemory();
+  }
+  napi_value result;
+  napi_get_boolean(env, cacheAllFramesInMemory, &result);
+  return result;
+}
+
+static napi_value SetCacheAllFramesInMemory(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool cacheAllFramesInMemory = false;
+  napi_get_value_bool(env, args[0], &cacheAllFramesInMemory);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setCacheAllFramesInMemory(cacheAllFramesInMemory);
+  }
+  return nullptr;
+}
+
+static napi_value RepeatCount(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  int repeatCount = 0;
+  if (view != nullptr) {
+    auto animator = view->getAnimator();
+    if (animator != nullptr) {
+      repeatCount = animator->repeatCount();
+    }
+  }
+  napi_value result;
+  napi_create_int32(env, repeatCount, &result);
+  return result;
 }
 
 static napi_value SetRepeatCount(napi_env env, napi_callback_info info) {
@@ -196,6 +245,25 @@ static napi_value Play(napi_env env, napi_callback_info info) {
     }
   }
   return nullptr;
+}
+
+static napi_value IsPlaying(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  bool isPlaying = false;
+  if (view != nullptr) {
+    auto animator = view->getAnimator();
+    if (animator != nullptr) {
+      isPlaying = animator->isRunning();
+    }
+  }
+  napi_value result;
+  napi_get_boolean(env, isPlaying, &result);
+  return result;
 }
 
 static napi_value Pause(napi_env env, napi_callback_info info) {
@@ -278,15 +346,10 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
   return nullptr;
 }
 
-static void ProgressCallback(napi_env env, napi_value callback, void*, void* data) {
-  Frame* framePtr = static_cast<Frame*>(data);
-  size_t argc = 1;
-  napi_value argv[1] = {0};
-  napi_create_int64(env, *framePtr, &argv[0]);
+static void ProgressCallback(napi_env env, napi_value callback, void*, void*) {
   napi_value undefined;
   napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, callback, argc, argv, nullptr);
-  delete framePtr;
+  napi_call_function(env, undefined, callback, 0, nullptr, nullptr);
 }
 
 static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info info) {
@@ -306,6 +369,21 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
   return nullptr;
 }
 
+static napi_value RenderScale(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
+  napi_value result;
+  napi_create_int64(env, view->renderScale(), &result);
+  return result;
+}
+
 static napi_value SetRenderScale(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 1;
@@ -319,27 +397,7 @@ static napi_value SetRenderScale(napi_env env, napi_callback_info info) {
   JPAGImageView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   if (view != nullptr) {
-    view->cacheScale = value;
-    view->invalidDecoder();
-  }
-  return nullptr;
-}
-
-static napi_value SetMaxFrameRate(napi_env env, napi_callback_info info) {
-  napi_value jsView = nullptr;
-  size_t argc = 1;
-  napi_value args[1] = {0};
-  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
-  if (argc == 0) {
-    return nullptr;
-  }
-  double value = 30.0f;
-  napi_get_value_double(env, args[0], &value);
-  JPAGImageView* view = nullptr;
-  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
-  if (view != nullptr) {
-    view->frameRate = value;
-    view->invalidDecoder();
+    view->setRenderScale(value);
   }
   return nullptr;
 }
@@ -351,19 +409,31 @@ static napi_value CurrentFrame(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
   JPAGImageView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
-  if (view == nullptr) {
-    return nullptr;
+  Frame currentFrame = 0;
+  if (view != nullptr) {
+    currentFrame = view->currentFrame();
   }
   napi_value result;
-  auto decoder = view->getDecoder();
-  auto animator = view->getAnimator();
-  if (!decoder || !animator) {
-    napi_create_int64(env, 0, &result);
-    return result;
-  }
-  auto currentFrame = ProgressToFrame(animator->progress(), decoder->numFrames());
   napi_create_int64(env, currentFrame, &result);
   return result;
+}
+
+static napi_value SetCurrentFrame(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  int64_t currentFrame = 0;
+  napi_get_value_int64(env, args[0], &currentFrame);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setCurrentFrame(currentFrame);
+  }
+  return nullptr;
 }
 
 static napi_value CurrentImage(napi_env env, napi_callback_info info) {
@@ -376,35 +446,7 @@ static napi_value CurrentImage(napi_env env, napi_callback_info info) {
   if (view == nullptr) {
     return nullptr;
   }
-  auto decoder = view->getDecoder();
-  auto animator = view->getAnimator();
-  if (!decoder || !animator) {
-    return nullptr;
-  }
-  tgfx::ImageInfo imageInfo =
-      tgfx::ImageInfo::Make(decoder->width(), decoder->height(), tgfx::ColorType::BGRA_8888);
-  uint8_t* pixels = new (std::nothrow) uint8_t[imageInfo.byteSize()];
-  if (pixels == nullptr) {
-    return nullptr;
-  }
-  auto currentFrame = ProgressToFrame(animator->progress(), decoder->numFrames());
-  if (!decoder->readFrame(currentFrame, pixels, imageInfo.rowBytes(), ColorType::BGRA_8888,
-                          AlphaType::Premultiplied)) {
-    delete[] pixels;
-    return nullptr;
-  }
-  OhosPixelMapCreateOps ops;
-  ops.width = imageInfo.width();
-  ops.height = imageInfo.height();
-  ops.pixelFormat = PIXEL_FORMAT_BGRA_8888;
-  ops.alphaType = OHOS_PIXEL_MAP_ALPHA_TYPE_PREMUL;
-  ops.editable = true;
-  napi_value pixelMap;
-  auto status = OH_PixelMap_CreatePixelMap(env, ops, pixels, imageInfo.byteSize(), &pixelMap);
-  if (status == napi_ok) {
-    return pixelMap;
-  }
-  return nullptr;
+  return view->getCurrentPixelMap(env);
 }
 
 static napi_value Release(napi_env env, napi_callback_info info) {
@@ -429,10 +471,12 @@ napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
   std::string id = "PAImageView" + std::to_string(UniqueID::Next());
   auto cView = std::make_shared<JPAGImageView>(id);
   cView->_animator = PAGAnimator::MakeFrom(cView);
+  XComponentHandler::AddListener(id, cView);
   napi_wrap(
       env, jsView, cView.get(),
       [](napi_env, void* finalize_data, void*) {
         JPAGImageView* view = static_cast<JPAGImageView*>(finalize_data);
+        XComponentHandler::RemoveListener(view->id);
         ViewMap.erase(view->id);
       },
       nullptr, nullptr);
@@ -441,21 +485,19 @@ napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
 }
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoderInternal() {
-  if (_window == nullptr || _composition == nullptr) {
+  if (window == nullptr || _composition == nullptr) {
     _decoder = nullptr;
     return nullptr;
   }
   if (_decoder == nullptr) {
-    int width = 0;
-    int height = 0;
-    OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &height, &width);
     float scaleFactor = 1.0;
-    if (width >= height) {
-      scaleFactor = static_cast<float>(cacheScale * (width * 1.0 / _composition->width()));
+    if (_width >= _height) {
+      scaleFactor = static_cast<float>(_renderScale * (_width * 1.0 / _composition->width()));
     } else {
-      scaleFactor = static_cast<float>(cacheScale * (width * 1.0 / _composition->height()));
+      scaleFactor = static_cast<float>(_renderScale * (_height * 1.0 / _composition->height()));
     }
-    _decoder = PAGDecoder::MakeFrom(_composition, frameRate, scaleFactor);
+    _decoder = PAGDecoder::MakeFrom(_composition, _frameRate, scaleFactor);
+    refreshMatrixFromScaleMode();
   }
   return _decoder;
 }
@@ -463,43 +505,35 @@ std::shared_ptr<PAGDecoder> JPAGImageView::getDecoderInternal() {
 bool JPAGImageView::Init(napi_env env, napi_value exports) {
   napi_property_descriptor classProp[] = {
       PAG_DEFAULT_METHOD_ENTRY(flush, Flush),
-      PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(setComposition, SetComposition),
+      PAG_DEFAULT_METHOD_ENTRY(scaleMode, ScaleMode),
+      PAG_DEFAULT_METHOD_ENTRY(setScaleMode, SetScaleMode),
+      PAG_DEFAULT_METHOD_ENTRY(matrix, Matrix),
+      PAG_DEFAULT_METHOD_ENTRY(setMatrix, SetMatrix),
+      PAG_DEFAULT_METHOD_ENTRY(cacheAllFramesInMemory, CacheAllFramesInMemory),
+      PAG_DEFAULT_METHOD_ENTRY(setCacheAllFramesInMemory, SetCacheAllFramesInMemory),
+      PAG_DEFAULT_METHOD_ENTRY(repeatCount, RepeatCount),
       PAG_DEFAULT_METHOD_ENTRY(setRepeatCount, SetRepeatCount),
       PAG_DEFAULT_METHOD_ENTRY(play, Play),
+      PAG_DEFAULT_METHOD_ENTRY(isPlaying, IsPlaying),
       PAG_DEFAULT_METHOD_ENTRY(pause, Pause),
       PAG_DEFAULT_METHOD_ENTRY(setStateChangeCallback, SetStateChangeCallback),
       PAG_DEFAULT_METHOD_ENTRY(setProgressUpdateCallback, SetProgressUpdateCallback),
       PAG_DEFAULT_METHOD_ENTRY(uniqueID, UniqueID),
       PAG_DEFAULT_METHOD_ENTRY(setRenderScale, SetRenderScale),
-      PAG_DEFAULT_METHOD_ENTRY(setMaxFrameRate, SetMaxFrameRate),
+      PAG_DEFAULT_METHOD_ENTRY(renderScale, RenderScale),
       PAG_DEFAULT_METHOD_ENTRY(currentFrame, CurrentFrame),
+      PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(numFrame, NumFrame),
+      PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(currentImage, CurrentImage),
+      PAG_DEFAULT_METHOD_ENTRY(update, Update),
       PAG_DEFAULT_METHOD_ENTRY(release, Release)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
   if (status != napi_ok) {
     return false;
   }
-  napi_value exportInstance = nullptr;
-  if (napi_get_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &exportInstance) != napi_ok) {
-    return true;
-  }
-
-  OH_NativeXComponent* nativeXComponent = nullptr;
-  auto temp = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
-  if (temp != napi_ok) {
-    return true;
-  }
-
-  static OH_NativeXComponent_Callback renderCallback;
-  renderCallback.OnSurfaceCreated = OnImageViewSurfaceCreatedCB;
-  renderCallback.OnSurfaceChanged = OnImageViewSurfaceChangedCB;
-  renderCallback.OnSurfaceDestroyed = OnImageViewSurfaceDestroyedCB;
-  renderCallback.DispatchTouchEvent = DispatchImageViewTouchEventCB;
-
-  OH_NativeXComponent_RegisterCallback(nativeXComponent, &renderCallback);
   return true;
 }
 
@@ -537,27 +571,43 @@ void JPAGImageView::onAnimationRepeat(PAGAnimator*) {
 
 void JPAGImageView::onAnimationUpdate(PAGAnimator* animator) {
   std::lock_guard lock_guard(locker);
-  Frame frame = 0;
-  if (_composition != nullptr) {
-    frame = ProgressToFrame(animator->progress(), _composition->getFile()->duration());
-  }
-
   if (progressCallback) {
-    napi_call_threadsafe_function(progressCallback, new Frame(frame),
+    napi_call_threadsafe_function(progressCallback, nullptr,
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
+  Frame frame = 0;
   auto decoder = getDecoderInternal();
-  if (_window && decoder && decoder->checkFrameChanged(frame)) {
-    OHNativeWindowBuffer* windowBuffer = nullptr;
-    HardwareBufferRef buffer = nullptr;
-    int windowBufferFd = 0;
-    OH_NativeWindow_NativeWindowRequestBuffer(_window, &windowBuffer, &windowBufferFd);
-    OH_NativeBuffer_FromNativeWindowBuffer(windowBuffer, &buffer);
-    decoder->readFrame(frame, buffer);
-    Region region{nullptr, 0};
-    OH_NativeWindow_NativeWindowFlushBuffer(_window, windowBuffer, windowBufferFd, region);
-    OH_NativeWindow_NativeWindowAbortBuffer(_window, windowBuffer);
+  if (_composition != nullptr && decoder != nullptr) {
+    frame = ProgressToFrame(animator->progress(), _decoder->numFrames());
   }
+  handleFrame(frame);
+}
+
+void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
+  std::lock_guard lock_guard(locker);
+  if (_animator == nullptr) {
+    return;
+  }
+  _window = window;
+  this->window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
+  _animator->update();
+  invalidSize();
+}
+
+void JPAGImageView::onSurfaceSizeChanged() {
+  std::lock_guard lock_guard(locker);
+  if (_animator == nullptr) {
+    return;
+  }
+  invalidSize();
+}
+
+void JPAGImageView::onSurfaceDestroyed() {
+  std::lock_guard lock_guard(locker);
+  _window = nullptr;
+  window = nullptr;
+  _width = 0;
+  _height = 0;
 }
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
@@ -565,14 +615,12 @@ std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
   return getDecoderInternal();
 }
 
-void JPAGImageView::setTargetWindow(void* targetWindow) {
-  std::lock_guard lock_guard(locker);
-  _window = static_cast<OHNativeWindow*>(targetWindow);
-}
-
-void JPAGImageView::invalidDecoder() {
-  std::lock_guard lock_guard(locker);
+void JPAGImageView::invalidSize() {
   _decoder = nullptr;
+  if (window) {
+    window->invalidSize();
+  }
+  OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &_height, &_width);
 }
 
 std::shared_ptr<PAGAnimator> JPAGImageView::getAnimator() {
@@ -588,7 +636,15 @@ void JPAGImageView::setCurrentFrame(Frame currentFrame) {
   _animator->setProgress(FrameToProgress(currentFrame, _decoder->numFrames()));
 }
 
-void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition) {
+Frame JPAGImageView::currentFrame() {
+  std::lock_guard lock_guard(locker);
+  if (_animator == nullptr || _decoder == nullptr) {
+    return 0;
+  }
+  return ProgressToFrame(_animator->progress(), _decoder->numFrames());
+}
+
+void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, float frameRate) {
   std::lock_guard lock_guard(locker);
   if (_animator == nullptr) {
     return;
@@ -600,6 +656,193 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition) 
   }
   _decoder = nullptr;
   _composition = composition;
+  _frameRate = frameRate;
+}
+
+void JPAGImageView::setScaleMode(int scaleMode) {
+  std::lock_guard lock_guard(locker);
+  _scaleMode = scaleMode;
+  refreshMatrixFromScaleMode();
+}
+
+int JPAGImageView::scaleMode() {
+  return _scaleMode;
+}
+
+void JPAGImageView::setMatrix(const class Matrix& matrix) {
+  std::lock_guard lock_guard(locker);
+  _matrix = ToTGFX(matrix);
+  _scaleMode = PAGScaleMode::None;
+}
+
+class Matrix JPAGImageView::matrix() {
+  std::lock_guard lock_guard(locker);
+  return ToPAG(_matrix);
+}
+
+void JPAGImageView::setRenderScale(float renderScale) {
+  std::lock_guard lock_guard(locker);
+  if (renderScale <= 0.0 || renderScale > 1.0) {
+    renderScale = 1.0;
+  }
+  _renderScale = renderScale;
+  _decoder = nullptr;
+}
+
+float JPAGImageView::renderScale() {
+  return _renderScale;
+}
+
+void JPAGImageView::setCacheAllFramesInMemory(bool cacheAllFramesInMemory) {
+  std::lock_guard lock_guard(locker);
+  if (_cacheAllFramesInMemory == cacheAllFramesInMemory) {
+    return;
+  }
+  _cacheAllFramesInMemory = cacheAllFramesInMemory;
+  if (!_cacheAllFramesInMemory) {
+    images.clear();
+  }
+}
+
+bool JPAGImageView::cacheAllFramesInMemory() {
+  return _cacheAllFramesInMemory;
+}
+
+bool JPAGImageView::flush() {
+  std::lock_guard lock_guard(locker);
+  auto decoder = getDecoderInternal();
+  if (decoder && _animator) {
+    return handleFrame(ProgressToFrame(_animator->progress(), decoder->numFrames()));
+  }
+  return false;
+}
+
+void JPAGImageView::refreshMatrixFromScaleMode() {
+  if (_scaleMode == PAGScaleMode::None) {
+    return;
+  }
+  if (_decoder == nullptr) {
+    return;
+  }
+
+  _matrix = ToTGFX(ApplyScaleMode(_scaleMode, _decoder->width() / _renderScale,
+                                  _decoder->height() / _renderScale, _width, _height));
+}
+
+bool JPAGImageView::handleFrame(Frame frame) {
+  auto decoder = getDecoderInternal();
+  if (!decoder) {
+    return false;
+  }
+  if (!decoder->checkFrameChanged(frame)) {
+    return true;
+  }
+  if (_cacheAllFramesInMemory) {
+    if (images.find(frame) == images.end()) {
+      tgfx::Bitmap bitmap;
+      if (!bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
+        return false;
+      }
+      auto pixels = bitmap.lockPixels();
+      if (pixels == nullptr) {
+        return false;
+      }
+      decoder->readFrame(frame, pixels, bitmap.rowBytes());
+      bitmap.unlockPixels();
+      images[frame] = {bitmap, tgfx::Image::MakeFrom(bitmap)};
+    }
+
+    currentBitmap = images[frame].first;
+    currentImage = images[frame].second;
+  } else {
+    tgfx::Bitmap bitmap;
+    if (!bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
+      return false;
+    }
+    auto pixels = bitmap.lockPixels();
+    if (pixels == nullptr) {
+      return false;
+    }
+    decoder->readFrame(frame, pixels, bitmap.rowBytes());
+    bitmap.unlockPixels();
+    currentBitmap = bitmap;
+    currentImage = tgfx::Image::MakeFrom(bitmap);
+  }
+  return drawImage(currentImage);
+}
+
+bool JPAGImageView::drawImage(std::shared_ptr<tgfx::Image> image) {
+  if (!window && image) {
+    return false;
+  }
+  auto device = window->getDevice();
+  if (!device) {
+    return false;
+  }
+  auto context = device->lockContext();
+  if (!context) {
+    return false;
+  }
+  auto surface = window->getSurface(context, true);
+  if (surface == nullptr) {
+    surface = window->getSurface(context, false);
+  }
+  if (!surface) {
+    device->unlock();
+    return false;
+  }
+  auto canvas = surface->getCanvas();
+  if (!canvas) {
+    device->unlock();
+    return false;
+  }
+  canvas->clear();
+  tgfx::Matrix imageMatrix = tgfx::Matrix::MakeScale(1.0 / _renderScale);
+  imageMatrix.postConcat(_matrix);
+  canvas->drawImage(image, imageMatrix);
+  surface->flush();
+  context->submit();
+  window->present(context);
+  context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
+  device->unlock();
+  return true;
+}
+
+napi_value JPAGImageView::getCurrentPixelMap(napi_env env) {
+  std::lock_guard lock_guard(locker);
+  if (currentBitmap.isEmpty()) {
+    return nullptr;
+  }
+
+  // create PixelMap
+  OhosPixelMapCreateOps ops;
+  ops.width = currentBitmap.width();
+  ops.height = currentBitmap.height();
+  ops.pixelFormat = currentBitmap.colorType() == tgfx::ColorType::RGBA_8888
+                        ? PIXEL_FORMAT_RGBA_8888
+                        : PIXEL_FORMAT_BGRA_8888;
+  ops.alphaType = OHOS_PIXEL_MAP_ALPHA_TYPE_PREMUL;
+  ops.editable = false;
+  napi_value pixelMap;
+  auto pixels = currentBitmap.lockPixels();
+  auto status = OH_PixelMap_CreatePixelMapWithStride(env, ops, pixels, currentBitmap.byteSize(),
+                                                     currentBitmap.rowBytes(), &pixelMap);
+  currentBitmap.unlockPixels();
+
+  // readPixels
+  auto nativePixelMap = OH_PixelMap_InitNativePixelMap(env, pixelMap);
+  if (!nativePixelMap) {
+    return nullptr;
+  }
+  void* pixelMapAddress = nullptr;
+  OH_PixelMap_AccessPixels(nativePixelMap, &pixelMapAddress);
+  currentBitmap.readPixels(currentBitmap.info(), pixelMapAddress);
+  OH_PixelMap_UnAccessPixels(nativePixelMap);
+  if (status == napi_ok) {
+    return pixelMap;
+  } else {
+    return nullptr;
+  }
 }
 
 void JPAGImageView::release() {

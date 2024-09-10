@@ -19,10 +19,11 @@
 
 #include <napi/native_api.h>
 #include "pag/pag.h"
+#include "platform/ohos/XComponentHandler.h"
 #include "rendering/PAGAnimator.h"
 
 namespace pag {
-class JPAGView : public PAGAnimator::Listener {
+class JPAGView : public PAGAnimator::Listener, public XComponentListener {
  public:
   static bool Init(napi_env env, napi_value exports);
   static inline std::string ClassName() {
@@ -43,6 +44,12 @@ class JPAGView : public PAGAnimator::Listener {
   void onAnimationRepeat(PAGAnimator*) override;
 
   void onAnimationUpdate(PAGAnimator* animator) override;
+
+  void onSurfaceCreated(NativeWindow* window) override;
+
+  void onSurfaceDestroyed() override;
+
+  void onSurfaceSizeChanged() override;
 
   void release();
 

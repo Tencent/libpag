@@ -48,4 +48,4 @@ export { PAG } from './src/main/ets/PAG'
 
 export { PAGDiskCache } from './src/main/ets/PAGDiskCache'
 
-export {PAGImageView} from './src/main/ets/PAGImageView'
+export { PAGImageView, PAGImageViewController, PAGImageViewListener } from './src/main/ets/PAGImageView'

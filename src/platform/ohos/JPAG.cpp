@@ -66,7 +66,8 @@ static napi_value Init(napi_env env, napi_value exports) {
                 pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
                 pag::JPAGText::Init(env, exports) && pag::JPAGImage::Init(env, exports) &&
                 pag::JPAGView::Init(env, exports) && pag::JPAGImageView::Init(env, exports) &&
-                pag::JPAGDiskCache::Init(env, exports);
+                pag::JPAGDiskCache::Init(env, exports) &&
+                pag::XComponentHandler::Init(env, exports);
   if (!result) {
     LOGE("PAG InitFailed");
   }

@@ -24,6 +24,7 @@
 #include "platform/ohos/GPUDrawable.h"
 #include "platform/ohos/JPAGLayerHandle.h"
 #include "platform/ohos/JsHelper.h"
+#include "platform/ohos/XComponentHandler.h"
 
 namespace pag {
 static int PAGViewStateStart = 0;
@@ -32,89 +33,6 @@ static int PAGViewStateEnd = 2;
 static int PAGViewStateRepeat = 3;
 
 static std::unordered_map<std::string, std::shared_ptr<JPAGView>> ViewMap = {};
-
-void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* window) {
-  if ((component == nullptr) || (window == nullptr)) {
-    return;
-  }
-
-  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
-  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
-  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
-      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
-    return;
-  }
-
-  std::string id(idStr);
-  if (ViewMap.find(id) == ViewMap.end()) {
-    return;
-  }
-  auto drawable = pag::GPUDrawable::FromWindow(static_cast<NativeWindow*>(window));
-  auto view = ViewMap[id];
-  auto player = view->getPlayer();
-  auto animator = view->getAnimator();
-  if (player == nullptr || animator == nullptr) {
-    return;
-  }
-  player->setSurface(pag::PAGSurface::MakeFrom(drawable));
-  animator->update();
-}
-
-void OnSurfaceChangedCB(OH_NativeXComponent* component, void* window) {
-  if ((component == nullptr) || (window == nullptr)) {
-    return;
-  }
-
-  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
-  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
-  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
-      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
-    return;
-  }
-
-  std::string id(idStr);
-  if (ViewMap.find(id) == ViewMap.end()) {
-    return;
-  }
-  auto view = ViewMap[id];
-  auto player = view->getPlayer();
-  if (player == nullptr) {
-    return;
-  }
-  auto surface = player->getSurface();
-  if (!surface) {
-    LOGE("PAGView id:%s without PAGSurface while surface size change", id.c_str());
-    return;
-  }
-  surface->updateSize();
-}
-
-void OnSurfaceDestroyedCB(OH_NativeXComponent* component, void* window) {
-  if ((component == nullptr) || (window == nullptr)) {
-    return;
-  }
-
-  char idStr[OH_XCOMPONENT_ID_LEN_MAX + 1] = {'\0'};
-  uint64_t idSize = OH_XCOMPONENT_ID_LEN_MAX + 1;
-  if (OH_NativeXComponent_GetXComponentId(component, idStr, &idSize) !=
-      OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
-    return;
-  }
-
-  std::string id(idStr);
-  if (ViewMap.find(id) == ViewMap.end()) {
-    return;
-  }
-  auto view = ViewMap[id];
-  auto player = view->getPlayer();
-  if (player == nullptr) {
-    return;
-  }
-  player->setSurface(nullptr);
-}
-
-static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
-}
 
 static napi_value Flush(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
@@ -845,10 +763,12 @@ napi_value JPAGView::Constructor(napi_env env, napi_callback_info info) {
   std::string id = "PAGView" + std::to_string(UniqueID::Next());
   auto cView = std::make_shared<JPAGView>(id);
   cView->animator = PAGAnimator::MakeFrom(cView);
+  XComponentHandler::AddListener(id, cView);
   napi_wrap(
       env, jsView, cView.get(),
       [](napi_env, void* finalize_data, void*) {
         JPAGView* view = static_cast<JPAGView*>(finalize_data);
+        XComponentHandler::RemoveListener(view->id);
         ViewMap.erase(view->id);
       },
       nullptr, nullptr);
@@ -898,24 +818,6 @@ bool JPAGView::Init(napi_env env, napi_value exports) {
   if (status != napi_ok) {
     return false;
   }
-  napi_value exportInstance = nullptr;
-  if (napi_get_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &exportInstance) != napi_ok) {
-    return true;
-  }
-
-  OH_NativeXComponent* nativeXComponent = nullptr;
-  auto temp = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
-  if (temp != napi_ok) {
-    return true;
-  }
-
-  static OH_NativeXComponent_Callback renderCallback;
-  renderCallback.OnSurfaceCreated = OnSurfaceCreatedCB;
-  renderCallback.OnSurfaceChanged = OnSurfaceChangedCB;
-  renderCallback.OnSurfaceDestroyed = OnSurfaceDestroyedCB;
-  renderCallback.DispatchTouchEvent = DispatchTouchEventCB;
-
-  OH_NativeXComponent_RegisterCallback(nativeXComponent, &renderCallback);
   return true;
 }
 
@@ -966,6 +868,35 @@ void JPAGView::onAnimationUpdate(PAGAnimator* animator) {
     player->setProgress(animator->progress());
     player->flush();
   }
+}
+
+void JPAGView::onSurfaceCreated(NativeWindow* window) {
+  std::lock_guard lock_guard(locker);
+  auto drawable = pag::GPUDrawable::FromWindow(window);
+  if (player == nullptr || animator == nullptr) {
+    return;
+  }
+  player->setSurface(pag::PAGSurface::MakeFrom(drawable));
+  animator->update();
+}
+
+void JPAGView::onSurfaceSizeChanged() {
+  std::lock_guard lock_guard(locker);
+  if (player == nullptr) {
+    return;
+  }
+  auto surface = player->getSurface();
+  if (surface) {
+    surface->updateSize();
+  }
+}
+
+void JPAGView::onSurfaceDestroyed() {
+  std::lock_guard lock_guard(locker);
+  if (player == nullptr) {
+    return;
+  }
+  player->setSurface(nullptr);
 }
 
 void JPAGView::release() {
