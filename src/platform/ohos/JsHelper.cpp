@@ -326,13 +326,13 @@ napi_value MakeSnapshot(napi_env env, PAGSurface* surface) {
   }
   tgfx::ImageInfo imageInfo =
       tgfx::ImageInfo::Make(surface->width(), surface->height(), tgfx::ColorType::BGRA_8888);
-  uint8_t* pixels = new (std::nothrow) uint8_t[imageInfo.byteSize()];
+
+  auto pixels = ByteData::Make(imageInfo.byteSize());
   if (pixels == nullptr) {
     return nullptr;
   }
-  if (!surface->readPixels(ColorType::BGRA_8888, AlphaType::Premultiplied, pixels,
+  if (!surface->readPixels(ColorType::BGRA_8888, AlphaType::Premultiplied, pixels->data(),
                            imageInfo.rowBytes())) {
-    delete[] pixels;
     return nullptr;
   }
 
@@ -343,7 +343,8 @@ napi_value MakeSnapshot(napi_env env, PAGSurface* surface) {
   ops.alphaType = OHOS_PIXEL_MAP_ALPHA_TYPE_PREMUL;
   ops.editable = true;
   napi_value pixelMap;
-  auto status = OH_PixelMap_CreatePixelMap(env, ops, pixels, imageInfo.byteSize(), &pixelMap);
+  auto status = OH_PixelMap_CreatePixelMapWithStride(env, ops, pixels->data(), imageInfo.byteSize(),
+                                                     imageInfo.rowBytes(), &pixelMap);
   if (status == napi_ok) {
     return pixelMap;
   }

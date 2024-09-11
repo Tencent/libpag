@@ -29,6 +29,14 @@
 
 namespace pag {
 
+class PAGAnimatorState {
+ public:
+  inline static const Enum Start = 0;
+  inline static const Enum Cancel = 1;
+  inline static const Enum End = 2;
+  inline static const Enum Repeat = 3;
+};
+
 napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf8name,
                         size_t propertyCount, const napi_property_descriptor* properties,
                         napi_callback constructor, const std::string& parentName);
