@@ -34,11 +34,6 @@
 #include "tgfx/platform/ohos/OHOSPixelMap.h"
 
 namespace pag {
-static int PAGViewStateStart = 0;
-static int PAGViewStateCancel = 1;
-static int PAGViewStateEnd = 2;
-static int PAGViewStateRepeat = 3;
-
 static std::unordered_map<std::string, std::shared_ptr<JPAGImageView>> ViewMap = {};
 
 static napi_value Flush(napi_env env, napi_callback_info info) {
@@ -540,7 +535,7 @@ bool JPAGImageView::Init(napi_env env, napi_value exports) {
 void JPAGImageView::onAnimationStart(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateStart,
+    napi_call_threadsafe_function(playingStateCallback, const_cast<Enum*>(&PAGAnimatorState::Start),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -548,7 +543,8 @@ void JPAGImageView::onAnimationStart(PAGAnimator*) {
 void JPAGImageView::onAnimationCancel(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateCancel,
+    napi_call_threadsafe_function(playingStateCallback,
+                                  const_cast<Enum*>(&PAGAnimatorState::Cancel),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -556,7 +552,7 @@ void JPAGImageView::onAnimationCancel(PAGAnimator*) {
 void JPAGImageView::onAnimationEnd(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateEnd,
+    napi_call_threadsafe_function(playingStateCallback, const_cast<Enum*>(&PAGAnimatorState::End),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -564,7 +560,8 @@ void JPAGImageView::onAnimationEnd(PAGAnimator*) {
 void JPAGImageView::onAnimationRepeat(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateRepeat,
+    napi_call_threadsafe_function(playingStateCallback,
+                                  const_cast<Enum*>(&PAGAnimatorState::Repeat),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }

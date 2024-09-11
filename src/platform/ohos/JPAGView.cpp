@@ -19,7 +19,6 @@
 #include "JPAGView.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include <cstdint>
-#include "base/utils/Log.h"
 #include "base/utils/UniqueID.h"
 #include "platform/ohos/GPUDrawable.h"
 #include "platform/ohos/JPAGLayerHandle.h"
@@ -27,10 +26,6 @@
 #include "platform/ohos/XComponentHandler.h"
 
 namespace pag {
-static int PAGViewStateStart = 0;
-static int PAGViewStateCancel = 1;
-static int PAGViewStateEnd = 2;
-static int PAGViewStateRepeat = 3;
 
 static std::unordered_map<std::string, std::shared_ptr<JPAGView>> ViewMap = {};
 
@@ -828,7 +823,7 @@ JPAGView::~JPAGView() {
 void JPAGView::onAnimationStart(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateStart,
+    napi_call_threadsafe_function(playingStateCallback, const_cast<Enum*>(&PAGAnimatorState::Start),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -836,7 +831,8 @@ void JPAGView::onAnimationStart(PAGAnimator*) {
 void JPAGView::onAnimationCancel(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateCancel,
+    napi_call_threadsafe_function(playingStateCallback,
+                                  const_cast<Enum*>(&PAGAnimatorState::Cancel),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -844,7 +840,7 @@ void JPAGView::onAnimationCancel(PAGAnimator*) {
 void JPAGView::onAnimationEnd(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateEnd,
+    napi_call_threadsafe_function(playingStateCallback, const_cast<Enum*>(&PAGAnimatorState::End),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -852,7 +848,8 @@ void JPAGView::onAnimationEnd(PAGAnimator*) {
 void JPAGView::onAnimationRepeat(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, &PAGViewStateRepeat,
+    napi_call_threadsafe_function(playingStateCallback,
+                                  const_cast<Enum*>(&PAGAnimatorState::Repeat),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }

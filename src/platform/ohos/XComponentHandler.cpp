@@ -56,18 +56,11 @@ void OnSurfaceChangedCB(OH_NativeXComponent* component, void* window) {
       OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
     return;
   }
-
   std::string id(idStr);
   auto listener = XComponentListeners[id].lock();
   if (listener) {
     listener->onSurfaceSizeChanged();
   }
-  //  auto surface = player->getSurface();
-  //  if (!surface) {
-  //    LOGE("PAGView id:%s without PAGSurface while surface size change", id.c_str());
-  //    return;
-  //  }
-  //  surface->updateSize();
 }
 
 void OnSurfaceDestroyedCB(OH_NativeXComponent* component, void* window) {
@@ -99,8 +92,8 @@ bool XComponentHandler::Init(napi_env env, napi_value exports) {
   }
 
   OH_NativeXComponent* nativeXComponent = nullptr;
-  auto temp = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
-  if (temp != napi_ok) {
+  auto status = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
+  if (status != napi_ok) {
     return true;
   }
 
