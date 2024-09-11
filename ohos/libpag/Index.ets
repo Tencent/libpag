@@ -45,3 +45,7 @@ export { PAGTextLayer } from './src/main/ets/PAGTextLayer'
 export { PAGVideoRange } from './src/main/ets/PAGVideoRange'
 
 export { PAG } from './src/main/ets/PAG'
+
+export { PAGDiskCache } from './src/main/ets/PAGDiskCache'
+
+export { PAGImageView, PAGImageViewController, PAGImageViewListener } from './src/main/ets/PAGImageView'

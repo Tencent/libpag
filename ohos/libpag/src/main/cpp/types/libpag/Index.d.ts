@@ -299,6 +299,8 @@ export declare class JPAGSurface {
   updateSize(): void;
 
   makeSnapshot(): image.PixelMap | null;
+
+  updateSize(): void;
 }
 
 export declare class JPAGView {
@@ -451,4 +453,54 @@ export declare class JPAGDiskCache {
   static ReadFile(key: string): ArrayBuffer;
 
   static WriteFile(key: string, data: ArrayBuffer): boolean;
+}
+
+export declare class JPAGImageView {
+  flush(): boolean;
+
+  setComposition(composition: JPAGComposition | null, maxFrameRate: number): void;
+
+  scaleMode(): number;
+
+  setScaleMode(scaleMode: number);
+
+  matrix(): Array<number>;
+
+  setMatrix(matrix: Array<number>);
+
+  cacheAllFramesInMemory(): boolean;
+
+  setCacheAllFramesInMemory(enable: boolean);
+
+  repeatCount(): number;
+
+  setRepeatCount(repeatCount: number): void;
+
+  play(): void;
+
+  isPlaying(): boolean;
+
+  pause(): void;
+
+  setStateChangeCallback(callback: (number) => void): void;
+
+  setProgressUpdateCallback(callback: () => void): void;
+
+  uniqueID(): string;
+
+  setRenderScale(renderScale: number): void;
+
+  renderScale(): number;
+
+  currentFrame(): number;
+
+  setCurrentFrame(progress: number): void;
+
+  numFrames(): number;
+
+  currentImage(): image.PixelMap | null;
+
+  update(): void;
+
+  release();
 }
