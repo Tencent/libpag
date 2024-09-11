@@ -24,7 +24,7 @@
 namespace pag {
 class XComponentListener {
  public:
-  virtual ~XComponentListener(){};
+  virtual ~XComponentListener() {};
   virtual void onSurfaceCreated(NativeWindow* window) = 0;
   virtual void onSurfaceSizeChanged() = 0;
   virtual void onSurfaceDestroyed() = 0;

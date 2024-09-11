@@ -106,7 +106,6 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   bool drawImage(std::shared_ptr<tgfx::Image> image);
 
   std::mutex locker;
-  std::shared_ptr<PAGDecoder> _decoder = nullptr;
   int _width = 0;
   int _height = 0;
   float _renderScale = 1.0f;
@@ -114,13 +113,12 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   int _scaleMode = PAGScaleMode::LetterBox;
   tgfx::Matrix _matrix = tgfx::Matrix::I();
   bool _cacheAllFramesInMemory = false;
+  std::shared_ptr<PAGComposition> _composition = nullptr;
+  std::shared_ptr<PAGAnimator> _animator = nullptr;
+  std::shared_ptr<PAGDecoder> _decoder = nullptr;
 
   NativeWindow* _window = nullptr;
-  std::shared_ptr<tgfx::Window> window = nullptr;
-  std::shared_ptr<PAGComposition> container = nullptr;
-  std::shared_ptr<PAGImageLayer> imageLayer = nullptr;
-  std::shared_ptr<PAGAnimator> _animator = nullptr;
-  std::shared_ptr<PAGComposition> _composition = nullptr;
+  std::shared_ptr<tgfx::Window> targetWindow = nullptr;
   std::shared_ptr<tgfx::Image> currentImage = nullptr;
   tgfx::Bitmap currentBitmap;
 

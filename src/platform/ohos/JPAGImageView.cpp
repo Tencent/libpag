@@ -485,7 +485,7 @@ napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
 }
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoderInternal() {
-  if (window == nullptr || _composition == nullptr) {
+  if (targetWindow == nullptr || _composition == nullptr) {
     _decoder = nullptr;
     return nullptr;
   }
@@ -589,7 +589,7 @@ void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
     return;
   }
   _window = window;
-  this->window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
+  targetWindow = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
   _animator->update();
   invalidSize();
 }
@@ -605,7 +605,7 @@ void JPAGImageView::onSurfaceSizeChanged() {
 void JPAGImageView::onSurfaceDestroyed() {
   std::lock_guard lock_guard(locker);
   _window = nullptr;
-  window = nullptr;
+  targetWindow = nullptr;
   _width = 0;
   _height = 0;
 }
@@ -617,8 +617,8 @@ std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
 
 void JPAGImageView::invalidSize() {
   _decoder = nullptr;
-  if (window) {
-    window->invalidSize();
+  if (targetWindow) {
+    targetWindow->invalidSize();
   }
   OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &_height, &_width);
 }
@@ -772,10 +772,10 @@ bool JPAGImageView::handleFrame(Frame frame) {
 }
 
 bool JPAGImageView::drawImage(std::shared_ptr<tgfx::Image> image) {
-  if (!window && image) {
+  if (!targetWindow && image) {
     return false;
   }
-  auto device = window->getDevice();
+  auto device = targetWindow->getDevice();
   if (!device) {
     return false;
   }
@@ -783,9 +783,9 @@ bool JPAGImageView::drawImage(std::shared_ptr<tgfx::Image> image) {
   if (!context) {
     return false;
   }
-  auto surface = window->getSurface(context, true);
+  auto surface = targetWindow->getSurface(context, true);
   if (surface == nullptr) {
-    surface = window->getSurface(context, false);
+    surface = targetWindow->getSurface(context, false);
   }
   if (!surface) {
     device->unlock();
@@ -802,7 +802,7 @@ bool JPAGImageView::drawImage(std::shared_ptr<tgfx::Image> image) {
   canvas->drawImage(image, imageMatrix);
   surface->flush();
   context->submit();
-  window->present(context);
+  targetWindow->present(context);
   context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
   device->unlock();
   return true;
