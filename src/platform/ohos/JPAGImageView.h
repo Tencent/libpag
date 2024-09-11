@@ -99,11 +99,15 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   void invalidSize();
 
+  void invalidDecoder();
+
   void refreshMatrixFromScaleMode();
 
   bool handleFrame(Frame frame);
 
-  bool drawImage(std::shared_ptr<tgfx::Image> image);
+  std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>> getImage(Frame frame);
+
+  bool present(std::shared_ptr<tgfx::Image> image);
 
   std::mutex locker;
   int _width = 0;
@@ -119,6 +123,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   NativeWindow* _window = nullptr;
   std::shared_ptr<tgfx::Window> targetWindow = nullptr;
+
   std::shared_ptr<tgfx::Image> currentImage = nullptr;
   tgfx::Bitmap currentBitmap;
 

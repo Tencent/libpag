@@ -44,10 +44,13 @@ static napi_value Flush(napi_env env, napi_callback_info info) {
 
   JPAGImageView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  bool flushResult = false;
   if (view != nullptr) {
-    view->flush();
+    flushResult = view->flush();
   }
-  return nullptr;
+  napi_value result;
+  napi_get_boolean(env, flushResult, &result);
+  return result;
 }
 
 static napi_value Update(napi_env env, napi_callback_info info) {
@@ -375,7 +378,7 @@ static napi_value RenderScale(napi_env env, napi_callback_info info) {
     return nullptr;
   }
   napi_value result;
-  napi_create_int64(env, view->renderScale(), &result);
+  napi_create_double(env, view->renderScale(), &result);
   return result;
 }
 
@@ -481,7 +484,7 @@ napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoderInternal() {
   if (targetWindow == nullptr || _composition == nullptr) {
-    _decoder = nullptr;
+    invalidDecoder();
     return nullptr;
   }
   if (_decoder == nullptr) {
@@ -587,8 +590,8 @@ void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
   }
   _window = window;
   targetWindow = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
-  _animator->update();
   invalidSize();
+  _animator->update();
 }
 
 void JPAGImageView::onSurfaceSizeChanged() {
@@ -603,8 +606,7 @@ void JPAGImageView::onSurfaceDestroyed() {
   std::lock_guard lock_guard(locker);
   _window = nullptr;
   targetWindow = nullptr;
-  _width = 0;
-  _height = 0;
+  invalidSize();
 }
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
@@ -613,11 +615,19 @@ std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
 }
 
 void JPAGImageView::invalidSize() {
-  _decoder = nullptr;
-  if (targetWindow) {
+  if (targetWindow && _window) {
     targetWindow->invalidSize();
+    OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &_height, &_width);
+  } else {
+    _width = 0;
+    _height = 0;
   }
-  OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &_height, &_width);
+  invalidDecoder();
+}
+
+void JPAGImageView::invalidDecoder() {
+  _decoder = nullptr;
+  images.clear();
 }
 
 std::shared_ptr<PAGAnimator> JPAGImageView::getAnimator() {
@@ -651,9 +661,9 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
   } else {
     _animator->setDuration(0);
   }
-  _decoder = nullptr;
   _composition = composition;
   _frameRate = frameRate;
+  invalidDecoder();
 }
 
 void JPAGImageView::setScaleMode(int scaleMode) {
@@ -682,8 +692,11 @@ void JPAGImageView::setRenderScale(float renderScale) {
   if (renderScale <= 0.0 || renderScale > 1.0) {
     renderScale = 1.0;
   }
+  if (_renderScale == renderScale) {
+    return;
+  }
   _renderScale = renderScale;
-  _decoder = nullptr;
+  invalidDecoder();
 }
 
 float JPAGImageView::renderScale() {
@@ -734,41 +747,42 @@ bool JPAGImageView::handleFrame(Frame frame) {
   if (!decoder->checkFrameChanged(frame)) {
     return true;
   }
-  if (_cacheAllFramesInMemory) {
-    if (images.find(frame) == images.end()) {
-      tgfx::Bitmap bitmap;
-      if (!bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
-        return false;
-      }
-      auto pixels = bitmap.lockPixels();
-      if (pixels == nullptr) {
-        return false;
-      }
-      decoder->readFrame(frame, pixels, bitmap.rowBytes());
-      bitmap.unlockPixels();
-      images[frame] = {bitmap, tgfx::Image::MakeFrom(bitmap)};
-    }
-
-    currentBitmap = images[frame].first;
-    currentImage = images[frame].second;
-  } else {
-    tgfx::Bitmap bitmap;
-    if (!bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
-      return false;
-    }
-    auto pixels = bitmap.lockPixels();
-    if (pixels == nullptr) {
-      return false;
-    }
-    decoder->readFrame(frame, pixels, bitmap.rowBytes());
-    bitmap.unlockPixels();
-    currentBitmap = bitmap;
-    currentImage = tgfx::Image::MakeFrom(bitmap);
+  auto image = getImage(frame);
+  if (!image.second) {
+    return false;
   }
-  return drawImage(currentImage);
+  currentBitmap = image.first;
+  currentImage = image.second;
+  return present(currentImage);
 }
 
-bool JPAGImageView::drawImage(std::shared_ptr<tgfx::Image> image) {
+std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>> JPAGImageView::getImage(Frame frame) {
+  if (_cacheAllFramesInMemory && images.find(frame) != images.end()) {
+    return images[frame];
+  }
+
+  tgfx::Bitmap bitmap;
+  if (!bitmap.allocPixels(_decoder->width(), _decoder->height(), false, false)) {
+    return {{}, nullptr};
+  }
+  auto pixels = bitmap.lockPixels();
+  if (pixels == nullptr) {
+    return {{}, nullptr};
+  }
+  _decoder->readFrame(frame, pixels, bitmap.rowBytes());
+  bitmap.unlockPixels();
+  auto image = tgfx::Image::MakeFrom(bitmap);
+
+  if (image == nullptr) {
+    return {{}, nullptr};
+  }
+  if (_cacheAllFramesInMemory) {
+    images[frame] = {bitmap, image};
+  }
+  return {bitmap, image};
+}
+
+bool JPAGImageView::present(std::shared_ptr<tgfx::Image> image) {
   if (!targetWindow && image) {
     return false;
   }
@@ -857,9 +871,7 @@ void JPAGImageView::release() {
     _animator = nullptr;
   }
 
-  if (_decoder) {
-    _decoder = nullptr;
-  }
+  invalidDecoder();
 }
 
 }  // namespace pag
