@@ -190,7 +190,7 @@ Check out the following projects to learn how to use the APIs of libpag:
 - [Android API Reference](https://pag.io/apis/android/index.html)
 - [Web API Reference](https://pag.io/apis/web/index.html)
 
-You can find other docs on [pag.io](https://pag.io/docs/mobile-sdk-guide.html)
+You can find other docs on [pag.io](https://pag.io/docs/home.html)
 
 ## Development
 
