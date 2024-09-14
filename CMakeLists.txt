@@ -53,7 +53,7 @@ endif ()
 
 if (MACOS OR IOS)
     option(PAG_BUILD_FRAMEWORK "Allow build framework" ON)
-    set(PAG_USE_SYSTEM_LZ4 ON)
+    option(PAG_USE_SYSTEM_LZ4 "Allow use of system lz4 library" ON)
 else ()
     set(PAG_BUILD_FRAMEWORK OFF)
     set(PAG_USE_SYSTEM_LZ4 OFF)
