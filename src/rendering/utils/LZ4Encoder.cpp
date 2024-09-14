@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LZ4Encoder.h"
-#ifdef __APPLE__
+#ifndef PAG_USE_SOFTWARE_LZ4
 #include <compression.h>
 #else
 #include "lz4.h"
 #endif
 
 namespace pag {
-#ifdef __APPLE__
+#ifndef PAG_USE_SOFTWARE_LZ4
 class AppleLZ4Encoder : public LZ4Encoder {
  public:
   AppleLZ4Encoder() {
