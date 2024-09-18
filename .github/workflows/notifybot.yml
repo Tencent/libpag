@@ -1,0 +1,163 @@
+name: notifybot
+
+# 监听 PR 事件的触发类型，包括打开、同步和重新打开 PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  poll_workflows:
+    runs-on: ubuntu-latest
+
+    # 定义必要的环境变量
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO_OWNER: ${{ github.repository_owner }}
+      PR_AUTHOR: ${{ github.event.pull_request.user.login }} # 获取 PR 作者
+      REPO_NAME: ${{ github.event.repository.name }} # 确保只包含仓库名称
+      EVENT_TITLE: ${{ github.event.pull_request.title }}
+      WECHAT_WEBHOOK_KEY: ${{ secrets.WECHAT_WEBHOOK_KEY }}
+      MAX_ATTEMPTS: 60               # 最大尝试次数（例如，60 次尝试 ~ 30 分钟）
+      SLEEP_DURATION: 30            # 每次轮询之间的睡眠时间（秒）
+      REQUIRED_WORKFLOWS: "build,autotest,Tencent DevOps(OpenSource)" # 需要监控的工作流，以逗号分隔
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      # 步骤 1：设置 GitHub CLI 并进行认证
+      - name: Set up GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      # 步骤 2：安装必要的依赖
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      # 步骤 3：获取并打印与 PR 相关的所有工作流
+      - name: Fetch and Print Associated Workflows
+        id: fetch_workflows
+        run: |
+          echo "Fetching all workflows associated with PR #$PR_NUMBER on branch $HEAD_REF..."
+
+          # 使用 GitHub CLI 获取指定分支上的所有工作流运行
+          workflow_runs=$(gh api "repos/$REPO_OWNER/$REPO_NAME/actions/runs?branch=$HEAD_REF&per_page=100" || echo "{}")
+
+          # 检查 API 请求是否成功
+          if [ "$workflow_runs" = "{}" ]; then
+            echo "Failed to fetch workflow runs. Please check repository name and permissions."
+            exit 1
+          fi
+
+          # 提取工作流名称并移除重复项
+          associated_workflows=$(echo "$workflow_runs" | jq -r '.workflow_runs[].name' | sort | uniq)
+
+          if [ -z "$associated_workflows" ]; then
+            echo "No associated workflows found."
+          else
+            echo "Associated workflows:"
+            echo "$associated_workflows"
+          fi
+          
+          # 从 REQUIRED_WORKFLOWS 中移除不在 associated_workflows 中的项目
+          IFS=',' read -ra REQUIRED_WORKFLOWS_ARRAY <<< "$REQUIRED_WORKFLOWS"
+          filtered_workflows=()
+          for workflow in "${REQUIRED_WORKFLOWS_ARRAY[@]}"; do
+            if echo "$associated_workflows" | grep -q "$workflow"; then
+              filtered_workflows+=("$workflow")
+            fi
+          done
+          REQUIRED_WORKFLOWS=$(IFS=','; echo "${filtered_workflows[*]}")
+          echo "Filtered REQUIRED_WORKFLOWS: $REQUIRED_WORKFLOWS"
+
+          # 设置输出变量
+          echo "filtered_workflows=$REQUIRED_WORKFLOWS" >> $GITHUB_OUTPUT
+
+      # 步骤 4：轮询工作流状态并根据结果发送通知
+      - name: Poll Workflow Status and Send Notifications
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          REPO_OWNER: ${{ env.REPO_OWNER }}
+          REPO_NAME: ${{ env.REPO_NAME }}
+          WECHAT_WEBHOOK_KEY: ${{ env.WECHAT_WEBHOOK_KEY }}
+          MAX_ATTEMPTS: ${{ env.MAX_ATTEMPTS }}
+          SLEEP_DURATION: ${{ env.SLEEP_DURATION }}
+          REQUIRED_WORKFLOWS: ${{ steps.fetch_workflows.outputs.filtered_workflows }}
+          EVENT_TITLE: ${{ env.EVENT_TITLE }}
+          HEAD_REF: ${{ env.HEAD_REF }}
+          PR_AUTHOR: ${{ env.PR_AUTHOR }} # 将 PR 作者传递给脚本
+        run: |
+          # 将需要监控的工作流名称拆分成数组
+          IFS=',' read -ra WORKFLOWS <<< "$REQUIRED_WORKFLOWS"
+          attempt=0
+          success=true
+
+          echo "Starting to poll workflow statuses for PR #$PR_NUMBER..."
+
+          while [ $attempt -lt $MAX_ATTEMPTS ]; do
+            echo "Checking workflow statuses, attempt: $((attempt+1))/${MAX_ATTEMPTS}"
+
+            all_success=true
+
+            for workflow in "${WORKFLOWS[@]}"; do
+              echo "Checking the latest run status of workflow \"$workflow\"..."
+
+              # 使用 GitHub CLI 获取特定工作流的最新运行
+              workflow_run=$(gh api "repos/$REPO_OWNER/$REPO_NAME/actions/workflows/$workflow.yml/runs?branch=$HEAD_REF&per_page=1" --jq '.workflow_runs[0]' || echo "{}")
+
+              if [ "$workflow_run" = "{}" ]; then
+                echo "Workflow \"$workflow\" has not started running yet."
+                all_success=false
+                continue
+              fi
+
+              # 提取结论和当前状态
+              conclusion=$(echo "$workflow_run" | jq -r '.conclusion // "no_run"')
+              status=$(echo "$workflow_run" | jq -r '.status')
+
+              echo "Workflow \"$workflow\" status: $conclusion, progress: $status"
+
+              if [[ "$status" == "completed" && "$conclusion" == "success" ]]; then
+                echo "Workflow \"$workflow\" has successfully completed."
+              elif [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" || "$conclusion" == "timed_out" || "$conclusion" == "action_required" ]]; then
+                echo "Workflow \"$workflow\" failed or requires manual intervention."
+                all_success=false
+              elif [[ "$status" == "queued" || "$status" == "in_progress" ]]; then
+                echo "Workflow \"$workflow\" is still in progress."
+                all_success=false
+              else
+                echo "Workflow \"$workflow\" has an unknown status."
+                all_success=false
+              fi
+            done
+
+            # 根据当前工作流状态决定下一步操作
+            if [ "$all_success" = true ]; then
+              echo "All monitored workflows have successfully completed."
+              # 发送成功通知
+              curl -X POST -H "Content-Type: application/json" \
+              -d "{
+                    \"msgtype\": \"text\",
+                    \"text\": {
+                      \"content\": \"标题：${EVENT_TITLE}\n地址：https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\n作者：${PR_AUTHOR}\"   
+                    }
+                  }" \
+              "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
+              exit 0
+            else
+              echo "Some workflows are not yet successfully completed. Waiting $SLEEP_DURATION seconds before retrying."
+              sleep $SLEEP_DURATION
+              attempt=$((attempt+1))
+            fi
+          done
+
+          # 超时处理，仅记录日志，不发送通知
+          echo "Workflow statuses were not detected as successful within the maximum number of attempts."
+          exit 1
+        shell: bash
