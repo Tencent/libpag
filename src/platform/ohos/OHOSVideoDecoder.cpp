@@ -252,19 +252,29 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       OH_NativeBuffer_Unreference(hardwareBuffer);
     }
   } else {
-    if (videoStride == 0) {
+    if (videoStride == 0 || videoSliceHeight == 0) {
       OH_AVFormat* format = OH_VideoDecoder_GetOutputDescription(videoCodec);
       if (format) {
         OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_STRIDE, &videoStride);
         OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_SLICE_HEIGHT, &videoSliceHeight);
-      } else {
+      }
+      if (videoStride == 0 || videoSliceHeight == 0) {
         return nullptr;
       }
       yBufferSize = videoStride * videoSliceHeight;
       uvBufferSize = codecBufferInfo.attr.size - yBufferSize;
       yuvBuffer = std::make_shared<pag::YUVBuffer>();
-      yuvBuffer->data[0] = new uint8_t[yBufferSize];
-      yuvBuffer->data[1] = new uint8_t[uvBufferSize];
+      yuvBuffer->data[0] = new (std::nothrow) uint8_t[yBufferSize];
+      if (yuvBuffer->data[0] == nullptr) {
+        videoStride = 0;
+        return nullptr;
+      }
+      yuvBuffer->data[1] = new (std::nothrow) uint8_t[uvBufferSize];
+      if (yuvBuffer->data[1] == nullptr) {
+        delete[] yuvBuffer->data[0];
+        videoStride = 0;
+        return nullptr;
+      }
       yuvBuffer->lineSize[0] = videoStride;
       yuvBuffer->lineSize[1] = videoStride;
       OH_AVFormat_Destroy(format);
