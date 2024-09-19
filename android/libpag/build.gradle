@@ -108,27 +108,6 @@ publishing {
                     developerConnection = 'scm:git:ssh://git@github.com/Tencent/libpag.git'
                 }
             }
-            //withXml 将依赖项添加至pom,否则会找不到依赖的第三方库
-            pom.withXml {
-                // for dependencies and exclusions
-                def dependenciesNode = asNode().appendNode('dependencies')
-                configurations.api.allDependencies.withType(ModuleDependency) { ModuleDependency dp ->
-                    def dependencyNode = dependenciesNode.appendNode('dependency')
-                    dependencyNode.appendNode('groupId', dp.group)
-                    dependencyNode.appendNode('artifactId', dp.name)
-                    dependencyNode.appendNode('version', dp.version)
-
-                    // for exclusions
-                    if (dp.excludeRules.size() > 0) {
-                        def exclusions = dependencyNode.appendNode('exclusions')
-                        dp.excludeRules.each { ExcludeRule ex ->
-                            def exclusion = exclusions.appendNode('exclusion')
-                            exclusion.appendNode('groupId', ex.group)
-                            exclusion.appendNode('artifactId', ex.module)
-                        }
-                    }
-                }
-            }
         }
     }
     repositories {
@@ -189,6 +168,41 @@ project.afterEvaluate {
             from project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi-v7a'
             into project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi'
             include '*.so'
+        }
+    }
+    publishing {
+        repositories {
+        }
+        publications {
+            aar(MavenPublication) {
+                groupId project.group
+                artifactId project.artifactId
+                version project.version
+
+                artifact bundleReleaseAar
+
+                //The publication doesn't know about our dependencies, so we have to manually add them to the pom
+                pom.withXml {
+                    // for dependencies and exclusions
+                    def dependenciesNode = asNode().appendNode('dependencies')
+                    configurations.api.allDependencies.withType(ModuleDependency) { ModuleDependency dp ->
+                        def dependencyNode = dependenciesNode.appendNode('dependency')
+                        dependencyNode.appendNode('groupId', dp.group)
+                        dependencyNode.appendNode('artifactId', dp.name)
+                        dependencyNode.appendNode('version', dp.version)
+
+                        // for exclusions
+                        if (dp.excludeRules.size() > 0) {
+                            def exclusions = dependencyNode.appendNode('exclusions')
+                            dp.excludeRules.each { ExcludeRule ex ->
+                                def exclusion = exclusions.appendNode('exclusion')
+                                exclusion.appendNode('groupId', ex.group)
+                                exclusion.appendNode('artifactId', ex.module)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
