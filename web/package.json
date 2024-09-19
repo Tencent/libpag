@@ -1,5 +1,5 @@
 {
-  "name": "libpag",
+  "name": "@tencent/libpag",
   "version": "4.0.0",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.cjs.js",
