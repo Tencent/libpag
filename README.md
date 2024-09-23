@@ -10,7 +10,7 @@
 
 [![Cloud Studio](https://cs-res.codehub.cn/common/assets/icon-badge.svg)](https://cloudstudio.net/a/20987965736472576?channel=share&sharetype=Markdown)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
+English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io) 测试
 
 ## Introduction
 
