@@ -252,7 +252,8 @@ static napi_value UniqueID(napi_env env, napi_callback_info info) {
 }
 
 static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
-  int state = *static_cast<int*>(data);
+  Enum enumValue = *static_cast<Enum*>(data);
+  int state = static_cast<int>(enumValue);
   size_t argc = 1;
   napi_value argv[1] = {0};
   napi_create_uint32(env, state, &argv[0]);
