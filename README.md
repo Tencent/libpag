@@ -59,7 +59,7 @@ effects and excellent performance now can be created more effectively.
 
 With the flexible editing APIs from PAG SDK, developers can easily change the layer structure of a
 single PAG file, mix multiple PAG files into one composition, or replace texts and images with all
-pre-designed animation effects applied at runtime. It reduces tons of coding work for product
+pre-designed animation effects applied at runtime. It reduces tons of coding work for product xxx
 features like video templates.
 
 ## System Requirements
