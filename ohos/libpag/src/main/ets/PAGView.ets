@@ -462,6 +462,9 @@ export struct PAGView {
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
+      .onLoad(() => {
+        this.controller.update();
+      })
   }
 
   onPageShow(): void {
