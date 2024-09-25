@@ -5,7 +5,6 @@
   "main": "Index.ets",
   "author": "libpag",
   "license": "Apache-2.0",
-  "packageType": "InterfaceHar",
   "dependencies": {
     "libpag.so": "file:./src/main/cpp/types/libpag"
   },
