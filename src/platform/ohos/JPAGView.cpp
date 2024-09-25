@@ -874,7 +874,6 @@ void JPAGView::onSurfaceCreated(NativeWindow* window) {
     return;
   }
   player->setSurface(pag::PAGSurface::MakeFrom(drawable));
-  animator->update();
 }
 
 void JPAGView::onSurfaceSizeChanged() {

@@ -202,10 +202,3 @@ project.afterEvaluate {
         }
     }
 }
-
-buildscript {
-    repositories {
-        maven { url "https://mirrors.tencent.com/nexus/repository/maven-public/" }
-    }
-    dependencies { classpath 'com.github.panpf.bintray-publish:bintray-publish:1.0.0' }
-}
