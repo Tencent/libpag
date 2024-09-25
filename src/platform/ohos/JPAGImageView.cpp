@@ -316,10 +316,10 @@ static napi_value NumFrame(napi_env env, napi_callback_info info) {
 }
 
 static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
-  int state = *static_cast<int*>(data);
+  Enum state = *static_cast<Enum*>(data);
   size_t argc = 1;
   napi_value argv[1] = {0};
-  napi_create_uint32(env, state, &argv[0]);
+  napi_create_uint32(env, static_cast<uint32_t>(state), &argv[0]);
   napi_value undefined;
   napi_get_undefined(env, &undefined);
   napi_call_function(env, undefined, callback, argc, argv, nullptr);
