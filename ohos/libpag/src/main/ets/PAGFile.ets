@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { JPAGDiskCache, JPAGFile, JPAGLayer } from 'libpag.so'
-import { PAGComposition } from './PAGComposition'
+import { JPAGDiskCache, JPAGFile, JPAGLayer } from 'libpag.so';
+import { PAGComposition } from './PAGComposition';
 import { resourceManager } from '@kit.LocalizationKit';
 import { PAGLayer, PAGLayerType } from './PAGLayer';
 import { PAGText } from './PAGText';
@@ -52,7 +52,6 @@ export enum PAGTimeStretchMode {
 }
 
 export class PAGFile extends PAGComposition {
-
   constructor(nativeLayer: JPAGLayer) {
     super(nativeLayer);
   }
@@ -95,7 +94,7 @@ export class PAGFile extends PAGComposition {
    * cache is alive until all PAGFiles are released. Use 'PAGFile.LoadFromBytes()' instead
    * if you don't want to load a PAGFile from the internal caches.
    */
-  static LoadFromPathAsync(filePath: string): Promise<PAGFile | null>  {
+  static LoadFromPathAsync(filePath: string): Promise<PAGFile | null> {
     PAGInit.Init();
     return new Promise<PAGFile | null>((resolve, reject) => {
       if (filePath == null) {
@@ -125,6 +124,9 @@ export class PAGFile extends PAGComposition {
             .catch((error: Error) => {
               console.error(`download file failed! filePath: ${filePath}`);
               reject(error);
+            })
+            .finally(() => {
+              httpRequest.destroy()
             })
         }
       } else {
