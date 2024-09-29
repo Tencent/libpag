@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { JPAGView } from 'libpag.so'
+import { JPAGView } from 'libpag.so';
 import { PAGComposition } from './PAGComposition';
 import { PAGScaleMode } from './PAGScaleMode';
 import { PAGLayer } from './PAGLayer';
@@ -350,14 +350,14 @@ export class PAGViewController {
    * Adds a listener to the set of listeners that are sent events through the life of an
    * animation, such as start, repeat, and end.
    */
-  addListener(listener: WeakRef<PAGViewListener>) {
+  addListener(listener: PAGViewListener) {
     this.listeners.push(listener);
   }
 
   /**
    * Removes a listener from the set listening to this animation.
    */
-  removeListener(listener: WeakRef<PAGViewListener>) {
+  removeListener(listener: PAGViewListener) {
     let index = this.listeners.indexOf(listener);
     if (index != -1) {
       this.listeners.splice(index);
@@ -389,8 +389,7 @@ export class PAGViewController {
   }
 
   private onAnimationStart() {
-    for (const weakListener of this.listeners) {
-      const listener = weakListener.deref();
+    for (const listener of this.listeners) {
       if (listener && listener.onAnimationStart) {
         listener.onAnimationStart(this);
       }
@@ -398,8 +397,7 @@ export class PAGViewController {
   }
 
   private onAnimationEnd() {
-    for (const weakListener of this.listeners) {
-      const listener = weakListener.deref();
+    for (const listener of this.listeners) {
       if (listener && listener.onAnimationEnd) {
         listener.onAnimationEnd(this);
       }
@@ -407,8 +405,7 @@ export class PAGViewController {
   }
 
   private onAnimationCancel() {
-    for (const weakListener of this.listeners) {
-      const listener = weakListener.deref();
+    for (const listener of this.listeners) {
       if (listener && listener.onAnimationCancel) {
         listener.onAnimationCancel(this);
       }
@@ -416,8 +413,7 @@ export class PAGViewController {
   }
 
   private onAnimationRepeat() {
-    for (const weakListener of this.listeners) {
-      const listener = weakListener.deref();
+    for (const listener of this.listeners) {
       if (listener && listener.onAnimationRepeat) {
         listener.onAnimationRepeat(this);
       }
@@ -437,8 +433,7 @@ export class PAGViewController {
     }
   }
   private onAnimatorProgressUpdate = (): void => {
-    for (const weakListener of this.listeners) {
-      const listener = weakListener.deref();
+    for (const listener of this.listeners) {
       if (listener && listener.onAnimationUpdate) {
         listener.onAnimationUpdate(this);
       }
@@ -446,7 +441,7 @@ export class PAGViewController {
   }
   private composition: PAGComposition | null = null;
   private filePath: string | null = null;
-  private listeners: Array<WeakRef<PAGViewListener>> = [];
+  private listeners: Array<PAGViewListener> = [];
   private jView: JPAGView = new JPAGView();
   private view: WeakRef<PAGView> | null = null;
 }
