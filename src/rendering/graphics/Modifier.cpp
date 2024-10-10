@@ -292,7 +292,10 @@ void MaskModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graph
   canvas->concat(matrix);
   tgfx::Paint paint;
   if (useLuma) {
-    shader = shader->makeWithColorFilter(tgfx::ColorFilter::Luma());
+    auto lumaFilter = tgfx::ColorFilter::Matrix(
+        {1,      0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0.21260000000000001, 0.71519999999999995,
+         0.0722, 0, 0});
+    shader = shader->makeWithColorFilter(lumaFilter);
   }
   paint.setMaskFilter(tgfx::MaskFilter::MakeShader(std::move(shader), inverted));
   canvas->drawImage(image, &paint);
