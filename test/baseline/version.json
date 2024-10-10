@@ -8337,7 +8337,7 @@
         "GradientOverlayFilter_Star": "3c6e493e",
         "HueSaturation": "4429f09f",
         "LevelsIndividualFilter": "bd2ee44f",
-        "LogoMipmap": "4b7f3114",
+        "LogoMipmap": "8aab41f8",
         "Mosaic": "48a897dd",
         "MotionBlur_200000": "28826fb2",
         "MotionBlur_600000": "c75e4d74",
@@ -8409,7 +8409,7 @@
         "nextFrame": "6a420423",
         "preFrame": "48a897dd",
         "trackMatte": "088c7e93",
-        "trackMatte_luma": "30dab356",
+        "trackMatte_luma": "8aab41f8",
         "visible": "7f7435d6f"
     },
     "PAGPlayerTest": {
