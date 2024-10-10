@@ -45,7 +45,7 @@ class BlendModifier : public Modifier {
   void prepare(RenderCache*) const override {
   }
 
-  void applyToBounds(tgfx::Rect*) const override{};
+  void applyToBounds(tgfx::Rect*) const override {};
 
   bool applyToPath(tgfx::Path*) const override {
     return alpha == 1.0f;  // blendMode 只影响颜色，不改变形状或透明度，不影响 getPath 结果。
@@ -293,7 +293,7 @@ void MaskModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graph
   tgfx::Paint paint;
   if (useLuma) {
     auto lumaFilter = tgfx::ColorFilter::Matrix(
-        {1,      0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0.21260000000000001, 0.71519999999999995,
+        {0,      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.21260000000000001, 0.71519999999999995,
          0.0722, 0, 0});
     shader = shader->makeWithColorFilter(lumaFilter);
   }
