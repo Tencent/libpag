@@ -811,8 +811,7 @@ bool JPAGImageView::present(std::shared_ptr<tgfx::Image> image) {
   tgfx::Matrix imageMatrix = tgfx::Matrix::MakeScale(1.0 / _renderScale);
   imageMatrix.postConcat(_matrix);
   canvas->drawImage(image, imageMatrix);
-  surface->flush();
-  context->submit();
+  context->flushAndSubmit();
   targetWindow->present(context);
   context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
   device->unlock();

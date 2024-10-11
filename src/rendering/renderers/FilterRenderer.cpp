@@ -467,10 +467,9 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
                                             filterSource->scale);
   }
 
-  // 必须要flush，要不然framebuffer还没真正画到canvas，就被其他图层的filter串改了该framebuffer
-  auto parentSurface = parentCanvas->getSurface();
-  parentSurface->flush();
   auto context = parentCanvas->getContext();
+  // 必须要flush，要不然framebuffer还没真正画到canvas，就被其他图层的filter串改了该framebuffer
+  context->flush();
   ApplyFilters(context, filterNodes, contentBounds, filterSource.get(), filterTarget.get());
   // Reset the GL states stored in the context, they may be modified during the filter being applied.
   context->resetState();

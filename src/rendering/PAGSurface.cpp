@@ -85,7 +85,7 @@ bool PAGSurface::clearAll() {
   contentVersion = 0;  // 清空画布后 contentVersion 还原为初始值 0.
   auto canvas = surface->getCanvas();
   canvas->clear();
-  surface->flush();
+  context->flush();
   drawable->setTimeStamp(0);
   drawable->present(context);
   unlockContext();
@@ -218,10 +218,10 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   }
   onDraw(graphic, surface, cache);
   if (signalSemaphore == nullptr) {
-    surface->flush();
+    context->flush();
   } else {
     tgfx::BackendSemaphore semaphore = {};
-    surface->flush(&semaphore);
+    context->flush(&semaphore);
     signalSemaphore->initGL(semaphore.glSync());
   }
   cache->detachFromContext();

@@ -132,7 +132,7 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
       blurYSize * source->scale.y, color));
   paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
-  targetSurface->flush();
+  context->flush();
 }
 
 void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
@@ -175,7 +175,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
       blurYSize * source->scale.y, color));
   paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
-  targetSurface->flush();
+  context->flush();
 }
 
 void DropShadowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,

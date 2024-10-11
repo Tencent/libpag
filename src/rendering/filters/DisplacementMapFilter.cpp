@@ -147,7 +147,7 @@ void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* 
   if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
     canvas.restore();
   }
-  mapSurface->flush();
+  cache->getContext()->flush();
 }
 
 struct SelectorCoeffs {
