@@ -19,7 +19,7 @@
 #include "GPUDrawable.h"
 #include <native_window/external_window.h>
 #include "base/utils/Log.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(NativeWindow* nativeWindow,

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Canvas.h"
-#include "tgfx/gpu/SurfaceOptions.h"
+#include "tgfx/core/SurfaceOptions.h"
 
 namespace pag {
 class RenderCache;

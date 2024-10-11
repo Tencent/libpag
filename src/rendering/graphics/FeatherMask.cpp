@@ -23,7 +23,7 @@
 #include "rendering/utils/PathUtil.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 std::shared_ptr<Graphic> FeatherMask::MakeFrom(const std::vector<MaskData*>& masks,

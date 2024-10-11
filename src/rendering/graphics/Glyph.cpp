@@ -19,7 +19,7 @@
 #include "Glyph.h"
 #include <unordered_map>
 #include "rendering/utils/shaper/TextShaper.h"
-#include "tgfx/utils/UTF.h"
+#include "tgfx/core/UTF.h"
 
 namespace pag {
 std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgfx::Font& font,

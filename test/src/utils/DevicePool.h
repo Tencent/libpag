@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 class DevicePool {

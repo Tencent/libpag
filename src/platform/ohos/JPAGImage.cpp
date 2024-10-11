@@ -19,9 +19,9 @@
 #include <js_native_api.h>
 #include <rawfile/raw_file.h>
 #include <rawfile/raw_file_manager.h>
-#include <tgfx/platform/ohos/OHOSPixelMap.h>
 #include "JsHelper.h"
 #include "rendering/editing/StillImage.h"
+#include "tgfx/platform/ohos/OHOSPixelMap.h"
 
 namespace pag {
 

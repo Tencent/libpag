@@ -21,7 +21,7 @@
 #include <string>
 #include "codec/utils/StreamContext.h"
 #include "pag/types.h"
-#include "tgfx/utils/DataView.h"
+#include "tgfx/core/DataView.h"
 
 namespace pag {
 

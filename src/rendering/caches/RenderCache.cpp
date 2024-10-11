@@ -27,7 +27,7 @@
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
-#include "tgfx/utils/Clock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。

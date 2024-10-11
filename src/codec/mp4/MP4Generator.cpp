@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MP4Generator.h"
-#include "tgfx/utils/Clock.h"
+#include "tgfx/core/Clock.h"
 
 #define PushInWriteFun(funName)                                                         \
   writeFun.emplace_back([this](auto&& PH1, auto&& PH2) -> int {                         \

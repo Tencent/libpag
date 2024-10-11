@@ -25,7 +25,7 @@
 #include "pag/types.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 #include "rendering/drawables/HardwareBufferDrawable.h"
-#include "tgfx/opengl/eagl/EAGLDevice.h"
+#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 @interface PAGSurfaceImpl ()
 

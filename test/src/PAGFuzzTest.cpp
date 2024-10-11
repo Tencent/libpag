@@ -21,8 +21,8 @@
 #include <vector>
 #include "nlohmann/json.hpp"
 #include "pag/pag.h"
-#include "tgfx/utils/Clock.h"
-#include "tgfx/utils/Task.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
 
 namespace pag {

@@ -19,8 +19,8 @@
 #include "JsHelper.h"
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
-#include <tgfx/core/ImageInfo.h>
 #include "base/utils/Log.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace pag {
 

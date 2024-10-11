@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 class GLRestorer {

@@ -23,7 +23,7 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix);

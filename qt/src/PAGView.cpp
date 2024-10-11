@@ -23,7 +23,7 @@
 #include <QThread>
 #include "pag/file.h"
 #include "platform/qt/GPUDrawable.h"
-#include "tgfx/utils/Clock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 class RenderThread : public QThread {

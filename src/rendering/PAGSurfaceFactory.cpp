@@ -23,7 +23,7 @@
 #include "rendering/drawables/OffscreenDrawable.h"
 #include "rendering/drawables/RenderTargetDrawable.h"
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {

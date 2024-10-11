@@ -23,7 +23,7 @@
 #include "base/utils/UniqueID.h"
 #include "rendering/utils/SurfaceUtil.h"
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 class BlendModifier : public Modifier {

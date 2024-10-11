@@ -20,8 +20,8 @@
 #include "base/utils/TimeUtil.h"
 #include "platform/Platform.h"
 #include "rendering/utils/DisplayLinkWrapper.h"
-#include "tgfx/utils/Clock.h"
-#include "tgfx/utils/Task.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 static constexpr int AnimationTypeEnd = 1;

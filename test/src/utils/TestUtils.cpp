@@ -20,9 +20,9 @@
 #include <fstream>
 #include "base/utils/TGFXCast.h"
 #include "rendering/utils/Directory.h"
-#include "tgfx/opengl/GLFunctions.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/Stream.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Stream.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
 

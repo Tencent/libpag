@@ -25,8 +25,8 @@
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LZ4Decoder.h"
 #include "rendering/utils/LZ4Encoder.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/utils/Buffer.h"
 
 namespace pag {
 class DiskCache;

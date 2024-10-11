@@ -19,7 +19,7 @@
 #include "DiskSequenceReader.h"
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
-#include "tgfx/utils/Buffer.h"
+#include "tgfx/core/Buffer.h"
 
 namespace pag {
 

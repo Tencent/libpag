@@ -18,7 +18,7 @@
 
 #include "pag/c/ext/egl/pag_egl_globals.h"
 #include <mutex>
-#include "tgfx/opengl/egl/EGLGlobals.h"
+#include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 
 static std::mutex eglGlobalsLocker = {};
 

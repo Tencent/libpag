@@ -28,7 +28,7 @@
 #include "rendering/filters/utils/FilterBuffer.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "rendering/utils/SurfaceUtil.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 

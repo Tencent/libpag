@@ -18,7 +18,7 @@
 
 #include "Canvas.h"
 #include "rendering/caches/RenderCache.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 struct CanvasState {

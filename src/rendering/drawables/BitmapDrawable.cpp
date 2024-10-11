@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapDrawable.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<BitmapDrawable> BitmapDrawable::Make(int width, int height) {
