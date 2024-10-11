@@ -20,7 +20,7 @@
 
 #include <native_window/external_window.h>
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 
 namespace pag {
 

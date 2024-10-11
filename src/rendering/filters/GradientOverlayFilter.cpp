@@ -20,7 +20,7 @@
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/graphics/GradientPaint.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "pag/pag.h"
-#include "tgfx/utils/Task.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 /**

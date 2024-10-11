@@ -18,7 +18,7 @@
 
 #include "TextShaperPrimitive.h"
 #include "rendering/FontManager.h"
-#include "tgfx/utils/UTF.h"
+#include "tgfx/core/UTF.h"
 
 namespace pag {
 PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,

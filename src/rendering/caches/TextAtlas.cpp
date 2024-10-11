@@ -20,7 +20,7 @@
 #include "RenderCache.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 class Atlas {

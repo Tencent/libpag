@@ -64,9 +64,9 @@ enum class Backend {
 enum class ImageOrigin {
   /**
    * The default origin of the native coordinate system in the GPU backend. For example, the
-   * SurfaceOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
-   * textures. Textures newly created by the backend API for off-screen rendering usually have a
-   * SurfaceOrigin::TopLeft origin.
+   * ImageOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
+   * textures. Textures newly created by the backend API for off-screen rendering usually have an
+   * ImageOrigin::TopLeft origin.
    */
   TopLeft,
 

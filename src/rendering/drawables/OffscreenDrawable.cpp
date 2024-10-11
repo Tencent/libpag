@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OffscreenDrawable.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height) {

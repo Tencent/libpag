@@ -23,8 +23,8 @@
 #include <iostream>
 #include "nlohmann/json.hpp"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestDir.h"
 #include "utils/TestUtils.h"
 

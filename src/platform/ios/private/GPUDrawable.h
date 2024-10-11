@@ -19,7 +19,7 @@
 #pragma once
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/opengl/eagl/EAGLWindow.h"
+#include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 
 namespace pag {
 

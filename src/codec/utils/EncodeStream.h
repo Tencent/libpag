@@ -20,7 +20,7 @@
 
 #include "codec/utils/StreamContext.h"
 #include "pag/file.h"
-#include "tgfx/utils/DataView.h"
+#include "tgfx/core/DataView.h"
 
 namespace pag {
 

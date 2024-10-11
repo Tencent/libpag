@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDrawable.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/cgl/CGLWindow.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromView(NSView* view) {

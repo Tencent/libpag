@@ -21,7 +21,7 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 class FilterBuffer {

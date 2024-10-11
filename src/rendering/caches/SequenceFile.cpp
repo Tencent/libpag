@@ -22,8 +22,8 @@
 #include "base/utils/Log.h"
 #include "pag/file.h"
 #include "rendering/utils/Directory.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/DataView.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/DataView.h"
 
 namespace pag {
 static constexpr uint8_t FILE_VERSION = 1;

@@ -22,7 +22,7 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/opengl/GLResource.h"
+#include "tgfx/gpu/opengl/GLResource.h"
 
 namespace pag {
 std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,

@@ -20,7 +20,7 @@
 #include "c/pag_types_priv.h"
 #include "pag/pag.h"
 #include "rendering/drawables/DoubleBufferedDrawable.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 pag_surface* pag_surface_make_offscreen_double_buffered(int width, int height, bool tryHardware,
                                                         void* sharedContext) {

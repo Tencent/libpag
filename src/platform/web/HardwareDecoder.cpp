@@ -20,7 +20,7 @@
 #include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 using namespace emscripten;
 

@@ -138,7 +138,7 @@ std::shared_ptr<tgfx::Shader> GradientPaint::getShader() const {
   } else if (gradientType == GradientFillType::Angle) {
     auto center = startPoint + endPoint;
     center.set(center.x * 0.5f, center.y * 0.5f);
-    shader = tgfx::Shader::MakeSweepGradient(center, 0, 360, colors, positions);
+    shader = tgfx::Shader::MakeConicGradient(center, 0, 360, colors, positions);
   } else if (gradientType == GradientFillType::Reflected) {
     auto reflectedColors = colors;
     reflectedColors.insert(reflectedColors.begin(), colors.rbegin(), colors.rend() - 1);

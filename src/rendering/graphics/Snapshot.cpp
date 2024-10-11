@@ -19,7 +19,7 @@
 #include "Snapshot.h"
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 size_t Snapshot::memoryUsage() const {

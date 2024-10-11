@@ -20,8 +20,8 @@
 #include "nlohmann/json.hpp"
 #include "pag/pag.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
 namespace pag {

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/opengl/GLDevice.h"
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 
 namespace pag {

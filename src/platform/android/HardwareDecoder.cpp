@@ -19,8 +19,8 @@
 #include "HardwareDecoder.h"
 #include "base/utils/Log.h"
 #include "platform/android/JStringUtil.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/Task.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 static Global<jclass> HardwareDecoderClass;

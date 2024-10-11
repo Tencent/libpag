@@ -19,7 +19,7 @@
 #include "Trace.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Bitmap.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 void Trace(std::shared_ptr<tgfx::Surface> surface, const std::string& path) {

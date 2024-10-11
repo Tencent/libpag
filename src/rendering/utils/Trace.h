@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 /**
