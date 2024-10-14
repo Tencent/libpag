@@ -87,6 +87,7 @@ class DiskCache {
   uint32_t filePathToID(const std::string& path);
   void notifyFileClosed(uint32_t fileID);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
+  void removeRedundancyCache();
 
   friend class SequenceFile;
   friend class PAGDiskCache;

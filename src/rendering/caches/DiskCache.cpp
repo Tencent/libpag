@@ -73,6 +73,7 @@ DiskCache::DiskCache() {
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");
+    removeRedundancyCache();
     readConfig();
   }
 }
@@ -413,4 +414,27 @@ void DiskCache::notifyFileSizeChanged(uint32_t fileID, size_t fileSize) {
     }
   }
 }
+
+void DiskCache::removeRedundancyCache() {
+  auto file = fopen(configPath.c_str(), "rb");
+  bool shouldVisitCacheFiles = false;
+  if (file == nullptr) {
+    shouldVisitCacheFiles = true;
+  } else {
+    fseek(file, 0, SEEK_END);
+    auto size = ftell(file);
+    fclose(file);
+    if (size == 0) {
+      shouldVisitCacheFiles = true;
+    }
+  }
+  if (shouldVisitCacheFiles) {
+    LOGE("Since %s does not exist, start clearing the cache files.\n",configPath.c_str());
+    Directory::VisitFiles(cacheFolder, [&](const std::string &path, size_t) {
+        remove(path.c_str());
+    });
+  }
+}
+
+
 }  // namespace pag
