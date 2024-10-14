@@ -73,7 +73,10 @@ DiskCache::DiskCache() {
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");
-    readConfig();
+    if (!readConfig()) {
+      Directory::VisitFiles(cacheFolder,
+                            [&](const std::string& path, size_t) { remove(path.c_str()); });
+    }
   }
 }
 
@@ -268,16 +271,16 @@ void DiskCache::moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo) {
   }
 }
 
-void DiskCache::readConfig() {
+bool DiskCache::readConfig() {
   auto file = fopen(configPath.c_str(), "rb");
   if (file == nullptr) {
-    return;
+    return false;
   }
   fseek(file, 0, SEEK_END);
   auto size = ftell(file);
   if (size == 0) {
     fclose(file);
-    return;
+    return false;
   }
   fseek(file, 0, SEEK_SET);
   tgfx::Buffer buffer(size);
@@ -321,6 +324,7 @@ void DiskCache::readConfig() {
   if (checkDiskSpace(maxDiskSize) || !expiredFiles.empty()) {
     saveConfig();
   }
+  return true;
 }
 
 void DiskCache::saveConfig() {
@@ -413,4 +417,5 @@ void DiskCache::notifyFileSizeChanged(uint32_t fileID, size_t fileSize) {
     }
   }
 }
+
 }  // namespace pag
