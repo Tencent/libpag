@@ -411,10 +411,10 @@ Frame PAGImageLayer::ScaleTimeRemap(AnimatableProperty<float>* property,
     if (keyframe->startTime < 0) {
       CutKeyframe(keyframe, 0, true);
     }
-    minValue = std::floor(std::min(keyframe->startValue, minValue));
-    minValue = std::floor(std::min(keyframe->endValue, minValue));
-    maxValue = std::floor(std::max(keyframe->startValue, maxValue));
-    maxValue = std::floor(std::max(keyframe->endValue, maxValue));
+    minValue = std::round(std::min(keyframe->startValue, minValue));
+    minValue = std::round(std::min(keyframe->endValue, minValue));
+    maxValue = std::round(std::max(keyframe->startValue, maxValue));
+    maxValue = std::round(std::max(keyframe->endValue, maxValue));
   }
   for (auto& keyframe : keyframes) {
     keyframe->startValue -= minValue;

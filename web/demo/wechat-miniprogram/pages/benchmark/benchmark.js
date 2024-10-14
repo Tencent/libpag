@@ -1,7 +1,7 @@
 import { PAGInit } from '../../utils/libpag';
 import { loadFileByRequest } from '../../utils/request';
 
-const origin = 'https://pag.art/file/';
+const origin = 'https://pag.io/file/';
 
 Page({
   data: {

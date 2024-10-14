@@ -1,6 +1,6 @@
-<img src="https://pag.art/img/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[官网](https://pag.art) | [English](./README.md) | 简体中文 | [Weblite版本](./web/lite) | [小程序版本](./web/wechat) | [小程序lite版本](./web/lite/wechat)
+[官网](https://pag.io) | [English](./README.md) | 简体中文 | [Weblite版本](./web/lite) | [小程序版本](./web/wechat) | [小程序lite版本](./web/lite/wechat)
 
 ## 介绍
 
@@ -38,7 +38,7 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
     // 实例化 PAG
     const PAG = await window.libpag.PAGInit();
     // 获取 PAG 素材数据
-    const buffer = await fetch('https://pag.art/file/like.pag').then((response) => response.arrayBuffer());
+    const buffer = await fetch('https://pag.io/file/like.pag').then((response) => response.arrayBuffer());
     // 加载 PAG 素材为 PAGFile 对象
     const pagFile = await PAG.PAGFile.load(buffer);
     // 将画布尺寸设置为 PAGFile的尺寸
@@ -58,12 +58,12 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
 ```js
 const PAG = await window.libpag.PAGInit({
   locateFile: () => {
-    if (location.host === 'dev.pag.art') {
+    if (location.host === 'dev.pag.io') {
       // development environment
-      return 'https://dev.pag.art/file/libpag.wasm';
+      return 'https://dev.pag.io/file/libpag.wasm';
     } else {
       // production environment
-      return 'https://pag.art/file/libpag.wasm';
+      return 'https://pag.io/file/libpag.wasm';
     }
   },
 });
@@ -89,7 +89,7 @@ npm package 中提供了多种构建产物，可以阅读 [这里](./doc/develop
 
 Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接入示例和 Vue / React / PixiJS 等配置示例， 可以点击 [这里](https://github.com/libpag/pag-web) 查看。
 
-更多的 API 接口可以阅读 [API 文档](https://pag.art/api.html#/apis/web/)。
+更多的 API 接口可以阅读 [API 文档](https://pag.io/api.html#/apis/web/)。
 
 ## 浏览器兼容性
 
@@ -156,7 +156,7 @@ PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行�
 
 ## 关于 BMP 预合成
 
-可以下载 [PAGViewer](https://pag.art/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量大于 0 时，即为 PAG 动画文件中存在 BMP 预合成。
+可以下载 [PAGViewer](https://pag.io/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量大于 0 时，即为 PAG 动画文件中存在 BMP 预合成。
 
 ## Roadmap
 
@@ -178,15 +178,11 @@ $ npm install
 执行 `build.sh debug` 来获得 `libpag.wasm` 文件
 
 ```bash
-# web/script目录下
-$ cd script
-# 添加执行权限
-$ chmod +x ./build.sh
-# 打包
-$ ./build.sh debug
+# ./web 目录下
+$ npm run build:debug
 ```
 
-打包 Typescript 文件，修改 Typescript 文件会自动打包到 Javascript 文件
+开启 Typescript 自动编译(可选)，修改 Typescript 文件会自动打包到 Javascript 文件
 
 ```bash
 # web目录下
@@ -204,28 +200,13 @@ Chrome 浏览器打开 `http://localhost:8081/demo/index.html` 即可看到效�
 
 需要断点调试时，可以安装 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)，并打开 Chrome DevTools > 设置 > 实验 > 勾选「WebAssembly Debugging: Enable DWARF support」选项启用 SourceMap 支持。现在就可以在 Chrome DevTools 中对 C++ 文件进行断点调试了。
 
-#### 注意点
-
-在使用  `build.sh` 编译 `libpag.wasm` 时，因为 `emscripten` 与系统的 std 库有兼容问题，所以屏蔽了 undefined symbols 报错。
-
-```shell
-# build.sh
-emcc -s ERROR_ON_UNDEFINED_SYMBOLS=0
-```
-
-编译过程中需要留意是否有std库兼容外的 warning 信息，避免 undefined symbols 的错误在运行时才暴露出来。
-
 ### 生产流程
 
 执行 `build.sh` 脚本
 
 ```bash
-# web/script目录下
-$ cd script
-# 添加执行权限
-$ chmod +x ./build.sh
-# 打包
-$ ./build.sh
+# ./web 目录下
+$ npm run build
 ```
 
 ### CLion 编译
@@ -241,7 +222,7 @@ $ ./build.sh
 打包生产版本
 
 ```bash
-$ cd script & ./build.sh
+$ npm run build
 ```
 
 启动测试 HTTP 服务

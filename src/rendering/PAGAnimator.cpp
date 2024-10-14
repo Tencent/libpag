@@ -19,8 +19,9 @@
 #include "PAGAnimator.h"
 #include "base/utils/TimeUtil.h"
 #include "platform/Platform.h"
-#include "tgfx/utils/Clock.h"
-#include "tgfx/utils/Task.h"
+#include "rendering/utils/DisplayLinkWrapper.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 static constexpr int AnimationTypeEnd = 1;
@@ -35,7 +36,11 @@ class AnimationTicker {
   }
 
   AnimationTicker() {
-    displayLink = Platform::Current()->createDisplayLink([this] { onFrameAvailable(); });
+    auto callback = [this] { onFrameAvailable(); };
+    displayLink = DisplayLinkWrapper::Make(callback);
+    if (displayLink == nullptr) {
+      displayLink = Platform::Current()->createDisplayLink(callback);
+    }
   }
 
   bool available() {
@@ -75,7 +80,7 @@ class AnimationTicker {
     auto listCopy = animators;
     locker.unlock();
     for (auto& animator : listCopy) {
-      if (animator.unique()) {
+      if (animator.use_count() == 1) {
         animator->cancelAnimation();
         continue;
       }
@@ -102,13 +107,17 @@ bool PAGAnimator::isSync() {
 }
 
 void PAGAnimator::setSync(bool value) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  locker.lock();
   if (_isSync == value) {
+    locker.unlock();
     return;
   }
   _isSync = value;
-  if (_isSync) {
-    resetTask();
+  auto tempTask = task;
+  task = nullptr;
+  locker.unlock();
+  if (tempTask) {
+    tempTask->wait();
   }
 }
 
@@ -143,6 +152,7 @@ void PAGAnimator::setRepeatCount(int repeatCount) {
     repeatCount = 0;
   }
   _repeatCount = repeatCount;
+  playedCount = 0;
 }
 
 double PAGAnimator::progress() {
@@ -271,6 +281,10 @@ void PAGAnimator::doUpdate(bool setStartTime) {
   }
   auto isSync = _isSync;
   locker.unlock();
+  auto listener = weakListener.lock();
+  if (listener) {
+    listener->onAnimationWillUpdate(this);
+  }
   if (isSync) {
     onFlush(setStartTime);
   } else {
@@ -317,11 +331,4 @@ void PAGAnimator::resetStartTime() {
   _startTime = INT64_MIN;
 }
 
-void PAGAnimator::resetTask() {
-  if (task != nullptr) {
-    task->cancel();
-    task->wait();
-    task = nullptr;
-  }
-}
 }  // namespace pag

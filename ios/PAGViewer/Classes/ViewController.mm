@@ -41,28 +41,28 @@
  * Notifies the start of the animation.
  */
 - (void)onAnimationStart:(PAGView*)pagView {
-    NSLog(@"[ViewController onAnimationStart]");
+//    NSLog(@"[ViewController onAnimationStart]");
 }
 
 /**
  * Notifies the end of the animation.
  */
 - (void)onAnimationEnd:(PAGView*)pagView {
-    NSLog(@"[ViewController onAnimationEnd]");
+//    NSLog(@"[ViewController onAnimationEnd]");
 }
 
 /**
  * Notifies the cancellation of the animation.
  */
 - (void)onAnimationCancel:(PAGView*)pagView {
-    NSLog(@"[ViewController onAnimationCancel]");
+//    NSLog(@"[ViewController onAnimationCancel]");
 }
 
 /**
  * Notifies the repetition of the animation.
  */
 - (void)onAnimationRepeat:(PAGView*)pagView {
-    NSLog(@"[ViewController onAnimationRepeat]");
+//    NSLog(@"[ViewController onAnimationRepeat]");
 }
 
 - (void)viewDidLoad {

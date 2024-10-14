@@ -1,4 +1,4 @@
-import type { WebFont } from './core/web-mask';
+import type { WebFont } from '@tgfx/core/web-mask';
 import type { ctor, Point, Rect, Vector } from './types';
 
 export interface TimeRange {
@@ -33,10 +33,10 @@ export interface FontMetrics {
 }
 
 export interface ScalerContext {
-  fontString: () => string;
-  getTextAdvance: (text: string) => number;
-  getTextBounds: (text: string) => Rect;
-  generateFontMetrics: () => FontMetrics;
+  fontString: (fauxBold: boolean, fauxItalic: boolean) => string;
+  getAdvance: (text: string) => number;
+  getBounds: (text: string, fauxBold: boolean, fauxItalic: boolean) => Rect;
+  getFontMetrics: () => FontMetrics;
   generateImage: (text: string, bounds: Rect) => TexImageSource | OffscreenCanvas;
 }
 

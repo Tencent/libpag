@@ -24,7 +24,13 @@ android {
         }
 
         ndk {
-            abiFilters "armeabi-v7a", "arm64-v8a"
+            if (project.hasProperty("arm64-only")) {
+                abiFilters.add("arm64-v8a")
+            } else {
+                abiFilters.add("armeabi-v7a")
+                abiFilters.add("arm64-v8a")
+                abiFilters.add("x86_64")
+            }
         }
     }
     sourceSets {
@@ -44,8 +50,8 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version rootProject.cmakeVersion
             path '../../CMakeLists.txt'
+            version = "3.22.1"
         }
     }
     namespace 'org.libpag'
@@ -195,11 +201,4 @@ project.afterEvaluate {
             }
         }
     }
-}
-
-buildscript {
-    repositories {
-        maven { url "https://mirrors.tencent.com/nexus/repository/maven-public/" }
-    }
-    dependencies { classpath 'com.github.panpf.bintray-publish:bintray-publish:1.0.0' }
 }

@@ -27,13 +27,13 @@ export class BackendContext {
 
   public handle: number;
 
-  private adopted: boolean;
+  private externallyOwned: boolean;
   private isDestroyed = false;
   private oldHandle = 0;
 
-  public constructor(handle: number, adopted = false) {
+  public constructor(handle: number, externallyOwned = false) {
     this.handle = handle;
-    this.adopted = adopted;
+    this.externallyOwned = externallyOwned;
   }
 
   public getContext(): WebGLRenderingContext | null {
@@ -93,7 +93,9 @@ export class BackendContext {
   }
 
   public destroy(): void {
-    if (this.adopted) return;
+    if (this.externallyOwned) {
+      return;
+    }
     PAGModule.GL.deleteContext(this.handle);
   }
 

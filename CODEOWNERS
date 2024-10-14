@@ -1,12 +1,12 @@
 # Default owners:
-*       @domchen @lvpengwei @luckyzhliu
+*       @domchen @Hparty @shlzxjp
 
-*.js    @zenoslin @domchen @lvpengwei @luckyzhliu
-*.ts    @zenoslin @domchen @lvpengwei @luckyzhliu
-*.sh    @kevingpqi123 @domchen @lvpengwei @luckyzhliu
-/*      @kevingpqi123 @domchen @lvpengwei @luckyzhliu
-/web/    @zenoslin @domchen @lvpengwei @luckyzhliu
-/.github/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
-/test/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
-/linux/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
-/win/   @FusionXu @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+*.sh    @kevingpqi123 @domchen @Hparty @shlzxjp
+/*      @kevingpqi123 @domchen @Hparty @shlzxjp
+/ohos/  @kevingpqi123 @domchen @Hparty @shlzxjp
+/ios/   @kevingpqi123 @domchen @Hparty @shlzxjp
+/mac/   @kevingpqi123 @domchen @Hparty @shlzxjp
+/.github/   @kevingpqi123 @domchen @Hparty @shlzxjp
+/test/   @kevingpqi123 @domchen @Hparty @shlzxjp
+/linux/   @kevingpqi123 @domchen @Hparty @shlzxjp
+/win/   @kevingpqi123 @domchen @Hparty @shlzxjp

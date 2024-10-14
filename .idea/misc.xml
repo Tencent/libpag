@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="CMakePythonSetting">
+    <option name="pythonIntegrationState" value="YES" />
+  </component>
   <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
   <component name="CidrRootsConfiguration">
     <excludeRoots>
-      <file path="$PROJECT_DIR$/.github" />
-      <file path="$PROJECT_DIR$/android" />
-      <file path="$PROJECT_DIR$/cmake-build-debug" />
-      <file path="$PROJECT_DIR$/cmake-build-webdebug" />
       <file path="$PROJECT_DIR$/assets" />
       <file path="$PROJECT_DIR$/build" />
-      <file path="$PROJECT_DIR$/ios" />
-      <file path="$PROJECT_DIR$/mac" />
+      <file path="$PROJECT_DIR$/cmake-build-debug" />
+      <file path="$PROJECT_DIR$/cmake-build-webdebug" />
       <file path="$PROJECT_DIR$/out" />
-      <file path="$PROJECT_DIR$/qt" />
       <file path="$PROJECT_DIR$/resources" />
       <file path="$PROJECT_DIR$/result" />
       <file path="$PROJECT_DIR$/tgfx/.idea" />

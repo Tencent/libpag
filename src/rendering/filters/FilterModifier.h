@@ -57,8 +57,7 @@ class FilterModifier : public Modifier {
     return false;
   }
 
-  void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                      std::shared_ptr<Graphic> graphic) const override;
+  void applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const override;
 
   std::shared_ptr<Modifier> mergeWith(const Modifier*) const override {
     return nullptr;

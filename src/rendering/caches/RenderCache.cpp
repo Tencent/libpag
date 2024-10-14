@@ -27,7 +27,7 @@
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
-#include "tgfx/utils/Clock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -183,7 +183,6 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
     removeTextAtlas(assetID);
-    shapeCaches.erase(assetID);
   }
 }
 
@@ -214,7 +213,7 @@ void RenderCache::detachFromContext() {
   clearExpiredDecodedImages();
   clearExpiredSnapshots();
   if (!timestamps.empty()) {
-    // Always purge scratch resources that haven't been used in 1 frame.
+    // Always purge recycled resources that haven't been used in 1 frame.
     context->purgeResourcesNotUsedSince(timestamps.back(), true);
   }
   if (context->memoryUsage() + graphicsMemory > PURGEABLE_GRAPHICS_MEMORY &&
@@ -223,7 +222,7 @@ void RenderCache::detachFromContext() {
     // is over 20M.
     context->purgeResourcesNotUsedSince(timestamps.front(), false);
   }
-  timestamps.push(tgfx::Clock::Now());
+  timestamps.push(std::chrono::steady_clock::now());
   while (timestamps.size() > PURGEABLE_EXPIRED_FRAME) {
     timestamps.pop();
   }
@@ -263,8 +262,8 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture) {
     return nullptr;
   }
   auto minScaleFactor = stage->getAssetMinScale(picture->assetID);
-  bool enableMipMap = minScaleFactor / scaleFactor < MIPMAP_ENABLED_THRESHOLD;
-  auto newSnapshot = picture->makeSnapshot(this, scaleFactor, enableMipMap);
+  bool enableMipmap = minScaleFactor / scaleFactor < MIPMAP_ENABLED_THRESHOLD;
+  auto newSnapshot = picture->makeSnapshot(this, scaleFactor, enableMipmap);
   if (newSnapshot == nullptr) {
     return nullptr;
   }
@@ -276,50 +275,6 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture) {
   snapshotPositions[snapshot] = snapshotLRU.begin();
   snapshotCaches[picture->assetID] = snapshot;
   return snapshot;
-}
-
-std::shared_ptr<tgfx::Shape> RenderCache::getShape(ID assetID, const tgfx::Path& path) {
-  usedAssets.insert(assetID);
-  auto scaleFactor = stage->getAssetMaxScale(assetID);
-  auto shape = findShape(assetID, path);
-  if (shape && fabsf(shape->resolutionScale() - scaleFactor) > SCALE_FACTOR_PRECISION) {
-    removeShape(assetID, path);
-    shape = nullptr;
-  }
-  if (shape != nullptr) {
-    return shape;
-  }
-  shape = tgfx::Shape::MakeFromFill(path, scaleFactor);
-  if (shape != nullptr) {
-    shapeCaches[assetID][path] = shape;
-  }
-  return shape;
-}
-
-std::shared_ptr<tgfx::Shape> RenderCache::findShape(ID assetID, const tgfx::Path& path) {
-  auto result = shapeCaches.find(assetID);
-  if (result != shapeCaches.end()) {
-    auto iter = result->second.find(path);
-    if (iter != result->second.end()) {
-      return iter->second;
-    }
-  }
-  return nullptr;
-}
-
-void RenderCache::removeShape(ID assetID, const tgfx::Path& path) {
-  auto shapeMap = shapeCaches.find(assetID);
-  if (shapeMap == shapeCaches.end()) {
-    return;
-  }
-  auto shape = shapeMap->second.find(path);
-  if (shape == shapeMap->second.end()) {
-    return;
-  }
-  shapeMap->second.erase(shape);
-  if (shapeMap->second.empty()) {
-    shapeCaches.erase(assetID);
-  }
 }
 
 void RenderCache::removeSnapshot(ID assetID) {
@@ -468,7 +423,7 @@ std::shared_ptr<tgfx::Image> RenderCache::getAssetImageInternal(ID assetID,
   }
   auto scaleFactor = stage->getAssetMinScale(assetID);
   if (scaleFactor < MIPMAP_ENABLED_THRESHOLD) {
-    image = image->makeMipMapped();
+    image = image->makeMipmapped(true);
   }
   assetImages[assetID] = image;
   return image;

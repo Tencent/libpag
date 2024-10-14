@@ -44,7 +44,7 @@ class Shape : public Graphic {
   bool hitTest(RenderCache* cache, float x, float y) override;
   bool getPath(tgfx::Path* result) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  void draw(Canvas* canvas) const override;
 
  private:
   Shape(ID assetID, tgfx::Path path, std::shared_ptr<tgfx::Shader> shader);

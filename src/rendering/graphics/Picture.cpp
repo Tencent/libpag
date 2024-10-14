@@ -20,9 +20,9 @@
 #include <unordered_set>
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
-#include "tgfx/utils/Clock.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
@@ -82,7 +82,8 @@ class ImageProxyPicture : public Picture {
     proxy->prepareImage(cache);
   }
 
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
+  void draw(Canvas* canvas) const override {
+    auto cache = canvas->getCache();
     // Do not call proxy->getImage() here, which will clear the decoded image in the render cache.
     if (proxy->isTemporary()) {
       auto image = proxy->getImage(cache);
@@ -115,14 +116,14 @@ class ImageProxyPicture : public Picture {
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
-                                         bool mipMapped) const override {
+                                         bool mipmapped) const override {
     auto image = proxy->getImage(cache);
     if (image == nullptr) {
       return nullptr;
     }
     bool needRescale = !image->isTextureBacked() && scaleFactor != 1.0f;
-    if (needRescale || image->isRGBAAA()) {
-      image = RescaleImage(cache->getContext(), image, scaleFactor, mipMapped);
+    if (needRescale) {
+      image = RescaleImage(cache->getContext(), image, scaleFactor, mipmapped);
     } else {
       image = image->makeTextureImage(cache->getContext());
       scaleFactor = 1.0f;
@@ -166,15 +167,15 @@ class SnapshotPicture : public Picture {
     graphic->prepare(cache);
   }
 
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
+  void draw(Canvas* canvas) const override {
     auto options = canvas->surfaceOptions();
     if (options && options->cacheDisabled()) {
-      graphic->draw(canvas, cache);
+      graphic->draw(canvas);
       return;
     }
-    auto snapshot = cache->getSnapshot(this);
+    auto snapshot = canvas->getCache()->getSnapshot(this);
     if (snapshot == nullptr) {
-      graphic->draw(canvas, cache);
+      graphic->draw(canvas);
       return;
     }
     canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
@@ -186,22 +187,22 @@ class SnapshotPicture : public Picture {
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
-                                         bool mipMapped) const override {
+                                         bool mipmapped) const override {
     tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-    tgfx::SurfaceOptions options(tgfx::SurfaceOptions::DisableCacheFlag);
+    tgfx::SurfaceOptions options(tgfx::RenderFlags::DisableCache);
     auto surface =
-        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped, &options);
+        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipmapped, &options);
     if (surface == nullptr) {
       return nullptr;
     }
-    auto canvas = surface->getCanvas();
+    Canvas canvas(surface.get(), cache);
     auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
     matrix.preTranslate(-bounds.x(), -bounds.y());
-    canvas->setMatrix(matrix);
-    graphic->draw(canvas, cache);
+    canvas.setMatrix(matrix);
+    graphic->draw(&canvas);
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
     auto image = surface->makeImageSnapshot();

@@ -40,6 +40,10 @@ VectorComposition* ReadVectorComposition(DecodeStream* stream) {
   auto composition = new VectorComposition();
   composition->id = stream->readEncodedUint32();
   ReadTags(stream, composition, ReadTagsOfVectorComposition);
+  if (stream->context->hasException()) {
+    delete composition;
+    return nullptr;
+  }
   Codec::InstallReferences(composition->layers);
   return composition;
 }

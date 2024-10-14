@@ -1,26 +1,24 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAGViewer)
 
-if (APPLE AND NOT IOS)
-    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
-    SET(CMAKE_OSX_ARCHITECTURES x86_64)
-endif ()
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
-#endif ()
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif ()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
 endif (MSVC)
 
 # Sets flags
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-DDEBUG)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
 endif ()
 
 add_definitions(-DQT_NO_KEYWORDS)
@@ -29,22 +27,40 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-# 配置 QT 库的本地安装路径
-if (NOT EXISTS ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg)
-    file(WRITE ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg
-            "set(CMAKE_PREFIX_PATH /Users/username/Qt5.13.0/5.13.0/clang_64/lib/cmake)  #这里需要填入自己安装的路径")
+# configures the local installation path of the QT library.
+if (NOT CMAKE_PREFIX_PATH)
+    if (NOT EXISTS ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg)
+        file(WRITE ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg
+                "set(CMAKE_PREFIX_PATH /Users/[username]/Qt/6.6.1/macos/lib/cmake)  #put your own QT path here")
+    endif ()
+    include("./QTCMAKE.cfg")
 endif ()
-include("./QTCMAKE.cfg")
 
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5OpenGL REQUIRED)
-find_package(Qt5Qml REQUIRED)
-find_package(Qt5Quick REQUIRED)
-list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt5::Widgets Qt5::OpenGL Qt5::Core Qt5::Gui Qt5::Qml Qt5::Quick)
-add_definitions(${Qt5Widgets_DEFINITIONS} ${QtQml_DEFINITIwONS} ${${Qt5Quick_DEFINITIONS}})
-qt5_add_resources(QT_RESOURCES res.qrc)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+if (${QT_VERSION_MAJOR} LESS 6)
+    message("The QT version is less than 6.0, force to use x86_64 architecture.")
+    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
+    SET(CMAKE_OSX_ARCHITECTURES x86_64)
+endif ()
+
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick)
+list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
+if (${QT_VERSION} VERSION_LESS "5.15")
+    function(qt_add_resources outfiles)
+        qt5_add_resources("${outfiles}" ${ARGN})
+        if (TARGET ${outfiles})
+            cmake_parse_arguments(PARSE_ARGV 1 arg "" "OUTPUT_TARGETS" "")
+            if (arg_OUTPUT_TARGETS)
+                set(${arg_OUTPUT_TARGETS} ${${arg_OUTPUT_TARGETS}} PARENT_SCOPE)
+            endif ()
+        else ()
+            set("${outfiles}" "${${outfiles}}" PARENT_SCOPE)
+        endif ()
+    endfunction()
+endif ()
+
+qt_add_resources(QT_RESOURCES res.qrc)
 
 if (APPLE)
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
@@ -61,6 +77,8 @@ if (APPLE)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${VIDEOTOOLBOX})
     find_library(CORE_MEDIA CoreMedia)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${CORE_MEDIA})
+    find_library(COMPRESSION_LIBRARIES NAMES compression)
+    list(APPEND PAG_VIEWER_PLATFORM_LIBS ${COMPRESSION_LIBRARIES})
 elseif (WIN32)
     set(BUILD_USE_64BITS ON)
     add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES)
@@ -69,18 +87,18 @@ elseif (WIN32)
     find_library(ws2_32_LIB ws2_32)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${ws2_32_LIB})
 endif ()
+
 # collects pag include directories.
-set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../tgfx/include ../tgfx/src)
+set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
 
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(PAG_USE_QT ON)
 set(PAG_BUILD_SHARED OFF)
-set(PAG_BUILD_TESTS OFF)
+set(PAG_BUILD_FRAMEWORK OFF)
 
-add_subdirectory(../ libpag EXCLUDE_FROM_ALL)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
-add_executable(PAGViewer MACOSX_BUNDLE ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
+add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
 target_link_libraries(PAGViewer pag ${PAG_VIEWER_PLATFORM_LIBS})
-qt5_use_modules(PAGViewer Core Widgets Gui OpenGL)

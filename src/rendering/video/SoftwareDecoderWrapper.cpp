@@ -18,59 +18,11 @@
 
 #include "SoftwareDecoderWrapper.h"
 #include "platform/Platform.h"
-#include "tgfx/core/YUVData.h"
+#include "rendering/video/SoftwareData.h"
 
 namespace pag {
-class SoftwareI420Data : public tgfx::YUVData {
- public:
-  static std::shared_ptr<YUVData> Make(int width, int height, uint8_t* buffer[3],
-                                       const int lineSize[3],
-                                       std::shared_ptr<SoftwareDecoder> softwareDecoder) {
-    auto data = new SoftwareI420Data(width, height, buffer, lineSize, std::move(softwareDecoder));
-    return std::shared_ptr<YUVData>(data);
-  }
 
- private:
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
-  size_t planeCount() const override {
-    return data.size();
-  }
-
-  const void* getBaseAddressAt(int planeIndex) const override {
-    return data[planeIndex];
-  }
-
-  size_t getRowBytesAt(int planeIndex) const override {
-    return rowBytes[planeIndex];
-  }
-
- private:
-  int _width = 0;
-  int _height = 0;
-  std::vector<const void*> data = {};
-  std::vector<size_t> rowBytes = {};
-  // hold a reference to the software decoder to keep the yuv data alive.
-  std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
-
-  SoftwareI420Data(int width, int height, uint8_t* buffer[3], const int lineSize[3],
-                   std::shared_ptr<SoftwareDecoder> softwareDecoder)
-      : _width(width), _height(height), softwareDecoder(std::move(softwareDecoder)) {
-    auto planeCount = static_cast<int>(tgfx::YUVData::I420_PLANE_COUNT);
-    data.reserve(planeCount);
-    rowBytes.reserve(planeCount);
-    for (int i = 0; i < planeCount; i++) {
-      data.push_back(buffer[i]);
-      rowBytes.push_back(lineSize[i]);
-    }
-  }
-};
+#define I420_PLANE_COUNT 3
 
 std::unique_ptr<VideoDecoder> SoftwareDecoderWrapper::Wrap(
     std::shared_ptr<SoftwareDecoder> softwareDecoder, const VideoFormat& format) {
@@ -196,8 +148,9 @@ std::shared_ptr<tgfx::ImageBuffer> SoftwareDecoderWrapper::onRenderFrame() {
   if (frame == nullptr) {
     return nullptr;
   }
-  auto yuvData = SoftwareI420Data::Make(videoFormat.width, videoFormat.height, frame->data,
-                                        frame->lineSize, softwareDecoder);
+  auto yuvData =
+      SoftwareData<SoftwareDecoder>::Make(videoFormat.width, videoFormat.height, frame->data,
+                                          frame->lineSize, I420_PLANE_COUNT, softwareDecoder);
   return tgfx::ImageBuffer::MakeI420(std::move(yuvData), videoFormat.colorSpace);
 }
 

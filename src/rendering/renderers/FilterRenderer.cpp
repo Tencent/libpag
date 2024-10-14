@@ -28,7 +28,7 @@
 #include "rendering/filters/utils/FilterBuffer.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "rendering/utils/SurfaceUtil.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 
@@ -131,7 +131,7 @@ void FilterRenderer::MeasureFilterBounds(tgfx::Rect* bounds, const FilterModifie
   }
 }
 
-tgfx::Rect GetClipBounds(tgfx::Canvas* canvas, const FilterList* filterList) {
+tgfx::Rect GetClipBounds(Canvas* canvas, const FilterList* filterList) {
   auto clip = canvas->getTotalClip();
   auto matrix = canvas->getMatrix();
   if (filterList->useParentSizeInput) {
@@ -342,7 +342,7 @@ static void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterN
   }
 }
 
-static bool HasComplexPaint(tgfx::Canvas* parentCanvas, const tgfx::Rect& drawingBounds) {
+static bool HasComplexPaint(Canvas* parentCanvas, const tgfx::Rect& drawingBounds) {
   if (parentCanvas->getAlpha() != 1.0f) {
     return true;
   }
@@ -363,9 +363,8 @@ static bool HasComplexPaint(tgfx::Canvas* parentCanvas, const tgfx::Rect& drawin
 }
 
 static std::unique_ptr<FilterTarget> GetDirectFilterTarget(
-    tgfx::Canvas* parentCanvas, const FilterList* filterList,
-    const std::vector<FilterNode>& filterNodes, const tgfx::Rect& contentBounds,
-    const tgfx::Point& sourceScale) {
+    Canvas* parentCanvas, const FilterList* filterList, const std::vector<FilterNode>& filterNodes,
+    const tgfx::Rect& contentBounds, const tgfx::Point& sourceScale) {
   // 在高分辨率下，模糊滤镜的开销会增大，需要降采样降低开销；当模糊为最后一个滤镜时，需要离屏绘制
   if (!filterList->effects.empty() && filterList->effects.back()->type() == EffectType::FastBlur) {
     return nullptr;
@@ -407,7 +406,7 @@ static std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(
   return ToFilterTarget(surface, totalMatrix);
 }
 
-static std::unique_ptr<FilterSource> ToFilterSource(tgfx::Canvas* canvas) {
+static std::unique_ptr<FilterSource> ToFilterSource(Canvas* canvas) {
   auto surface = canvas->getSurface();
   auto texture = surface->getBackendTexture();
   tgfx::Point scale = {};
@@ -424,16 +423,16 @@ static float GetScaleFactor(FilterList* filterList, const tgfx::Rect& contentBou
   return scale;
 }
 
-void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cache,
-                                    const FilterModifier* modifier,
+void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* modifier,
                                     std::shared_ptr<Graphic> content) {
+  auto cache = parentCanvas->getCache();
   auto filterList = MakeFilterList(modifier);
   auto contentBounds = GetContentBounds(filterList.get(), content);
   // 相对于content Bounds的clip Bounds
   auto clipBounds = GetClipBounds(parentCanvas, filterList.get());
   auto filterNodes = MakeFilterNodes(filterList.get(), cache, &contentBounds, clipBounds);
   if (filterNodes.empty()) {
-    content->draw(parentCanvas, cache);
+    content->draw(parentCanvas);
     return;
   }
   if (filterList->useParentSizeInput) {
@@ -447,12 +446,12 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
   if (contentSurface == nullptr) {
     return;
   }
-  auto contentCanvas = contentSurface->getCanvas();
+  Canvas contentCanvas(contentSurface.get(), cache);
   if (filterList->useParentSizeInput) {
-    contentCanvas->concat(filterList->layerMatrix);
+    contentCanvas.concat(filterList->layerMatrix);
   }
-  content->draw(contentCanvas, cache);
-  auto filterSource = ToFilterSource(contentCanvas);
+  content->draw(&contentCanvas);
+  auto filterSource = ToFilterSource(&contentCanvas);
   std::shared_ptr<tgfx::Surface> targetSurface = nullptr;
   std::unique_ptr<FilterTarget> filterTarget = GetDirectFilterTarget(
       parentCanvas, filterList.get(), filterNodes, contentBounds, filterSource->scale);
@@ -468,9 +467,9 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
                                             filterSource->scale);
   }
 
-  // 必须要flush，要不然framebuffer还没真正画到canvas，就被其他图层的filter串改了该framebuffer
-  parentCanvas->flush();
   auto context = parentCanvas->getContext();
+  // 必须要flush，要不然framebuffer还没真正画到canvas，就被其他图层的filter串改了该framebuffer
+  context->flush();
   ApplyFilters(context, filterNodes, contentBounds, filterSource.get(), filterTarget.get());
   // Reset the GL states stored in the context, they may be modified during the filter being applied.
   context->resetState();

@@ -41,8 +41,6 @@
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
-using ShapeMap = std::unordered_map<tgfx::Path, std::shared_ptr<tgfx::Shape>, PathHasher>;
-
 class RenderCache : public Performance {
  public:
   explicit RenderCache(PAGStage* stage);
@@ -130,18 +128,16 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
-  std::shared_ptr<tgfx::Shape> getShape(ID assetID, const tgfx::Path& path);
-
   TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
   /**
-   * Prepares an image for next getAssetImage() call, which may schedule an asynchronous decoding
-   * task immediately.
+   * Prepares an image for the next getAssetImage() call, which may schedule an asynchronous
+   * decoding task immediately.
    */
   void prepareAssetImage(ID assetID, const ImageProxy* proxy);
 
   /**
-   * Returns an image of the specified assetID.Returns a decoded or mipMapped image if available.
+   * Returns an image of the specified assetID.Returns a decoded or mipmapped image if available.
    * Otherwise, returns the original Image.
    */
   std::shared_ptr<tgfx::Image> getAssetImage(ID assetID, const ImageProxy* proxy);
@@ -182,7 +178,7 @@ class RenderCache : public Performance {
   PAGStage* stage = nullptr;
   uint32_t deviceID = 0;
   tgfx::Context* context = nullptr;
-  std::queue<int64_t> timestamps = {};
+  std::queue<std::chrono::steady_clock::time_point> timestamps = {};
   bool isDrawingFrame = false;
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
@@ -193,7 +189,6 @@ class RenderCache : public Performance {
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
-  std::unordered_map<ID, ShapeMap> shapeCaches = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> assetImages = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
   std::unordered_map<ID, std::vector<SequenceImageQueue*>> sequenceCaches = {};
@@ -230,10 +225,6 @@ class RenderCache : public Performance {
   void clearAllTextAtlas();
   void removeTextAtlas(ID assetID);
   TextAtlas* getTextAtlas(ID assetID) const;
-
-  // shape caches:
-  std::shared_ptr<tgfx::Shape> findShape(ID assetID, const tgfx::Path& path);
-  void removeShape(ID assetID, const tgfx::Path& path);
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);

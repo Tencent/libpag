@@ -26,12 +26,12 @@
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
-#include "tgfx/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
 
 using namespace emscripten;
-using namespace pag;
 
-EMSCRIPTEN_BINDINGS(pag) {
+namespace pag {
+bool PAGBindInit() {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
       .function("_uniqueID", optional_override([](PAGLayer& pagLayer) {
@@ -495,7 +495,7 @@ EMSCRIPTEN_BINDINGS(pag) {
   function("_SDKVersion", &PAG::SDKVersion);
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
-  register_vector<std::string>("VectorString");
-  register_vector<int>("VectorInt");
   register_vector<Marker>("VectorMarker");
+  return true;
 }
+}  // namespace pag

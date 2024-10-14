@@ -29,25 +29,24 @@
 
 int main(int argc, char* argv[]) {
   QApplication::setApplicationName("PAGViewer");
-  QApplication::setOrganizationName("pag.art");
-  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-
+  QApplication::setOrganizationName("Tencent");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
   defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
   defaultFormat.setVersion(3, 2);
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+#else
+  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
 
   PAGViewer app(argc, argv);
-  app.setWindowIcon(QIcon(":/images/window-icon.png"));
+  QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   auto rootPath = QApplication::applicationDirPath();
-#ifdef WIN32
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
-#else
-  rootPath = QFileInfo(rootPath + "/../../../../../").absolutePath();
-#endif
   app.OpenFile(rootPath + "/assets/test2.pag");
-  return app.exec();
+  return QApplication::exec();
 }

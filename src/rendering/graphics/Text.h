@@ -58,15 +58,15 @@ class Text : public Graphic {
   bool hitTest(RenderCache* cache, float x, float y) override;
   bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  void draw(Canvas* canvas) const override;
 
  private:
   Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns, const tgfx::Rect& bounds,
        bool hasAlpha, std::shared_ptr<TextBlock> textBlock);
 
-  void draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const;
+  void draw(Canvas* canvas, const TextAtlas* textAtlas) const;
 
-  void drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const;
+  void drawTextRuns(Canvas* canvas, int paintIndex) const;
 
   std::vector<GlyphHandle> glyphs;
   std::vector<TextRun*> textRuns;

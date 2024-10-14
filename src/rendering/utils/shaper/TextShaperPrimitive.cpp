@@ -18,12 +18,12 @@
 
 #include "TextShaperPrimitive.h"
 #include "rendering/FontManager.h"
-#include "tgfx/utils/UTF.h"
+#include "tgfx/core/UTF.h"
 
 namespace pag {
 PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
                                             std::shared_ptr<tgfx::Typeface> typeface) {
-  const char* textStart = &(text[0]);
+  const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs;
   auto fallbackTypefaces = FontManager::GetFallbackTypefaces();
@@ -32,8 +32,7 @@ PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
     tgfx::UTF::NextUTF8(&textStart, textStop);
     auto length = textStart - oldPosition;
     auto str = std::string(oldPosition, length);
-    auto glyphID = typeface->getGlyphID(str);
-    bool found = false;
+    auto glyphID = typeface ? typeface->getGlyphID(str) : 0;
     if (glyphID == 0) {
       for (const auto& faceHolder : fallbackTypefaces) {
         auto face = faceHolder->getTypeface();
@@ -42,16 +41,12 @@ PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
         }
         glyphID = face->getGlyphID(str);
         if (glyphID != 0) {
-          glyphs.emplace_back(std::move(face), glyphID, oldPosition - &(text[0]));
-          found = true;
+          glyphs.emplace_back(std::move(face), glyphID, oldPosition - text.data());
           break;
         }
       }
-      if (!found) {
-        glyphs.emplace_back(typeface, glyphID, oldPosition - &(text[0]));
-      }
     } else {
-      glyphs.emplace_back(typeface, glyphID, oldPosition - &(text[0]));
+      glyphs.emplace_back(typeface, glyphID, oldPosition - text.data());
     }
   }
   return PositionedGlyphs(glyphs);

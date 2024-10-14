@@ -42,24 +42,32 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   }
   blurrinessX *= filterScale.x * source->scale.x;
   blurrinessY *= filterScale.y * source->scale.y;
-  tgfx::TileMode tileMode = tgfx::TileMode::Decal;
-  tgfx::Rect cropRect = tgfx::Rect::MakeEmpty();
-  if (repeatEdgePixels) {
-    tileMode = tgfx::TileMode::Clamp;
-    cropRect = tgfx::Rect::MakeWH(source->width, source->height);
-  }
-  auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tileMode, cropRect);
+
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
   auto image = tgfx::Image::MakeFrom(context, backendTexture);
+  if (image == nullptr) {
+    LOGE("GaussianBlurFilter::draw() failed to create an Image from the backend texture!");
+    return;
+  }
+  tgfx::Point offset = tgfx::Point::Zero();
+  if (repeatEdgePixels) {
+    auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
+    image = image->makeWithFilter(std::move(blurFilter), &offset);
+    image = image->makeSubset(tgfx::Rect::MakeXYWH(-offset.x, -offset.y,
+                                                   static_cast<float>(source->width),
+                                                   static_cast<float>(source->height)));
+    offset = tgfx::Point::Zero();
+  } else {
+    auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
+    image = image->makeWithFilter(std::move(blurFilter), &offset);
+  }
   targetCanvas->save();
   targetCanvas->setMatrix(ToMatrix(target));
-  tgfx::Paint paint;
-  paint.setImageFilter(blurFilter);
-  targetCanvas->drawImage(std::move(image), &paint);
+  targetCanvas->drawImage(std::move(image), offset.x, offset.y);
   targetCanvas->restore();
-  targetCanvas->flush();
+  context->flush();
 }
 }  // namespace pag

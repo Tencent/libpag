@@ -20,9 +20,9 @@
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/utils/Directory.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/DataView.h"
-#include "tgfx/utils/Stream.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/DataView.h"
+#include "tgfx/core/Stream.h"
 
 namespace pag {
 class FileInfo {

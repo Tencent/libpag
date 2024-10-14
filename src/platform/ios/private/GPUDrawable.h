@@ -19,9 +19,11 @@
 #pragma once
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/opengl/eagl/EAGLWindow.h"
+#include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 
 namespace pag {
+
+extern NSString* const kAsyncSurfacePreparedNotification;
 
 class GPUDrawable : public Drawable {
  public:
@@ -31,14 +33,16 @@ class GPUDrawable : public Drawable {
 
   int height() const override;
 
+  std::shared_ptr<tgfx::Device> getDevice() override;
+
   void updateSize() override;
 
   void present(tgfx::Context* context) override;
 
  protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override;
-
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+
+  void onFreeSurface() override;
 
  private:
   std::weak_ptr<GPUDrawable> weakThis;
@@ -46,8 +50,10 @@ class GPUDrawable : public Drawable {
   int _height = 0;
   CAEAGLLayer* layer = nil;
   std::shared_ptr<tgfx::EAGLWindow> window = nullptr;
+  std::atomic<bool> bufferPreparing = false;
 
   explicit GPUDrawable(CAEAGLLayer* layer);
+
   void tryCreateSurface();
 };
 }  // namespace pag

@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+let args = process.argv.slice(2);
+if (args.indexOf("-h") === -1 && args.indexOf("--help") === -1) {
+    require("child_process").execSync("depsync");
+}
+require("./third_party/vendor_tools/lib-build");

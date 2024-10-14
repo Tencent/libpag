@@ -44,6 +44,8 @@ local.properties
 
 /third_party
 /out
+/result
+/vendor_tools
 cmake-build-*
 node_modules
 Build/
@@ -71,8 +73,8 @@ win/Win32Demo/Debug/
 win/Win32Demo/Release/
 QTCMAKE.cfg
 test/baseline/.cache
-/result
-
-
-vendor_tools/
 .vscode
+ios/PAG
+mac/PAG
+linux/vendor/
+/PAG

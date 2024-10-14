@@ -54,7 +54,7 @@ void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const s
   tgfx::Pixmap pixmap(dstInfo, dstPixels);
   pixmap.writePixels(info, pixels);
   auto byteBuffer = MakeByteBufferObject(env, dstPixels, dstInfo.byteSize());
-  auto tagString = SafeConvertToJString(env, tag.c_str());
+  auto tagString = SafeConvertToJString(env, tag);
   env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString, byteBuffer,
                             info.width(), info.height());
   env->DeleteLocalRef(byteBuffer);

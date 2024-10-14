@@ -18,7 +18,7 @@
 
 #include "FilterHelper.h"
 #include "base/utils/USE.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {

@@ -20,8 +20,8 @@
 
 #include "TextBlock.h"
 #include "pag/types.h"
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/utils/BytesKey.h"
 
 namespace pag {
 class RenderCache;

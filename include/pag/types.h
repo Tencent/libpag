@@ -1309,7 +1309,7 @@ class PAG_API Matrix {
    * of zero values are different. Returns false if either Matrix contains NaN, even if the other
    * Matrix also contains NaN.
    */
-  friend bool operator==(const Matrix& a, const Matrix& b);
+  friend PAG_API bool operator==(const Matrix& a, const Matrix& b);
 
   /**
    * Compares a and b; returns true if a and b are not numerically equal. Returns false even if

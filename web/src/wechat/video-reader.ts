@@ -1,6 +1,6 @@
 import { MP4_CACHE_PATH } from './constant';
 import { removeFile, touchDirectory, writeFile } from './file-utils';
-import { ArrayBufferImage } from './array-buffer-image';
+import { ArrayBufferImage, FrameData } from '@tgfx/wechat/array-buffer-image';
 
 import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
 
@@ -10,13 +10,6 @@ declare const setInterval: (callback: () => void, delay: number) => number;
 const BUFFER_MAX_SIZE = 6;
 const BUFFER_MIN_SIZE = 2;
 const GET_FRAME_DATA_INTERVAL = 2; // ms
-
-export interface FrameData {
-  id: number;
-  data: ArrayBuffer;
-  width: number;
-  height: number;
-}
 
 const frameDataOptions2FrameData = (id: number, options: FrameDataOptions): FrameData => {
   const data = new ArrayBuffer(options.data.byteLength);

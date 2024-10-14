@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "rendering/graphics/Canvas.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Path.h"
@@ -71,8 +72,7 @@ class Modifier {
   /**
    * Draws the graphic to specified canvas with custom modification.
    */
-  virtual void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                              std::shared_ptr<Graphic> graphic) const = 0;
+  virtual void applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const = 0;
 
   /**
    * Returns a new modifier which is the combination of this modifier and specified modifier if this

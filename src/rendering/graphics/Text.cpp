@@ -255,8 +255,8 @@ static std::vector<TextStyle> GetGlyphStyles(const GlyphHandle& glyph) {
   return styles;
 }
 
-void Text::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
-  auto textAtlas = renderCache->getTextAtlas(textBlock.get());
+void Text::draw(Canvas* canvas) const {
+  auto textAtlas = canvas->getCache()->getTextAtlas(textBlock.get());
   if (textAtlas != nullptr) {
     draw(canvas, textAtlas);
   } else {
@@ -272,13 +272,14 @@ struct Parameters {
   std::vector<tgfx::Color> colors;
 };
 
-static void Draw(tgfx::Canvas* canvas, const TextAtlas* atlas, const Parameters& parameters) {
+static void Draw(Canvas* canvas, const TextAtlas* atlas, const Parameters& parameters) {
   if (parameters.matrices.empty()) {
     return;
   }
-  canvas->drawAtlas(
-      atlas->getAtlasImage(parameters.imageIndex), &parameters.matrices[0], &parameters.rects[0],
-      parameters.colors.empty() ? nullptr : &parameters.colors[0], parameters.matrices.size());
+  canvas->drawAtlas(atlas->getAtlasImage(parameters.imageIndex), parameters.matrices.data(),
+                    parameters.rects.data(),
+                    parameters.colors.empty() ? nullptr : parameters.colors.data(),
+                    parameters.matrices.size());
 }
 
 static bool RectStaysRectAndNoScale(const tgfx::Matrix& matrix) {
@@ -293,7 +294,7 @@ static bool RectStaysRectAndNoScale(const tgfx::Matrix& matrix) {
   }
 }
 
-void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
+void Text::draw(Canvas* canvas, const TextAtlas* textAtlas) const {
   Parameters parameters = {};
   auto viewMatrix = canvas->getMatrix();
   canvas->setMatrix(tgfx::Matrix::I());
@@ -327,7 +328,7 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
       }
       parameters.matrices.emplace_back(matrix);
       parameters.rects.emplace_back(locator.location);
-      if (glyph->getFont().getTypeface()->hasColor()) {
+      if (glyph->getFont().hasColor()) {
         auto alpha = canvas->getAlpha();
         canvas->setAlpha(alpha * glyph->getAlpha());
         Draw(canvas, textAtlas, parameters);
@@ -345,7 +346,7 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
   canvas->setMatrix(viewMatrix);
 }
 
-void Text::drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const {
+void Text::drawTextRuns(Canvas* canvas, int paintIndex) const {
   auto totalMatrix = canvas->getMatrix();
   for (auto& textRun : textRuns) {
     auto textPaint = textRun->paints[paintIndex];
@@ -354,8 +355,8 @@ void Text::drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const {
     }
     canvas->setMatrix(totalMatrix);
     canvas->concat(textRun->matrix);
-    auto ids = &textRun->glyphIDs[0];
-    auto positions = &textRun->positions[0];
+    auto ids = textRun->glyphIDs.data();
+    auto positions = textRun->positions.data();
     canvas->drawGlyphs(ids, positions, textRun->glyphIDs.size(), textRun->textFont, *textPaint);
   }
   canvas->setMatrix(totalMatrix);

@@ -1,5 +1,5 @@
 {
-  "name": "libpag",
+  "name": "@tencent/libpag",
   "version": "4.0.0",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.cjs.js",
@@ -7,8 +7,12 @@
   "browser": "lib/libpag.umd.js",
   "typings": "types/web/pag.d.ts",
   "scripts": {
-    "build": "rimraf lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
-    "build:wx": "rimraf wechat/lib/*.js wechat/lib/*.map wechat/lib/*.br wechat/types/* && rollup -c ./script/rollup.config.wx.js && tsc -p ./wechat/tsconfig.type.json && brotli ./wechat/lib/libpag.wasm",
+    "build:js": "rimraf lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
+    "build:wx:js": "rimraf wechat/lib/*.js wechat/lib/*.map wechat/lib/*.br wechat/types/* && rollup -c ./script/rollup.config.wx.js && tsc -p ./wechat/tsconfig.type.json && brotli ./wechat/lib/libpag.wasm",
+    "build": "node script/cmake.demo.js && npm run build:js",
+    "build:wx": "node script/cmake.demo.js && npm run build:wx:js",
+    "build:debug": "node script/cmake.demo.js --debug && npm run build:js",
+    "build:wx:debug": "node script/cmake.demo.js --debug && npm run build:wx:js",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",
     "dev:wx": "rollup -c ./script/rollup.config.wx.dev.js -w",
     "dev:wx:brotli": "./script/brotli.sh",
@@ -18,7 +22,7 @@
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
     "test": "node ./script/test.js",
     "cypress": "cypress run --browser chrome",
-    "server": "http-server -p 8080 . -c-1 --cors",
+    "server": "http-server -p 8080 . -c-1 --cors -o demo",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
     "brotli": "brotli ./lib/libpag.wasm"
   },

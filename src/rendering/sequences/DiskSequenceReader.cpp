@@ -19,7 +19,7 @@
 #include "DiskSequenceReader.h"
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
-#include "tgfx/utils/Buffer.h"
+#include "tgfx/core/Buffer.h"
 
 namespace pag {
 
@@ -94,18 +94,18 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
     }
   }
 
-  if (!pagDecoder->checkFrameChanged(targetFrame)) {
+  if (!pagDecoder->checkFrameChanged(static_cast<int>(targetFrame))) {
     return imageBuffer;
   }
   bool success = false;
   auto renderBuffer = useFrontBuffer ? frontHardWareBuffer : backHardwareBuffer;
   if (frontHardWareBuffer) {
-    success = pagDecoder->readFrame(targetFrame, renderBuffer);
+    success = pagDecoder->readFrame(static_cast<int>(targetFrame), renderBuffer);
   } else {
     if (pixels) {
       success =
-          pagDecoder->readFrame(targetFrame, const_cast<void*>(pixels->data()), info.rowBytes(),
-                                ToPAG(info.colorType()), ToPAG(info.alphaType()));
+          pagDecoder->readFrame(static_cast<int>(targetFrame), const_cast<void*>(pixels->data()),
+                                info.rowBytes(), ToPAG(info.colorType()), ToPAG(info.alphaType()));
     }
   }
   if (!success) {

@@ -48,9 +48,8 @@ void FilterModifier::applyToBounds(tgfx::Rect* bounds) const {
   FilterRenderer::MeasureFilterBounds(bounds, this);
 }
 
-void FilterModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
-                                    std::shared_ptr<Graphic> graphic) const {
-  FilterRenderer::DrawWithFilter(canvas, cache, this, graphic);
+void FilterModifier::applyToGraphic(Canvas* canvas, std::shared_ptr<Graphic> graphic) const {
+  FilterRenderer::DrawWithFilter(canvas, this, graphic);
 }
 
 void FilterModifier::prepare(RenderCache* renderCache) const {

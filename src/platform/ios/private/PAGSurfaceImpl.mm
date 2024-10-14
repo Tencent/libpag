@@ -25,7 +25,7 @@
 #include "pag/types.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 #include "rendering/drawables/HardwareBufferDrawable.h"
-#include "tgfx/opengl/eagl/EAGLDevice.h"
+#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -71,7 +71,7 @@
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext {
-  auto device = tgfx::EAGLDevice::MakeAdopted(eaglContext);
+  auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
   auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {

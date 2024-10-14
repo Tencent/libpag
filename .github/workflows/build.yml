@@ -1,0 +1,366 @@
+name: build
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Environment Cache
+        id: environment-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /usr/local/Cellar/ninja
+            /usr/local/Cellar/icu4c
+            /usr/local/bin/ninja
+            /usr/local/Cellar/yasm
+            /usr/local/bin/yasm
+          key: libpag-environment-ios-20231129
+          restore-keys: libpag-environment-ios-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ios-
+
+      - name: Install Build Tools
+        run: |
+          chmod +x install_tools.sh
+          ./install_tools.sh
+        shell: bash
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build iOS
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+          cd ios
+          node gen_ios
+          xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /usr/local/Cellar/ninja
+            /usr/local/Cellar/icu4c
+            /usr/local/bin/ninja
+            /usr/local/Cellar/yasm
+            /usr/local/bin/yasm
+          key: libpag-environment-ios-20231129
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios_build
+          path: ios
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-android-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r19c
+          link-to-sdk: true
+          local-cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Build Android
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+          cd android
+          ./gradlew assembleRelease -Parm64-only --no-daemon
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: android_build
+          path: android
+
+  web:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Environment Cache
+        id: environment-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: libpag-environment-web-20231130
+          restore-keys: libpag-environment-web-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-web-
+
+      - name: Install Build Tools
+        if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install 3.1.20
+          ./emsdk activate 3.1.20
+        shell: bash
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build Web
+        run: |
+          cd web
+          emsdk/emsdk_env
+          npm run build
+
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: libpag-environment-web-20231130
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: web_build
+          path: |
+            web
+            !web/emsdk
+            !web/node_modules
+
+  win:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-windows-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build Windows
+        run: |
+          New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
+          node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: win_build
+          path: out
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-linux-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build Linux
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+          cd linux
+          ./build_pag.sh
+          cmake -B ./build -DCMAKE_BUILD_TYPE=Release
+          cmake --build ./build -- -j 12
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux_build
+          path: linux
+
+  qt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-qt-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          host: 'linux'
+          target: 'desktop'
+          version: '6.6.1'
+          dir: '${{github.workspace}}/qt/'
+          install-deps: 'true'
+          cache: 'true'
+          cache-key-prefix: 'install-qt-action'
+
+      - name: Build QT
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+          node build_pag -s ./qt PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: qt_build
+          path: out

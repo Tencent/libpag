@@ -18,7 +18,7 @@
 
 #include "GPUDrawable.h"
 #include "base/utils/Log.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(ANativeWindow* nativeWindow,
@@ -42,9 +42,12 @@ GPUDrawable::~GPUDrawable() {
 void GPUDrawable::updateSize() {
   _width = ANativeWindow_getWidth(nativeWindow);
   _height = ANativeWindow_getHeight(nativeWindow);
+  if (window) {
+    window->invalidSize();
+  }
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -55,7 +58,13 @@ std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window ? window->createSurface(context) : nullptr;
+  return window ? window->getSurface(context) : nullptr;
+}
+
+void GPUDrawable::onFreeSurface() {
+  if (window) {
+    window->freeSurface();
+  }
 }
 
 void GPUDrawable::present(tgfx::Context* context) {

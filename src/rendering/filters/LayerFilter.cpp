@@ -90,17 +90,18 @@ std::shared_ptr<const FilterProgram> FilterProgram::Make(tgfx::Context* context,
   if (program == 0) {
     return nullptr;
   }
-  auto filterProgram = new FilterProgram();
+  auto filterProgram = std::shared_ptr<FilterProgram>(new FilterProgram());
   filterProgram->program = program;
   if (gl->bindVertexArray != nullptr) {
     gl->genVertexArrays(1, &filterProgram->vertexArray);
   }
   gl->genBuffers(1, &filterProgram->vertexBuffer);
-  return Resource::Wrap(context, filterProgram);
+  tgfx::GLResource::AttachToContext(context, filterProgram);
+  return filterProgram;
 }
 
 void FilterProgram::onReleaseGPU() {
-  auto gl = tgfx::GLFunctions::Get(context);
+  auto gl = tgfx::GLFunctions::Get(getContext());
   if (program > 0) {
     gl->deleteProgram(program);
     program = 0;
@@ -304,7 +305,7 @@ void LayerFilter::bindVertices(tgfx::Context* context, const FilterSource* sourc
     gl->bindVertexArray(filterProgram->vertexArray);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STREAM_DRAW);
+  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STREAM_DRAW);
   gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
                           4 * sizeof(float), static_cast<void*>(0));
   gl->enableVertexAttribArray(static_cast<unsigned>(positionHandle));

@@ -18,120 +18,6 @@
       }
     },
     {
-      "name": "skcms",
-      "cmake": {
-        "targets": [
-          "skcms"
-        ]
-      }
-    },
-    {
-      "name": "pathkit",
-      "cmake": {
-        "targets": [
-          "pathkit"
-        ]
-      }
-    },
-    {
-      "name": "zlib",
-      "cmake": {
-        "targets": [
-          "zlibstatic"
-        ],
-        "includes": [
-          "${SOURCE_DIR}/zlib.h",
-          "${BUILD_DIR}/zconf.h"
-        ]
-      }
-    },
-    {
-      "name": "libwebp",
-      "cmake": {
-        "targets": [
-          "webp",
-          "webpdemux"
-        ]
-      }
-    },
-    {
-      "name": "libwebp",
-      "cmake": {
-        "targets": [
-          "webp",
-          "webpdemux"
-        ],
-        "arguments": [
-          "-DWEBP_BUILD_WEBP_JS=ON"
-        ],
-        "platforms": [
-          "web"
-        ]
-      }
-    },
-    {
-      "name": "libjpeg-turbo",
-      "cmake": {
-        "targets": [
-          "turbojpeg-static"
-        ],
-        "includes": [
-          "${SOURCE_DIR}/jmorecfg.h",
-          "${SOURCE_DIR}/jpeglib.h",
-          "${SOURCE_DIR}/jerror.h",
-          "${BUILD_DIR}/jconfig.h"
-        ]
-      }
-    },
-    {
-      "name": "libpng",
-      "deps": {
-        "ZLIB": "zlib"
-      },
-      "cmake": {
-        "targets": [
-          "png_static"
-        ],
-        "arguments": [
-          "-DPNG_BUILD_ZLIB=ON"
-        ],
-        "includes": [
-          "${SOURCE_DIR}/png.h",
-          "${SOURCE_DIR}/pngconf.h",
-          "${BUILD_DIR}/pnglibconf.h"
-        ],
-        "platforms": [
-          "android",
-          "win",
-          "linux"
-        ]
-      }
-    },
-    {
-      "name": "libpng",
-      "deps": {
-        "ZLIB": "zlib"
-      },
-      "cmake": {
-        "targets": [
-          "png_static"
-        ],
-        "arguments": [
-          "-DPNG_BUILD_ZLIB=ON",
-          "-DPNG_ARM_NEON=on"
-        ],
-        "includes": [
-          "${SOURCE_DIR}/png.h",
-          "${SOURCE_DIR}/pngconf.h",
-          "${BUILD_DIR}/pnglibconf.h"
-        ],
-        "platforms": [
-          "ios",
-          "mac"
-        ]
-      }
-    },
-    {
       "name": "harfbuzz",
       "cmake": {
         "targets": [
@@ -141,34 +27,6 @@
           "-DHB_HAVE_FREETYPE=OFF",
           "-DHB_HAVE_CORETEXT=OFF",
           "-DCMAKE_CXX_FLAGS=\"-DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
-        ]
-      }
-    },
-    {
-      "name": "freetype",
-      "deps": {
-        "ZLIB": "zlib",
-        "PNG": "libpng"
-      },
-      "cmake": {
-        "targets": [
-          "freetype"
-        ],
-        "arguments": [
-          "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
-          "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE"
-        ]
-      }
-    },
-    {
-      "name": "swiftshader",
-      "cmake": {
-        "targets": [
-          "libEGL",
-          "libGLESv2"
-        ],
-        "platforms": [
-          "linux"
         ]
       }
     },
@@ -184,19 +42,6 @@
         "includes": [
           "${SOURCE_DIR}/src/rttr",
           "${BUILD_DIR}/src/rttr"
-        ],
-        "platforms": [
-          "mac",
-          "win",
-          "linux"
-        ]
-      }
-    },
-    {
-      "name": "googletest",
-      "cmake": {
-        "targets": [
-          "gtest"
         ],
         "platforms": [
           "mac",

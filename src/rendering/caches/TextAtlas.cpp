@@ -20,7 +20,7 @@
 #include "RenderCache.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 class Atlas {
@@ -78,9 +78,11 @@ class RectanglePack {
     auto point = Point::Make(x, y);
     if (x + w - _width < y + h - _height) {
       x += w;
+      _width = std::max(_width, x);
       _height = std::max(_height, y + h);
     } else {
       y += h;
+      _height = std::max(_height, y);
       _width = std::max(_width, x + w);
     }
     return point;
@@ -143,7 +145,8 @@ static AtlasTextRun CreateTextRun(const GlyphHandle& glyph) {
 static void ComputeStyleKey(tgfx::BytesKey* styleKey, const GlyphHandle& glyph) {
   styleKey->write(static_cast<uint32_t>(glyph->getStyle()));
   styleKey->write(glyph->getStrokeWidth());
-  styleKey->write(glyph->getFont().getTypeface()->uniqueID());
+  auto typeface = glyph->getFont().getTypeface();
+  styleKey->write(typeface ? typeface->uniqueID() : 0);
 }
 
 struct Page {
@@ -224,7 +227,7 @@ std::shared_ptr<tgfx::Image> DrawMask(tgfx::Context* context, const Page& page) 
     return nullptr;
   }
   for (auto& textRun : page.textRuns) {
-    auto blob = tgfx::TextBlob::MakeFrom(&textRun.glyphIDs[0], &textRun.positions[0],
+    auto blob = tgfx::TextBlob::MakeFrom(textRun.glyphIDs.data(), textRun.positions.data(),
                                          textRun.glyphIDs.size(), textRun.textFont);
     if (textRun.paint.getStyle() == tgfx::PaintStyle::Fill) {
       mask->fillText(blob.get());
@@ -245,8 +248,8 @@ std::shared_ptr<tgfx::Image> DrawColor(tgfx::Context* context, const Page& page)
   auto totalMatrix = canvas->getMatrix();
   for (auto& textRun : page.textRuns) {
     canvas->setMatrix(totalMatrix);
-    auto glyphs = &textRun.glyphIDs[0];
-    auto positions = &textRun.positions[0];
+    auto glyphs = textRun.glyphIDs.data();
+    auto positions = textRun.positions.data();
     canvas->drawGlyphs(glyphs, positions, textRun.glyphIDs.size(), textRun.textFont, textRun.paint);
   }
   canvas->setMatrix(totalMatrix);

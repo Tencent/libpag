@@ -126,7 +126,7 @@ void OuterGlowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSo
       blurYSize * source->scale.y, color));
   paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
-  targetCanvas->flush();
+  context->flush();
 }
 
 void OuterGlowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
@@ -169,7 +169,7 @@ void OuterGlowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Filt
       blurYSize * source->scale.y, color));
   paint.setAlpha(opacity);
   targetCanvas->drawImage(std::move(image), &paint);
-  targetCanvas->flush();
+  context->flush();
 }
 
 void OuterGlowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,

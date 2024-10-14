@@ -19,7 +19,7 @@
 #pragma once
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 namespace pag {
 class GPUDrawable : public Drawable {
@@ -34,15 +34,17 @@ class GPUDrawable : public Drawable {
     return _height;
   }
 
+  std::shared_ptr<tgfx::Device> getDevice() override;
+
   void updateSize() override;
 
   void present(tgfx::Context*) override {
   }
 
  protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override;
-
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+
+  void onFreeSurface() override;
 
  private:
   explicit GPUDrawable(std::string canvasID);

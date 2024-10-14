@@ -44,6 +44,10 @@ class GPUDrawable : public Drawable {
     return _height;
   }
 
+  std::shared_ptr<tgfx::Device> getDevice() override;
+
+  std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context, bool queryOnly) override;
+
   void updateSize() override;
 
   void present(tgfx::Context* context) override;
@@ -53,9 +57,9 @@ class GPUDrawable : public Drawable {
   QSGTexture* getTexture();
 
  protected:
-  std::shared_ptr<tgfx::Device> onCreateDevice() override;
-
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
+
+  void onFreeSurface() override;
 
  private:
   int _width = 0;

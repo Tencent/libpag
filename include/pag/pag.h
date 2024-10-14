@@ -1248,7 +1248,7 @@ class PAG_API PAGSurface {
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
  protected:
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);
 
   virtual void onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> surface,
                       RenderCache* cache);
@@ -1259,20 +1259,27 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  bool contextAdopted = false;
+  bool externalContext = false;
   GLRestorer* glRestorer = nullptr;
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
   bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  tgfx::Context* lockContext(bool force = false);
+  tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
+
+  BackendTexture getFrontTexture();
+  BackendTexture getBackTexture();
+  HardwareBufferRef getFrontHardwareBuffer();
+  HardwareBufferRef getBackHardwareBuffer();
 
   friend class PAGPlayer;
 
   friend class FileReporter;
+
+  friend class PAGSurfaceExt;
 };
 
 class FileReporter;

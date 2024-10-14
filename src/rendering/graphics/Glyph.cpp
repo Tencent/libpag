@@ -19,7 +19,7 @@
 #include "Glyph.h"
 #include <unordered_map>
 #include "rendering/utils/shaper/TextShaper.h"
-#include "tgfx/utils/UTF.h"
+#include "tgfx/core/UTF.h"
 
 namespace pag {
 std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgfx::Font& font,
@@ -53,6 +53,9 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
   horizontalInfo->originPosition.set(horizontalInfo->advance / 2, 0);
   horizontalInfo->bounds = _font.getBounds(_glyphId);
   auto metrics = _font.getMetrics();
+  if (horizontalInfo->bounds.isEmpty() && horizontalInfo->advance > 0) {
+    horizontalInfo->bounds.setLTRB(0, metrics.ascent, horizontalInfo->advance, metrics.descent);
+  }
   horizontalInfo->ascent = metrics.ascent;
   horizontalInfo->descent = metrics.descent;
   if (_name == " ") {
@@ -109,7 +112,8 @@ void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
                             static_cast<uint8_t>(textStyle)};
   styleKey->write(strokeValues);
   styleKey->write(strokeWidth);
-  styleKey->write(getFont().getTypeface()->uniqueID());
+  auto typeface = getFont().getTypeface();
+  styleKey->write(typeface ? typeface->uniqueID() : 0);
 }
 
 bool Glyph::isVisible() const {
@@ -126,7 +130,7 @@ tgfx::Matrix Glyph::getTotalMatrix() const {
 }
 
 void Glyph::computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const {
-  bytesKey->write(static_cast<uint32_t>(getFont().getTypeface()->hasColor()));
+  bytesKey->write(static_cast<uint32_t>(getFont().hasColor()));
   bytesKey->write(static_cast<uint32_t>(getGlyphID()));
   bytesKey->write(static_cast<uint32_t>(style));
 }

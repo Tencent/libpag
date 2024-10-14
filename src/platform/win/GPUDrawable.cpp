@@ -19,7 +19,7 @@
 #include "GPUDrawable.h"
 #include <windows.h>
 #include "base/utils/Log.h"
-#include "tgfx/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(void* nativeWindow, void* sharedContext) {
@@ -45,10 +45,13 @@ void GPUDrawable::updateSize() {
       _width = 0;
       _height = 0;
     }
+    if (window) {
+      window->invalidSize();
+    }
   }
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -60,7 +63,13 @@ std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window ? window->createSurface(context) : nullptr;
+  return window ? window->getSurface(context) : nullptr;
+}
+
+void GPUDrawable::onFreeSurface() {
+  if (window) {
+    window->freeSurface();
+  }
 }
 
 void GPUDrawable::present(tgfx::Context* context) {

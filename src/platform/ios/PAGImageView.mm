@@ -76,20 +76,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
   std::mutex imageViewLock;
-  CVPixelBufferRef cvPixeBuffer;
+  CVPixelBufferPoolRef diskBufferPool;
 }
 
 @synthesize memoryCacheEnabled = _memoryCacheEnabled;
 
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
-    [self initPAG];
-  }
-  return self;
-}
-
-- (instancetype)init {
-  if (self = [super init]) {
     [self initPAG];
   }
   return self;
@@ -174,17 +167,29 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
 }
 
-- (CVPixelBufferRef)getDickCacheCVPixelBuffer {
-  if (cvPixeBuffer == nil) {
-    cvPixeBuffer = pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
-                                              static_cast<int>([[self getPAGDecoder] height]));
-    if (cvPixeBuffer == nil) {
-      NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
+- (CVPixelBufferRef)getDiskCacheCVPixelBuffer {
+  if (diskBufferPool == nil) {
+    NSDictionary* options = @{
+      (id)kCVPixelBufferIOSurfacePropertiesKey : @{},
+      (id)kCVPixelBufferWidthKey : @([[self getPAGDecoder] width]),
+      (id)kCVPixelBufferHeightKey : @([[self getPAGDecoder] height]),
+      (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA)
+    };
+    CVReturn status = CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, (CFDictionaryRef)options,
+                                              &diskBufferPool);
+    if (status != kCVReturnSuccess || diskBufferPool == nil) {
       return nil;
     }
-    CFRetain(cvPixeBuffer);
   }
-  return cvPixeBuffer;
+  CVPixelBufferRef pixelBuffer;
+  CVReturn status =
+      CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, diskBufferPool, &pixelBuffer);
+  CVPixelBufferPoolFlush(diskBufferPool, kCVPixelBufferPoolFlushExcessBuffers);
+  if (status != kCVReturnSuccess) {
+    return nil;
+  }
+  CFAutorelease(pixelBuffer);
+  return pixelBuffer;
 }
 
 - (CVPixelBufferRef)getMemoryCacheCVPixelBuffer {
@@ -262,9 +267,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  PAGDecoder* pagDecoder = [self getPAGDecoder];
-  if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
-    BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
+  PAGDecoder* decoder = [self getPAGDecoder];
+  if ([decoder checkFrameChanged:(int)frameIndex]) {
+    BOOL status = [decoder readFrame:frameIndex to:pixelBuffer];
     if (!status) {
       return status;
     }
@@ -326,9 +331,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     imagesMap = nil;
     self.memeoryCacheFinished = NO;
   }
-  if (cvPixeBuffer) {
-    CFRelease(cvPixeBuffer);
-    cvPixeBuffer = nil;
+  if (diskBufferPool) {
+    CVPixelBufferPoolRelease(diskBufferPool);
+    diskBufferPool = nil;
   }
   if (pagDecoder) {
     [pagDecoder release];
@@ -521,7 +526,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   filePath = [path retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* pagFile) {
-        [self setComposition:pagComposition maxFrameRate:maxFrameRate];
+        [self setComposition:pagFile maxFrameRate:maxFrameRate];
         callback(pagFile);
       }];
 }
@@ -576,7 +581,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   [self checkPAGCompositionChanged];
   CVPixelBufferRef pixelBuffer = self.memoryCacheEnabled ? [self getMemoryCacheCVPixelBuffer]
-                                                         : [self getDickCacheCVPixelBuffer];
+                                                         : [self getDiskCacheCVPixelBuffer];
   if (pixelBuffer == nil) {
     self.currentUIImage = nil;
     [self submitToImageView];

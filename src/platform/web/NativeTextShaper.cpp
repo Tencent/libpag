@@ -19,7 +19,7 @@
 #include "NativeTextShaper.h"
 #include "UnicodeEmojiTable.hh"
 #include "rendering/FontManager.h"
-#include "tgfx/utils/UTF.h"
+#include "tgfx/core/UTF.h"
 
 namespace pag {
 template <typename T>
@@ -97,10 +97,10 @@ static void MergeClusters(std::vector<Info>& infos) {
 PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
                                          const std::shared_ptr<tgfx::Typeface>& typeface) {
   std::vector<Info> infos;
-  const char* textStart = &(text[0]);
+  const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   while (textStart < textStop) {
-    auto cluster = static_cast<uint32_t>(textStart - &(text[0]));
+    auto cluster = static_cast<uint32_t>(textStart - text.data());
     infos.emplace_back(Info{tgfx::UTF::NextUTF8(&textStart, textStop), cluster});
   }
 
@@ -116,7 +116,7 @@ PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
       continue;
     }
     auto str = text.substr(infos[i].cluster, length);
-    auto glyphID = typeface->getGlyphID(str);
+    auto glyphID = typeface ? typeface->getGlyphID(str) : 0;
     if (glyphID == 0) {
       for (const auto& faceHolder : fallbackTypefaces) {
         auto face = faceHolder->getTypeface();

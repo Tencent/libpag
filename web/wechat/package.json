@@ -1,5 +1,5 @@
 {
-  "name": "libpag-miniprogram",
+  "name": "@tencent/libpag-miniprogram",
   "version": "4.0.0",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.js",

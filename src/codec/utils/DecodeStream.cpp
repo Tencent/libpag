@@ -22,7 +22,7 @@
 namespace pag {
 void DecodeStream::setPosition(uint32_t value) {
   if (!checkEndOfFile(value)) {
-    positionChanged(value - _position);
+    positionChanged(static_cast<size_t>(value) - _position);
   }
 }
 
@@ -144,7 +144,7 @@ std::unique_ptr<ByteData> DecodeStream::readByteData() {
   auto length = readEncodedUint32();
   auto bytes = readBytes(length);
   // must check whether the byte data is valid. otherwise, memcpy() will crash.
-  if (length == 0 || context->hasException()) {
+  if (length == 0 || length > bytes.length() || context->hasException()) {
     return nullptr;
   }
   return ByteData::MakeCopy(bytes.data(), length);
@@ -153,17 +153,14 @@ std::unique_ptr<ByteData> DecodeStream::readByteData() {
 std::string DecodeStream::readUTF8String() {
   if (_position < dataView.size()) {
     auto text = reinterpret_cast<const char*>(dataView.bytes() + _position);
-    auto textLength = strlen(text);
-    if (textLength > dataView.size() - _position) {
-      textLength = dataView.size() - _position;
-      positionChanged(static_cast<off_t>(textLength));
-    } else {
-      positionChanged(static_cast<off_t>(textLength + 1));
+    auto maxLength = dataView.size() - _position;
+    auto textLength = strnlen(text, maxLength);
+    if (textLength < maxLength) {
+      positionChanged(textLength + 1);
+      return {text, textLength};
     }
-    return {text, textLength};
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
   }
+  PAGThrowError(context, "End of file was encountered.");
   return "";
 }
 
@@ -291,17 +288,18 @@ void DecodeStream::readPoint3DList(Point3D* points, uint32_t count, float precis
   }
 }
 
-void DecodeStream::bitPositionChanged(off_t offset) {
+void DecodeStream::bitPositionChanged(size_t offset) {
   _bitPosition += offset;
   _position = BitsToBytes(_bitPosition);
 }
 
-void DecodeStream::positionChanged(off_t offset) {
+void DecodeStream::positionChanged(size_t offset) {
   _position += offset;
-  _bitPosition = static_cast<uint64_t>(_position) * 8;
+  _bitPosition = _position * 8;
 }
 
 bool DecodeStream::checkEndOfFile(uint32_t bytesToRead) {
+  // The _position must not use the uint32_t type, otherwise it will overflow.
   if (_position + bytesToRead > dataView.size()) {
     PAGThrowError(context, "End of file was encountered.");
     return true;

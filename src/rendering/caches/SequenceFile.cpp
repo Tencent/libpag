@@ -22,8 +22,8 @@
 #include "base/utils/Log.h"
 #include "pag/file.h"
 #include "rendering/utils/Directory.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/DataView.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/DataView.h"
 
 namespace pag {
 static constexpr uint8_t FILE_VERSION = 1;
@@ -356,7 +356,7 @@ bool SequenceFile::compatible(const tgfx::ImageInfo& info, int frameCount, float
       _staticTimeRanges.size() != staticTimeRanges.size()) {
     return false;
   }
-  return memcmp(&_staticTimeRanges[0], &staticTimeRanges[0],
+  return memcmp(_staticTimeRanges.data(), staticTimeRanges.data(),
                 sizeof(TimeRange) * staticTimeRanges.size()) == 0;
 }
 }  // namespace pag

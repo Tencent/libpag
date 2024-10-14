@@ -273,22 +273,25 @@ static std::unique_ptr<BlockConfig> TextDocumentBlockV3(TextDocument* textDocume
   return TextDocumentBlockCore(textDocument, TagCode::TextSourceV3);
 }
 
+TextDocumentHandle ReadTextDocument(DecodeStream* stream,
+                                    std::unique_ptr<BlockConfig> (*ConfigMaker)(TextDocument*)) {
+  auto value = std::make_shared<TextDocument>();
+  if (!ReadBlock(stream, value.get(), ConfigMaker)) {
+    return nullptr;
+  };
+  return value;
+}
+
 TextDocumentHandle ReadTextDocument(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlock);
-  return TextDocumentHandle(value);
+  return ReadTextDocument(stream, TextDocumentBlock);
 }
 
 TextDocumentHandle ReadTextDocumentV2(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlockV2);
-  return TextDocumentHandle(value);
+  return ReadTextDocument(stream, TextDocumentBlockV2);
 }
 
 TextDocumentHandle ReadTextDocumentV3(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlockV3);
-  return TextDocumentHandle(value);
+  return ReadTextDocument(stream, TextDocumentBlockV3);
 }
 
 GradientColorHandle ReadGradientColor(DecodeStream* stream) {
@@ -459,7 +462,8 @@ static void WritePathInternal(EncodeStream* stream, pag::PathHandle value) {
         break;
     }
   }
-  stream->writeFloatList(&pointList[0], static_cast<int32_t>(pointList.size()), SPATIAL_PRECISION);
+  stream->writeFloatList(pointList.data(), static_cast<int32_t>(pointList.size()),
+                         SPATIAL_PRECISION);
 }
 
 void WritePath(EncodeStream* stream, pag::PathHandle value) {

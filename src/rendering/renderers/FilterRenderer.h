@@ -50,8 +50,8 @@ class FilterRenderer {
  public:
   static void MeasureFilterBounds(tgfx::Rect* bounds, const FilterModifier* modifier);
 
-  static void DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cache,
-                             const FilterModifier* modifier, std::shared_ptr<Graphic> content);
+  static void DrawWithFilter(Canvas* parentCanvas, const FilterModifier* modifier,
+                             std::shared_ptr<Graphic> content);
 
  private:
   static std::unique_ptr<FilterList> MakeFilterList(const FilterModifier* modifier);

@@ -4,19 +4,23 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) 
 [![codecov](https://codecov.io/gh/Tencent/libpag/branch/main/graph/badge.svg)](https://codecov.io/gh/Tencent/libpag)
 [![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
+[![build](https://github.com/Tencent/libpag/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
+
+[![Cloud Studio](https://cs-res.codehub.cn/common/assets/icon-badge.svg)](https://cloudstudio.net/a/20987965736472576?channel=share&sharetype=Markdown)
+
+English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
 ## Introduction
 
 libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
-vector-based and raster-based animations across most platforms, such as iOS, Android, macOS,
+vector-based and raster-based animations across most platforms, such as iOS, Android, OpenHarmony, macOS,
 Windows, Linux, and Web.
 
 PAG is an open-source file format for recording animations. PAG files can be created and exported
 from Adobe After Effects with the PAGExporter plugin and previewed in the PAGViewer app, which you
-can get from [pag.art](https://pag.art), and both of them are available on both macOS and Windows.
+can get from [pag.io](https://pag.io), and both of them are available on both macOS and Windows.
 
 PAG is now being used by 40+ Tencent apps, such as WeChat, Mobile QQ, Honor of Kings Mobile Game,
 Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
@@ -62,7 +66,8 @@ features like video templates.
 
 - iOS 9.0 or later
 - Android 4.4 or later
-- macOS 10.13 or later
+- HarmonyOS Next 5.0.0(12) or later
+- macOS 10.15 or later
 - Windows 7.0 or later
 - Chrome 69.0 or later (Web)
 - Safari 11.3 or later (Web)
@@ -129,6 +134,26 @@ Add the following rule to your proguard rules to avoid the wrong obfuscation.
 
 Finally, run gradle sync and then build the project.
 
+### OpenHarmony Integration
+You can use the har downloaded from the [release](https://github.com/Tencent/libpag/releases) page, or add libpag to your project by
+OHPM:
+
+```
+ohpm install @tencent/libpag
+```
+
+Or, you can add it to your project manually.
+Add the following lines to oh-package.json5 on your app module.
+```
+"dependencies": {
+"@tencent/libpag": "^1.0.1",
+}
+```
+Then run
+```
+ohpm install
+```
+
 ### Web Integration
 
 Simply copy the following code into an HTML file and open it in your browser:
@@ -138,7 +163,7 @@ Simply copy the following code into an HTML file and open it in your browser:
 <script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
 <script>
   window.libpag.PAGInit().then((PAG) => {
-    const url = 'https://pag.art/file/like.pag';
+    const url = 'https://pag.io/file/like.pag';
     fetch(url)
       .then((response) => response.blob())
       .then(async (blob) => {
@@ -161,11 +186,11 @@ Check out the following projects to learn how to use the APIs of libpag:
 
 ### Documentation
 
-- [iOS API Reference](https://pag.art/api.html#/apis/ios/)
-- [Android API Reference](https://pag.art/api.html#/apis/android/org/libpag/package-summary.html)
-- [Web API Reference](https://pag.art/api.html#/apis/web/)
+- [iOS API Reference](https://pag.io/apis/ios/index.html)
+- [Android API Reference](https://pag.io/apis/android/index.html)
+- [Web API Reference](https://pag.io/apis/web/index.html)
 
-You can find other docs on [pag.art](https://pag.art/docs/mobile-sdk-guide.html)
+You can find other docs on [pag.io](https://pag.io/docs/home.html)
 
 ## Development
 
@@ -176,7 +201,7 @@ We recommend using CLion IDE on the macOS platform for development.
 - The `main` branch is our active developing branch which contains the latest features and bugfixes. 
 - The branches under `release/` are our stable milestone branches which are fully tested. We will 
 periodically cut a `release/{version}` branch from the `main` branch. After one `release/{version}` 
-branch is cut, only high priority fixes are checked into it.
+branch is cut, only high-priority fixes are checked into it.
 
 **Note: This repository only contains the latest code since PAG 4.0. To use the legacy PAG 3.0 
 versions, you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
@@ -184,24 +209,28 @@ versions, you can download the precompiled libraries from [here](https://github.
 ### Build Prerequisites
 
 - Xcode 11.0+
-- GCC 7.0+
-- CMake 3.10.2+
-- Visual Studio 2019
-- NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
+- GCC 9.0+
+- Visual Studio 2019+
+- NodeJS 14.14.0+
+- Ninja 1.9.0+
+- CMake 3.13.0+
+- QT 5.13.0+
+- NDK 19.2+ (**19.2.5345600 recommended**)
+- Emscripten 3.1.20+ (**3.1.20 recommended**)
 
 ### Dependency Management
 
-libpag uses `depsync` tool to manage third-party dependencies.
+libpag uses [depsync](https://github.com/domchen/depsync) tool to manage third-party dependencies.
 
 **For macOS platform：**
 
-Just simply run the script in the root of libpag project:
+Run the script in the root of the project:
 
 ```
 ./sync_deps.sh
 ```
 
-This script will automatically install necessary tools and synchronize all third-party repositories.
+This script will automatically install the necessary tools and synchronize all third-party repositories.
 
 **For other platforms：**
 
@@ -212,7 +241,7 @@ computer after this step). And then run the following command to install depsync
 npm install -g depsync
 ```
 
-And then run `depsync` in the root directory of libpag project.
+And then run `depsync` in the root directory of the project.
 
 ```
 depsync

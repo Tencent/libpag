@@ -33,7 +33,7 @@ const plugins = [
   resolve({ extensions: ['.ts', '.js'] }),
   commonJs(),
   alias({
-    entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../tgfx/web/src') }],
+    entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
   }),
 ];
 
@@ -118,5 +118,15 @@ export default [
       { banner, file: 'lib/libpag.worker.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
     ],
     plugins: [...plugins],
+  },
+  {
+    input: 'demo/index.ts',
+    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
+    plugins: plugins,
+  },
+  {
+    input: 'demo/worker.ts',
+    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
+    plugins: plugins,
   },
 ];

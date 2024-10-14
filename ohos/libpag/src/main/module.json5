@@ -1,0 +1,24 @@
+{
+  "module": {
+    "name": "libpag",
+    "type": "har",
+    "description": "$string:shared_desc",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "requestPermissions":[
+      {
+        "name": "ohos.permission.INTERNET",
+        "reason": "$string:internet_permission",
+        "usedScene": {
+          "abilities": [
+            "PAGFile"
+          ],
+          "when": "inuse"
+        }
+      }
+    ]
+  }
+}

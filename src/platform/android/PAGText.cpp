@@ -100,9 +100,9 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   jint fillColor = MakeColorInt(env, textDocument->fillColor.red, textDocument->fillColor.green,
                                 textDocument->fillColor.blue);
   env->SetIntField(textData, PAGText_fillColor, fillColor);
-  auto fontFamily = SafeConvertToJString(env, textDocument->fontFamily.c_str());
+  auto fontFamily = SafeConvertToJString(env, textDocument->fontFamily);
   env->SetObjectField(textData, PAGText_fontFamily, fontFamily);
-  auto fontStyle = SafeConvertToJString(env, textDocument->fontStyle.c_str());
+  auto fontStyle = SafeConvertToJString(env, textDocument->fontStyle);
   env->SetObjectField(textData, PAGText_fontStyle, fontStyle);
   env->SetFloatField(textData, PAGText_fontSize, textDocument->fontSize);
   jint strokeColor = MakeColorInt(env, textDocument->strokeColor.red,
@@ -111,7 +111,7 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   env->SetBooleanField(textData, PAGText_strokeOverFill,
                        static_cast<jboolean>(textDocument->strokeOverFill));
   env->SetFloatField(textData, PAGText_strokeWidth, textDocument->strokeWidth);
-  auto text = SafeConvertToJString(env, textDocument->text.c_str());
+  auto text = SafeConvertToJString(env, textDocument->text);
   env->SetObjectField(textData, PAGText_text, text);
   env->SetIntField(textData, PAGText_justification, textDocument->justification);
   env->SetFloatField(textData, PAGText_leading, textDocument->leading);

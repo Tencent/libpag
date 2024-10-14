@@ -18,8 +18,8 @@
 
 #include "GPUDrawable.h"
 #include "base/utils/Log.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDefines.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
@@ -37,10 +37,13 @@ GPUDrawable::GPUDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
 void GPUDrawable::updateSize() {
   if (!canvasID.empty()) {
     emscripten_get_canvas_element_size(canvasID.c_str(), &_width, &_height);
+    if (window) {
+      window->invalidSize();
+    }
   }
 }
 
-std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
@@ -51,6 +54,12 @@ std::shared_ptr<tgfx::Device> GPUDrawable::onCreateDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  return window ? window->createSurface(context) : nullptr;
+  return window ? window->getSurface(context) : nullptr;
+}
+
+void GPUDrawable::onFreeSurface() {
+  if (window) {
+    window->freeSurface();
+  }
 }
 }  // namespace pag

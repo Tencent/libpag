@@ -25,6 +25,8 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
+#elif defined(__OHOS__)
+struct OH_NativeBuffer;
 #elif defined(__APPLE__)
 struct __CVBuffer;
 #endif
@@ -35,6 +37,8 @@ typedef AHardwareBuffer* HardwareBufferRef;
 #elif defined(__APPLE__)
 // __CVBuffer == CVPixelBufferRef
 typedef __CVBuffer* HardwareBufferRef;
+#elif defined(__OHOS__)
+typedef OH_NativeBuffer* HardwareBufferRef;
 #else
 typedef void* HardwareBufferRef;
 #endif
@@ -60,9 +64,9 @@ enum class Backend {
 enum class ImageOrigin {
   /**
    * The default origin of the native coordinate system in the GPU backend. For example, the
-   * SurfaceOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
-   * textures. Textures newly created by the backend API for off-screen rendering usually have a
-   * SurfaceOrigin::TopLeft origin.
+   * ImageOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
+   * textures. Textures newly created by the backend API for off-screen rendering usually have an
+   * ImageOrigin::TopLeft origin.
    */
   TopLeft,
 

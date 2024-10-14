@@ -18,8 +18,8 @@
 
 #include "NativeTextShaper.h"
 #include <CoreText/CoreText.h>
+#include "tgfx/core/UTF.h"
 #include "tgfx/platform/apple/CTTypeface.h"
-#include "tgfx/utils/UTF.h"
 
 namespace pag {
 std::optional<PositionedGlyphs> NativeTextShaper::Shape(
@@ -29,12 +29,12 @@ std::optional<PositionedGlyphs> NativeTextShaper::Shape(
     return std::nullopt;
   }
   std::vector<uint32_t> clusters;
-  const char* textStart = &(text[0]);
+  const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   while (textStart < textStop) {
     auto oldPosition = textStart;
     auto uni = tgfx::UTF::NextUTF8(&textStart, textStop);
-    auto cluster = oldPosition - &(text[0]);
+    auto cluster = oldPosition - text.data();
     clusters.emplace_back(static_cast<uint32_t>(cluster));
     if (0x10000 <= uni && uni <= 0x10FFFF) {
       clusters.emplace_back(static_cast<uint32_t>(cluster));
@@ -63,9 +63,9 @@ std::optional<PositionedGlyphs> NativeTextShaper::Shape(
     }
     auto count = CTRunGetGlyphCount(run);
     std::vector<CGGlyph> glyphs(count);
-    CTRunGetGlyphs(run, CFRangeMake(0, count), &(glyphs[0]));
+    CTRunGetGlyphs(run, CFRangeMake(0, count), glyphs.data());
     std::vector<CFIndex> indices(count);
-    CTRunGetStringIndices(run, CFRangeMake(0, count), &(indices[0]));
+    CTRunGetStringIndices(run, CFRangeMake(0, count), indices.data());
     for (size_t j = 0; j < glyphs.size(); j++) {
       glyphIDs.emplace_back(face, static_cast<tgfx::GlyphID>(glyphs[j]), clusters[indices[j]]);
     }

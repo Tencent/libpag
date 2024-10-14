@@ -1,6 +1,6 @@
-<img src="https://pag.art/img/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[Homepage](https://pag.art) | English | [简体中文](./README.zh_CN.md)
+[Homepage](https://pag.io) | English | [简体中文](./README.zh_CN.md)
 
 ## Introduction
 
@@ -38,7 +38,7 @@ The PAG library is also available on other public CDNs that sync with NPM, such 
     // Initialize pag webassembly module.
     const PAG = await window.libpag.PAGInit();
     // Fetch pag file data.
-    const buffer = await fetch('https://pag.art/file/like.pag').then((response) => response.arrayBuffer());
+    const buffer = await fetch('https://pag.io/file/like.pag').then((response) => response.arrayBuffer());
     // Load the PAGFile from data.
     const pagFile = await PAG.PAGFile.load(buffer);
     // Set canvas size from the PAGFile size.
@@ -58,12 +58,12 @@ You can use the `locateFile` function to get the path of `libpag.wasm` file. By 
 ```js
 const PAG = await window.libpag.PAGInit({
   locateFile: () => {
-    if (location.host === 'dev.pag.art') {
+    if (location.host === 'dev.pag.io') {
       // development environment
-      return 'https://dev.pag.art/file/libpag.wasm';
+      return 'https://dev.pag.io/file/libpag.wasm';
     } else {
       // production environment
-      return 'https://pag.art/file/libpag.wasm';
+      return 'https://pag.io/file/libpag.wasm';
     }
   },
 });
@@ -89,7 +89,7 @@ There are many kinds of products in the npm package after building. You could re
 
 There is also a [repository](https://github.com/libpag/pag-web) that contains some demos about using PAG Web SDK with HTML / Vue / React / PixiJS.
 
-You can find the API documentation [here](https://pag.art/docs/apis-web.html).
+You can find the API documentation [here](https://pag.io/docs/apis-web.html).
 
 ## Browser
 
@@ -120,16 +120,14 @@ $ npm install
 Execute `build.sh debug` to get `libpag.wasm` file.
 
 ```bash
-# ./web/script/
-$ cd script
-$ chmod +x ./build.sh
-$ ./build.sh debug
+# ./web
+$ npm run build:debug
 ```
 
-Build Typescript file.
+Start TypeScript compiler watcher (Optional).
 
 ```bash
-# ./web/
+# ./web
 $ npm run dev
 ```
 
@@ -139,28 +137,15 @@ Start HTTP server.
 # ./
 $ npm run server
 ```
-Use Chrome to open `http://localhost:8081/web/demo/index.html` to see the demo.
+Use Chrome to open `http://localhost:8081/demo/index.html` to see the demo.
 
 If you need to debug, you can install [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb), and open Chrome DevTools > Settings > Experiments > Check the "WebAssembly Debugging: Enable DWARF support" option to enable SourceMap support. Now you can debug C++ files in Chrome DevTools.
-
-#### PS
-
-When using build.sh to compile libpag.wasm, undefined symbols error was suppressed due to compatibility issues between emscripten and the system's std library.
-
-```shell
-# build.sh
-emcc -s ERROR_ON_UNDEFINED_SYMBOLS=0
-```
-
-During the compilation process, it is necessary to pay attention to any warning messages unrelated to std library to avoid the undefined symbols errors during runtime.
 
 ### Build (Release)
 
 ```bash
-# ./web/script
-$ cd script
-$ chmod +x ./build.sh
-$ ./build.sh
+# ./web
+$ npm run build
 ```
 
 ### Build with CLion
@@ -176,7 +161,7 @@ Create a new build target in CLion, and use the following **CMake options**（fi
 Build release version
 
 ```bash
-$ cd script & ./build.sh
+$ npm run build
 ```
 
 Start test HTTP server.
