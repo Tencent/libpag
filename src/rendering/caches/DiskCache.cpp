@@ -73,8 +73,7 @@ DiskCache::DiskCache() {
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");
-    auto ret = readConfig();
-    if (!ret) {
+    if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
                             [&](const std::string& path, size_t) { remove(path.c_str()); });
     }
