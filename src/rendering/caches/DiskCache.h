@@ -79,7 +79,7 @@ class DiskCache {
   void removeFromCachedFiles(std::shared_ptr<FileInfo> fileInfo);
   void moveToFront(std::shared_ptr<FileInfo> fileInfo);
   void moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo);
-  void readConfig();
+  bool readConfig();
   void saveConfig();
   uint32_t getFileID(const std::string& key);
   void changeToTemporary(uint32_t fileID);
