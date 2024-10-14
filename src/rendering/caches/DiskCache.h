@@ -79,7 +79,7 @@ class DiskCache {
   void removeFromCachedFiles(std::shared_ptr<FileInfo> fileInfo);
   void moveToFront(std::shared_ptr<FileInfo> fileInfo);
   void moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo);
-  void readConfig();
+  bool readConfig();
   void saveConfig();
   uint32_t getFileID(const std::string& key);
   void changeToTemporary(uint32_t fileID);
@@ -87,7 +87,6 @@ class DiskCache {
   uint32_t filePathToID(const std::string& path);
   void notifyFileClosed(uint32_t fileID);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
-  void removeRedundancyCache();
 
   friend class SequenceFile;
   friend class PAGDiskCache;
