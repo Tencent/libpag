@@ -429,12 +429,10 @@ void DiskCache::removeRedundancyCache() {
     }
   }
   if (shouldVisitCacheFiles) {
-    LOGE("Since %s does not exist, start clearing the cache files.\n",configPath.c_str());
-    Directory::VisitFiles(cacheFolder, [&](const std::string &path, size_t) {
-        remove(path.c_str());
-    });
+    LOGE("Since %s does not exist, start clearing the cache files.\n", configPath.c_str());
+    Directory::VisitFiles(cacheFolder,
+                          [&](const std::string& path, size_t) { remove(path.c_str()); });
   }
 }
-
 
 }  // namespace pag
