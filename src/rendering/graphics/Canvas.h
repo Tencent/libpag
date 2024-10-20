@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/SurfaceOptions.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace pag {
 class RenderCache;
@@ -39,7 +39,7 @@ class Canvas {
 
   tgfx::Surface* getSurface() const;
 
-  const tgfx::SurfaceOptions* surfaceOptions() const;
+  uint32_t renderFlags() const;
 
   void save();
 
