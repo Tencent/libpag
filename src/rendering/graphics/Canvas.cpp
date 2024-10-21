@@ -43,9 +43,9 @@ tgfx::Surface* Canvas::getSurface() const {
   return canvas->getSurface();
 }
 
-const tgfx::SurfaceOptions* Canvas::surfaceOptions() const {
+uint32_t Canvas::renderFlags() const {
   auto surface = canvas->getSurface();
-  return surface ? surface->options() : nullptr;
+  return surface ? surface->renderFlags() : 0;
 }
 
 void Canvas::save() {
