@@ -163,14 +163,14 @@ void RenderCache::beginFrame() {
 }
 
 void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
-  if (deviceID > 0 && deviceID != current->device()->uniqueID()) {
+  if (contextID > 0 && contextID != current->uniqueID()) {
     // Context 改变需要清理内部所有缓存，这里用 uniqueID
     // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
     releaseAll();
   }
   context = current;
   context->setCacheLimit(MAX_GRAPHICS_MEMORY);
-  deviceID = context->device()->uniqueID();
+  contextID = context->uniqueID();
   isDrawingFrame = forDrawing;
   if (!isDrawingFrame) {
     return;
@@ -199,7 +199,7 @@ void RenderCache::releaseAll() {
   motionBlurFilter = nullptr;
   delete transform3DFilter;
   transform3DFilter = nullptr;
-  deviceID = 0;
+  contextID = 0;
 }
 
 void RenderCache::detachFromContext() {

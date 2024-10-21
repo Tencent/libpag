@@ -90,8 +90,8 @@ class ImageProxyPicture : public Picture {
       canvas->drawImage(std::move(image));
       return;
     }
-    auto options = canvas->surfaceOptions();
-    if (options && !options->cacheDisabled()) {
+    auto renderFlags = canvas->renderFlags();
+    if (!(renderFlags & tgfx::RenderFlags::DisableCache)) {
       auto snapshot = cache->getSnapshot(this);
       if (snapshot) {
         canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
@@ -168,8 +168,8 @@ class SnapshotPicture : public Picture {
   }
 
   void draw(Canvas* canvas) const override {
-    auto options = canvas->surfaceOptions();
-    if (options && options->cacheDisabled()) {
+    auto renderFlags = canvas->renderFlags();
+    if (renderFlags & tgfx::RenderFlags::DisableCache) {
       graphic->draw(canvas);
       return;
     }
@@ -192,9 +192,9 @@ class SnapshotPicture : public Picture {
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-    tgfx::SurfaceOptions options(tgfx::RenderFlags::DisableCache);
+    auto renderFlags = tgfx::RenderFlags::DisableCache;
     auto surface =
-        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipmapped, &options);
+        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipmapped, renderFlags);
     if (surface == nullptr) {
       return nullptr;
     }
