@@ -196,26 +196,22 @@
 }
 
 - (BOOL)setPath:(NSString*)path {
-  if (![filePath isEqualToString:path]) {
-    if (filePath != nil) {
-      [filePath release];
-      filePath = nil;
-    }
-    filePath = [path retain];
+  if (filePath != nil) {
+    [filePath release];
+    filePath = nil;
   }
+  filePath = [path retain];
   PAGFile* file = [PAGFile Load:path];
   [self setCompositionInternal:file];
   return file != nil;
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
-  if (![filePath isEqualToString:path]) {
-    if (filePath != nil) {
-      [filePath release];
-      filePath = nil;
-    }
-    filePath = [path retain];
+  if (filePath != nil) {
+    [filePath release];
+    filePath = nil;
   }
+  filePath = [path retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* file) {
         [self setCompositionInternal:file];
