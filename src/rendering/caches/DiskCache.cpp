@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskCache.h"
-#include <filesystem>
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/utils/Directory.h"
@@ -74,9 +73,6 @@ DiskCache::DiskCache() {
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");
-    if (!std::filesystem::exists(cacheFolder)) {
-      Directory::CreateRecursively(cacheFolder);
-    }
     if (!readConfig()) {
       Directory::VisitFiles(cacheFolder,
                             [&](const std::string& path, size_t) { remove(path.c_str()); });
