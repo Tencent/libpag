@@ -176,7 +176,7 @@ class RenderCache : public Performance {
  private:
   ID _uniqueID = 0;
   PAGStage* stage = nullptr;
-  uint32_t deviceID = 0;
+  uint32_t contextID = 0;
   tgfx::Context* context = nullptr;
   std::queue<std::chrono::steady_clock::time_point> timestamps = {};
   bool isDrawingFrame = false;
