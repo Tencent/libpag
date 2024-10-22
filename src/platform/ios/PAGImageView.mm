@@ -521,9 +521,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     filePath = nil;
   }
   filePath = [path retain];
+  [self retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* pagFile) {
-        [self retain];
         imageViewLock.lock();
         [self setCompositionInternal:pagFile maxFrameRate:maxFrameRate];
         imageViewLock.unlock();

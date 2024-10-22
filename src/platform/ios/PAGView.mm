@@ -212,9 +212,9 @@
     filePath = nil;
   }
   filePath = [path retain];
+  [self retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* file) {
-        [self retain];
         [self setCompositionInternal:file];
         callback(file);
         [self release];
