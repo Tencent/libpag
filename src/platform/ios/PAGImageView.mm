@@ -495,10 +495,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (BOOL)setPath:(NSString*)path maxFrameRate:(float)maxFrameRate {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if ([filePath isEqualToString:path]) {
-    return YES;
-  }
-  if (filePath) {
+  if (filePath != nil) {
     [filePath release];
     filePath = nil;
   }
@@ -524,10 +521,14 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     filePath = nil;
   }
   filePath = [path retain];
+  [self retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* pagFile) {
-        [self setComposition:pagFile maxFrameRate:maxFrameRate];
+        imageViewLock.lock();
+        [self setCompositionInternal:pagFile maxFrameRate:maxFrameRate];
+        imageViewLock.unlock();
         callback(pagFile);
+        [self release];
       }];
 }
 

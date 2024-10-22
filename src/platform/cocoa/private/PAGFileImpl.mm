@@ -103,8 +103,10 @@
     return;
   }
   void (^copyCallback)(PAGFile*) = Block_copy(callback);
+  [path retain];
   tgfx::Task::Run([callBack = copyCallback, path]() {
     PAGFile* file = [PAGFileImpl Load:path];
+    [path release];
     callBack(file);
     Block_release(callBack);
   });

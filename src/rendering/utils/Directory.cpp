@@ -120,6 +120,9 @@ bool Directory::CreateRecursively(const std::string& folder) {
 
 void Directory::VisitFiles(const std::string& folder,
                            std::function<void(const std::string&, size_t)> callback) {
+  if (!std::filesystem::exists(folder)) {
+    Directory::CreateRecursively(folder);
+  }
   for (const auto& entry : std::filesystem::directory_iterator(folder)) {
     if (entry.is_regular_file()) {
       std::string str = entry.path().filename().string();
