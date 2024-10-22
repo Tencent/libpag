@@ -24,7 +24,6 @@
 @implementation PAGView {
   PAGPlayer* pagPlayer;
   PAGSurface* pagSurface;
-  PAGFile* pagFile;
   NSString* filePath;
   PAGAnimator* animator;
   BOOL _isVisible;
@@ -39,7 +38,6 @@
 
 - (void)initPAG {
   _isVisible = FALSE;
-  pagFile = nil;
   filePath = nil;
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
@@ -60,7 +58,6 @@
   [animator release];
   [pagPlayer release];
   [pagSurface release];
-  [pagFile release];
   [filePath release];
   [[NSNotificationCenter defaultCenter] removeObserver:self];
   [super dealloc];
@@ -198,9 +195,9 @@
     [filePath release];
     filePath = nil;
   }
-  PAGFile* file = [PAGFile Load:path];
-  [self setComposition:file];
   filePath = [path retain];
+  PAGFile* file = [PAGFile Load:path];
+  [self setCompositionInternal:file];
   return file != nil;
 }
 
@@ -210,10 +207,12 @@
     filePath = nil;
   }
   filePath = [path retain];
+  [self retain];
   [PAGFile LoadAsync:path
-      completionBlock:^(PAGFile* pagFile) {
-        [self setComposition:pagFile];
-        callback(pagFile);
+      completionBlock:^(PAGFile* file) {
+        [self setCompositionInternal:file];
+        callback(file);
+        [self release];
       }];
 }
 
@@ -226,10 +225,10 @@
     [filePath release];
     filePath = nil;
   }
-  if (pagFile != nil) {
-    [pagFile release];
-    pagFile = nil;
-  }
+  [self setCompositionInternal:newComposition];
+}
+
+- (void)setCompositionInternal:(PAGComposition*)newComposition {
   [pagPlayer setComposition:newComposition];
   [animator setProgress:[pagPlayer getProgress]];
   if (_isVisible) {
