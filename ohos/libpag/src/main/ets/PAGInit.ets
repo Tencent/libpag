@@ -43,7 +43,7 @@ export class PAGInit {
           fontInfo = font.getFontByName(element.fallback[j].family + " Regular")
         }
         if (fontInfo != null) {
-          if (fontInfo.fullName.indexOf("Emoji") > 0) {
+          if (fontInfo.fullName.toLowerCase().indexOf("emoji") > 0) {
             emojiPaths.push(fontInfo.path);
           } else {
             paths.push(fontInfo.path);
