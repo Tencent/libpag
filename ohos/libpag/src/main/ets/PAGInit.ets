@@ -33,20 +33,26 @@ export class PAGInit {
 
   private static InitFontFallback() {
     let fontConfig = font.getUIFontConfig();
+    let paths = new Array<string>();
+    let emojiPaths = new Array<string>();
     for (let index = 0; index < fontConfig.fallbackGroups.length; index++) {
       const element = fontConfig.fallbackGroups[index];
-      let paths = new Array<string>();
       for (let j = 0; j < element.fallback.length; j++) {
         let fontInfo = font.getFontByName(element.fallback[j].family)
         if (fontInfo == null) {
           fontInfo = font.getFontByName(element.fallback[j].family + " Regular")
         }
         if (fontInfo != null) {
-          paths.push(fontInfo.path);
+          if (fontInfo.fullName.indexOf("Emoji") > 0) {
+            emojiPaths.push(fontInfo.path);
+          } else {
+            paths.push(fontInfo.path);
+          }
         }
       }
-      JPAGFont.SetFallbackFontPaths(paths);
     }
+    paths.concat(emojiPaths);
+    JPAGFont.SetFallbackFontPaths(paths);
   }
 
   private static InitCacheDir() {
