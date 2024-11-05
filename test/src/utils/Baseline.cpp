@@ -212,9 +212,8 @@ void Baseline::saveData() {
     outMD5File << std::setw(4) << outputMD5 << std::endl;
     outMD5File.close();
     CreateFolder(cacheVersionPath);
-    std::ofstream outVersionFile(cacheVersionPath);
-    outVersionFile << std::setw(4) << baselineVersions << std::endl;
-    outVersionFile.close();
+    std::filesystem::copy(baselineVersionPath, cacheVersionPath,
+                          std::filesystem::copy_options::overwrite_existing);
   }
 #else
   std::filesystem::remove(outMD5Path);
