@@ -15,15 +15,14 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
-make_dir result
-make_dir build
-
 ./update_baseline.sh 1
 if test $? -ne 0; then
    exit 1
 fi
 cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
+make_dir result
+make_dir build
 cd build
 
 cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
