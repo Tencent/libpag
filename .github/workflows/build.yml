@@ -156,7 +156,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: libpag-environment-web-20231130
+          key: libpag-environment-web-20241106
           restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
@@ -173,10 +173,16 @@ jobs:
         run: |
           cd web
           npm install
-          git clone https://github.com/emscripten-core/emsdk.git
+          if [ ! -d "emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git
+          else
+            cd emsdk
+            git pull
+            cd ..
+          fi
           cd emsdk
-          ./emsdk install 3.1.20
-          ./emsdk activate 3.1.20
+          ./emsdk install 3.1.71
+          ./emsdk activate 3.1.71
         shell: bash
 
       - name: Run depsync
@@ -198,7 +204,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: libpag-environment-web-20231130
+          key: libpag-environment-web-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

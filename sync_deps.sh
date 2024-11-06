@@ -6,7 +6,7 @@ cd $(dirname $0)
 if [[ `uname` == 'Darwin' ]]; then
   if [ ! $(which emcc) ]; then
       echo "emscripten not found. Trying to install..."
-      ./web/script/install-emscripten.sh
+      brew install emscripten
   fi
 fi
 
