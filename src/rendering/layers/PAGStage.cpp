@@ -190,7 +190,7 @@ void PAGStage::invalidateCacheScale(PAGLayer* pagLayer) {
 
 std::shared_ptr<Graphic> PAGStage::getSequenceGraphic(Composition* composition,
                                                       Frame compositionFrame) {
-  auto result = sequenceCache.find(composition->id);
+  auto result = sequenceCache.find(composition->uniqueID);
   if (result != sequenceCache.end()) {
     if (result->second.compositionFrame == compositionFrame) {
       return result->second.graphic;
