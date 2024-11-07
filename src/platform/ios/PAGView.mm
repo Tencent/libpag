@@ -28,6 +28,7 @@
   NSString* filePath;
   PAGAnimator* animator;
   BOOL _isVisible;
+  std::mutex lock;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -192,10 +193,12 @@
 }
 
 - (NSString*)getPath {
+  std::lock_guard<std::mutex> autoLock(lock);
   return filePath == nil ? nil : [[filePath retain] autorelease];
 }
 
 - (BOOL)setPath:(NSString*)path {
+  std::lock_guard<std::mutex> autoLock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -207,6 +210,7 @@
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
+  std::lock_guard<std::mutex> autoLock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -226,6 +230,7 @@
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
+  std::lock_guard<std::mutex> autoLock(lock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
