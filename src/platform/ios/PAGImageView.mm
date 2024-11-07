@@ -73,6 +73,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   PAGDecoder* pagDecoder;
   NSInteger duartion;
   float renderScaleFactor;
+  NSInteger width;
+  NSInteger height;
+  NSUInteger numFrames;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
   std::mutex imageViewLock;
@@ -104,6 +107,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   self.memeoryCacheFinished = NO;
   self.isVisible = NO;
   filePath = nil;
+  width = 0;
+  height = 0;
+  numFrames = 0;
   self.backgroundColor = [UIColor clearColor];
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
 
@@ -169,17 +175,23 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   duartion = [newComposition duration];
 
   [self reset];
+  [self updatePAGDecoder];
   if (self.isVisible) {
     [animator setDuration:duartion];
   }
 }
 
-- (CVPixelBufferRef)getDickCacheCVPixelBuffer {
-  if (cvPixeBuffer == nil) {
-    cvPixeBuffer = pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
-                                              static_cast<int>([[self getPAGDecoder] height]));
-    if (cvPixeBuffer == nil) {
-      NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
+- (CVPixelBufferRef)getDiskCacheCVPixelBuffer {
+  if (diskBufferPool == nil) {
+    NSDictionary* options = @{
+      (id)kCVPixelBufferIOSurfacePropertiesKey : @{},
+      (id)kCVPixelBufferWidthKey : @(width),
+      (id)kCVPixelBufferHeightKey : @(height),
+      (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA)
+    };
+    CVReturn status = CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, (CFDictionaryRef)options,
+                                              &diskBufferPool);
+    if (status != kCVReturnSuccess || diskBufferPool == nil) {
       return nil;
     }
     CFRetain(cvPixeBuffer);
@@ -189,8 +201,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (CVPixelBufferRef)getMemoryCacheCVPixelBuffer {
   CVPixelBufferRef pixelBuffer =
-      pag::PixelBufferUtil::Make(static_cast<int>([[self getPAGDecoder] width]),
-                                 static_cast<int>([[self getPAGDecoder] height]));
+      pag::PixelBufferUtil::Make(static_cast<int>(width), static_cast<int>(height));
   if (pixelBuffer == nil) {
     NSLog(@"PAGImageView: CVPixelBufferRef create failed!");
     return nil;
@@ -198,7 +209,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   return pixelBuffer;
 }
 
-- (PAGDecoder*)getPAGDecoder {
+- (void)updatePAGDecoder {
   if (pagDecoder == nil) {
     float scaleFactor;
     if (self.viewSize.width >= self.viewSize.height) {
@@ -219,10 +230,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
                               scale:scaleFactor];
     }
     if (pagDecoder) {
+      width = [pagDecoder width];
+      height = [pagDecoder height];
+      numFrames = [pagDecoder numFrames];
       [pagDecoder retain];
     }
   }
-  return pagDecoder;
 }
 
 - (void)onAnimationFlush:(double)progress {
@@ -257,12 +270,15 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
       self.currentUIImage = image;
       [self submitToImageView];
     }
-    if ([imagesMap count] == (NSUInteger)[[self getPAGDecoder] numFrames]) {
+    if ([imagesMap count] == numFrames) {
       self.memeoryCacheFinished = YES;
     }
     return YES;
   }
-  PAGDecoder* pagDecoder = [self getPAGDecoder];
+  [self updatePAGDecoder];
+  if (pagDecoder == nil) {
+    return false;
+  }
   if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
     BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
     if (!status) {
@@ -289,6 +305,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if ([PAGContentVersion Get:pagComposition] != self.pagContentVersion) {
     self.pagContentVersion = [PAGContentVersion Get:pagComposition];
     [self reset];
+    [self updatePAGDecoder];
     if (self.isVisible) {
       [animator setDuration:[pagComposition duration]];
     }
@@ -312,8 +329,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)freeCache {
-  if (self.memoryCacheEnabled && self->pagDecoder &&
-      [self->imagesMap count] == (NSUInteger)[self->pagDecoder numFrames]) {
+  if (self.memoryCacheEnabled && self->pagDecoder && [self->imagesMap count] == numFrames) {
     [self->pagDecoder release];
     self->pagDecoder = nil;
   }
@@ -334,6 +350,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [pagDecoder release];
     pagDecoder = nil;
   }
+  width = 0;
+  height = 0;
+  numFrames = 0;
 }
 
 - (UIImage*)imageForCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
@@ -365,6 +384,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
+      [self updatePAGDecoder];
       if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
         [animator update];
       }
@@ -380,6 +400,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
       [self reset];
+      [self updatePAGDecoder];
       if (oldRect.size.width == 0 || oldRect.size.height == 0) {
         [animator update];
       }
@@ -395,6 +416,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   renderScaleFactor = scale;
   if (pagComposition || filePath) {
     [self reset];
+    [self updatePAGDecoder];
   }
 }
 
@@ -410,6 +432,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     if (pagComposition || filePath) {
       std::lock_guard<std::mutex> autoLock(imageViewLock);
       [self reset];
+      [self updatePAGDecoder];
       self.viewSize = CGSizeMake(self.frame.size.width, self.frame.size.height);
     }
   }
@@ -452,7 +475,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (NSUInteger)numFrames {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  return [[self getPAGDecoder] numFrames];
+  return numFrames;
 }
 
 - (UIImage*)currentImage {
@@ -481,6 +504,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (NSString*)getPath {
+  std::lock_guard<std::mutex> autoLock(imageViewLock);
   return filePath == nil ? nil : [[filePath retain] autorelease];
 }
 
@@ -511,6 +535,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)setPathAsync:(NSString*)path
         maxFrameRate:(float)maxFrameRate
      completionBlock:(void (^)(PAGFile*))callback {
+  std::lock_guard<std::mutex> autoLock(imageViewLock);
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
@@ -528,6 +553,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (PAGComposition*)getComposition {
+  std::lock_guard<std::mutex> autoLock(imageViewLock);
   if (filePath) {
     return nil;
   }
@@ -549,16 +575,21 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  [animator setProgress:pag::FrameToProgress(currentFrame, [[self getPAGDecoder] numFrames])];
+  [animator setProgress:pag::FrameToProgress(currentFrame, numFrames)];
 }
 
 - (NSUInteger)currentFrame {
-  return pag::ProgressToFrame([animator progress], [[self getPAGDecoder] numFrames]);
+  std::lock_guard<std::mutex> autoLock(imageViewLock);
+  return [self currentFrameInternal];
+}
+
+- (NSUInteger)currentFrameInternal {
+  return pag::ProgressToFrame([animator progress], numFrames);
 }
 
 - (BOOL)flush {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  NSInteger frameIndex = [self currentFrame];
+  NSInteger frameIndex = [self currentFrameInternal];
   if (self.memeoryCacheFinished) {
     if ([self checkPAGCompositionChanged] == NO) {
       if (self.currentFrameIndex != frameIndex) {
