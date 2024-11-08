@@ -70,17 +70,11 @@ static napi_value LoadFromAssets(napi_env env, napi_callback_info info) {
   size_t strSize;
   char srcBuf[1024];
   napi_get_value_string_utf8(env, args[1], srcBuf, sizeof(srcBuf), &strSize);
-  RawFile* rawFile = OH_ResourceManager_OpenRawFile(mNativeResMgr, srcBuf);
-  if (rawFile != NULL) {
-    long len = OH_ResourceManager_GetRawFileSize(rawFile);
-    auto data = ByteData::Make(len);
-    if (!data) {
-      return nullptr;
-    }
-    OH_ResourceManager_ReadRawFile(rawFile, data->data(), len);
-    return JPAGImage::ToJs(env, PAGImage::FromBytes(data->data(), data->length()));
+  auto data = LoadDataFromAsset(mNativeResMgr, srcBuf);
+  if (data == NULL) {
+    return nullptr;
   }
-  return nullptr;
+  return JPAGImage::ToJs(env, PAGImage::FromBytes(data->data(), data->length()));
 }
 
 static napi_value Width(napi_env env, napi_callback_info info) {

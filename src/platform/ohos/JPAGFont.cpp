@@ -71,13 +71,10 @@ static napi_value RegisterFontFromAsset(napi_env env, napi_callback_info info) {
   if (rawFile == NULL) {
     return nullptr;
   }
-
-  long len = OH_ResourceManager_GetRawFileSize(rawFile);
-  auto data = ByteData::Make(len);
+  auto data = LoadDataFromAsset(mNativeResMgr, name);
   if (data == nullptr) {
     return nullptr;
   }
-  OH_ResourceManager_ReadRawFile(rawFile, data->data(), len);
 
   int index = 0;
   if (argc > 2) {
