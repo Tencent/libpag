@@ -463,7 +463,7 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
   }
   auto effect = tgfx::PathEffect::MakeCorner(maxRadius);
   if (effect) {
-    effect->applyTo(&backgroundPath);
+    effect->filterPath(&backgroundPath);
   }
   auto graphic = Shape::MakeFrom(assetID, backgroundPath, ToTGFX(textDocument->backgroundColor));
   auto modifier =

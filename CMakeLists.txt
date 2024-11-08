@@ -147,7 +147,7 @@ file(GLOB COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${COMMON_FILES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND PAG_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-unused-command-line-argument)
+    list(APPEND PAG_COMPILE_OPTIONS -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
 if (MSVC)
@@ -226,6 +226,7 @@ if (WEB)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
+    list(APPEND PAG_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (IOS)
     # finds all required platform libraries.
     find_library(UIKit_LIBS UIKit REQUIRED)

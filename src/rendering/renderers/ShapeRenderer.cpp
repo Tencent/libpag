@@ -635,7 +635,7 @@ void ApplyRoundCorners(RoundCornersElement* roundCorners, const tgfx::Matrix& pa
     return;
   }
   for (auto& path : pathList) {
-    effect->applyTo(path);
+    effect->filterPath(path);
   }
 }
 
@@ -835,11 +835,7 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
       effects.emplace_back(std::move(dashEffect));
     }
   }
-  auto strokeData = stroke.getStroke();
-  auto strokeEffect = tgfx::PathEffect::MakeStroke(&strokeData);
-  if (strokeEffect) {
-    effects.emplace_back(std::move(strokeEffect));
-  }
+  stroke.getStroke().applyToPath(path);
   if (effects.empty()) {
     return;
   }
@@ -852,7 +848,7 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
     }
   }
   for (const auto& effect : effects) {
-    effect->applyTo(path);
+    effect->filterPath(path);
   }
   if (applyMatrix) {
     path->transform(stroke.matrix);

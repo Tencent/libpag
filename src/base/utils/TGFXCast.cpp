@@ -36,7 +36,7 @@ static constexpr std::pair<Enum, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Saturation, tgfx::BlendMode::Saturation},
     {BlendMode::Color, tgfx::BlendMode::Color},
     {BlendMode::Luminosity, tgfx::BlendMode::Luminosity},
-    {BlendMode::Add, tgfx::BlendMode::Plus}};
+    {BlendMode::Add, tgfx::BlendMode::PlusLighter}};
 
 tgfx::BlendMode ToTGFXBlend(Enum blendMode) {
   for (const auto& pair : BlendModeMap) {
