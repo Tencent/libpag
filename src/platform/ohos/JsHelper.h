@@ -18,6 +18,7 @@
 
 #pragma once
 #include <napi/native_api.h>
+#include <rawfile/raw_file_manager.h>
 #include <string>
 #include "pag/pag.h"
 #include "pag/types.h"
@@ -62,5 +63,7 @@ int MakeColorInt(uint32_t red, uint32_t green, uint32_t blue);
 Color ToColor(int value);
 
 napi_value CreateVideoRanges(napi_env env, const std::vector<PAGVideoRange>& videoRanges);
+
+std::shared_ptr<ByteData> LoadDataFromAsset(NativeResourceManager* mNativeResMgr, char* srcBuf);
 
 }  // namespace pag

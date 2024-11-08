@@ -437,4 +437,20 @@ napi_value CreateVideoRanges(napi_env env, const std::vector<PAGVideoRange>& vid
   return result;
 }
 
+std::shared_ptr<ByteData> LoadDataFromAsset(NativeResourceManager* mNativeResMgr, char* srcBuf) {
+  RawFile* rawFile = OH_ResourceManager_OpenRawFile(mNativeResMgr, srcBuf);
+  if (rawFile == NULL) {
+    return nullptr;
+  }
+  long len = OH_ResourceManager_GetRawFileSize(rawFile);
+  auto data = ByteData::Make(len);
+  if (!data) {
+    OH_ResourceManager_CloseRawFile(rawFile);
+    return nullptr;
+  }
+  OH_ResourceManager_ReadRawFile(rawFile, data->data(), len);
+  OH_ResourceManager_CloseRawFile(rawFile);
+  return data;
+}
+
 }  // namespace pag

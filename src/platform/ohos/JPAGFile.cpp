@@ -80,17 +80,12 @@ static napi_value LoadFromAssets(napi_env env, napi_callback_info info) {
   char srcBuf[1024];
   napi_get_value_string_utf8(env, args[1], srcBuf, sizeof(srcBuf), &strSize);
   std::string fileName(srcBuf, strSize);
-  RawFile* rawFile = OH_ResourceManager_OpenRawFile(mNativeResMgr, srcBuf);
-  if (rawFile != NULL) {
-    long len = OH_ResourceManager_GetRawFileSize(rawFile);
-    auto data = ByteData::Make(len);
-    if (!data) {
-      return nullptr;
-    }
-    OH_ResourceManager_ReadRawFile(rawFile, data->data(), len);
-    return JPAGLayerHandle::ToJs(env, PAGFile::Load(data->data(), len, "asset://" + fileName));
+  auto data = LoadDataFromAsset(mNativeResMgr, srcBuf);
+  if (data == NULL) {
+    return nullptr;
   }
-  return nullptr;
+  return JPAGLayerHandle::ToJs(env,
+                               PAGFile::Load(data->data(), data->length(), "asset://" + fileName));
 }
 
 static napi_value TagLevel(napi_env env, napi_callback_info info) {
