@@ -161,9 +161,8 @@ static void ApplyPaintToPath(const tgfx::Paint& paint, tgfx::Path* path) {
     return;
   }
   auto strokePath = *path;
-  auto strokeEffect = paint.getStroke();
-  if (strokeEffect) {
-    strokeEffect->applyToPath(&strokePath);
+  if (const auto stroke = paint.getStroke()) {
+    stroke->applyToPath(&strokePath);
   }
   *path = strokePath;
 }
