@@ -835,7 +835,6 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
       effects.emplace_back(std::move(dashEffect));
     }
   }
-  auto strokeData = stroke.getStroke();
   auto applyMatrix = false;
   if (!stroke.matrix.isIdentity()) {
     auto matrix = tgfx::Matrix::I();
@@ -847,6 +846,7 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
   for (const auto& effect : effects) {
     effect->filterPath(path);
   }
+  auto strokeData = stroke.getStroke();
   strokeData.applyToPath(path);
   if (applyMatrix) {
     path->transform(stroke.matrix);
