@@ -226,6 +226,7 @@ if (WEB)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
+    list(APPEND PAG_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (IOS)
     # finds all required platform libraries.
     find_library(UIKit_LIBS UIKit REQUIRED)

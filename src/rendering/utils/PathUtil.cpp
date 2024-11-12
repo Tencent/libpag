@@ -70,10 +70,7 @@ void ExpandPath(tgfx::Path* path, float expansion) {
   }
   auto strokePath = *path;
   tgfx::Stroke stroke(fabsf(expansion) * 2, tgfx::LineCap::Butt, tgfx::LineJoin::Round);
-  auto effect = tgfx::PathEffect::MakeStroke(&stroke);
-  if (effect) {
-    effect->applyTo(&strokePath);
-  }
+  stroke.applyToPath(&strokePath);
   if (expansion < 0) {
     path->addPath(strokePath, tgfx::PathOp::Difference);
   } else {
