@@ -828,13 +828,14 @@ std::unique_ptr<tgfx::PathEffect> CreateDashEffect(const std::vector<float>& das
 }
 
 void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
-  std::vector<std::unique_ptr<tgfx::PathEffect>> effects;
   if (!stroke.dashes.empty()) {
     auto dashEffect = CreateDashEffect(stroke.dashes, stroke.dashOffset);
     if (dashEffect) {
-      effects.emplace_back(std::move(dashEffect));
+      dashEffect->filterPath(path);
     }
   }
+  auto strokeData = stroke.getStroke();
+  strokeData.applyToPath(path);
   auto applyMatrix = false;
   if (!stroke.matrix.isIdentity()) {
     auto matrix = tgfx::Matrix::I();
@@ -843,11 +844,6 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
       applyMatrix = true;
     }
   }
-  for (const auto& effect : effects) {
-    effect->filterPath(path);
-  }
-  auto strokeData = stroke.getStroke();
-  strokeData.applyToPath(path);
   if (applyMatrix) {
     path->transform(stroke.matrix);
   }
