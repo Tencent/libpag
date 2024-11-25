@@ -32,7 +32,15 @@
 namespace pag {
 #define NV12_PLANE_COUNT 2
 
-void OH_AVCodecOnError(OH_AVCodec*, int32_t, void*) {
+void OH_AVCodecOnError(OH_AVCodec*, int32_t index, void* userData) {
+  if (userData == nullptr) {
+    return;
+  }
+  LOGE("video decoder error, index:%d \n", index);
+  CodecUserData* codecUserData = static_cast<CodecUserData*>(userData);
+  std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
+  codecUserData->outputBufferInfoQueue.emplace(index, nullptr);
+  codecUserData->outputCondition.notify_all();
 }
 
 void OH_AVCodecOnStreamChanged(OH_AVCodec*, OH_AVFormat*, void*) {
@@ -84,9 +92,13 @@ OHOSVideoDecoder::OHOSVideoDecoder(const VideoFormat& format, bool hardware) {
 
 OHOSVideoDecoder::~OHOSVideoDecoder() {
   if (codecCategory == SOFTWARE) {
-    if (yuvBuffer->data[0] != nullptr) {
-      delete[] yuvBuffer->data[0];
-      delete[] yuvBuffer->data[1];
+    if (yuvBuffer) {
+      if (yuvBuffer->data[0]) {
+        delete[] yuvBuffer->data[0];
+      }
+      if (yuvBuffer->data[1]) {
+        delete[] yuvBuffer->data[1];
+      }
     }
   }
   if (videoCodec != nullptr) {
@@ -196,6 +208,9 @@ DecodingResult OHOSVideoDecoder::onDecodeFrame() {
     codecUserData->outputBufferInfoQueue.pop();
     lock.unlock();
     pendingFrames.remove(codecBufferInfo.attr.pts);
+    if (codecBufferInfo.buffer == nullptr) {
+      return DecodingResult::Error;
+    }
   } else {
     lock.unlock();
     return DecodingResult::Success;
