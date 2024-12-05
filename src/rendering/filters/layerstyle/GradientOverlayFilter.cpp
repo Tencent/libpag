@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientOverlayFilter.h"
+#include <tgfx/core/Recorder.h>
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/graphics/GradientPaint.h"
@@ -27,12 +28,9 @@ GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
     : layerStyle(layerStyle) {
 }
 
-bool GradientOverlayFilter::initialize(tgfx::Context*) {
-  return true;
-}
-
-void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* source,
-                                 const FilterTarget* target) {
+bool GradientOverlayFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                                   const tgfx::Point& filterScale, const tgfx::Matrix&,
+                                   tgfx::Canvas* target) {
   auto* gradStyle = static_cast<GradientOverlayStyle*>(layerStyle);
   auto opacity = gradStyle->opacity->getValueAt(layerFrame);
   auto colors = gradStyle->colors->getValueAt(layerFrame);
@@ -42,8 +40,8 @@ void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* sou
   auto scale = gradStyle->scale->getValueAt(layerFrame) / 100.f;
   auto offset = gradStyle->offset->getValueAt(layerFrame);
 
-  auto width = static_cast<float>(source->width);
-  auto height = static_cast<float>(source->height);
+  auto width = static_cast<float>(source->width());
+  auto height = static_cast<float>(source->height());
 
   angle = fmodf(angle, 360.f);
   auto diagonalAngle = RadiansToDegrees(std::atan(height / width));
@@ -78,23 +76,18 @@ void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* sou
         tgfx::Shader::MakeColorShader(tgfx::Color::FromRGBA(0, 0, 0, opacity)));
   }
 
-  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
-  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
-  auto targetCanvas = targetSurface->getCanvas();
-  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto image = tgfx::Image::MakeFrom(context, backendTexture);
-  auto imageShader = tgfx::Shader::MakeImageShader(image);
+  auto imageShader = tgfx::Shader::MakeImageShader(source);
   shader = tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, shader, imageShader);
   shader = tgfx::Shader::MakeBlend(ToTGFXBlend(gradStyle->blendMode->getValueAt(layerFrame)),
                                    imageShader, shader);
   tgfx::Paint paint;
   paint.setShader(shader);
-  targetCanvas->save();
-  targetCanvas->setMatrix(ToMatrix(target));
-  targetCanvas->concat(tgfx::Matrix::MakeScale(1.f / filterScale.x, 1.f / filterScale.y));
   auto rect = tgfx::Rect::MakeWH(width, height);
-  targetCanvas->drawRect(rect, paint);
-  targetCanvas->restore();
-  context->flush();
+  target->save();
+  target->scale(1.f / filterScale.x, 1.f / filterScale.y);
+  target->drawRect(rect, paint);
+  target->restore();
+  return true;
 }
+
 }  // namespace pag

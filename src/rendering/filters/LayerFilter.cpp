@@ -21,7 +21,6 @@
 #include "BulgeFilter.h"
 #include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
-#include "GradientOverlayFilter.h"
 #include "HueSaturationFilter.h"
 #include "LevelsIndividualFilter.h"
 #include "MosaicFilter.h"
@@ -30,8 +29,6 @@
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/layerstyle/DropShadowFilter.h"
-#include "rendering/filters/layerstyle/OuterGlowFilter.h"
-#include "rendering/filters/layerstyle/StrokeFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -114,27 +111,6 @@ void FilterProgram::onReleaseGPU() {
     gl->deleteBuffers(1, &vertexBuffer);
     vertexBuffer = 0;
   }
-}
-
-std::unique_ptr<LayerFilter> LayerFilter::Make(LayerStyle* layerStyle) {
-  LayerFilter* filter = nullptr;
-  switch (layerStyle->type()) {
-    case LayerStyleType::DropShadow:
-      filter = new DropShadowFilter(reinterpret_cast<DropShadowStyle*>(layerStyle));
-      break;
-    case LayerStyleType::OuterGlow:
-      filter = new OuterGlowFilter(reinterpret_cast<OuterGlowStyle*>(layerStyle));
-      break;
-    case LayerStyleType::Stroke:
-      filter = new StrokeFilter(reinterpret_cast<StrokeStyle*>(layerStyle));
-      break;
-    case LayerStyleType::GradientOverlay:
-      filter = new GradientOverlayFilter(reinterpret_cast<GradientOverlayStyle*>(layerStyle));
-      break;
-    default:
-      break;
-  }
-  return std::unique_ptr<LayerFilter>(filter);
 }
 
 std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {

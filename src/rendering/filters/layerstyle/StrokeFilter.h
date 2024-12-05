@@ -20,11 +20,9 @@
 
 #include "AlphaEdgeDetectFilter.h"
 #include "SolidStrokeFilter.h"
-#include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
 
 namespace pag {
-class StrokeFilter : public LayerFilter {
+class StrokeFilter : public EffectFilter {
  public:
   explicit StrokeFilter(StrokeStyle* layerStyle);
 
@@ -34,32 +32,14 @@ class StrokeFilter : public LayerFilter {
 
   ~StrokeFilter() override;
 
-  bool initialize(tgfx::Context* context) override;
-
-  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
-              const tgfx::Point& filterScale) override;
-
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
+  std::shared_ptr<tgfx::Image> applyFilterEffect(Frame layerFrame,
+                                                 std::shared_ptr<tgfx::Image> source,
+                                                 const tgfx::Point& filterScale,
+                                                 tgfx::Point* offset) override;
 
  private:
-  void onDrawPositionOutside(tgfx::Context* context, const FilterSource* source,
-                             const FilterTarget* target);
-  void onDrawPositionInsideOrCenter(tgfx::Context* context, const FilterSource* source,
-                                    const FilterTarget* target);
-
   StrokeStyle* layerStyle = nullptr;
-
-  std::shared_ptr<FilterBuffer> alphaEdgeDetectFilterBuffer = nullptr;
-
-  Enum strokePosition;
-
-  SolidStrokeOption strokeOption;
   SolidStrokeFilter* strokeFilter = nullptr;
-  SolidStrokeFilter* strokeThickFilter = nullptr;
   AlphaEdgeDetectFilter* alphaEdgeDetectFilter = nullptr;
-
-  tgfx::Color color = tgfx::Color::Black();
-  float spreadSize = 0.f;
 };
 }  // namespace pag

@@ -153,8 +153,6 @@ class RenderCache : public Performance {
   std::shared_ptr<tgfx::Image> getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
                                                 Frame targetFrame);
 
-  LayerFilter* getFilterCache(LayerStyle* layerStyle);
-
   LayerFilter* getFilterCache(Effect* effect);
 
   MotionBlurFilter* getMotionBlurFilter();

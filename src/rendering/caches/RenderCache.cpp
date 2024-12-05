@@ -568,12 +568,6 @@ void RenderCache::clearSequenceCache(ID uniqueID) {
 
 //===================================== filter caches =====================================
 
-LayerFilter* RenderCache::getFilterCache(LayerStyle* layerStyle) {
-  return getLayerFilterCache(layerStyle->uniqueID, [=]() -> LayerFilter* {
-    return LayerFilter::Make(layerStyle).release();
-  });
-}
-
 LayerFilter* RenderCache::getFilterCache(Effect* effect) {
   return getLayerFilterCache(effect->uniqueID,
                              [=]() -> LayerFilter* { return LayerFilter::Make(effect).release(); });
@@ -620,7 +614,7 @@ LayerStylesFilter* RenderCache::getLayerStylesFilter(Layer* layer) {
   LayerStylesFilter* filter = nullptr;
   auto result = filterCaches.find(layer->uniqueID);
   if (result == filterCaches.end()) {
-    filter = new LayerStylesFilter(this);
+    filter = new LayerStylesFilter();
     if (initFilter(filter)) {
       filterCaches.insert(std::make_pair(layer->uniqueID, filter));
     } else {
