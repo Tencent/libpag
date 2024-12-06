@@ -204,7 +204,9 @@ We recommend using the CLion IDE on macOS for development.
 ### Branch Management
 
 - The `main` branch is our active development branch, containing the latest features and bug fixes.
-- The `release/` branches are our stable milestone branches, fully tested. We periodically create a `release/{version}` branch from the `main` branch. After a `release/{version}` branch is created, only high-priority fixes are added to it.
+- The `release/` branches are our stable milestone branches, fully tested. We periodically create a
+  `release/{version}` branch from the `main` branch. After a `release/{version}` branch is created, 
+  only high-priority fixes are checked into it.
 
 **Note: This repository only contains the latest code since PAG 4.0. For legacy PAG 3.0 versions, 
 you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
