@@ -31,13 +31,13 @@ declare global {
 
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
-    _Load: (bytes: number, length: number) => any;
+    _Load: (buffer: Uint8Array) => any;
     _MaxSupportedTagLevel: () => number;
   };
   _PAGImage: {
     _FromNativeImage: (source: TexImageSource | ArrayBufferImage) => any;
     _FromPixels: (
-      pixels: number,
+      pixels: Uint8Array,
       width: number,
       height: number,
       rowBytes: number,
