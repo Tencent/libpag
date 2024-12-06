@@ -18,7 +18,8 @@ Windows, Linux, 以及 Web 端。
 PAG 方案是一套完善的动效工作流。提供从 AE（Adobe After Effects）导出插件，到桌面预览工具 PAGViewer，再到各端的跨平台渲染 SDK。
 目标是降低或消除动效研发相关的成本，打通设计师创作到素材交付上线的极简流程，不断输出运行时可编辑的高质量动效内容。
 
-PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机QQ，王者荣耀，腾讯视频，QQ音乐等头部产品，稳定性经过了海量用户的持续验证，可以广泛应用于UI动画、贴纸动画、视频编辑、模板设计等场景。典型应用场景可以参考[官网案例](https://pag.io/case.html)。
+PAG 方案目前已经接入了腾讯系几乎所有主流应用以及外部几千个业务，包括微信，手机QQ，王者荣耀，腾讯视频，QQ音乐等头部产品，
+稳定性经过了海量用户的持续验证，可以广泛应用于UI动画、贴纸动画、视频编辑、模板设计等场景。典型应用场景可以参考[官网案例](https://pag.io/case.html)。
 
 详细介绍可以参考相关报道：
 
@@ -63,8 +64,8 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 ## 快速接入
 
-由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS, Android 和 Web 平台定期发布预编译的二进制库，其他平台的库需要通过
-源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/Tencent/libpag/releases)
+由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS, Android，macOs, Web 和鸿蒙平台定期发布预编译的二进制库，
+其他平台的库需要通过源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/Tencent/libpag/releases)
 下载。 详细的 SDK接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
 接入](./web/README.md)
 
@@ -267,7 +268,7 @@ libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
 
 ## 隐私政策
 
-使用 libpag SDK 时请遵守 [PAG SDK个人信息保护规则](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd).
+使用 libpag SDK 时请参考 [PAG SDK个人信息保护规则](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd).
 
 ## 贡献
 

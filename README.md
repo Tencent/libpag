@@ -14,16 +14,16 @@ English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
 ## Introduction
 
-libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
-vector-based and raster-based animations across most platforms, such as iOS, Android, OpenHarmony, macOS,
-Windows, Linux, and Web.
+libpag is a real-time rendering library for PAG (Portable Animated Graphics) files, capable of 
+rendering both vector-based and raster-based animations across various platforms, including iOS, 
+Android, OpenHarmony, macOS, Windows, Linux, and the Web.
 
-PAG is an open-source file format for recording animations. PAG files can be created and exported
-from Adobe After Effects with the PAGExporter plugin and previewed in the PAGViewer app, which you
-can get from [pag.io](https://pag.io), and both of them are available on both macOS and Windows.
+PAG is an open-source file format designed for recording animations. You can create and export PAG 
+files from Adobe After Effects using the PAGExporter plugin and preview them in the PAGViewer app, 
+both available on macOS and Windows.
 
-PAG is now being used by 40+ Tencent apps, such as WeChat, Mobile QQ, Honor of Kings Mobile Game,
-Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
+PAG is widely used in major Tencent apps like WeChat, Mobile QQ, Honor of Kings, Tencent Video, and 
+QQ Music, as well as in thousands of third-party apps, reaching hundreds of millions of users.
 
 ## Advantages
 
@@ -31,36 +31,38 @@ Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
 
 <img src="resources/readme/intro_1.png" alt="intro_1" width="282"/>
 
-Benefiting from the highly efficient binary format design, PAG files can be decoded 10x faster than
-JSON files but also are about 50% smaller in file size when exporting the same animations. Designers
-can also ship beautiful animations with bitmaps or audiovisual media integrated into a single file
-easily without other attachments.
+Benefiting from its highly efficient binary format, PAG files decode 10 times faster than JSON files 
+and are about 50% smaller in file size for the same animations. Designers can also easily include 
+beautiful animations with bitmaps or audiovisual media in a single file without needing additional 
+attachments.
 
 - **All AE features supported**
 
 <img src="resources/readme/intro_2.png" alt="intro_2" width="282"/>
 
-While other solutions may only support exporting limited vector-based AE features, PAG supports
-exporting all AE animations into a single file by combining vector-based exporting with raster-based
-exporting techniques. Therefore, third-party plugin effects in AE can be exported as well.
+While other solutions may only support exporting limited vector-based AE features, PAG combines 
+vector-based and raster-based exporting techniques to support all AE animations in a single file. 
+This means third-party plugin effects in AE can also be exported.
 
 - **Measurable performance**
 
 <img src="resources/readme/intro_4.png" alt="intro_4" width="282"/>
 
-PAG provides a monitoring panel in PAGViewer that shows normalized performance data for PAG files,
-which helps designers to examine and optimize performance easily without developers. Along with
-dozens of automatic optimization techniques from the PAGExporter plugin, animations with cool visual
-effects and excellent performance now can be created more effectively.
+PAG provides a monitoring panel in PAGViewer that displays normalized performance data for PAG files,
+making it easy for designers to review and optimize performance without needing developers. With 
+numerous automatic optimization techniques from the PAGExporter plugin, you can create animations 
+with impressive visual effects and excellent performance more efficiently.
 
+
+PAGViewer includes a monitoring panel 
 - **Runtime editable animations**
 
 <img src="resources/readme/intro_5.png" alt="intro_5" width="282"/>
 
-With the flexible editing APIs from PAG SDK, developers can easily change the layer structure of a
-single PAG file, mix multiple PAG files into one composition, or replace texts and images with all
-pre-designed animation effects applied at runtime. It reduces tons of coding work for product
-features like video templates.
+With the flexible editing APIs from the PAG SDK, developers can easily modify the layer structure of
+a single PAG file, combine multiple PAG files into one composition, or replace text and images with 
+all pre-designed animation effects applied at runtime. This significantly reduces the coding work 
+required for features like video templates.
 
 ## System Requirements
 
@@ -74,15 +76,14 @@ features like video templates.
 
 ## Getting Started
 
-We currently only publish precompiled libraries for iOS, Android, and Web. You can build libraries of
-other platforms from the source code. The latest releases can be downloaded
+We currently only publish precompiled libraries for iOS, Android, macOS, Web, and OpenHarmony. You 
+can build libraries of other platforms from the source code. The latest releases can be downloaded
 from [here](https://github.com/Tencent/libpag/releases).
 
 ### iOS Integration
 
-You can use the framework downloaded from the release page, or add libpag to your project by
-CocoaPods:
-Add the pod to your Podfile:
+You can download the framework from the release page or add `libpag` to your project using CocoaPods.
+To add the pod to your Podfile, include:
 
 ```
 pod 'libpag'
@@ -94,7 +95,7 @@ And then run:
 pod install
 ```
 
-After installing the cocoapod into your project import libpag with
+After installing the CocoaPod, import `libpag` into your project with:
 
 ```
 #import <libpag/xxx.h>
@@ -102,9 +103,9 @@ After installing the cocoapod into your project import libpag with
 
 ### Android Integration
 
-You can use the aar downloaded from the release page, or add libpag to your project by Maven:
+You can download the AAR from the release page or add `libpag` to your project using Maven:
 
-Edit the `build.gradle` file in the root of your project, add `mavenCentral()` to `repositories`:
+Edit the `build.gradle` file in the root of your project and add `mavenCentral()` to the `repositories` section:
 
 ```
 buildscript {
@@ -125,38 +126,42 @@ dependencies {
 }
 ```
 
-Add the following rule to your proguard rules to avoid the wrong obfuscation.
+Add the following rule to your proguard rules to prevent incorrect obfuscation:
 
 ```
   -keep class org.libpag.** {*;}
   -keep class androidx.exifinterface.** {*;}
 ```
 
-Finally, run gradle sync and then build the project.
+Finally, run gradle sync and build your project.
 
 ### OpenHarmony Integration
-You can use the har downloaded from the [release](https://github.com/Tencent/libpag/releases) page, or add libpag to your project by
-OHPM:
+
+You can download the HAR file from the [release](https://github.com/Tencent/libpag/releases) page, 
+or add `libpag` to your project using OHPM:
 
 ```
 ohpm install @tencent/libpag
 ```
 
-Or, you can add it to your project manually.
-Add the following lines to oh-package.json5 on your app module.
+Alternatively, you can add it to your project manually. Add the following lines to `oh-package.json5` 
+in your app module.
+
 ```
 "dependencies": {
 "@tencent/libpag": "^1.0.1",
 }
 ```
-Then run
+
+Then run:
+
 ```
 ohpm install
 ```
 
 ### Web Integration
 
-Simply copy the following code into an HTML file and open it in your browser:
+Copy the following code into an HTML file and open it in your browser:
 
 ```html
 <canvas class="canvas" id="pag"></canvas>
@@ -178,7 +183,7 @@ More information：[Web SDK Guide](./web/README.md)
 
 ### Example
 
-Check out the following projects to learn how to use the APIs of libpag:
+Explore these projects to learn how to use the libpag APIs:
 
 - [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
 - [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
@@ -190,21 +195,21 @@ Check out the following projects to learn how to use the APIs of libpag:
 - [Android API Reference](https://pag.io/apis/android/index.html)
 - [Web API Reference](https://pag.io/apis/web/index.html)
 
-You can find other docs on [pag.io](https://pag.io/docs/home.html)
+You can find additional documentation on [pag.io](https://pag.io/docs/home.html)
 
 ## Development
 
-We recommend using CLion IDE on the macOS platform for development.
+We recommend using the CLion IDE on macOS for development.
 
 ### Branch Management
 
-- The `main` branch is our active developing branch which contains the latest features and bugfixes. 
-- The branches under `release/` are our stable milestone branches which are fully tested. We will 
-periodically cut a `release/{version}` branch from the `main` branch. After one `release/{version}` 
-branch is cut, only high-priority fixes are checked into it.
+- The `main` branch is our active development branch, containing the latest features and bug fixes.
+- The `release/` branches are our stable milestone branches, fully tested. We periodically create a 
+- `release/{version}` branch from the `main` branch. After a `release/{version}` branch is created, 
+- only high-priority fixes are added to it.
 
-**Note: This repository only contains the latest code since PAG 4.0. To use the legacy PAG 3.0 
-versions, you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
+**Note: This repository only contains the latest code since PAG 4.0. For legacy PAG 3.0 versions, 
+you can download the precompiled libraries from [here](https://github.com/Tencent/libpag/releases).**
 
 ### Build Prerequisites
 
@@ -220,57 +225,58 @@ versions, you can download the precompiled libraries from [here](https://github.
 
 ### Dependency Management
 
-libpag uses [depsync](https://github.com/domchen/depsync) tool to manage third-party dependencies.
+libpag uses the [depsync](https://github.com/domchen/depsync) tool to manage third-party dependencies.
 
 **For macOS platform：**
 
-Run the script in the root of the project:
+Run the script located in the root directory of the project:
 
 ```
 ./sync_deps.sh
 ```
 
-This script will automatically install the necessary tools and synchronize all third-party repositories.
+This script will automatically install the necessary tools and sync all third-party repositories.
 
 **For other platforms：**
 
-First, make sure you have installed the latest version of node.js (You may need to restart your
-computer after this step). And then run the following command to install depsync tool:
+First, ensure you have the latest version of Node.js installed (you may need to restart your 
+computer afterward). Then, run the following command to install the depsync tool:
 
 ```
 npm install -g depsync
 ```
 
-And then run `depsync` in the root directory of the project.
+Then, run `depsync` in the root directory of the project.
 
 ```
 depsync
 ```
 
-Git account and password may be required during synchronizing. Please make sure you have enabled the
-`git-credential-store` so that `CMakeList.txt` can trigger synchronizing automatically next time.
+You might need to enter your Git account and password during synchronization. Ensure you have 
+enabled the `git-credential-store` so that `CMakeList.txt` can automatically trigger synchronization 
+next time.
 
 ### Build
 
-After the synchronization, you can open the project with CLion and build the pag library.
+After synchronization, you can open the project with CLion and build the PAG library.
 
-**For macOS platform：**
+**For macOS:**
 
-There are no extra configurations of CLion required.
+No additional CLion configuration is needed.
 
-**For Windows platform：**
+**For Windows:**
 
-Please follow the following steps to configure the CLion environment correctly:
+Follow these steps to configure CLion correctly:
 
-- Make sure you have installed at least the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
-- Open the **File->Setting** panel, and go to **Build, Execution, Deployment->ToolChains**, then set the toolchain of CLion to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
+- Ensure you have installed the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
+- Open the **File->Settings** panel, go to **Build, Execution, Deployment->Toolchains**, and set the toolchain to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
 
-**Note: If anything goes wrong during cmake building, please update the cmake commandline tool to the latest
-version and try again.**
+**Note: If you encounter issues during the CMake build, update to the latest version of the CMake 
+command-line tool and try again.**
 
 ## Support Us
 
-If you find libpag is helpful, please give us a **Star**. We sincerely appreciate your support :)
+If you find libpag helpful, please give us a **Star**. We truly appreciate your support :)
 
 
 [![Star History Chart](https://api.star-history.com/svg?repos=Tencent/libpag&type=Date)](https://star-history.com/#Tencent/libpag&Date)
@@ -282,13 +288,12 @@ libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
 
 ## Privacy Policy
 
-Please comply with [the personal information processing rules of PAG SDK](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd) while using libpag SDK
+Please refer to the [PAG SDK Personal Information Processing Rules](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd) when using the libpag SDK.
 
 ## Contribution
 
-If you have any ideas or suggestions to improve libpag, welcome to submit
-an [issue](https://github.com/Tencent/libpag/issues/new/choose)
-/ [pull request](https://github.com/Tencent/libpag/pulls). Before making a pull request or issue,
-please make sure to read [Contributing Guide](./CONTRIBUTING.md).
+If you have any ideas or suggestions to improve libpag, feel free to submit an
+[issue](https://github.com/Tencent/libpag/issues/new/choose) or a [pull request](https://github.com/Tencent/libpag/pulls). 
+Before doing so, please read our [Contributing Guide](./CONTRIBUTING.md).
 
 
