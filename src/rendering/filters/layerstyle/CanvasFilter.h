@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,24 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "LayerStyleFilter.h"
 
 namespace pag {
-class GradientOverlayFilter : public LayerFilter {
+
+class CanvasFilter : public LayerStyleFilter {
  public:
-  explicit GradientOverlayFilter(GradientOverlayStyle* layerStyle);
+  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
+            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
 
-  bool initialize(tgfx::Context* context) override;
+  std::shared_ptr<tgfx::Image> applyFilterEffect(Frame layerFrame,
+                                                 std::shared_ptr<tgfx::Image> source,
+                                                 const tgfx::Point& filterScale,
+                                                 tgfx::Point* offset) override;
 
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
-
- private:
-  GradientOverlayStyle* layerStyle = nullptr;
+ protected:
+  virtual bool onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                      const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
+                      tgfx::Canvas* target) = 0;
 };
+
 }  // namespace pag

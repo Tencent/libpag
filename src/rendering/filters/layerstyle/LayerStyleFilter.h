@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,27 @@
 
 #pragma once
 
+#include "pag/file.h"
 #include "pag/pag.h"
-#include "rendering/filters/FilterModifier.h"
-#include "rendering/filters/LayerFilter.h"
+#include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace pag {
-struct FilterList;
 
-class LayerStylesFilter : public Filter {
+class LayerStyleFilter {
  public:
-  static void TransformBounds(tgfx::Rect* bounds, const FilterList* filterList);
+  virtual ~LayerStyleFilter() = default;
 
-  bool initialize(tgfx::Context* context) override;
+  static std::unique_ptr<LayerStyleFilter> Make(LayerStyle* layerStyle);
 
-  void update(const FilterList* filterList, const tgfx::Point& filterScale);
+  virtual bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                    const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
+                    tgfx::Canvas* target) = 0;
 
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
-
- private:
-  const FilterList* filterList = nullptr;
-  tgfx::Point filterScale = {};
+  virtual std::shared_ptr<tgfx::Image> applyFilterEffect(Frame layerFrame,
+                                                         std::shared_ptr<tgfx::Image> source,
+                                                         const tgfx::Point& filterScale,
+                                                         tgfx::Point* offset) = 0;
 };
+
 }  // namespace pag

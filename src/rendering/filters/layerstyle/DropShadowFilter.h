@@ -18,12 +18,12 @@
 
 #pragma once
 
+#include "CanvasFilter.h"
 #include "SolidStrokeFilter.h"
-#include "rendering/filters/LayerFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 
 namespace pag {
-class DropShadowFilter : public LayerFilter {
+class DropShadowFilter : public CanvasFilter {
  public:
   explicit DropShadowFilter(DropShadowStyle* layerStyle);
 
@@ -33,41 +33,12 @@ class DropShadowFilter : public LayerFilter {
 
   ~DropShadowFilter() override;
 
-  bool initialize(tgfx::Context* context) override;
-
-  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
-              const tgfx::Point& filterScale) override;
-
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
+ protected:
+  bool onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
+              const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
 
  private:
-  void updateParamModeNotFullSpread(const tgfx::Rect& contentBounds);
-  void updateParamModeFullSpread(const tgfx::Rect& contentBounds);
-
-  void onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
-                           const FilterTarget* target);
-  void onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
-                               const FilterTarget* target);
-  void onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
-                            const FilterTarget* target);
-
   DropShadowStyle* layerStyle = nullptr;
-
-  std::shared_ptr<FilterBuffer> solidStrokeFilterBuffer = nullptr;
-
-  SolidStrokeOption strokeOption;
   SolidStrokeFilter* strokeFilter = nullptr;
-  SolidStrokeFilter* strokeThickFilter = nullptr;
-
-  tgfx::Color color = tgfx::Color::Black();
-  float spread = 0.f;
-  float spreadSize = 0.f;
-  float opacity = 1.0f;
-  float blurXSize = 0.f;
-  float blurYSize = 0.f;
-  float offsetX = 0.f;
-  float offsetY = 0.f;
-  std::vector<tgfx::Rect> filtersBounds = {};
 };
 }  // namespace pag

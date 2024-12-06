@@ -47,8 +47,6 @@ class FilterProgram : public tgfx::GLResource {
 
 class LayerFilter : public Filter {
  public:
-  static std::unique_ptr<LayerFilter> Make(LayerStyle* layerStyle);
-
   static std::unique_ptr<LayerFilter> Make(Effect* effect);
 
   bool initialize(tgfx::Context* context) override;
