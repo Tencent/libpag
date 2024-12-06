@@ -71,7 +71,7 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
 
 #ifdef PAG_BUILD_FOR_WEB
   bool asyncSupport() const override {
-    return true;
+    return false;
   }
 #endif
 
@@ -100,7 +100,7 @@ class SequenceFrameGenerator : public tgfx::ImageGenerator {
 
 #ifdef PAG_BUILD_FOR_WEB
   bool asyncSupport() const override {
-    return true;
+    return false;
   }
 #endif
 
