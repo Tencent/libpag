@@ -155,7 +155,7 @@ bool FilterEffect::onDraw(const tgfx::RuntimeProgram* program,
   for (size_t i = 0; i < sources.size(); i++) {
     tgfx::GLTextureInfo sourceInfo;
     sources[i].getGLTextureInfo(&sourceInfo);
-    ActiveGLTexture(context, i, &sourceInfo);
+    ActiveGLTexture(context, static_cast<int>(i), &sourceInfo);
   }
   onUpdateParams(context, filterProgram, sources);
   auto vertices = computeVertices(sources, target, offset);
