@@ -170,6 +170,9 @@ std::shared_ptr<tgfx::RuntimeEffect> SolidStrokeFilter::onCreateEffect(
   newOption.spreadSizeY *= filterScale.y;
   newOption.offsetX *= filterScale.x;
   newOption.offsetY *= filterScale.y;
+  if (!newOption.valid()) {
+    return nullptr;
+  }
   if (styleMode == SolidStrokeMode::Normal) {
     return SolidStrokeNormalEffect::Make(newOption, originalImage);
   } else {
