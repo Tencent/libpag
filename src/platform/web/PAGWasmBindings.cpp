@@ -31,6 +31,26 @@
 using namespace emscripten;
 
 namespace pag {
+
+std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
+  if (!emscriptenData.as<bool>()) {
+    return nullptr;
+  }
+  auto length = emscriptenData["length"].as<size_t>();
+  if (length == 0) {
+    return nullptr;
+  }
+  auto buffer = ByteData::Make(length);
+  if (!buffer) {
+    return nullptr;
+  }
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView =
+      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(buffer->data()), length);
+  memoryView.call<void>("set", emscriptenData);
+  return buffer;
+}
+
 bool PAGBindInit() {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
@@ -215,8 +235,13 @@ bool PAGBindInit() {
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_MaxSupportedTagLevel", PAGFile::MaxSupportedTagLevel)
-      .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
-                        return PAGFile::Load(reinterpret_cast<void*>(bytes), length);
+      .class_function("_Load",
+                      optional_override([](const val& emscriptenData) -> std::shared_ptr<PAGFile> {
+                        auto data = CopyDataFromUint8Array(emscriptenData);
+                        if (data == nullptr) {
+                          return nullptr;
+                        }
+                        return PAGFile::Load(data->data(), data->length());
                       }))
       .function("_tagLevel", &PAGFile::tagLevel)
       .function("_numTexts", &PAGFile::numTexts)
@@ -274,30 +299,55 @@ bool PAGBindInit() {
       .function("_updateSize", &PAGSurface::updateSize)
       .function("_clearAll", &PAGSurface::clearAll)
       .function("_freeCache", &PAGSurface::freeCache)
-      .function("_readPixels",
-                optional_override([](PAGSurface& pagSurface, int colorType, int alphaType,
-                                     uintptr_t dstPixels, size_t dstRowBytes) {
-                  return pagSurface.readPixels(static_cast<ColorType>(colorType),
-                                               static_cast<AlphaType>(alphaType),
-                                               reinterpret_cast<void*>(dstPixels), dstRowBytes);
+      .function("_readPixels", optional_override([](PAGSurface& pagSurface, int colorType,
+                                                    int alphaType, size_t dstRowBytes) -> val {
+                  auto dataSize = dstRowBytes * pagSurface.height();
+                  if (dataSize == 0) {
+                    return val::null();
+                  }
+                  std::unique_ptr<uint8_t[]> uint8Array(new (std::nothrow) uint8_t[dataSize]);
+                  if (uint8Array && pagSurface.readPixels(static_cast<ColorType>(colorType),
+                                                          static_cast<AlphaType>(alphaType),
+                                                          uint8Array.get(), dstRowBytes)) {
+                    auto memory = val::module_property("HEAPU8")["buffer"];
+                    auto memoryView =
+                        val::global("Uint8Array")
+                            .new_(memory, reinterpret_cast<uintptr_t>(uint8Array.get()), dataSize);
+                    auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
+                    auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
+                    newUint8Array.call<void>("set", memoryView);
+                    return newUint8Array;
+                  }
+                  return val::null();
                 }));
 
   class_<PAGImage>("_PAGImage")
       .smart_ptr<std::shared_ptr<PAGImage>>("_PAGImage")
-      .class_function("_FromBytes", optional_override([](uintptr_t bytes, size_t length) {
-                        return PAGImage::FromBytes(reinterpret_cast<void*>(bytes), length);
+      .class_function("_FromBytes",
+                      optional_override([](const val& emscriptenData) -> std::shared_ptr<PAGImage> {
+                        auto data = CopyDataFromUint8Array(emscriptenData);
+                        if (data == nullptr) {
+                          return nullptr;
+                        }
+                        return PAGImage::FromBytes(reinterpret_cast<void*>(data->data()),
+                                                   data->length());
                       }))
       .class_function("_FromNativeImage", optional_override([](val nativeImage) {
                         auto image = tgfx::Image::MakeFrom(nativeImage);
                         return std::static_pointer_cast<PAGImage>(StillImage::MakeFrom(image));
                       }))
-      .class_function("_FromPixels",
-                      optional_override([](uintptr_t pixels, int width, int height, size_t rowBytes,
-                                           int colorType, int alphaType) {
-                        return PAGImage::FromPixels(reinterpret_cast<void*>(pixels), width, height,
-                                                    rowBytes, static_cast<ColorType>(colorType),
-                                                    static_cast<AlphaType>(alphaType));
-                      }))
+      .class_function(
+          "_FromPixels",
+          optional_override([](const val& pixels, int width, int height, size_t rowBytes,
+                               int colorType, int alphaType) -> std::shared_ptr<PAGImage> {
+            auto data = CopyDataFromUint8Array(pixels);
+            if (data == nullptr) {
+              return nullptr;
+            }
+            return PAGImage::FromPixels(reinterpret_cast<void*>(data->data()), width, height,
+                                        rowBytes, static_cast<ColorType>(colorType),
+                                        static_cast<AlphaType>(alphaType));
+          }))
       .class_function("_FromTexture",
                       optional_override([](int textureID, int width, int height, bool flipY) {
                         GLTextureInfo glInfo = {};
