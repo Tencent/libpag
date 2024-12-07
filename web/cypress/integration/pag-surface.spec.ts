@@ -61,12 +61,8 @@ describe('PAGSurface', () => {
     pagPlayer.setProgress(0.5);
     pagPlayer.setScaleMode(PAGTypes.PAGScaleMode.Stretch);
     await pagPlayer.flush();
-    console.log("readPixels");
-    const tmp = pagSurface.readPixels(PAGTypes.ColorType.RGBA_8888, PAGTypes.AlphaType.Unpremultiplied);
-    console.log(tmp);
-    expect(tmp.byteLength).to.be.eq(360000);
-    // expect(pagSurface.readPixels(PAGTypes.ColorType.RGBA_8888, PAGTypes.AlphaType.Unpremultiplied).byteLength).to.be.eq(
-    //   360000,
-    // );
+    expect(pagSurface.readPixels(PAGTypes.ColorType.RGBA_8888, PAGTypes.AlphaType.Unpremultiplied).byteLength).to.be.eq(
+      360000,
+    );
   });
 });

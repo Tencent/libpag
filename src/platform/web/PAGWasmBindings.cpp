@@ -299,12 +299,26 @@ bool PAGBindInit() {
       .function("_updateSize", &PAGSurface::updateSize)
       .function("_clearAll", &PAGSurface::clearAll)
       .function("_freeCache", &PAGSurface::freeCache)
-      .function("_readPixels",
-                optional_override([](PAGSurface& pagSurface, int colorType, int alphaType,
-                                     uintptr_t dstPixels, size_t dstRowBytes) {
-                  return pagSurface.readPixels(static_cast<ColorType>(colorType),
-                                               static_cast<AlphaType>(alphaType),
-                                               reinterpret_cast<void*>(dstPixels), dstRowBytes);
+      .function("_readPixels", optional_override([](PAGSurface& pagSurface, int colorType,
+                                                    int alphaType, size_t dstRowBytes) -> val {
+                  auto dataSize = dstRowBytes * pagSurface.height();
+                  if (dataSize == 0) {
+                    return val::null();
+                  }
+                  std::unique_ptr<uint8_t[]> uint8Array(new (std::nothrow) uint8_t[dataSize]);
+                  if (uint8Array && pagSurface.readPixels(static_cast<ColorType>(colorType),
+                                                          static_cast<AlphaType>(alphaType),
+                                                          uint8Array.get(), dstRowBytes)) {
+                    auto memory = val::module_property("HEAPU8")["buffer"];
+                    auto memoryView =
+                        val::global("Uint8Array")
+                            .new_(memory, reinterpret_cast<uintptr_t>(uint8Array.get()), dataSize);
+                    auto newArrayBuffer = val::global("ArrayBuffer").new_(dataSize);
+                    auto newUint8Array = val::global("Uint8Array").new_(newArrayBuffer);
+                    newUint8Array.call<void>("set", memoryView);
+                    return newUint8Array;
+                  }
+                  return val::null();
                 }));
 
   class_<PAGImage>("_PAGImage")
