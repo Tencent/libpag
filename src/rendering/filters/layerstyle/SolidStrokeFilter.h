@@ -34,7 +34,7 @@ struct SolidStrokeOption {
   float offsetY = 0.0f;
 
   bool valid() {
-    return opacity != 0 && (spreadSizeX != 0 || spreadSizeY !=0 || offsetX != 0 || offsetY != 0);
+    return opacity != 0 && (spreadSizeX != 0 || spreadSizeY != 0 || offsetX != 0 || offsetY != 0);
   }
 };
 
