@@ -4,29 +4,30 @@
 
 ## Introduction
 
-libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
-vector-based and raster-based animations across most platforms, such as iOS, Android, macOS,
-Windows, Linux, and Web.
+libpag is a real-time rendering library for PAG (Portable Animated Graphics) files. It supports 
+rendering both vector-based and raster-based animations on various platforms, including iOS, Android,
+macOS, Windows, Linux, OpenHarmony, and Web.
 
 ## Features
 
-PAG Web SDK is built on WebAssembly and WebGL which supports all of the PAG features.
+The PAG Web SDK is built using WebAssembly and WebGL, supporting all PAG features.
 
 ## Quick start
 
-PAG Web SDK consists of two files: `libpag.js` and `libpag.wasm`.
+The PAG Web SDK includes two files: `libpag.js` and `libpag.wasm`.
 
 ### Browser (Recommend)
 
-Use <script/> to include the library directly, `libpag` will be registered as a global variable.
+Use the `<script>` tag to include the library directly. The `libpag` object will be registered as a global variable.
 
-For production use, we recommend using a specific version number of libpag to avoid unexpected breakage from newer versions:
+For production use, we recommend specifying a version number for `libpag` to avoid unexpected issues from newer versions:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/libpag@4.1.8/lib/libpag.min.js"></script>
 ```
 
-You can browse the files of the NPM package at the public CDN [cdn.jsdelivr.net/npm/libpag/](https://cdn.jsdelivr.net/npm/libpag/) , and you can use the keyword `@lastest` to get the lastest version.
+You can browse the files of the NPM package on the public CDN at [cdn.jsdelivr.net/npm/libpag/](https://cdn.jsdelivr.net/npm/libpag/).
+You can also use the keyword `@latest` to get the latest version.
 
 The PAG library is also available on other public CDNs that sync with NPM, such as [unpkg](https://unpkg.com/libpag@latest/lib/libpag.min.js).
 
@@ -53,7 +54,8 @@ The PAG library is also available on other public CDNs that sync with NPM, such 
 </script>
 ```
 
-You can use the `locateFile` function to get the path of `libpag.wasm` file. By default, the `libpag.wasm` file is located next to the `libpag.js` file. For example:
+You can use the `locateFile` function to specify the path of the `libpag.wasm` file. By default, 
+the `libpag.wasm` file is located next to the `libpag.js` file. For example:
 
 ```js
 const PAG = await window.libpag.PAGInit({
@@ -83,11 +85,16 @@ PAGInit().then((PAG) => {
 });
 ```
 
-**Note: If you are using ESModule to import PAG Web SDK, you must pack the `libpag.wasm` file manually into the final web program, because the common packing tools usually ignore the wasm file. Then use the `locateFile` function to get the path of the `libpag.wasm` . You also need to upload the `libpag.wasm` file to a server so that users can load it from network.**
+**Note: If you are using ESModule to import the PAG Web SDK, you need to manually include the `libpag.wasm` 
+file in your final web program, as common packing tools usually ignore it. Use the `locateFile` 
+function to specify the path of the `libpag.wasm` file. Additionally, you need to upload the
+`libpag.wasm` file to a server so users can load it from the network.**
 
-There are many kinds of products in the npm package after building. You could read the [doc](./doc/develop-install.md) to know about them.
+The npm package includes various products after building. You can read the [documentation](./doc/develop-install.md) 
+to learn more about them.
 
-There is also a [repository](https://github.com/libpag/pag-web) that contains some demos about using PAG Web SDK with HTML / Vue / React / PixiJS.
+There is also a [repository](https://github.com/libpag/pag-web) with demos on using the PAG Web SDK 
+with HTML, Vue, React, and PixiJS.
 
 You can find the API documentation [here](https://pag.io/docs/apis-web.html).
 
@@ -97,19 +104,15 @@ You can find the API documentation [here](https://pag.io/docs/apis-web.html).
 | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ----------------- |
 | Chrome >= 69                                                 | Safari >= 11.3                                               | Android >= 7.0                                               | iOS >= 11.3                                                  | last 2 versions   |
 
-More compatible versions are coming soon.
-
-## Roadmap
-
-Please visit [here](https://github.com/Tencent/libpag/wiki/PAG-Web-roadmap) to see the roadmap of the PAG Web SDK.
 
 ## Development
 
-First, make sure you have installed all the tools and dependencies listed in the [README.md](../README.md#Development) located in the project root directory.
+First, ensure you have installed all the tools and dependencies listed in the [README.md](../README.md#Development)
+located in the project root directory.
 
 ### Dependency Management
 
-Then run the following command to install required node modules:
+Next, run the following command to install the required Node modules:
 
 ```bash
 $ npm install
@@ -124,22 +127,25 @@ Execute `build.sh debug` to get `libpag.wasm` file.
 $ npm run build:debug
 ```
 
-Start TypeScript compiler watcher (Optional).
+Start the TypeScript compiler watcher (optional).
 
 ```bash
 # ./web
 $ npm run dev
 ```
 
-Start HTTP server.
+Start the HTTP server.
 
 ```bash
 # ./
 $ npm run server
 ```
-Use Chrome to open `http://localhost:8081/demo/index.html` to see the demo.
 
-If you need to debug, you can install [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb), and open Chrome DevTools > Settings > Experiments > Check the "WebAssembly Debugging: Enable DWARF support" option to enable SourceMap support. Now you can debug C++ files in Chrome DevTools.
+Open Chrome and go to `http://localhost:8081/demo/index.html` to see the demo.
+
+To debug, install [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb). 
+Then, open Chrome DevTools, go to Settings, Experiments, and check the "WebAssembly Debugging: Enable
+DWARF support" option to enable SourceMap support. Now you can debug C++ files in Chrome DevTools.
 
 ### Build (Release)
 
@@ -150,7 +156,7 @@ $ npm run build
 
 ### Build with CLion
 
-Create a new build target in CLion, and use the following **CMake options**（find them under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
+Create a new build target in CLion and use the following **CMake options** (found under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**):
 
 ```
 -DCMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
@@ -158,19 +164,19 @@ Create a new build target in CLion, and use the following **CMake options**（fi
 
 ### Test
 
-Build release version
+Build the release version
 
 ```bash
 $ npm run build
 ```
 
-Start test HTTP server.
+Start the HTTP server.
 
 ```bash
 $ npm run server
 ```
 
-Start cypress test.
+Start the cypress test.
 
 ```bash
 $ npm run test
