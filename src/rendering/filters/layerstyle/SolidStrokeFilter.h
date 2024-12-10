@@ -22,7 +22,6 @@
 #include "FilterEffect.h"
 
 namespace pag {
-enum class SolidStrokeMode { Normal, Thick };
 
 struct SolidStrokeOption {
   Enum position = -1;

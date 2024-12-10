@@ -138,9 +138,9 @@ std::shared_ptr<tgfx::ImageFilter> SolidStrokeEffect::CreateFilter(
   }
   std::shared_ptr<tgfx::RuntimeEffect> effect;
   if (option.spreadSizeX < STROKE_SPREAD_MIN_THICK_SIZE) {
-    effect = SolidStrokeNormalEffect::Make(option, std::move(source));
+    effect = SolidStrokeNormalEffect::Make(newOption, std::move(source));
   } else {
-    effect = SolidStrokeThickEffect::Make(option, std::move(source));
+    effect = SolidStrokeThickEffect::Make(newOption, std::move(source));
   }
   return tgfx::ImageFilter::Runtime(effect);
 }
