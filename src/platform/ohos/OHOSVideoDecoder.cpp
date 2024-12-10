@@ -134,6 +134,7 @@ bool OHOSVideoDecoder::initDecoder(const OH_AVCodecCategory avCodecCategory) {
   OH_AVFormat* ohFormat = OH_AVFormat_Create();
   OH_AVFormat_SetIntValue(ohFormat, OH_MD_KEY_WIDTH, videoFormat.width);
   OH_AVFormat_SetIntValue(ohFormat, OH_MD_KEY_HEIGHT, videoFormat.height);
+  OH_AVFormat_SetIntValue(ohFormat, OH_MD_KEY_VIDEO_ENABLE_LOW_LATENCY, 1);
   OH_AVFormat_SetIntValue(ohFormat, OH_MD_KEY_PIXEL_FORMAT, AV_PIXEL_FORMAT_NV12);
   ret = OH_VideoDecoder_Configure(videoCodec, ohFormat);
   OH_AVFormat_Destroy(ohFormat);
