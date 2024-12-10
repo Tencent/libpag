@@ -19,6 +19,7 @@
 #include "OuterGlowFilter.h"
 #include <tgfx/core/Recorder.h>
 #include "base/utils/TGFXCast.h"
+#include "rendering/filters/effects/SolidStrokeEffect.h"
 #include "rendering/filters/utils/BlurTypes.h"
 #include "tgfx/core/ImageFilter.h"
 
@@ -26,63 +27,57 @@ namespace pag {
 OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle) : layerStyle(layerStyle) {
 }
 
-bool OuterGlowFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                           const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
-                           tgfx::Canvas* target) {
-  auto spread = layerStyle->spread->getValueAt(layerFrame);
-  auto color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
-  auto opacity = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
-  auto size = layerStyle->size->getValueAt(layerFrame);
-  auto range = layerStyle->range->getValueAt(layerFrame);
+void OuterGlowFilter::update(Frame layerFrame, const tgfx::Point& filterScale) {
+  spread = layerStyle->spread->getValueAt(layerFrame);
   spread *= (spread == 1.f) ? 1.f : 0.8f;
-  auto spreadSize = size * spread / range;
-  auto blurSize = size * (1.f - spread) * 2.f / range;
-  auto blurXSize = blurSize * filterScale.x;
-  auto blurYSize = blurSize * filterScale.y;
+  color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
+  alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
+  auto size = layerStyle->size->getValueAt(layerFrame);
+  sizeX = size * filterScale.x;
+  sizeY = size * filterScale.y;
+  mode = size < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick;
+  range = layerStyle->range->getValueAt(layerFrame);
+}
 
-  auto strokeOption = SolidStrokeOption();
-  strokeOption.color = layerStyle->color->getValueAt(layerFrame);
-  strokeOption.opacity = layerStyle->opacity->getValueAt(layerFrame);
-  strokeOption.spreadSizeX = spreadSize;
-  strokeOption.spreadSizeY = spreadSize;
-
+bool OuterGlowFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+  std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (spread == 0.f) {
-    tgfx::Paint paint;
-    paint.setImageFilter(createBlurFilter(blurXSize, blurYSize, color, filterScale));
-    paint.setAlpha(opacity);
-    target->drawImage(source, &paint);
-    return true;
-  }
-
-  if (spread == 1.f) {
-    auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale);
+    filter = getDropShadowFilter();
+  } else if (spread == 1.f) {
+    filter = getStrokeFilter();
+  } else {
+    auto strokeFilter = getStrokeFilter();
     if (strokeFilter == nullptr) {
       return false;
     }
-    tgfx::Paint paint;
-    paint.setImageFilter(strokeFilter);
-    target->drawImage(source, matrix, &paint);
-    return true;
+    auto dropShadowFilter = getDropShadowFilter();
+    if (dropShadowFilter == nullptr) {
+      return false;
+    }
+    filter = tgfx::ImageFilter::Compose(strokeFilter, dropShadowFilter);
   }
-  auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale);
-  if (strokeFilter == nullptr) {
+  if (!filter) {
     return false;
   }
-
-  auto dropShadowFilter = createBlurFilter(blurXSize, blurYSize, color, filterScale);
-  auto composeFilter = tgfx::ImageFilter::Compose(strokeFilter, dropShadowFilter);
   tgfx::Paint paint;
-  paint.setImageFilter(composeFilter);
-  paint.setAlpha(opacity);
-  target->drawImage(source, matrix, &paint);
+  paint.setImageFilter(filter);
+  paint.setAlpha(alpha);
+  canvas->drawImage(std::move(image), &paint);
   return true;
 }
 
-std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::createBlurFilter(
-    float blurrinessX, float blurrinessY, const tgfx::Color& color,
-    const tgfx::Point& filterScale) {
-  return tgfx::ImageFilter::DropShadowOnly(0, 0, blurrinessX * filterScale.x,
-                                           blurrinessY * filterScale.y, color);
+std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getStrokeFilter() const {
+  auto strokeOption = SolidStrokeOption();
+  strokeOption.color = color;
+  strokeOption.spreadSizeX = spread * sizeX / range;
+  strokeOption.spreadSizeY = spread * sizeY / range;
+  return SolidStrokeEffect::CreateFilter(strokeOption, mode);
+}
+
+std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getDropShadowFilter() const {
+  auto blurSizeX = sizeX * (1.f - spread) * 2.f / range;
+  auto blurSizeY = sizeY * (1.f - spread) * 2.f / range;
+  return tgfx::ImageFilter::DropShadowOnly(0, 0, blurSizeX, blurSizeY, color);
 }
 
 }  // namespace pag

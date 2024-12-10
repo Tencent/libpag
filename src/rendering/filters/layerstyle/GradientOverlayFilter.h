@@ -25,10 +25,20 @@ class GradientOverlayFilter : public LayerStyleFilter {
  public:
   explicit GradientOverlayFilter(GradientOverlayStyle* layerStyle);
 
-  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale) override;
+
+  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> source) override;
 
  private:
   GradientOverlayStyle* layerStyle = nullptr;
+  Enum blendMode = 0;  // BlendMode
+  Opacity opacity = 255;
+  GradientColorHandle colors = nullptr;
+  float angle = 0;
+  Enum gradStyle = 0;  // GradientFillType
+  bool reverse = false;
+  float scale = 1.0;
+  Point offset = Point::Zero();
+  tgfx::Point _filterScale = tgfx::Point::Make(1.0f, 1.0f);
 };
 }  // namespace pag

@@ -18,8 +18,9 @@
 
 #pragma once
 
-#include "LayerStyleFilter.h"
-#include "tgfx/gpu/RuntimeProgram.h"
+#include <tgfx/gpu/RuntimeEffect.h>
+#include <tgfx/gpu/RuntimeProgram.h>
+#include <tgfx/gpu/opengl/GLFunctions.h>
 namespace pag {
 
 class Uniforms {
@@ -84,7 +85,7 @@ class FilterEffect : public tgfx::RuntimeEffect {
   /**
    * filter的收集顶点数据的接口
    * 如果顶点数据和普通滤镜不一致，需要需重载该接口。
-   * @param source : 滤镜输入的纹理
+   * @param sources : 滤镜输入的纹理
    * @param target : 滤镜输出的纹理
    * @param offset : 滤镜输出的纹理的偏移量
    * @return : 返回所有顶点数据

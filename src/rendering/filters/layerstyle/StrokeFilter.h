@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "AlphaEdgeDetectFilter.h"
-#include "SolidStrokeFilter.h"
-
+#include "LayerStyleFilter.h"
+#include "rendering/filters/effects/SolidStrokeEffect.h"
 namespace pag {
 class StrokeFilter : public LayerStyleFilter {
  public:
@@ -30,10 +28,14 @@ class StrokeFilter : public LayerStyleFilter {
 
   StrokeFilter(StrokeFilter&&) = delete;
 
-  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale) override;
+
+  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
   StrokeStyle* layerStyle = nullptr;
+  SolidStrokeOption strokeOption;
+  SolidStrokeMode mode = SolidStrokeMode::Normal;
+  float alpha = 1.0f;
 };
 }  // namespace pag

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlphaEdgeDetectFilter.h"
+#include "AlphaEdgeDetectEffect.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(

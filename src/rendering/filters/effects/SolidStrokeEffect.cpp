@@ -16,9 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SolidStrokeFilter.h"
+#include "SolidStrokeEffect.h"
 #include <tgfx/core/ImageFilter.h>
-#include <utility>
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/utils/BlurTypes.h"
 
@@ -29,7 +28,6 @@ static const char SOLID_STROKE_FRAGMENT_SHADER[] = R"(
         uniform sampler2D uTextureInput;
         uniform sampler2D uOriginalTextureInput;
         uniform vec3 uColor;
-        uniform float uAlpha;
         uniform vec2 uSize;
         uniform float uIsUseOriginalTexture;
         uniform float uIsOutside;
@@ -60,14 +58,13 @@ static const char SOLID_STROKE_FRAGMENT_SHADER[] = R"(
                 point = vertexColor + vec2(measureX, -measureY);
                 alphaSum += texture2D(uTextureInput, point).a * check(point);
             }
-        
+
             vec4 srcColor = (uIsUseOriginalTexture == 1.0) ? texture2D(uOriginalTextureInput, vertexColor) : inputColor;
-    
-            vec4 result = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
+
+            vec4 result = (alphaSum > 0.0) ? vec4(uColor, 1.0) : vec4(0.0);
             result = (uIsOutside == 1.0 && srcColor.a > threshold) ? srcColor : result;
             result = (uIsCenter == 1.0 && result.a < threshold) ? srcColor : result;
             result = (uIsInside == 1.0 && (result.a < threshold || srcColor.a < threshold)) ? srcColor : result;
-
             gl_FragColor = result;
         }
     )";
@@ -78,7 +75,6 @@ static const char SOLID_STROKE_THICK_FRAGMENT_SHADER[] = R"(
         uniform sampler2D uTextureInput;
         uniform sampler2D uOriginalTextureInput;
         uniform vec3 uColor;
-        uniform float uAlpha;
         uniform vec2 uSize;
         uniform float uIsUseOriginalTexture;
         uniform float uIsOutside;
@@ -113,34 +109,28 @@ static const char SOLID_STROKE_THICK_FRAGMENT_SHADER[] = R"(
                 point = vertexColor + vec2(measureX / 2.0, -measureY / 2.0);
                 alphaSum += texture2D(uTextureInput, point).a * check(point);
             }
-        
+
             vec4 srcColor = (uIsUseOriginalTexture == 1.0) ? texture2D(uOriginalTextureInput, vertexColor) : inputColor;
-    
-            vec4 result = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
+
+            vec4 result = (alphaSum > 0.0) ? vec4(uColor, 1.0) : vec4(0.0);
             result = (uIsOutside == 1.0 && srcColor.a > threshold) ? srcColor : result;
             result = (uIsCenter == 1.0 && result.a < threshold) ? srcColor : result;
             result = (uIsInside == 1.0 && (result.a < threshold || srcColor.a < threshold)) ? srcColor : result;
-    
+
             gl_FragColor = result;
         }
     )";
 
 std::shared_ptr<tgfx::ImageFilter> SolidStrokeEffect::CreateFilter(
-    const SolidStrokeOption& option, const tgfx::Point& filterScale,
-    std::shared_ptr<tgfx::Image> source) {
-  auto newOption = option;
-  newOption.spreadSizeX *= filterScale.x;
-  newOption.spreadSizeY *= filterScale.y;
-  newOption.offsetX *= filterScale.x;
-  newOption.offsetY *= filterScale.y;
-  if (!newOption.valid()) {
+    const SolidStrokeOption& option, SolidStrokeMode mode, std::shared_ptr<tgfx::Image> source) {
+  if (!option.valid()) {
     return nullptr;
   }
   std::shared_ptr<tgfx::RuntimeEffect> effect;
-  if (option.spreadSizeX < STROKE_SPREAD_MIN_THICK_SIZE) {
-    effect = SolidStrokeNormalEffect::Make(newOption, std::move(source));
+  if (mode == SolidStrokeMode::Normal) {
+    effect = SolidStrokeNormalEffect::Make(option, std::move(source));
   } else {
-    effect = SolidStrokeThickEffect::Make(newOption, std::move(source));
+    effect = SolidStrokeThickEffect::Make(option, std::move(source));
   }
   return tgfx::ImageFilter::Runtime(effect);
 }
@@ -179,9 +169,7 @@ std::unique_ptr<Uniforms> SolidStrokeEffect::onPrepareProgram(tgfx::Context* con
 void SolidStrokeEffect::onUpdateParams(tgfx::Context* context, const EffectProgram* program,
                                        const std::vector<tgfx::BackendTexture>& sources) const {
 
-  auto color = ToTGFX(option.color);
-  auto alpha = ToAlpha(option.opacity);
-
+  auto color = option.color;
   auto spreadSizeX = option.spreadSizeX;
   auto spreadSizeY = option.spreadSizeY;
   spreadSizeX = std::min(spreadSizeX, STROKE_MAX_SPREAD_SIZE);
@@ -195,7 +183,6 @@ void SolidStrokeEffect::onUpdateParams(tgfx::Context* context, const EffectProgr
     gl->uniform1f(uniforms->isUseOriginalTextureHandle, 0.0);
   }
   gl->uniform3f(uniforms->colorHandle, color.red, color.green, color.blue);
-  gl->uniform1f(uniforms->alphaHandle, alpha);
   gl->uniform2f(uniforms->sizeHandle, spreadSizeX / sources[0].width(),
                 spreadSizeY / sources[0].height());
   gl->uniform1f(uniforms->isOutsideHandle, option.position == StrokePosition::Outside);

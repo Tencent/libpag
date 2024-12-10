@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "SolidStrokeFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
+#include "LayerStyleFilter.h"
+#include "rendering/filters/effects/SolidStrokeEffect.h"
 
 namespace pag {
 class DropShadowFilter : public LayerStyleFilter {
@@ -30,16 +30,23 @@ class DropShadowFilter : public LayerStyleFilter {
 
   DropShadowFilter(DropShadowFilter&&) = delete;
 
-  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale) override;
+
+  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
-  static std::shared_ptr<tgfx::ImageFilter> createDropShadowFilter(float dx, float dy,
-                                                                   float blurrinessX,
-                                                                   float blurrinessY,
-                                                                   const tgfx::Color& color,
-                                                                   const tgfx::Point& filterScale);
+  std::shared_ptr<tgfx::ImageFilter> getStrokeFilter() const;
+
+  std::shared_ptr<tgfx::ImageFilter> getDropShadowFilter() const;
 
   DropShadowStyle* layerStyle = nullptr;
+  tgfx::Color color = tgfx::Color::Black();
+  float alpha = 1.0f;
+  SolidStrokeMode mode = SolidStrokeMode::Normal;
+  float sizeX = 0;
+  float sizeY = 0;
+  Percent spread = 0;
+  float offsetX = 0;
+  float offsetY = 0;
 };
 }  // namespace pag

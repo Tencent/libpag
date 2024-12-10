@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "SolidStrokeFilter.h"
+#include "LayerStyleFilter.h"
+#include "rendering/filters/effects/SolidStrokeEffect.h"
 
 namespace pag {
 class OuterGlowFilter : public LayerStyleFilter {
@@ -29,14 +30,23 @@ class OuterGlowFilter : public LayerStyleFilter {
 
   OuterGlowFilter(OuterGlowFilter&&) = delete;
 
-  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale) override;
+
+  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
-  static std::shared_ptr<tgfx::ImageFilter> createBlurFilter(float blurrinessX, float blurrinessY,
-                                                             const tgfx::Color& color,
-                                                             const tgfx::Point& filterScale);
+  std::shared_ptr<tgfx::ImageFilter> getStrokeFilter() const;
+
+  std::shared_ptr<tgfx::ImageFilter> getDropShadowFilter() const;
 
   OuterGlowStyle* layerStyle = nullptr;
+
+  tgfx::Color color = tgfx::Color::Black();
+  float alpha = 1.0f;
+  float sizeX = 0;
+  float sizeY = 0;
+  SolidStrokeMode mode = SolidStrokeMode::Normal;
+  Percent spread = 0;
+  Percent range = 1.0f;
 };
 }  // namespace pag

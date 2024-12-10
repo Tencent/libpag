@@ -31,9 +31,9 @@ class LayerStyleFilter {
 
   static std::unique_ptr<LayerStyleFilter> Make(LayerStyle* layerStyle);
 
-  virtual bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                    const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
-                    tgfx::Canvas* target) = 0;
+  virtual void update(Frame layerFrame, const tgfx::Point& filterScale) = 0;
+
+  virtual bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) = 0;
 };
 
 }  // namespace pag

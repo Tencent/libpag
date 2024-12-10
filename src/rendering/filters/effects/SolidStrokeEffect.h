@@ -18,22 +18,24 @@
 
 #pragma once
 
-#include <utility>
+#include <pag/types.h>
+#include <tgfx/core/Color.h>
 #include "FilterEffect.h"
+#include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
+enum class SolidStrokeMode { Normal, Thick };
 
 struct SolidStrokeOption {
   Enum position = -1;
-  Color color = Black;
-  float opacity = 0.0f;
+  tgfx::Color color = tgfx::Color::Black();
   float spreadSizeX = 0.0f;
   float spreadSizeY = 0.0f;
   float offsetX = 0.0f;
   float offsetY = 0.0f;
 
   bool valid() const {
-    return opacity != 0 && (spreadSizeX != 0 || spreadSizeY != 0 || offsetX != 0 || offsetY != 0);
+    return spreadSizeX != 0 || spreadSizeY != 0 || offsetX != 0 || offsetY != 0;
   }
 };
 
@@ -43,8 +45,8 @@ class SolidStrokeUniforms : public Uniforms {
     auto gl = tgfx::GLFunctions::Get(context);
     originalTextureHandle = gl->getUniformLocation(program, "uOriginalTextureInput");
     isUseOriginalTextureHandle = gl->getUniformLocation(program, "uIsUseOriginalTexture");
-    colorHandle = gl->getUniformLocation(program, "uColor");
     alphaHandle = gl->getUniformLocation(program, "uAlpha");
+    colorHandle = gl->getUniformLocation(program, "uColor");
     sizeHandle = gl->getUniformLocation(program, "uSize");
     isOutsideHandle = gl->getUniformLocation(program, "uIsOutside");
     isCenterHandle = gl->getUniformLocation(program, "uIsCenter");
@@ -64,7 +66,7 @@ class SolidStrokeUniforms : public Uniforms {
 class SolidStrokeEffect : public FilterEffect {
  public:
   static std::shared_ptr<tgfx::ImageFilter> CreateFilter(
-      const SolidStrokeOption& option, const tgfx::Point& filterScale,
+      const SolidStrokeOption& option, SolidStrokeMode mode,
       std::shared_ptr<tgfx::Image> source = nullptr);
 
   SolidStrokeEffect(tgfx::UniqueType type, const SolidStrokeOption& option)

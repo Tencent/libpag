@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <tgfx/gpu/ImageOrigin.h>
 #include <array>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/gpu/Backend.h"
@@ -49,11 +50,17 @@ struct FilterSource {
   tgfx::Point scale = {};
 
   /**
+   * The origin of the source image.
+   */
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
+
+  /**
    * The 3x3 texture coordinate transform matrix. This transform matrix maps 2D texture coordinates
    * of the form (s, t, 0, 1) with s and t in the inclusive range [0, 1] to the texture coordinate
    * that should be used to sample that location from the texture. Sampling the texture outside of
    * the range of this transform is undefined. The matrix is stored in column-major order so that it
    * may be passed directly to OpenGL ES via the glLoadMatrixf or glUniformMatrix4fv functions.
+   * note:The texture matrix is the data after applying the ImageOrigin.
    */
   std::array<float, 9> textureMatrix = {};
 };

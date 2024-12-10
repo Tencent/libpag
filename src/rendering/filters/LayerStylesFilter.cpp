@@ -45,7 +45,7 @@ void LayerStylesFilter::update(const FilterList* list, const tgfx::Point& extraS
 void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
                              const FilterTarget* target) {
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto sourceImage = tgfx::Image::MakeFrom(context, backendTexture);
+  auto sourceImage = tgfx::Image::MakeFrom(context, backendTexture, source->origin);
   if (sourceImage == nullptr) {
     return;
   }
@@ -55,7 +55,6 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
   if (surface == nullptr) {
     return;
   }
-  auto sourceMatrix = ToMatrix(source->textureMatrix);
   auto canvas = surface->getCanvas();
   canvas->concat(ToMatrix(target));
   auto totalScale = filterScale;
@@ -65,7 +64,8 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
     if (layerStyle->drawPosition() == LayerStylePosition::Blow) {
       auto filter = LayerStyleFilter::Make(layerStyle);
       if (filter) {
-        filter->draw(filterList->layerFrame, sourceImage, totalScale, sourceMatrix, canvas);
+        filter->update(filterList->layerFrame, totalScale);
+        filter->draw(canvas, sourceImage);
       }
     }
   }
@@ -79,14 +79,15 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
       if (filter) {
         // GradientOverlayFilter is scale-invariant for the source image, so we can use the filter
         // scale directly.
-        filter->draw(filterList->layerFrame, sourceImage, filterScale, sourceMatrix, canvas);
+        filter->update(filterList->layerFrame, filterScale);
+        filter->draw(canvas, sourceImage);
         drawSource = false;
       }
     }
   }
 
   if (drawSource) {
-    canvas->drawImage(sourceImage, sourceMatrix);
+    canvas->drawImage(sourceImage);
   }
   context->flush();
 }

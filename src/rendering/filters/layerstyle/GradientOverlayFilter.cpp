@@ -28,18 +28,19 @@ GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
     : layerStyle(layerStyle) {
 }
 
-bool GradientOverlayFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                                 const tgfx::Point& filterScale, const tgfx::Matrix&,
-                                 tgfx::Canvas* target) {
-  auto* gradStyle = static_cast<GradientOverlayStyle*>(layerStyle);
-  auto opacity = gradStyle->opacity->getValueAt(layerFrame);
-  auto colors = gradStyle->colors->getValueAt(layerFrame);
-  auto angle = gradStyle->angle->getValueAt(layerFrame);
-  auto style = gradStyle->style->getValueAt(layerFrame);
-  auto reverse = gradStyle->reverse->getValueAt(layerFrame);
-  auto scale = gradStyle->scale->getValueAt(layerFrame) / 100.f;
-  auto offset = gradStyle->offset->getValueAt(layerFrame);
+void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point& filterScale) {
+  opacity = layerStyle->opacity->getValueAt(layerFrame);
+  colors = layerStyle->colors->getValueAt(layerFrame);
+  angle = layerStyle->angle->getValueAt(layerFrame);
+  gradStyle = layerStyle->style->getValueAt(layerFrame);
+  reverse = layerStyle->reverse->getValueAt(layerFrame);
+  scale = layerStyle->scale->getValueAt(layerFrame) / 100.f;
+  offset = layerStyle->offset->getValueAt(layerFrame);
+  blendMode = layerStyle->blendMode->getValueAt(layerFrame);
+  _filterScale = filterScale;
+}
 
+bool GradientOverlayFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> source) {
   auto width = static_cast<float>(source->width());
   auto height = static_cast<float>(source->height());
 
@@ -67,9 +68,8 @@ bool GradientOverlayFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> 
   matrix.postRotate(360.f - angle, centerX, centerY);
   matrix.postTranslate(offset.x * 0.01f * width, offset.y * 0.01f * height);
 
-  auto gradient = GradientPaint(style, startPoint, endPoint, colors, matrix, reverse);
+  auto gradient = GradientPaint(gradStyle, startPoint, endPoint, colors, matrix, reverse);
   auto shader = gradient.getShader();
-
   if (opacity != 255) {
     shader = tgfx::Shader::MakeBlend(
         tgfx::BlendMode::DstIn, shader,
@@ -78,15 +78,14 @@ bool GradientOverlayFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> 
 
   auto imageShader = tgfx::Shader::MakeImageShader(source);
   shader = tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, shader, imageShader);
-  shader = tgfx::Shader::MakeBlend(ToTGFXBlend(gradStyle->blendMode->getValueAt(layerFrame)),
-                                   imageShader, shader);
+  shader = tgfx::Shader::MakeBlend(ToTGFXBlend(blendMode), imageShader, shader);
   tgfx::Paint paint;
   paint.setShader(shader);
   auto rect = tgfx::Rect::MakeWH(width, height);
-  target->save();
-  target->scale(1.f / filterScale.x, 1.f / filterScale.y);
-  target->drawRect(rect, paint);
-  target->restore();
+  canvas->save();
+  canvas->scale(1.f / _filterScale.x, 1.f / _filterScale.y);
+  canvas->drawRect(rect, paint);
+  canvas->restore();
   return true;
 }
 

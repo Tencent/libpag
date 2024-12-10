@@ -97,6 +97,7 @@ std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& backend
   filterSource->width = backendTexture.width();
   filterSource->height = backendTexture.height();
   filterSource->scale = scale;
+  filterSource->origin = origin;
   filterSource->textureMatrix =
       ToGLTextureMatrix(tgfx::Matrix::I(), backendTexture.width(), backendTexture.height(), origin);
   return std::unique_ptr<FilterSource>(filterSource);
