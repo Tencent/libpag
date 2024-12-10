@@ -162,13 +162,12 @@ static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, tgfx::Rect&
       return false;
     }
     auto layerStyleScale = filterList->layerStyleScale;
-    auto oldBounds = filterBounds;
     LayerStylesFilter::TransformBounds(&filterBounds, filterList);
     filterBounds.roundOut();
-    filter->update(filterList, oldBounds, filterBounds, layerStyleScale);
     if (!filterBounds.intersect(clipBounds)) {
       return false;
     }
+    filter->update(filterList, layerStyleScale);
     filterNodes.emplace_back(filter, filterBounds);
   }
   return true;
@@ -200,7 +199,7 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
                                     int clipIndex) {
   auto effectIndex = 0;
   for (auto& effect : filterList->effects) {
-    auto filter = renderCache->getFilterCache(effect);
+    auto filter = static_cast<LayerFilter*>(renderCache->getFilterCache(effect));
     if (filter) {
       auto oldBounds = filterBounds;
       effect->transformBounds(ToPAG(&filterBounds), ToPAG(effectScale), filterList->layerFrame);

@@ -36,6 +36,8 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
 
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 
+tgfx::Matrix ToMatrix(const std::array<float, 9>& matrix);
+
 std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& texture,
                                              tgfx::ImageOrigin origin, const tgfx::Point& scale);
 
@@ -46,6 +48,10 @@ tgfx::Point ToGLTexturePoint(const FilterSource* source, const tgfx::Point& text
 
 tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
                             const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint);
+
+tgfx::Point ToGLTexturePoint(const tgfx::BackendTexture* source, const tgfx::Point& texturePoint);
+
+tgfx::Point ToGLVertexPoint(const tgfx::BackendRenderTarget& target, const tgfx::Point& point);
 
 unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
                          const std::string& fragment);
