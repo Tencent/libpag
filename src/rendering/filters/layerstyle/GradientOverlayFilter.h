@@ -18,16 +18,15 @@
 
 #pragma once
 
-#include "CanvasFilter.h"
+#include "LayerStyleFilter.h"
 
 namespace pag {
-class GradientOverlayFilter : public CanvasFilter {
+class GradientOverlayFilter : public LayerStyleFilter {
  public:
   explicit GradientOverlayFilter(GradientOverlayStyle* layerStyle);
 
- protected:
-  bool onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-              const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
+            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
 
  private:
   GradientOverlayStyle* layerStyle = nullptr;

@@ -28,9 +28,9 @@ GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
     : layerStyle(layerStyle) {
 }
 
-bool GradientOverlayFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                                   const tgfx::Point& filterScale, const tgfx::Matrix&,
-                                   tgfx::Canvas* target) {
+bool GradientOverlayFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                                 const tgfx::Point& filterScale, const tgfx::Matrix&,
+                                 tgfx::Canvas* target) {
   auto* gradStyle = static_cast<GradientOverlayStyle*>(layerStyle);
   auto opacity = gradStyle->opacity->getValueAt(layerFrame);
   auto colors = gradStyle->colors->getValueAt(layerFrame);

@@ -34,11 +34,6 @@ class LayerStyleFilter {
   virtual bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
                     const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
                     tgfx::Canvas* target) = 0;
-
-  virtual std::shared_ptr<tgfx::Image> applyFilterEffect(Frame layerFrame,
-                                                         std::shared_ptr<tgfx::Image> source,
-                                                         const tgfx::Point& filterScale,
-                                                         tgfx::Point* offset) = 0;
 };
 
 }  // namespace pag

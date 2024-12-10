@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "EffectFilter.h"
+#include "FilterEffect.h"
 #include "rendering/filters/LayerFilter.h"
 
 namespace pag {
@@ -50,13 +50,4 @@ class AlphaEdgeDetectLayerEffect : public FilterEffect {
                       const std::vector<tgfx::BackendTexture>& sources) const override;
 };
 
-class AlphaEdgeDetectFilter : public EffectFilter {
- public:
-  explicit AlphaEdgeDetectFilter();
-  ~AlphaEdgeDetectFilter() override = default;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> onCreateEffect(
-      Frame layerFrame, const tgfx::Point& filterScale) const override;
-};
 }  // namespace pag

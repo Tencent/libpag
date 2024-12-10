@@ -24,16 +24,11 @@
 
 namespace pag {
 OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle) : layerStyle(layerStyle) {
-  strokeFilter = new SolidStrokeFilter();
 }
 
-OuterGlowFilter::~OuterGlowFilter() {
-  delete strokeFilter;
-}
-
-bool OuterGlowFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                             const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
-                             tgfx::Canvas* target) {
+bool OuterGlowFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                           const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
+                           tgfx::Canvas* target) {
   auto spread = layerStyle->spread->getValueAt(layerFrame);
   auto color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto opacity = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
@@ -53,31 +48,41 @@ bool OuterGlowFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> sour
 
   if (spread == 0.f) {
     tgfx::Paint paint;
-    paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(0, 0, blurXSize * filterScale.x,
-                                                           blurYSize * filterScale.y, color));
+    paint.setImageFilter(createBlurFilter(blurXSize, blurYSize, color, filterScale));
     paint.setAlpha(opacity);
     target->drawImage(source, &paint);
     return true;
   }
 
-  strokeFilter->setSolidStrokeMode(
-      spreadSize < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick);
-  strokeFilter->onUpdateOption(strokeOption);
   if (spread == 1.f) {
-    return strokeFilter->draw(layerFrame, source, filterScale, matrix, target);
+    auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale);
+    if (strokeFilter == nullptr) {
+      return false;
+    }
+    tgfx::Paint paint;
+    paint.setImageFilter(strokeFilter);
+    target->drawImage(source, matrix, &paint);
+    return true;
   }
-  tgfx::Point offset = {};
-  auto image = strokeFilter->applyFilterEffect(layerFrame, source, filterScale, &offset);
-  if (image == nullptr) {
+  auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale);
+  if (strokeFilter == nullptr) {
     return false;
   }
-  auto totalMatrix = matrix;
-  totalMatrix.preTranslate(offset.x, offset.y);
+
+  auto dropShadowFilter = createBlurFilter(blurXSize, blurYSize, color, filterScale);
+  auto composeFilter = tgfx::ImageFilter::Compose(strokeFilter, dropShadowFilter);
   tgfx::Paint paint;
-  paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(0, 0, blurXSize, blurYSize, color));
+  paint.setImageFilter(composeFilter);
   paint.setAlpha(opacity);
-  target->drawImage(image, totalMatrix, &paint);
+  target->drawImage(source, matrix, &paint);
   return true;
+}
+
+std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::createBlurFilter(
+    float blurrinessX, float blurrinessY, const tgfx::Color& color,
+    const tgfx::Point& filterScale) {
+  return tgfx::ImageFilter::DropShadowOnly(0, 0, blurrinessX * filterScale.x,
+                                           blurrinessY * filterScale.y, color);
 }
 
 }  // namespace pag

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EffectFilter.h"
+#include "FilterEffect.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "tgfx/core/Canvas.h"
 
@@ -215,40 +215,6 @@ void FilterEffect::bindVertices(tgfx::Context* context, const EffectProgram* fil
                           reinterpret_cast<void*>(2 * sizeof(float)));
   gl->enableVertexAttribArray(uniform->textureCoordHandle);
   gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> EffectFilter::onCreateEffect(Frame, const tgfx::Point&) const {
-  return nullptr;
-}
-
-bool EffectFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                        const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
-                        tgfx::Canvas* target) {
-  auto offset = tgfx::Point::Zero();
-  auto image = applyFilterEffect(layerFrame, source, filterScale, &offset);
-  if (image == nullptr) {
-    return false;
-  }
-  auto totalMatrix = matrix;
-  totalMatrix.preTranslate(offset.x, offset.y);
-  target->drawImage(image, totalMatrix);
-  return true;
-}
-
-std::shared_ptr<tgfx::Image> EffectFilter::applyFilterEffect(Frame layerFrame,
-                                                             std::shared_ptr<tgfx::Image> source,
-                                                             const tgfx::Point& filterScale,
-                                                             tgfx::Point* offset) {
-  auto effect = onCreateEffect(layerFrame, filterScale);
-  if (effect == nullptr) {
-    return nullptr;
-  }
-
-  auto filter = tgfx::ImageFilter::Runtime(effect);
-  if (filter == nullptr) {
-    return nullptr;
-  }
-  return source->makeWithFilter(filter, offset);
 }
 
 }  // namespace pag

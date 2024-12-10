@@ -97,27 +97,4 @@ class FilterEffect : public tgfx::RuntimeEffect {
                     const std::vector<float>& points) const;
 };
 
-class EffectFilter : public LayerStyleFilter {
- public:
-  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
-
-  std::shared_ptr<tgfx::Image> applyFilterEffect(Frame layerFrame,
-                                                 std::shared_ptr<tgfx::Image> source,
-                                                 const tgfx::Point& filterScale,
-                                                 tgfx::Point* offset) override;
-
- protected:
-  /**
-   * 具体effect的创建接口。
-   * @param layerFrame : 当前绘制的layerFrame, 主要用来从effect或者style中获取滤镜所需的参数
-   * @param filterScale :
-   * 滤镜效果的scale，比如LayerStyle本应该在图层matrix之后应用的，但是我们为了简化渲染改到了matrix之前，
-   * 因此需要反向排除图层matrix的缩放值
-   * 该filterScale等于反向matrix的scale，不包含source.scale，source.scale会整体应用到FilterTarget
-   * 上屏的matrix里。
-   */
-  virtual std::shared_ptr<tgfx::RuntimeEffect> onCreateEffect(Frame layerFrame,
-                                                              const tgfx::Point& filterScale) const;
-};
 }  // namespace pag

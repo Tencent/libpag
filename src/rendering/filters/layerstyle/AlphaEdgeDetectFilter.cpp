@@ -44,9 +44,6 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-AlphaEdgeDetectFilter::AlphaEdgeDetectFilter() {
-}
-
 std::string AlphaEdgeDetectLayerEffect::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
@@ -65,8 +62,4 @@ void AlphaEdgeDetectLayerEffect::onUpdateParams(
   gl->uniform1f(uniforms->verticalStepHandle, 1.0f / sources[0].height());
 }
 
-std::shared_ptr<tgfx::RuntimeEffect> AlphaEdgeDetectFilter::onCreateEffect(
-    Frame, const tgfx::Point&) const {
-  return std::make_shared<AlphaEdgeDetectLayerEffect>();
-}
 }  // namespace pag

@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include "CanvasFilter.h"
 #include "SolidStrokeFilter.h"
 
 namespace pag {
-class OuterGlowFilter : public CanvasFilter {
+class OuterGlowFilter : public LayerStyleFilter {
  public:
   explicit OuterGlowFilter(OuterGlowStyle* layerStyle);
 
@@ -30,15 +29,14 @@ class OuterGlowFilter : public CanvasFilter {
 
   OuterGlowFilter(OuterGlowFilter&&) = delete;
 
-  ~OuterGlowFilter() override;
-
- protected:
-  bool onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-              const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
+            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
 
  private:
-  OuterGlowStyle* layerStyle = nullptr;
+  static std::shared_ptr<tgfx::ImageFilter> createBlurFilter(float blurrinessX, float blurrinessY,
+                                                             const tgfx::Color& color,
+                                                             const tgfx::Point& filterScale);
 
-  SolidStrokeFilter* strokeFilter = nullptr;
+  OuterGlowStyle* layerStyle = nullptr;
 };
 }  // namespace pag

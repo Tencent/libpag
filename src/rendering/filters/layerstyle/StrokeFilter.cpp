@@ -17,27 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeFilter.h"
-#include "rendering/filters/utils/BlurTypes.h"
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Paint.h>
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 StrokeFilter::StrokeFilter(StrokeStyle* layerStyle) : layerStyle(layerStyle) {
-  strokeFilter = new SolidStrokeFilter();
-  alphaEdgeDetectFilter = new AlphaEdgeDetectFilter();
 }
 
-StrokeFilter::~StrokeFilter() {
-  delete strokeFilter;
-  delete alphaEdgeDetectFilter;
-}
-
-std::shared_ptr<tgfx::Image> StrokeFilter::applyFilterEffect(Frame layerFrame,
-                                                             std::shared_ptr<tgfx::Image> source,
-                                                             const tgfx::Point& filterScale,
-                                                             tgfx::Point* offset) {
+bool StrokeFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                        const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
+                        tgfx::Canvas* target) {
 
   if (source == nullptr) {
-    return nullptr;
+    return false;
   }
   auto strokePosition = layerStyle->position->getValueAt(layerFrame);
   auto spreadSize = layerStyle->size->getValueAt(layerFrame);
@@ -57,25 +50,27 @@ std::shared_ptr<tgfx::Image> StrokeFilter::applyFilterEffect(Frame layerFrame,
     strokeOption.spreadSizeY *= 0.8;
   }
 
-  strokeFilter->setSolidStrokeMode(
-      spreadSize < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick);
-  strokeFilter->onUpdateOption(strokeOption);
-
   if (strokePosition == StrokePosition::Outside) {
-    return strokeFilter->applyFilterEffect(layerFrame, source, filterScale, offset);
+    auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale, nullptr);
+    if (strokeFilter == nullptr) {
+      return false;
+    }
+    tgfx::Paint paint;
+    paint.setImageFilter(strokeFilter);
+    target->drawImage(source, matrix, &paint);
+    return true;
   }
 
-  tgfx::Point totalOffset = tgfx::Point::Zero();
-  auto image =
-      alphaEdgeDetectFilter->applyFilterEffect(layerFrame, source, filterScale, &totalOffset);
-  if (image == nullptr) {
-    return nullptr;
+  auto alphaEdgeDetectFilter =
+      tgfx::ImageFilter::Runtime(std::make_shared<AlphaEdgeDetectLayerEffect>());
+  auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale, source);
+  auto composeFilter = tgfx::ImageFilter::Compose(alphaEdgeDetectFilter, strokeFilter);
+  if (composeFilter == nullptr) {
+    return false;
   }
-  strokeFilter->onUpdateOriginalImage(source);
-  image = strokeFilter->applyFilterEffect(layerFrame, image, filterScale, offset);
-  if (offset) {
-    *offset += totalOffset;
-  }
-  return image;
+  tgfx::Paint paint;
+  paint.setImageFilter(composeFilter);
+  target->drawImage(source, matrix, &paint);
+  return true;
 }
 }  // namespace pag

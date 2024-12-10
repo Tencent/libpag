@@ -26,16 +26,11 @@
 
 namespace pag {
 DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {
-  strokeFilter = new SolidStrokeFilter();
 }
 
-DropShadowFilter::~DropShadowFilter() {
-  delete strokeFilter;
-}
-
-bool DropShadowFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
-                              const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
-                              tgfx::Canvas* target) {
+bool DropShadowFilter::draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source,
+                            const tgfx::Point& filterScale, const tgfx::Matrix& matrix,
+                            tgfx::Canvas* target) {
   auto spread = layerStyle->spread->getValueAt(layerFrame);
   auto color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto opacity = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
@@ -57,16 +52,13 @@ bool DropShadowFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> sou
 
   if (spread == 0.f) {
     tgfx::Paint paint;
-    paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
-        offsetX * filterScale.x, offsetY * filterScale.y, blurXSize * filterScale.x,
-        blurYSize * filterScale.y, color));
+    paint.setImageFilter(
+        createDropShadowFilter(offsetX, offsetY, blurXSize, blurYSize, color, filterScale));
     paint.setAlpha(opacity);
     target->drawImage(source, &paint);
     return true;
   }
 
-  strokeFilter->setSolidStrokeMode(
-      spreadSize < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick);
   auto strokeOption = SolidStrokeOption();
   strokeOption.color = layerStyle->color->getValueAt(layerFrame);
   strokeOption.opacity = layerStyle->opacity->getValueAt(layerFrame);
@@ -76,26 +68,38 @@ bool DropShadowFilter::onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> sou
   if (spread == 1.f) {
     strokeOption.offsetX = offsetX;
     strokeOption.offsetY = offsetY;
-    strokeFilter->onUpdateOption(strokeOption);
-    return strokeFilter->draw(layerFrame, source, filterScale, matrix, target);
+    auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale);
+    if (strokeFilter == nullptr) {
+      return false;
+    }
+    tgfx::Paint paint;
+    paint.setImageFilter(strokeFilter);
+    target->drawImage(source, matrix, &paint);
+    return true;
   }
 
-  strokeFilter->onUpdateOption(strokeOption);
-
-  tgfx::Point offset = {};
-  auto image = strokeFilter->applyFilterEffect(layerFrame, source, filterScale, &offset);
-  if (image == nullptr) {
+  auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, filterScale);
+  if (strokeFilter == nullptr) {
     return false;
   }
-  auto totalMatrix = matrix;
-  totalMatrix.preTranslate(offset.x, offset.y);
+
+  auto dropShadowFilter =
+      createDropShadowFilter(offsetX, offsetY, blurXSize, blurYSize, color, filterScale);
+
+  auto composeFilter = tgfx::ImageFilter::Compose(strokeFilter, dropShadowFilter);
   tgfx::Paint paint;
-  paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
-      offsetX * filterScale.x, offsetY * filterScale.y, blurXSize * filterScale.x,
-      blurYSize * filterScale.y, color));
+  paint.setImageFilter(composeFilter);
   paint.setAlpha(opacity);
-  target->drawImage(image, totalMatrix, &paint);
+  target->drawImage(source, matrix, &paint);
   return true;
+}
+
+std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::createDropShadowFilter(
+    float dx, float dy, float blurrinessX, float blurrinessY, const tgfx::Color& color,
+    const tgfx::Point& filterScale) {
+  return tgfx::ImageFilter::DropShadowOnly(dx * filterScale.x, dy * filterScale.y,
+                                           blurrinessX * filterScale.x, blurrinessY * filterScale.y,
+                                           color);
 }
 
 }  // namespace pag

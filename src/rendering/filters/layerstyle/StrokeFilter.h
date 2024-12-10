@@ -22,7 +22,7 @@
 #include "SolidStrokeFilter.h"
 
 namespace pag {
-class StrokeFilter : public EffectFilter {
+class StrokeFilter : public LayerStyleFilter {
  public:
   explicit StrokeFilter(StrokeStyle* layerStyle);
 
@@ -30,16 +30,10 @@ class StrokeFilter : public EffectFilter {
 
   StrokeFilter(StrokeFilter&&) = delete;
 
-  ~StrokeFilter() override;
-
-  std::shared_ptr<tgfx::Image> applyFilterEffect(Frame layerFrame,
-                                                 std::shared_ptr<tgfx::Image> source,
-                                                 const tgfx::Point& filterScale,
-                                                 tgfx::Point* offset) override;
+  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
+            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
 
  private:
   StrokeStyle* layerStyle = nullptr;
-  SolidStrokeFilter* strokeFilter = nullptr;
-  AlphaEdgeDetectFilter* alphaEdgeDetectFilter = nullptr;
 };
 }  // namespace pag

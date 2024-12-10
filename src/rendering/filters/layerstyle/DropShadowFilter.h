@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "CanvasFilter.h"
 #include "SolidStrokeFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 
 namespace pag {
-class DropShadowFilter : public CanvasFilter {
+class DropShadowFilter : public LayerStyleFilter {
  public:
   explicit DropShadowFilter(DropShadowStyle* layerStyle);
 
@@ -31,14 +30,16 @@ class DropShadowFilter : public CanvasFilter {
 
   DropShadowFilter(DropShadowFilter&&) = delete;
 
-  ~DropShadowFilter() override;
-
- protected:
-  bool onDraw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
-              const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
+  bool draw(Frame layerFrame, std::shared_ptr<tgfx::Image> source, const tgfx::Point& filterScale,
+            const tgfx::Matrix& matrix, tgfx::Canvas* target) override;
 
  private:
+  static std::shared_ptr<tgfx::ImageFilter> createDropShadowFilter(float dx, float dy,
+                                                                   float blurrinessX,
+                                                                   float blurrinessY,
+                                                                   const tgfx::Color& color,
+                                                                   const tgfx::Point& filterScale);
+
   DropShadowStyle* layerStyle = nullptr;
-  SolidStrokeFilter* strokeFilter = nullptr;
 };
 }  // namespace pag
