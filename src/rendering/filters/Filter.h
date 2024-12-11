@@ -19,7 +19,7 @@
 #pragma once
 
 #include <array>
-#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Context.h"
 

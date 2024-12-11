@@ -49,6 +49,9 @@ std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int
 
 std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
                                        tgfx::ImageOrigin origin) {
+  if (matrix.isIdentity() && origin == tgfx::ImageOrigin::TopLeft) {
+    return ToGLMatrix(matrix);
+  }
   auto result = matrix;
   tgfx::Matrix convertMatrix = {};
   convertMatrix.setScale(static_cast<float>(width), static_cast<float>(height));
@@ -64,9 +67,7 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
 }
 
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
-  tgfx::Matrix matrix = {};
-  auto values = target->vertexMatrix;
-  matrix.setAll(values[0], values[3], values[6], values[1], values[4], values[7]);
+  tgfx::Matrix matrix = ToMatrix(target->vertexMatrix);
   if (flipY) {
     matrix.postScale(1.0f, -1.0f);
   }
@@ -81,6 +82,12 @@ tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
     matrix.postConcat(convertMatrix);
   }
   return matrix;
+}
+
+tgfx::Matrix ToMatrix(const std::array<float, 9>& values) {
+  tgfx::Matrix result = {};
+  result.setAll(values[0], values[3], values[6], values[1], values[4], values[7]);
+  return result;
 }
 
 std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& backendTexture,
@@ -124,6 +131,16 @@ tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* sour
                              (contentPoint.y - contentBounds.top) * source->scale.y};
   return {2.0f * vertexPoint.x / static_cast<float>(target->width) - 1.0f,
           2.0f * vertexPoint.y / static_cast<float>(target->height) - 1.0f};
+}
+
+tgfx::Point ToGLTexturePoint(const tgfx::BackendTexture* source, const tgfx::Point& texturePoint) {
+  return {texturePoint.x / static_cast<float>(source->width()),
+          texturePoint.y / static_cast<float>(source->height())};
+}
+
+tgfx::Point ToGLVertexPoint(const tgfx::BackendRenderTarget& target, const tgfx::Point& point) {
+  return {2.0f * point.x / static_cast<float>(target.width()) - 1.0f,
+          2.0f * point.y / static_cast<float>(target.height()) - 1.0f};
 }
 
 static unsigned LoadGLShader(tgfx::Context* context, unsigned shaderType,

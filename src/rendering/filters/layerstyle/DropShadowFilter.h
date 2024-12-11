@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "SolidStrokeFilter.h"
-#include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
+#include "LayerStyleFilter.h"
+#include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 
 namespace pag {
-class DropShadowFilter : public LayerFilter {
+class DropShadowFilter : public LayerStyleFilter {
  public:
   explicit DropShadowFilter(DropShadowStyle* layerStyle);
 
@@ -31,43 +30,24 @@ class DropShadowFilter : public LayerFilter {
 
   DropShadowFilter(DropShadowFilter&&) = delete;
 
-  ~DropShadowFilter() override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale,
+              const tgfx::Point& sourceScale) override;
 
-  bool initialize(tgfx::Context* context) override;
-
-  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
-              const tgfx::Point& filterScale) override;
-
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
+  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
-  void updateParamModeNotFullSpread(const tgfx::Rect& contentBounds);
-  void updateParamModeFullSpread(const tgfx::Rect& contentBounds);
+  std::shared_ptr<tgfx::ImageFilter> getStrokeFilter() const;
 
-  void onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
-                           const FilterTarget* target);
-  void onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
-                               const FilterTarget* target);
-  void onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
-                            const FilterTarget* target);
+  std::shared_ptr<tgfx::ImageFilter> getDropShadowFilter() const;
 
   DropShadowStyle* layerStyle = nullptr;
-
-  std::shared_ptr<FilterBuffer> solidStrokeFilterBuffer = nullptr;
-
-  SolidStrokeOption strokeOption;
-  SolidStrokeFilter* strokeFilter = nullptr;
-  SolidStrokeFilter* strokeThickFilter = nullptr;
-
   tgfx::Color color = tgfx::Color::Black();
-  float spread = 0.f;
-  float spreadSize = 0.f;
-  float opacity = 1.0f;
-  float blurXSize = 0.f;
-  float blurYSize = 0.f;
-  float offsetX = 0.f;
-  float offsetY = 0.f;
-  std::vector<tgfx::Rect> filtersBounds = {};
+  float alpha = 1.0f;
+  SolidStrokeMode mode = SolidStrokeMode::Normal;
+  float sizeX = 0;
+  float sizeY = 0;
+  Percent spread = 0;
+  float offsetX = 0;
+  float offsetY = 0;
 };
 }  // namespace pag

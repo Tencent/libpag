@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerStylesFilter.h"
+#include "layerstyle/LayerStyleFilter.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* filterList) {
@@ -31,55 +33,60 @@ void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* fi
   }
 }
 
-LayerStylesFilter::LayerStylesFilter(RenderCache* renderCache) : renderCache(renderCache) {
-  drawFilter = new LayerFilter();
+bool LayerStylesFilter::initialize(tgfx::Context*) {
+  return true;
 }
 
-LayerStylesFilter::~LayerStylesFilter() {
-  delete drawFilter;
-}
-
-bool LayerStylesFilter::initialize(tgfx::Context* context) {
-  return drawFilter->initialize(context);
-}
-
-void LayerStylesFilter::update(const FilterList* list, const tgfx::Rect& inputBounds,
-                               const tgfx::Rect& outputBounds, const tgfx::Point& extraScale) {
+void LayerStylesFilter::update(const FilterList* list, const tgfx::Point& extraScale) {
   filterList = list;
-  contentBounds = inputBounds;
-  transformedBounds = outputBounds;
   filterScale = extraScale;
 }
 
 void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
                              const FilterTarget* target) {
+  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
+  auto sourceMatrix = ToMatrix(source->textureMatrix);
+  auto origin = tgfx::ImageOrigin::TopLeft;
+  if (!sourceMatrix.isIdentity()) {
+    origin = tgfx::ImageOrigin::BottomLeft;
+  }
+  auto sourceImage = tgfx::Image::MakeFrom(context, backendTexture, origin);
+  if (sourceImage == nullptr) {
+    return;
+  }
+
+  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
+  auto surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
+  if (surface == nullptr) {
+    return;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->concat(ToMatrix(target));
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Blow) {
-      auto filter = renderCache->getFilterCache(layerStyle);
+      auto filter = LayerStyleFilter::Make(layerStyle);
       if (filter) {
-        filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
-        filter->draw(context, source, target);
+        filter->update(filterList->layerFrame, filterScale, source->scale);
+        filter->draw(canvas, sourceImage);
       }
     }
   }
 
-  // The above layer style is only GradientOverlayFilter, and the GradientOverlayFilter has drawn
-  // the source with blend.
+  // The filter above source will draw the source with blend.
   bool drawSource = true;
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Above) {
-      auto filter = renderCache->getFilterCache(layerStyle);
+      auto filter = LayerStyleFilter::Make(layerStyle);
       if (filter) {
-        filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
-        filter->draw(context, source, target);
+        filter->update(filterList->layerFrame, filterScale, source->scale);
+        filter->draw(canvas, sourceImage);
         drawSource = false;
       }
     }
   }
 
   if (drawSource) {
-    drawFilter->update(filterList->layerFrame, contentBounds, contentBounds, filterScale);
-    drawFilter->draw(context, source, target);
+    canvas->drawImage(sourceImage);
   }
 }
 }  // namespace pag

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,23 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "pag/file.h"
+#include "pag/pag.h"
+#include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace pag {
-class GradientOverlayFilter : public LayerFilter {
+
+class LayerStyleFilter {
  public:
-  explicit GradientOverlayFilter(GradientOverlayStyle* layerStyle);
+  virtual ~LayerStyleFilter() = default;
 
-  bool initialize(tgfx::Context* context) override;
+  static std::unique_ptr<LayerStyleFilter> Make(LayerStyle* layerStyle);
 
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
+  virtual void update(Frame layerFrame, const tgfx::Point& filterScale,
+                      const tgfx::Point& sourceScale) = 0;
 
- private:
-  GradientOverlayStyle* layerStyle = nullptr;
+  virtual bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) = 0;
 };
+
 }  // namespace pag

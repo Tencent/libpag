@@ -17,111 +17,66 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeFilter.h"
-#include "base/utils/MathUtil.h"
-#include "base/utils/TGFXCast.h"
+#include "rendering/filters/layerstyle/AlphaEdgeDetectFilter.h"
+#include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
-#include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Paint.h"
 
 namespace pag {
 StrokeFilter::StrokeFilter(StrokeStyle* layerStyle) : layerStyle(layerStyle) {
-  strokeFilter = new SolidStrokeFilter(SolidStrokeMode::Normal);
-  strokeThickFilter = new SolidStrokeFilter(SolidStrokeMode::Thick);
-  alphaEdgeDetectFilter = new AlphaEdgeDetectFilter();
 }
 
-StrokeFilter::~StrokeFilter() {
-  delete strokeFilter;
-  delete strokeThickFilter;
-  delete alphaEdgeDetectFilter;
+void StrokeFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
+                          const tgfx::Point& sourceScale) {
+  auto totalScale = tgfx::Point::Make(filterScale.x * sourceScale.x, filterScale.y * sourceScale.y);
+  strokeOption = SolidStrokeOption();
+  auto spreadSize = layerStyle->size->getValueAt(layerFrame);
+  mode =
+      spreadSize < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick;
+  auto sizeX = spreadSize * totalScale.x;
+  ;
+  auto sizeY = spreadSize * totalScale.y;
+  auto color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
+  auto position = layerStyle->position->getValueAt(layerFrame);
+  strokeOption.color = color;
+  strokeOption.spreadSizeX = sizeX;
+  strokeOption.spreadSizeY = sizeY;
+  strokeOption.position = position;
+
+  if (position == StrokePosition::Center) {
+    strokeOption.spreadSizeX *= 0.4;
+    strokeOption.spreadSizeY *= 0.4;
+  } else if (position == StrokePosition::Inside) {
+    strokeOption.spreadSizeX *= 0.8;
+    strokeOption.spreadSizeY *= 0.8;
+  }
+
+  alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
 }
 
-bool StrokeFilter::initialize(tgfx::Context* context) {
-  if (!strokeFilter->initialize(context) || !strokeThickFilter->initialize(context) ||
-      !alphaEdgeDetectFilter->initialize(context)) {
+bool StrokeFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+
+  std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
+  if (strokeOption.position == StrokePosition::Outside) {
+    filter = SolidStrokeFilter::CreateFilter(strokeOption, mode, nullptr);
+  } else {
+    auto strokeFilter = SolidStrokeFilter::CreateFilter(strokeOption, mode, image);
+    if (strokeFilter == nullptr) {
+      return false;
+    }
+    auto alphaEdgeDetectFilter =
+        tgfx::ImageFilter::Runtime(std::make_shared<AlphaEdgeDetectLayerEffect>());
+    filter = tgfx::ImageFilter::Compose(alphaEdgeDetectFilter, strokeFilter);
+  }
+  if (filter == nullptr) {
     return false;
   }
+  tgfx::Paint paint;
+  paint.setImageFilter(filter);
+  paint.setAlpha(alpha);
+  canvas->drawImage(image, &paint);
   return true;
-}
-
-void StrokeFilter::update(Frame frame, const tgfx::Rect& contentBounds,
-                          const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
-  LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
-
-  strokePosition = layerStyle->position->getValueAt(layerFrame);
-  spreadSize = layerStyle->size->getValueAt(layerFrame);
-
-  strokeOption = SolidStrokeOption();
-  strokeOption.color = layerStyle->color->getValueAt(layerFrame);
-  strokeOption.opacity = layerStyle->opacity->getValueAt(layerFrame);
-  strokeOption.spreadSize = spreadSize;
-  strokeOption.position = strokePosition;
-
-  if (strokePosition == StrokePosition::Center) {
-    strokeOption.spreadSize *= 0.4;
-  } else if (strokePosition == StrokePosition::Inside) {
-    strokeOption.spreadSize *= 0.8;
-  }
-
-  auto filterBounds = contentBounds;
-  filterBounds.outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
-  filterBounds.roundOut();
-  alphaEdgeDetectFilter->update(layerFrame, contentBounds, contentBounds, filterScale);
-  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
-    strokeFilter->onUpdateOption(strokeOption);
-    strokeFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
-  } else {
-    strokeThickFilter->onUpdateOption(strokeOption);
-    strokeThickFilter->update(layerFrame, contentBounds, filterBounds, filterScale);
-  }
-}
-
-void StrokeFilter::draw(tgfx::Context* context, const FilterSource* source,
-                        const FilterTarget* target) {
-  if (source == nullptr || target == nullptr) {
-    return;
-  }
-  if (strokePosition == StrokePosition::Outside) {
-    onDrawPositionOutside(context, source, target);
-  } else {
-    onDrawPositionInsideOrCenter(context, source, target);
-  }
-}
-
-void StrokeFilter::onDrawPositionOutside(tgfx::Context* context, const FilterSource* source,
-                                         const FilterTarget* target) {
-  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
-    strokeFilter->draw(context, source, target);
-  } else {
-    strokeThickFilter->draw(context, source, target);
-  }
-}
-
-void StrokeFilter::onDrawPositionInsideOrCenter(tgfx::Context* context, const FilterSource* source,
-                                                const FilterTarget* target) {
-  auto targetWidth = source->width;
-  auto targetHeight = source->height;
-  if (alphaEdgeDetectFilterBuffer == nullptr ||
-      alphaEdgeDetectFilterBuffer->width() != targetWidth ||
-      alphaEdgeDetectFilterBuffer->height() != targetHeight) {
-    alphaEdgeDetectFilterBuffer = FilterBuffer::Make(context, targetWidth, targetHeight);
-  }
-  if (alphaEdgeDetectFilterBuffer == nullptr) {
-    return;
-  }
-
-  alphaEdgeDetectFilterBuffer->clearColor();
-  auto alphaEdgeDetectTarget = alphaEdgeDetectFilterBuffer->toFilterTarget(tgfx::Matrix::I());
-  alphaEdgeDetectFilter->draw(context, source, alphaEdgeDetectTarget.get());
-
-  auto newSource = alphaEdgeDetectFilterBuffer->toFilterSource(source->scale);
-
-  if (spreadSize < STROKE_SPREAD_MIN_THICK_SIZE) {
-    strokeFilter->onUpdateOriginalTexture(&source->sampler);
-    strokeFilter->draw(context, newSource.get(), target);
-  } else {
-    strokeThickFilter->onUpdateOriginalTexture(&source->sampler);
-    strokeThickFilter->draw(context, newSource.get(), target);
-  }
 }
 }  // namespace pag

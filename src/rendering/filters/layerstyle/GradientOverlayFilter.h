@@ -18,26 +18,28 @@
 
 #pragma once
 
-#include "pag/pag.h"
-#include "rendering/filters/FilterModifier.h"
-#include "rendering/filters/LayerFilter.h"
+#include "LayerStyleFilter.h"
 
 namespace pag {
-struct FilterList;
-
-class LayerStylesFilter : public Filter {
+class GradientOverlayFilter : public LayerStyleFilter {
  public:
-  static void TransformBounds(tgfx::Rect* bounds, const FilterList* filterList);
+  explicit GradientOverlayFilter(GradientOverlayStyle* layerStyle);
 
-  bool initialize(tgfx::Context* context) override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale,
+              const tgfx::Point& sourceScale) override;
 
-  void update(const FilterList* filterList, const tgfx::Point& filterScale);
-
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
+  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> source) override;
 
  private:
-  const FilterList* filterList = nullptr;
-  tgfx::Point filterScale = {};
+  GradientOverlayStyle* layerStyle = nullptr;
+  Enum blendMode = 0;  // BlendMode
+  Opacity opacity = 255;
+  GradientColorHandle colors = nullptr;
+  float angle = 0;
+  Enum gradStyle = 0;  // GradientFillType
+  bool reverse = false;
+  float scale = 1.0;
+  Point offset = Point::Zero();
+  tgfx::Point _filterScale = tgfx::Point::Make(1.0f, 1.0f);
 };
 }  // namespace pag

@@ -44,23 +44,22 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-AlphaEdgeDetectFilter::AlphaEdgeDetectFilter() {
-}
-
-std::string AlphaEdgeDetectFilter::onBuildFragmentShader() {
+std::string AlphaEdgeDetectLayerEffect::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-void AlphaEdgeDetectFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  horizontalStepHandle = gl->getUniformLocation(program, "mHorizontalStep");
-  verticalStepHandle = gl->getUniformLocation(program, "mVerticalStep");
+std::unique_ptr<Uniforms> AlphaEdgeDetectLayerEffect::onPrepareProgram(tgfx::Context* context,
+                                                                       unsigned program) const {
+  return std::make_unique<AlphaEdgeDetectEffectUniforms>(context, program);
 }
 
-void AlphaEdgeDetectFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                           const tgfx::Point&) {
+void AlphaEdgeDetectLayerEffect::onUpdateParams(
+    tgfx::Context* context, const RuntimeProgram* program,
+    const std::vector<tgfx::BackendTexture>& sources) const {
+  auto uniforms = static_cast<AlphaEdgeDetectEffectUniforms*>(program->uniforms.get());
   auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(horizontalStepHandle, 1.0f / contentBounds.width());
-  gl->uniform1f(verticalStepHandle, 1.0f / contentBounds.height());
+  gl->uniform1f(uniforms->horizontalStepHandle, 1.0f / sources[0].width());
+  gl->uniform1f(uniforms->verticalStepHandle, 1.0f / sources[0].height());
 }
+
 }  // namespace pag
