@@ -20,8 +20,8 @@
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Paint.h"
 
 namespace pag {
 OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle) : layerStyle(layerStyle) {
