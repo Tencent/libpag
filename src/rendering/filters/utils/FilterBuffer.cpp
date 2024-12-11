@@ -61,7 +61,6 @@ std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& sc
   filterSource->width = surface->width();
   filterSource->height = surface->height();
   filterSource->scale = scale;
-  filterSource->origin = tgfx::ImageOrigin::TopLeft;
   filterSource->textureMatrix = ToGLTextureMatrix(tgfx::Matrix::I(), surface->width(),
                                                   surface->height(), tgfx::ImageOrigin::TopLeft);
   return std::unique_ptr<FilterSource>(filterSource);

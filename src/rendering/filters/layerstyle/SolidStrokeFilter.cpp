@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SolidStrokeEffect.h"
-#include <tgfx/core/ImageFilter.h>
+#include "SolidStrokeFilter.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/utils/BlurTypes.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char SOLID_STROKE_FRAGMENT_SHADER[] = R"(
@@ -121,52 +121,52 @@ static const char SOLID_STROKE_THICK_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-std::shared_ptr<tgfx::ImageFilter> SolidStrokeEffect::CreateFilter(
+std::shared_ptr<tgfx::ImageFilter> SolidStrokeFilter::CreateFilter(
     const SolidStrokeOption& option, SolidStrokeMode mode, std::shared_ptr<tgfx::Image> source) {
   if (!option.valid()) {
     return nullptr;
   }
   std::shared_ptr<tgfx::RuntimeEffect> effect;
   if (mode == SolidStrokeMode::Normal) {
-    effect = SolidStrokeNormalEffect::Make(option, std::move(source));
+    effect = SolidStrokeNormalFilter::Make(option, std::move(source));
   } else {
-    effect = SolidStrokeThickEffect::Make(option, std::move(source));
+    effect = SolidStrokeThickFilter::Make(option, std::move(source));
   }
   return tgfx::ImageFilter::Runtime(effect);
 }
 
-std::shared_ptr<SolidStrokeNormalEffect> SolidStrokeNormalEffect::Make(
+std::shared_ptr<SolidStrokeNormalFilter> SolidStrokeNormalFilter::Make(
     SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage) {
   if (originalImage) {
-    return std::make_shared<SolidStrokeNormalEffect>(option, std::move(originalImage));
+    return std::make_shared<SolidStrokeNormalFilter>(option, std::move(originalImage));
   } else {
-    return std::make_shared<SolidStrokeNormalEffect>(option);
+    return std::make_shared<SolidStrokeNormalFilter>(option);
   }
 }
 
-std::shared_ptr<SolidStrokeThickEffect> SolidStrokeThickEffect::Make(
+std::shared_ptr<SolidStrokeThickFilter> SolidStrokeThickFilter::Make(
     SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage) {
   if (originalImage) {
-    return std::make_shared<SolidStrokeThickEffect>(option, std::move(originalImage));
+    return std::make_shared<SolidStrokeThickFilter>(option, std::move(originalImage));
   } else {
-    return std::make_shared<SolidStrokeThickEffect>(option);
+    return std::make_shared<SolidStrokeThickFilter>(option);
   }
 }
 
-std::string SolidStrokeNormalEffect::onBuildFragmentShader() const {
+std::string SolidStrokeNormalFilter::onBuildFragmentShader() const {
   return SOLID_STROKE_FRAGMENT_SHADER;
 }
 
-std::string SolidStrokeThickEffect::onBuildFragmentShader() const {
+std::string SolidStrokeThickFilter::onBuildFragmentShader() const {
   return SOLID_STROKE_THICK_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> SolidStrokeEffect::onPrepareProgram(tgfx::Context* context,
+std::unique_ptr<Uniforms> SolidStrokeFilter::onPrepareProgram(tgfx::Context* context,
                                                               unsigned program) const {
   return std::make_unique<SolidStrokeUniforms>(context, program);
 }
 
-void SolidStrokeEffect::onUpdateParams(tgfx::Context* context, const EffectProgram* program,
+void SolidStrokeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
                                        const std::vector<tgfx::BackendTexture>& sources) const {
 
   auto color = option.color;
@@ -190,7 +190,7 @@ void SolidStrokeEffect::onUpdateParams(tgfx::Context* context, const EffectProgr
   gl->uniform1f(uniforms->isInsideHandle, option.position == StrokePosition::Inside);
 }
 
-std::vector<float> SolidStrokeEffect::computeVertices(
+std::vector<float> SolidStrokeFilter::computeVertices(
     const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
     const tgfx::Point&) const {
   auto outputBounds = tgfx::Rect::MakeWH(target.width(), target.height());
@@ -220,7 +220,7 @@ std::vector<float> SolidStrokeEffect::computeVertices(
   return vertices;
 }
 
-tgfx::Rect SolidStrokeEffect::filterBounds(const tgfx::Rect& srcRect) const {
+tgfx::Rect SolidStrokeFilter::filterBounds(const tgfx::Rect& srcRect) const {
   auto desRect = srcRect.makeOutset(option.spreadSizeX, option.spreadSizeY);
   desRect.offset(option.offsetX, option.offsetY);
   return desRect;

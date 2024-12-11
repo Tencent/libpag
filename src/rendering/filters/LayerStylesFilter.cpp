@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerStylesFilter.h"
-#include <tgfx/core/Surface.h>
 #include "layerstyle/LayerStyleFilter.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* filterList) {
@@ -45,7 +45,12 @@ void LayerStylesFilter::update(const FilterList* list, const tgfx::Point& extraS
 void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
                              const FilterTarget* target) {
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto sourceImage = tgfx::Image::MakeFrom(context, backendTexture, source->origin);
+  auto sourceMatrix = ToMatrix(source->textureMatrix);
+  auto origin = tgfx::ImageOrigin::TopLeft;
+  if (!sourceMatrix.isIdentity()) {
+    origin = tgfx::ImageOrigin::BottomLeft;
+  }
+  auto sourceImage = tgfx::Image::MakeFrom(context, backendTexture, origin);
   if (sourceImage == nullptr) {
     return;
   }
@@ -57,29 +62,23 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
   }
   auto canvas = surface->getCanvas();
   canvas->concat(ToMatrix(target));
-  auto totalScale = filterScale;
-  totalScale.x *= source->scale.x;
-  totalScale.y *= source->scale.y;
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Blow) {
       auto filter = LayerStyleFilter::Make(layerStyle);
       if (filter) {
-        filter->update(filterList->layerFrame, totalScale);
+        filter->update(filterList->layerFrame, filterScale, source->scale);
         filter->draw(canvas, sourceImage);
       }
     }
   }
 
-  // The above layer style is only GradientOverlayFilter, and the GradientOverlayFilter has drawn
-  // the source with blend.
+  // The filter above source will draw the source with blend.
   bool drawSource = true;
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Above) {
       auto filter = LayerStyleFilter::Make(layerStyle);
       if (filter) {
-        // GradientOverlayFilter is scale-invariant for the source image, so we can use the filter
-        // scale directly.
-        filter->update(filterList->layerFrame, filterScale);
+        filter->update(filterList->layerFrame, filterScale, source->scale);
         filter->draw(canvas, sourceImage);
         drawSource = false;
       }
@@ -89,6 +88,5 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
   if (drawSource) {
     canvas->drawImage(sourceImage);
   }
-  context->flush();
 }
 }  // namespace pag

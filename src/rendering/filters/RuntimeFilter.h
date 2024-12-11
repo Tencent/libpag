@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <tgfx/gpu/RuntimeEffect.h>
-#include <tgfx/gpu/RuntimeProgram.h>
-#include <tgfx/gpu/opengl/GLFunctions.h>
+#include "tgfx/gpu/RuntimeEffect.h"
+#include "tgfx/gpu/RuntimeProgram.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 namespace pag {
 
 class Uniforms {
@@ -37,10 +37,10 @@ class Uniforms {
   int textureCoordHandle = -1;
 };
 
-class EffectProgram : public tgfx::RuntimeProgram {
+class RuntimeProgram : public tgfx::RuntimeProgram {
  public:
-  static std::unique_ptr<EffectProgram> Make(tgfx::Context* context, const std::string& vertex,
-                                             const std::string& fragment);
+  static std::unique_ptr<RuntimeProgram> Make(tgfx::Context* context, const std::string& vertex,
+                                              const std::string& fragment);
 
   unsigned program = 0;
   unsigned int vertexArray = 0;
@@ -52,14 +52,14 @@ class EffectProgram : public tgfx::RuntimeProgram {
   void onReleaseGPU() override;
 
  private:
-  explicit EffectProgram(tgfx::Context* context) : RuntimeProgram(context) {
+  explicit RuntimeProgram(tgfx::Context* context) : tgfx::RuntimeProgram(context) {
   }
 };
 
-class FilterEffect : public tgfx::RuntimeEffect {
+class RuntimeFilter : public tgfx::RuntimeEffect {
  public:
-  explicit FilterEffect(tgfx::UniqueType type,
-                        const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
+  explicit RuntimeFilter(tgfx::UniqueType type,
+                         const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
       : RuntimeEffect(std::move(type), extraInputs) {
   }
 
@@ -79,7 +79,7 @@ class FilterEffect : public tgfx::RuntimeEffect {
   /**
    * filter的给shader上传数据接口
    */
-  virtual void onUpdateParams(tgfx::Context* context, const EffectProgram* program,
+  virtual void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
                               const std::vector<tgfx::BackendTexture>& sources) const;
 
   /**
@@ -94,7 +94,7 @@ class FilterEffect : public tgfx::RuntimeEffect {
                                              const tgfx::BackendRenderTarget& target,
                                              const tgfx::Point& offset) const;
 
-  void bindVertices(tgfx::Context* context, const EffectProgram* program,
+  void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
                     const std::vector<float>& points) const;
 };
 

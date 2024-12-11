@@ -17,24 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OuterGlowFilter.h"
-#include <tgfx/core/Recorder.h>
 #include "base/utils/TGFXCast.h"
-#include "rendering/filters/effects/SolidStrokeEffect.h"
+#include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Paint.h"
 
 namespace pag {
 OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle) : layerStyle(layerStyle) {
 }
 
-void OuterGlowFilter::update(Frame layerFrame, const tgfx::Point& filterScale) {
+void OuterGlowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
+                             const tgfx::Point& sourceScale) {
+  auto totalScale = tgfx::Point::Make(filterScale.x * sourceScale.x, filterScale.y * sourceScale.y);
   spread = layerStyle->spread->getValueAt(layerFrame);
   spread *= (spread == 1.f) ? 1.f : 0.8f;
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
-  sizeX = size * filterScale.x;
-  sizeY = size * filterScale.y;
+  sizeX = size * totalScale.x;
+  sizeY = size * totalScale.y;
   mode = size < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick;
   range = layerStyle->range->getValueAt(layerFrame);
 }
@@ -71,7 +73,7 @@ std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getStrokeFilter() const {
   strokeOption.color = color;
   strokeOption.spreadSizeX = spread * sizeX / range;
   strokeOption.spreadSizeY = spread * sizeY / range;
-  return SolidStrokeEffect::CreateFilter(strokeOption, mode);
+  return SolidStrokeFilter::CreateFilter(strokeOption, mode);
 }
 
 std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getDropShadowFilter() const {

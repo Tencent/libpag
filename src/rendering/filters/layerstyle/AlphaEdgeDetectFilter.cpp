@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlphaEdgeDetectEffect.h"
+#include "AlphaEdgeDetectFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -54,7 +54,7 @@ std::unique_ptr<Uniforms> AlphaEdgeDetectLayerEffect::onPrepareProgram(tgfx::Con
 }
 
 void AlphaEdgeDetectLayerEffect::onUpdateParams(
-    tgfx::Context* context, const EffectProgram* program,
+    tgfx::Context* context, const RuntimeProgram* program,
     const std::vector<tgfx::BackendTexture>& sources) const {
   auto uniforms = static_cast<AlphaEdgeDetectEffectUniforms*>(program->uniforms.get());
   auto gl = tgfx::GLFunctions::Get(context);

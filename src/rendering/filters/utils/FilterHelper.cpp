@@ -49,6 +49,9 @@ std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int
 
 std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
                                        tgfx::ImageOrigin origin) {
+  if (matrix.isIdentity() && origin == tgfx::ImageOrigin::TopLeft) {
+    return ToGLMatrix(matrix);
+  }
   auto result = matrix;
   tgfx::Matrix convertMatrix = {};
   convertMatrix.setScale(static_cast<float>(width), static_cast<float>(height));
@@ -97,7 +100,6 @@ std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& backend
   filterSource->width = backendTexture.width();
   filterSource->height = backendTexture.height();
   filterSource->scale = scale;
-  filterSource->origin = origin;
   filterSource->textureMatrix =
       ToGLTextureMatrix(tgfx::Matrix::I(), backendTexture.width(), backendTexture.height(), origin);
   return std::unique_ptr<FilterSource>(filterSource);

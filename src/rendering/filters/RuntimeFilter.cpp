@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FilterEffect.h"
+#include "RuntimeFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "tgfx/core/Canvas.h"
 
@@ -44,15 +44,15 @@ static constexpr char FRAGMENT_SHADER[] = R"(
     }
 )";
 
-std::unique_ptr<EffectProgram> EffectProgram::Make(tgfx::Context* context,
-                                                   const std::string& vertex,
-                                                   const std::string& fragment) {
+std::unique_ptr<RuntimeProgram> RuntimeProgram::Make(tgfx::Context* context,
+                                                     const std::string& vertex,
+                                                     const std::string& fragment) {
   auto gl = tgfx::GLFunctions::Get(context);
   auto program = CreateGLProgram(context, vertex, fragment);
   if (program == 0) {
     return nullptr;
   }
-  auto filterProgram = std::unique_ptr<EffectProgram>(new EffectProgram(context));
+  auto filterProgram = std::unique_ptr<RuntimeProgram>(new RuntimeProgram(context));
   filterProgram->program = program;
   if (gl->bindVertexArray != nullptr) {
     gl->genVertexArrays(1, &filterProgram->vertexArray);
@@ -61,7 +61,7 @@ std::unique_ptr<EffectProgram> EffectProgram::Make(tgfx::Context* context,
   return filterProgram;
 }
 
-void EffectProgram::onReleaseGPU() {
+void RuntimeProgram::onReleaseGPU() {
   auto gl = tgfx::GLFunctions::Get(getContext());
   if (program > 0) {
     gl->deleteProgram(program);
@@ -77,13 +77,13 @@ void EffectProgram::onReleaseGPU() {
   }
 }
 
-std::unique_ptr<tgfx::RuntimeProgram> FilterEffect::onCreateProgram(tgfx::Context* context) const {
+std::unique_ptr<tgfx::RuntimeProgram> RuntimeFilter::onCreateProgram(tgfx::Context* context) const {
   // 防止前面产生的GLError，导致后面CheckGLError逻辑返回错误结果
   CheckGLError(context);
 
   auto vertex = onBuildVertexShader();
   auto fragment = onBuildFragmentShader();
-  auto filterProgram = EffectProgram::Make(context, vertex, fragment);
+  auto filterProgram = RuntimeProgram::Make(context, vertex, fragment);
   if (filterProgram == nullptr) {
     return nullptr;
   }
@@ -94,21 +94,21 @@ std::unique_ptr<tgfx::RuntimeProgram> FilterEffect::onCreateProgram(tgfx::Contex
   return filterProgram;
 }
 
-std::string FilterEffect::onBuildVertexShader() const {
+std::string RuntimeFilter::onBuildVertexShader() const {
   return VERTEX_SHADER;
 }
 
-std::string FilterEffect::onBuildFragmentShader() const {
+std::string RuntimeFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> FilterEffect::onPrepareProgram(tgfx::Context* context,
-                                                         unsigned program) const {
+std::unique_ptr<Uniforms> RuntimeFilter::onPrepareProgram(tgfx::Context* context,
+                                                          unsigned program) const {
   return std::make_unique<Uniforms>(context, program);
 }
 
-void FilterEffect::onUpdateParams(tgfx::Context*, const EffectProgram*,
-                                  const std::vector<tgfx::BackendTexture>&) const {
+void RuntimeFilter::onUpdateParams(tgfx::Context*, const RuntimeProgram*,
+                                   const std::vector<tgfx::BackendTexture>&) const {
 }
 
 static void EnableMultisample(tgfx::Context* context, bool usesMSAA) {
@@ -125,10 +125,10 @@ static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
   }
 }
 
-bool FilterEffect::onDraw(const tgfx::RuntimeProgram* program,
-                          const std::vector<tgfx::BackendTexture>& sources,
-                          const tgfx::BackendRenderTarget& target,
-                          const tgfx::Point& offset) const {
+bool RuntimeFilter::onDraw(const tgfx::RuntimeProgram* program,
+                           const std::vector<tgfx::BackendTexture>& sources,
+                           const tgfx::BackendRenderTarget& target,
+                           const tgfx::Point& offset) const {
   if (sources.empty() || !target.isValid() || program == nullptr ||
       sources[0].backend() != tgfx::Backend::OPENGL || target.backend() != tgfx::Backend::OPENGL) {
     LOGE(
@@ -144,7 +144,7 @@ bool FilterEffect::onDraw(const tgfx::RuntimeProgram* program,
   auto needsMSAA = sampleCount() > 1;
   EnableMultisample(context, needsMSAA);
   auto gl = tgfx::GLFunctions::Get(context);
-  auto filterProgram = static_cast<const EffectProgram*>(program);
+  auto filterProgram = static_cast<const RuntimeProgram*>(program);
   gl->useProgram(filterProgram->program);
   gl->disable(GL_SCISSOR_TEST);
   gl->enable(GL_BLEND);
@@ -168,9 +168,9 @@ bool FilterEffect::onDraw(const tgfx::RuntimeProgram* program,
   return CheckGLError(context);
 }
 
-std::vector<float> FilterEffect::computeVertices(const std::vector<tgfx::BackendTexture>& sources,
-                                                 const tgfx::BackendRenderTarget& target,
-                                                 const tgfx::Point& offset) const {
+std::vector<float> RuntimeFilter::computeVertices(const std::vector<tgfx::BackendTexture>& sources,
+                                                  const tgfx::BackendRenderTarget& target,
+                                                  const tgfx::Point& offset) const {
   std::vector<float> vertices = {};
   auto textureWidth = static_cast<float>(sources[0].width());
   auto textureHeight = static_cast<float>(sources[0].height());
@@ -196,8 +196,8 @@ std::vector<float> FilterEffect::computeVertices(const std::vector<tgfx::Backend
   return vertices;
 }
 
-void FilterEffect::bindVertices(tgfx::Context* context, const EffectProgram* filterProgram,
-                                const std::vector<float>& points) const {
+void RuntimeFilter::bindVertices(tgfx::Context* context, const RuntimeProgram* filterProgram,
+                                 const std::vector<float>& points) const {
 
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = filterProgram->uniforms.get();

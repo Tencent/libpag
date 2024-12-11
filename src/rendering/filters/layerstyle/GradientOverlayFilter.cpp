@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientOverlayFilter.h"
-#include <tgfx/core/Recorder.h>
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/graphics/GradientPaint.h"
@@ -28,7 +27,8 @@ GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
     : layerStyle(layerStyle) {
 }
 
-void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point& filterScale) {
+void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
+                                   const tgfx::Point&) {
   opacity = layerStyle->opacity->getValueAt(layerFrame);
   colors = layerStyle->colors->getValueAt(layerFrame);
   angle = layerStyle->angle->getValueAt(layerFrame);

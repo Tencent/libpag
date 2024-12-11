@@ -470,9 +470,10 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   // 必须要flush，要不然framebuffer还没真正画到canvas，就被其他图层的filter串改了该framebuffer
   context->flush();
   ApplyFilters(context, filterNodes, contentBounds, filterSource.get(), filterTarget.get());
+  // contentSurface在函数结束时析构，防止filter仍然使用contentSurface，需要在最后flush一下
+  context->flush();
   // Reset the GL states stored in the context, they may be modified during the filter being applied.
   context->resetState();
-
   if (targetSurface) {
     tgfx::Matrix drawingMatrix = {};
     auto targetCanvas = targetSurface->getCanvas();

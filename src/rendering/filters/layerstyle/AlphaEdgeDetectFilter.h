@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "FilterEffect.h"
 #include "rendering/filters/LayerFilter.h"
+#include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
 
@@ -35,10 +35,10 @@ class AlphaEdgeDetectEffectUniforms : public Uniforms {
   int verticalStepHandle = -1;
 };
 
-class AlphaEdgeDetectLayerEffect : public FilterEffect {
+class AlphaEdgeDetectLayerEffect : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE;
-  explicit AlphaEdgeDetectLayerEffect() : FilterEffect(Type()) {
+  explicit AlphaEdgeDetectLayerEffect() : RuntimeFilter(Type()) {
   }
 
   std::string onBuildFragmentShader() const override;
@@ -46,7 +46,7 @@ class AlphaEdgeDetectLayerEffect : public FilterEffect {
   std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
                                              unsigned program) const override;
 
-  void onUpdateParams(tgfx::Context* context, const EffectProgram* program,
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
                       const std::vector<tgfx::BackendTexture>& sources) const override;
 };
 

@@ -31,7 +31,8 @@ class LayerStyleFilter {
 
   static std::unique_ptr<LayerStyleFilter> Make(LayerStyle* layerStyle);
 
-  virtual void update(Frame layerFrame, const tgfx::Point& filterScale) = 0;
+  virtual void update(Frame layerFrame, const tgfx::Point& filterScale,
+                      const tgfx::Point& sourceScale) = 0;
 
   virtual bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) = 0;
 };

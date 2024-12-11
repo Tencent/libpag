@@ -17,24 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeFilter.h"
-#include <tgfx/core/Canvas.h>
-#include <tgfx/core/ImageFilter.h>
-#include <tgfx/core/Paint.h>
-#include "rendering/filters/effects/AlphaEdgeDetectEffect.h"
-#include "rendering/filters/effects/SolidStrokeEffect.h"
+#include "rendering/filters/layerstyle/AlphaEdgeDetectFilter.h"
+#include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Paint.h"
 
 namespace pag {
 StrokeFilter::StrokeFilter(StrokeStyle* layerStyle) : layerStyle(layerStyle) {
 }
 
-void StrokeFilter::update(Frame layerFrame, const tgfx::Point& filterScale) {
+void StrokeFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
+                          const tgfx::Point& sourceScale) {
+  auto totalScale = tgfx::Point::Make(filterScale.x * sourceScale.x, filterScale.y * sourceScale.y);
   strokeOption = SolidStrokeOption();
   auto spreadSize = layerStyle->size->getValueAt(layerFrame);
   mode =
       spreadSize < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal : SolidStrokeMode::Thick;
-  auto sizeX = spreadSize * filterScale.x;
-  auto sizeY = spreadSize * filterScale.y;
+  auto sizeX = spreadSize * totalScale.x;
+  ;
+  auto sizeY = spreadSize * totalScale.y;
   auto color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto position = layerStyle->position->getValueAt(layerFrame);
   strokeOption.color = color;
@@ -57,9 +60,9 @@ bool StrokeFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image
 
   std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (strokeOption.position == StrokePosition::Outside) {
-    filter = SolidStrokeEffect::CreateFilter(strokeOption, mode, nullptr);
+    filter = SolidStrokeFilter::CreateFilter(strokeOption, mode, nullptr);
   } else {
-    auto strokeFilter = SolidStrokeEffect::CreateFilter(strokeOption, mode, image);
+    auto strokeFilter = SolidStrokeFilter::CreateFilter(strokeOption, mode, image);
     if (strokeFilter == nullptr) {
       return false;
     }

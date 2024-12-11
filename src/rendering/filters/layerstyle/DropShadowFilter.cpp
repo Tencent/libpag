@@ -17,34 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DropShadowFilter.h"
-#include <tgfx/core/Canvas.h>
-#include <tgfx/core/ImageFilter.h>
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
-#include "rendering/filters/effects/SolidStrokeEffect.h"
+#include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {
 }
 
-void DropShadowFilter::update(Frame layerFrame, const tgfx::Point& filterScale) {
+void DropShadowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
+                              const tgfx::Point& sourceScale) {
+  auto totalScale = tgfx::Point::Make(filterScale.x * sourceScale.x, filterScale.y * sourceScale.y);
   spread = layerStyle->spread->getValueAt(layerFrame);
   spread *= (spread == 1.f) ? 1.f : 0.8f;
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
-  sizeX = size * filterScale.x;
-  sizeY = size * filterScale.y;
+  sizeX = size * totalScale.x;
+  sizeY = size * totalScale.y;
   mode = size * spread < STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Normal
                                                       : SolidStrokeMode::Thick;
   auto distance = layerStyle->distance->getValueAt(layerFrame);
   if (distance > 0.f) {
     auto angle = layerStyle->angle->getValueAt(layerFrame);
     auto radians = DegreesToRadians(angle - 180.f);
-    offsetX = cosf(radians) * distance * filterScale.x;
-    offsetY = -sinf(radians) * distance * filterScale.y;
+    offsetX = cosf(radians) * distance * totalScale.x;
+    offsetY = -sinf(radians) * distance * totalScale.y;
   } else {
     offsetX = 0.f;
     offsetY = 0.f;
@@ -85,7 +87,7 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getStrokeFilter() const {
   strokeOption.spreadSizeY = sizeY * spread;
   strokeOption.offsetX = offsetX;
   strokeOption.offsetY = offsetY;
-  return SolidStrokeEffect::CreateFilter(strokeOption, mode);
+  return SolidStrokeFilter::CreateFilter(strokeOption, mode);
 }
 
 std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getDropShadowFilter() const {

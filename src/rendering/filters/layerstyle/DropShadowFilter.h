@@ -19,7 +19,7 @@
 #pragma once
 
 #include "LayerStyleFilter.h"
-#include "rendering/filters/effects/SolidStrokeEffect.h"
+#include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 
 namespace pag {
 class DropShadowFilter : public LayerStyleFilter {
@@ -30,7 +30,8 @@ class DropShadowFilter : public LayerStyleFilter {
 
   DropShadowFilter(DropShadowFilter&&) = delete;
 
-  void update(Frame layerFrame, const tgfx::Point& filterScale) override;
+  void update(Frame layerFrame, const tgfx::Point& filterScale,
+              const tgfx::Point& sourceScale) override;
 
   bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
