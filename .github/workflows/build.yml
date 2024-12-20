@@ -15,19 +15,6 @@ jobs:
         with:
           lfs: true
 
-      - name: Get Environment Cache
-        id: environment-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-          key: libpag-environment-ios-20231129
-          restore-keys: libpag-environment-ios-
-
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -36,6 +23,10 @@ jobs:
             third_party
           key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ios-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
 
       - name: Install Build Tools
         run: |
@@ -56,18 +47,6 @@ jobs:
           node gen_ios
           xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
-      - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-          key: libpag-environment-ios-20231129
-
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
@@ -78,7 +57,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ios_build
           path: ios
@@ -107,13 +86,6 @@ jobs:
 
       - uses: seanmiddleditch/gha-setup-ninja@master
 
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r19c
-          link-to-sdk: true
-          local-cache: true
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -136,7 +108,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android_build
           path: android
@@ -216,7 +188,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web_build
           path: |
@@ -262,7 +234,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: win_build
           path: out
@@ -292,6 +264,11 @@ jobs:
           depsync
         shell: bash
 
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libx11-dev
+          version: 1.0
+
       - name: Build Linux
         run: |
           mkdir -p third_party/tgfx/out/cache
@@ -310,7 +287,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_build
           path: linux
@@ -341,11 +318,11 @@ jobs:
         shell: bash
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           host: 'linux'
           target: 'desktop'
-          version: '6.6.1'
+          version: '6.8.1'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
           cache: 'true'
@@ -366,7 +343,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: qt_build
           path: out

@@ -105,7 +105,9 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
     return;
   }
   auto queue = makeSequenceImageQueue(info);
-  queue->prepareNextImage();
+  if (queue) {
+    queue->prepareNextImage();
+  }
 }
 
 void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {

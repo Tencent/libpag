@@ -806,7 +806,7 @@ void RenderElements(const std::vector<ShapeElement*>& list, const tgfx::Matrix& 
   }
 }
 
-std::unique_ptr<tgfx::PathEffect> CreateDashEffect(const std::vector<float>& dashes,
+std::shared_ptr<tgfx::PathEffect> CreateDashEffect(const std::vector<float>& dashes,
                                                    float dashOffset) {
   auto dashCount = dashes.size();
   auto size = static_cast<int>(dashCount);
