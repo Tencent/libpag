@@ -15,19 +15,6 @@ jobs:
         with:
           lfs: true
 
-      - name: Get Environment Cache
-        id: environment-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-          key: libpag-environment-ios-20231129
-          restore-keys: libpag-environment-ios-
-
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -36,6 +23,10 @@ jobs:
             third_party
           key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ios-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
 
       - name: Install Build Tools
         run: |
@@ -55,18 +46,6 @@ jobs:
           cd ios
           node gen_ios
           xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
-
-      - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-          key: libpag-environment-ios-20231129
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
