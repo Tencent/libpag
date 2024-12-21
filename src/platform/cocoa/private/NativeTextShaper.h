@@ -19,13 +19,13 @@
 #pragma once
 
 #include <optional>
-#include "rendering/utils/shaper/PositionedGlyphs.h"
+#include "rendering/utils/shaper/ShapedGlyph.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
 class NativeTextShaper {
  public:
-  static std::optional<PositionedGlyphs> Shape(const std::string& text,
-                                               const std::shared_ptr<tgfx::Typeface>& typeface);
+  static std::vector<ShapedGlyph> Shape(const std::string& text,
+                                        std::shared_ptr<tgfx::Typeface> typeface);
 };
 }  // namespace pag

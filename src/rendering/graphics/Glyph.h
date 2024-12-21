@@ -67,8 +67,8 @@ class Glyph {
   /**
    * Returns the id of this glyph in associated typeface.
    */
-  tgfx::GlyphID getGlyphID() const {
-    return _glyphId;
+  const std::vector<tgfx::GlyphID>& getGlyphIDs() const {
+    return _glyphIDs;
   }
 
   /**
@@ -250,7 +250,7 @@ class Glyph {
   };
 
   // read only attributes:
-  tgfx::GlyphID _glyphId = 0;
+  std::vector<tgfx::GlyphID> _glyphIDs = {};
   std::string _name;
   tgfx::Font _font;
   bool _isVertical = false;
@@ -268,7 +268,7 @@ class Glyph {
   std::shared_ptr<Info> verticalInfo;
   const Info* info = horizontalInfo.get();
 
-  Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
+  Glyph(std::vector<tgfx::GlyphID> glyphIDs, std::string name, tgfx::Font font, bool isVertical,
         const TextPaint& textPaint);
 };
 }  // namespace pag

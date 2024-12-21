@@ -36,9 +36,9 @@ NALUType Platform::naluType() const {
 void Platform::traceImage(const tgfx::ImageInfo&, const void*, const std::string&) const {
 }
 
-std::optional<PositionedGlyphs> Platform::shapeText(const std::string&,
-                                                    const std::shared_ptr<tgfx::Typeface>&) const {
-  return std::nullopt;
+std::vector<ShapedGlyph> Platform::shapeText(const std::string&,
+                                             std::shared_ptr<tgfx::Typeface>) const {
+  return {};
 }
 
 std::string Platform::getCacheDir() const {

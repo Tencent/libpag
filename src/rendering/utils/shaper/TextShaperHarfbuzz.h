@@ -20,13 +20,14 @@
 
 #ifdef PAG_USE_HARFBUZZ
 
-#include "PositionedGlyphs.h"
+#include "ShapedGlyph.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
 class TextShaperHarfbuzz {
  public:
-  static PositionedGlyphs Shape(const std::string& text, std::shared_ptr<tgfx::Typeface> typeface);
+  static std::vector<ShapedGlyph> Shape(const std::string& text,
+                                        std::shared_ptr<tgfx::Typeface> typeface);
 
   static void PurgeCaches();
 };

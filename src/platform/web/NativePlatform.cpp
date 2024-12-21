@@ -65,15 +65,9 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   traceImage(info, bytes, tag);
 }
 
-std::optional<PositionedGlyphs> NativePlatform::shapeText(
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-#ifdef PAG_USE_HARBUZZ
-  USE(text);
-  USE(typeface);
-  return std::nullopt;
-#else
+std::vector<ShapedGlyph> NativePlatform::shapeText(const std::string& text,
+                                                   std::shared_ptr<tgfx::Typeface> typeface) const {
   return NativeTextShaper::Shape(text, typeface);
-#endif
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {

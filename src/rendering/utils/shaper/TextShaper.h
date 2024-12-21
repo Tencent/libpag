@@ -18,14 +18,24 @@
 
 #pragma once
 
-#include "PositionedGlyphs.h"
+#include "ShapedGlyph.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
+/**
+ * TextShaper is a utility class for shaping text.
+ */
 class TextShaper {
  public:
-  static PositionedGlyphs Shape(const std::string& text, std::shared_ptr<tgfx::Typeface> typeface);
+  /**
+   * Shapes the given text using the specified typeface.
+   */
+  static std::vector<ShapedGlyph> Shape(const std::string& text,
+                                        std::shared_ptr<tgfx::Typeface> typeface);
 
+  /**
+   * Purges the caches used by the text shaper.
+   */
   static void PurgeCaches();
 };
 }  // namespace pag

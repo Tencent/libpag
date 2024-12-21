@@ -202,8 +202,10 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, int
       pack.reset();
       point = pack.addRect(width, height);
     }
-    textRun->glyphIDs.push_back(glyph->getGlyphID());
-    textRun->positions.push_back({-bounds.x() + point.x, -bounds.y() + point.y});
+    for (auto& glyphID : glyph->getGlyphIDs()) {
+      textRun->glyphIDs.push_back(glyphID);
+      textRun->positions.push_back({-bounds.x() + point.x, -bounds.y() + point.y});
+    }
     AtlasLocator locator;
     locator.imageIndex = pages.size();
     locator.location = tgfx::Rect::MakeXYWH(point.x, point.y, static_cast<float>(width),

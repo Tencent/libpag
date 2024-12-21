@@ -94,21 +94,20 @@ static void MergeClusters(std::vector<Info>& infos) {
   }
 }
 
-PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
-                                         const std::shared_ptr<tgfx::Typeface>& typeface) {
-  std::vector<Info> infos;
-  const char* textStart = text.data();
-  const char* textStop = textStart + text.size();
+std::vector<ShapedGlyph> NativeTextShaper::Shape(const std::string& text,
+                                                 std::shared_ptr<tgfx::Typeface> typeface) {
+  std::vector<Info> infos = {};
+  auto textStart = text.data();
+  auto textStop = textStart + text.size();
   while (textStart < textStop) {
     auto cluster = static_cast<uint32_t>(textStart - text.data());
     infos.emplace_back(Info{tgfx::UTF::NextUTF8(&textStart, textStop), cluster});
   }
 
   CheckContinuations(infos);
-
   MergeClusters(infos);
 
-  std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs;
+  std::vector<ShapedGlyph> glyphs = {};
   auto fallbackTypefaces = FontManager::GetFallbackTypefaces();
   for (size_t i = 0; i < infos.size(); ++i) {
     auto length = (i + 1 == infos.size() ? text.length() : infos[i + 1].cluster) - infos[i].cluster;
@@ -130,6 +129,6 @@ PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
       glyphs.emplace_back(typeface, typeface->getGlyphID(str), infos[i].cluster);
     }
   }
-  return PositionedGlyphs(glyphs);
+  return glyphs;
 }
 }  // namespace pag
