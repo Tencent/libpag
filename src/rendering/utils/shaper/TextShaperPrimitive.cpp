@@ -21,11 +21,11 @@
 #include "tgfx/core/UTF.h"
 
 namespace pag {
-PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
-                                            std::shared_ptr<tgfx::Typeface> typeface) {
+std::vector<ShapedGlyph> TextShaperPrimitive::Shape(const std::string& text,
+                                                    std::shared_ptr<tgfx::Typeface> typeface) {
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
-  std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs;
+  std::vector<ShapedGlyph> glyphs = {};
   auto fallbackTypefaces = FontManager::GetFallbackTypefaces();
   while (textStart < textStop) {
     auto oldPosition = textStart;
@@ -49,6 +49,6 @@ PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
       glyphs.emplace_back(typeface, glyphID, oldPosition - text.data());
     }
   }
-  return PositionedGlyphs(glyphs);
+  return glyphs;
 }
 }  // namespace pag
