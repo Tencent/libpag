@@ -25,7 +25,7 @@
 #include <unordered_map>
 #include "codec/NALUType.h"
 #include "rendering/utils/DisplayLink.h"
-#include "rendering/utils/shaper/PositionedGlyphs.h"
+#include "rendering/utils/shaper/ShapedGlyph.h"
 #include "rendering/video/VideoDecoderFactory.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
@@ -76,8 +76,8 @@ class Platform {
   /**
     * Returns the shaped glyphs of the given text and typeface.
     */
-  virtual std::optional<PositionedGlyphs> shapeText(
-      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const;
+  virtual std::vector<ShapedGlyph> shapeText(const std::string& text,
+                                             std::shared_ptr<tgfx::Typeface> typeface) const;
 
   /**
    * Returns the corresponding sandbox path from the absolute file path, which usually starts with

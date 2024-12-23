@@ -18,13 +18,9 @@
 
 #include "CocoaPlatform.h"
 #import <Foundation/Foundation.h>
+#include "NativeTextShaper.h"
 #include "TraceImage.h"
 #include "pag/pag.h"
-#ifdef PAG_USE_HARFBUZZ
-#include "base/utils/USE.h"
-#else
-#include "NativeTextShaper.h"
-#endif
 
 namespace pag {
 bool CocoaPlatform::registerFallbackFonts() const {
@@ -69,15 +65,9 @@ std::string CocoaPlatform::getCacheDir() const {
   return [cachePath UTF8String];
 }
 
-std::optional<PositionedGlyphs> CocoaPlatform::shapeText(
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-#ifdef PAG_USE_HARFBUZZ
-  USE(text);
-  USE(typeface);
-  return std::nullopt;
-#else
-  return NativeTextShaper::Shape(text, typeface);
-#endif
+std::vector<ShapedGlyph> CocoaPlatform::shapeText(const std::string& text,
+                                                  std::shared_ptr<tgfx::Typeface> typeface) const {
+  return NativeTextShaper::Shape(text, std::move(typeface));
 }
 
 }  // namespace pag

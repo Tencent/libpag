@@ -8,6 +8,8 @@ process.argv.push("-o");
 process.argv.push("../src");
 process.argv.push("-p");
 process.argv.push("web");
+process.argv.push("-a");
+process.argv.push("wasm");
 process.argv.push("pag");
 require("../../build_pag");
 
