@@ -307,9 +307,7 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   clock.mark("presenting");
   renderCache->renderingTime = clock.measure("", "rendering");
   renderCache->presentingTime = clock.measure("rendering", "presenting");
-  auto knownTime = renderCache->imageDecodingTime + renderCache->textureUploadingTime +
-                   renderCache->programCompilingTime + renderCache->hardwareDecodingTime +
-                   renderCache->softwareDecodingTime;
+  auto knownTime = renderCache->textureUploadingTime + renderCache->programCompilingTime;
   renderCache->presentingTime -= knownTime;
   renderCache->totalTime = clock.measure("", "presenting");
   //  auto composition = stage->getRootComposition();
@@ -391,12 +389,13 @@ int64_t PAGPlayer::renderingTime() {
   LockGuard autoLock(rootLocker);
   // TODO(domrjchen): update the performance monitoring panel of PAGViewer to display the new
   // properties
-  return renderCache->totalTime - renderCache->presentingTime - renderCache->imageDecodingTime;
+  return renderCache->totalTime - renderCache->presentingTime;
 }
 
 int64_t PAGPlayer::imageDecodingTime() {
   LockGuard autoLock(rootLocker);
-  return renderCache->imageDecodingTime;
+  return renderCache->imageDecodingTime + renderCache->hardwareDecodingTime +
+         renderCache->softwareDecodingTime;
 }
 
 int64_t PAGPlayer::presentingTime() {
