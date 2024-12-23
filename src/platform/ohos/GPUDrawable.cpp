@@ -37,6 +37,7 @@ GPUDrawable::GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext)
 }
 
 GPUDrawable::~GPUDrawable() {
+  OH_NativeWindow_DestroyNativeWindow(nativeWindow);
 }
 
 void GPUDrawable::updateSize() {
