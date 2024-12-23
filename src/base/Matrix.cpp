@@ -85,7 +85,7 @@ void Matrix::setAll(float scaleX, float skewX, float transX, float skewY, float 
 }
 
 void Matrix::setAffine(float a, float b, float c, float d, float tx, float ty) {
-  ToTGFX(this)->setAffine(a, b, c, d, tx, ty);
+  ToTGFX(this)->setAll(a, c, tx, b, d, ty);
 }
 
 void Matrix::setTranslate(float dx, float dy) {

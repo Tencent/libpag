@@ -17,26 +17,6 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Get Environment Cache
-        id: environment-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-            /usr/local/Cellar/gcovr
-            /usr/local/bin/gcovr
-            /usr/local/Cellar/python-lxml
-            /usr/local/Cellar/python-markupsafe
-            /usr/local/lib/python3.12/site-packages/gcovr
-            /usr/local/lib/python3.12/site-packages/lxml
-            /usr/local/lib/python3.12/site-packages/markupsafe
-          key: libpag-environment-autotest-202311129
-          restore-keys: libpag-environment-autotest-
-
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -46,6 +26,10 @@ jobs:
             test/baseline/.cache
           key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-autotest-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm gcovr
 
       - name: Run depsync
         run: |
@@ -76,25 +60,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: result/coverage.xml
           version: 'v0.7.3'
-
-      - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-            /usr/local/Cellar/gcovr
-            /usr/local/bin/gcovr
-            /usr/local/Cellar/python-lxml
-            /usr/local/Cellar/python-markupsafe
-            /usr/local/lib/python3.12/site-packages/gcovr
-            /usr/local/lib/python3.12/site-packages/lxml
-            /usr/local/lib/python3.12/site-packages/markupsafe
-          key: libpag-environment-autotest-202311129
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
