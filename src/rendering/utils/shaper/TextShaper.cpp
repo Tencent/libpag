@@ -25,17 +25,20 @@
 #endif
 
 namespace pag {
-PositionedGlyphs TextShaper::Shape(const std::string& text,
-                                   std::shared_ptr<tgfx::Typeface> typeface) {
+std::vector<ShapedGlyph> TextShaper::Shape(const std::string& text,
+                                           std::shared_ptr<tgfx::Typeface> typeface) {
   if (text.empty()) {
     return {};
   }
 #ifdef PAG_USE_HARFBUZZ
   return TextShaperHarfbuzz::Shape(text, std::move(typeface));
 #else
-  if (auto ret = Platform::Current()->shapeText(text, typeface)) {
-    return *ret;
+#ifndef TGFX_USE_FREETYPE
+  auto glyphs = Platform::Current()->shapeText(text, typeface);
+  if (!glyphs.empty()) {
+    return glyphs;
   }
+#endif
   return TextShaperPrimitive::Shape(text, std::move(typeface));
 #endif
 }

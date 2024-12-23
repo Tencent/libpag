@@ -232,28 +232,28 @@ static bool Shape(std::list<HBGlyph>& glyphs, std::shared_ptr<tgfx::Typeface> ty
   return allShaped;
 }
 
-PositionedGlyphs TextShaperHarfbuzz::Shape(const std::string& text,
-                                           std::shared_ptr<tgfx::Typeface> face) {
-  std::list<HBGlyph> glyphs;
-  glyphs.emplace_back(HBGlyph{text, {}, 0, nullptr});
+std::vector<ShapedGlyph> TextShaperHarfbuzz::Shape(const std::string& text,
+                                                   std::shared_ptr<tgfx::Typeface> face) {
+  std::list<HBGlyph> hbGlyphs = {};
+  hbGlyphs.emplace_back(HBGlyph{text, {}, 0, nullptr});
   bool allShaped = false;
   if (face && !face->fontFamily().empty()) {
-    allShaped = ::pag::Shape(glyphs, std::move(face));
+    allShaped = ::pag::Shape(hbGlyphs, std::move(face));
   }
   if (!allShaped) {
     auto typefaces = FontManager::GetFallbackTypefaces();
     for (const auto& faceHolder : typefaces) {
       auto typeface = faceHolder->getTypeface();
-      if (typeface && ::pag::Shape(glyphs, std::move(typeface))) {
+      if (typeface && ::pag::Shape(hbGlyphs, std::move(typeface))) {
         break;
       }
     }
   }
-  std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphIDs;
-  for (const auto& glyph : glyphs) {
-    glyphIDs.emplace_back(glyph.typeface, glyph.glyphID, glyph.stringIndex);
+  std::vector<ShapedGlyph> glyphs = {};
+  for (const auto& hbGlyph : hbGlyphs) {
+    glyphs.emplace_back(hbGlyph.typeface, hbGlyph.glyphID, hbGlyph.stringIndex);
   }
-  return PositionedGlyphs(std::move(glyphIDs));
+  return glyphs;
 }
 
 void TextShaperHarfbuzz::PurgeCaches() {

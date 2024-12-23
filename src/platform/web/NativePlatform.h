@@ -26,8 +26,8 @@ class NativePlatform : public Platform {
   void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                   const std::string& tag) const override;
 
-  std::optional<PositionedGlyphs> shapeText(
-      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
+  std::vector<ShapedGlyph> shapeText(const std::string& text,
+                                     std::shared_ptr<tgfx::Typeface> typeface) const override;
 
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 };

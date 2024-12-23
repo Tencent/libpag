@@ -71,10 +71,12 @@ static std::unique_ptr<TextRun> MakeTextRun(const std::vector<Glyph*>& glyphs) {
   std::vector<tgfx::GlyphID> glyphIDs = {};
   std::vector<tgfx::Point> positions = {};
   for (auto& glyph : glyphs) {
-    glyphIDs.push_back(glyph->getGlyphID());
     auto m = glyph->getTotalMatrix();
     m.postConcat(noTranslateMatrix);
-    positions.push_back({m.getTranslateX(), m.getTranslateY()});
+    for (auto& glyphID : glyph->getGlyphIDs()) {
+      glyphIDs.push_back(glyphID);
+      positions.push_back({m.getTranslateX(), m.getTranslateY()});
+    }
   }
   textRun->textFont = firstGlyph->getFont();
   textRun->glyphIDs = glyphIDs;

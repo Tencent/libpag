@@ -100,7 +100,7 @@
         PAGFile* pagFile = [PAGFile Load:path];
         if ([pagFile numTexts] > 0) {
             PAGText* textData = [pagFile getTextData:0];
-            textData.text = @"hah哈 哈哈哈哈👌하";
+            textData.text = @"hah哈 哈哈👩🏼‍❤️‍👨🏽哈哈👌하";
             [pagFile replaceText:0 data:textData];
         }
 

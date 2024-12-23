@@ -27,31 +27,34 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
   auto textFont = font;
   std::unordered_map<std::string, GlyphHandle> glyphMap;
   std::vector<GlyphHandle> glyphList;
-  auto positionedGlyphs = TextShaper::Shape(text, font.getTypeface());
-  auto count = positionedGlyphs.glyphCount();
+  auto shapedGlyphs = TextShaper::Shape(text, font.getTypeface());
+  auto count = shapedGlyphs.size();
   for (size_t i = 0; i < count; ++i) {
-    auto index = positionedGlyphs.getStringIndex(i);
-    auto length = (i + 1 == count ? text.length() : positionedGlyphs.getStringIndex(i + 1)) - index;
-    auto name = text.substr(index, length);
+    auto& shapedGlyph = shapedGlyphs[i];
+    auto length = (i + 1 == count ? text.length() : shapedGlyphs[i + 1].stringIndex) -
+                  shapedGlyph.stringIndex;
+    auto name = text.substr(shapedGlyph.stringIndex, length);
     if (glyphMap.find(name) != glyphMap.end()) {
       glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
       continue;
     }
-    textFont.setTypeface(positionedGlyphs.getTypeface(i));
-    auto glyph = std::shared_ptr<Glyph>(
-        new Glyph(positionedGlyphs.getGlyphID(i), name, textFont, isVertical, paint));
+    textFont.setTypeface(shapedGlyph.typeface);
+    auto glyph =
+        std::shared_ptr<Glyph>(new Glyph(shapedGlyph.glyphIDs, name, textFont, isVertical, paint));
     glyphMap[name] = glyph;
     glyphList.emplace_back(glyph);
   }
   return glyphList;
 }
 
-Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
-             const TextPaint& textPaint)
-    : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)), _isVertical(isVertical) {
-  horizontalInfo->advance = _font.getAdvance(_glyphId);
+Glyph::Glyph(std::vector<tgfx::GlyphID> glyphIDs, std::string name, tgfx::Font font,
+             bool isVertical, const TextPaint& textPaint)
+    : _glyphIDs(std::move(glyphIDs)), _name(std::move(name)), _font(std::move(font)),
+      _isVertical(isVertical) {
+  auto glyphID = _glyphIDs.front();
+  horizontalInfo->advance = _font.getAdvance(glyphID);
   horizontalInfo->originPosition.set(horizontalInfo->advance / 2, 0);
-  horizontalInfo->bounds = _font.getBounds(_glyphId);
+  horizontalInfo->bounds = _font.getBounds(glyphID);
   auto metrics = _font.getMetrics();
   if (horizontalInfo->bounds.isEmpty() && horizontalInfo->advance > 0) {
     horizontalInfo->bounds.setLTRB(0, metrics.ascent, horizontalInfo->advance, metrics.descent);
@@ -78,10 +81,10 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
       verticalInfo->ascent += offsetX;
       verticalInfo->descent += offsetX;
     } else {
-      auto offset = _font.getVerticalOffset(_glyphId);
+      auto offset = _font.getVerticalOffset(glyphID);
       verticalInfo->extraMatrix.postTranslate(offset.x, offset.y);
       auto width = verticalInfo->advance;
-      verticalInfo->advance = _font.getAdvance(_glyphId, true);
+      verticalInfo->advance = _font.getAdvance(glyphID, true);
       if (verticalInfo->advance == 0) {
         verticalInfo->advance = width;
       }
@@ -131,7 +134,9 @@ tgfx::Matrix Glyph::getTotalMatrix() const {
 
 void Glyph::computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const {
   bytesKey->write(static_cast<uint32_t>(getFont().hasColor()));
-  bytesKey->write(static_cast<uint32_t>(getGlyphID()));
+  for (auto& glyphID : getGlyphIDs()) {
+    bytesKey->write(glyphID);
+  }
   bytesKey->write(static_cast<uint32_t>(style));
 }
 
@@ -154,6 +159,6 @@ std::shared_ptr<Glyph> Glyph::makeScaledGlyph(float s) const {
   textPaint.fillColor = fillColor;
   textPaint.strokeColor = strokeColor;
   textPaint.strokeWidth = strokeWidth * s;
-  return std::shared_ptr<Glyph>(new Glyph(_glyphId, _name, scaledFont, _isVertical, textPaint));
+  return std::shared_ptr<Glyph>(new Glyph(_glyphIDs, _name, scaledFont, _isVertical, textPaint));
 }
 }  // namespace pag
