@@ -281,6 +281,8 @@ export declare class JPAGPlayer {
 
   hitTestPoint(pagLayer: JPAGLayer, surfaceX: number,
     surfaceY: number, pixelHitTest: boolean): boolean;
+
+  release();
 }
 
 export declare class JPAGSurface {
@@ -295,6 +297,8 @@ export declare class JPAGSurface {
   clearAll(): boolean;
 
   freeCache(): void;
+
+  release(): void;
 
   updateSize(): void;
 

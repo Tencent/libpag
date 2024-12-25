@@ -91,14 +91,12 @@ OHOSVideoDecoder::OHOSVideoDecoder(const VideoFormat& format, bool hardware) {
 }
 
 OHOSVideoDecoder::~OHOSVideoDecoder() {
-  if (codecCategory == SOFTWARE) {
-    if (yuvBuffer) {
-      if (yuvBuffer->data[0]) {
-        delete[] yuvBuffer->data[0];
-      }
-      if (yuvBuffer->data[1]) {
-        delete[] yuvBuffer->data[1];
-      }
+  if (yuvBuffer) {
+    if (yuvBuffer->data[0]) {
+      delete[] yuvBuffer->data[0];
+    }
+    if (yuvBuffer->data[1]) {
+      delete[] yuvBuffer->data[1];
     }
   }
   if (videoCodec != nullptr) {
