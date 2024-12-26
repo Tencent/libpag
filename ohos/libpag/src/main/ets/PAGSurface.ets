@@ -78,6 +78,14 @@ export class PAGSurface {
   }
 
   /**
+   * Free up resources used by the PAGSurface instance immediately instead of relying on the
+   * garbage collector to do this for you at some point in the future.
+   */
+  release(): void {
+    this.nativeSurface.release();
+  }
+
+  /**
    * Returns a bitmap capturing the contents of the PAGSurface. Subsequent rendering of the
    * PAGSurface will not be captured.
    */

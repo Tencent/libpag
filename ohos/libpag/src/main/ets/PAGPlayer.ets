@@ -253,6 +253,14 @@ export class PAGPlayer {
     return this.nativePlayer.hitTestPoint(pagLayer.nativeLayer, surfaceX, surfaceY, pixelHitTest);
   }
 
+  /**
+   * Free up resources used by the PAGPlayer instance immediately instead of relying on the
+   * garbage collector to do this for you at some point in the future.
+   */
+  release(): void {
+    this.nativePlayer.release();
+  }
+
   readonly nativePlayer: JPAGPlayer;
   private composition: PAGComposition | null = null;
   private surface: PAGSurface | null = null;
