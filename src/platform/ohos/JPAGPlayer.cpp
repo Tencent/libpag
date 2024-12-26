@@ -508,6 +508,16 @@ static napi_value HitTestPoint(napi_env env, napi_callback_info info) {
   return jsResult;
 }
 
+static napi_value Release(napi_env env, napi_callback_info info) {
+  napi_value jsPlayer = nullptr;
+  size_t argc = 0;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsPlayer, nullptr);
+  void* data = nullptr;
+  napi_remove_wrap(env, jsPlayer, &data);
+  return nullptr;
+}
+
 napi_value JPAGPlayer::Constructor(napi_env env, napi_callback_info info) {
   napi_value jsPlayer = nullptr;
   size_t argc = 1;
@@ -561,7 +571,8 @@ bool JPAGPlayer::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(flush, Flush),
       PAG_DEFAULT_METHOD_ENTRY(getBounds, GetBounds),
       PAG_DEFAULT_METHOD_ENTRY(getLayersUnderPoint, GetLayersUnderPoint),
-      PAG_DEFAULT_METHOD_ENTRY(hitTestPoint, HitTestPoint)};
+      PAG_DEFAULT_METHOD_ENTRY(hitTestPoint, HitTestPoint),
+      PAG_DEFAULT_METHOD_ENTRY(release, Release)};
 
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");

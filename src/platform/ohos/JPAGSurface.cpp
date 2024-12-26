@@ -94,6 +94,20 @@ static napi_value FreeCache(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value Release(napi_env env, napi_callback_info info) {
+  napi_value jSurface = nullptr;
+  size_t argc = 0;
+  napi_value args[1];
+  napi_get_cb_info(env, info, &argc, args, &jSurface, nullptr);
+  auto surface = JPAGSurface::FromJs(env, jSurface);
+  if (surface) {
+    surface->freeCache();
+  }
+  void* data = nullptr;
+  napi_remove_wrap(env, jSurface, &data);
+  return nullptr;
+}
+
 static napi_value MakeOffscreen(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2];
@@ -159,6 +173,7 @@ bool JPAGSurface::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(updateSize, UpdateSize),
       PAG_DEFAULT_METHOD_ENTRY(clearAll, ClearAll),
       PAG_DEFAULT_METHOD_ENTRY(freeCache, FreeCache),
+      PAG_DEFAULT_METHOD_ENTRY(release, Release),
       PAG_DEFAULT_METHOD_ENTRY(makeSnapshot, MakeSnapshot)};
 
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
