@@ -106,6 +106,7 @@ OHOSVideoDecoder::~OHOSVideoDecoder() {
     videoCodec = nullptr;
   }
   if (codecUserData) {
+    codecUserData->clearQueue();
     delete codecUserData;
   }
 }
@@ -271,6 +272,7 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       if (format) {
         OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_STRIDE, &videoStride);
         OH_AVFormat_GetIntValue(format, OH_MD_KEY_VIDEO_SLICE_HEIGHT, &videoSliceHeight);
+        OH_AVFormat_Destroy(format);
       }
       if (videoStride == 0 || videoSliceHeight == 0) {
         return nullptr;
@@ -291,7 +293,6 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
       }
       yuvBuffer->lineSize[0] = videoStride;
       yuvBuffer->lineSize[1] = videoStride;
-      OH_AVFormat_Destroy(format);
     }
     auto capacity = OH_AVBuffer_GetCapacity(codecBufferInfo.buffer);
     if (capacity <= 0) {
