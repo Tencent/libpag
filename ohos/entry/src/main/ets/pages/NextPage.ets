@@ -17,63 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { PAGFile, PAGImageViewController, PAGImageView , PAGView, PAGViewController} from 'libpag';
-import { NextPage } from './NextPage';
 
 @Entry
 @Component
-struct Index {
-  @Provide('pageInfos') pageInfos: NavPathStack = new NavPathStack()
+export struct NextPage {
   @State imageViewControllers: Array<PAGImageViewController> = new Array<PAGImageViewController>();
   @State viewController: PAGViewController = new PAGViewController();
   @State pageIndex: number = 0;
+  @Consume('pageInfos') pageInfos: NavPathStack;
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
-    let file = PAGFile.LoadFromAssets(manager, "PAG_LOGO.pag");
+    this.viewController = new PAGViewController();
+    let file = PAGFile.LoadFromAssets(manager, "castle.pag");
     this.viewController.setComposition(file);
     this.viewController.setRepeatCount(-1);
-    // this.viewController.play();
-    this.viewController.setProgress(0.5);
-    this.viewController.flush();
+    this.viewController.play();
+    // this.viewController.setProgress(0);
+    // this.viewController.flush();
   }
 
-  @Builder
-  PageMap(name: string) {
-    if (name === "NextPage") {
-      NextPage()
-    }
+  aboutToDisappear(): void {
+    console.log("--------------NextPage aboutToDisappear ----------------\n");
+    // this.viewController.release();
   }
 
-  onNext() {
-    // router.pushUrl({url: "pages/Index"});
-    // router.back({url: "pages/Index"});
-    this.pageInfos.pushPath({ name: "NextPage"})
-  }
   build() {
-    Navigation(this.pageInfos) {
+    NavDestination() {
       Column() {
-        Button('下一页').onClick(() => {
-          this.onNext();
-        })
         Row() {
-          if (this.pageIndex == 1) {
-            Grid() {
-              ForEach(this.imageViewControllers, (item: PAGImageViewController) => {
-                GridItem() {
-                  PAGImageView({
-                    controller: item
-                  })
-                    .onClick(() => {
-                      if (item.isPlaying()) {
-                        item.pause();
-                      } else {
-                        item.play();
-                      }
-                    })
-                }.width("25%").height(100)
-              })
-            }.width("100%")
-          } else {
             PAGView({
               controller: this.viewController
             }).onClick(() => {
@@ -83,7 +55,6 @@ struct Index {
                 this.viewController.play();
               }
             })
-          }
         }.height("70%")
 
 
@@ -99,9 +70,11 @@ struct Index {
         }
 
       }
-    }
-    .title("主标题")
-    .mode(NavigationMode.Stack)
-    .navDestination(this.PageMap)
+    }.title("NextPage")
+    .onBackPressed(() => {
+      const popDestinationInfo = this.pageInfos.pop() // 弹出路由栈栈顶元素
+      console.log('pop' + '返回值' + JSON.stringify(popDestinationInfo))
+      return true
+    })
   }
 }

@@ -39,6 +39,7 @@ PAGPlayer::~PAGPlayer() {
   setSurface(nullptr);
   stage->removeAllLayers();
   delete reporter;
+  LOGI("--------------PAGPlayer::~PAGPlayer()------------\n");
 }
 
 std::shared_ptr<PAGComposition> PAGPlayer::getComposition() {
