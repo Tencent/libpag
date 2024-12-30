@@ -375,6 +375,14 @@ export class PAGViewController {
     this.view = null;
   }
 
+  /**
+   * Free up resources used by the PAGViewController instance immediately instead of relying on the
+   * garbage collector to do this for you at some point in the future.
+   */
+  release() {
+    this.jView.release();
+  }
+
   uniqueID() {
     return this.jView.uniqueID();
   }

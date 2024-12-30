@@ -325,6 +325,14 @@ export class PAGImageViewController {
     this.view = null;
   }
 
+  /**
+   * Free up resources used by the PAGImageViewController instance immediately instead of relying on the
+   * garbage collector to do this for you at some point in the future.
+   */
+  release() {
+    this.jImageView.release();
+  }
+
   private composition: PAGComposition | null = null;
   private filePath: string | null = null;
   private listeners: Array<WeakRef<PAGImageViewListener>> = [];
