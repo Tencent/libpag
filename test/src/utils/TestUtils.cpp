@@ -131,7 +131,11 @@ std::shared_ptr<tgfx::Data> ReadFile(const std::string& path) {
 }
 
 std::string GetOutputFile(const std::string& key) {
+#ifdef GENERATE_BASELINE_IMAGES
+  static const std::string OUT_ROOT = TestDir::GetRoot() + "/baseline-out";
+#else
   static const std::string OUT_ROOT = TestDir::GetRoot() + "/out";
+#endif
   return OUT_ROOT + "/" + key + ".webp";
 }
 

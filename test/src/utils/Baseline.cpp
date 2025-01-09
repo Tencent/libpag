@@ -21,20 +21,24 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include "base/utils/USE.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestDir.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
 
+static std::unique_ptr<Baseline> baseline = nullptr;
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline");
 static const std::string CACHE_ROOT = TestDir::GetRoot() + "/baseline/.cache";
+#ifdef GENERATE_BASELINE_IMAGES
+static const std::string OUT_ROOT = TestDir::GetRoot() + "/baseline-out";
+#else
 static const std::string OUT_ROOT = TestDir::GetRoot() + "/out";
-static std::unique_ptr<Baseline> baseline = nullptr;
+#endif
 
 static void RemoveEmptyFolder(const std::filesystem::path& path) {
   if (!std::filesystem::is_directory(path)) {
@@ -58,7 +62,6 @@ void Baseline::SetUp() {
 void Baseline::TearDown() {
   baseline->saveData();
   baseline = nullptr;
-  RemoveEmptyFolder(OUT_ROOT);
 }
 
 bool Baseline::Compare(std::shared_ptr<tgfx::Surface> surface, const std::string& key) {
@@ -139,7 +142,7 @@ bool Baseline::compare(const Pixmap& pixmap, const std::string& key) {
   } else {
     SaveImage(pixmap, key);
   }
-#ifdef GENERATOR_BASELINE_IMAGES
+#ifdef GENERATE_BASELINE_IMAGES
   SaveImage(pixmap, key + "_base");
 #endif
   return result;
@@ -207,6 +210,13 @@ Baseline::Baseline(const std::string& baselinePath, const std::string& cachePath
 void Baseline::saveData() {
 #ifdef UPDATE_BASELINE
   if (!PAGTest::HasFailure()) {
+#ifdef GENERATE_BASELINE_IMAGES
+    auto outPath = TestDir::GetRoot() + "/out";
+    std::filesystem::remove_all(outPath);
+    if (std::filesystem::exists(OUT_ROOT)) {
+      std::filesystem::rename(OUT_ROOT, outPath);
+    }
+#endif
     CreateFolder(cacheMD5Path);
     std::ofstream outMD5File(cacheMD5Path);
     outMD5File << std::setw(4) << outputMD5 << std::endl;
@@ -214,7 +224,10 @@ void Baseline::saveData() {
     CreateFolder(cacheVersionPath);
     std::filesystem::copy(baselineVersionPath, cacheVersionPath,
                           std::filesystem::copy_options::overwrite_existing);
+  } else {
+    std::filesystem::remove_all(OUT_ROOT);
   }
+  USE(RemoveEmptyFolder);
 #else
   std::filesystem::remove(outMD5Path);
   if (!outputMD5.empty()) {
@@ -227,6 +240,7 @@ void Baseline::saveData() {
   std::ofstream versionFile(outVersionPath);
   versionFile << std::setw(4) << outputVersions << std::endl;
   versionFile.close();
+  RemoveEmptyFolder(OUT_ROOT);
 #endif
 }
 
