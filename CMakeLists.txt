@@ -583,23 +583,19 @@ if (PAG_BUILD_TESTS)
         list(REMOVE_ITEM PAG_TEST_FILES ${PAG_TEST_EXCLUDE_FILES})
     endif ()
 
-    # used to update the local md5 data for baseline testing.
+    list(APPEND PAG_BASELINE_DEFINES ${PAG_TEST_DEFINES} UPDATE_BASELINE)
+    if (NOT PAG_SKIP_GENERATE_BASELINE_IMAGES)
+        list(APPEND PAG_BASELINE_DEFINES GENERATE_BASELINE_IMAGES)
+    endif ()
+    # used to update the local md5 data for baseline testing and generate baseline images to the
+    # out/ directory. each image has a "_base" suffix.
     add_executable(UpdateBaseline ${PAG_TEST_FILES})
     add_dependencies(UpdateBaseline test-vendor)
     target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(UpdateBaseline PUBLIC ${PAG_TEST_DEFINES} UPDATE_BASELINE)
+    target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
     target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_options(UpdateBaseline PRIVATE ${PAG_TEST_LINK_OPTIONS})
     target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
-
-    # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(GenerateImages ${PAG_TEST_FILES})
-    add_dependencies(GenerateImages test-vendor)
-    target_include_directories(GenerateImages PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(GenerateImages PUBLIC ${PAG_TEST_DEFINES} GENERATOR_BASELINE_IMAGES)
-    target_compile_options(GenerateImages PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(GenerateImages PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(GenerateImages ${PAG_TEST_LIBS})
 
     add_executable(PAGUnitTest ${PAG_TEST_FILES})
     add_dependencies(PAGUnitTest test-vendor)

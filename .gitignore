@@ -50,6 +50,7 @@ cmake-build-*
 node_modules
 Build/
 test/out/
+test/baseline-out/
 DerivedData/
 xcuserdata
 xcshareddata
