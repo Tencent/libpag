@@ -40,7 +40,7 @@ void* PixelRef::lockWritablePixels() {
   if (pixels == nullptr) {
     return nullptr;
   }
-  if (!pixelBuffer.unique()) {
+  if (pixelBuffer.use_count() != 1) {
     auto& info = pixelBuffer->info();
     auto newBuffer = PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
                                        pixelBuffer->isHardwareBacked());

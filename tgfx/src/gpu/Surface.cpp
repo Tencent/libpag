@@ -219,7 +219,7 @@ void Surface::aboutToDraw(bool discardContent) {
   if (cachedImage == nullptr) {
     return;
   }
-  auto isUnique = cachedImage.unique();
+  auto isUnique = cachedImage.use_count() == 1;
   cachedImage = nullptr;
   if (isUnique) {
     return;

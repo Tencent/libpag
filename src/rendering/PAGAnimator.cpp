@@ -75,7 +75,7 @@ class AnimationTicker {
     auto listCopy = animators;
     locker.unlock();
     for (auto& animator : listCopy) {
-      if (animator.unique()) {
+      if (animator.use_count() == 1) {
         animator->cancelAnimation();
         continue;
       }

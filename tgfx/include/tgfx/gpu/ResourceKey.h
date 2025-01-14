@@ -84,7 +84,7 @@ class UniqueKey {
    * Returns true if the UniqueKey has only one valid reference.
    */
   bool unique() const {
-    return id.unique();
+    return id.use_count() == 1;
   }
 
   /**
