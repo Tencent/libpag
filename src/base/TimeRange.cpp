@@ -145,7 +145,7 @@ std::vector<TimeRange> OffsetTimeRanges(const std::vector<TimeRange>& timeRanges
 bool HasVaryingTimeRange(const std::vector<TimeRange>* staticTimeRanges, Frame startTime,
                          Frame duration) {
   if (staticTimeRanges->size() == 1) {
-    const auto& range = (*staticTimeRanges)[0];
+    const auto& range = *staticTimeRanges->data();
     if (range.start == startTime && range.end == startTime + duration - 1) {
       return false;
     }

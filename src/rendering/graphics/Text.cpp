@@ -276,9 +276,10 @@ static void Draw(tgfx::Canvas* canvas, const TextAtlas* atlas, const Parameters&
   if (parameters.matrices.empty()) {
     return;
   }
-  canvas->drawAtlas(
-      atlas->getAtlasImage(parameters.imageIndex), &parameters.matrices[0], &parameters.rects[0],
-      parameters.colors.empty() ? nullptr : &parameters.colors[0], parameters.matrices.size());
+  canvas->drawAtlas(atlas->getAtlasImage(parameters.imageIndex), parameters.matrices.data(),
+                  parameters.rects.data(),
+                  parameters.colors.empty() ? nullptr : parameters.colors.data(),
+                  parameters.matrices.size());
 }
 
 static bool RectStaysRectAndNoScale(const tgfx::Matrix& matrix) {
@@ -354,8 +355,8 @@ void Text::drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const {
     }
     canvas->setMatrix(totalMatrix);
     canvas->concat(textRun->matrix);
-    auto ids = &textRun->glyphIDs[0];
-    auto positions = &textRun->positions[0];
+    auto ids = textRun->glyphIDs.data();
+    auto positions = textRun->positions.data();
     canvas->drawGlyphs(ids, positions, textRun->glyphIDs.size(), textRun->textFont, *textPaint);
   }
   canvas->setMatrix(totalMatrix);
