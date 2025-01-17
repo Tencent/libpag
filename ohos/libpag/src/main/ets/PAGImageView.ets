@@ -23,6 +23,7 @@ import { PAGScaleMode } from './PAGScaleMode';
 import { PAGFile } from './PAGFile';
 import { PAGAnimatorState } from './private/PAGAnimatorState';
 import { PAGUtils } from './private/PAGUtils';
+import { PAGViewCallbackHandler } from './private/PAGViewCallbackHandler'
 
 export interface PAGImageViewListener {
   /**
@@ -274,8 +275,9 @@ export class PAGImageViewController {
   }
 
   constructor() {
-    this.jImageView.setStateChangeCallback(this.onAnimatorStateChange);
-    this.jImageView.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
+    let handler = new PAGViewCallbackHandler(this);
+    this.jImageView.setStateChangeCallback(handler.onStateChange);
+    this.jImageView.setProgressUpdateCallback(handler.onProgressUpdate);
   }
 
   private onAnimationStart() {
@@ -338,7 +340,7 @@ export class PAGImageViewController {
   private listeners: Array<WeakRef<PAGImageViewListener>> = [];
   private view: WeakRef<PAGImageView> | null = null;
   private jImageView: JPAGImageView = new JPAGImageView();
-  private onAnimatorStateChange = (state: number): void => {
+  readonly onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case PAGAnimatorState.Start:
         return this.onAnimationStart();
@@ -350,7 +352,7 @@ export class PAGImageViewController {
         return this.onAnimationRepeat();
     }
   }
-  private onAnimatorProgressUpdate = (): void => {
+  readonly onAnimatorProgressUpdate = (): void => {
     for (const weakListener of this.listeners) {
       const listener = weakListener.deref();
       if (listener && listener.onAnimationUpdate) {
