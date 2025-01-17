@@ -26,6 +26,7 @@ import { Matrix4 } from '@ohos.arkui.node';
 import { PAGAnimatorState } from './private/PAGAnimatorState';
 import { PAGFile } from './PAGFile';
 import { common2D } from '@kit.ArkGraphics2D';
+import { PAGViewCallbackHandler } from './private/PAGViewCallbackHandler';
 
 export interface PAGViewListener {
   /**
@@ -392,8 +393,9 @@ export class PAGViewController {
   }
 
   constructor() {
-    this.jView.setStateChangeCallback(this.onAnimatorStateChange);
-    this.jView.setProgressUpdateCallback(this.onAnimatorProgressUpdate);
+    let handler = new PAGViewCallbackHandler(this);
+    this.jView.setStateChangeCallback(handler.onStateChange);
+    this.jView.setProgressUpdateCallback(handler.onProgressUpdate);
   }
 
   private onAnimationStart() {
@@ -432,7 +434,7 @@ export class PAGViewController {
     }
   }
 
-  private onAnimatorStateChange = (state: number): void => {
+  readonly onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case PAGAnimatorState.Start:
         return this.onAnimationStart();
@@ -444,7 +446,7 @@ export class PAGViewController {
         return this.onAnimationRepeat();
     }
   }
-  private onAnimatorProgressUpdate = (): void => {
+  readonly onAnimatorProgressUpdate = (): void => {
     for (const weakListener of this.listeners) {
       const listener = weakListener.deref();
       if (listener && listener.onAnimationUpdate) {
