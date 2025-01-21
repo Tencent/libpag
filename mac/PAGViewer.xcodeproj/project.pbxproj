@@ -11,7 +11,7 @@
 		7785F05225ADB58D004D5CE9 /* WindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7785F05125ADB58D004D5CE9 /* WindowController.m */; };
 		7785F05525ADB630004D5CE9 /* red.pag in Resources */ = {isa = PBXBuildFile; fileRef = 7785F05425ADB630004D5CE9 /* red.pag */; };
 		857B02A82455D81100E533CF /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02A72455D81100E533CF /* AppDelegate.m */; };
-		857B02AB2455D81100E533CF /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02AA2455D81100E533CF /* ViewController.m */; };
+		857B02AB2455D81100E533CF /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 857B02AA2455D81100E533CF /* ViewController.mm */; };
 		857B02AD2455D81200E533CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AC2455D81200E533CF /* Assets.xcassets */; };
 		857B02B02455D81200E533CF /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AE2455D81200E533CF /* Main.storyboard */; };
 		857B02B32455D81200E533CF /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02B22455D81200E533CF /* main.m */; };
@@ -90,7 +90,7 @@
 		857B02A62455D81100E533CF /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		857B02A72455D81100E533CF /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		857B02A92455D81100E533CF /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
-		857B02AA2455D81100E533CF /* ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ViewController.m; sourceTree = "<group>"; };
+		857B02AA2455D81100E533CF /* ViewController.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
 		857B02AC2455D81200E533CF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		857B02AF2455D81200E533CF /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		857B02B12455D81200E533CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -185,7 +185,7 @@
 				857B02A62455D81100E533CF /* AppDelegate.h */,
 				857B02A72455D81100E533CF /* AppDelegate.m */,
 				857B02A92455D81100E533CF /* ViewController.h */,
-				857B02AA2455D81100E533CF /* ViewController.m */,
+				857B02AA2455D81100E533CF /* ViewController.mm */,
 				7785F05025ADB58D004D5CE9 /* WindowController.h */,
 				7785F05125ADB58D004D5CE9 /* WindowController.m */,
 				857B02AC2455D81200E533CF /* Assets.xcassets */,
@@ -411,7 +411,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7785F05225ADB58D004D5CE9 /* WindowController.m in Sources */,
-				857B02AB2455D81100E533CF /* ViewController.m in Sources */,
+				857B02AB2455D81100E533CF /* ViewController.mm in Sources */,
 				85C9A3DB25309D7C00B2CA8C /* DragFilePAGView.m in Sources */,
 				857B02B32455D81200E533CF /* main.m in Sources */,
 				857B02A82455D81100E533CF /* AppDelegate.m in Sources */,
@@ -555,6 +555,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = c17;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../include";
 				INFOPLIST_FILE = PAGViewer/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -577,6 +578,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				GCC_C_LANGUAGE_STANDARD = c17;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/../include";
 				INFOPLIST_FILE = PAGViewer/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
