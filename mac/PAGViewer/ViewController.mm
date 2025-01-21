@@ -36,14 +36,14 @@
 }
 
 - (void)handleClick:(NSClickGestureRecognizer *)gesture {
-    @autoreleasepool {
-        for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 10000; i++) {
+        @autoreleasepool {
             auto surface = pag::PAGSurface::MakeOffscreen(1280, 720);
             int width = surface->width();
+            surface->clearAll();
             printf("--width:%d ,index:%d\n", width, i);
         }
     }
-    
     NSLog(@"handleClick\n");
 }
 
