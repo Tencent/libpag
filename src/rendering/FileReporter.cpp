@@ -108,7 +108,7 @@ void FileReporter::reportData() {
 static int64_t GetOldRenderTime(RenderCache* cache) {
   // 性能统计增加了数据字段，部分含义发生了改变，这里拼装出原先的
   // renderingTime，确保数据上报结果跟之前一致。
-  return cache->totalTime - cache->presentingTime - cache->imageDecodingTime;
+  return cache->totalTime - cache->presentingTime;
 }
 
 void FileReporter::recordPerformance(RenderCache* cache) {
