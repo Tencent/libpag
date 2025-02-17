@@ -220,7 +220,7 @@ you can download the precompiled libraries from [here](https://github.com/Tencen
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 5.13.0+
-- NDK 19.2+ (**19.2.5345600 recommended**)
+- NDK 28+ (**28.0.13004108 recommended**)
 - Emscripten 3.1.58+
 
 ### Dependency Management

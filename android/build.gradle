@@ -7,7 +7,7 @@ buildscript {
         junitVersion = '4.12'
         compileSdkVersion = 33
         buildToolsVersion = '33.0.2'
-        ndkVersion = '19.2.5345600'
+        ndkVersion = '28.0.13004108'
         minSdkVersion = 19
         targetSdkVersion = 33
         // Set the AGP version according to the corresponding Gradle version.
