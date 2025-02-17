@@ -334,7 +334,7 @@ elseif (ANDROID)
     endif ()
 
     # optimizes the output size
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/android/libpag/export.def")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,-z,max-page-size=16384 -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/android/libpag/export.def")
     list(APPEND PAG_COMPILE_OPTIONS -ffunction-sections -fdata-sections -Os -fno-exceptions -fno-rtti)
 
     if (USE_NATIVE_PLATFORM)

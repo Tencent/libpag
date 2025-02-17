@@ -19,7 +19,8 @@ android {
             cmake {
                 arguments "-DANDROID_STL=c++_static",
                         "-DPAG_USE_LIBAVC=OFF",
-                        "-DPAG_USE_FFAVC=ON"
+                        "-DPAG_USE_FFAVC=ON",
+                        "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
         }
 

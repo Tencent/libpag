@@ -7,8 +7,8 @@ buildscript {
         junitVersion = '4.12'
         compileSdkVersion = 33
         buildToolsVersion = '33.0.2'
-        ndkVersion = '19.2.5345600'
-        minSdkVersion = 19
+        ndkVersion = '27.2.12479018'
+        minSdkVersion = 21
         targetSdkVersion = 33
         // Set the AGP version according to the corresponding Gradle version.
         // Documentation: https://developer.android.com/build/releases/gradle-plugin#updating-gradle
