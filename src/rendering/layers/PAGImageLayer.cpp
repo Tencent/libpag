@@ -202,7 +202,7 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
   }
   delete replacement;
   if (image != nullptr) {
-    replacement = new ImageReplacement(static_cast<ImageLayer*>(layer), image);
+    replacement = new ImageReplacement(rootFile, static_cast<ImageLayer*>(layer), image);
   } else {
     replacement = nullptr;
   }
