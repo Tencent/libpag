@@ -22,10 +22,34 @@
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
-ImageReplacement::ImageReplacement(ImageLayer* imageLayer, std::shared_ptr<PAGImage> pagImage)
+ImageReplacement::ImageReplacement(PAGFile* pagFile, ImageLayer* imageLayer, std::shared_ptr<PAGImage> pagImage)
     : pagImage(std::move(pagImage)) {
+  defaultScaleMode = PAGScaleMode::LetterBox;
+  if (pagFile != nullptr) {
+    auto file = pagFile->getFile();
+    if (file != nullptr && file->imageScaleModes != nullptr && !file->imageScaleModes->empty()) {
+      auto editableImages = pagFile->getEditableIndices(LayerType::Image);
+      for (size_t i = 0; i < editableImages.size(); i++) {
+        bool found = false;
+        auto imageLayers = file->getImageAt(editableImages.at(i));
+        for (size_t j = 0; j < imageLayers.size(); j++) {
+          auto tmpImageLayer = imageLayers.at(j);
+          if (imageLayer == tmpImageLayer) {
+            defaultScaleMode = file->imageScaleModes->at(i);
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          break;
+        }
+      }
+    }
+  }
   auto imageFillRule = imageLayer->imageFillRule;
-  defaultScaleMode = imageFillRule ? imageFillRule->scaleMode : PAGScaleMode::LetterBox;
+  if (imageFillRule != nullptr) {
+    defaultScaleMode = imageFillRule->scaleMode;
+  }
   contentWidth = imageLayer->imageBytes->width;
   contentHeight = imageLayer->imageBytes->height;
 }
