@@ -10,7 +10,7 @@ buildscript {
         ndkVersion = '28.0.13004108'
         minSdkVersion = 19
         targetSdkVersion = 33
-        agpVersion = '8.0.0'
+        agpVersion = '8.8.1'
         appcompatVersion = '1.4.2' // after this version, compileSdkVersion must large than 31
     }
     repositories {
