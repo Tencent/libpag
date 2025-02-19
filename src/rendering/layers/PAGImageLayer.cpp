@@ -678,17 +678,16 @@ int64_t PAGImageLayer::contentDurationInternal() {
 }
 
 int PAGImageLayer::getDefaultScaleMode() {
-  int defaultScaleMode = PAGScaleMode::LetterBox;
-  int index = editableIndex();
-  if (index >= 0 && file && file->imageScaleModes && !file->imageScaleModes->empty()) {
-    defaultScaleMode = file->imageScaleModes->at(index);
-  }
   auto imageLayer = static_cast<ImageLayer*>(layer);
   if (imageLayer && imageLayer->imageFillRule) {
-    defaultScaleMode = imageLayer->imageFillRule->scaleMode;
+    return imageLayer->imageFillRule->scaleMode;
+  }
+  int index = editableIndex();
+  if (index >= 0 && file && file->imageScaleModes && !file->imageScaleModes->empty()) {
+    return file->imageScaleModes->at(index);
   }
 
-  return defaultScaleMode;
+  return PAGScaleMode::LetterBox;
 }
 
 }  // namespace pag
