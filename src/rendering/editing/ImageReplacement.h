@@ -22,7 +22,7 @@
 namespace pag {
 class ImageReplacement : public Content {
  public:
-  ImageReplacement(File* file, ImageLayer* imageLayer, std::shared_ptr<PAGImage> pagImage);
+  ImageReplacement(int scaleMode, ImageBytes* bytes, std::shared_ptr<PAGImage> pagImage);
 
   void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;

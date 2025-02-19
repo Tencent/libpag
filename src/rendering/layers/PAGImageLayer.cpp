@@ -202,7 +202,8 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
   }
   delete replacement;
   if (image != nullptr) {
-    replacement = new ImageReplacement(file.get(), static_cast<ImageLayer*>(layer), image);
+    replacement = new ImageReplacement(getDefaultScaleMode(),
+                                       static_cast<ImageLayer*>(layer)->imageBytes, image);
   } else {
     replacement = nullptr;
   }
@@ -674,6 +675,20 @@ int64_t PAGImageLayer::contentDurationInternal() {
   }
 
   return FrameToTime(maxFrame + 1, frameRate);
+}
+
+int PAGImageLayer::getDefaultScaleMode() {
+  int defaultScaleMode = PAGScaleMode::LetterBox;
+  int index = editableIndex();
+  if (index >= 0 && file && file->imageScaleModes && !file->imageScaleModes->empty()) {
+    defaultScaleMode = file->imageScaleModes->at(index);
+  }
+  auto imageLayer = static_cast<ImageLayer*>(layer);
+  if (imageLayer && imageLayer->imageFillRule) {
+    defaultScaleMode = imageLayer->imageFillRule->scaleMode;
+  }
+
+  return defaultScaleMode;
 }
 
 }  // namespace pag
