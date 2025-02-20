@@ -808,6 +808,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
   Frame getFrameFromTimeRemap(Frame value);
   void measureBounds(tgfx::Rect* bounds) override;
   int64_t contentDurationInternal();
+  int getDefaultScaleMode();
 
   friend class RenderCache;
 
