@@ -127,42 +127,42 @@ signing {
 project.afterEvaluate {
     mergeReleaseNativeLibs.doLast {
         delete {
-            delete project.getBuildDir().path + '/intermediates/merged_native_libs/release/out/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi'
         }
         copy {
-            from project.getBuildDir().path + '/intermediates/merged_native_libs/release/out/lib/armeabi-v7a'
-            into project.getBuildDir().path + '/intermediates/merged_native_libs/release/out/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi'
             include '*.so'
         }
     }
     stripReleaseDebugSymbols.doLast {
         delete {
-            delete project.getBuildDir().path + '/intermediates/stripped_native_libs/release/out/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi'
         }
         copy {
-            from project.getBuildDir().path + '/intermediates/stripped_native_libs/release/out/lib/armeabi-v7a'
-            into project.getBuildDir().path + '/intermediates/stripped_native_libs/release/out/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi'
             include '*.so'
         }
     }
     // 此处为了方便debug，保留debug版本armeabi的拷贝，方便源码接入时候的调试
     mergeDebugNativeLibs.doLast {
         delete {
-            delete project.getBuildDir().path + '/intermediates/merged_native_libs/debug/out/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/armeabi'
         }
         copy {
-            from project.getBuildDir().path + '/intermediates/merged_native_libs/debug/out/lib/armeabi-v7a'
-            into project.getBuildDir().path + '/intermediates/merged_native_libs/debug/out/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/armeabi'
             include '*.so'
         }
     }
     stripDebugDebugSymbols.doLast {
         delete {
-            delete project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi'
+            delete project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/armeabi'
         }
         copy {
-            from project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi-v7a'
-            into project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/out/lib/armeabi'
+            from project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/armeabi-v7a'
+            into project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/armeabi'
             include '*.so'
         }
     }
