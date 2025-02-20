@@ -105,8 +105,7 @@ versions, you can download the precompiled libraries from [here](https://github.
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 5.13.0+
-- NDK 19.2+ (**19.2.5345600 recommended**)
-- Emscripten 3.1.20+ (**3.1.20 recommended**)
+- Emscripten 3.1.58+
 
 ### Dependency Management
 
