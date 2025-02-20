@@ -1,0 +1,56 @@
+{
+  "version": "1.3.12",
+  "vars": {
+    "PAG_GROUP": "https://github.com/libpag"
+  },
+  "repos": {
+    "common": [
+      {
+        "url": "${PAG_GROUP}/vendor_tools.git",
+        "commit": "ef445edee3335b3ee30bd79afea76c0419947401",
+        "dir": "tools/vendor_tools"
+      },
+      {
+        "url": "https://github.com/jedisct1/libsodium.git",
+        "commit": "9511c982fb1d046470a8b42aa36556cdb7da15de",
+        "dir": "third_party/sodium"
+      }
+    ],
+    "mac": [
+      {
+        "url": "https://github.com/MEONMedical/Log4Qt.git",
+        "commit": "befbf512137daddb000b9bbdd5ae5ed8dc28da5f",
+        "dir": "third_party/log4qt"
+      },
+      {
+        "url": "https://github.com/sparkle-project/Sparkle.git",
+        "commit": "e9726ff718cffb2d045d84ede9548e38ea48fa01",
+        "dir": "third_party/sparkle"
+      }
+    ]
+  },
+  "files": {
+    "common": [
+      {
+        "url": "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp",
+        "dir": "third_party/nlohman-json",
+        "unzip": false
+      }
+    ],
+    "win": [
+      {
+        "url": "https://github.com/vslavik/winsparkle/releases/download/v0.8.3/WinSparkle-0.8.3.zip",
+        "dir": "third_party/winsparkle",
+        "unzip": true
+      }
+    ]
+  },
+  "actions": {
+    "common": [
+      {
+        "command": "depsync --clean",
+        "dir": "third_party"
+      }
+    ]
+  }
+}

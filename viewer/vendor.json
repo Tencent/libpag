@@ -1,0 +1,57 @@
+{
+    "source": "third_party",
+    "out": "third_party/out",
+    "vendors": [
+        {
+            "name": "log4qt",
+            "scripts": {
+                "mac": {
+                    "executor": "python",
+                    "file": "tools/build/log4qt/build.py",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "nlohman-json",
+            "scripts": {
+                "mac": {
+                    "executor": "python",
+                    "file": "tools/build/nlohman-json/build.py",
+                    "arguments": []
+                },
+                "win": {
+                    "executor": "python",
+                    "file": "tools/build/nlohman-json/build.py",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "sodium",
+            "scripts": {
+                "mac": {
+                    "executor": "python",
+                    "file": "tools/build/sodium/build.py",
+                    "arguments": []
+                },
+                "win": {
+                    "executor": "python",
+                    "file": "tools/build/sodium/build.py",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "sparkle",
+            "scripts": {
+                "mac": {
+                    "executor": "python",
+                    "file": "tools/build/sparkle/build.py",
+                    "arguments": []
+                }
+            }
+        }
+    ]
+}
+  
