@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{cda151bd-bf0f-4864-bf84-8da2301b24ea}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Headers\AE">
+      <UniqueIdentifier>{4997f2a3-8dbc-43c1-b75b-ef27a6e16dbe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{07965232-dd6b-4fb6-800b-82ede24c031b}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Supporting Code">
+      <UniqueIdentifier>{294e2083-c8b9-4fef-ab13-6e43fd8a16e5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Mangler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Mangler_Strings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_AdvEffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AE_EffectSuitesHelper.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlugOld.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_IO.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_SuiteHandler.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_Utils.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\FIEL_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PF_Masks.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PR_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\String_Utils.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Mangler_PiPL.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\AEGP_Utils.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Mangler.cpp" />
+    <ClCompile Include="..\Mangler_Strings.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Mangler_PiPL.r">
+      <Filter>Resources</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

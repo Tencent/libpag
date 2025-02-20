@@ -1,0 +1,212 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		7EF36FC116F29931002A3CB3 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF36FC016F29931002A3CB3 /* Cocoa.framework */; };
+		C4D30BC7095B394800E2F3B4 /* CheckoutPiPL.r in Rez */ = {isa = PBXBuildFile; fileRef = C4E61899095A3C810012CA3F /* CheckoutPiPL.r */; };
+		C4E618D2095A3D3A0012CA3F /* Checkout.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E6189F095A3C810012CA3F /* Checkout.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		7E76EEDB1F7087FC00536F9D /* AE_Effect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AE_Effect.h; path = ../../../Headers/AE_Effect.h; sourceTree = "<group>"; };
+		7E76EEDC1F7087FC00536F9D /* AE_PluginData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AE_PluginData.h; path = ../../../Headers/AE_PluginData.h; sourceTree = "<group>"; };
+		7EB4276C0FBA0E9E003C7DD1 /* Checkout.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Checkout.h; path = ../Checkout.h; sourceTree = SOURCE_ROOT; };
+		7EE914321A5C6F19009CD299 /* AEFX_SuiteHandlerTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AEFX_SuiteHandlerTemplate.h; path = ../../../Headers/AEFX_SuiteHandlerTemplate.h; sourceTree = "<group>"; };
+		7EE914701A5C7051009CD299 /* DuckSuite.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DuckSuite.h; path = ../../../Util/DuckSuite.h; sourceTree = "<group>"; };
+		7EF36FC016F29931002A3CB3 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		C4E61899095A3C810012CA3F /* CheckoutPiPL.r */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.rez; name = CheckoutPiPL.r; path = ../CheckoutPiPL.r; sourceTree = SOURCE_ROOT; };
+		C4E6189F095A3C810012CA3F /* Checkout.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Checkout.cpp; path = ../Checkout.cpp; sourceTree = SOURCE_ROOT; };
+		C4E618CC095A3CE80012CA3F /* Checkout.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Checkout.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C4E618CA095A3CE80012CA3F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7EF36FC116F29931002A3CB3 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C4E6187C095A3C800012CA3F = {
+			isa = PBXGroup;
+			children = (
+				C4E6189F095A3C810012CA3F /* Checkout.cpp */,
+				7EB4276C0FBA0E9E003C7DD1 /* Checkout.h */,
+				C4E61899095A3C810012CA3F /* CheckoutPiPL.r */,
+				7EF36FC016F29931002A3CB3 /* Cocoa.framework */,
+				D05CB7DF09C797100070A8DA /* Supporting Code */,
+				C4E6188C095A3C800012CA3F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C4E6188C095A3C800012CA3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C4E618CC095A3CE80012CA3F /* Checkout.plugin */,
+			);
+			name = Products;
+			sourceTree = SOURCE_ROOT;
+		};
+		D05CB7DF09C797100070A8DA /* Supporting Code */ = {
+			isa = PBXGroup;
+			children = (
+				7E76EEDB1F7087FC00536F9D /* AE_Effect.h */,
+				7E76EEDC1F7087FC00536F9D /* AE_PluginData.h */,
+				7EE914321A5C6F19009CD299 /* AEFX_SuiteHandlerTemplate.h */,
+				7EE914701A5C7051009CD299 /* DuckSuite.h */,
+			);
+			name = "Supporting Code";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C4E618CB095A3CE80012CA3F /* Checkout */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "Checkout" */;
+			buildPhases = (
+				C4E618C8095A3CE80012CA3F /* Resources */,
+				C4E618C9095A3CE80012CA3F /* Sources */,
+				C4E618CA095A3CE80012CA3F /* Frameworks */,
+				C4E618EA095A3E040012CA3F /* Rez */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Checkout;
+			productName = Checkout.plugin;
+			productReference = C4E618CC095A3CE80012CA3F /* Checkout.plugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C4E6187E095A3C800012CA3F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0720;
+			};
+			buildConfigurationList = C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "Checkout" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				Japanese,
+				French,
+				German,
+				"zh-Hans",
+			);
+			mainGroup = C4E6187C095A3C800012CA3F;
+			productRefGroup = C4E6188C095A3C800012CA3F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C4E618CB095A3CE80012CA3F /* Checkout */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C4E618C8095A3CE80012CA3F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXRezBuildPhase section */
+		C4E618EA095A3E040012CA3F /* Rez */ = {
+			isa = PBXRezBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C4D30BC7095B394800E2F3B4 /* CheckoutPiPL.r in Rez */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXRezBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C4E618C9095A3CE80012CA3F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C4E618D2095A3D3A0012CA3F /* Checkout.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		C4E61880095A3C800012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_TESTABILITY = YES;
+				GCC_INPUT_FILETYPE = sourcecode.cpp.objcpp;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Cocoa.framework/Headers/Cocoa.h";
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../Headers,
+					../../../Util,
+					../../../Headers/SP,
+					../../../Resources,
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				REZ_PREPROCESSOR_DEFINITIONS = __MACH__;
+				SDKROOT = macosx;
+				WRAPPER_EXTENSION = plugin;
+			};
+			name = Debug;
+		};
+		C4E618CF095A3CE90012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+				GENERATE_PKGINFO_FILE = YES;
+				INFOPLIST_FILE = "Checkout.plugin-Info.plist";
+				INSTALL_PATH = "$(HOME)/Library/Bundles";
+				PRODUCT_BUNDLE_IDENTIFIER = com.adobe.AfterEffects.Checkout;
+				PRODUCT_NAME = Checkout;
+				SDKROOT = macosx;
+				ZERO_LINK = NO;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "Checkout" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E61880095A3C800012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 1;
+			defaultConfigurationName = Debug;
+		};
+		C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "Checkout" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E618CF095A3CE90012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C4E6187E095A3C800012CA3F /* Project object */;
+}

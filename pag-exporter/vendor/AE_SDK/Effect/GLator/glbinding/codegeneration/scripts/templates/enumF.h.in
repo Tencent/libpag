@@ -1,0 +1,15 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+#include <glbinding/%a/enum.h>
+
+
+namespace %a%f
+{
+
+// import enums to namespace
+
+%s
+
+} // namespace %a%f

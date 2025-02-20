@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Viewer</class>
+ <widget class="QMainWindow" name="Viewer">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>734</width>
+    <height>541</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string/>
+  </property>
+  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>734</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="viewMenu">
+    <property name="title">
+     <string>&amp;View</string>
+    </property>
+    <addaction name="toggleFullScreenAction"/>
+    <addaction name="toggleSwapIntervalAction"/>
+   </widget>
+   <widget class="QMenu" name="fileMenu">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="quitAction"/>
+   </widget>
+   <widget class="QMenu" name="helpMenu">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="aboutAction"/>
+   </widget>
+   <addaction name="fileMenu"/>
+   <addaction name="viewMenu"/>
+   <addaction name="helpMenu"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="toggleDebugModeAction">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Toggle &amp;Debug Mode</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="togglePrintModeAction">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Toggle &amp;Print Mode</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="toggleFullScreenAction">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Toggle &amp;Full Screen</string>
+   </property>
+   <property name="shortcut">
+    <string>F11</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="specifyResolutionAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Specify Resolution ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="captureCameraPathAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Capture Camera Path ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="aboutAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>About ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::AboutRole</enum>
+   </property>
+  </action>
+  <action name="quitAction">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Close</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::QuitRole</enum>
+   </property>
+  </action>
+  <action name="driveManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Drive Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="playCameraPathAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Play Camera Path ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="flightManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Flight Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="terrainManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Terrain Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="trackballManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Track&amp;ball Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="treemapManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>3D Tree&amp;map Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="fpsManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>FPS Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="specifyBenchmarkAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Specify Benchmark ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="runBenchmarksAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Run Benchmarks ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="manageConfigurationsAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Manage &amp;Configurations ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="preferencesAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Preferences ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="listOfFBOsAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>List of named FBOs</string>
+   </property>
+  </action>
+  <action name="showFrameBuffersAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Show Frame Buffers ...</string>
+   </property>
+  </action>
+  <action name="ufoManipulatorAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;UFO Manipulator</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="selectVantagePointAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Select V&amp;antage Point ...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="createVantagePointAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Create Vantage Point</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="toggleLogoAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Toggle &amp;Logo</string>
+   </property>
+  </action>
+  <action name="loadPresentationAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Load Presentation ...</string>
+   </property>
+  </action>
+  <action name="captureImageAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Capture &amp;Image</string>
+   </property>
+  </action>
+  <action name="captureImageAdvancedAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Capture &amp;Image (Advanced) ...</string>
+   </property>
+  </action>
+  <action name="captureMovieAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Capture &amp;Movie</string>
+   </property>
+  </action>
+  <action name="toggleSwapIntervalAction">
+   <property name="text">
+    <string>Toggle &amp;Swap Interval</string>
+   </property>
+   <property name="shortcut">
+    <string>F10</string>
+   </property>
+  </action>
+  <action name="showAdaptiveGridAction">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Adaptive &amp;Grid</string>
+   </property>
+   <property name="shortcut">
+    <string>G</string>
+   </property>
+  </action>
+  <action name="toggleTimeAction">
+   <property name="text">
+    <string>&amp;Toggle Time</string>
+   </property>
+   <property name="shortcut">
+    <string>T</string>
+   </property>
+  </action>
+  <action name="restartTimeAction">
+   <property name="text">
+    <string>&amp;Restart Time</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

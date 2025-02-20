@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{18a902f9-1bd5-4a37-b868-d5c4a222713e}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\AE">
+      <UniqueIdentifier>{f346ee1b-0e87-438f-bac7-cbc9c614c000}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{a0f73fe6-f975-4fdc-a517-b6d1f6f967a7}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Supporting Code">
+      <UniqueIdentifier>{a086fdba-20ac-4e02-8f56-2fdd427f6908}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Artie.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Artie_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Artie_vector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_AdvEffectSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_ChannelSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AE_EffectSuitesHelper.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_FPF.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlugOld.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Hook.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_IO.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_SuiteHandler.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\FIEL_Public.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\GP_Vers.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PF_Masks.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PR_Public.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Artie.cpp" />
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp" />
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Artie_PiPL.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Artie_PiPL.r">
+      <Filter>Resource Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

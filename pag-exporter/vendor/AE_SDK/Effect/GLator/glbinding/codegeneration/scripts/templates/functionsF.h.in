@@ -1,0 +1,12 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+#include <glbinding/%a/functions.h>
+
+
+namespace %a%f
+{
+
+%s
+
+} // namespace %a%f

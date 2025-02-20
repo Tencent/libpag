@@ -1,0 +1,18 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+
+namespace %a
+{
+
+enum class GLboolean : unsigned char
+{
+    %s
+};
+
+// import booleans to namespace
+
+%s
+
+} // namespace %a

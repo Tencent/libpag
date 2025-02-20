@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{7bce3b0c-2859-4fc2-9004-53c6dd90b22c}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Headers\AE">
+      <UniqueIdentifier>{12a44093-29c6-4a9a-9130-74bebe3681a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{71490440-ef5a-48eb-a239-11d1e05a7260}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Supporting Code">
+      <UniqueIdentifier>{8beaf83a-c0ff-4de3-9165-e79e4ff269f9}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Grabba.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Grabba_Strings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_AdvEffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuitesHelper.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlugOld.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Hook.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_IO.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_SuiteHandler.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\FIEL_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PF_Masks.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PR_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\String_Utils.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Grabba_PiPL.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Grabba.cpp" />
+    <ClCompile Include="..\Grabba_Strings.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Grabba_PiPL.r">
+      <Filter>Resources</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

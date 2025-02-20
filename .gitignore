@@ -79,3 +79,11 @@ ios/PAG
 mac/PAG
 linux/vendor/
 /PAG
+
+# pag-exporter
+pag-exporter/third_party
+pag-exporter/build
+pag-exporter/QTCMAKE.cfg
+pag-exporter/PAGExporter.rsrc
+pag-exporter/cmake-build-*
+!pag-exporter/vendor/AE_SDK/Resources/PiPLtool.exe

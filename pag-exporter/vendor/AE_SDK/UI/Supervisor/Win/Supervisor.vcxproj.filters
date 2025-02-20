@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Supporting Code">
+      <UniqueIdentifier>{5ba2c57b-9074-48e9-b52a-42ce4048bb96}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;hpj;bat;for;f90</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{3cc5a16b-c795-44a3-a1ac-7b1903e2cedc}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\AE">
+      <UniqueIdentifier>{92adcee9-16c9-4c26-8383-7c3f4c0b6caf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{4dff6fa5-2903-4830-89c4-fcbf99c6e318}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Util\AEFX_SuiteHelper.c">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\Smart_Utils.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Supervisor.cpp" />
+    <ClCompile Include="..\Supervisor_Strings.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Util\AEFX_SuiteHelper.h">
+      <Filter>Supporting Code</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Supervisor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_AdvEffectSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AE_EffectSuitesHelper.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlugOld.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_IO.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_SuiteHandler.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\FIEL_Public.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Param_Utils.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PF_Masks.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\PF_Suite_Helper.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Smart_Utils.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\String_Utils.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Supervisor_Strings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_PluginData.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="SupervisorPiPL.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\SupervisorPiPL.r">
+      <Filter>Resource Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

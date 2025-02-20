@@ -1,0 +1,19 @@
+
+#include "Meta_Maps.h"
+
+#include <glbinding/gl/bitfield.h>
+
+
+using namespace gl; // ToDo: multiple APIs?
+
+namespace glbinding
+{
+
+const std::unordered_map<std::string, GLbitfield> Meta_BitfieldsByString
+{
+#ifdef GL_BY_STRINGS
+    %s
+#endif
+};
+
+} // namespace glbinding

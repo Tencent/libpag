@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Supporting code">
+      <UniqueIdentifier>{3f50f82f-ceee-409f-91dc-129af99c73f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{54266cd3-f8d6-4089-ba09-10072dd2a3c1}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\AE">
+      <UniqueIdentifier>{0a0c09ae-7124-446e-bd1d-d465176c7ce0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\AE\aesdk">
+      <UniqueIdentifier>{341ba82d-a306-4920-bc10-aabe8c3f546f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{aa6b5656-4084-4db6-9ae3-baeb55a9c875}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Util\AEFX_SuiteHelper.c">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\Smart_Utils.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ColorGrid.cpp" />
+    <ClCompile Include="..\ColorGrid_Arb_Handler.cpp" />
+    <ClCompile Include="..\ColorGrid_UI_Handler.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Util\AEFX_SuiteHelper.h">
+      <Filter>Supporting code</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Smart_Utils.h">
+      <Filter>Supporting code</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ColorGrid.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_AdvEffectSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_ChannelSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AE_EffectSuitesHelper.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuitesHelper.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEFX_ArbParseHelper.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Param_Utils.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\String_Utils.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\adobesdk\DrawbotSuite.h">
+      <Filter>Header Files\AE\aesdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\adobesdk\drawbotsuite\DrawbotSuiteTypes.h">
+      <Filter>Header Files\AE\aesdk</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_PluginData.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ColorGridPiPL.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\ColorGridPiPL.r">
+      <Filter>Resource Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

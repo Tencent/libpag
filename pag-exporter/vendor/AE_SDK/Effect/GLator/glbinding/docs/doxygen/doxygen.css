@@ -1,0 +1,38 @@
+div.row {
+	margin-top: 20px;
+}
+
+#projectlogo img {
+	margin: 2ex 4ex;
+}
+
+span.icon {
+	padding: 4pt;
+}
+
+.directory .levels {
+    text-align: right;
+}
+
+.directory .levels span {
+    cursor: pointer;
+}
+
+.arrow {
+    color: #f3a01d;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    cursor: pointer;
+    font-size: 80%;
+    display: inline-block;
+    width: 16px;
+    height: 22px;
+}
+
+div.dyncontent div.center {
+	text-align: center;
+	padding: 20px 0px;
+}

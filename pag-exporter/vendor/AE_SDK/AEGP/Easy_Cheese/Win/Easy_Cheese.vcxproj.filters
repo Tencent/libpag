@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{90723b35-9c35-4936-9881-8271cd5cdcbd}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Headers\Windows">
+      <UniqueIdentifier>{db672975-e78a-4999-95b2-005522d35442}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headers\AE">
+      <UniqueIdentifier>{c96f7659-789f-4c4e-8b50-1699613b2341}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{5630fd81-2782-4dc8-a605-746de7ff10ad}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Supporting Code">
+      <UniqueIdentifier>{8fd63b1c-1865-47c0-973d-39300267d168}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Easy_Cheese.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Easy_Cheese_Strings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\..\Program Files\Microsoft Visual Studio\VC98\Include\BASETSD.H">
+      <Filter>Headers\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_AdvEffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AE_EffectSuitesHelper.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlugOld.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Hook.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_IO.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_SuiteHandler.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\FIEL_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PF_Masks.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PR_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PT_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\String_Utils.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Easy_Cheese_PiPL.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp">
+      <Filter>Supporting Code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Easy_Cheese.cpp" />
+    <ClCompile Include="..\Easy_Cheese_Strings.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Easy_Cheese_PiPL.r">
+      <Filter>Resources</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

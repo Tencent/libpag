@@ -1,0 +1,228 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 42;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D092F695099B9DCB00D8FE41 /* Artie_PiPL.r in Rez */ = {isa = PBXBuildFile; fileRef = D092F694099B9DCB00D8FE41 /* Artie_PiPL.r */; };
+		D0FDF9BB09941656008E4F6B /* Artie.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FDF9B709941656008E4F6B /* Artie.cpp */; };
+		D0FE579D0993C5E500139A60 /* AEGP_SuiteHandler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FE579A0993C5E500139A60 /* AEGP_SuiteHandler.cpp */; };
+		D0FE579E0993C5E500139A60 /* MissingSuiteError.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FE579C0993C5E500139A60 /* MissingSuiteError.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		C4E618CC095A3CE80012CA3F /* Artie.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Artie.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
+		D092F694099B9DCB00D8FE41 /* Artie_PiPL.r */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.rez; name = Artie_PiPL.r; path = ../Artie_PiPL.r; sourceTree = SOURCE_ROOT; };
+		D0FDF9B709941656008E4F6B /* Artie.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = Artie.cpp; path = ../Artie.cpp; sourceTree = SOURCE_ROOT; };
+		D0FDF9B809941656008E4F6B /* Artie.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = Artie.h; path = ../Artie.h; sourceTree = SOURCE_ROOT; };
+		D0FE579A0993C5E500139A60 /* AEGP_SuiteHandler.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = AEGP_SuiteHandler.cpp; path = ../../../Util/AEGP_SuiteHandler.cpp; sourceTree = SOURCE_ROOT; };
+		D0FE579C0993C5E500139A60 /* MissingSuiteError.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = MissingSuiteError.cpp; path = ../../../Util/MissingSuiteError.cpp; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C4E618CA095A3CE80012CA3F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C4E6187C095A3C800012CA3F = {
+			isa = PBXGroup;
+			children = (
+				D0FDF9B709941656008E4F6B /* Artie.cpp */,
+				D0FDF9B809941656008E4F6B /* Artie.h */,
+				D092F694099B9DCB00D8FE41 /* Artie_PiPL.r */,
+				D0FE57630993C4FD00139A60 /* Supporting Code */,
+				C4E6188C095A3C800012CA3F /* Products */,
+			);
+			comments = "Artisans are the trickiest AE plug-in type. Here's hoping you never have to write one. If you do, treat the contents of this sample as a skeleton, indicating aspects of the API you'll need to use. Do NOT treat this sample as a best-case implementation of a 3D renderer. It isn't.";
+			sourceTree = "<group>";
+		};
+		C4E6188C095A3C800012CA3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C4E618CC095A3CE80012CA3F /* Artie.plugin */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D0FE57630993C4FD00139A60 /* Supporting Code */ = {
+			isa = PBXGroup;
+			children = (
+				D0FE579A0993C5E500139A60 /* AEGP_SuiteHandler.cpp */,
+				D0FE579C0993C5E500139A60 /* MissingSuiteError.cpp */,
+			);
+			name = "Supporting Code";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C4E618CB095A3CE80012CA3F /* Artie */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "Artie" */;
+			buildPhases = (
+				C4E618C9095A3CE80012CA3F /* Sources */,
+				C4E618CA095A3CE80012CA3F /* Frameworks */,
+				C4E618EA095A3E040012CA3F /* Rez */,
+				D0445653099417B00073E055 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Artie;
+			productName = Artie.plugin;
+			productReference = C4E618CC095A3CE80012CA3F /* Artie.plugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C4E6187E095A3C800012CA3F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0450;
+			};
+			buildConfigurationList = C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "Artie" */;
+			compatibilityVersion = "Xcode 2.4";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				en,
+			);
+			mainGroup = C4E6187C095A3C800012CA3F;
+			productRefGroup = C4E6188C095A3C800012CA3F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C4E618CB095A3CE80012CA3F /* Artie */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D0445653099417B00073E055 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXRezBuildPhase section */
+		C4E618EA095A3E040012CA3F /* Rez */ = {
+			isa = PBXRezBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D092F695099B9DCB00D8FE41 /* Artie_PiPL.r in Rez */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXRezBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C4E618C9095A3CE80012CA3F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0FE579D0993C5E500139A60 /* AEGP_SuiteHandler.cpp in Sources */,
+				D0FE579E0993C5E500139A60 /* MissingSuiteError.cpp in Sources */,
+				D0FDF9BB09941656008E4F6B /* Artie.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		C4E61880095A3C800012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					ppc,
+					i386,
+				);
+				CONFIGURATION_BUILD_DIR = "$(BUILD_DIR)";
+				COPY_PHASE_STRIP = NO;
+				GCC_MODEL_TUNING = "";
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_REUSE_STRINGS = NO;
+				GCC_THREADSAFE_STATICS = NO;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_CHECK_SWITCH_STATEMENTS = YES;
+				GCC_WARN_EFFECTIVE_CPLUSPLUS_VIOLATIONS = NO;
+				GCC_WARN_MISSING_PARENTHESES = YES;
+				GCC_WARN_SHADOW = YES;
+				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_LABEL = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../Headers,
+					../../../Util,
+					../../../Headers/SP,
+					../../../Resources,
+				);
+				REZ_PREPROCESSOR_DEFINITIONS = __MACH__;
+				SDKROOT = macosx10.7;
+				STRIP_INSTALLED_PRODUCT = NO;
+			};
+			name = Debug;
+		};
+		C4E618CF095A3CE90012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Carbon.framework/Headers/Carbon.h";
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GENERATE_PKGINFO_FILE = YES;
+				INFOPLIST_FILE = "Artie.plugin-Info.plist";
+				INSTALL_PATH = "$(HOME)/Library/Bundles";
+				LINK_WITH_STANDARD_LIBRARIES = YES;
+				OTHER_LDFLAGS = (
+					"-framework",
+					Carbon,
+				);
+				PRODUCT_NAME = Artie;
+				SDKROOT = macosx10.8;
+				WRAPPER_EXTENSION = plugin;
+				ZERO_LINK = NO;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "Artie" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E61880095A3C800012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 1;
+			defaultConfigurationName = Debug;
+		};
+		C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "Artie" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E618CF095A3CE90012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C4E6187E095A3C800012CA3F /* Project object */;
+}

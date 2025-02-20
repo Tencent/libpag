@@ -1,0 +1,55 @@
+#pragma once
+
+#include <array>
+#include <vector>
+#include <functional>
+
+#include <glbinding/glbinding_api.h>
+
+#include <glbinding/gl/types.h>
+
+#include <glbinding/ContextHandle.h>
+#include <glbinding/Function.h>
+
+
+namespace glbinding
+{
+
+class GLBINDING_API Binding
+{
+public:
+    using array_t = std::array<AbstractFunction *, %s>;
+    using ContextSwitchCallback = std::function<void(ContextHandle)>;
+
+    Binding() = delete;
+
+    static void initialize(bool resolveFunctions = true);
+    static void initialize(ContextHandle context, bool useContext = true, bool resolveFunctions = true);
+    
+    static void registerAdditionalFunction(AbstractFunction * function);
+
+    static void resolveFunctions();
+
+    static void useCurrentContext();
+    static void useContext(ContextHandle context);
+
+    static void releaseCurrentContext();
+    static void releaseContext(ContextHandle context);
+    
+    static void addContextSwitchCallback(ContextSwitchCallback callback);
+
+    static size_t size();
+
+    static const array_t & functions();
+    static const std::vector<AbstractFunction *> & additionalFunctions();
+
+public:
+%s
+
+protected:
+	static const array_t s_functions;
+	static std::vector<AbstractFunction *> s_additionalFunctions;
+	static std::vector<ContextSwitchCallback> s_callbacks;
+};
+
+} // namespace glbinding

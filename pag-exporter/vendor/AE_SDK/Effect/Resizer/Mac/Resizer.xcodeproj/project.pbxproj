@@ -1,0 +1,222 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		7EF36FCF16F299EC002A3CB3 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF36FCE16F299EC002A3CB3 /* Cocoa.framework */; };
+		D075387F09940A81000099DF /* Resizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D075387E09940A81000099DF /* Resizer.cpp */; };
+		D075388309940AA7000099DF /* ResizerPiPL.r in Rez */ = {isa = PBXBuildFile; fileRef = D075388209940AA7000099DF /* ResizerPiPL.r */; };
+		D075388509940AC8000099DF /* Resizer_Strings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D075388409940AC8000099DF /* Resizer_Strings.cpp */; };
+		D0FE579D0993C5E500139A60 /* AEGP_SuiteHandler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FE579A0993C5E500139A60 /* AEGP_SuiteHandler.cpp */; };
+		D0FE579E0993C5E500139A60 /* MissingSuiteError.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FE579C0993C5E500139A60 /* MissingSuiteError.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		7E76EEEB1F7088A600536F9D /* AE_Effect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AE_Effect.h; path = ../../../Headers/AE_Effect.h; sourceTree = "<group>"; };
+		7E76EEEC1F7088A600536F9D /* AE_PluginData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AE_PluginData.h; path = ../../../Headers/AE_PluginData.h; sourceTree = "<group>"; };
+		7EF36FCE16F299EC002A3CB3 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		7EF3706916F29DD6002A3CB3 /* Resizer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Resizer.h; path = ../Resizer.h; sourceTree = "<group>"; };
+		7EF3706A16F29DDB002A3CB3 /* Resizer_Strings.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Resizer_Strings.h; path = ../Resizer_Strings.h; sourceTree = "<group>"; };
+		C4E618CC095A3CE80012CA3F /* Resizer.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Resizer.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
+		D075387E09940A81000099DF /* Resizer.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = Resizer.cpp; path = ../Resizer.cpp; sourceTree = SOURCE_ROOT; };
+		D075388209940AA7000099DF /* ResizerPiPL.r */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.rez; name = ResizerPiPL.r; path = ../ResizerPiPL.r; sourceTree = SOURCE_ROOT; };
+		D075388409940AC8000099DF /* Resizer_Strings.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = Resizer_Strings.cpp; path = ../Resizer_Strings.cpp; sourceTree = SOURCE_ROOT; };
+		D0FE579A0993C5E500139A60 /* AEGP_SuiteHandler.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = AEGP_SuiteHandler.cpp; path = ../../../Util/AEGP_SuiteHandler.cpp; sourceTree = SOURCE_ROOT; };
+		D0FE579C0993C5E500139A60 /* MissingSuiteError.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = MissingSuiteError.cpp; path = ../../../Util/MissingSuiteError.cpp; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C4E618CA095A3CE80012CA3F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7EF36FCF16F299EC002A3CB3 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C4E6187C095A3C800012CA3F = {
+			isa = PBXGroup;
+			children = (
+				D075387E09940A81000099DF /* Resizer.cpp */,
+				7EF3706916F29DD6002A3CB3 /* Resizer.h */,
+				D075388409940AC8000099DF /* Resizer_Strings.cpp */,
+				7EF3706A16F29DDB002A3CB3 /* Resizer_Strings.h */,
+				D075388209940AA7000099DF /* ResizerPiPL.r */,
+				D0FE57630993C4FD00139A60 /* Supporting Code */,
+				7EF36FCE16F299EC002A3CB3 /* Cocoa.framework */,
+				C4E6188C095A3C800012CA3F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C4E6188C095A3C800012CA3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C4E618CC095A3CE80012CA3F /* Resizer.plugin */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D0FE57630993C4FD00139A60 /* Supporting Code */ = {
+			isa = PBXGroup;
+			children = (
+				7E76EEEB1F7088A600536F9D /* AE_Effect.h */,
+				7E76EEEC1F7088A600536F9D /* AE_PluginData.h */,
+				D0FE579A0993C5E500139A60 /* AEGP_SuiteHandler.cpp */,
+				D0FE579C0993C5E500139A60 /* MissingSuiteError.cpp */,
+			);
+			name = "Supporting Code";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C4E618CB095A3CE80012CA3F /* Resizer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "Resizer" */;
+			buildPhases = (
+				C4E618C9095A3CE80012CA3F /* Sources */,
+				C4E618CA095A3CE80012CA3F /* Frameworks */,
+				C4E618EA095A3E040012CA3F /* Rez */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Resizer;
+			productName = Resizer.plugin;
+			productReference = C4E618CC095A3CE80012CA3F /* Resizer.plugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C4E6187E095A3C800012CA3F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0720;
+			};
+			buildConfigurationList = C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "Resizer" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				en,
+				"zh-Hans",
+			);
+			mainGroup = C4E6187C095A3C800012CA3F;
+			productRefGroup = C4E6188C095A3C800012CA3F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C4E618CB095A3CE80012CA3F /* Resizer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXRezBuildPhase section */
+		C4E618EA095A3E040012CA3F /* Rez */ = {
+			isa = PBXRezBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D075388309940AA7000099DF /* ResizerPiPL.r in Rez */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXRezBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C4E618C9095A3CE80012CA3F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0FE579D0993C5E500139A60 /* AEGP_SuiteHandler.cpp in Sources */,
+				D0FE579E0993C5E500139A60 /* MissingSuiteError.cpp in Sources */,
+				D075387F09940A81000099DF /* Resizer.cpp in Sources */,
+				D075388509940AC8000099DF /* Resizer_Strings.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		C4E61880095A3C800012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				ENABLE_TESTABILITY = YES;
+				GCC_INPUT_FILETYPE = sourcecode.cpp.objcpp;
+				GCC_MODEL_TUNING = "";
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Cocoa.framework/Headers/Cocoa.h";
+				GCC_REUSE_STRINGS = NO;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_THREADSAFE_STATICS = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_CHECK_SWITCH_STATEMENTS = YES;
+				GCC_WARN_EFFECTIVE_CPLUSPLUS_VIOLATIONS = NO;
+				GCC_WARN_MISSING_PARENTHESES = YES;
+				GCC_WARN_SHADOW = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_LABEL = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../Headers,
+					../../../Util,
+					../../../Headers/SP,
+					../../../Resources,
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				REZ_PREPROCESSOR_DEFINITIONS = __MACH__;
+				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = NO;
+				WRAPPER_EXTENSION = plugin;
+			};
+			name = Debug;
+		};
+		C4E618CF095A3CE90012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_MODEL_TUNING = G5;
+				GENERATE_PKGINFO_FILE = YES;
+				INFOPLIST_FILE = "Resizer.plugin-Info.plist";
+				INSTALL_PATH = "$(HOME)/Library/Bundles";
+				PRODUCT_BUNDLE_IDENTIFIER = com.adobe.AfterEffects.Resizer;
+				PRODUCT_NAME = Resizer;
+				SDKROOT = macosx;
+				ZERO_LINK = NO;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "Resizer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E61880095A3C800012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 1;
+			defaultConfigurationName = Debug;
+		};
+		C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "Resizer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E618CF095A3CE90012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C4E6187E095A3C800012CA3F /* Project object */;
+}

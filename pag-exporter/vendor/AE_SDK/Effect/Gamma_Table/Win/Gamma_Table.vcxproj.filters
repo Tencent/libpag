@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{d2883c9f-72ad-4553-9e9f-5d976bb90039}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{4e2ab6e7-1951-4884-b56c-6515e65f5b47}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\AE">
+      <UniqueIdentifier>{4a08d88d-a651-46a2-97af-8e200a78a9c0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Gamma_TablePiPL.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Gamma_Table.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Param_Utils.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_PluginData.h">
+      <Filter>Header Files\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Gamma_Table.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\Gamma_TablePiPL.r">
+      <Filter>Resource Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

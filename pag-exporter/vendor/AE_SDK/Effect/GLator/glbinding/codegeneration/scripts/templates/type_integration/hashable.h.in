@@ -1,0 +1,14 @@
+
+namespace std
+{
+
+template<>
+struct hash<gl::%t>
+{
+    hash<std::underlying_type<gl::%t>::type>::result_type operator()(const gl::%t & t) const
+    {
+        return hash<std::underlying_type<gl::%t>::type>()(static_cast<std::underlying_type<gl::%t>::type>(t));
+    }
+};
+
+}

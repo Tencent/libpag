@@ -1,0 +1,14 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+#include <glbinding/%a/types.h>
+
+
+namespace %a%f
+{
+
+using gl::GLextension;
+%s
+%s
+
+} // namespace %a%f

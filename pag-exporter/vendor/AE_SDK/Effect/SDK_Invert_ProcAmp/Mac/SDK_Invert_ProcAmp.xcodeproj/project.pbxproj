@@ -1,0 +1,279 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		02C34AC2211D4974005B98A7 /* SDK_Invert_ProcAmp_Kernel.cl in Sources */ = {isa = PBXBuildFile; fileRef = 02C34AC1211D4971005B98A7 /* SDK_Invert_ProcAmp_Kernel.cl */; };
+		25F5A54E0B2A1A6B00D969DF /* Smart_Utils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 25F5A54C0B2A1A6B00D969DF /* Smart_Utils.cpp */; };
+		7EF36FD516F29A14002A3CB3 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF36FD416F29A14002A3CB3 /* Cocoa.framework */; };
+		A115BEB4211E4420002E56C3 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A115BEB3211E4420002E56C3 /* Metal.framework */; };
+		A115BEB6211E4430002E56C3 /* OpenCL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A115BEB5211E4430002E56C3 /* OpenCL.framework */; };
+		D075387F09940A81000099DF /* SDK_Invert_ProcAmp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D075387E09940A81000099DF /* SDK_Invert_ProcAmp.cpp */; };
+		D075388309940AA7000099DF /* SDK_Invert_ProcAmpPiPL.r in Rez */ = {isa = PBXBuildFile; fileRef = D075388209940AA7000099DF /* SDK_Invert_ProcAmpPiPL.r */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildRule section */
+		A1565A53211B6C0B00070361 /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			filePatterns = "OpenCL source files";
+			fileType = sourcecode.opencl;
+			isEditable = 1;
+			outputFiles = (
+				"$(DERIVED_FILE_DIR)/64/PreprocessedMetal/${INPUT_FILE_BASE}.metal.h",
+				"$(DERIVED_FILE_DIR)/64/PreprocessedOpenCL/${INPUT_FILE_BASE}.cl.h",
+			);
+			script = "mkdir -p ${DERIVED_FILE_DIR}/64/PreprocessedMetal/\n\nchmod 777 ${DERIVED_FILE_DIR}/64/PreprocessedMetal/\n\n/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -E -x c  -I\"../../../GPUUtils\" -I\"${BOOST_BASE_PATH}\" -I\"${SDKROOT}\"/../../../usr/lib/clang/3.5/include/metal/ -DGF_DEVICE_TARGET_METAL=1  -o ${DERIVED_FILE_DIR}/64/PreprocessedMetal/${INPUT_FILE_BASE}.i \"${INPUT_FILE_PATH}\"\n\npython \"${PROJECT_DIR}\"/../../../GPUUtils/CreateCString.py -i ${DERIVED_FILE_DIR}/64/PreprocessedMetal/${INPUT_FILE_BASE}.i -o ${DERIVED_FILE_DIR}/64/PreprocessedMetal/${INPUT_FILE_BASE}.metal.h --name k${INPUT_FILE_BASE}_MetalString\n\nmkdir -p ${DERIVED_FILE_DIR}/64/PreprocessedOpenCL/\n\nchmod 777 ${DERIVED_FILE_DIR}/64/PreprocessedOpenCL/\n\n/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -E -x c  -I\"../../../GPUUtils\" -I\"${BOOST_BASE_PATH}\" -DGF_DEVICE_TARGET_OPENCL=1  -o ${DERIVED_FILE_DIR}/64/PreprocessedOpenCL/${INPUT_FILE_BASE}.i \"${INPUT_FILE_PATH}\"\n\npython \"${PROJECT_DIR}\"/../../../GPUUtils/CreateCString.py -i ${DERIVED_FILE_DIR}/64/PreprocessedOpenCL/${INPUT_FILE_BASE}.i -o ${DERIVED_FILE_DIR}/64/PreprocessedOpenCL/${INPUT_FILE_BASE}.cl.h --name k${INPUT_FILE_BASE}_OpenCLString";
+		};
+/* End PBXBuildRule section */
+
+/* Begin PBXFileReference section */
+		027F68572163214E00E619EA /* SDK_Invert_ProcAmp_Kernel.cu */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = SDK_Invert_ProcAmp_Kernel.cu; path = ../SDK_Invert_ProcAmp_Kernel.cu; sourceTree = "<group>"; };
+		02C34AC1211D4971005B98A7 /* SDK_Invert_ProcAmp_Kernel.cl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.opencl; name = SDK_Invert_ProcAmp_Kernel.cl; path = ../SDK_Invert_ProcAmp_Kernel.cl; sourceTree = "<group>"; };
+		11117D370B66C171003986A3 /* PrSDKAESupport.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PrSDKAESupport.h; path = ../../../Headers/PrSDKAESupport.h; sourceTree = SOURCE_ROOT; };
+		11117D380B66C171003986A3 /* PrSDKPixelFormat.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PrSDKPixelFormat.h; path = ../../../Headers/PrSDKPixelFormat.h; sourceTree = SOURCE_ROOT; };
+		25F5A54C0B2A1A6B00D969DF /* Smart_Utils.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = Smart_Utils.cpp; path = ../../../Util/Smart_Utils.cpp; sourceTree = SOURCE_ROOT; };
+		25F5A54D0B2A1A6B00D969DF /* Smart_Utils.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = Smart_Utils.h; path = ../../../Util/Smart_Utils.h; sourceTree = SOURCE_ROOT; };
+		7E4EB82F16F12CDF00240388 /* SDK_Invert_ProcAmp.plugin-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "SDK_Invert_ProcAmp.plugin-Info.plist"; sourceTree = "<group>"; };
+		7E5643271F6C7C4400B5EAFE /* AE_PluginData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AE_PluginData.h; path = ../../../Headers/AE_PluginData.h; sourceTree = "<group>"; };
+		7E5643281F6C7CEF00B5EAFE /* entry.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = entry.h; path = ../../../Util/entry.h; sourceTree = "<group>"; };
+		7EE914711A5C884A009CD299 /* AEFX_SuiteHandlerTemplate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AEFX_SuiteHandlerTemplate.h; path = ../../../Headers/AEFX_SuiteHandlerTemplate.h; sourceTree = "<group>"; };
+		7EF36FD416F29A14002A3CB3 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		A115BEB3211E4420002E56C3 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		A115BEB5211E4430002E56C3 /* OpenCL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenCL.framework; path = System/Library/Frameworks/OpenCL.framework; sourceTree = SDKROOT; };
+		A115CB70211E4B9E002E56C3 /* AE_EffectGPUSuites.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AE_EffectGPUSuites.h; path = ../../../Headers/AE_EffectGPUSuites.h; sourceTree = "<group>"; };
+		C4E618CC095A3CE80012CA3F /* SDK_Invert_ProcAmp.plugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SDK_Invert_ProcAmp.plugin; sourceTree = BUILT_PRODUCTS_DIR; };
+		D075387E09940A81000099DF /* SDK_Invert_ProcAmp.cpp */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.cpp.cpp; name = SDK_Invert_ProcAmp.cpp; path = ../SDK_Invert_ProcAmp.cpp; sourceTree = SOURCE_ROOT; };
+		D075388209940AA7000099DF /* SDK_Invert_ProcAmpPiPL.r */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.rez; name = SDK_Invert_ProcAmpPiPL.r; path = ../SDK_Invert_ProcAmpPiPL.r; sourceTree = SOURCE_ROOT; };
+		D0D30D350A48C36000AC30E7 /* AE_Effect.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = AE_Effect.h; path = ../../../Headers/AE_Effect.h; sourceTree = SOURCE_ROOT; };
+		D0D30D360A48C37000AC30E7 /* SDK_Invert_ProcAmp.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = SDK_Invert_ProcAmp.h; path = ../SDK_Invert_ProcAmp.h; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C4E618CA095A3CE80012CA3F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A115BEB6211E4430002E56C3 /* OpenCL.framework in Frameworks */,
+				A115BEB4211E4420002E56C3 /* Metal.framework in Frameworks */,
+				7EF36FD516F29A14002A3CB3 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		25F5A63F0B2A1D4C00D969DF /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D075388209940AA7000099DF /* SDK_Invert_ProcAmpPiPL.r */,
+				7E4EB82F16F12CDF00240388 /* SDK_Invert_ProcAmp.plugin-Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		A115BEB2211E4420002E56C3 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7EF36FD416F29A14002A3CB3 /* Cocoa.framework */,
+				A115BEB5211E4430002E56C3 /* OpenCL.framework */,
+				A115BEB3211E4420002E56C3 /* Metal.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C4E6187C095A3C800012CA3F = {
+			isa = PBXGroup;
+			children = (
+				02C34AC1211D4971005B98A7 /* SDK_Invert_ProcAmp_Kernel.cl */,
+				027F68572163214E00E619EA /* SDK_Invert_ProcAmp_Kernel.cu */,
+				D075387E09940A81000099DF /* SDK_Invert_ProcAmp.cpp */,
+				D0D30D360A48C37000AC30E7 /* SDK_Invert_ProcAmp.h */,
+				25F5A63F0B2A1D4C00D969DF /* Resources */,
+				D0FE57630993C4FD00139A60 /* Supporting Code */,
+				C4E6188C095A3C800012CA3F /* Products */,
+				A115BEB2211E4420002E56C3 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		C4E6188C095A3C800012CA3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C4E618CC095A3CE80012CA3F /* SDK_Invert_ProcAmp.plugin */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D0FE57630993C4FD00139A60 /* Supporting Code */ = {
+			isa = PBXGroup;
+			children = (
+				A115CB70211E4B9E002E56C3 /* AE_EffectGPUSuites.h */,
+				D0D30D350A48C36000AC30E7 /* AE_Effect.h */,
+				7E5643271F6C7C4400B5EAFE /* AE_PluginData.h */,
+				7EE914711A5C884A009CD299 /* AEFX_SuiteHandlerTemplate.h */,
+				11117D370B66C171003986A3 /* PrSDKAESupport.h */,
+				11117D380B66C171003986A3 /* PrSDKPixelFormat.h */,
+				25F5A54C0B2A1A6B00D969DF /* Smart_Utils.cpp */,
+				25F5A54D0B2A1A6B00D969DF /* Smart_Utils.h */,
+				7E5643281F6C7CEF00B5EAFE /* entry.h */,
+			);
+			name = "Supporting Code";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C4E618CB095A3CE80012CA3F /* SDK_Invert_ProcAmp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "SDK_Invert_ProcAmp" */;
+			buildPhases = (
+				C4E618C9095A3CE80012CA3F /* Sources */,
+				C4E618CA095A3CE80012CA3F /* Frameworks */,
+				C4E618EA095A3E040012CA3F /* Rez */,
+			);
+			buildRules = (
+				A1565A53211B6C0B00070361 /* PBXBuildRule */,
+			);
+			dependencies = (
+			);
+			name = SDK_Invert_ProcAmp;
+			productName = SDK_Invert_ProcAmp.plugin;
+			productReference = C4E618CC095A3CE80012CA3F /* SDK_Invert_ProcAmp.plugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C4E6187E095A3C800012CA3F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0720;
+			};
+			buildConfigurationList = C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "SDK_Invert_ProcAmp" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = C4E6187C095A3C800012CA3F;
+			productRefGroup = C4E6188C095A3C800012CA3F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C4E618CB095A3CE80012CA3F /* SDK_Invert_ProcAmp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXRezBuildPhase section */
+		C4E618EA095A3E040012CA3F /* Rez */ = {
+			isa = PBXRezBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D075388309940AA7000099DF /* SDK_Invert_ProcAmpPiPL.r in Rez */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXRezBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C4E618C9095A3CE80012CA3F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D075387F09940A81000099DF /* SDK_Invert_ProcAmp.cpp in Sources */,
+				02C34AC2211D4974005B98A7 /* SDK_Invert_ProcAmp_Kernel.cl in Sources */,
+				25F5A54E0B2A1A6B00D969DF /* Smart_Utils.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		C4E61880095A3C800012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				ENABLE_TESTABILITY = YES;
+				GCC_INPUT_FILETYPE = sourcecode.cpp.objcpp;
+				GCC_MODEL_TUNING = "";
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Cocoa.framework/Headers/Cocoa.h";
+				GCC_REUSE_STRINGS = NO;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_THREADSAFE_STATICS = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_CHECK_SWITCH_STATEMENTS = YES;
+				GCC_WARN_EFFECTIVE_CPLUSPLUS_VIOLATIONS = NO;
+				GCC_WARN_MISSING_PARENTHESES = YES;
+				GCC_WARN_SHADOW = NO;
+				GCC_WARN_UNKNOWN_PRAGMAS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_LABEL = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../Headers,
+					../../../Util,
+					../../../Headers/SP,
+					../../../Resources,
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				REZ_PREPROCESSOR_DEFINITIONS = __MACH__;
+				SDKROOT = macosx;
+				STRIP_INSTALLED_PRODUCT = NO;
+				WRAPPER_EXTENSION = plugin;
+			};
+			name = Debug;
+		};
+		C4E618CF095A3CE90012CA3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = build/Debug;
+				GCC_MODEL_TUNING = G5;
+				GENERATE_PKGINFO_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					../../../Headers,
+					../../../Util,
+					../../../Headers/SP,
+					../../../Resources,
+					../../../GPUUtils,
+					../../../GPUUtils/PrGPU/KernelSupport,
+				);
+				INFOPLIST_FILE = "SDK_Invert_ProcAmp.plugin-Info.plist";
+				INSTALL_PATH = "$(HOME)/Library/Bundles";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.adobe.AfterEffects.SDK-Invert-ProcAmp";
+				PRODUCT_NAME = SDK_Invert_ProcAmp;
+				SDKROOT = macosx;
+				ZERO_LINK = NO;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C4E6187F095A3C800012CA3F /* Build configuration list for PBXProject "SDK_Invert_ProcAmp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E61880095A3C800012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 1;
+			defaultConfigurationName = Debug;
+		};
+		C4E618CE095A3CE90012CA3F /* Build configuration list for PBXNativeTarget "SDK_Invert_ProcAmp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4E618CF095A3CE90012CA3F /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C4E6187E095A3C800012CA3F /* Project object */;
+}

@@ -1,0 +1,2 @@
+
+#pragma pack( pop, AdobeSDKExternalAlign )

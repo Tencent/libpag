@@ -1,0 +1,25 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Shifter", "Shifter.vcxproj", "{D90E076B-3A76-4F67-A492-D3A18AF538F1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Debug|x64.ActiveCfg = Debug|x64
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Debug|x64.Build.0 = Debug|x64
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Debug|x86.ActiveCfg = Debug|Win32
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Debug|x86.Build.0 = Debug|Win32
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Release|x64.ActiveCfg = Release|x64
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Release|x64.Build.0 = Release|x64
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Release|x86.ActiveCfg = Release|Win32
+		{D90E076B-3A76-4F67-A492-D3A18AF538F1}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

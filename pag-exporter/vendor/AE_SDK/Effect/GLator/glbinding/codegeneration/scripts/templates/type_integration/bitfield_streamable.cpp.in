@@ -1,0 +1,6 @@
+
+std::ostream & operator<<(std::ostream & stream, const gl::%t & value)
+{
+    stream << bitfieldString<gl::%t>(value, glbinding::Meta_StringsBy%t);
+    return stream;
+}

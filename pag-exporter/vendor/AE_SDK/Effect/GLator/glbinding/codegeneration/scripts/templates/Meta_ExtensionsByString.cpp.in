@@ -1,0 +1,18 @@
+
+#include "Meta_Maps.h"
+
+#include <glbinding/gl/extension.h>
+
+
+using namespace gl; // ToDo: multiple APIs?
+
+namespace glbinding
+{
+
+const std::unordered_map<std::string, GLextension> Meta_ExtensionsByString
+{
+// NOTE: this is intended to work irrespective of a GL_BY_STRINGS definition.
+    %s
+};
+
+} // namespace glbinding

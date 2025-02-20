@@ -1,0 +1,240 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{8cb54d3b-232b-4673-9735-96eed9ebdd87}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{5d285a54-c385-45e9-8a07-1d2f0853fa1e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headers\AE">
+      <UniqueIdentifier>{50b6f164-a831-4644-9908-b80b57adabd6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Supporting code">
+      <UniqueIdentifier>{79927c73-6487-4b67-912d-3fefeb174109}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GLSL files">
+      <UniqueIdentifier>{b5c8841d-9feb-48b8-8693-da0bdd61b3ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glbinding">
+      <UniqueIdentifier>{84fd5098-2911-41a7-b21f-72e866091f60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glbinding\gl">
+      <UniqueIdentifier>{88fc9faa-129c-4133-b5da-49c09f9f1921}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="GLatorPiPL.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\GL_base.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\GLator.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\GLator_Strings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\A.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Effect.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCB.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectCBSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectSuites.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AE_EffectSuitesHelper.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_EffectUI.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlug.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_GeneralPlugOld.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_IO.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_Macros.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEFX_ChannelDepthTpl.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEGP_SuiteHandler.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\entry.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\FIEL_Public.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Param_Utils.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\PF_Masks.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\String_Utils.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\vmath.hpp">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\AEFX_SuiteHelper.h">
+      <Filter>Supporting code</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Util\Smart_Utils.h">
+      <Filter>Supporting code</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glbinding\source\glbinding\source\callbacks_private.h">
+      <Filter>glbinding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glbinding\source\glbinding\source\glrevision.h">
+      <Filter>glbinding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glbinding\source\glbinding\source\logging_private.h">
+      <Filter>glbinding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glbinding\source\glbinding\source\Meta_Maps.h">
+      <Filter>glbinding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glbinding\source\glbinding\source\RingBuffer.h">
+      <Filter>glbinding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glbinding\source\glbinding\source\RingBuffer.hpp">
+      <Filter>glbinding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Headers\AE_PluginData.h">
+      <Filter>Headers\AE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Util\AEGP_SuiteHandler.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\GL_base.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\GLator_Strings.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\MissingSuiteError.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\GLator.cpp" />
+    <ClCompile Include="..\..\..\Util\AEFX_SuiteHelper.c">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Util\Smart_Utils.cpp">
+      <Filter>Supporting code</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\AbstractFunction.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\AbstractValue.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Binding.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Binding_objects.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\callbacks.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\ContextHandle.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\ContextInfo.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\logging.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_BitfieldsByString.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_BooleansByString.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_EnumsByString.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_ExtensionsByFunctionString.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_ExtensionsByString.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_FunctionStringsByExtension.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_ReqVersionsByExtension.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_StringsByBitfield.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_StringsByBoolean.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_StringsByEnum.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Meta_StringsByExtension.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\ProcAddress.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Value.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Version.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\Version_ValidVersions.cpp">
+      <Filter>glbinding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\gl\functions.cpp">
+      <Filter>glbinding\gl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glbinding\source\glbinding\source\gl\types.cpp">
+      <Filter>glbinding\gl</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\GLatorPiPL.r">
+      <Filter>Resources</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\GLSL_files\fragment_shader.frag">
+      <Filter>GLSL files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\GLSL_files\vertex_shader.vert">
+      <Filter>GLSL files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\GLSL_files\fragment_shader2.frag">
+      <Filter>GLSL files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

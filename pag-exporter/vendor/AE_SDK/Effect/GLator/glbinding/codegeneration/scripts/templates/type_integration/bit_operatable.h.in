@@ -1,0 +1,11 @@
+namespace gl
+{
+
+GLBINDING_API gl::%t operator|(const gl::%t & a, const gl::%t & b);
+GLBINDING_API gl::%t & operator|=(gl::%t & a, const gl::%t & b);
+GLBINDING_API gl::%t operator&(const gl::%t & a, const gl::%t & b);
+GLBINDING_API gl::%t & operator&=(gl::%t & a, const gl::%t & b);
+GLBINDING_API gl::%t operator^(const gl::%t & a, const gl::%t & b);
+GLBINDING_API gl::%t & operator^=(gl::%t & a, const gl::%t & b);
+
+} // namespace gl

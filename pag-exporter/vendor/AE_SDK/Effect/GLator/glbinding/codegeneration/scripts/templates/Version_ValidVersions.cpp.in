@@ -1,0 +1,15 @@
+
+#include <glbinding/Version.h>
+
+
+namespace glbinding
+{
+
+const std::set<Version> Version::s_validVersions = 
+{
+    %s
+};
+
+const Version Version::s_latest %s;
+
+} // namespace glbinding
