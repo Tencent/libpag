@@ -6,13 +6,11 @@ buildscript {
         supportLibVersion = '28.0.0'
         junitVersion = '4.12'
         compileSdkVersion = 33
-        buildToolsVersion = '33.0.2'
+        buildToolsVersion = '35.0.0'
         ndkVersion = '28.0.13004108'
         minSdkVersion = 21
         targetSdkVersion = 33
-        // Set the AGP version according to the corresponding Gradle version.
-        // Documentation: https://developer.android.com/build/releases/gradle-plugin#updating-gradle
-        agpVersion = '8.7.3'
+        agpVersion = '8.8.1'
         appcompatVersion = '1.4.2' // after this version, compileSdkVersion must large than 31
     }
     repositories {
