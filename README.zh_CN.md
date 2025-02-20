@@ -6,17 +6,19 @@
 [![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-[English](./README.md) | 简体中文 | [官网](https://pag.art)
+[![Cloud Studio](https://cs-res.codehub.cn/common/assets/icon-badge.svg)](https://cloudstudio.net/a/20987965736472576?channel=share&sharetype=Markdown)
+
+[English](./README.md) | 简体中文 | [官网](https://pag.io)
 
 ## 介绍
 
-libpag 是 PAG (Portable Animated Graphics) 动效文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, macOS,
+libpag 是 PAG (Portable Animated Graphics) 动效文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, OpenHarmony, macOS,
 Windows, Linux, 以及 Web 端。
 
 PAG 方案是一套完善的动效工作流。提供从 AE（Adobe After Effects）导出插件，到桌面预览工具 PAGViewer，再到各端的跨平台渲染 SDK。
 目标是降低或消除动效研发相关的成本，打通设计师创作到素材交付上线的极简流程，不断输出运行时可编辑的高质量动效内容。
 
-PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机QQ，王者荣耀，腾讯视频，QQ音乐等头部产品，稳定性经过了海量用户的持续验证，可以广泛应用于UI动画、贴纸动画、视频编辑、模板设计等场景。典型应用场景可以参考[官网案例](https://pag.art/case.html)。
+PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机QQ，王者荣耀，腾讯视频，QQ音乐等头部产品，稳定性经过了海量用户的持续验证，可以广泛应用于UI动画、贴纸动画、视频编辑、模板设计等场景。典型应用场景可以参考[官网案例](https://pag.io/case.html)。
 
 详细介绍可以参考相关报道：
 
@@ -52,7 +54,8 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 ## 系统要求
 
 - iOS 9.0 版本及以上
-- Android 4.4 版本及以上
+- Android 5.0 版本及以上
+- HarmonyOS Next 5.0.0(12) 版本及以上
 - macOS 10.15 版本及以上
 - Windows 7.0 版本及以上
 - Chrome 69.0 版本及以上
@@ -62,7 +65,7 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS, Android 和 Web 平台定期发布预编译的二进制库，其他平台的库需要通过
 源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/Tencent/libpag/releases)
-下载。 详细的 SDK接入文档可以参考 [SDK 接入](https://pag.art/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
+下载。 详细的 SDK接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
 接入](./web/README.md)
 
 ### iOS 端接入
@@ -121,6 +124,26 @@ dependencies {
 
 配置完以后，sync一下，再编译即可。
 
+### OpenHarmony 端接入
+可以从 [release](https://github.com/Tencent/libpag/releases) 页面下载预编译的 har，或者通过 OHPM 将 libpag 添加到您的项目中：
+
+```
+ohpm install @tencent/libpag
+```
+
+或者可以手动将其添加到您的项目中。
+将以下几行添加到应用模块上的 oh-package.json5
+
+```
+"dependencies": {
+"@tencent/libpag": "^1.0.1",
+}
+```
+Then run
+```
+ohpm install
+```
+
 ### Web 端接入
 
 直接拷贝如下代码，然后在浏览器中运行即可：
@@ -130,7 +153,7 @@ dependencies {
 <script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
 <script>
   window.libpag.PAGInit().then((PAG) => {
-    const url = 'https://pag.art/file/like.pag';
+    const url = 'https://pag.io/file/like.pag';
     fetch(url)
       .then((response) => response.blob())
       .then(async (blob) => {
@@ -140,7 +163,7 @@ dependencies {
   });
 </script>
 ```
-Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/sdk-web.html)
+Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sdk-web.html)
 
 ### 范例工程
 
@@ -152,11 +175,11 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 
 ### API 手册：
 
-- [iOS API 参考](https://pag.art/apis/ios/index.html)
-- [Android API 参考](https://pag.art/apis/android/index.html)
-- [Web API 参考](https://pag.art/apis/web/index.html)
+- [iOS API 参考](https://pag.io/apis/ios/index.html)
+- [Android API 参考](https://pag.io/apis/android/index.html)
+- [Web API 参考](https://pag.io/apis/web/index.html)
 
-更多的其他文档可以访问官网  [pag.art](https://pag.art/docs/mobile-sdk-guide.html) 获得。
+更多的其他文档可以访问官网  [pag.io](https://pag.io/docs/mobile-sdk-guide.html) 获得。
 
 ## 开发指南
 
@@ -181,8 +204,8 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.art/docs/s
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 5.13.0+
-- NDK 19.2+ (**推荐 19.2.5345600 版本**)
-- Emscripten 3.1.20+ (**推荐 3.1.20 版本**)
+- NDK 28+ (**推荐 28.0.13004108 版本**)
+- Emscripten 3.1.58+
 
 ### 依赖管理
 
@@ -229,7 +252,7 @@ depsync
 注：**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
 另外，由于团队日常主要都在 macOS 平台上进行开发，Windows
 平台偶尔可能会出现编译不通过的情况，如果遇到阻塞的问题欢迎通过提交 [issue](https://github.com/Tencent/libpag/issues/new/choose)
-或 [官方论坛](https://bbs.pag.art/)跟我们反馈。
+或 [Discussions](https://github.com/Tencent/libpag/discussions)跟我们反馈。
 
 ## 支持我们
 
