@@ -1,6 +1,5 @@
 import os
 import sys
-import glob
 import shutil
 import platform
 
@@ -38,12 +37,7 @@ def build(rootDir: str, buildType: str):
 
     libps_generated_match_rule = []
     libps_generated_match_rule.append(os.path.join(working_dir, 'build', 'Sparkle.*', 'build', 'Products', buildType, 'Sparkle.framework'))
-    for rule in libps_generated_match_rule:
-        lib_generated_path = glob.glob(rule)
-        if not lib_generated_path:
-            print(f'Failed to find {rule}')
-            exit(1)
-        copyFileToDir(lib_generated_path, lib_out_path)
+    copyFileToDirByRule(libps_generated_match_rule, lib_out_path)
 
     os.chdir(origin_working_dir)
 

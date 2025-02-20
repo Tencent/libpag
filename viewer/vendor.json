@@ -7,7 +7,7 @@
             "scripts": {
                 "mac": {
                     "executor": "python",
-                    "file": "tools/build/log4qt/build.py",
+                    "file": "tools/build_tools/log4qt/build.py",
                     "arguments": []
                 }
             }
@@ -17,12 +17,12 @@
             "scripts": {
                 "mac": {
                     "executor": "python",
-                    "file": "tools/build/nlohman-json/build.py",
+                    "file": "tools/build_tools/nlohman-json/build.py",
                     "arguments": []
                 },
                 "win": {
                     "executor": "python",
-                    "file": "tools/build/nlohman-json/build.py",
+                    "file": "tools/build_tools/nlohman-json/build.py",
                     "arguments": []
                 }
             }
@@ -32,12 +32,12 @@
             "scripts": {
                 "mac": {
                     "executor": "python",
-                    "file": "tools/build/sodium/build.py",
+                    "file": "tools/build_tools/sodium/build.py",
                     "arguments": []
                 },
                 "win": {
                     "executor": "python",
-                    "file": "tools/build/sodium/build.py",
+                    "file": "tools/build_tools/sodium/build.py",
                     "arguments": []
                 }
             }
@@ -47,7 +47,17 @@
             "scripts": {
                 "mac": {
                     "executor": "python",
-                    "file": "tools/build/sparkle/build.py",
+                    "file": "tools/build_tools/sparkle/build.py",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "winsparkle",
+            "scripts": {
+                "win": {
+                    "executor": "python",
+                    "file": "tools/build_tools/winsparkle/build.py",
                     "arguments": []
                 }
             }

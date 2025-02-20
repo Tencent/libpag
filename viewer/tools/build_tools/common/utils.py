@@ -1,6 +1,8 @@
 import os
 import re
 import sys
+import glob
+import json
 import shutil
 import subprocess
 
@@ -53,6 +55,14 @@ def copyFileToDir(files: list, targetDir: str):
         else:
             shutil.copy2(file, targetDir)
 
+def copyFileToDirByRule(rules: list, targetDir: str):
+    for rule in rules:
+        path = glob.glob(rule)
+        if not path:
+            print(f'Failed to find path by {rule}')
+            exit(1)
+        copyFileToDir(path, targetDir)
+
 def patchDiff(workingDir: str, patchFile: str):
     origin_working_dir = os.getcwd()
     os.chdir(workingDir)
@@ -60,8 +70,17 @@ def patchDiff(workingDir: str, patchFile: str):
     command = f'git apply {patchFile}'
     if runCommand(command) != True:
         print(f'Failed to patch diff to {workingDir}')
-        os.chdir(origin_working_dir)
         # exit(1)
+
+    os.chdir(origin_working_dir)
+
+def restore(workingDir: str):
+    origin_working_dir = os.getcwd()
+    os.chdir(workingDir)
+
+    command = f'git restore .'
+    if runCommand(command) != True:
+        print(f'Failed to restore path {workingDir}')
 
     os.chdir(origin_working_dir)
 
@@ -73,3 +92,48 @@ def getCmakePrefixPath(filePath: str):
             if match:
                 return match.group(1)
     return None
+
+def getVisualStudioVersions():
+    try:
+        vswhere_path = os.path.expandvars(
+            r"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+        )
+        
+        if not os.path.exists(vswhere_path):
+            print(f"vswhere.exe not found at: {vswhere_path}")
+            return []
+
+        cmd = [
+            vswhere_path,
+            "-all",
+            "-format", "json",
+            "-products", "*",
+            "-prerelease"
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            vs_instances = json.loads(result.stdout)
+            versions = []
+            for instance in vs_instances:
+                installation_version = instance.get('installationVersion', '')
+                if installation_version:
+                    display_version = installation_version.split('.')[0]
+                    version_map = {'17': '2022',
+                                   '16': '2019',
+                                   '15': '2017',
+                                   '14': '2015',
+                                   '12': '2013',
+                                   '11': "2012",
+                                   '10': "2010"}
+                    line_version = version_map.get(display_version, '')
+                    if line_version:
+                        versions.append((line_version, display_version))
+            return versions
+            
+        print(f"vswhere.exe returned error code: {result.returncode}")
+        return []
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        return []

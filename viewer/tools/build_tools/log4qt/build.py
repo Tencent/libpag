@@ -33,7 +33,7 @@ def build(cmakePrefixPath: str, rootDir: str, buildType: str):
 
     lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'log4qt', 'lib', current_os, buildType)
     if os.path.exists(lib_out_path):
-        print(f'log4qt path[{lib_out_path}] is exist, skip build')
+        print(f'Log4Qt path[{lib_out_path}] is exist, skip build')
         return
 
     build_params = []

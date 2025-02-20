@@ -18,11 +18,17 @@ if (WIN32)
 endif ()
 
 include(tools/vendor_tools/vendor.cmake)
-
-add_vendor_target(log4qt STATIC_VENDORS log4qt)
-add_vendor_target(nlohman-json STATIC_VENDORS nlohman-json)
-add_vendor_target(sodium STATIC_VENDORS sodium)
-add_vendor_target(sparkle STATIC_VENDORS sparkle)
+execute_process(COMMAND sh ${CMAKE_SOURCE_DIR}/sync_deps.sh WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(PAGViewer src/main.cpp)
-add_dependencies(PAGViewer log4qt nlohman-json sodium sparkle)
+
+add_vendor_target(nlohman-json STATIC_VENDORS nlohman-json)
+add_vendor_target(sodium STATIC_VENDORS sodium)
+if (WIN32)
+    add_vendor_target(winsparkle STATIC_VENDORS winsparkle)
+    add_dependencies(PAGViewer nlohman-json sodium winsparkle)
+elseif (APPLE)
+    add_vendor_target(log4qt STATIC_VENDORS log4qt)
+    add_vendor_target(sparkle STATIC_VENDORS sparkle)
+    add_dependencies(PAGViewer log4qt nlohman-json sodium sparkle)
+endif()
