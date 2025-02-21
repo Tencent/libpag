@@ -22,12 +22,10 @@
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
-ImageReplacement::ImageReplacement(ImageLayer* imageLayer, std::shared_ptr<PAGImage> pagImage)
-    : pagImage(std::move(pagImage)) {
-  auto imageFillRule = imageLayer->imageFillRule;
-  defaultScaleMode = imageFillRule ? imageFillRule->scaleMode : PAGScaleMode::LetterBox;
-  contentWidth = imageLayer->imageBytes->width;
-  contentHeight = imageLayer->imageBytes->height;
+ImageReplacement::ImageReplacement(std::shared_ptr<PAGImage> pagImage, int scaleMode,
+                                   ImageBytes* imageBytes)
+    : pagImage(std::move(pagImage)), defaultScaleMode(scaleMode), contentWidth(imageBytes->width),
+      contentHeight(imageBytes->height) {
 }
 
 void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
