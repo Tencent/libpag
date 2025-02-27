@@ -27,27 +27,27 @@
 #ifndef CYDER_STRINGUTIL_H
 #define CYDER_STRINGUTIL_H
 
+#include <AEGP_SuiteHandler.h>
+#include <algorithm>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <algorithm>
-#include <sstream>
-#include <iomanip>
-#include <AEGP_SuiteHandler.h>
-
 
 class StringUtil {
  public:
   static std::vector<std::string> Split(const std::string& text, const std::string& separator);
 
-  static std::string ReplaceAll(const std::string& text, const std::string& from, const std::string& to);
+  static std::string ReplaceAll(const std::string& text, const std::string& from,
+                                const std::string& to);
 
   static std::string ToLowerCase(const std::string& text);
 
   static std::string ToUpperCase(const std::string& text);
-  
+
   static std::string DeleteLastSpace(const std::string& text);
 
   static std::string ToString(const AEGP_SuiteHandler& suites, AEGP_MemHandle memHandle);
 };
 
-#endif //CYDER_STRINGUTIL_H
+#endif  //CYDER_STRINGUTIL_H

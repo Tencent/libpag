@@ -1,0 +1,67 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/export_bmp.png</file>
+        <file>images/export_text.png</file>
+        <file>images/export_folder.png</file>
+        <file>images/export_preview.png</file>
+        <file>images/export_settings.png</file>
+        <file>images/export_fold.png</file>
+        <file>images/export_open.png</file>
+        <file>images/exprot_warning.png</file>
+        <file>images/exprot_wrong.png</file>
+        <file>images/export_success.png</file>
+        <file>images/export_waiting.png</file>
+        <file>images/down_arrow.png</file>
+        <file>images/play.png</file>
+        <file>images/pause.png</file>
+        <file>images/next.png</file>
+        <file>images/previous.png</file>
+        <file>images/export_radio_off.png</file>
+        <file>images/export_radio_on.png</file>
+        <file>images/checkbox_off.png</file>
+        <file>images/checkbox_on.png</file>
+        <file>images/tip.png</file>
+        <file>images/right_arrow.png</file>
+        <file>images/close-dark.png</file>
+        <file>images/maximize-dark.png</file>
+        <file>images/minimize-dark.png</file>
+        <file>images/restore-dark.png</file>
+        <file>images/export_search.png</file>
+
+        <file>qml/Main.qml</file>
+        <file>qml/MainForm.ui.qml</file>
+        <file>qml/Control.qml</file>
+        <file>qml/ControlForm.ui.qml</file>
+        <file>qml/InspectorItem.qml</file>
+        <file>qml/RectangleWithRadius.qml</file>
+        <file>qml/PApplicationWindow.qml</file>
+        <file>qml/PListView.qml</file>
+        <file>qml/PSplitView.qml</file>
+        <file>qml/ErrorListView.qml</file>
+        <file>qml/ExportConfig.qml</file>
+        <file>qml/MockLayerModel.qml</file>
+        <file>qml/MockErrorListModel.qml</file>
+        <file>qml/ExportSettings.qml</file>
+        <file>qml/CustomTabButton.qml</file>
+        <file>qml/MockCompositionsModel.qml</file>
+        <file>qml/MockPlaceHolderModel.qml</file>
+        <file>qml/ExportPlaceHolderPage.qml</file>
+        <file>qml/ExportComboBox.qml</file>
+        <file>qml/ExportCompositionPage.qml</file>
+        <file>qml/TimeEditText.qml</file>
+        <file>qml/ExportTimeStretchPage.qml</file>
+        <file>qml/ExportLayerEditablePage.qml</file>
+        <file>qml/ExportImageEditablePage.qml</file>
+        <file>qml/ProgressPage.qml</file>
+        <file>qml/ErrorTextArea.qml</file>
+        <file>qml/ExportProgressWindow.qml</file>
+        <file>qml/ExportProgressListView.qml</file>
+        <file>qml/CommonAlert.qml</file>
+
+        <file>qss/scrollbar_vertical.qss</file>
+        <file>qss/scrollbar_horizontal.qss</file>
+        <file>qss/combobox_pop_win.qss</file>
+
+        <file>language/english.qm</file>
+    </qresource>
+</RCC>

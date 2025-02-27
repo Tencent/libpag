@@ -15,15 +15,14 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include <iostream>
 #include "AEConfig.h"
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
 #include "AE_Macros.h"
-#include "utils/AEUtils.h"
 #include "aecmd/AECommand.h"
-#include <entry.h>
-
+#include "utils/AEUtils.h"
 
 extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long majorVersion,
                                           A_long minorVersion, AEGP_PluginID pluginID,
@@ -31,18 +30,24 @@ extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long maj
   AEUtils::SetSuitesAndPluginID(suite, pluginID);
   A_Err err = A_Err_NONE;
   A_Err err2 = A_Err_NONE;
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
 
-  ERR(suites.CommandSuite1()->AEGP_GetUniqueCommand(&PAGConfigCMD));
+  // PAG Config...
+  ERR(suites.CommandSuite1()->AEGP_GetUniqueCommand(&AECommand::PAGConfigCMD));
   ERR(suites.CommandSuite1()->AEGP_InsertMenuCommand(
-      PAGConfigCMD, "PAG Config...",
+      AECommand::PAGConfigCMD, "PAG Config...",
       AEGP_Menu_PREFS,  // "After Effect CC" -> "首选项"
       AEGP_MENU_INSERT_AT_BOTTOM));
-  ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(pluginID, AEGP_HP_BeforeAE,
-                                                        AEGP_Command_ALL, OnClickConfig, nullptr));
-
-
-  ERR(suites.RegisterSuite5()->AEGP_RegisterUpdateMenuHook(pluginID, OnUpdateMenu, nullptr));
+  ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(
+      pluginID, AEGP_HP_BeforeAE, AEGP_Command_ALL, AECommand::OnClickConfig, nullptr));
+  //PAG File (Panel)...
+  ERR(suites.CommandSuite1()->AEGP_GetUniqueCommand(&AECommand::PAGPanelCMD));
+  ERR(suites.CommandSuite1()->AEGP_InsertMenuCommand(AECommand::PAGPanelCMD, "PAG File (Panel)...",
+                                                     AEGP_Menu_EXPORT, AEGP_MENU_INSERT_SORTED));
+  ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(
+      pluginID, AEGP_HP_BeforeAE, AEGP_Command_ALL, AECommand::OnClickPanel, nullptr));
+  ERR(suites.RegisterSuite5()->AEGP_RegisterUpdateMenuHook(pluginID, AECommand::OnUpdateMenu,
+                                                           nullptr));
 
   if (err) {
     ERR2(suites.UtilitySuite3()->AEGP_ReportInfo(pluginID,

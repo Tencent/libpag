@@ -1,6 +1,6 @@
 #include "StringUtil.h"
-#include <codecvt>
 #include <assert.h>
+#include <codecvt>
 
 std::vector<std::string> StringUtil::Split(const std::string& text, const std::string& separator) {
   std::vector<std::string> result;
@@ -19,7 +19,8 @@ std::vector<std::string> StringUtil::Split(const std::string& text, const std::s
   return result;
 }
 
-std::string StringUtil::ReplaceAll(const std::string& text, const std::string& from, const std::string& to) {
+std::string StringUtil::ReplaceAll(const std::string& text, const std::string& from,
+                                   const std::string& to) {
   auto str = text;
   size_t start_pos = 0;
   while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
@@ -47,7 +48,7 @@ static bool LastIsSpace(const std::string& text) {
   if (text.length() == 0) {
     return false;
   }
-  auto last = text.substr(text.length()-1, 1);
+  auto last = text.substr(text.length() - 1, 1);
   if (last == " " || last == "\n") {
     return true;
   }
@@ -57,7 +58,7 @@ static bool LastIsSpace(const std::string& text) {
 std::string StringUtil::DeleteLastSpace(const std::string& text) {
   std::string result = text;
   while (LastIsSpace(result)) {
-    result = result.substr(0, result.length()-1);
+    result = result.substr(0, result.length() - 1);
   }
   return result;
 }
@@ -67,7 +68,7 @@ std::string StringUtil::ToString(const AEGP_SuiteHandler& suites, AEGP_MemHandle
   suites.MemorySuite1()->AEGP_LockMemHandle(memHandle, reinterpret_cast<void**>(&name));
 
   std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-  std::string text = convert.to_bytes(name); // utf-16 to utf-8
+  std::string text = convert.to_bytes(name);  // utf-16 to utf-8
 
   suites.MemorySuite1()->AEGP_UnlockMemHandle(memHandle);
   return text;

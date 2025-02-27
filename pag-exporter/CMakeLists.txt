@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+set(LIBPAG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Compile different architectures based on parameters
 if (APPLE)
     if (DEFINED BUILD_ARCH)
@@ -27,6 +28,9 @@ endif ()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC_SEARCH_PATHS
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/ui
+)
 
 if (NOT EXISTS ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg)
     if (APPLE)
@@ -43,40 +47,79 @@ find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick Multimedia Network
 add_definitions(${Qt6Widgets_DEFINITIONS} ${QtQml_DEFINITIONS} ${${Qt6Quick_DEFINITIONS}})
 qt6_add_resources(QT_RESOURCES assets/res.qrc)
 
-file(GLOB_RECURSE UTIL_FILES ${ROOT}/src/utils/*.cpp)
-list(APPEND SOURCE_FILES ${UTIL_FILES})
+file(GLOB UI_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui/*.ui")
+
+file(GLOB_RECURSE SOURCE_FILES
+        ${ROOT}/src/utils/*.cpp
+        ${ROOT}/src/ui/qt/*.cpp
+        ${ROOT}/src/exports/*.cpp
+        ${ROOT}/src/cJSON/*.c)
 
 file(GLOB_RECURSE AESDK_FILES ${ROOT}/vendor/AE_SDK/Util/*.cpp)
 list(APPEND SOURCE_FILES ${AESDK_FILES})
-
-file(GLOB_RECURSE UIQT_FILES ${ROOT}/src/ui/qt/*.cpp)
-list(APPEND SOURCE_FILES ${UIQT_FILES})
-
 list(APPEND SOURCE_FILES
         ${ROOT}/src/aecmd/AECommand.cpp
-
+        ${ROOT}/src/configparam/ConfigParam.cpp
         ${ROOT}/src/main.cpp)
 
 list(APPEND PAGEXPORTER_INCLUDES
+        ${ROOT}/src/utils
+        ${ROOT}/src/aecmd
+        ${ROOT}/src/ui/qt
+        ${ROOT}/src/cJSON
+        ${ROOT}/src/exports
+        ${ROOT}/src/configparam)
+
+list(APPEND THIRDPARTY_INCLUDES
         ${ROOT}/vendor/AE_SDK/Headers
         ${ROOT}/vendor/AE_SDK/Headers/SP
         ${ROOT}/vendor/AE_SDK/Util
         ${ROOT}/vendor/AE_SDK/Resources
-        ${ROOT}/src/util
-        ${ROOT}/src/aecmd
-        ${ROOT}/src/ui/qt)
+        ${ROOT}/third_party/json/include)
 
 if (APPLE)
     set(CMAKE_CXX_FLAGS "-stdlib=libc++")
     set_source_files_properties(${SOURCE_FILES} PROPERTIES
             COMPILE_FLAGS "-x objective-c++")
+
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
+
+    add_definitions(-DOS_MACOS)
+    set(OS_ARCH darwin-x64)
+
+    find_library(COCOA Cocoa REQUIRED)
+    list(APPEND libs ${COCOA})
+    find_library(QUARTZ_CORE QuartzCore REQUIRED)
+    list(APPEND libs ${QUARTZ_CORE})
+    find_library(FOUNDATION Foundation REQUIRED)
+    list(APPEND libs ${FOUNDATION})
+    find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
+    list(APPEND libs ${ICONV_LIBRARIES})
+    find_library(A_G_L AGL REQUIRED)
+    list(APPEND libs ${A_G_L})
+    find_library(OPENGL OpenGL REQUIRED)
+    list(APPEND libs ${OPENGL})
+    find_library(VIDEO_TOOL_BOX VideoToolBox)
+    list(APPEND libs ${VIDEO_TOOL_BOX})
+    find_library(CORE_MEDIA CoreMedia)
+    list(APPEND libs ${CORE_MEDIA})
+
+    find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
+    list(APPEND libs ${ICONV_LIBRARIES})
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/libpag.a)
 elseif (WIN32)
 endif ()
 
 
-add_library(PAGExporter MODULE ${SOURCE_FILES})
+add_library(PAGExporter MODULE ${SOURCE_FILES} ${UI_FILES} ${QT_RESOURCES})
+#target_compile_options(PAGExporter PUBLIC -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 target_include_directories(PAGExporter PUBLIC ${PAGEXPORTER_INCLUDES})
-target_link_libraries(PAGExporter Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Multimedia Qt6::Network)
+target_include_directories(PAGExporter SYSTEM PRIVATE ${THIRDPARTY_INCLUDES})
+target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/include)
+
+target_link_libraries(PAGExporter ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Multimedia Qt6::Network)
 if (APPLE)
     set_target_properties(PAGExporter PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugin/${BUILD_ARCH}/)
     target_link_libraries(PAGExporter "-framework AppKit" compression)
@@ -103,15 +146,23 @@ if (APPLE)
             COMMENT "Generating PAGExporter.rsrc"
             VERBATIM
     )
-    # 添加自定义目标
     add_custom_target(
             GeneratePAGExporterRsrc
             DEPENDS ${ROOT}/PAGExporter.rsrc
     )
     add_dependencies(PAGExporter GeneratePAGExporterRsrc)
 
+    set(RSRC_FILE ${ROOT}/PAGExporter.rsrc)
+    set(RESOURCES_DIR "$<TARGET_BUNDLE_DIR:PAGExporter>/Contents/Resources")
+    add_custom_command(
+            TARGET PAGExporter POST_BUILD
+            COMMAND /bin/sh -c "mkdir -p ${RESOURCES_DIR}"
+            COMMAND /bin/sh -c "cp -r ${RSRC_FILE} ${RESOURCES_DIR}"
+            COMMENT "Copying ${RSRC_FILE} to ${RESOURCES_DIR}"
+            VERBATIM
+    )
+
 elseif (WIN32)
-    # 设置目标扩展名
     set_target_properties(${PROJECT_NAME} PROPERTIES
             SUFFIX ".aex"
     )
@@ -123,6 +174,5 @@ elseif (WIN32)
             DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r"
             COMMENT "Compiling the PiPL"
     )
-    # 将资源文件添加到项目中
     target_sources(${PROJECT_NAME} PRIVATE PAGExporterPiPL.rc)
 endif ()

@@ -1,11 +1,11 @@
 #include "RunScript.h"
 
-
-std::string RunScript(const AEGP_SuiteHandler& suites, AEGP_PluginID pluginID, const std::string& scriptText) {
+std::string RunScript(const AEGP_SuiteHandler& suites, AEGP_PluginID pluginID,
+                      const std::string& scriptText) {
   AEGP_MemHandle scriptResult;
   AEGP_MemHandle errorResult;
-  suites.UtilitySuite6()->AEGP_ExecuteScript(pluginID, scriptText.c_str(),
-                                             FALSE, &scriptResult, &errorResult);
+  suites.UtilitySuite6()->AEGP_ExecuteScript(pluginID, scriptText.c_str(), FALSE, &scriptResult,
+                                             &errorResult);
   A_char* result = nullptr;
   suites.MemorySuite1()->AEGP_LockMemHandle(scriptResult, reinterpret_cast<void**>(&result));
   std::string resultText = result;

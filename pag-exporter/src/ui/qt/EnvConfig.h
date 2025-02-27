@@ -19,8 +19,8 @@
 #define ENVCONFIG_H
 #include <QtWidgets/QApplication>
 #include <string>
-
 QApplication* SetupQT();
 
+QApplication* CurrentUseQtApp();
 
-#endif //ENVCONFIG_H
+#endif  //ENVCONFIG_H

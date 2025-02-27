@@ -2,8 +2,8 @@
 #define AE_UTILS_H
 
 #include <string>
-#include "AE_GeneralPlug.h"
 #include "AEGP_SuiteHandler.h"
+#include "AE_GeneralPlug.h"
 #define PLUGIN_ID() AEUtils::GetPluginID()
 #define SUITES() (*AEUtils::GetSuites())
 
@@ -42,15 +42,19 @@ class AEUtils {
   static void EnableBmp(const AEGP_ItemH& itemH);
   static void DisableBmp(const AEGP_ItemH& itemH);
   static void ChangeBmp(const AEGP_ItemH& itemH);
-    
+
   static bool IsExistPath(std::string path);
   static bool IsExistPath(const char* path);
 
   static void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id);
 
-  static AEGP_SuiteHandler* GetSuites() { return Suites; }
+  static AEGP_SuiteHandler* GetSuites() {
+    return Suites;
+  }
 
-  static AEGP_PluginID GetPluginID() { return PluginID; }
+  static AEGP_PluginID GetPluginID() {
+    return PluginID;
+  }
   static void GetLanguageString(char language[]);
 
   static void RunScriptPreWarm();

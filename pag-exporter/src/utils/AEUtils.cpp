@@ -2,11 +2,11 @@
 #ifdef WIN32
 #include <io.h>  // windows for access
 #endif
+#include <QtWidgets/QFileDialog>
+#include <codecvt>
 #include <iostream>
 #include "RunScript.h"
 #include "StringUtil.h"
-#include <codecvt>
-#include <QtWidgets/QFileDialog>
 
 AEGP_PluginID AEUtils::PluginID = 0L;
 AEGP_SuiteHandler* AEUtils::Suites = nullptr;
@@ -19,88 +19,84 @@ std::string AEUtils::FolderTempName = "";
 
 #define Script(text) #text;
 
-static const std::string TextDocumentScript = Script(
-  if (typeof PAG !== 'object') {
-    PAG = {};
-  }
-  (function () {
-    'use strict';
+static const std::string TextDocumentScript =
+    Script(if (typeof PAG != = 'object') { PAG = {}; }(function() {
+             'use strict';
 
-    PAG.printTextDocuments = function (compositionID, layerIndex, keyframeIndex) {
-      var composition = null;
-      for (var i = 1; i <= app.project.numItems; i++) {
-        var item = app.project.item(i);
-        if (item instanceof CompItem && item.id == compositionID) {
-          composition = item;
-          break;
-        }
-      }
-      if (composition == null) {
-        return "";
-      }
+             PAG.printTextDocuments = function(compositionID, layerIndex, keyframeIndex) {
+               var composition = null;
+               for (var i = 1; i <= app.project.numItems; i++) {
+                 var item = app.project.item(i);
+                 if (item instanceof CompItem && item.id == compositionID) {
+                   composition = item;
+                   break;
+                 }
+               }
+               if (composition == null) {
+                 return "";
+               }
 
-      if (layerIndex >= composition.layers.length) {
-        return "";
-      }
-      var textLayer = composition.layers[layerIndex + 1];
-      var sourceText = textLayer.property("Source Text");
-      if (!sourceText) {
-        return "";
-      }
+               if (layerIndex >= composition.layers.length) {
+                 return "";
+               }
+               var textLayer = composition.layers[layerIndex + 1];
+               var sourceText = textLayer.property("Source Text");
+               if (!sourceText) {
+                 return "";
+               }
 
-      var textDocument;
-      if (keyframeIndex === 0 && sourceText.numKeys === 0) {
-        textDocument = sourceText.value;
-      } else {
-        textDocument = sourceText.keyValue(keyframeIndex + 1);
-      }
-      if (!textDocument) {
-        return "";
-      }
+               var textDocument;
+               if (keyframeIndex == = 0 && sourceText.numKeys == = 0) {
+                 textDocument = sourceText.value;
+               } else {
+                 textDocument = sourceText.keyValue(keyframeIndex + 1);
+               }
+               if (!textDocument) {
+                 return "";
+               }
 
-      var result =[];
-      for (var key in textDocument) {
-        if (!Object.prototype.hasOwnProperty.call(textDocument, key)) {
-          continue;
-        }
-        try {
-          var value = textDocument[key];
-        } catch (e) {
-          continue;
-        }
+               var result = [];
+               for (var key in textDocument) {
+                 if (!Object.prototype.hasOwnProperty.call(textDocument, key)) {
+                   continue;
+                 }
+                 try {
+                   var value = textDocument[key];
+                 } catch (e) {
+                   continue;
+                 }
 
-        var text = key + " : ";
-        switch (typeof value) {
-        case 'string':
-          value = value.split("\x03").join("\n");
-          value = value.split("\r\n").join("\n");
-          value = value.split("\r").join("\n");
-          value = value.split("\n").join("\\n");
-          text += value;
-          break;
-        case 'number':
-        case 'boolean':
-          text += String(value);
-          break;
-        case 'object':
-          if (value && Object.prototype.toString.apply(value) === '[object Array]') {
-            var partial =[];
-            var length = value.length;
-            for (var i = 0; i < length; i += 1) {
-              partial[i] = String(value[i]);
-            }
-            text += partial.join(',');
-          }
-          break;
-        }
-        if (text !== key + " : ") {
-          result.push(text);
-        }
-      }
-      return result.join("\n");
-    }
-  }());
-);
+                 var text = key + " : ";
+                 switch (typeof value) {
+                   case 'string':
+                     value = value.split("\x03").join("\n");
+                     value = value.split("\r\n").join("\n");
+                     value = value.split("\r").join("\n");
+                     value = value.split("\n").join("\\n");
+                     text += value;
+                     break;
+                   case 'number':
+                   case 'boolean':
+                     text += String(value);
+                     break;
+                   case 'object':
+                     if (value && Object.prototype.toString.apply(value) == = '[object Array]') {
+                       var partial = [];
+                       var length = value.length;
+                       for (var i = 0; i < length; i += 1) {
+                         partial[i] = String(value[i]);
+                       }
+                       text += partial.join(',');
+                     }
+                     break;
+                 }
+                 if (text != = key + " : ") {
+                   result.push(text);
+                 }
+               }
+               return result.join("\n");
+             }
+           }()););
 
 void AEUtils::RegisterTextDocumentScript() {
   static bool hasInit = false;
@@ -242,7 +238,7 @@ std::string AEUtils::GetItemName(const AEGP_ItemH& itemH) {
   suites.ItemSuite8()->AEGP_GetItemName(pluginID, itemH, &nameMemory);
   std::string itemName = StringUtil::ToString(suites, nameMemory);
   suites.MemorySuite1()->AEGP_FreeMemHandle(nameMemory);
-  
+
   itemName = StringUtil::DeleteLastSpace(itemName);
   return itemName;
 }
@@ -270,7 +266,7 @@ std::string AEUtils::GetLayerName(const AEGP_LayerH& layerH) {
   }
   suites.MemorySuite1()->AEGP_FreeMemHandle(layerNameHandle);
   suites.MemorySuite1()->AEGP_FreeMemHandle(sourceNameHandle);
-  
+
   name = StringUtil::DeleteLastSpace(name);
   return name;
 }
@@ -281,7 +277,7 @@ void AEUtils::SetItemName(const AEGP_ItemH& itemH, std::string newName) {
   }
   auto& suites = SUITES();
   std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-  auto fmtName = convert.from_bytes(newName); // utf-8 to utf-16
+  auto fmtName = convert.from_bytes(newName);  // utf-8 to utf-16
   suites.ItemSuite8()->AEGP_SetItemName(itemH, (const A_UTF16Char*)fmtName.c_str());
 }
 
@@ -313,7 +309,8 @@ void AEUtils::SelectItem(const AEGP_ItemH& itemH) {
   auto& suites = SUITES();
   if (itemH != nullptr) {
     suites.ItemSuite6()->AEGP_SelectItem(itemH, true, true);
-    suites.CommandSuite1()->AEGP_DoCommand(3061); // 3061: Open selection, ignoring any modifier keys.
+    suites.CommandSuite1()->AEGP_DoCommand(
+        3061);  // 3061: Open selection, ignoring any modifier keys.
   }
 }
 
@@ -323,9 +320,9 @@ void AEUtils::SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
   if (itemH == nullptr) {
     return;
   }
-  
+
   bool hasLayer = (layerH != nullptr);
-  
+
   AEGP_CollectionItemV2 collectionItem;
   AEGP_StreamRefH streamH;
   if (hasLayer) {
@@ -334,19 +331,21 @@ void AEUtils::SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
     collectionItem.u.layer.layerH = layerH;
     collectionItem.stream_refH = streamH;
   }
-  
+
   suites.ItemSuite6()->AEGP_SelectItem(itemH, true, true);
   if (!hasLayer) {
-    suites.CommandSuite1()->AEGP_DoCommand(3061); // 3061: Open selection, ignoring any modifier keys.
+    suites.CommandSuite1()->AEGP_DoCommand(
+        3061);  // 3061: Open selection, ignoring any modifier keys.
     return;
   }
-  
+
   auto compH = GetCompFromItem(itemH);
   AEGP_Collection2H collectionH = nullptr;
   suites.CollectionSuite2()->AEGP_NewCollection(pluginID, &collectionH);
   suites.CollectionSuite2()->AEGP_CollectionPushBack(collectionH, &collectionItem);
   suites.CompSuite6()->AEGP_SetSelection(compH, collectionH);
-  suites.CommandSuite1()->AEGP_DoCommand(3061); // 3061: Open selection, ignoring any modifier keys.
+  suites.CommandSuite1()->AEGP_DoCommand(
+      3061);  // 3061: Open selection, ignoring any modifier keys.
   suites.CollectionSuite2()->AEGP_DisposeCollection(collectionH);
 }
 
@@ -511,7 +510,8 @@ AEGP_StreamRefH AEUtils::GetMarkerStreamFromLayer(const AEGP_LayerH& layerH) {
   auto& suites = SUITES();
   auto pluginID = PLUGIN_ID();
   AEGP_StreamRefH streamH;
-  suites.StreamSuite4()->AEGP_GetNewLayerStream(pluginID, layerH, AEGP_LayerStream_MARKER, &streamH);
+  suites.StreamSuite4()->AEGP_GetNewLayerStream(pluginID, layerH, AEGP_LayerStream_MARKER,
+                                                &streamH);
   return streamH;
 }
 

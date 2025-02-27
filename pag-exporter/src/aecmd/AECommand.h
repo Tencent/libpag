@@ -18,19 +18,25 @@
 
 #ifndef AECOMMAND_H
 #define AECOMMAND_H
+#include <entry.h>
 #include "AE_GeneralPlug.h"
 #include "AE_Macros.h"
+class AECommand {
+ public:
+  static A_Err OnUpdateMenu(AEGP_GlobalRefcon globalRefcon, AEGP_UpdateMenuRefcon menuRefcon,
+                            AEGP_WindowType windowType);
+  static A_Err OnClickConfig(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon commandRefcon,
+                             AEGP_Command command, AEGP_HookPriority hookPriority,
+                             A_Boolean alreadyHandled, A_Boolean* handled);
+  static A_Err OnClickPanel(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon commandRefcon,
+                            AEGP_Command command, AEGP_HookPriority hookPriority,
+                            A_Boolean alreadyHandled, A_Boolean* handled);
 
+  static AEGP_Command PAGExporterCMD;
+  static A_long idleCount;
+  static AEGP_Command PAGConfigCMD;
+  static AEGP_Command PAGPanelCMD;
+  static AEGP_Command PAGPreviewCMD;
+};
 
-static AEGP_Command PAGExporterCMD = 0L;
-static A_long idleCount = 0L;
-static AEGP_Command PAGConfigCMD = 0L;
-static AEGP_Command PAGPanelCMD = 0L;
-static AEGP_Command PAGPreviewCMD = 0L;
-
-A_Err OnUpdateMenu(AEGP_GlobalRefcon globalRefcon, AEGP_UpdateMenuRefcon menuRefcon,
-                          AEGP_WindowType windowType);
-A_Err OnClickConfig(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon commandRefcon,
-                           AEGP_Command command, AEGP_HookPriority hookPriority,
-                           A_Boolean alreadyHandled, A_Boolean* handled);
 #endif  //AECOMMAND_H

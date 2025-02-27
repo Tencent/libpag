@@ -16,21 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-#include <QtWidgets/QApplication>
-#include <QtGui/QFont>
-#include <QtQuick/QQuickWindow>
-#include <QtGui/QSurfaceFormat>
 #include "EnvConfig.h"
-
-static int gAppIndex = 0;
+#include <QtGui/QFont>
+#include <QtGui/QSurfaceFormat>
+#include <QtQuick/QQuickWindow>
+#include <QtWidgets/QApplication>
 static QApplication* gCurrentQtApp = nullptr;
+static int gAppIndex = 0;
 
 QApplication* SetupQT() {
   QApplication::setAttribute(Qt::AA_PluginApplication, true);
-  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-
   QSurfaceFormat defaultFormat = QSurfaceFormat();
   defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
   defaultFormat.setVersion(3, 2);
@@ -51,6 +46,10 @@ QApplication* SetupQT() {
   fallbackList = {"PingFang SC", "Apple Color Emoji"};
 #endif
 
+  if (gCurrentQtApp) {
+    delete gCurrentQtApp;
+  }
+
   int argc = 0;
   QApplication* app = new QApplication(argc, nullptr);
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
@@ -58,7 +57,6 @@ QApplication* SetupQT() {
   appName.append(QString::number(gAppIndex));
   app->setObjectName(appName);
   gCurrentQtApp = app;
-  printf("SetupQT objectName:%s\n", appName.toStdString().c_str());
   gAppIndex++;
   return app;
 }
