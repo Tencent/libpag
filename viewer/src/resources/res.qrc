@@ -1,0 +1,66 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- png -->
+        <file>image/appicon.png</file>
+        <file>image/appicon-32x.png</file>
+        <file>image/back.png</file>
+        <file>image/background.png</file>
+        <file>image/background-on.png</file>
+        <file>image/checked.png</file>
+        <file>image/grayWarn.png</file>
+        <file>image/hide.png</file>
+        <file>image/icon3.png</file>
+        <file>image/icon-collapse.png</file>
+        <file>image/icon-edit.png</file>
+        <file>image/icon-save.png</file>
+        <file>image/icon-close.png</file>
+        <file>image/image-placeholder.png</file>
+        <file>image/next.png</file>
+        <file>image/panels.png</file>
+        <file>image/panels-on.png</file>
+        <file>image/pause.png</file>
+        <file>image/performance-warn.png</file>
+        <file>image/play.png</file>
+        <file>image/previous.png</file>
+        <file>image/scene.png</file>
+        <file>image/tiles.png</file>
+        <file>image/unchecked.png</file>
+        <file>image/update-on.png</file>
+        <file>image/update-red.png</file>
+        <file>image/update-white.png</file>
+        <file>image/volume.png</file>
+        <file>image/warn-bg.png</file>
+        <file>image/warn-bg2.png</file>
+        <file>image/warn-bg3.png</file>
+        <file>image/warnChecked.png</file>
+        <file>image/warnUnchecked.png</file>
+
+        <!-- svg -->
+        <file>image/close-dark.svg</file>
+        <file>image/maximize-dark.svg</file>
+        <file>image/minimize-dark.svg</file>
+        <file>image/restore-dark.svg</file>
+
+        <!-- qml -->
+        <file>qml/Menu.qml</file>
+        <file>qml/Profiler.qml</file>
+        <file>qml/MainForm.qml</file>
+        <file>qml/PListView.qml</file>
+        <file>qml/MainWindow.qml</file>
+        <file>qml/MessageBox.qml</file>
+        <file>qml/PSplitView.qml</file>
+        <file>qml/ControlForm.qml</file>
+        <file>qml/TextListView.qml</file>
+        <file>qml/ImageListView.qml</file>
+        <file>qml/SettingsWindow.qml</file>
+        <file>qml/TextEditDialog.qml</file>
+        <file>qml/AboutMessageBox.qml</file>
+        <file>qml/PTreeViewDelegate.qml</file>
+        <file>qml/PApplicationWindow.qml</file>
+        <file>qml/RectangleWithRadius.qml</file>
+        <file>qml/AttributeEditDialog.qml</file>
+
+        <!-- pag -->
+        <file>pag/jzznm.pag</file>
+    </qresource>
+</RCC>

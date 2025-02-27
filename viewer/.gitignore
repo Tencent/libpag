@@ -1,2 +1,3 @@
 /third_party/
 __pycache__
+/.cache/
