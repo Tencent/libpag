@@ -22,7 +22,6 @@
 #include <iostream>
 #include "ExportSingleAlert.h"
 #include "String_Utils.h"
-#include "Strings.h"
 #include "src/ui/qt/ExportAlertDialog/ExportAlertDialog.h"
 
 bool WarningsAlert(std::vector<std::string>& infos) {

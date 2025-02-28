@@ -18,14 +18,18 @@
 
 #include "AECommand.h"
 #include <QApplication>
+#include <QtWidgets/QApplication>
 #include <iostream>
+#include <string>
 #include "AEConfig.h"
 #include "AEGP_SuiteHandler.h"
-#include "PAGConfigDialog/PAGConfigDialog.h"
-#include "PAGPanelExporterDialog/PAGPanelExporterDialog.h"
+#include "AE_GeneralPlug.h"
+#include "src/ui/qt/PAGConfigDialog/PAGConfigDialog.h"
+#include "src/ui/qt/PAGPanelExporterDialog/PAGPanelExporterDialog.h"
 #include "src/configparam/ConfigParam.h"
+#include "src/ui/qt/EnvConfig.h"
 #include "src/utils/AEUtils.h"
-
+#include "src/utils/AEResource.h"
 AEGP_Command AECommand::PAGExporterCMD = 0L;
 AEGP_Command AECommand::PAGConfigCMD = 0L;
 AEGP_Command AECommand::PAGPanelCMD = 0L;
@@ -35,14 +39,14 @@ A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon globalRefcon, AEGP_UpdateMenuRef
                               AEGP_WindowType windowType) {
   A_Err err = A_Err_NONE, err2 = A_Err_NONE;
   auto& suites = SUITES();
-  //  AEGP_ItemH active_itemH = AEUtils::GetActiveCompositionItem();
-  //  if (active_itemH) {
-  //    ERR(suites.CommandSuite1()->AEGP_EnableCommand(PAGExporterCMD));
-  //    ERR(suites.CommandSuite1()->AEGP_EnableCommand(PAGPreviewCMD));
-  //  } else {
-  //    ERR2(suites.CommandSuite1()->AEGP_DisableCommand(PAGExporterCMD));
-  //    ERR2(suites.CommandSuite1()->AEGP_DisableCommand(PAGPreviewCMD));
-  //  }
+  AEGP_ItemH active_itemH = AEUtils::GetActiveCompositionItem();
+  if (active_itemH) {
+    ERR(suites.CommandSuite1()->AEGP_EnableCommand(PAGExporterCMD));
+    ERR(suites.CommandSuite1()->AEGP_EnableCommand(PAGPreviewCMD));
+  } else {
+    ERR2(suites.CommandSuite1()->AEGP_DisableCommand(PAGExporterCMD));
+    ERR2(suites.CommandSuite1()->AEGP_DisableCommand(PAGPreviewCMD));
+  }
 
   ERR(suites.CommandSuite1()->AEGP_EnableCommand(PAGConfigCMD));
   if (AEResource::HasCompositionResource()) {
@@ -52,6 +56,7 @@ A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon globalRefcon, AEGP_UpdateMenuRef
   }
   return err;
 }
+
 
 A_Err AECommand::OnClickConfig(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon commandRefcon,
                                AEGP_Command command, AEGP_HookPriority hookPriority,
@@ -79,7 +84,7 @@ A_Err AECommand::OnClickPanel(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon
   *handled = TRUE;
   SetupQT();
 
-  PAGPanelExporterDialog* dialog = new PAGPanelExporterDialog();
+  const auto dialog = new PAGPanelExporterDialog();
   dialog->showMainPage();
   return err;
 }

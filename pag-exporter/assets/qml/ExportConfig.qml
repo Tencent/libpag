@@ -1,8 +1,7 @@
 import QtQuick 2.12
-import QtQuick.Controls 2.5
+import QtQuick.Controls
 import Qt.labs.qmlmodels 1.0
 import QtQuick.Window 2.13
-import "."
 PApplicationWindow {
     property var windowWidth: 819
     property var windowHeight: 778

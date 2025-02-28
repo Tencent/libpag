@@ -19,13 +19,13 @@
 #define ERRORLIST_H
 #include <QtCore/QAbstractListModel>
 #include "AlertInfo.h"
-#include "ExportCommonConfig.h"
+#include "src/ui/qt/ExportCommonConfig.h"
 
 class ErrorListModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  ErrorListModel(QObject* parent = nullptr);
-  ~ErrorListModel();
+  explicit ErrorListModel(QObject* parent = nullptr);
+  ~ErrorListModel() override;
 
   Q_INVOKABLE int rowCount(const QModelIndex& parent = QModelIndex()) const override;
   Q_INVOKABLE int columnCount(const QModelIndex& parent = QModelIndex()) const override;

@@ -20,6 +20,8 @@
 #define AECOMMAND_H
 #include <entry.h>
 #include "AE_GeneralPlug.h"
+#include "AEGP_SuiteHandler.h"
+#include "AE_GeneralPlug.h"
 #include "AE_Macros.h"
 class AECommand {
  public:
@@ -31,7 +33,6 @@ class AECommand {
   static A_Err OnClickPanel(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon commandRefcon,
                             AEGP_Command command, AEGP_HookPriority hookPriority,
                             A_Boolean alreadyHandled, A_Boolean* handled);
-
   static AEGP_Command PAGExporterCMD;
   static A_long idleCount;
   static AEGP_Command PAGConfigCMD;

@@ -53,7 +53,8 @@ file(GLOB_RECURSE SOURCE_FILES
         ${ROOT}/src/utils/*.cpp
         ${ROOT}/src/ui/qt/*.cpp
         ${ROOT}/src/exports/*.cpp
-        ${ROOT}/src/cJSON/*.c)
+        ${ROOT}/src/cJSON/*.c
+)
 
 file(GLOB_RECURSE AESDK_FILES ${ROOT}/vendor/AE_SDK/Util/*.cpp)
 list(APPEND SOURCE_FILES ${AESDK_FILES})
@@ -110,6 +111,7 @@ if (APPLE)
     list(APPEND libs ${ICONV_LIBRARIES})
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/libpag.a)
 elseif (WIN32)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/win/libpag.lib)
 endif ()
 
 
@@ -175,4 +177,24 @@ elseif (WIN32)
             COMMENT "Compiling the PiPL"
     )
     target_sources(${PROJECT_NAME} PRIVATE PAGExporterPiPL.rc)
+
+    get_target_property(qmake_executable Qt6::qmake IMPORTED_LOCATION)
+    if (NOT qmake_executable)
+        message(FATAL_ERROR "qmake executable not found")
+    endif ()
+    get_filename_component(qt_bin_dir "${qmake_executable}" DIRECTORY)
+    find_program(windeployqt_executable windeployqt HINTS "${qt_bin_dir}")
+    if (NOT windeployqt_executable)
+        message(FATAL_ERROR "windeployqt.exe not found in ${qt_bin_dir}")
+    elseif (windeployqt_executable)
+        message(STATUS "Found windeployqt.exe at: ${windeployqt_executable}")
+        add_custom_command(
+                TARGET PAGExporter POST_BUILD
+                COMMAND ${ROOT}/scripts/win/deployqt.bat "${windeployqt_executable}" "$<TARGET_FILE:PAGExporter>"  # 调用脚本并传递参数
+                COMMENT "Running deploy script..."
+                VERBATIM
+        )
+
+    endif ()
+
 endif ()

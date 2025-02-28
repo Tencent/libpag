@@ -22,7 +22,7 @@
 #include "AE_GeneralPlug.h"
 #include "AE_Macros.h"
 #include "aecmd/AECommand.h"
-#include "utils/AEUtils.h"
+#include "src/utils/AEUtils.h"
 
 extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long majorVersion,
                                           A_long minorVersion, AEGP_PluginID pluginID,

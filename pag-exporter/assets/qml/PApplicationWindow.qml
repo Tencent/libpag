@@ -1,6 +1,5 @@
 import QtQuick 2.13
 import QtQuick.Window 2.13
-import "."
 
 Window {
     default property alias contents: placeholder.data

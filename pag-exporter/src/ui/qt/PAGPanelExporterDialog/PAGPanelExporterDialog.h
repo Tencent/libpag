@@ -26,9 +26,9 @@
 #include <QtWidgets/QListView>
 #include <QtWidgets/QTableView>
 #include "AEResource.h"
-#include "EnvConfig.h"
-#include "ErrorList/ErrorListModel.h"
-#include "PAGPanelExporterDialog//PanelExporterDataModel.h"
+#include "src/ui/qt/EnvConfig.h"
+#include "src/ui/qt/ErrorList/ErrorListModel.h"
+#include "src/ui/qt/PAGPanelExporterDialog/PanelExporterDataModel.h"
 
 class PAGPanelExporterDialog : public QObject {
   Q_OBJECT

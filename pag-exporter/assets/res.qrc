@@ -57,11 +57,5 @@
         <file>qml/ExportProgressWindow.qml</file>
         <file>qml/ExportProgressListView.qml</file>
         <file>qml/CommonAlert.qml</file>
-
-        <file>qss/scrollbar_vertical.qss</file>
-        <file>qss/scrollbar_horizontal.qss</file>
-        <file>qss/combobox_pop_win.qss</file>
-
-        <file>language/english.qm</file>
     </qresource>
 </RCC>
