@@ -1,0 +1,7 @@
+#!/usr/bin/osascript
+do shell script "/bin/bash -s <<'EOF'
+if ! [ -d '/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/' ]; then
+	mkdir -p '/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/'
+fi
+chmod -R a+w '/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/'
+EOF" with administrator privileges

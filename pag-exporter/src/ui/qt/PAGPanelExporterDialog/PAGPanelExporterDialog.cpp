@@ -48,10 +48,14 @@ PAGPanelExporterDialog::PAGPanelExporterDialog(QWidget* parent) {
   translate();
   initLayerTableView();
   //  initErrorListView();
-  registConnect();
+  registerConnect();
 }
 
 PAGPanelExporterDialog::~PAGPanelExporterDialog() {
+  if (settingDialog) {
+    settingDialog->deleteLater();
+    settingDialog = nullptr;
+  }
 }
 
 static void covertLayerData(std::shared_ptr<AEResource>& root,
@@ -108,7 +112,7 @@ void PAGPanelExporterDialog::resetData() {
 }
 
 void PAGPanelExporterDialog::resetToLastSelected(
-    const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> layerDataList) {
+    const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) const {
   if (aeResource != nullptr && !layerDataList->empty()) {
     for (auto layerData : *layerDataList) {
       if (layerData->aeResource == nullptr || layerData->aeResource->itemH == nullptr ||
@@ -137,7 +141,7 @@ void PAGPanelExporterDialog::initLayerTableView() {
   ctx->setContextProperty("compositionModel", layerModel);
 }
 
-void PAGPanelExporterDialog::registConnect() {
+void PAGPanelExporterDialog::registerConnect() {
   connect(layerModel, &ExportConfigLayerModel::settingIconClicked, this,
           &PAGPanelExporterDialog::goToSettingDialog);
   connect(layerModel, &ExportConfigLayerModel::previewIconClicked, this,
@@ -151,11 +155,11 @@ void PAGPanelExporterDialog::registConnect() {
 void PAGPanelExporterDialog::goToSettingDialog(std::shared_ptr<AEResource> aeResource) {
   hide();
   this->aeResource = aeResource;
-  // ShowExportSettingDialog(aeResource->itemH);
+  showExportSettingDialog(aeResource->itemH);
 }
 
 void PAGPanelExporterDialog::goToPreviewDialog(std::shared_ptr<AEResource> aeResource) {
-  //hide();
+  // hide();
   this->aeResource = aeResource;
   // ShowExportPreviewDialog(aeResource->itemH, isExportAudio, true);
 }
@@ -289,4 +293,21 @@ void PAGPanelExporterDialog::hide() {
   if (window) {
     window->hide();
   }
+}
+
+void PAGPanelExporterDialog::showExportSettingDialog(AEGP_ItemH& currentAEItem) {
+  if (settingDialog != nullptr) {
+    delete settingDialog;
+    settingDialog = nullptr;
+  }
+  settingDialog = new ExportSettingDialog(currentAEItem);
+  connect(settingDialog, &ExportSettingDialog::showExportConfigDialogSignal, this,
+          &PAGPanelExporterDialog::refreshDialog);
+  settingDialog->showPage();
+}
+
+void PAGPanelExporterDialog::refreshDialog() {
+  // resetData();
+  // refreshErrorListView();
+  show();
 }

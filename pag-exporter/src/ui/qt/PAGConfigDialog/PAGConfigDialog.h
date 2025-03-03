@@ -52,7 +52,7 @@ class PAGConfigDialog : public QDialog {
 
   void refreshData();
  private Q_SLOTS:
-  void onConcelClicked();
+  void onCancelClicked();
   void onConfirmClicked();
   void onResetClicked();
 

@@ -76,7 +76,8 @@ list(APPEND THIRDPARTY_INCLUDES
         ${ROOT}/vendor/AE_SDK/Headers/SP
         ${ROOT}/vendor/AE_SDK/Util
         ${ROOT}/vendor/AE_SDK/Resources
-        ${ROOT}/third_party/json/include)
+        ${ROOT}/third_party/json/include
+        ${ROOT}/vendor/webp/include)
 
 if (APPLE)
     set(CMAKE_CXX_FLAGS "-stdlib=libc++")
@@ -164,6 +165,14 @@ if (APPLE)
             VERBATIM
     )
 
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_custom_command(
+                TARGET PAGExporter POST_BUILD
+                COMMAND ${ROOT}/scripts/mac/debugbuild.sh "$<TARGET_BUNDLE_DIR:PAGExporter>"  # 调用脚本并传递参数
+                COMMENT "Running deugbuild script..."
+                VERBATIM
+        )
+    endif ()
 elseif (WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES
             SUFFIX ".aex"

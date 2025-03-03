@@ -28,9 +28,10 @@
 #include "AEResource.h"
 #include "src/ui/qt/EnvConfig.h"
 #include "src/ui/qt/ErrorList/ErrorListModel.h"
+#include "src/ui/qt/ExportSettingDialog/ExportSettingDialog.h"
 #include "src/ui/qt/PAGPanelExporterDialog/PanelExporterDataModel.h"
-
-class PAGPanelExporterDialog : public QObject {
+#include "src/utils/ExportProgressItem.h"
+class PAGPanelExporterDialog final : public QObject {
   Q_OBJECT
 
  public:
@@ -58,8 +59,16 @@ class PAGPanelExporterDialog : public QObject {
   void handleCompositionCheckBoxChange();
   void onTitleCheckBoxStateChange(int state);
   void onSavePathItemClick(const QModelIndex& index);
+  void refreshDialog();
 
  private:
+  void initLayerTableView();
+  void initErrorListView();
+  void registerConnect();
+  void resetToLastSelected(
+      const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) const;
+  void showExportSettingDialog(AEGP_ItemH& currentAEItem);
+
   QApplication* app = nullptr;
   QQmlApplicationEngine* engine = nullptr;
   QQuickWindow* window = nullptr;
@@ -68,12 +77,7 @@ class PAGPanelExporterDialog : public QObject {
   ErrorListModel* errorListModel;
   QTranslator* translator;
   bool isExportAudio = false;
-
-  void initLayerTableView();
-  void initErrorListView();
-  void registConnect();
-  void resetToLastSelected(
-      const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> layerDataList);
+  ExportSettingDialog* settingDialog = nullptr;
 };
 
 #endif  //PAGPANELEXPORTERDIALOG_H

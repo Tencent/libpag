@@ -40,7 +40,7 @@ void PAGConfigDialog::init() {
   cancelButton = new QPushButton(tr("取消"), this);
   confirmButton = new QPushButton(tr("确定"), this);
 
-  connect(cancelButton, &QPushButton::clicked, this, &PAGConfigDialog::onConcelClicked);
+  connect(cancelButton, &QPushButton::clicked, this, &PAGConfigDialog::onCancelClicked);
   connect(confirmButton, &QPushButton::clicked, this, &PAGConfigDialog::onConfirmClicked);
   connect(commResetButton, &QPushButton::clicked, this, &PAGConfigDialog::onResetClicked);
   // connect(bitmapResetButton, &QPushButton::clicked, this, &PAGConfigDialog::onResetClicked);
@@ -261,7 +261,7 @@ void PAGConfigDialog::createBmpTab() {
   bmpTab->setLayout(vlayout);
 }
 
-void PAGConfigDialog::onConcelClicked() {
+void PAGConfigDialog::onCancelClicked() {
   accept();
 }
 
