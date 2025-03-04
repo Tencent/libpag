@@ -52,10 +52,10 @@ class ExportSettingDialog : public QObject {
   std::shared_ptr<AECompositionPanel> compositionPanel;
   std::shared_ptr<PlaceImagePanel> placeImagePanel;
   std::shared_ptr<PlaceTextPanel> placeTextPanel;
-  CompositionModel* compositionModel;
-  PlaceholderModel* placeholderModel;
-  LayerEditableModel* layerEditableModel;
-  TimeStretchModel* timeStretchModel;
+  CompositionModel* compositionModel = nullptr;
+  PlaceholderModel* placeholderModel = nullptr;
+  LayerEditableModel* layerEditableModel = nullptr;
+  TimeStretchModel* timeStretchModel = nullptr;
   QQmlApplicationEngine* engine = nullptr;
   QQuickWindow* window = nullptr;
   SnapshotCenter* snapshotCenter = nullptr;

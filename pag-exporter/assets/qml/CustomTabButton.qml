@@ -9,6 +9,9 @@ TabButton{
     id: tabButton
     width: 100
     height: parent.height
+    background: Rectangle {
+        border.color: windowColor
+    }
     contentItem: Rectangle{
         color: windowColor
         anchors.fill: parent

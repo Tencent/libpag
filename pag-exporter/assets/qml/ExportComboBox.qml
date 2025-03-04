@@ -2,10 +2,10 @@ import QtQuick 2.12
 import QtQuick.Templates 2.12 as T
 import QtQuick.Controls 2.12
 import QtQuick.Controls.impl 2.12
- 
+
 T.ComboBox {
-    id:control
- 
+    id: control
+
     //checked选中状态，down按下状态，hovered悬停状态
     property color backgroundTheme: "#383840"
     //下拉框背景色
@@ -34,17 +34,17 @@ T.ComboBox {
     property string textLeft: ""
     //model数据右侧附加的文字
     property string textRight: ""
- 
+
     implicitWidth: 120
     implicitHeight: 30
     spacing: 0
     leftPadding: padding
     rightPadding: padding + indicator.width + spacing
-    font{
+    font {
         family: "PingFang SC"
         pixelSize: 14
     }
- 
+
     //各item
     delegate: ItemDelegate {
         id: box_item
@@ -53,13 +53,13 @@ T.ComboBox {
         width: control.width
         padding: 0
         contentItem: Text {
-            text: control.textLeft+
-                  (control.textRole
-                   ? (Array.isArray(control.model)
-                      ? modelData[control.textRole]
-                      : model[control.textRole])
-                   : modelData)+
-                  control.textRight
+            text: control.textLeft +
+                (control.textRole
+                    ? (Array.isArray(control.model)
+                        ? modelData[control.textRole]
+                        : model[control.textRole])
+                    : modelData) +
+                control.textRight
             color: control.textColor
             leftPadding: control.itemPadding
             rightPadding: control.itemPadding
@@ -69,25 +69,25 @@ T.ComboBox {
             verticalAlignment: Text.AlignVCenter
         }
         hoverEnabled: control.hoverEnabled
-        background: Rectangle{
+        background: Rectangle {
             radius: control.radius
             color: (control.highlightedIndex === index)
-                   ? control.itemHighlightColor
-                   : control.itemNormalColor
+                ? control.itemHighlightColor
+                : control.itemNormalColor
             //item底部的线
-            Rectangle{
+            Rectangle {
                 height: 1
-                width: parent.width-2*control.radius
+                width: parent.width - 2 * control.radius
                 anchors.bottom: parent.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
                 color: Qt.lighter(control.itemNormalColor)
             }
         }
     }
- 
+
     //之前用的Shape，现在替换为Image
     //图标自己画比较麻烦，还是贴图方便，使用的时候换成自己图
-    indicator: Item{
+    indicator: Item {
         id: box_indicator
         x: control.width - width
         y: control.topPadding + (control.availableHeight - height) / 2
@@ -102,15 +102,16 @@ T.ComboBox {
             source: control.indicatorSource
         }
     }
- 
+
     //box显示item
-    contentItem: T.TextField{
+    contentItem: T.TextField
+    {
         //control的leftPadding会挤过来，不要设置control的padding
         leftPadding: control.itemPadding
         rightPadding: control.itemPadding
         text: control.editable
-              ? control.editText
-              : (control.textLeft+control.displayText+control.textRight)
+            ? control.editText
+            : (control.textLeft + control.displayText + control.textRight)
         font: control.font
         color: control.textColor
         verticalAlignment: Text.AlignVCenter
@@ -135,7 +136,7 @@ T.ComboBox {
             color: "transparent"
         }
     }
- 
+
     //box框背景
     background: Rectangle {
         implicitWidth: control.implicitWidth
@@ -144,18 +145,19 @@ T.ComboBox {
         color: control.backgroundColor
         border.color: control.borderColor
     }
- 
+
     //弹出框
-    popup: T.Popup {
+    popup: T.Popup
+    {
         //默认向下弹出，如果距离不够，y会自动调整（）
         y: control.height + 1
         width: control.width
         //根据showCount来设置最多显示item个数
         implicitHeight: control.delegateModel
-                        ?((control.delegateModel.count<showCount)
-                          ?contentItem.implicitHeight
-                          :control.showCount*control.itemHeight)+2
-                        :0
+            ? ((control.delegateModel.count < showCount)
+            ? contentItem.implicitHeight
+            : control.showCount * control.itemHeight) + 2
+            : 0
         contentItem: ListView {
             clip: true
             implicitHeight: contentHeight

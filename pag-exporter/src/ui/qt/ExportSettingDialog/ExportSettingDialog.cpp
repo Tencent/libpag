@@ -27,7 +27,7 @@ static QLatin1String PLACEHOLDER_IMAGE("PlaceHolderImg");
 
 void ExportSettingDialog::initTabWidget() {
   engine = new QQmlApplicationEngine(this);
-  // resetData(currentAEItem);
+  //resetData(currentAEItem);
   QQmlContext* ctx = engine->rootContext();
   ctx->setContextProperty("exportSettingDialog", this);
 }
@@ -35,7 +35,7 @@ void ExportSettingDialog::initTabWidget() {
 ExportSettingDialog::ExportSettingDialog(AEGP_ItemH& currentAEItem, QObject* parent)
     : currentAEItem(currentAEItem), QObject(parent) {
   initTabWidget();
-  connect(compositionModel, &CompositionModel::bmpDataChange, this, &ExportSettingDialog::onBmpDataChange);
+  //connect(compositionModel, &CompositionModel::bmpDataChange, this, &ExportSettingDialog::onBmpDataChange);
 }
 
 ExportSettingDialog::~ExportSettingDialog() {

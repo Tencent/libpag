@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "ImageRawData.h"
 #include <assert.h>
+#ifdef APPLE
 #include <CoreGraphics/CoreGraphics.h>
-void ConvertARGBToRGBA(const uint8_t* argb, int width, int height, int srcStride, uint8_t* rgba, int dstStride) {
+#endif
+
+void ConvertARGBToRGBA(const uint8_t* argb, int width, int height, int srcStride, uint8_t* rgba,
+                       int dstStride) {
   for (int y = 0; y < height; y++) {
     auto src = argb + srcStride * y;
     auto dst = rgba + dstStride * y;
@@ -76,7 +80,8 @@ void ClipTransparentEdge(ImageRect& rect, const uint8_t* pData, int width, int h
 }
 
 // 未优化版, 仅用作理解示意
-void GetImageDiffRect(ImageRect& rect, const uint8_t* pCur, const uint8_t* pRef, int width, int height, int stride) {
+void GetImageDiffRect(ImageRect& rect, const uint8_t* pCur, const uint8_t* pRef, int width,
+                      int height, int stride) {
   int minx = width - 1;
   int miny = height - 1;
   int maxx = 0;
@@ -135,8 +140,8 @@ bool ImageIsStatic(const uint8_t* pCur, const uint8_t* pRef, int width, int heig
 
 #ifdef WIN32
 // 缩放，双线性插值，未优化
-void ScaleRGBABiLinear(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride, int dstWidth, int dstHeight,
-                       int srcWidth, int srcHeight) {
+void ScaleRGBABiLinear(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride,
+                       int dstWidth, int dstHeight, int srcWidth, int srcHeight) {
 
   double xFactor = (double)srcWidth / dstWidth;
   double yFactor = (double)srcHeight / dstHeight;
@@ -162,16 +167,16 @@ void ScaleRGBABiLinear(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int sr
       double x1 = i * xFactor - si;
       double x0 = 1 - x1;
 
-      si *= 4; // RGBA=4
+      si *= 4;  // RGBA=4
 
-      dst[0] = (uint8_t)lround(
-          src0[si + 0] * x0 * y0 + src0[si + 4] * x1 * y0 + src1[si + 0] * x0 * y1 + src1[si + 4] * x1 * y1);
-      dst[1] = (uint8_t)lround(
-          src0[si + 1] * x0 * y0 + src0[si + 5] * x1 * y0 + src1[si + 1] * x0 * y1 + src1[si + 5] * x1 * y1);
-      dst[2] = (uint8_t)lround(
-          src0[si + 2] * x0 * y0 + src0[si + 6] * x1 * y0 + src1[si + 2] * x0 * y1 + src1[si + 6] * x1 * y1);
-      dst[3] = (uint8_t)lround(
-          src0[si + 3] * x0 * y0 + src0[si + 7] * x1 * y0 + src1[si + 3] * x0 * y1 + src1[si + 7] * x1 * y1);
+      dst[0] = (uint8_t)lround(src0[si + 0] * x0 * y0 + src0[si + 4] * x1 * y0 +
+                               src1[si + 0] * x0 * y1 + src1[si + 4] * x1 * y1);
+      dst[1] = (uint8_t)lround(src0[si + 1] * x0 * y0 + src0[si + 5] * x1 * y0 +
+                               src1[si + 1] * x0 * y1 + src1[si + 5] * x1 * y1);
+      dst[2] = (uint8_t)lround(src0[si + 2] * x0 * y0 + src0[si + 6] * x1 * y0 +
+                               src1[si + 2] * x0 * y1 + src1[si + 6] * x1 * y1);
+      dst[3] = (uint8_t)lround(src0[si + 3] * x0 * y0 + src0[si + 7] * x1 * y0 +
+                               src1[si + 3] * x0 * y1 + src1[si + 7] * x1 * y1);
 
       dst += 4;
     }
@@ -180,19 +185,22 @@ void ScaleRGBABiLinear(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int sr
 #endif
 
 // 缩放，CoreGraphics系统差值
-void ScaleCoreGraphics(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride, int dstWidth, int dstHeight,
-                       int srcWidth, int srcHeight) {
+void ScaleCoreGraphics(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride,
+                       int dstWidth, int dstHeight, int srcWidth, int srcHeight) {
 
 #ifdef WIN32
-  ScaleRGBABiLinear(dstRGBA, dstStride, srcRGBA, srcStride, dstWidth, dstHeight, srcWidth, srcHeight);
+  ScaleRGBABiLinear(dstRGBA, dstStride, srcRGBA, srcStride, dstWidth, dstHeight, srcWidth,
+                    srcHeight);
 #else
   CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
 
-  CGContextRef dstCtx = CGBitmapContextCreate(dstRGBA, (size_t)dstWidth, (size_t)dstHeight, 8, (size_t)dstStride,
-                                              colorSpace, kCGImageAlphaPremultipliedLast);
+  CGContextRef dstCtx =
+      CGBitmapContextCreate(dstRGBA, (size_t)dstWidth, (size_t)dstHeight, 8, (size_t)dstStride,
+                            colorSpace, kCGImageAlphaPremultipliedLast);
 
-  CGContextRef srcCtx = CGBitmapContextCreate(srcRGBA, (size_t)srcWidth, (size_t)srcHeight, 8, (size_t)srcStride,
-                                              colorSpace, kCGImageAlphaPremultipliedLast);
+  CGContextRef srcCtx =
+      CGBitmapContextCreate(srcRGBA, (size_t)srcWidth, (size_t)srcHeight, 8, (size_t)srcStride,
+                            colorSpace, kCGImageAlphaPremultipliedLast);
   CGImageRef imageRef = CGBitmapContextCreateImage(srcCtx);
 
   auto dstRect = CGRectMake(0, 0, (size_t)dstWidth, (size_t)dstHeight);
@@ -211,8 +219,8 @@ static bool InRange(int val, int pos, int width) {
   return val >= pos && val <= pos + width;
 }
 
-void ExpandRectRange(ImageRect& dstRect, ImageRect& srcRect, ImageRect& lastRect,
-                     A_long width, A_long height, int expand) {
+void ExpandRectRange(ImageRect& dstRect, ImageRect& srcRect, ImageRect& lastRect, A_long width,
+                     A_long height, int expand) {
 
   int lftExpand = 0;
   int topExpand = 0;
@@ -238,10 +246,11 @@ void ExpandRectRange(ImageRect& dstRect, ImageRect& srcRect, ImageRect& lastRect
   dstRect.height = srcRect.height + topExpand + botExpand;
 }
 
-void ConvertAlphaRGB(uint8_t* dst, int dstStride, uint8_t* src, int srcStride, int width, int height) {
+void ConvertAlphaRGB(uint8_t* dst, int dstStride, uint8_t* src, int srcStride, int width,
+                     int height) {
   for (int j = 0; j < height; j++) {
-    uint8_t* pdst0 = dst + j * dstStride; // rgb
-    uint8_t* pdst1 = pdst0 + height * dstStride; // alpha
+    uint8_t* pdst0 = dst + j * dstStride;         // rgb
+    uint8_t* pdst1 = pdst0 + height * dstStride;  // alpha
     uint8_t* psrc = src + j * srcStride;
 
     for (int i = 0; i < width; i++) {
@@ -303,8 +312,8 @@ void OddPaddingRGBA(uint8_t* inData, int inDataStride, int width, int height) {
 }
 
 // 获取不透明区域
-void GetOpaqueRect(int& left, int& top, int& right, int& bottom,
-                   const uint8_t* data, int width, int height, int stride) {
+void GetOpaqueRect(int& left, int& top, int& right, int& bottom, const uint8_t* data, int width,
+                   int height, int stride) {
   if (right - left >= width && bottom - top >= height) {
     return;
   }
@@ -331,9 +340,8 @@ void GetOpaqueRect(int& left, int& top, int& right, int& bottom,
   }
 }
 
-static void CopyPlane(uint8_t* dst, int dstStride,
-                      const uint8_t* src, int srcStride,
-                      int width, int height) {
+static void CopyPlane(uint8_t* dst, int dstStride, const uint8_t* src, int srcStride, int width,
+                      int height) {
   auto pDst = dst;
   auto pSrc = src;
   for (int j = 0; j < height; j++) {
@@ -343,14 +351,13 @@ static void CopyPlane(uint8_t* dst, int dstStride,
   }
 }
 
-void CopyRGBA(uint8_t* dst, int dstStride, const uint8_t* src, int srcStride,
-              int width, int height) {
+void CopyRGBA(uint8_t* dst, int dstStride, const uint8_t* src, int srcStride, int width,
+              int height) {
   CopyPlane(dst, dstStride, src, srcStride, width * 4, height);
 }
 
-void CopyYUV420(uint8_t* dst[4], int dstStride[4],
-                uint8_t* src[4], int srcStride[4],
-                int width, int height) {
+void CopyYUV420(uint8_t* dst[4], int dstStride[4], uint8_t* src[4], int srcStride[4], int width,
+                int height) {
   CopyPlane(dst[0], dstStride[0], src[0], srcStride[0], width >> 0, height >> 0);
   CopyPlane(dst[1], dstStride[1], src[1], srcStride[1], width >> 1, height >> 1);
   CopyPlane(dst[2], dstStride[2], src[2], srcStride[2], width >> 1, height >> 1);

@@ -5,7 +5,7 @@ import QtQuick.Layouts 1.3
 
 PApplicationWindow {
     property var isPreview: false
-    property var windowWidth : 666
+    property var windowWidth: 666
     property var windowHeight: 715
     property var borderWidth: 1
     property var normalIconSize: 20
@@ -13,18 +13,18 @@ PApplicationWindow {
     property var windowMarginRight: 12
     property var tabBarHeight: 47
 
-    property var windowColor: Qt.rgba(20/255,20/255,30/255,1)
+    property var windowColor: Qt.rgba(20 / 255, 20 / 255, 30 / 255, 1)
     property var conentColor: "#22222B"
     property var placeholderTips: qsTr("占位图·%1个")
 
-    property var settingIconPath : isPreview ? "../images/export_settings.png" : "qrc:/images/export_settings.png"
-    property var previewIconPath : isPreview ? "../images/export_preview.png" : "qrc:/images/export_preview.png"
-    property var eportFoldIconPath : isPreview ? "../images/export_fold.png" : "qrc:/images/export_fold.png"
-    property var eportOpenIconPath : isPreview ? "../images/export_open.png" : "qrc:/images/export_open.png"
-    property var folderIconPath : isPreview ? "../images/export_folder.png" : "qrc:/images/export_folder.png"
-    property var radioOnIconPath : isPreview ? "../images/export_radio_on.png" : "qrc:/images/export_radio_on.png"
-    property var radioOffIconPath : isPreview ? "../images/export_radio_off.png" : "qrc:/images/export_radio_off.png"
-    property var warnIconPath : isPreview ? "../images/exprot_warning.png" : "qrc:/images/exprot_warning.png"
+    property var settingIconPath: isPreview ? "../images/export_settings.png" : "qrc:/images/export_settings.png"
+    property var previewIconPath: isPreview ? "../images/export_preview.png" : "qrc:/images/export_preview.png"
+    property var eportFoldIconPath: isPreview ? "../images/export_fold.png" : "qrc:/images/export_fold.png"
+    property var eportOpenIconPath: isPreview ? "../images/export_open.png" : "qrc:/images/export_open.png"
+    property var folderIconPath: isPreview ? "../images/export_folder.png" : "qrc:/images/export_folder.png"
+    property var radioOnIconPath: isPreview ? "../images/export_radio_on.png" : "qrc:/images/export_radio_on.png"
+    property var radioOffIconPath: isPreview ? "../images/export_radio_off.png" : "qrc:/images/export_radio_off.png"
+    property var warnIconPath: isPreview ? "../images/exprot_warning.png" : "qrc:/images/exprot_warning.png"
 
     id: wind
     visible: true
@@ -41,28 +41,28 @@ PApplicationWindow {
     minBtnVisible: false
     canMaxSize: false
 
-    onClosing: function(closeEvent) {
+    onClosing: function (closeEvent) {
         console.log("ExportSettings window close")
         exportSettingDialog.exit()
     }
 
-    Rectangle{
+    Rectangle {
         id: rootContainer
         anchors.fill: parent
         color: windowColor
 
-        TabBar{
+        TabBar {
             id: tabBar
             width: parent.width
             height: tabBarHeight
             leftPadding: 24
 
-            background: Rectangle{
+            background: Rectangle {
                 anchors.fill: parent
                 color: windowColor
             }
 
-            CustomTabButton{
+            CustomTabButton {
                 id: compositionTabBtn
                 text: qsTr("预合成")
                 width: virtualText0.width
@@ -80,8 +80,8 @@ PApplicationWindow {
                 underLineVisible: tabBar.currentIndex == 1 ? true : false
                 anchors.bottom: parent.bottom
             }*/
-            
-            CustomTabButton{
+
+            CustomTabButton {
                 id: layerEditableTabBtn
                 text: qsTr("文本图层")
                 width: virtualText1.width
@@ -89,8 +89,8 @@ PApplicationWindow {
                 underLineVisible: tabBar.currentIndex == 1 ? true : false
                 anchors.bottom: parent.bottom
             }
-            
-            CustomTabButton{
+
+            CustomTabButton {
                 id: imageEditableTabBtn
                 text: qsTr("占位图")
                 width: virtualText2.width
@@ -98,8 +98,8 @@ PApplicationWindow {
                 underLineVisible: tabBar.currentIndex == 2 ? true : false
                 anchors.bottom: parent.bottom
             }
-            
-            CustomTabButton{
+
+            CustomTabButton {
                 id: timeStretchTabBtn
                 text: qsTr("时间伸缩")
                 width: virtualText3.width
@@ -120,31 +120,31 @@ PApplicationWindow {
                 visible: false
                 text: placeholderTips
             }*/
-            
+
             Text {
                 id: virtualText1
                 visible: false
                 text: qsTr("文本图层")
             }
-            
+
             Text {
                 id: virtualText2
                 visible: false
                 text: qsTr("占位图")
             }
-            
+
             Text {
                 id: virtualText3
                 visible: false
                 text: qsTr("时间伸缩")
             }
 
-            Component.onCompleted:{
+            Component.onCompleted: {
                 rootContainer.resetPlaceHolderTabTitle()
             }
         }
 
-        StackLayout{
+        StackLayout {
             id: contentStackLayout
             anchors.left: parent.left
             anchors.right: parent.right
@@ -153,28 +153,28 @@ PApplicationWindow {
             anchors.bottomMargin: 24
             currentIndex: tabBar.currentIndex
 
-            ExportCompositionPage{
+            ExportCompositionPage {
                 id: compositionPage
             }
-/*
-            ExportPlaceHolderPage{
-                id: placeHolderPage
-            }*/
+            /*
+                        ExportPlaceHolderPage{
+                            id: placeHolderPage
+                        }*/
 
-            ExportLayerEditablePage{
+            ExportLayerEditablePage {
                 id: layerEditablePage
             }
-            
-            ExportImageEditablePage{
+
+            ExportImageEditablePage {
                 id: imageEditablePage
             }
 
-            ExportTimeStretchPage{
+            ExportTimeStretchPage {
                 id: timeStretchPage
             }
         }
 
-        Rectangle{
+        Rectangle {
             id: sureBtn
             width: 130
             height: 48
@@ -185,7 +185,7 @@ PApplicationWindow {
             anchors.bottomMargin: 24
             anchors.rightMargin: windowMarginRight
 
-            Text{
+            Text {
                 font.pixelSize: 18
                 font.family: "PingFang SC"
                 anchors.centerIn: parent
@@ -195,7 +195,7 @@ PApplicationWindow {
                 renderType: Text.NativeRendering
             }
 
-            MouseArea{
+            MouseArea {
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton
                 cursorShape: Qt.PointingHandCursor
@@ -205,9 +205,9 @@ PApplicationWindow {
             }
         }
 
-        Connections{
+        Connections {
             target: exportSettingDialog
-            onBmpStatusChange:{
+            onBmpStatusChange: {
                 console.log("onBmpStatusChange")
                 rootContainer.resetPlaceHolderTabTitle()
                 placeHolderTabBtn.resetTitleWidth()
