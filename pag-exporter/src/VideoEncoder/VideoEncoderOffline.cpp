@@ -19,6 +19,12 @@
 #include "src/cJSON/cJSON.h"
 #include "VideoEncoderX264.h"
 #include "src/configparam/ConfigParam.h"
+#ifdef _WIN32
+#include <windows.h>
+#define usleep(x) Sleep(x / 1000)  // 将微秒转换为毫秒
+#else
+#include <unistd.h>
+#endif
 
 #define SLEEP_US 1000
 #define SLEEP_COUNT 2000

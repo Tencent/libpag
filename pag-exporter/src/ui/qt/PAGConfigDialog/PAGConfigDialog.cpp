@@ -286,6 +286,7 @@ void PAGConfigDialog::onConfirmClicked() {
   param.bmpComposParam.bitmapKeyFrameInterval = keyFrameIntervalSpinBox->value();
 
   paramManager.setConfigParam(param);
+  accept();
 }
 
 void PAGConfigDialog::onResetClicked() {

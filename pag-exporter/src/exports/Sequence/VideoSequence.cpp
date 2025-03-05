@@ -15,6 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include "VideoSequence.h"
 #include <webp/encode.h>
 #include "codec/mp4/MP4BoxHelper.h"
@@ -33,6 +34,13 @@
       return;                                                                     \
     }                                                                             \
   } while (0)
+
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif /* MIN */
+#ifndef MAX
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif /* MAX */
 
 static int EncodeVideoHeader(PAGEncoder* pagEncoder, std::vector<pag::ByteData*>& headers) {
   uint8_t* nal[16];
