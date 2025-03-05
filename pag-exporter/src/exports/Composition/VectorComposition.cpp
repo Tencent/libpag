@@ -15,3 +15,22 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "VectorComposition.h"
+#include "src/exports/Composition/Composition.h"
+#include "src/exports/Layer/ExporterLayer.h"
+#include "src/utils/CommonMethod.h"
+#include "src/utils/StringUtil.h"
+
+pag::VectorComposition* ExportVectorComposition(pagexporter::Context* context,
+                                                const AEGP_CompH& compHandle) {
+  auto composition = new pag::VectorComposition();
+
+  GetCompositionAttributes(context, compHandle, composition);
+
+  AssignRecover<std::vector<pag::Marker*>*> arAM(context->pAudioMarkers,
+                                                 &(composition->audioMarkers));
+
+  composition->layers = ExportLayers(context, compHandle);
+  context->compositions.push_back(composition);
+  return composition;
+}

@@ -25,6 +25,7 @@
 #include "AEGP_SuiteHandler.h"
 #include "src/utils/AlertInfo.h"
 #include "ConfigParam.h"
+class ProgressWindow;
 namespace pagexporter {
 typedef std::pair<float, float> ScaleFactorAndFpsFactor;
 struct ScaleAndFps {
@@ -70,6 +71,7 @@ enum class PresetTagLevel {
   TagLevelMax = (static_cast<uint16_t>(pag::TagCode::Count) - 1),      // 最新版本
 };
 
+
 #define DEFAULT_BITMAP_KEYFRAME_INTERVAL 60
 #define DEFAULT_BITMAP_MAX_RESOLUTION 720
 #define DEFAULT_TAG_MODE ExportVersionType::Stable
@@ -85,8 +87,6 @@ enum class PresetTagLevel {
 #define DEFAULT_SCENES ExportScenes::GeneralScene
 #define DEFAULT_ENABLE_AUDIO true
 #define DEFAULT_LANGUAGE LanguageType::Chinese
-
-class ProgressWindow;
 
 class Context {
  public:

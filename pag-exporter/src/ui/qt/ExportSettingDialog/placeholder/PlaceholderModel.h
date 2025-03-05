@@ -18,7 +18,7 @@
 #ifndef PLACEHOLDERMODEL_H
 #define PLACEHOLDERMODEL_H
 #include <QtCore/QAbstractListModel>
-#include "src/utils/PAnels/PlaceImagePanel.h"
+#include "src/utils/Panels/PlaceImagePanel.h"
 
 class PlaceholderModel : public QAbstractListModel {
   Q_OBJECT

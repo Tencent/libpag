@@ -21,7 +21,10 @@
 #include "BitmapComposition.h"
 #include "StringUtil.h"
 #include "VectorComposition.h"
-
+#include "VideoComposition.h"
+#include "src/exports/ImageBytes/ImageBytes.h"
+#include "src/utils/CommonMethod.h"
+#include "src/utils/ImageData/ImageRawData.h"
 // 获取合成的时长
 static pag::Frame GetCompositionDuration(pagexporter::Context* context,
                                          AEGP_CompH const& compHandle) {
@@ -68,51 +71,52 @@ pag::ID GetCompositionAttributes(pagexporter::Context* context, AEGP_CompH const
 
 //判断是否全静止的合成。
 static bool IsStaticComposition(pagexporter::Context* context, AEGP_CompH const& compHandle) {
-  // auto isSame = true;
-  //
-  // auto& suites = context->suites;
-  // auto itemHandle = AEUtils::GetItemFromComp(compHandle);
-  //
-  // A_FpLong fps = 24;
-  // RECORD_ERROR(suites.CompSuite6()->AEGP_GetCompFramerate(compHandle, &fps));
-  // float frameRate = static_cast<float>(fps);
-  //
-  // A_Time durationTime = {};
-  // RECORD_ERROR(suites.ItemSuite6()->AEGP_GetItemDuration(itemHandle, &durationTime));
-  // pag::Frame duration = durationTime.value * frameRate / durationTime.scale;
-  //
-  // AEGP_RenderOptionsH renderOptions = nullptr;
-  // RECORD_ERROR(suites.RenderOptionsSuite3()->AEGP_NewFromItem(context->pluginID, itemHandle, &renderOptions));
-  //
-  // uint8_t* curData = nullptr;
-  // uint8_t* preData = nullptr;
-  // A_u_long stride = 0;
-  //
-  // for (int frame = 0; frame < duration && !context->bEarlyExit; frame++) {
-  //   SetRenderTime(context, renderOptions, frameRate, frame); // 设置render时间
-  //
-  //   A_long width = 0;
-  //   A_long height = 0;
-  //   GetRenderFrame(curData, stride, width, height, suites, renderOptions);
-  //
-  //   if (curData != nullptr && preData != nullptr) {
-  //     if (!ImageIsStatic(curData, preData, width, height, stride)) {
-  //       isSame = false;
-  //       break;
-  //     }
-  //   }
-  //
-  //   std::swap(curData, preData);
-  // }
-  //
-  // if (curData != nullptr) {
-  //   delete curData;
-  // }
-  // if (preData != nullptr) {
-  //   delete preData;
-  // }
-  //
-  // return isSame;
+  auto isSame = true;
+
+  auto& suites = context->suites;
+  auto itemHandle = AEUtils::GetItemFromComp(compHandle);
+
+  A_FpLong fps = 24;
+  RECORD_ERROR(suites.CompSuite6()->AEGP_GetCompFramerate(compHandle, &fps));
+  float frameRate = static_cast<float>(fps);
+
+  A_Time durationTime = {};
+  RECORD_ERROR(suites.ItemSuite6()->AEGP_GetItemDuration(itemHandle, &durationTime));
+  pag::Frame duration = durationTime.value * frameRate / durationTime.scale;
+
+  AEGP_RenderOptionsH renderOptions = nullptr;
+  RECORD_ERROR(suites.RenderOptionsSuite3()->AEGP_NewFromItem(context->pluginID, itemHandle,
+                                                              &renderOptions));
+
+  uint8_t* curData = nullptr;
+  uint8_t* preData = nullptr;
+  A_u_long stride = 0;
+
+  for (int frame = 0; frame < duration && !context->bEarlyExit; frame++) {
+    SetRenderTime(context, renderOptions, frameRate, frame);  // 设置render时间
+
+    A_long width = 0;
+    A_long height = 0;
+    GetRenderFrame(curData, stride, width, height, suites, renderOptions);
+
+    if (curData != nullptr && preData != nullptr) {
+      if (!ImageIsStatic(curData, preData, width, height, stride)) {
+        isSame = false;
+        break;
+      }
+    }
+
+    std::swap(curData, preData);
+  }
+
+  if (curData != nullptr) {
+    delete curData;
+  }
+  if (preData != nullptr) {
+    delete preData;
+  }
+
+  return isSame;
 }
 
 // 通过判断composition名字中是否包含"_BMP"来判断是否导出位图序列帧或视频序列帧，或矢量PAG
@@ -142,28 +146,28 @@ static pag::CompositionType GetCompositionType(pagexporter::Context* context,
 }
 
 pag::Composition* ExportComposition(pagexporter::Context* context, const AEGP_ItemH& itemH) {
-  // auto id = AEUtils::GetItemId(itemH);
-  // context->compItemHList.insert(std::make_pair(id, itemH));
-  // AssignRecover<pag::ID> arCI(context->curCompId, id);
-  //
-  // auto compHandle = AEUtils::GetCompFromItem(itemH);
-  // auto compositionType = GetCompositionType(context, compHandle);
-  // if (context->bEarlyExit) {
-  //   return nullptr;
-  // }
+  auto id = AEUtils::GetItemId(itemH);
+  context->compItemHList.insert(std::make_pair(id, itemH));
+  AssignRecover<pag::ID> arCI(context->curCompId, id);
+
+  auto compHandle = AEUtils::GetCompFromItem(itemH);
+  auto compositionType = GetCompositionType(context, compHandle);
+  if (context->bEarlyExit) {
+    return nullptr;
+  }
 
   pag::Composition* composition = nullptr;
-  // switch (compositionType) {
-  //   case pag::CompositionType::Video:
-  //     composition = static_cast<pag::Composition*>(ExportVideoComposition(context, compHandle));
-  //     break;
-  //   case pag::CompositionType::Bitmap:
-  //     composition = static_cast<pag::Composition*>(ExportBitmapComposition(context, compHandle));
-  //     break;
-  //   case pag::CompositionType::Vector:
-  //   default:
-  //     composition = static_cast<pag::Composition*>(ExportVectorComposition(context, compHandle));
-  //     break;
-  // }
+  switch (compositionType) {
+    case pag::CompositionType::Video:
+      composition = static_cast<pag::Composition*>(ExportVideoComposition(context, compHandle));
+      break;
+    case pag::CompositionType::Bitmap:
+      composition = static_cast<pag::Composition*>(ExportBitmapComposition(context, compHandle));
+      break;
+    case pag::CompositionType::Vector:
+    default:
+      composition = static_cast<pag::Composition*>(ExportVectorComposition(context, compHandle));
+      break;
+  }
   return composition;
 }

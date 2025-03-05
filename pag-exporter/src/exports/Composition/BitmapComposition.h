@@ -17,5 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef BITMAPCOMPOSITION_H
 #define BITMAPCOMPOSITION_H
+#include "src/exports/PAGDataTypes.h"
+
+pag::BitmapComposition* ExportBitmapComposition(pagexporter::Context* context, const AEGP_CompH& compHandle);
+void ReExportBitmapComposition(pagexporter::Context* context, pag::BitmapComposition* composition, float compositionFactor);
+
 
 #endif  //BITMAPCOMPOSITION_H

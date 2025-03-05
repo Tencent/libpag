@@ -33,6 +33,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "src/utils/Context.h"
 
 class StringUtil {
  public:
@@ -48,6 +49,9 @@ class StringUtil {
   static std::string DeleteLastSpace(const std::string& text);
 
   static std::string ToString(const AEGP_SuiteHandler& suites, AEGP_MemHandle memHandle);
+
+  static bool IsSuffixContainsSequenceSuffix(const std::string& text,
+                                             pagexporter::Context& context);
 };
 
 #endif  //CYDER_STRINGUTIL_H

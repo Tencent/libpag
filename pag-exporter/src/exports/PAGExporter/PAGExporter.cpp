@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <unordered_set>
 // #include "AudioSequence.h"
-#include "ExportVerify.h"
+#include "src/exports/ExportVerify/ExportVerify.h"
 #include "src/exports/Composition/BitmapComposition.h"
 // #include "ImageBytes.h"
 // #include "UI/CompressionOperate.h"

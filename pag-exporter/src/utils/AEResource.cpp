@@ -24,7 +24,7 @@
 #include "ConfigParam.h"
 #include "RunScript.h"
 #include "StringUtil.h"
-#include "src/cJSON/cJson.h"
+#include "src/cJSON/cJSON.h"
 #include "src/exports/AEMarker/AEMarker.h"
 #include "src/exports/Composition/Composition.h"
 #include "src/exports/PAGExporter/PAGExporter.h"
@@ -32,7 +32,6 @@
 static const std::string StorePathKey = "storePath";
 static const std::string ExportFlagKey = "exportFlag";
 static const std::vector<std::string> MarkerJsonKeys = {StorePathKey, ExportFlagKey};
-
 static std::string GetAEResourceTypeName(AEResourceType type) {
   if (type == AEResourceType::Folder) {
     return "Folder";

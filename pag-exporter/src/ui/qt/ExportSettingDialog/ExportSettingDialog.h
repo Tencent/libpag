@@ -27,7 +27,7 @@
 #include "src/ui/qt/ExportSettingDialog/placeholder/PlaceholderModel.h"
 #include "src/ui/qt/ExportSettingDialog/timestreach/TimeStretchModel.h"
 #include "src/ui/qt/common/BaseDialog.h"
-#include "src/utils/PANels/AECompositionPanel.h"
+#include "src/utils/Panels/AECompositionPanel.h"
 #include "src/utils/Panels/PlaceImagePanel.h"
 #include "src/utils/Panels/TextLayerEditablePanel.h"
 

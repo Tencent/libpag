@@ -15,3 +15,28 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "BitmapComposition.h"
+#include "Composition.h"
+#include "src/exports/Layer/ExporterLayer.h"
+#include "src/exports/Sequence/BitmapSequence.h"
+#include <src/utils/StringUtil.h>
+
+pag::BitmapComposition* ExportBitmapComposition(pagexporter::Context* context, const AEGP_CompH& compHandle) {
+  auto composition = new pag::BitmapComposition();
+
+  GetCompositionAttributes(context, compHandle, composition);
+
+  // 位图序列帧现在不导出，延后再真正导出。
+
+  context->compositions.push_back(composition);
+  return composition;
+}
+
+void ReExportBitmapComposition(pagexporter::Context* context, pag::BitmapComposition* composition, float compositionFactor) {
+  auto itemH = context->getCompItemHById(composition->id);
+  if (itemH != nullptr) {
+    for (auto scaleAndFps : context->scaleAndFpsList) {
+      ExportBitmapSequence(context, itemH, composition, scaleAndFps.first, scaleAndFps.second, compositionFactor);
+    }
+  }
+}

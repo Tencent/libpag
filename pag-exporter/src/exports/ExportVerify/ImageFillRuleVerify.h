@@ -15,3 +15,11 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef IMAGEFILLRULEVERIFY_H
+#define IMAGEFILLRULEVERIFY_H
+#include "src/exports/PAGDataTypes.h"
+
+
+void ImageFillRuleVerify(pagexporter::Context& context, pag::Composition* composition);
+
+#endif //IMAGEFILLRULEVERIFY_H

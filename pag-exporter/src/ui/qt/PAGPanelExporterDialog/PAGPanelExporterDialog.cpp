@@ -47,7 +47,7 @@ PAGPanelExporterDialog::PAGPanelExporterDialog(QWidget* parent) {
 
   translate();
   initLayerTableView();
-  //  initErrorListView();
+  initErrorListView();
   registerConnect();
 }
 

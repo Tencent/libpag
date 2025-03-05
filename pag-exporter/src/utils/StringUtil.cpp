@@ -73,3 +73,14 @@ std::string StringUtil::ToString(const AEGP_SuiteHandler& suites, AEGP_MemHandle
   suites.MemorySuite1()->AEGP_UnlockMemHandle(memHandle);
   return text;
 }
+
+bool StringUtil::IsSuffixContainsSequenceSuffix(const std::string& text,
+                                                pagexporter::Context& context) {
+  std::string bmpSuffix = context.sequenceSuffix;
+  if (text.size() < bmpSuffix.size()) {
+    return false;
+  }
+  std::string suffix = text.substr(text.length() - bmpSuffix.size());
+  transform(suffix.begin(), suffix.end(), suffix.begin(), ::tolower);
+  return strcmp(suffix.c_str(), bmpSuffix.c_str()) == 0;
+}

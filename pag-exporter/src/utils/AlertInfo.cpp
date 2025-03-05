@@ -20,7 +20,7 @@
 #include "AEUtils.h"
 #include "CommonMethod.h"
 #include "EnumClassHash.h"
-#include "src/exports/ExportVerify.h"
+#include "src/exports/ExportVerify/ExportVerify.h"
 #include "src/exports/PAGExporter/PAGExporter.h"
 #include "src/ui/qt/ErrorList/AlertInfoUI.h"
 
@@ -653,7 +653,7 @@ std::vector<AlertInfo> AlertInfos::GetAlertList(AEGP_ItemH itemH) {
 
   auto images = PAGExporter::ResortImages(context, compositions);
 
-  // ExportVerifyBefore(context, compositions, images);
+  ExportVerifyBefore(context, compositions, images);
 
   //context.alertInfos.eraseUnusedInfo();
 

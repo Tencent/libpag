@@ -54,7 +54,7 @@ file(GLOB_RECURSE SOURCE_FILES
         ${ROOT}/src/ui/qt/*.cpp
         ${ROOT}/src/exports/*.cpp
         ${ROOT}/src/cJSON/*.c
-)
+        ${ROOT}/src/VideoEncoder/*.cpp)
 
 file(GLOB_RECURSE AESDK_FILES ${ROOT}/vendor/AE_SDK/Util/*.cpp)
 list(APPEND SOURCE_FILES ${AESDK_FILES})
@@ -69,7 +69,8 @@ list(APPEND PAGEXPORTER_INCLUDES
         ${ROOT}/src/ui/qt
         ${ROOT}/src/cJSON
         ${ROOT}/src/exports
-        ${ROOT}/src/configparam)
+        ${ROOT}/src/configparam
+        ${ROOT}/src/VideoEncoder)
 
 list(APPEND THIRDPARTY_INCLUDES
         ${ROOT}/vendor/AE_SDK/Headers
@@ -77,7 +78,9 @@ list(APPEND THIRDPARTY_INCLUDES
         ${ROOT}/vendor/AE_SDK/Util
         ${ROOT}/vendor/AE_SDK/Resources
         ${ROOT}/third_party/json/include
-        ${ROOT}/vendor/webp/include)
+        ${ROOT}/vendor/webp/include
+        ${ROOT}/vendor/x264/include
+        ${ROOT}/vendor/ffmpeg/include)
 
 if (APPLE)
     set(CMAKE_CXX_FLAGS "-stdlib=libc++")
@@ -111,6 +114,10 @@ if (APPLE)
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND libs ${ICONV_LIBRARIES})
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/libpag.a)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/webp/mac/libwebp.a)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/x264/mac/libx264.a)
+    file(GLOB ffmpeglibs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffmpeg/mac/*.a)
+    list(APPEND libs ${ffmpeglibs})
 elseif (WIN32)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/win/libpag.lib)
 endif ()
@@ -121,6 +128,8 @@ add_library(PAGExporter MODULE ${SOURCE_FILES} ${UI_FILES} ${QT_RESOURCES})
 target_include_directories(PAGExporter PUBLIC ${PAGEXPORTER_INCLUDES})
 target_include_directories(PAGExporter SYSTEM PRIVATE ${THIRDPARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/include)
+target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/src)
+target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/third_party/tgfx/include)
 
 target_link_libraries(PAGExporter ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Multimedia Qt6::Network)
 if (APPLE)
@@ -165,7 +174,7 @@ if (APPLE)
             VERBATIM
     )
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_custom_command(
                 TARGET PAGExporter POST_BUILD
                 COMMAND ${ROOT}/scripts/mac/debugbuild.sh "$<TARGET_BUNDLE_DIR:PAGExporter>"  # 调用脚本并传递参数

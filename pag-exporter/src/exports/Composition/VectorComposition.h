@@ -17,5 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef VECTORCOMPOSITION_H
 #define VECTORCOMPOSITION_H
+#include "src/exports/PAGDataTypes.h"
+
+pag::VectorComposition* ExportVectorComposition(pagexporter::Context* context,
+                                                const AEGP_CompH& compHandle);
 
 #endif  //VECTORCOMPOSITION_H

@@ -27,6 +27,7 @@
 #include "RunScript.h"
 #include "StringUtil.h"
 #include "src/exports/PAGDataTypes.h"
+#include "src/ui/qt/Progress/ProgressWindow.h"
 
 namespace pagexporter {
 void ScaleAndFpsListDefault(std::vector<std::pair<float, float>>& scaleAndFpsList) {
@@ -48,7 +49,7 @@ Context::Context(std::string outputPath)
 Context::~Context() {
   delete[] fileBytes;
   if (progressWindow) {
-    // delete progressWindow;
+    delete progressWindow;
   }
 }
 
