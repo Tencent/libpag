@@ -16,7 +16,7 @@ class PAGQuickItemProtocol {
 class TextureNode : public QObject, public QSGSimpleTextureNode {
   Q_OBJECT
  public:
-  TextureNode(QQuickWindow* window);
+  explicit TextureNode(QQuickWindow* window);
   ~TextureNode() override;
 
  private:

@@ -4,6 +4,7 @@ function(pag_common_setting TARGET)
         if (MSVC)
             set_target_properties(${TARGET} PROPERTIES LINK_FLAGS "/OPT:REF /OPT:ICF")
             target_compile_definitions(${TARGET} PRIVATE -DPAG_MSVC)
+            target_compile_options(${TARGET} PRIVATE /WX)
             target_compile_options(${TARGET} PRIVATE /bigobj)
             target_compile_options(${TARGET} PRIVATE
                 "$<$<C_COMPILER_ID:MSVC>:/utf-8>" # 启用 utf-8
@@ -18,14 +19,10 @@ function(pag_common_setting TARGET)
     elseif (PAG_MACOS)
         target_link_options(${TARGET} PRIVATE -Wl,-dead_strip)
         target_compile_definitions(${TARGET} PRIVATE -DPAG_MACOS)
+        target_compile_options(${TARGET} PRIVATE -Werror)
     else()
         message(FATAL_ERROR "Unsupported Platform: ${CMAKE_SYSTEM_NAME}")
     endif()
-
-    set_target_properties(${TARGET} PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
-    )
 endfunction()
 
 macro(set_default_qt_dir)
@@ -62,3 +59,11 @@ function(init_tools)
 
     set(python ${pag_python} CACHE INTERNAL "Python program path")
 endfunction(init_tools)
+
+function(update_version)
+    message(STATUS "Generate Version File")
+    execute_process(COMMAND python ${CMAKE_SOURCE_DIR}/tools/version_build_tools/main.py
+                                --type cpp
+                                --output ${CMAKE_SOURCE_DIR}/src/common/version.h
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endfunction()

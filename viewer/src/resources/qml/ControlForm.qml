@@ -102,7 +102,6 @@ Item {
             x: 8
             width: 28
             wheelEnabled: true
-            // from: 0
             padding: 2
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom

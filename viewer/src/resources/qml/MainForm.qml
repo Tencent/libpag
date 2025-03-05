@@ -47,6 +47,7 @@ PSplitView {
         color: "#000000"
     }
 
+    /* Main Area */
     RectangleWithRadius {
         id: centerItem
 
@@ -74,6 +75,7 @@ PSplitView {
             sourceSize.height: 32
         }
 
+        /* Control Area */
         ControlForm {
             id: controlForm
 
@@ -88,7 +90,8 @@ PSplitView {
             anchors.leftMargin: 0
         }
 
-        PAGQuickItem {
+        /* Display Area */
+        PAGViewWindow {
             id: pagViewer
 
             x: 0
@@ -99,6 +102,7 @@ PSplitView {
             progress: controlForm.progress
         }
 
+        /* Mouse Drag Area */
         DropArea {
             id: dropArea
 
@@ -106,6 +110,7 @@ PSplitView {
             anchors.fill: parent
         }
 
+        /* Mouse Click Area */
         MouseArea {
             id: mouseArea
 
@@ -136,6 +141,7 @@ PSplitView {
             }
         }
 
+        /* Progress Bar */
         Loader {
             id: popup
 
@@ -179,6 +185,7 @@ PSplitView {
         // }
     }
 
+    /* The Right Area */
     RectangleWithRadius {
         id: rightItem
 
@@ -299,7 +306,7 @@ PSplitView {
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 277+25+1
 
-            /* Layer Editing */
+            /* Layer Editing Area */
             Rectangle {
                 color: "#20202A"
                 anchors.fill: tabContents.alignment
@@ -380,7 +387,7 @@ PSplitView {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onPressed: {
+                                        onPressed: function(mouse) {
                                             mouse.accepted = false
                                         }
                                     }
@@ -455,7 +462,7 @@ PSplitView {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
 
-                                        onPressed: {
+                                        onPressed: function(mouse) {
                                             mouse.accepted = false
                                         }
                                     }
@@ -496,7 +503,7 @@ PSplitView {
                 }
             }
 
-            /* File Structure */
+            /* File Structure Area */
             Rectangle {
                 color: "#20202A"
                 anchors.fill: tabContents.alignment
@@ -538,6 +545,7 @@ PSplitView {
             }
         }
 
+        /* Performance Display Area */
         RectangleWithRadius {
             id: performance
 

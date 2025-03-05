@@ -10,7 +10,7 @@ def runCommand(command: str, output_file="build.log"):
     file_handle = None
     if output_file:
         file_handle = open(output_file, 'w', buffering=1)
-        print(f'outoput will be wiritten to \"{os.path.abspath(output_file)}\"')
+        print(f'Run cmd[{command}] outoput will be wiritten to \"{os.path.abspath(output_file)}\"')
     
     try:
         proc = subprocess.Popen(
@@ -40,28 +40,45 @@ def runCommand(command: str, output_file="build.log"):
         if file_handle:
             file_handle.close()
 
-def copyFileToDir(files: list, targetDir: str):
+def copyFileToDir(files: list, targetDir: str, baseDir = None):
     os.makedirs(targetDir, exist_ok=True)
     for file in files:
         if not os.path.exists(file):
             print(f'Failed to find {file}')
             exit(1)
-        if os.path.isdir(file):
+
+        if baseDir == None:
+            shutil.copy2(file, targetDir)
+        elif os.path.isdir(file):
             dir_name = os.path.basename(file)
             target_path = os.path.join(targetDir, dir_name)
             if os.path.exists(target_path):
                 shutil.rmtree(target_path)
             shutil.copytree(file, target_path, symlinks=True, dirs_exist_ok=True)
         else:
-            shutil.copy2(file, targetDir)
+            rel_path = os.path.relpath(file, baseDir)
+            target_path = os.path.join(targetDir, rel_path)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            shutil.copy2(file, target_path)
 
-def copyFileToDirByRule(rules: list, targetDir: str):
+def copyFileToDirByRule(rules: list, targetDir: str, baseDir = None):
     for rule in rules:
-        path = glob.glob(rule)
-        if not path:
+        rule = os.path.normpath(rule)
+        
+        if baseDir == None:
+            paths = glob.glob(rule)
+        elif '**' not in rule:
+            file_pattern = os.path.basename(rule)
+            recursive_rule = os.path.join(baseDir, '**', file_pattern)
+            paths = glob.glob(recursive_rule, recursive=True)
+        else:
+            paths = glob.glob(rule, recursive=True)
+            
+        if not paths:
             print(f'Failed to find path by {rule}')
             exit(1)
-        copyFileToDir(path, targetDir)
+            
+        copyFileToDir(paths, targetDir, baseDir)
 
 def patchDiff(workingDir: str, patchFile: str):
     origin_working_dir = os.getcwd()

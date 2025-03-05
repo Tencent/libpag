@@ -1,7 +1,6 @@
 import os
 import sys
 import shutil
-import platform
 
 common_module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if common_module_dir not in sys.path:
@@ -10,15 +9,9 @@ if common_module_dir not in sys.path:
 from common.utils import *
 
 def build(rootDir: str, buildType: str):
-    current_os = ''
-    if platform.system() == 'Windows':
-        current_os = 'win'
-    else:
-        current_os = 'mac'
-
     origin_working_dir = os.getcwd()
 
-    lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'sparkle', 'lib', current_os, buildType)
+    lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'sparkle', 'lib', buildType)
     if os.path.exists(lib_out_path):
         print(f'Sparkle path[{lib_out_path}] is exist, skip build')
         return
@@ -37,8 +30,8 @@ def build(rootDir: str, buildType: str):
 
     libps_generated_match_rule = []
     libps_generated_match_rule.append(os.path.join(working_dir, 'build', 'Sparkle.*', 'build', 'Products', buildType, 'Sparkle.framework'))
-    copyFileToDirByRule(libps_generated_match_rule, lib_out_path)
-
+    copyFileToDirByRule(libps_generated_match_rule, lib_out_path, os.path.join(working_dir, 'build', 'Sparkle.*', 'build', 'Products', buildType))
+    shutil.rmtree(os.path.join(working_dir, 'build'), ignore_errors=True)
     os.chdir(origin_working_dir)
 
 def main():

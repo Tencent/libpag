@@ -116,18 +116,15 @@ PApplicationWindow {
         }
 
         dropArea {
-            onEntered: {
-                console.log("enter")
+            onEntered: function(drag) {
                 drag.accept (Qt.CopyAction)
                 if(drag.urls[0]) {
                     mainWindow.filePath = (drag.urls[0])
-                    console.log("filePath =", mainWindow.filePath)
+                    console.log("Drop Area entered filePath: ", mainWindow.filePath)
                 }
             }
 
             onDropped: function(drag) {
-                console.log("drop x:" + drag.x + " y:" + drag.y)
-
                 let path
                 if(mainWindow.filePath !== "") {
                     path = filePath
@@ -203,10 +200,11 @@ PApplicationWindow {
             onFileChanged: {
                 let path = mainForm.pagViewer.filePath
 
-                console.log("file changed path:", path)
+                console.log("File changed to:", path)
                 path = path.replace(/\\/ig,'/').match(/\/([^\/]+)$/)[1]
                 mainWindow.title = path
-                mainForm.profilerForm.pagFileChanged(mainForm.pagViewer.filePath)
+                // TODO
+                // mainForm.profilerForm.pagFileChanged(mainForm.pagViewer.filePath)
                 mainWindow.filePath = mainForm.pagViewer.filePath
 
                 mainForm.hasPAGFile = true
@@ -214,7 +212,10 @@ PApplicationWindow {
                 mainForm.centerItem.color = mainForm.pagViewer.backgroundColor
                 updateProgressText()
 
-                let px = mainWindow.x, py = mainWindow.y, sw = mainWindow.width, sh = mainWindow.height
+                let px = mainWindow.x
+                let py = mainWindow.y
+                let sw = mainWindow.width
+                let sh = mainWindow.height
                 let preferredSize = pagViewer.preferredSize
                 let height = controlForm.height + mainWindow.windowTitleBarHeight + preferredSize.height
                 let y = Math.max(50, py - ((height - sh) / 2))
@@ -240,8 +241,8 @@ PApplicationWindow {
                 mainWindow.width = width + windowPadding
                 mainWindow.height = height
 
-                mainForm.profilerForm.performanceWarnLeftDialog.close()
-                mainForm.profilerForm.performanceWarnRightDialog.close()
+                // mainForm.profilerForm.performanceWarnLeftDialog.close()
+                // mainForm.profilerForm.performanceWarnRightDialog.close()
 
                 // TODO
                 // benchmarkTimer.start()
@@ -479,17 +480,17 @@ PApplicationWindow {
     Connections {
         id: taskConnections
 
-        onProgressChange: function(progress){
-            console.log("progress: " + mainForm.popup.item.popProgress.value + " -> " + progress)
+        function onProgressChange(progress){
+            console.log("Progress: " + mainForm.popup.item.popProgress.value + " -> " + progress)
             mainForm.popup.item.popProgress.value = progress
         }
 
-        onProgressVisibleChange: function(visible) {
-            console.log("visible " + visible)
+        function onProgressVisibleChange(visible) {
+            console.log("Visible change: " + visible)
             mainForm.popup.active = visible
         }
 
-        onTaskComplete: function(filePath, result) {
+        function onTaskComplete(filePath, result) {
             if (result !== 0) {
                 alert(warn1 + result)
             }
@@ -852,7 +853,6 @@ PApplicationWindow {
 
     function checkRequiredVariables() {
         const variables = [
-            { name: "fileSystem", ref: fileSystem },
             { name: "licenseUrl", ref: licenseUrl },
             { name: "privacyUrl", ref: privacyUrl },
             { name: "windowHelper", ref: windowHelper },
@@ -865,7 +865,7 @@ PApplicationWindow {
             { name: "checkUpdateModel", ref: checkUpdateModel },
             { name: "pagTreeViewModel", ref: pagTreeViewModel },
             { name: "pagBenchmarkModel", ref: pagBenchmarkModel },
-            { name: "multiLanguageModel", ref: multiLanguageModel },
+            { name: "languageModel", ref: languageModel },
             { name: "pagEditAttributeModel", ref: pagEditAttributeModel }
         ]
 
@@ -917,24 +917,25 @@ PApplicationWindow {
 
 
     Component.onCompleted: {
+        console.log("init completed")
         checkRequiredVariables()
+        console.log("init completed")
         if (settings.isFirstRun) {
             console.log("First Run")
             settings.isFirstRun = false
             settings.isUseBeta = Qt.application.version.indexOf("beta") > 0
-            // TODO
-            // settings.isUseEnglish = multiLanguageModel.getSystemLanguage()
+            settings.isUseEnglish = languageModel.getSystemLanguage()
             settingsWindow.useBeta = settings.isUseBeta
             settingsWindow.useEnglish = settings.isUseEnglish
         }
 
-        // multiLanguageModel.setLanguage(settings.isUseEnglish)
+        languageModel.setLanguage(settings.isUseEnglish)
 
         resizePAGViewer()
 
         // todo: merge menu to single file
         let isMacOS = Qt.platform.os === "osx"
-        let menu = Qt.createComponent("MenuMac.qml")
+        let menu = Qt.createComponent("Menu.qml")
         let bar = menu.createObject(mainWindow)
         bar.onCommand.connect(onCommand)
         mainWindow.visibilityChanged.connect(function(){
@@ -948,7 +949,6 @@ PApplicationWindow {
 
         mainForm.pagViewer.onFileChanged.connect(function(v) {
             bar.hasPAGFile = true
-            mainForm.pagViewer.setPassword("")
         })
         mainForm.pagViewer.onFrameMetricsReady.connect(function(frame, m1, m2, m3) {
             currentFrame = frame

@@ -2,15 +2,28 @@
 #include <QFont>
 #include <QQuickStyle>
 #include <QApplication>
-#include <QQuickWindow>
+#include <pag/pag.h>
+#include "common/version.h"
+#include "report/PAGReport.h"
 #include "license/LicenseDialog.h"
-#include "rendering/WindowHelper.h"
-#include "rendering/PAGQuickItem.h"
+#include "rendering/PAGWindowHelper.h"
+#include "rendering/PAGViewWindow.h"
 #if defined(PAG_MACOS)
 #include "macos/PAGApplication.h"
 #elif defined(PAG_WINDOWS)
 
 #endif
+
+void initReportConfig(const std::string& appVersion) {
+#if defined(PAG_MACOS)
+  PAGReport::getInstance()->setAppKey("0MAC04NRHX4I60N9");
+#elif defined(PAG_WINDOWS)
+  PAGReport::getInstance()->setAppKey("0WIN0KMRHX4YCIW9");
+#endif
+  PAGReport::getInstance()->setAppName("PAGViewer");
+  PAGReport::getInstance()->setAppVersion(appVersion);
+  PAGReport::getInstance()->setAppBundleId("com.tencent.pagplayer");
+}
 
 int main(int argc, char *argv[]) {
   bool cpuMode = false;
@@ -22,7 +35,7 @@ int main(int argc, char *argv[]) {
       cpuMode = true;
     } else if (arg == "-top") {
       // TODO(markffan)
-      WindowHelper::SetTopWindow(true);
+      PAGWindowHelper::SetTopWindow(true);
     } else if (argc > 1) {
       fileToOpen = arg;
     }
@@ -43,24 +56,21 @@ int main(int argc, char *argv[]) {
   defaultFormat.setVersion(3, 2);
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
-#if defined(PAG_MACOS)
+#if defined(PAG_WINDOWS)
   QFont defaultFonts("Microsoft Yahei");
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
   fallbackList = {"Microsoft YaHei"};
-  // pag::PAGFont::SetFallbackFontNames(fallbackList);
-  // pag::SDKLicenseManager::GetInstance()->loadLicense("com.tencent.pagplayer");
-  PAGApplication app(argc, argv);
-
-#elif defined(PAG_WINDOWS)
+  pag::PAGFont::SetFallbackFontNames(fallbackList);
+  // TODO
+#elif defined(PAG_MACOS)
   QFont defaultFonts("Helvetica Neue,PingFang SC");
   QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
   fallbackList = {"PingFang SC", "Apple Color Emoji"};
   pag::PAGFont::SetFallbackFontNames(fallbackList);
-  pag::SDKLicenseManager::GetInstance()->loadLicense("com.tencent.pagplayer");
-  // TODO
+  PAGApplication app(argc, argv);
 #endif
   QApplication::setWindowIcon(QIcon(":/image/appicon.png"));
 
@@ -68,7 +78,7 @@ int main(int argc, char *argv[]) {
   // TODO
   // qmlRegisterType<PAGUITask>("PAG", 1, 0, "PAGUITask");
   // qmlRegisterType<ChartModel>("PAG", 1, 0, "ChartModel");
-  qmlRegisterType<PAGQuickItem>("PAG", 1, 0, "PAGQuickItem");
+  qmlRegisterType<PAGViewWindow>("PAG", 1, 0, "PAGViewWindow");
   // qmlRegisterType<RunTimeModel>("PAG", 1, 0, "RunTimeModel");
   // qmlRegisterType<ChartColumModel>("PAG", 1, 0, "ChartColumModel");
   // qmlRegisterType<FileTaskFactory>("PAG", 1, 0, "FileTaskFactory");
@@ -80,6 +90,8 @@ int main(int argc, char *argv[]) {
     qDebug() << "User disagree with license";
     return 0;
   }
+
+  initReportConfig(AppVersion + "(" + UpdateChannel + ")");
 
   auto path = QString::fromLocal8Bit(fileToOpen.data());
   app.openFile(path);

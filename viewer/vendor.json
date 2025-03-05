@@ -3,6 +3,21 @@
     "out": "third_party/out",
     "vendors": [
         {
+            "name": "libpag",
+            "scripts": {
+                "mac": {
+                    "executor": "python",
+                    "file": "tools/build_tools/libpag/build.py",
+                    "arguments": []
+                },
+                "win": {
+                    "executor": "python",
+                    "file": "tools/build_tools/libpag/build.py",
+                    "arguments": []
+                }
+            }
+        },
+        {
             "name": "log4qt",
             "scripts": {
                 "mac": {

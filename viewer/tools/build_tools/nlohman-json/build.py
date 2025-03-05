@@ -1,6 +1,5 @@
 import os
 import sys
-import shutil
 
 common_module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if common_module_dir not in sys.path:
@@ -9,7 +8,7 @@ if common_module_dir not in sys.path:
 from common.utils import *
 
 def build(rootDir: str):
-    include_out_dir = os.path.join(rootDir, 'third_party', 'out', 'nlohman-json', 'include')
+    include_out_dir = os.path.join(rootDir, 'third_party', 'out', 'nlohman-json', 'include', 'nlohman')
     if os.path.exists(include_out_dir):
         print(f'log4qt path[{include_out_dir}] is exist, skip build')
         return
@@ -17,7 +16,7 @@ def build(rootDir: str):
     include_src_path = []
     include_src_path.append(os.path.join(rootDir, 'third_party', 'nlohman-json', 'json.hpp'))
 
-    copyFileToDir(include_src_path, include_out_dir)
+    copyFileToDir(include_src_path, include_out_dir, os.path.join(rootDir, 'third_party', 'nlohman-json'))
 
 
 def main():

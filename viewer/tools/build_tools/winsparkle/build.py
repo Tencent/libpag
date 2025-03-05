@@ -1,6 +1,5 @@
 import os
 import sys
-import platform
 
 common_module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if common_module_dir not in sys.path:
@@ -9,13 +8,7 @@ if common_module_dir not in sys.path:
 from common.utils import *
 
 def build(rootDir: str, buildType: str):
-    current_os = ''
-    if platform.system() == 'Windows':
-        current_os = 'win'
-    else:
-        current_os = 'mac'
-
-    lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'winsparkle', 'lib', current_os, buildType)
+    lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'winsparkle', 'lib', buildType)
     include_out_path = os.path.join(rootDir, 'third_party', 'out', 'winsparkle', 'include')
     if os.path.exists(lib_out_path) and os.path.exists(include_out_path):
         print(f'WinSparkle path[{lib_out_path}, {include_out_path}] is exist, skip build')

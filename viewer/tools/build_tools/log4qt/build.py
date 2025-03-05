@@ -1,6 +1,5 @@
 import os
 import sys
-import shutil
 import platform
 
 common_module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,21 +8,6 @@ if common_module_dir not in sys.path:
 
 from common.utils import *
 
-def copyFileToDir(files: list, targetDir: str):
-    os.makedirs(targetDir, exist_ok=True)
-    for file in files:
-        if not os.path.exists(file):
-            print(f'Failed to find {file}')
-            exit(1)
-        if os.path.isdir(file):
-            dir_name = os.path.basename(file)
-            target_path = os.path.join(targetDir, dir_name)
-            if os.path.exists(target_path):
-                shutil.rmtree(target_path)
-            shutil.copytree(file, target_path, symlinks=True, dirs_exist_ok=True)
-        else:
-            shutil.copy2(file, targetDir)
-
 def build(cmakePrefixPath: str, rootDir: str, buildType: str):
     current_os = ''
     if platform.system() == 'Windows':
@@ -31,8 +15,9 @@ def build(cmakePrefixPath: str, rootDir: str, buildType: str):
     else:
         current_os = 'mac'
 
-    lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'log4qt', 'lib', current_os, buildType)
-    if os.path.exists(lib_out_path):
+    lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'log4qt', 'lib', buildType)
+    include_out_path = os.path.join(rootDir, 'third_party', 'out', 'log4qt', 'include')
+    if os.path.exists(lib_out_path) and os.path.exists(include_out_path):
         print(f'Log4Qt path[{lib_out_path}] is exist, skip build')
         return
 
@@ -54,8 +39,12 @@ def build(cmakePrefixPath: str, rootDir: str, buildType: str):
     
     libs_generated_path = []
     libs_generated_path.append(os.path.join(rootDir, 'third_party', 'log4qt', 'out', 'universal', 'liblog4qt.a'))
+    copyFileToDir(libs_generated_path, lib_out_path, os.path.join(rootDir, 'third_party', 'log4qt', 'out', 'universal'))
 
-    copyFileToDir(libs_generated_path, lib_out_path)
+    includes_generated_path = []
+    includes_generated_path.append(os.path.join(rootDir, 'third_party', 'log4qt', 'src', 'log4qt', '*.h'))
+    includes_generated_path.append(os.path.join(rootDir, 'third_party', 'log4qt', 'src', 'log4qt', '*', '*.h'))
+    copyFileToDirByRule(includes_generated_path, include_out_path, os.path.join(rootDir, 'third_party', 'log4qt', 'src'))
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))

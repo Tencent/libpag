@@ -14,12 +14,10 @@ public:
   auto openFile(QString path) -> void;
 
   Q_SLOT void onWindowDestroyed(PAGWindow* window);
-  Q_SLOT void applicationMessage(int instanceId, QByteArray message);
+  Q_SLOT void applicationMessage(int instanceId, const QByteArray& message);
 
  public:
   QString waitToOpenFile;
-  const QString PAGViewerVersion = "~PAGViewerVersion~";
-  const QString UpdateChannel = "~UpdateChannel~";
 };
 
 #endif // MACOS_PAGAPPLICATION_H_

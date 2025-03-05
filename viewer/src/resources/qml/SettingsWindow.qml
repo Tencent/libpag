@@ -37,7 +37,7 @@ PApplicationWindow {
             anchors.verticalCenterOffset: 0
             anchors.verticalCenter: parent.verticalCenter
             fillMode: Image.PreserveAspectFit
-            source: "qrc:/image/window-icon.png"
+            source: "qrc:/image/appicon.png"
         }
 
         Item {

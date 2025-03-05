@@ -1,3 +1,4 @@
 /third_party/
 __pycache__
 /.cache/
+/src/common/version.h

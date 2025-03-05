@@ -1,13 +1,13 @@
 #include "PAGApplication.h"
 #include <QList>
 #include <QEvent>
-#include "license/LicenseDialog.h"
+#include "common/version.h"
 #include "rendering/PAGWindow.h"
+#include "license/LicenseDialog.h"
 
 PAGApplication::PAGApplication(int& argc, char** argv) : QApplication(argc, argv) {
-  setApplicationVersion(PAGViewerVersion == "~PAGViewerVersion~"
-    ? "1.0.0 (stable)"
-    : PAGViewerVersion + " (" + UpdateChannel + ")");
+  std::string version = AppVersion + " (" + UpdateChannel + ")";
+  setApplicationVersion(QString::fromStdString(version));
 }
 
 auto PAGApplication::event(QEvent* event) -> bool {
@@ -80,7 +80,7 @@ auto PAGApplication::onWindowDestroyed(PAGWindow* window) -> void {
   window->deleteLater();
 }
 
-auto PAGApplication::applicationMessage(int instanceId, QByteArray message) -> void {
+auto PAGApplication::applicationMessage(int instanceId, const QByteArray& message) -> void {
   QString cmd = QString::fromUtf8(message);
   if (!LicenseDialog::isUserAgreeWithLicense()) {
     qDebug() << "User do not agree with the license, just store the file path: " << cmd;

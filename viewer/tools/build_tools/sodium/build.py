@@ -1,6 +1,5 @@
 import os
 import sys
-import glob
 import shutil
 import platform
 
@@ -11,14 +10,13 @@ if common_module_dir not in sys.path:
 from common.utils import *
 
 def buildForMacOS(rootDir: str, buildType: str):
-    current_os = 'mac'
     origin_working_dir = os.getcwd()
 
     config_file_path = os.path.join(rootDir, 'third_party', 'sodium', 'configure')
     prefix_path = os.path.join(rootDir, 'third_party', 'out', 'sodium')
-    include_out_dir = os.path.join(prefix_path, 'include')
-    lib_out_path = os.path.join(prefix_path, 'lib', current_os, buildType)
-    if os.path.exists(prefix_path):
+    include_out_path = os.path.join(prefix_path, 'include')
+    lib_out_path = os.path.join(prefix_path, 'lib', buildType)
+    if os.path.exists(lib_out_path) and os.path.exists(include_out_path):
         print(f'Sodium path[{prefix_path}] is exist, skip build')
         return
 
@@ -36,7 +34,7 @@ def buildForMacOS(rootDir: str, buildType: str):
     elif buildType == 'Release':
         build_params.append('CFLAGS=\"-O2 -DNDEBUG -arch x86_64 -arch arm64\"')
     build_params.append('--prefix=' + prefix_path)
-    build_params.append('--includedir=' + include_out_dir)
+    build_params.append('--includedir=' + include_out_path)
     build_params.append('--libdir=' + lib_out_path)    
 
     runCommand(' '.join(build_params))
@@ -54,7 +52,6 @@ def buildForMacOS(rootDir: str, buildType: str):
     os.chdir(origin_working_dir)
 
 def buildForWindows(rootDir: str):
-    current_os = 'win'
     visual_studio_versions = getVisualStudioVersions()
     if not visual_studio_versions:
         print('No Visual Studio version found')
@@ -81,7 +78,7 @@ def buildForWindows(rootDir: str):
 
     build_types = ['Debug', 'Release']
     for build_type in build_types:
-        libs_out_path = os.path.join(out_prefix_dir, 'lib', current_os, build_type)
+        libs_out_path = os.path.join(out_prefix_dir, 'lib', build_type)
         includes_out_path = os.path.join(out_prefix_dir, 'include')
 
         libps_generated_match_rule = []
@@ -92,7 +89,7 @@ def buildForWindows(rootDir: str):
         includes_generated_path = []
         includes_generated_path.append(os.path.join(source_dir, 'src', 'libsodium', 'include', 'sodium.h'))
         includes_generated_path.append(os.path.join(source_dir, 'src', 'libsodium', 'include', 'sodium'))
-        copyFileToDir(includes_generated_path, includes_out_path)
+        copyFileToDir(includes_generated_path, includes_out_path, os.path.join(source_dir, 'src', 'libsodium', 'include'))
 
 
 def main():

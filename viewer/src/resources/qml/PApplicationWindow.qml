@@ -124,7 +124,6 @@ Window {
                 color: "#DDDDDD"
                 text: main.title
                 font.pixelSize: 12
-                font.family: "Microsoft Yahei"
                 font.weight: Font.Bold
                 anchors.left: parent.left
                 anchors.leftMargin: hasMenu ? (main.width < 600 ? 220 : 0) : 0
