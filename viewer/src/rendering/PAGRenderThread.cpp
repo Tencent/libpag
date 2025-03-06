@@ -1,6 +1,6 @@
 #include "PAGRenderThread.h"
 #include "PAGViewWindow.h"
-#include "utils/TimeUtils.h"
+#include "utils/Time.h"
 
 PAGRenderThread::PAGRenderThread(PAGViewWindow* item) : pagWindow(item) {
 
@@ -78,13 +78,14 @@ void PAGRenderThread::renderNext() {
   }
 
   if (needRender) {
-    auto totalFrames = TimeToFrame(pagFile->duration(), pagFile->frameRate()) - 1;
+    bool update = player->flush();
+    auto totalFrames = Utils::TimeToFrame(pagFile->duration(), pagFile->frameRate()) - 1;
     int frame = static_cast<int>(round(pagFile->getProgress() * static_cast<double>(totalFrames)));
     Q_EMIT pagWindow->frameMetricsReady(frame,static_cast<int>(player->renderingTime()),
       static_cast<int>(player->presentingTime()),
       static_cast<int>(player->imageDecodingTime()));
 
-    if (player->flush()) {
+    if (update) {
       Q_EMIT textureReady();
     }
   }

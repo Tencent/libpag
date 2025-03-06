@@ -2,8 +2,8 @@
 #import <QWindow>
 #import <Cocoa/Cocoa.h>
 #import <Sparkle/Sparkle.h>
+#import "utils/Translate.h"
 #import "rendering/PAGWindow.h"
-#import "utils/TranslateUtils.h"
 
 @interface PAGUpdaterDelegate : NSObject<SPUUpdaterDelegate>
 @property BOOL showUI;
@@ -22,7 +22,7 @@
     }
     NSAlert *anAlert = [[NSAlert alloc] init];
     anAlert.messageText = @" ";
-    anAlert.informativeText = @(Translate("您当前使用的 PAG 已经是最新版本。").c_str());
+    anAlert.informativeText = @(Utils::Translate("您当前使用的 PAG 已经是最新版本。").c_str());
     [anAlert runModal];
 }
 
@@ -43,7 +43,7 @@
     }
     NSAlert *anAlert = [[NSAlert alloc] init];
     anAlert.messageText = @" ";
-    anAlert.informativeText = @(Translate("查找更新时遇到一些问题，请稍后再试。").c_str());
+    anAlert.informativeText = @(Utils::Translate("查找更新时遇到一些问题，请稍后再试。").c_str());
     [anAlert runModal];
 }
 @end

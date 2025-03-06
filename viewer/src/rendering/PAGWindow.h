@@ -7,6 +7,9 @@
 #include "rendering/PAGViewWindow.h"
 #include "rendering/PAGWindowHelper.h"
 #include "translate/PAGLanguageModel.h"
+#include "profiling/PAGFileInfoModel.h"
+#include "profiling/PAGBenchmarkModel.h"
+#include "profiling/PAGRunTimeModelManager.h"
 
 class PAGWindow : public QObject {
   Q_OBJECT
@@ -38,16 +41,19 @@ class PAGWindow : public QObject {
   // FileInfoModel *infoModel = nullptr;
   // TextLayerModel *textLayerModel = nullptr;
   // CheckUpdateModel *checkUpdateModel = nullptr;
-  PAGViewWindow *viewWindow = nullptr;
+  PAGViewWindow* viewWindow = nullptr;
   // RunTimeModel *runTimeModel = nullptr;
   // FileTaskFactory *taskFactory = nullptr;
   // QQuickWindow *window = nullptr;
   // PAGImageProvider *pagImageProvider = nullptr;
   // TreeModel *pagTreeViewModel = nullptr;
-  PAGWindowHelper *windowHelper = nullptr;
+  PAGWindowHelper* windowHelper = nullptr;
   PAGLanguageModel* languageModel = nullptr;
+  PAGFileInfoModel* fileInfoModel = nullptr;
+  PAGBenchmarkModel* benchmarkModel = nullptr;
+  PAGRunTimeModelManager* runTimeModelManager = nullptr;
   // PAGEditAttributeModel *pagEditAttributeModel = nullptr;
-  // PAGBenchmarkModel *pagBenchmarkModel = nullptr;
+
   // LicenseManagerModel *licenseManagerModel = nullptr;
   // WatermarkModel *watermarkModel = nullptr;
   // FileSystem *fileSystem = nullptr;

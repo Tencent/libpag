@@ -2,7 +2,7 @@
 #import <inttypes.h>
 #import <Cocoa/Cocoa.h>
 #import <Foundation/Foundation.h>
-#import "utils/TranslateUtils.h"
+#import "utils/Translate.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -365,17 +365,17 @@ auto MacPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
 
         if (!bCopyPagPlugin) {
             NSAlert *alert = [[NSAlert new] autorelease];
-            [alert addButtonWithTitle:@(Translate("确定").c_str())];
-            [alert setMessageText:@(Translate("当前 AE 插件并无更新").c_str())];
+            [alert addButtonWithTitle:@(Utils::Translate("确定").c_str())];
+            [alert setMessageText:@(Utils::Translate("当前 AE 插件并无更新").c_str())];
             [alert runModal];
             return 0;
         }
 
         NSAlert *alert = [[NSAlert new] autorelease];
-        [alert addButtonWithTitle:@(Translate("更新").c_str())];
-        [alert addButtonWithTitle:@(Translate("取消").c_str())];
-        [alert setMessageText:@(Translate("更新 Adobe After Effects 插件").c_str())];
-        [alert setInformativeText:@(Translate("发现新版本 Adobe After Effects 插件，是否更新？").c_str())];
+        [alert addButtonWithTitle:@(Utils::Translate("更新").c_str())];
+        [alert addButtonWithTitle:@(Utils::Translate("取消").c_str())];
+        [alert setMessageText:@(Utils::Translate("更新 Adobe After Effects 插件").c_str())];
+        [alert setInformativeText:@(Utils::Translate("发现新版本 Adobe After Effects 插件，是否更新？").c_str())];
         [alert setAlertStyle:NSWarningAlertStyle];
         NSModalResponse returnCode = [alert runModal];
         if (returnCode == NSAlertSecondButtonReturn) {
@@ -385,10 +385,10 @@ auto MacPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
 
     while (isAeOpened()) {
         NSAlert *alert = [[NSAlert new] autorelease];
-        [alert addButtonWithTitle:@(Translate("重试").c_str())];
-        [alert addButtonWithTitle:@(Translate("取消").c_str())];
-        [alert setMessageText:@(Translate("请关闭 Adobe After Effects").c_str())];
-        [alert setInformativeText:@(Translate("检测到 Adobe After Effects 已经打开，请关闭软件后重试。").c_str())];
+        [alert addButtonWithTitle:@(Utils::Translate("重试").c_str())];
+        [alert addButtonWithTitle:@(Utils::Translate("取消").c_str())];
+        [alert setMessageText:@(Utils::Translate("请关闭 Adobe After Effects").c_str())];
+        [alert setInformativeText:@(Utils::Translate("检测到 Adobe After Effects 已经打开，请关闭软件后重试。").c_str())];
         [alert setAlertStyle:NSWarningAlertStyle];
         NSModalResponse returnCode = [alert runModal];
         if (returnCode == NSAlertSecondButtonReturn) {
@@ -400,14 +400,14 @@ auto MacPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
 
     if (ret == 0) {
         NSAlert *alert = [[NSAlert new] autorelease];
-        [alert addButtonWithTitle:@(Translate("确定").c_str())];
-        [alert setMessageText:@(Translate("Adobe After Effects 插件安装成功！").c_str())];
+        [alert addButtonWithTitle:@(Utils::Translate("确定").c_str())];
+        [alert setMessageText:@(Utils::Translate("Adobe After Effects 插件安装成功！").c_str())];
         [alert runModal];
     } else {
         NSAlert *alert = [[NSAlert new] autorelease];
-        [alert addButtonWithTitle:@(Translate("确定").c_str())];
-        [alert setMessageText:@(Translate("警告").c_str())];
-        [alert setInformativeText:@(Translate("Adobe After Effects 插件安装失败(error code: %1)，请联系开发者！", std::to_string(ret).c_str()).c_str())];
+        [alert addButtonWithTitle:@(Utils::Translate("确定").c_str())];
+        [alert setMessageText:@(Utils::Translate("警告").c_str())];
+        [alert setInformativeText:@(Utils::Translate("Adobe After Effects 插件安装失败(error code: %1)，请联系开发者！", std::to_string(ret).c_str()).c_str())];
         [alert runModal];
     }
 
@@ -417,10 +417,10 @@ auto MacPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
 auto MacPluginInstaller::UninstallPlugins() -> int {
   while (isAeOpened()) {
     NSAlert *alert = [[NSAlert new] autorelease];
-    [alert addButtonWithTitle:@(Translate("重试").c_str())];
-    [alert addButtonWithTitle:@(Translate("取消").c_str())];
-    [alert setMessageText:@(Translate("请关闭 Adobe After Effects").c_str())];
-    [alert setInformativeText:@(Translate("检测到 Adobe After Effects 已经打开，请关闭软件后重试。").c_str())];
+    [alert addButtonWithTitle:@(Utils::Translate("重试").c_str())];
+    [alert addButtonWithTitle:@(Utils::Translate("取消").c_str())];
+    [alert setMessageText:@(Utils::Translate("请关闭 Adobe After Effects").c_str())];
+    [alert setInformativeText:@(Utils::Translate("检测到 Adobe After Effects 已经打开，请关闭软件后重试。").c_str())];
     [alert setAlertStyle:NSWarningAlertStyle];
     NSModalResponse returnCode = [alert runModal];
     if (returnCode == NSAlertSecondButtonReturn) {
@@ -439,14 +439,14 @@ auto MacPluginInstaller::UninstallPlugins() -> int {
 
   if (ret == 0) {
     NSAlert *alert = [[NSAlert new] autorelease];
-    [alert addButtonWithTitle:@(Translate("确定").c_str())];
-    [alert setMessageText:@(Translate("导出插件删除成功！").c_str())];
+    [alert addButtonWithTitle:@(Utils::Translate("确定").c_str())];
+    [alert setMessageText:@(Utils::Translate("导出插件删除成功！").c_str())];
     [alert runModal];
   } else {
     NSAlert *alert = [[NSAlert new] autorelease];
-    [alert addButtonWithTitle:@(Translate("确定").c_str())];
-    [alert setMessageText:@(Translate("警告").c_str())];
-    [alert setInformativeText:@(Translate("导出插件删除失败，请联系开发者！").c_str())];
+    [alert addButtonWithTitle:@(Utils::Translate("确定").c_str())];
+    [alert setMessageText:@(Utils::Translate("警告").c_str())];
+    [alert setInformativeText:@(Utils::Translate("导出插件删除失败，请联系开发者！").c_str())];
     [alert runModal];
   }
 

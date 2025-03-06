@@ -6,8 +6,11 @@
 #include "common/version.h"
 #include "report/PAGReport.h"
 #include "license/LicenseDialog.h"
-#include "rendering/PAGWindowHelper.h"
 #include "rendering/PAGViewWindow.h"
+#include "rendering/PAGWindowHelper.h"
+#include "profiling/PAGBenchmarkModel.h"
+#include "profiling/PAGRunTimeChartModel.h"
+#include "profiling/PAGRunTimeModelManager.h"
 #if defined(PAG_MACOS)
 #include "macos/PAGApplication.h"
 #elif defined(PAG_WINDOWS)
@@ -78,7 +81,11 @@ int main(int argc, char *argv[]) {
   // TODO
   // qmlRegisterType<PAGUITask>("PAG", 1, 0, "PAGUITask");
   // qmlRegisterType<ChartModel>("PAG", 1, 0, "ChartModel");
+  qmlRegisterType<PAGChartData>("PAG", 1, 0, "PAGChartData");
   qmlRegisterType<PAGViewWindow>("PAG", 1, 0, "PAGViewWindow");
+  qmlRegisterType<PAGBenchmarkModel>("PAG", 1, 0, "PAGBenchmarkModel");
+  // qmlRegisterType<PAGRunTimeChartModel>("PAG", 1, 0, "PAGRunTimeChartModel");
+  qmlRegisterType<PAGRunTimeModelManager>("PAG", 1, 0, "PAGRunTimeModelManager");
   // qmlRegisterType<RunTimeModel>("PAG", 1, 0, "RunTimeModel");
   // qmlRegisterType<ChartColumModel>("PAG", 1, 0, "ChartColumModel");
   // qmlRegisterType<FileTaskFactory>("PAG", 1, 0, "FileTaskFactory");

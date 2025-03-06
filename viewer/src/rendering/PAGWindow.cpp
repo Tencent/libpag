@@ -12,17 +12,23 @@ PAGWindow::~PAGWindow() {
   delete qmlEngine;
   delete windowHelper;
   delete languageModel;
+  delete fileInfoModel;
+  delete runTimeModelManager;
 }
 auto PAGWindow::Open() -> void {
   qmlEngine = new QQmlApplicationEngine();
   windowHelper = new PAGWindowHelper();
   languageModel = new PAGLanguageModel();
+  fileInfoModel = new PAGFileInfoModel();
+  benchmarkModel = new PAGBenchmarkModel();
   // TODO
 
   auto context = qmlEngine->rootContext();
   context->setContextProperty("windowManager", this);
   context->setContextProperty("windowHelper", windowHelper);
   context->setContextProperty("languageModel", languageModel);
+  context->setContextProperty("fileInfoModel", fileInfoModel);
+  context->setContextProperty("benchmarkModel", benchmarkModel);
   context->setContextProperty("licenseUrl", LicenseDialog::licenseUrl);
   context->setContextProperty("privacyUrl", LicenseDialog::privacyUrl);
 #if defined(PAG_MACOS)
@@ -43,7 +49,13 @@ auto PAGWindow::Open() -> void {
   quickWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
 
   viewWindow = quickWindow->findChild<PAGViewWindow*>("pagViewer");
+  runTimeModelManager = quickWindow->findChild<PAGRunTimeModelManager*>("runTimeModelManager");
 
+  connect(viewWindow, &PAGViewWindow::fileChanged, fileInfoModel, &PAGFileInfoModel::updateFileInfo);
+  connect(viewWindow, &PAGViewWindow::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
+  connect(viewWindow, &PAGViewWindow::frameMetricsReady, runTimeModelManager, &PAGRunTimeModelManager::updateDisplayData);
+  connect(viewWindow, &PAGViewWindow::showVideoFramesChanged, this, &PAGWindow::onShowVideoFramesChanged);
+  connect(quickWindow, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()), Qt::QueuedConnection);
   // TODO
 }
 

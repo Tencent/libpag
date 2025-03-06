@@ -34,12 +34,14 @@
         <file>image/warn-bg3.png</file>
         <file>image/warnChecked.png</file>
         <file>image/warnUnchecked.png</file>
+        <file>image/unencrypted.png</file>
+        <file>image/un-encryption.png</file>
 
         <!-- svg -->
         <file>image/close-dark.svg</file>
+        <file>image/restore-dark.svg</file>
         <file>image/maximize-dark.svg</file>
         <file>image/minimize-dark.svg</file>
-        <file>image/restore-dark.svg</file>
 
         <!-- qml -->
         <file>qml/Menu.qml</file>
@@ -51,6 +53,7 @@
         <file>qml/PSplitView.qml</file>
         <file>qml/ControlForm.qml</file>
         <file>qml/TextListView.qml</file>
+        <file>qml/ProfilerForm.qml</file>
         <file>qml/ImageListView.qml</file>
         <file>qml/SettingsWindow.qml</file>
         <file>qml/TextEditDialog.qml</file>
@@ -59,6 +62,7 @@
         <file>qml/PApplicationWindow.qml</file>
         <file>qml/RectangleWithRadius.qml</file>
         <file>qml/AttributeEditDialog.qml</file>
+        <file>qml/PerformanceWarnDialog.qml</file>
 
         <!-- pag -->
         <file>pag/jzznm.pag</file>

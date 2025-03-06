@@ -1,4 +1,4 @@
-// import PAG
+import PAG
 import QtQuick as Quick
 import Qt.labs.platform as Labs
 
@@ -123,8 +123,8 @@ MenuBar {
             enabled: hasPAGFile
             
             onTriggered: {
-                console.log("[Menu] Triggered command: performance_benchmark")
-                command('performance_benchmark')
+                console.log("[Menu] Triggered command: performance-benchmark")
+                command('performance-benchmark')
             }
         }
         Labs.Menu {

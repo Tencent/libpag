@@ -1,7 +1,9 @@
-#ifndef UTILS_TIMEUTILS_H_
-#define UTILS_TIMEUTILS_H_
+#ifndef UTILS_TIME_H_
+#define UTILS_TIME_H_
 
 #include <pag/pag.h>
+
+namespace Utils {
 
 inline pag::Frame TimeToFrame(int64_t time, float frameRate) {
   return static_cast<pag::Frame>(floor(time * frameRate / 1000000ll));
@@ -35,4 +37,6 @@ inline double FrameToProgress(pag::Frame currentFrame, pag::Frame totalFrames) {
   return (currentFrame * 1.0 + 0.1) / totalFrames;
 }
 
-#endif // UTILS_TIMEUTILS_H_
+} // namespace Utils
+
+#endif // UTILS_TIME_H_

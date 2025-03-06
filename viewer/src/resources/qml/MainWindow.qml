@@ -203,8 +203,7 @@ PApplicationWindow {
                 console.log("File changed to:", path)
                 path = path.replace(/\\/ig,'/').match(/\/([^\/]+)$/)[1]
                 mainWindow.title = path
-                // TODO
-                // mainForm.profilerForm.pagFileChanged(mainForm.pagViewer.filePath)
+                mainForm.profilerForm.pagFileChanged(mainForm.pagViewer.filePath)
                 mainWindow.filePath = mainForm.pagViewer.filePath
 
                 mainForm.hasPAGFile = true
@@ -241,8 +240,8 @@ PApplicationWindow {
                 mainWindow.width = width + windowPadding
                 mainWindow.height = height
 
-                // mainForm.profilerForm.performanceWarnLeftDialog.close()
-                // mainForm.profilerForm.performanceWarnRightDialog.close()
+                mainForm.profilerForm.performanceWarnLeftDialog.close()
+                mainForm.profilerForm.performanceWarnRightDialog.close()
 
                 // TODO
                 // benchmarkTimer.start()
@@ -497,33 +496,32 @@ PApplicationWindow {
         }
     }
 
-    // TODO
-    // Connections {
-    //     target: pagBenchmarkModel
-    //
-    //     function onBenchmarkComplete(templateAvgRenderingTime, templateFirstFrameRenderingTime, uiAvgRenderingTime, uiFirstFrameRenderingTime, isAuto) {
-    //         console.log(" templateAvgRenderingTime: ", templateAvgRenderingTime, " templateFirstFrameRenderingTime: ", templateFirstFrameRenderingTime)
-    //         console.log(" uiAvgRenderingTime: ", uiAvgRenderingTime, " uiFirstFrameRenderingTime: ", uiFirstFrameRenderingTime)
-    //         settings.templateAvgRenderingTime = templateAvgRenderingTime
-    //         settings.templateFirstFrameRenderingTime = templateFirstFrameRenderingTime
-    //         settings.uiAvgRenderingTime = uiAvgRenderingTime
-    //         settings.uiFirstFrameRenderingTime = uiFirstFrameRenderingTime
-    //
-    //         busyLoading.visible = false
-    //         busyLoading.running = false
-    //
-    //         console.log("------ isAuto:  ", isAuto)
-    //
-    //         if(!isAuto){
-    //             benchmarkCompleteWindow.visible = true
-    //             benchmarkCompleteWindow.raise()
-    //         }
-    //
-    //         if(isAuto){
-    //             settings.hadBenchmarkVersion = Qt.application.version
-    //         }
-    //     }
-    // }
+    Connections {
+        target: benchmarkModel
+    
+        function onBenchmarkComplete(templateAvgRenderingTime, templateFirstFrameRenderingTime, uiAvgRenderingTime, uiFirstFrameRenderingTime, isAuto) {
+            console.log(" templateAvgRenderingTime: ", templateAvgRenderingTime, " templateFirstFrameRenderingTime: ", templateFirstFrameRenderingTime)
+            console.log(" uiAvgRenderingTime: ", uiAvgRenderingTime, " uiFirstFrameRenderingTime: ", uiFirstFrameRenderingTime)
+            settings.templateAvgRenderingTime = templateAvgRenderingTime
+            settings.templateFirstFrameRenderingTime = templateFirstFrameRenderingTime
+            settings.uiAvgRenderingTime = uiAvgRenderingTime
+            settings.uiFirstFrameRenderingTime = uiFirstFrameRenderingTime
+    
+            busyLoading.visible = false
+            busyLoading.running = false
+    
+            console.log("------ isAuto:  ", isAuto)
+    
+            if(!isAuto){
+                benchmarkCompleteWindow.visible = true
+                benchmarkCompleteWindow.raise()
+            }
+    
+            if(isAuto){
+                settings.hadBenchmarkVersion = Qt.application.version
+            }
+        }
+    }
 
     Connections {
         target: mainForm.popup.item
@@ -670,12 +668,12 @@ PApplicationWindow {
                 checkUpdate(false)
                 break
             }
-            case 'performance_benchmark': {
+            case 'performance-benchmark': {
                 mainForm.pagViewer.isPlaying = false
                 // TODO
                 // busyLoading.visible = true
                 // busyLoading.running = true
-                pagBenchmarkModel.startBenchmarkFromQRC(false)
+                benchmarkModel.startBenchmarkFromQRC(false)
                 break
             }
             case 'install-ae-plugin': {
@@ -696,7 +694,7 @@ PApplicationWindow {
                 break
             }
             case 'open-commerce-page': {
-                Qt.openUrlExternally("https://pag.art/product.html")
+                Qt.openUrlExternally("https://pag.io/product.html#pag-enterprise-edition")
                 break
             }
             case 'reload-project': {
@@ -851,75 +849,7 @@ PApplicationWindow {
 
     }
 
-    function checkRequiredVariables() {
-        const variables = [
-            { name: "licenseUrl", ref: licenseUrl },
-            { name: "privacyUrl", ref: privacyUrl },
-            { name: "windowHelper", ref: windowHelper },
-            { name: "windowManager", ref: windowManager },
-            { name: "DefaultFontFamily", ref: DefaultFontFamily },
-            { name: "fileInfoModel", ref: fileInfoModel },
-            { name: "watermarkModel", ref: watermarkModel },
-            { name: "textLayerModel", ref: textLayerModel },
-            { name: "imageLayerModel", ref: imageLayerModel },
-            { name: "checkUpdateModel", ref: checkUpdateModel },
-            { name: "pagTreeViewModel", ref: pagTreeViewModel },
-            { name: "pagBenchmarkModel", ref: pagBenchmarkModel },
-            { name: "languageModel", ref: languageModel },
-            { name: "pagEditAttributeModel", ref: pagEditAttributeModel }
-        ]
-
-        let missingVariables = []
-        let definedVariables = []
-
-        for (const variable of variables) {
-            try {
-                if (typeof variable.ref === "undefined") {
-                    missingVariables.push(variable.name)
-                } else {
-                    definedVariables.push({
-                        name: variable.name,
-                        value: variable.ref
-                    })
-                }
-            } catch (e) {
-                missingVariables.push(variable.name)
-            }
-        }
-
-        // 打印检查结果
-        console.log("\n=== Variables Check Result ===")
-
-        if (missingVariables.length > 0) {
-            console.log("\nMissing Variables:")
-            missingVariables.forEach(name => {
-                console.log(`- ${name}`)
-            })
-        }
-
-        console.log("\nDefined Variables:")
-        definedVariables.forEach(variable => {
-            console.log(`- ${variable.name}: ${variable.value}`)
-        })
-
-        console.log("\nSummary:")
-        console.log(`Total Variables: ${variables.length}`)
-        console.log(`Defined: ${definedVariables.length}`)
-        console.log(`Missing: ${missingVariables.length}`)
-        console.log("===========================\n")
-
-        return {
-            success: missingVariables.length === 0,
-            missingVariables: missingVariables,
-            definedVariables: definedVariables
-        }
-    }
-
-
     Component.onCompleted: {
-        console.log("init completed")
-        checkRequiredVariables()
-        console.log("init completed")
         if (settings.isFirstRun) {
             console.log("First Run")
             settings.isFirstRun = false
@@ -937,7 +867,7 @@ PApplicationWindow {
         let isMacOS = Qt.platform.os === "osx"
         let menu = Qt.createComponent("Menu.qml")
         let bar = menu.createObject(mainWindow)
-        bar.onCommand.connect(onCommand)
+        bar.onCommand.connect(mainWindow.onCommand)
         mainWindow.visibilityChanged.connect(function(){
             bar.isFullscreen = (mainWindow.visibility === qWindowFullscreen)
         })
