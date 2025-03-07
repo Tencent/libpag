@@ -33,10 +33,12 @@
 namespace fs = std::filesystem;
 
 static std::string GetH264EncoderToolsFolder() {
-  return fs::path(GetRoamingPath()) / "H264EncoderTools/";
+  const auto res=fs::path(GetRoamingPath()) / "H264EncoderTools/";
+  return res.string();
 }
 static std::string GetOfflineFolder() {
-  return fs::path(GetH264EncoderToolsFolder()) / "OffLineFolder/";
+  const auto res=fs::path(GetH264EncoderToolsFolder()) / "OffLineFolder/";
+  return res.string();
 }
 
 static int ReadFileData(const std::string& path, uint8_t data[]) {
@@ -192,21 +194,17 @@ bool VideoEncoderOffline::open(int width, int height, double frameRate, bool has
   memset(data[2], 128, stride[2] * (SIZE_ALIGN(height) >> 1));
 
   rootPath = GetOfflineFolder();
-
-  std::string cmd = "";
-  cmd += "cd \'" + GetH264EncoderToolsFolder() + "\'\n";
-  cmd += "if [ -d OffLineFolder/ ]; then \nrm -rf OffLineFolder/ \n fi\n";
-  cmd += "mkdir OffLineFolder/ \n";
-  system(cmd.c_str());
+  ReCreateFolder(GetOfflineFolder());
   WriteParamToFile(&param);
 
-  // enable x264
+#ifdef WIN32
+  std::string cmd2 = "\"" + GetH264EncoderToolsFolder() + "H264EncoderTools.exe\" " + GetOfflineFolder();
+  WinExec(cmd2.c_str(), SW_HIDE);
+#elif defined(__APPLE__) || defined(__MACH__)
   std::string cmd2 =
       "\'" + GetH264EncoderToolsFolder() + "H264EncoderTools\' \'" + GetOfflineFolder() + "\' &";
   system(cmd2.c_str());
-
-  //encoderX264 = new VideoEncoderX264();
-  //return encoderX264->open(width, height, frameRate, hasAlpha, maxKeyFrameInterval, quality);
+#endif
   return true;
 }
 
@@ -333,10 +331,15 @@ VideoEncoderOffline::~VideoEncoderOffline() {
   if (h264Buf != nullptr) {
     delete h264Buf;
   }
-  //for (int i = 0; i < static_cast<int>(sizeof(headers)/sizeof(headers[0])); i++) {
-  //  if (headers[i] != nullptr) {
-  //    delete headers[i];
-  //  }
-  //}
-  //delete encoderX264;
+  for (int i = 0; i < frames; i++) {
+    fs::remove((rootPath + "YUV-" + std::to_string(i) + ".yuv").c_str());
+    fs::remove((rootPath + "H264-" + std::to_string(i) + ".264").c_str());
+    fs::remove((rootPath + "InFrameInfo-" + std::to_string(i) + ".txt").c_str());
+    fs::remove((rootPath + "OutFrameInfo-" + std::to_string(i) + ".txt").c_str());
+  }
+  fs::remove((rootPath + "InEnd.txt").c_str());
+  fs::remove((rootPath + "OutEnd.txt").c_str());
+  fs::remove((rootPath + "Header-0.dat").c_str());
+  fs::remove((rootPath + "Header-1.dat").c_str());
+  fs::remove((rootPath + "EncoderParam.txt").c_str());
 }

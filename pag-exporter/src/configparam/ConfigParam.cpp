@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+
 namespace fs = std::filesystem;
 
 ConfigParamManager& ConfigParamManager::getInstance() {
@@ -104,7 +105,15 @@ bool ConfigParamManager::configFileIsExist() const {
 std::string GetRoamingPath() {
   std::string roamingPath;
 #ifdef WIN32
-  roamingPath = std::getenv("APPDATA");
+  char* envVar = nullptr;
+  size_t len = 0;
+  _dupenv_s(&envVar, &len, "APPDATA");
+  if (envVar) {
+    roamingPath = envVar;
+    free(envVar);
+  } else {
+    std::cerr << "Environment variable 'APPDATA' not found." << std::endl;
+  }
 #elif defined(__APPLE__) || defined(__MACH__)
   roamingPath = std::getenv("HOME");
   roamingPath += "/Library/Application Support";
@@ -115,4 +124,17 @@ std::string GetRoamingPath() {
 std::string GetConfigPath() {
   const fs::path path = fs::path(GetRoamingPath()) / "PAGExporter/";
   return path.string();
+}
+
+void CreateFolder(const std::string& path) {
+  if (!fs::exists(path)) {
+    fs::create_directories(path);
+  }
+}
+
+void ReCreateFolder(const std::string& path) {
+  if (fs::exists(path)) {
+    fs::remove_all(path);
+  }
+  fs::create_directories(path);
 }

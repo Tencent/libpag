@@ -100,4 +100,7 @@ class ConfigParamManager {
 std::string GetRoamingPath();
 std::string GetConfigPath();
 
+void CreateFolder(const std::string& path);
+void ReCreateFolder(const std::string& path);
+
 #endif  //CONFIGPARAM_H

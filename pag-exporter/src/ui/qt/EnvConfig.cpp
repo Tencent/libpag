@@ -77,3 +77,7 @@ std::string GetSystemVersion() {
 std::string GetAuthorName() {
     return "libpag";
 }
+
+std::string QStringToString(const std::string& str) {
+  return QString::fromStdString(str).toLocal8Bit().toStdString();
+}

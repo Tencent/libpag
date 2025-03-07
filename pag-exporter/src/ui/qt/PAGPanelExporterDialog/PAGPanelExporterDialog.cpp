@@ -177,7 +177,7 @@ void PAGPanelExporterDialog::exportFiles() {
       std::string pagFileName = layerData->name + ".pag";
       QDir dir(QString(layerData->aeResource->getStorePath().c_str()));
       QString savePath = dir.absoluteFilePath(QString(pagFileName.c_str()));
-      const std::string pagSavePath = savePath.toStdString();
+      const std::string pagSavePath = QStringToString(savePath.toStdString());
 
       std::shared_ptr<ExportProgressItem> progressItem =
           std::make_shared<ExportProgressItem>(pagFileName);

@@ -80,11 +80,16 @@ std::string AEUtils::GetFolderDocumentsName() {
 
 std::string AEUtils::GetFolderTempName() {
   if (FolderTempName.empty()) {
+
+#ifdef WIN32
     auto& suites = SUITES();
     auto pluginID = PLUGIN_ID();
+    FolderTempName = RunScript(suites, pluginID, "Folder.myDocuments.fsName;");
+#elif defined(__APPLE__) || defined(__MACH__)
     // macOS下Folder.temp.fsName;获取到的系统临时目录AE没有写入权限
     // 因此将临时文件保存至系统文件夹/tmp，该文件夹系统会定期删除文件
     FolderTempName = "/tmp";
+#endif
   }
   return FolderTempName;
 }

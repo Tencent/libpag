@@ -33,6 +33,7 @@
 #include "src/utils/ByteArray.h"
 #include "src/utils/aep/AEPReader.h"
 #include "src/utils/aep/PsdTextParse.h"
+#include "src/ui/qt/EnvConfig.h"
 
 namespace pagexporter {
 void ScaleAndFpsListDefault(std::vector<std::pair<float, float>>& scaleAndFpsList) {
@@ -618,10 +619,9 @@ char* Context::getFileBytes() {
     suites.ProjSuite6()->AEGP_SaveProjectToPath(projectHandle,
                                                 reinterpret_cast<const A_UTF16Char*>(path.c_str()));
   }
+  filePath = QStringToString(filePath);
   TemporaryFileManager tempFileMgr;
   tempFileMgr.tempFilePath = filePath;
-
-  filePath = std::string(filePath);
 
   std::ifstream t;
   t.open(filePath, std::ios::binary);

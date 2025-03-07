@@ -18,17 +18,13 @@
 
 #include "AEResource.h"
 #include <codecvt>
-#include <iostream>
 #include "AEUtils.h"
 #include "CommonMethod.h"
 #include "ConfigParam.h"
-#include "RunScript.h"
-#include "StringUtil.h"
 #include "src/cJSON/cJSON.h"
 #include "src/exports/AEMarker/AEMarker.h"
 #include "src/exports/Composition/Composition.h"
-#include "src/exports/PAGExporter/PAGExporter.h"
-
+#include "src/ui/qt/EnvConfig.h"
 static const std::string StorePathKey = "storePath";
 static const std::string ExportFlagKey = "exportFlag";
 static const std::vector<std::string> MarkerJsonKeys = {StorePathKey, ExportFlagKey};
@@ -147,7 +143,7 @@ std::string AEResource::getStorePath() {
   auto findPath = AEMarker::GetMarkerFromComposition(itemH, StorePathKey);
   if (findPath.empty()) {
     storePath = defaultPath;
-  } else if (!AEUtils::IsExistPath(std::string(findPath))) {
+  } else if (!AEUtils::IsExistPath(QStringToString(findPath))) {
     storePath = defaultPath;
     AEMarker::DeleteMarkersFromComposition(itemH, StorePathKey);
   } else {
@@ -303,7 +299,7 @@ void AEResource::setStorePath(std::string path) {
       AEMarker::DeleteMarkersFromComposition(itemH, StorePathKey);
     }
     path = defaultPath;
-  } else if (!AEUtils::IsExistPath(std::string(path))) {
+  } else if (!AEUtils::IsExistPath(QStringToString(path))) {
     return;
   }
   storePath = path;
