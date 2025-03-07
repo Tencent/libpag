@@ -43,9 +43,9 @@ void PAGConfigDialog::init() {
   connect(cancelButton, &QPushButton::clicked, this, &PAGConfigDialog::onCancelClicked);
   connect(confirmButton, &QPushButton::clicked, this, &PAGConfigDialog::onConfirmClicked);
   connect(commResetButton, &QPushButton::clicked, this, &PAGConfigDialog::onResetClicked);
-  // connect(bitmapResetButton, &QPushButton::clicked, this, &PAGConfigDialog::onResetClicked);
+  connect(bitmapResetButton, &QPushButton::clicked, this, &PAGConfigDialog::onResetClicked);
 
-  QHBoxLayout* buttonLayout = new QHBoxLayout();
+  auto* buttonLayout = new QHBoxLayout();
   buttonLayout->addStretch();
   buttonLayout->addWidget(cancelButton);
   buttonLayout->addWidget(confirmButton);
@@ -213,9 +213,11 @@ void PAGConfigDialog::createBmpTab() {
   exportSizeLimitpinBox->setFixedSize(192, 30);
   exportSizeLimitpinBox->setStyleSheet(QSpinBoxStyle);
 
-  maxFrameRateSpinBox = new QSpinBox(bmpTab);
+  maxFrameRateSpinBox = new QDoubleSpinBox(bmpTab);
+  maxFrameRateSpinBox->setDecimals(1);
   maxFrameRateSpinBox->setRange(1, 120);
   maxFrameRateSpinBox->setValue(24);
+  maxFrameRateSpinBox->setSingleStep(0.1);  // 设置步长为 0.1
   maxFrameRateSpinBox->setFixedSize(192, 30);
   maxFrameRateSpinBox->setStyleSheet(QSpinBoxStyle);
 

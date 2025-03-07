@@ -61,7 +61,13 @@ bool ConfigParamManager::getConfigParam(ConfigParam& param) {
 bool ConfigParamManager::setConfigParam(const ConfigParam& param) {
   try {
     configParam = param;
-    nlohmann::json j = param;
+    if (configParam.bmpComposParam.frameFormat == FrameFormatType::h264) {
+      configParam.sequenceType = pag::CompositionType::Video;
+    } else if (configParam.bmpComposParam.frameFormat == FrameFormatType::Webp) {
+      configParam.sequenceType = pag::CompositionType::Bitmap;
+    }
+    configParam.scaleAndFpsList[0].second = configParam.bmpComposParam.maxFrameRate;
+    nlohmann::json j = configParam;
     std::ofstream file(configFileSavePath);
     if (!file.is_open()) {
       std::cerr << "Failed to open file for writing: " << configFileSavePath << std::endl;
@@ -103,7 +109,7 @@ std::string GetRoamingPath() {
   roamingPath = std::getenv("HOME");
   roamingPath += "/Library/Application Support";
 #endif
-  return roamingPath;
+  return fs::path(roamingPath).string();
 }
 
 std::string GetConfigPath() {

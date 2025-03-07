@@ -23,7 +23,7 @@
 
 pag::VectorComposition* ExportVectorComposition(pagexporter::Context* context,
                                                 const AEGP_CompH& compHandle) {
-  auto composition = new pag::VectorComposition();
+  const auto composition = new pag::VectorComposition();
 
   GetCompositionAttributes(context, compHandle, composition);
 

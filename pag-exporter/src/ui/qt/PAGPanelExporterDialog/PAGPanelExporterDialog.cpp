@@ -42,7 +42,7 @@ PAGPanelExporterDialog::PAGPanelExporterDialog(QWidget* parent) {
 
   QQmlContext* ctx = engine->rootContext();
   ctx->setContextProperty("exportConfigDialog", this);
-  TextEdit* textEdit = new TextEdit();
+  auto* textEdit = new TextEdit();
   ctx->setContextProperty("ExportUtils", textEdit);
 
   translate();
@@ -58,14 +58,14 @@ PAGPanelExporterDialog::~PAGPanelExporterDialog() {
   }
 }
 
-static void covertLayerData(std::shared_ptr<AEResource>& root,
+static void covertLayerData(const std::shared_ptr<AEResource>& root,
                             std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList,
-                            std::shared_ptr<ConfigLayerData> parent = nullptr) {
+                            const std::shared_ptr<ConfigLayerData>& parent = nullptr) {
   if (root != nullptr && root->childs.empty()) {
     return;
   }
   auto aeResources = root->childs;
-  for (std::shared_ptr<AEResource> resource : aeResources) {
+  for (const std::shared_ptr<AEResource>& resource : aeResources) {
     std::shared_ptr<ConfigLayerData> layerData = nullptr;
     if (resource->type == AEResourceType::Composition) {
       layerData = std::make_shared<ConfigLayerData>(resource);
@@ -85,22 +85,21 @@ static void covertLayerData(std::shared_ptr<AEResource>& root,
 }
 
 static void removeEmptyFolder(
-    std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) {
+    const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) {
   auto it = layerDataList->begin();
   while (it != layerDataList->end()) {
     std::shared_ptr<ConfigLayerData> layerData = *it;
-    if (typeid(*layerData.get()) == typeid(FolderData) && !layerData->hasChild()) {
+    if (typeid(*layerData) == typeid(FolderData) && !layerData->hasChild()) {
       it = layerDataList->erase(it);
     } else {
-      it++;
+      ++it;
     }
   }
 }
 
 void PAGPanelExporterDialog::resetData() {
-  std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> layerDataList =
-      std::make_shared<QList<std::shared_ptr<ConfigLayerData>>>();
-  auto root = AEResource::GetResourceTree();
+  auto layerDataList = std::make_shared<QList<std::shared_ptr<ConfigLayerData>>>();
+  const auto root = AEResource::GetResourceTree();
   if (root == nullptr) {
     return;
   }
@@ -114,7 +113,7 @@ void PAGPanelExporterDialog::resetData() {
 void PAGPanelExporterDialog::resetToLastSelected(
     const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) const {
   if (aeResource != nullptr && !layerDataList->empty()) {
-    for (auto layerData : *layerDataList) {
+    for (const auto& layerData : *layerDataList) {
       if (layerData->aeResource == nullptr || layerData->aeResource->itemH == nullptr ||
           layerData->aeResource->itemH != aeResource->itemH) {
         layerData->setChecked(false);
@@ -152,19 +151,16 @@ void PAGPanelExporterDialog::registerConnect() {
           &PAGPanelExporterDialog::handleCompositionCheckBoxChange);
 }
 
-void PAGPanelExporterDialog::goToSettingDialog(std::shared_ptr<AEResource> aeResource) {
+void PAGPanelExporterDialog::goToSettingDialog(const std::shared_ptr<AEResource>& aeResource) {
   hide();
   this->aeResource = aeResource;
   showExportSettingDialog(aeResource->itemH);
 }
 
-void PAGPanelExporterDialog::goToPreviewDialog(std::shared_ptr<AEResource> aeResource) {
+void PAGPanelExporterDialog::goToPreviewDialog(const std::shared_ptr<AEResource>& aeResource) {
   // hide();
   this->aeResource = aeResource;
   // ShowExportPreviewDialog(aeResource->itemH, isExportAudio, true);
-}
-
-void PAGPanelExporterDialog::onCancelBtnClick() {
 }
 
 void PAGPanelExporterDialog::onExportBtnClick() {
@@ -173,41 +169,43 @@ void PAGPanelExporterDialog::onExportBtnClick() {
 
 void PAGPanelExporterDialog::exportFiles() {
   hide();
-  // std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> selectedLayers = layerModel->getSelectedLayer();
-  // std::vector<std::shared_ptr<ExportProgressItem>> exportProgressList;
-  // for (std::shared_ptr<ConfigLayerData> layerData : *selectedLayers) {
-  //   if (layerData->isChecked() && layerData->aeResource && layerData->aeResource->itemH) {
-  //     std::string pagFileName = layerData->name + ".pag";
-  //     QDir dir(QString(layerData->aeResource->getStorePath().c_str()));
-  //     QString savePath = dir.absoluteFilePath(QString(pagFileName.c_str()));
-  //     std::string pagSavePath = FormatStdString(savePath.toStdString());
-  //
-  //     std::shared_ptr<ExportProgressItem> progressItem = std::make_shared<ExportProgressItem>(pagFileName);
-  //     progressItem->saveFilePath = pagSavePath;
-  //     progressItem->aeResource = layerData->aeResource;
-  //     progressItem->isExportAudio = isExportAudio;
-  //
-  //     exportProgressList.emplace_back(progressItem);
-  //   }
-  // }
-  // if(!exportProgressList.empty()){
-  //   ShowProgressListWindow(exportProgressList);
-  // }
+  const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> selectedLayers =
+      layerModel->getSelectedLayer();
+  std::vector<std::shared_ptr<ExportProgressItem>> exportProgressList;
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *selectedLayers) {
+    if (layerData->isChecked() && layerData->aeResource && layerData->aeResource->itemH) {
+      std::string pagFileName = layerData->name + ".pag";
+      QDir dir(QString(layerData->aeResource->getStorePath().c_str()));
+      QString savePath = dir.absoluteFilePath(QString(pagFileName.c_str()));
+      const std::string pagSavePath = savePath.toStdString();
+
+      std::shared_ptr<ExportProgressItem> progressItem =
+          std::make_shared<ExportProgressItem>(pagFileName);
+      progressItem->saveFilePath = pagSavePath;
+      progressItem->aeResource = layerData->aeResource;
+      progressItem->isExportAudio = isExportAudio;
+
+      exportProgressList.emplace_back(progressItem);
+    }
+  }
+  if (!exportProgressList.empty()) {
+    showProgressListWindow(exportProgressList);
+  }
 }
 
-void PAGPanelExporterDialog::handleCompositionCheckBoxChange() {
+void PAGPanelExporterDialog::handleCompositionCheckBoxChange() const {
   refreshErrorListView();
 }
 
-void PAGPanelExporterDialog::onTitleCheckBoxStateChange(int state) {
+void PAGPanelExporterDialog::onTitleCheckBoxStateChange(int state) const {
   refreshErrorListView();
 }
 
-void PAGPanelExporterDialog::refreshErrorListView() {
+void PAGPanelExporterDialog::refreshErrorListView() const {
   std::vector<pagexporter::AlertInfo> alertInfos;
   std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> selectedLayer =
       layerModel->getSelectedLayer();
-  for (std::shared_ptr<ConfigLayerData> layerData : *selectedLayer) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *selectedLayer) {
     if (layerData->aeResource && layerData->aeResource->itemH) {
       std::vector<pagexporter::AlertInfo> alertList =
           pagexporter::AlertInfos::GetAlertList(layerData->aeResource->itemH);
@@ -217,15 +215,15 @@ void PAGPanelExporterDialog::refreshErrorListView() {
   errorListModel->setAlertInfos(alertInfos);
 }
 
-void PAGPanelExporterDialog::exit() {
+void PAGPanelExporterDialog::exit() const {
   app->exit();
 }
 
-bool PAGPanelExporterDialog::isAudioExport() {
+bool PAGPanelExporterDialog::isAudioExport() const {
   return isExportAudio;
 }
 
-void PAGPanelExporterDialog::onSavePathItemClick(const QModelIndex& index) {
+void PAGPanelExporterDialog::onSavePathItemClick(const QModelIndex& index) const {
   QString savePath = index.data(SAVE_PATH_ROLE).toString();
   QString selectPath = QFileDialog::getExistingDirectory(QApplication::topLevelWidgets().value(0),
                                                          tr("选择存储路径"), savePath,
@@ -233,30 +231,30 @@ void PAGPanelExporterDialog::onSavePathItemClick(const QModelIndex& index) {
   layerModel->setData(index, selectPath, SAVE_PATH_ROLE);
 }
 
-void PAGPanelExporterDialog::onExportAudioChange(bool checked) {
+void PAGPanelExporterDialog::onExportAudioChange(const bool checked) {
   isExportAudio = checked;
   AEResource::SetExportAudioFlag(checked);
 }
 
-void PAGPanelExporterDialog::searchCompositionsByName(QString name) {
+void PAGPanelExporterDialog::searchCompositionsByName(const QString& name) const {
   layerModel->searchCompositionsByName(name);
   refreshErrorListView();
 }
 
-void PAGPanelExporterDialog::resetAfterNoSearch() {
+void PAGPanelExporterDialog::resetAfterNoSearch() const {
   layerModel->resetAfterNoSearch();
   refreshErrorListView();
 }
 
-void PAGPanelExporterDialog::setAllChecked(bool checked) {
+void PAGPanelExporterDialog::setAllChecked(const bool checked) const {
   layerModel->setAllChecked(checked);
   refreshErrorListView();
 }
 
 void PAGPanelExporterDialog::showMainPage() {
-  QUrl qUrl = QUrl(QStringLiteral("qrc:/qml/ExportConfig.qml"));
+  const auto qUrl = QUrl(QStringLiteral("qrc:/qml/ExportConfig.qml"));
   engine->load(qUrl);
-  window = static_cast<QQuickWindow*>(engine->rootObjects().at(0));
+  window = dynamic_cast<QQuickWindow*>(engine->rootObjects().at(0));
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
 #ifdef ENABLE_OLD_API
   window->setPersistentOpenGLContext(true);
@@ -289,7 +287,7 @@ void PAGPanelExporterDialog::show() {
   translate();
 }
 
-void PAGPanelExporterDialog::hide() {
+void PAGPanelExporterDialog::hide() const {
   if (window) {
     window->hide();
   }
@@ -306,8 +304,19 @@ void PAGPanelExporterDialog::showExportSettingDialog(AEGP_ItemH& currentAEItem) 
   settingDialog->showPage();
 }
 
+void PAGPanelExporterDialog::showProgressListWindow(
+    std::vector<std::shared_ptr<ExportProgressItem>>& progressItems) {
+  if (exportProgressListWindow != nullptr) {
+    delete exportProgressListWindow;
+    exportProgressListWindow = nullptr;
+  }
+  exportProgressListWindow = new ExportProgressListWindow(progressItems);
+  exportProgressListWindow->showProgressListWindow();
+  exportProgressListWindow->startExport();
+}
+
 void PAGPanelExporterDialog::refreshDialog() {
-  // resetData();
-  // refreshErrorListView();
+  resetData();
+  refreshErrorListView();
   show();
 }

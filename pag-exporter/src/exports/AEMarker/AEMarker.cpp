@@ -22,10 +22,10 @@
 #include "AEUtils.h"
 #include "StringUtil.h"
 #include "cJSON.h"
-// #include "PlaceImagePanel.h"
-// #include "PAGFilterUtil.h"
+#include "src/utils/PAGFilterUtil.h"
+#include "src/utils/Panels/PlaceImagePanel.h"
 
-void AEMarker::ExportMarkers(pagexporter::Context* context, const AEGP_LayerH& layerHandle,
+void AEMarker::ExportMarkers(const pagexporter::Context* context, const AEGP_LayerH& layerHandle,
                              std::vector<pag::Marker*>& markers) {
   if (context == nullptr || layerHandle == nullptr) {
     return;
@@ -80,17 +80,17 @@ void AEMarker::PrintMarkers(pag::Composition* composition) {
     return;
   }
 
-  for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+  for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
 
     printf("layer->markers=%ld\n", layer->markers.size());
 
-    for (auto marker : layer->markers) {
+    for (const auto marker : layer->markers) {
       printf("marker time=%.0f duration=%.0f marker=%s\n", (double)marker->startTime,
              (double)marker->duration, marker->comment.c_str());
     }
 
     if (layer->type() == pag::LayerType::PreCompose) {
-      PrintMarkers(static_cast<pag::PreComposeLayer*>(layer)->composition);
+      PrintMarkers(dynamic_cast<pag::PreComposeLayer*>(layer)->composition);
     }
   }
 }
@@ -99,17 +99,16 @@ void AEMarker::ParseMarkers(pag::Layer* layer) {
   if (layer == nullptr) {
     return;
   }
-  for (auto marker : layer->markers) {
-    auto comment = &marker->comment;
+  for (const auto marker : layer->markers) {
+    const auto comment = &marker->comment;
 
-    auto cjson = cJSON_Parse(comment->c_str());
+    const auto cjson = cJSON_Parse(comment->c_str());
     if (cjson == nullptr || cjson->type != cJSON_Object) {
       continue;
     }
 
     // 暂时只处理CachePolicy
-    auto item = cJSON_GetObjectItem(cjson, "CachePolicy");
-    if (item != nullptr) {
+    if (const auto item = cJSON_GetObjectItem(cjson, "CachePolicy"); item != nullptr) {
       if (item->type == cJSON_Int) {  // 数字类型：0 = auto; 1 = enable; 2 = disable
         if (item->valueint == 1) {
           layer->cachePolicy = pag::CachePolicy::Enable;
@@ -142,7 +141,7 @@ struct {
     {"none", pag::PAGTimeStretchMode::None},
 };
 
-static std::string TimeStretchModeToString(pag::Enum mode) {
+static std::string TimeStretchModeToString(const pag::Enum mode) {
   switch (mode) {
     case pag::PAGTimeStretchMode::None:
       return "None";
@@ -162,7 +161,7 @@ static std::string TimeStretchModeToString(pag::Enum mode) {
   }
 }
 
-static pag::Enum StringToTimeStretchMode(std::string str) {
+static pag::Enum StringToTimeStretchMode(const std::string& str) {
   auto newStr = str;
   transform(newStr.begin(), newStr.end(), newStr.begin(), ::tolower);
   auto p = newStr.c_str();
@@ -179,15 +178,14 @@ static pag::Enum StringToTimeStretchMode(std::string str) {
   }
 }
 
-static bool FindKeyFromComment(std::string comment, std::string key, cJSON** ppValue) {
+static bool FindKeyFromComment(const std::string& comment, const std::string& key,
+                               cJSON** ppValue) {
   bool ret = false;
   if (ppValue != nullptr) {
     *ppValue = nullptr;
   }
-  auto cjson = cJSON_Parse(comment.c_str());
-  if (cjson != nullptr) {
-    auto item = cJSON_GetObjectItem(cjson, key.c_str());
-    if (item != nullptr) {
+  if (const auto cjson = cJSON_Parse(comment.c_str()); cjson != nullptr) {
+    if (const auto item = cJSON_GetObjectItem(cjson, key.c_str()); item != nullptr) {
       ret = true;
       if (ppValue != nullptr) {
         if (item->type == cJSON_Int) {
@@ -205,8 +203,8 @@ static bool FindKeyFromComment(std::string comment, std::string key, cJSON** ppV
 
 bool AEMarker::GetTimeStretchInfoOld(pag::Enum& timeStretchMode, pag::Frame& timeStretchStart,
                                      pag::Frame& timeStretchDuration, const AEGP_ItemH& itemH) {
-  auto& suites = SUITES();
-  auto pluginID = PLUGIN_ID();
+  const auto& suites = SUITES();
+  const auto pluginID = PLUGIN_ID();
   bool find = false;
 
   timeStretchMode = pag::PAGTimeStretchMode::Repeat;
@@ -254,7 +252,7 @@ bool AEMarker::GetTimeStretchInfoOld(pag::Enum& timeStretchMode, pag::Frame& tim
     A_Time duration;
     suites.MarkerSuite2()->AEGP_GetMarkerDuration(markerP, &duration);
 
-    float frameRate = AEUtils::GetFrameRateFromItem(itemH);
+    const float frameRate = AEUtils::GetFrameRateFromItem(itemH);
     timeStretchStart = ExportTime(time, frameRate);
     timeStretchDuration = ExportTime(duration, frameRate);
     break;
@@ -265,8 +263,8 @@ bool AEMarker::GetTimeStretchInfoOld(pag::Enum& timeStretchMode, pag::Frame& tim
 }
 
 void AEMarker::DeleteTimeStretchMarkerOld(const AEGP_ItemH& itemH) {
-  auto& suites = SUITES();
-  auto pluginID = PLUGIN_ID();
+  const auto& suites = SUITES();
+  const auto pluginID = PLUGIN_ID();
 
   std::vector<int> list;
 
@@ -298,8 +296,8 @@ void AEMarker::DeleteTimeStretchMarkerOld(const AEGP_ItemH& itemH) {
 
 bool AEMarker::GetTimeStretchInfo(pag::Enum& timeStretchMode, pag::Frame& timeStretchStart,
                                   pag::Frame& timeStretchDuration, const AEGP_ItemH& itemH) {
-  auto& suites = SUITES();
-  auto pluginID = PLUGIN_ID();
+  const auto& suites = SUITES();
+  const auto pluginID = PLUGIN_ID();
   bool find = false;
 
   timeStretchMode = pag::PAGTimeStretchMode::Repeat;
@@ -328,7 +326,7 @@ bool AEMarker::GetTimeStretchInfo(pag::Enum& timeStretchMode, pag::Frame& timeSt
       A_Time duration;
       suites.MarkerSuite2()->AEGP_GetMarkerDuration(markerP, &duration);
 
-      float frameRate = AEUtils::GetFrameRateFromItem(itemH);
+      const float frameRate = AEUtils::GetFrameRateFromItem(itemH);
       timeStretchStart = ExportTime(time, frameRate);
       timeStretchDuration = ExportTime(duration, frameRate);
       break;
@@ -339,26 +337,26 @@ bool AEMarker::GetTimeStretchInfo(pag::Enum& timeStretchMode, pag::Frame& timeSt
   return find;
 }
 
-void AEMarker::SetTimeStretchInfo(pag::Enum timeStretchMode, pag::Frame timeStretchStart,
-                                  pag::Frame timeStretchDuration, const AEGP_ItemH& itemH) {
+void AEMarker::SetTimeStretchInfo(const pag::Enum timeStretchMode,
+                                  const pag::Frame timeStretchStart,
+                                  const pag::Frame timeStretchDuration, const AEGP_ItemH& itemH) {
   auto markerStreamH = AEUtils::GetMarkerStreamFromItem(itemH);
 
   DeleteTimeStretchMarkerOld(itemH);
   DeleteMarkersFromStream(markerStreamH, "TimeStretchMode");
 
-  auto modeString = TimeStretchModeToString(timeStretchMode);
-  auto node = AEMarker::KeyValueToJsonNode("TimeStretchMode", modeString);
+  const auto modeString = TimeStretchModeToString(timeStretchMode);
+  const auto node = AEMarker::KeyValueToJsonNode("TimeStretchMode", modeString);
   A_Time keyTime;
   A_Time durationTime;
-  float frameRate = AEUtils::GetFrameRateFromItem(itemH);
+  const float frameRate = AEUtils::GetFrameRateFromItem(itemH);
   keyTime.scale = static_cast<A_u_long>(frameRate);
   keyTime.value = static_cast<A_long>(timeStretchStart);
   durationTime.scale = static_cast<A_u_long>(frameRate);
   durationTime.value = static_cast<A_long>(timeStretchDuration);
 
-  int mergedIndex = MergeMarkerToStream(markerStreamH, node);
-  if (mergedIndex >= 0) {
-    auto comment = GetMarkerComment(markerStreamH, mergedIndex);
+  if (const int mergedIndex = MergeMarkerToStream(markerStreamH, node); mergedIndex >= 0) {
+    const auto comment = GetMarkerComment(markerStreamH, mergedIndex);
     DeleteMarkerByIndex(markerStreamH, mergedIndex);
     AddNewMarkerToStream(markerStreamH, comment, keyTime, durationTime);
   } else {
@@ -368,9 +366,9 @@ void AEMarker::SetTimeStretchInfo(pag::Enum timeStretchMode, pag::Frame timeStre
   AEUtils::DeleteStream(markerStreamH);
 }
 
-void AEMarker::ExportTimeStretch(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
-                                 const AEGP_ItemH& itemH) {
-  auto& suites = SUITES();
+void AEMarker::ExportTimeStretch(const std::shared_ptr<pag::File>& file,
+                                 pagexporter::Context& context, const AEGP_ItemH& itemH) {
+  const auto& suites = SUITES();
 
   pag::Enum timeStretchMode = pag::PAGTimeStretchMode::Repeat;
   pag::Frame timeStretchStart = 0;
@@ -384,10 +382,11 @@ void AEMarker::ExportTimeStretch(std::shared_ptr<pag::File>& file, pagexporter::
   if (finded) {
     A_Time durationTime = {};
     suites.ItemSuite6()->AEGP_GetItemDuration(itemH, &durationTime);
-    auto compositionDuration = ExportTime(durationTime, &context);
+    const auto compositionDuration = ExportTime(durationTime, &context);
 
-    timeStretchStart = std::min(std::max(timeStretchStart, (pag::Frame)0), compositionDuration);
-    timeStretchDuration = std::min(std::max(timeStretchDuration, (pag::Frame)0),
+    timeStretchStart =
+        std::min(std::max(timeStretchStart, static_cast<pag::Frame>(0)), compositionDuration);
+    timeStretchDuration = std::min(std::max(timeStretchDuration, static_cast<pag::Frame>(0)),
                                    compositionDuration - timeStretchStart);
     if (timeStretchDuration == 0) {
       timeStretchStart = 0;
@@ -400,56 +399,56 @@ void AEMarker::ExportTimeStretch(std::shared_ptr<pag::File>& file, pagexporter::
   file->timeStretchMode = timeStretchMode;
 }
 
-static void ExportImageLayerEditable(std::shared_ptr<pag::File>& file,
+static void ExportImageLayerEditable(const std::shared_ptr<pag::File>& file,
                                      pagexporter::Context& context,
                                      const AEGP_ItemH& mainCompItemH) {
-  // int count = static_cast<int>(file->images.size());
-  // if (count == 0) {
-  //   return;
-  // }
-  // auto list = new int[count];
-  // for (int i = 0; i < count; i++) {
-  //   list[i] = i;
-  // }
-  // bool hasNoPlace = false;
-  // for(auto pair : context.imageLayerHList) {
-  //   auto layerH = pair.first;
-  //   auto isNoPlace = PlaceImageLayer::IsNoReplaceImageLayer(context, mainCompItemH, layerH);
-  //   if (isNoPlace) {
-  //     auto id = AEUtils::GetItemIdFromLayer(layerH);
-  //     for (int index = 0; index < count; index++) {
-  //       if (id == file->images[index]->id) {
-  //         hasNoPlace = true;
-  //         list[index] = -1;
-  //       }
-  //     }
-  //   }
-  // }
-  // if (hasNoPlace) {
-  //   file->editableImages = new std::vector<int>();
-  //   for (int i = 0; i < count; i++) {
-  //     if (list[i] != -1) {
-  //       file->editableImages->push_back(list[i]);
-  //     }
-  //   }
-  // }
-  // delete []list;
-}
-
-static void ExportTextLayerEditable(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
-                                    const AEGP_ItemH& mainCompItemH) {
-  int count = static_cast<int>(file->numTexts());
+  const int count = static_cast<int>(file->images.size());
   if (count == 0) {
     return;
   }
-  auto list = new int[count];
+  const auto list = new int[count];
+  for (int i = 0; i < count; i++) {
+    list[i] = i;
+  }
+  bool hasNoPlace = false;
+  for (auto [fst, snd] : context.imageLayerHList) {
+    auto layerH = fst;
+    if (auto isNoPlace = PlaceImageLayer::IsNoReplaceImageLayer(context, mainCompItemH, layerH)) {
+      const auto id = AEUtils::GetItemIdFromLayer(layerH);
+      for (int index = 0; index < count; index++) {
+        if (id == file->images[index]->id) {
+          hasNoPlace = true;
+          list[index] = -1;
+        }
+      }
+    }
+  }
+  if (hasNoPlace) {
+    file->editableImages = new std::vector<int>();
+    for (int i = 0; i < count; i++) {
+      if (list[i] != -1) {
+        file->editableImages->push_back(list[i]);
+      }
+    }
+  }
+  delete[] list;
+}
+
+static void ExportTextLayerEditable(const std::shared_ptr<pag::File>& file,
+                                    pagexporter::Context& context,
+                                    const AEGP_ItemH& mainCompItemH) {
+  const int count = static_cast<int>(file->numTexts());
+  if (count == 0) {
+    return;
+  }
+  const auto list = new int[count];
   for (int i = 0; i < count; i++) {
     list[i] = i;
   }
   bool hasNoPlace = false;
   for (int i = 0; i < count; i++) {
-    auto layer = file->getTextAt(i);
-    auto keyString = AEMarker::GetKeyStringWithId("noReplace", layer->id);
+    const auto layer = file->getTextAt(i);
+    const auto keyString = AEMarker::GetKeyStringWithId("noReplace", layer->id);
     auto isNoPlace = AEMarker::FindMarkerFromComposition(mainCompItemH, keyString);
     if (!isNoPlace) {
       auto layerH = context.getLayerHById(layer->id);
@@ -474,21 +473,20 @@ static void ExportTextLayerEditable(std::shared_ptr<pag::File>& file, pagexporte
   delete[] list;
 }
 
-static std::vector<int>* MakeDefaultEditableIndices(int count) {
-  auto indices = new std::vector<int>();
+static std::vector<int>* MakeDefaultEditableIndices(const int count) {
+  const auto indices = new std::vector<int>();
   for (int i = 0; i < count; i++) {
     indices->push_back(i);
   }
   return indices;
 }
 
-void AEMarker::ExportLayerEditable(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
-                                   const AEGP_ItemH& itemH) {
+void AEMarker::ExportLayerEditable(const std::shared_ptr<pag::File>& file,
+                                   pagexporter::Context& context, const AEGP_ItemH& itemH) {
   ExportImageLayerEditable(file, context, itemH);
   ExportTextLayerEditable(file, context, itemH);
 
-  if (file->editableImages == nullptr && file->images.size() > 0 &&
-      file->editableTexts != nullptr) {
+  if (file->editableImages == nullptr && !file->images.empty() && file->editableTexts != nullptr) {
     file->editableImages = MakeDefaultEditableIndices(static_cast<int>(file->images.size()));
   }
   if (file->editableTexts == nullptr && file->numTexts() > 0 && file->editableImages != nullptr) {
@@ -496,12 +494,13 @@ void AEMarker::ExportLayerEditable(std::shared_ptr<pag::File>& file, pagexporter
   }
 }
 
-void AEMarker::AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, std::string comment,
-                                    A_Time keyTime, A_Time durationTime) {
+void AEMarker::AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH,
+                                    const std::string& comment, const A_Time keyTime,
+                                    const A_Time durationTime) {
   if (markerStreamH == nullptr) {
     return;
   }
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
   A_long index = 0;
   suites.KeyframeSuite4()->AEGP_InsertKeyframe(markerStreamH, AEGP_LTimeMode_LayerTime, &keyTime,
                                                &index);
@@ -511,36 +510,36 @@ void AEMarker::AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, std::s
 }
 
 void AEMarker::AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* node,
-                                    A_Time keyTime, A_Time durationTime) {
+                                    const A_Time keyTime, const A_Time durationTime) {
   if (markerStreamH == nullptr || node == nullptr) {
     return;
   }
-  auto cjson = cJSON_CreateObject();
+  const auto cjson = cJSON_CreateObject();
   cJSON_AddItemToArray(cjson, node);
-  std::string comment = cJSON_Print(cjson);
+  const std::string comment = cJSON_Print(cjson);
   AddNewMarkerToStream(markerStreamH, comment, keyTime, durationTime);
   cJSON_Delete(cjson);
 }
 
-void AEMarker::DeleteMarkerByIndex(const AEGP_StreamRefH& markerStreamH, int index) {
+void AEMarker::DeleteMarkerByIndex(const AEGP_StreamRefH& markerStreamH, const int index) {
   if (markerStreamH == nullptr) {
     return;
   }
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
   suites.KeyframeSuite4()->AEGP_DeleteKeyframe(markerStreamH, index);
 }
 
-void AEMarker::SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index,
-                                std::string comment, A_Time durationTime) {
+void AEMarker::SetMarkerComment(const AEGP_StreamRefH& markerStreamH, const int index,
+                                const std::string& comment, A_Time durationTime) {
   if (markerStreamH == nullptr) {
     return;
   }
-  auto& suites = SUITES();
-  auto pluginID = PLUGIN_ID();
+  const auto& suites = SUITES();
+  const auto pluginID = PLUGIN_ID();
   AEGP_StreamValue2 streamValue;
   suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStreamH, index, &streamValue);
   std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-  auto fmtComment = convert.from_bytes(comment);  // utf-8 to utf-16
+  const auto fmtComment = convert.from_bytes(comment);  // utf-8 to utf-16
   AEGP_MarkerValP newMarkerP = nullptr;
   suites.MarkerSuite1()->AEGP_NewMarker(&newMarkerP);
   suites.MarkerSuite1()->AEGP_SetMarkerString(newMarkerP, AEGP_MarkerString_COMMENT,
@@ -561,8 +560,8 @@ std::string AEMarker::GetMarkerComment(const AEGP_StreamRefH& markerStreamH, int
   if (markerStreamH == nullptr) {
     return "";
   }
-  auto& suites = SUITES();
-  auto pluginID = PLUGIN_ID();
+  const auto& suites = SUITES();
+  const auto pluginID = PLUGIN_ID();
   AEGP_StreamValue2 streamValue;
   suites.KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStreamH, index, &streamValue);
   AEGP_MarkerValP markerP = streamValue.val.markerP;
@@ -577,17 +576,15 @@ std::string AEMarker::GetMarkerComment(const AEGP_StreamRefH& markerStreamH, int
 
 bool AEMarker::MergeToMarkerWithKey(const AEGP_StreamRefH& markerStreamH, std::string& key,
                                     cJSON* node) {
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
   A_long numKeyframes = 0;
   suites.KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
   for (A_long index = 0; index < numKeyframes; index++) {
     auto comment = GetMarkerComment(markerStreamH, index);
-    auto cjson = cJSON_Parse(comment.c_str());
-    if (cjson != nullptr) {
-      auto item = cJSON_GetObjectItem(cjson, key.c_str());
-      if (item != nullptr) {
+    if (const auto cjson = cJSON_Parse(comment.c_str()); cjson != nullptr) {
+      if (const auto item = cJSON_GetObjectItem(cjson, key.c_str()); item != nullptr) {
         cJSON_AddItemToArray(cjson, node);
-        auto text = cJSON_Print(cjson);
+        const auto text = cJSON_Print(cjson);
         SetMarkerComment(markerStreamH, index, text);
         delete text;
         cJSON_Delete(cjson);
@@ -600,15 +597,15 @@ bool AEMarker::MergeToMarkerWithKey(const AEGP_StreamRefH& markerStreamH, std::s
 }
 
 int AEMarker::MergeMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* node) {
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
   A_long numKeyframes = 0;
   suites.KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
   for (A_long index = 0; index < numKeyframes; index++) {
     auto comment = GetMarkerComment(markerStreamH, index);
-    auto cjson = cJSON_Parse(comment.c_str());
-    if (cjson != nullptr && cjson->type == cJSON_Object) {
+    if (const auto cjson = cJSON_Parse(comment.c_str());
+        cjson != nullptr && cjson->type == cJSON_Object) {
       cJSON_AddItemToArray(cjson, node);
-      auto text = cJSON_Print(cjson);
+      const auto text = cJSON_Print(cjson);
       SetMarkerComment(markerStreamH, index, text);
       delete text;
       cJSON_Delete(cjson);
@@ -618,13 +615,13 @@ int AEMarker::MergeMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* n
   return -1;
 }
 
-bool AEMarker::FindMarkerFromStream(const AEGP_StreamRefH& markerStreamH, std::string key,
+bool AEMarker::FindMarkerFromStream(const AEGP_StreamRefH& markerStreamH, const std::string& key,
                                     cJSON** ppValue) {
   if (markerStreamH == nullptr) {
     return false;
   }
   bool ret = false;
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
   A_long numKeyframes = 0;
   suites.KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
   for (A_long index = 0; index < numKeyframes; index++) {
@@ -637,26 +634,28 @@ bool AEMarker::FindMarkerFromStream(const AEGP_StreamRefH& markerStreamH, std::s
   return ret;
 }
 
-bool AEMarker::FindMarkerFromLayer(const AEGP_LayerH& layerH, std::string key, cJSON** ppValue) {
+bool AEMarker::FindMarkerFromLayer(const AEGP_LayerH& layerH, const std::string& key,
+                                   cJSON** ppValue) {
   auto markerStreamH = AEUtils::GetMarkerStreamFromLayer(layerH);
-  auto ret = FindMarkerFromStream(markerStreamH, key, ppValue);
+  const auto ret = FindMarkerFromStream(markerStreamH, key, ppValue);
   AEUtils::DeleteStream(markerStreamH);
   return ret;
 }
 
-bool AEMarker::FindMarkerFromComposition(const AEGP_ItemH& itemH, std::string key,
+bool AEMarker::FindMarkerFromComposition(const AEGP_ItemH& itemH, const std::string& key,
                                          cJSON** ppValue) {
   auto markerStreamH = AEUtils::GetMarkerStreamFromItem(itemH);
-  auto ret = FindMarkerFromStream(markerStreamH, key, ppValue);
+  const auto ret = FindMarkerFromStream(markerStreamH, key, ppValue);
   AEUtils::DeleteStream(markerStreamH);
   return ret;
 }
 
-void AEMarker::DeleteMarkersFromStream(const AEGP_StreamRefH& markerStreamH, std::string key) {
+void AEMarker::DeleteMarkersFromStream(const AEGP_StreamRefH& markerStreamH,
+                                       const std::string& key) {
   if (markerStreamH == nullptr) {
     return;
   }
-  auto& suites = SUITES();
+  const auto& suites = SUITES();
   A_long numKeyframes = 0;
   suites.KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
   for (A_long index = numKeyframes - 1; index >= 0; index--) {
@@ -667,7 +666,7 @@ void AEMarker::DeleteMarkersFromStream(const AEGP_StreamRefH& markerStreamH, std
       if (cjson->type == cJSON_Object && cjson->child == nullptr) {
         DeleteMarkerByIndex(markerStreamH, index);
       } else {
-        auto newStr = cJSON_Print(cjson);
+        const auto newStr = cJSON_Print(cjson);
         SetMarkerComment(markerStreamH, index, newStr);
         free(newStr);
       }
@@ -676,24 +675,22 @@ void AEMarker::DeleteMarkersFromStream(const AEGP_StreamRefH& markerStreamH, std
   }
 }
 
-void AEMarker::DeleteMarkersFromLayer(const AEGP_LayerH& layerH, std::string key) {
+void AEMarker::DeleteMarkersFromLayer(const AEGP_LayerH& layerH, const std::string& key) {
   auto markerStreamH = AEUtils::GetMarkerStreamFromLayer(layerH);
   DeleteMarkersFromStream(markerStreamH, key);
   AEUtils::DeleteStream(markerStreamH);
 }
 
-void AEMarker::DeleteMarkersFromCompostion(const AEGP_ItemH& itemH, std::string key) {
+void AEMarker::DeleteMarkersFromComposition(const AEGP_ItemH& itemH, const std::string& key) {
   auto markerStreamH = AEUtils::GetMarkerStreamFromItem(itemH);
   DeleteMarkersFromStream(markerStreamH, key);
   AEUtils::DeleteStream(markerStreamH);
 }
 
-static std::string GetValueFromComment(std::string comment, std::string key) {
-  std::string ret = "";
-  auto cjson = cJSON_Parse(comment.c_str());
-  if (cjson != nullptr) {
-    auto item = cJSON_GetObjectItem(cjson, key.c_str());
-    if (item != nullptr) {
+static std::string GetValueFromComment(const std::string& comment, const std::string& key) {
+  std::string ret;
+  if (const auto cjson = cJSON_Parse(comment.c_str()); cjson != nullptr) {
+    if (const auto item = cJSON_GetObjectItem(cjson, key.c_str()); item != nullptr) {
       if (item->type == cJSON_String && item->valuestring != nullptr) {
         ret = item->valuestring;
       } else if (item->type == cJSON_Int) {
@@ -705,12 +702,12 @@ static std::string GetValueFromComment(std::string comment, std::string key) {
   return ret;
 }
 
-std::string AEMarker::GetMarkerFromCompostion(const AEGP_ItemH& itemH, std::string key) {
+std::string AEMarker::GetMarkerFromComposition(const AEGP_ItemH& itemH, const std::string& key) {
   if (itemH == nullptr) {
     return "";
   }
-  auto& suites = SUITES();
-  std::string value = "";
+  const auto& suites = SUITES();
+  std::string value;
   AEGP_StreamRefH markerStreamH = AEUtils::GetMarkerStreamFromItem(itemH);
   A_long numKeyframes = 0;
   suites.KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
@@ -730,8 +727,7 @@ void AEMarker::AddMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* no
     return;
   }
   DeleteMarkersFromStream(markerStreamH, node->string);
-  int mergedIndex = MergeMarkerToStream(markerStreamH, node);
-  if (mergedIndex < 0) {
+  if (const int mergedIndex = MergeMarkerToStream(markerStreamH, node); mergedIndex < 0) {
     AddNewMarkerToStream(markerStreamH, node);
   }
 }
@@ -742,79 +738,79 @@ void AEMarker::AddMarkerToLayer(const AEGP_LayerH& layerH, cJSON* node) {
   AEUtils::DeleteStream(markerStreamH);
 }
 
-void AEMarker::AddMarkerToCompostion(const AEGP_ItemH& itemH, cJSON* node) {
+void AEMarker::AddMarkerToComposition(const AEGP_ItemH& itemH, cJSON* node) {
   auto markerStreamH = AEUtils::GetMarkerStreamFromItem(itemH);
   AddMarkerToStream(markerStreamH, node);
   AEUtils::DeleteStream(markerStreamH);
 }
 
-cJSON* AEMarker::KeyValueToJsonNode(const std::string key, const std::string value) {
-  auto node = cJSON_CreateString(value.c_str());
+cJSON* AEMarker::KeyValueToJsonNode(const std::string& key, const std::string& value) {
+  const auto node = cJSON_CreateString(value.c_str());
   node->string = cJSON_strdup(key.c_str());
   return node;
 }
 
-cJSON* AEMarker::KeyValueToJsonNode(const std::string key, int value) {
-  auto node = cJSON_CreateInt(value, -1);
+cJSON* AEMarker::KeyValueToJsonNode(const std::string& key, const int value) {
+  const auto node = cJSON_CreateInt(value, -1);
   node->string = cJSON_strdup(key.c_str());
   return node;
 }
 
 static void ProcessImageFillMode(pagexporter::Context& context, pag::Layer* layer, void* ctx) {
-  // if (layer->type() != pag::LayerType::Image) {
-  //   return;
-  // }
-  // auto list = static_cast<std::vector<std::pair<pag::ID, ImageFillMode>>*>(ctx);
-  // auto imageLayer = static_cast<pag::ImageLayer*>(layer);
-  // auto layerH = context.getLayerHById(layer->id);
-  // auto mode = PlaceImageLayer::GetFillModeFromLayer(layerH);
-  // if (mode == ImageFillMode::NotFind) {
-  //   mode = ImageFillMode::Default;
-  // }
-  // auto imageId = imageLayer->imageBytes->id;
-  // bool finded = false;
-  // for (auto pair : *list) {
-  //   if (imageId == pair.first) {
-  //     finded = true;
-  //     if (mode != pair.second) {
-  //       context.pushWarning(AlertInfoType::TextPathAnimator);
-  //     }
-  //     break;
-  //   }
-  // }
-  // if (!finded) {
-  //   list->push_back(std::make_pair(imageId, mode));
-  // }
+  if (layer->type() != pag::LayerType::Image) {
+    return;
+  }
+  const auto list = static_cast<std::vector<std::pair<pag::ID, ImageFillMode>>*>(ctx);
+  const auto imageLayer = dynamic_cast<pag::ImageLayer*>(layer);
+  const auto layerH = context.getLayerHById(layer->id);
+  auto mode = PlaceImageLayer::GetFillModeFromLayer(layerH);
+  if (mode == ImageFillMode::NotFind) {
+    mode = ImageFillMode::Default;
+  }
+  auto imageId = imageLayer->imageBytes->id;
+  bool finded = false;
+  for (auto [fst, snd] : *list) {
+    if (imageId == fst) {
+      finded = true;
+      if (mode != snd) {
+        context.pushWarning(pagexporter::AlertInfoType::TextPathAnimator);
+      }
+      break;
+    }
+  }
+  if (!finded) {
+    list->push_back(std::make_pair(imageId, mode));
+  }
 }
 
-void AEMarker::ExportImageFillMode(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
-                                   const AEGP_ItemH& itemH) {
-  // std::vector<std::pair<pag::ID, pag::Enum>> list;
-  // PAGFilterUtil::TraversalLayers(context, context.compositions.back(), pag::LayerType::Image,
-  //                                &ProcessImageFillMode, &list);
-  // for (auto& pair : list) {
-  //   auto mode = PlaceImageLayer::GetFillModeFromComposition(itemH, pair.first);
-  //   if (mode != ImageFillMode::NotFind) {
-  //     pair.second = static_cast<pag::Enum>(mode);
-  //   }
-  // }
-  // auto editableImages = file->editableImages;
-  // if (editableImages == nullptr) {
-  //   editableImages = MakeDefaultEditableIndices(static_cast<int>(file->images.size()));
-  // }
-  // if (editableImages->size() > 0) {
-  //   file->imageScaleModes = new std::vector<pag::Enum>();
-  //   for (int i = 0; i < static_cast<int>(editableImages->size()); i++) {
-  //     int index = editableImages->at(i);
-  //     auto id = file->images[index]->id;
-  //     for (auto pair : list) {
-  //       if (pair.first == id) {
-  //         file->imageScaleModes->push_back(pair.second);
-  //       }
-  //     }
-  //   }
-  // }
-  // if (file->editableImages == nullptr) {
-  //   delete editableImages;
-  // }
+void AEMarker::ExportImageFillMode(const std::shared_ptr<pag::File>& file,
+                                   pagexporter::Context& context, const AEGP_ItemH& itemH) {
+  std::vector<std::pair<pag::ID, pag::Enum>> list;
+  PAGFilterUtil::TraversalLayers(context, context.compositions.back(), pag::LayerType::Image,
+                                 &ProcessImageFillMode, &list);
+  for (auto& pair : list) {
+    auto mode = PlaceImageLayer::GetFillModeFromComposition(itemH, pair.first);
+    if (mode != ImageFillMode::NotFind) {
+      pair.second = static_cast<pag::Enum>(mode);
+    }
+  }
+  auto editableImages = file->editableImages;
+  if (editableImages == nullptr) {
+    editableImages = MakeDefaultEditableIndices(static_cast<int>(file->images.size()));
+  }
+  if (!editableImages->empty()) {
+    file->imageScaleModes = new std::vector<pag::Enum>();
+    for (int i = 0; i < static_cast<int>(editableImages->size()); i++) {
+      const int index = editableImages->at(i);
+      const auto id = file->images[index]->id;
+      for (auto [fst, snd] : list) {
+        if (fst == id) {
+          file->imageScaleModes->push_back(snd);
+        }
+      }
+    }
+  }
+  if (file->editableImages == nullptr) {
+    delete editableImages;
+  }
 }

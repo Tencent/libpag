@@ -15,13 +15,11 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "src/utils/AlertInfo.h"
+#include "AlertInfo.h"
 #include "AlertInfoUI.h"
 #include <QtWidgets/QMessageBox>
 #include <fstream>
-#include <iostream>
 #include "ExportSingleAlert.h"
-#include "String_Utils.h"
 #include "src/ui/qt/ExportAlertDialog/ExportAlertDialog.h"
 
 bool WarningsAlert(std::vector<std::string>& infos) {
@@ -29,22 +27,20 @@ bool WarningsAlert(std::vector<std::string>& infos) {
     return false;
   }
 
-  std::shared_ptr<QTExportAlertDialog> alert =
-      std::shared_ptr<QTExportAlertDialog>(new QTExportAlertDialog(infos, nullptr));
-  auto title = QObject::tr("优化建议");
+  const auto alert = std::make_shared<QTExportAlertDialog>(infos, nullptr);
+  const auto title = QObject::tr("优化建议");
   alert->setAlertTitle(title.toStdString());
   alert->alertShow();
 
   return !alert->isContinueExport();
 }
 
-bool ErrorAlert(std::string info) {
+bool ErrorAlert(const std::string& info) {
   if (info.empty()) {
     return false;
   }
 
-  std::shared_ptr<ExportSingleAlert> alert =
-      std::shared_ptr<ExportSingleAlert>(new ExportSingleAlert(info));
+  const auto alert = std::make_shared<ExportSingleAlert>(info);
   alert->alertShow();
 
   return true;
@@ -55,9 +51,8 @@ bool ErrorsAlert(std::vector<std::string>& infos) {
     return false;
   }
 
-  std::shared_ptr<QTExportAlertDialog> alert =
-      std::shared_ptr<QTExportAlertDialog>(new QTExportAlertDialog(infos));
-  auto title = QObject::tr("错误");
+  const auto alert = std::make_shared<QTExportAlertDialog>(infos);
+  const auto title = QObject::tr("错误");
   alert->setAlertTitle(title.toStdString());
   alert->alertShow();
 

@@ -64,3 +64,16 @@ QApplication* SetupQT() {
 QApplication* CurrentUseQtApp() {
   return gCurrentQtApp;
 }
+
+
+std::string GetPAGExporterVersion() {
+  return "1.0.0";
+}
+
+std::string GetSystemVersion() {
+  return "1.0.0";
+}
+
+std::string GetAuthorName() {
+    return "libpag";
+}

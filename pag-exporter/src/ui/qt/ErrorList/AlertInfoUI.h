@@ -15,13 +15,11 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef ALERTINFO_H
+#ifndef ALERTINFOUI_H
 #define ALERTINFO_H
-#include "PAGDataTypes.h"
-
-bool WarningAlert(std::string info);
+#include "src/exports/PAGDataTypes.h"
 bool WarningsAlert(std::vector<std::string>& infos);
 
-bool ErrorAlert(std::string info);
+bool ErrorAlert(const std::string& info);
 bool ErrorsAlert(std::vector<std::string>& infos);
-#endif  //ALERTINFO_H
+#endif  //ALERTINFOUI_H

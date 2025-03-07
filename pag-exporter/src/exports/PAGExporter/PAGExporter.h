@@ -31,21 +31,19 @@ class PAGExporter {
                          std::vector<pagexporter::AlertInfo>* errorInfos = nullptr,
                          bool bHardware = false);
 
-  static std::vector<pag::Composition*> ResortCompositions(pagexporter::Context& context);
-  static std::vector<pag::ImageBytes*> ResortImages(pagexporter::Context& context,
-                                                    std::vector<pag::Composition*>& compositions);
+  static std::vector<pag::Composition*> ResortCompositions(const pagexporter::Context& context);
+  static std::vector<pag::ImageBytes*> ResortImages(const pagexporter::Context& context, const std::vector<pag::Composition*>& compositions);
 
   PAGExporter(const AEGP_ItemH& activeItemH, std::string outputPath,
               ProgressBase* progressBase = nullptr);
 
-  ~PAGExporter() {
-  }
+  ~PAGExporter() = default;
 
  private:
   std::shared_ptr<pag::File> ExportPAG(const AEGP_ItemH& activeItemH);
   void exporterRescale(std::vector<pag::Composition*>& compositions);
   void exportRescaleImages();
-  void exportRescaleBitmapCompositions(std::vector<pag::Composition*>& compositions);
+  void exportRescaleBitmapCompositions(const std::vector<pag::Composition*>& compositions);
   void exportRescaleVideoCompositions(std::vector<pag::Composition*>& compositions);
   void processWorkArea(const AEGP_ItemH& activeItemH);
 

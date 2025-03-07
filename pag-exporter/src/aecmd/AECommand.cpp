@@ -83,7 +83,7 @@ A_Err AECommand::OnClickPanel(AEGP_GlobalRefcon globalRefcon, AEGP_CommandRefcon
   }
   *handled = TRUE;
   SetupQT();
-
+  AEUtils::RunScriptPreWarm();
   const auto dialog = new PAGPanelExporterDialog();
   dialog->showMainPage();
   return err;

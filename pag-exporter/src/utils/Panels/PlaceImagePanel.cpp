@@ -323,12 +323,12 @@ void PlaceImageLayer::setFillMode(ImageFillMode mode) {
   }
   auto keyString = AEMarker::GetKeyStringWithId("ImageFillMode", AEUtils::GetItemId(imageH));
   if (mode == ImageFillMode::NotFind || mode == ImageFillMode::Default) {
-    AEMarker::DeleteMarkersFromCompostion(mainPanel->mainCompItemH, keyString);
+    AEMarker::DeleteMarkersFromComposition(mainPanel->mainCompItemH, keyString);
     fillMode = ImageFillMode::Default;
   } else {
     auto modeString = ImageFillModeToString(mode);
     auto node = AEMarker::KeyValueToJsonNode(keyString, modeString);
-    AEMarker::AddMarkerToCompostion(mainPanel->mainCompItemH, node);
+    AEMarker::AddMarkerToComposition(mainPanel->mainCompItemH, node);
     fillMode = mode;
   }
 }
@@ -345,11 +345,11 @@ void PlaceImageLayer::setResourceType(FillResourceType newType) {
   }
   auto keyString = AEMarker::GetKeyStringWithId("noReplace", AEUtils::GetItemId(imageH));
   if (resourceType == FillResourceType::NoReplace) {
-    AEMarker::DeleteMarkersFromCompostion(mainPanel->mainCompItemH, keyString);
+    AEMarker::DeleteMarkersFromComposition(mainPanel->mainCompItemH, keyString);
   }
   if (newType == FillResourceType::NoReplace) {
     auto node = AEMarker::KeyValueToJsonNode(keyString, 1);
-    AEMarker::AddMarkerToCompostion(mainPanel->mainCompItemH, node);
+    AEMarker::AddMarkerToComposition(mainPanel->mainCompItemH, node);
   }
   resourceType = newType;
   editableFlag = (resourceType == FillResourceType::Replace);

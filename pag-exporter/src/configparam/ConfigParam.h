@@ -59,7 +59,7 @@ struct BMPComposParam {
   FrameFormatType frameFormat = FrameFormatType::h264;
   int sequenceQuality = 80;
   int bitmapMaxResolution = 720;
-  int maxFrameRate = 24;
+  float maxFrameRate = 24.0;
   int bitmapKeyFrameInterval = 60;
   NLOHMANN_DEFINE_TYPE_INTRUSIVE(BMPComposParam, frameFormat, sequenceQuality, bitmapMaxResolution,
                                  maxFrameRate, bitmapKeyFrameInterval)

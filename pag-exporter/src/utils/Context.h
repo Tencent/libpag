@@ -113,7 +113,7 @@ class Context {
   std::unordered_map<pag::ID, AEGP_LayerH> layerHList;
   AEGP_ItemH getCompItemHById(pag::ID id);
   AEGP_LayerH getLayerHById(pag::ID id);
-  bool isVideoReplaceLayer(AEGP_LayerH layerH);
+  bool isVideoReplaceLayer(AEGP_LayerH layerH) const;
 
   float frameRate = -1;
   pag::ID curCompId = 0;
@@ -156,7 +156,7 @@ class Context {
   pagexporter::AlertInfos alertInfos;
   void pushWarning(pagexporter::AlertInfoType type, std::string addInfo = "");
   void pushWarning(pagexporter::AlertInfoType type, pag::ID compId, pag::ID layerId,
-                   std::string addInfo = "");
+                   const std::string& addInfo = "");
 
   std::vector<pag::Marker*>* pAudioMarkers = nullptr;
   std::atomic_bool bEarlyExit;
@@ -170,8 +170,8 @@ class Context {
   pag::ID recordCompId = 0;
   pag::ID recordLayerId = 0;
   std::vector<pag::Enum> textDirectList;
-  void exportFontFile(pag::TextDocument* textDocument,
-                      std::unordered_map<std::string, std::string>& valueMap);
+  void exportFontFile(const pag::TextDocument* textDocument,
+                      const std::unordered_map<std::string, std::string>& valueMap);
 };
 
 class TemporaryFileManager {

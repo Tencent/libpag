@@ -41,12 +41,12 @@ bool ExportConfigLayerModel::isFolderData(const QModelIndex& index) const {
     return false;
   }
   auto layerData = layerDataList->at(index.row());
-  return typeid(*layerData.get()) == typeid(FolderData);
+  return typeid(*layerData) == typeid(FolderData);
 }
 
 QVariant ExportConfigLayerModel::data(const QModelIndex& index, int role) const {
   if (!index.isValid() || index.row() > layerDataList->size()) {
-    return QVariant();
+    return {};
   }
 
   std::shared_ptr<ConfigLayerData> layerData = layerDataList->at(index.row());
@@ -58,13 +58,13 @@ QVariant ExportConfigLayerModel::data(const QModelIndex& index, int role) const 
       return QString::fromStdString(path);
     }
     case IS_FOLDER_ROLE:
-      return QVariant(isFolderData(index));
+      return {isFolderData(index)};
     case IS_UNFOLD_ROLE: {
       if (!isFolderData(index)) {
-        return QVariant();
+        return {};
       }
       std::shared_ptr<FolderData> folderData = std::dynamic_pointer_cast<FolderData>(layerData);
-      return QVariant(folderData->isUnfold);
+      return {folderData->isUnfold};
     }
     case LAYER_LEVEL_ROLE: {
       int level = 0;
@@ -73,13 +73,13 @@ QVariant ExportConfigLayerModel::data(const QModelIndex& index, int role) const 
         tmpData = tmpData->parent;
         level++;
       }
-      return QVariant(level);
+      return {level};
     }
     case Qt::CheckStateRole: {
       if (isFolderData(index)) {
-        return QVariant(false);
+        return {false};
       }
-      return QVariant(layerData->isChecked());
+      return {layerData->isChecked()};
     }
     case Qt::BackgroundRole: {
       if (index.row() % 2 == 0) {
@@ -91,24 +91,24 @@ QVariant ExportConfigLayerModel::data(const QModelIndex& index, int role) const 
     case AE_ITEM_DATA_ROLE:
       return QVariant::fromValue(layerData->aeResource);
     case AE_ITEM_HEIGHT_ROLE: {
-      return QVariant(35);
+      return {35};
     }
     default:
-      return QVariant();
+      return {};
   }
 }
 
-void ExportConfigLayerModel::unfoldFolder(std::shared_ptr<FolderData> folderData) {
+void ExportConfigLayerModel::unfoldFolder(const std::shared_ptr<FolderData>& folderData) {
   if (folderData == nullptr) {
     return;
   }
   int index = layerDataList->indexOf(folderData);
-  for (std::shared_ptr<ConfigLayerData> layerData : *folderData->layerData) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *folderData->layerData) {
     if (!layerDataList->contains(layerData)) {
       layerDataList->insert(++index, layerData);
 
       // 如果子级也是目录，则递归展开
-      if (typeid(*layerData.get()) == typeid(FolderData)) {
+      if (typeid(*layerData) == typeid(FolderData)) {
         auto innerFolderData = std::dynamic_pointer_cast<FolderData>(layerData);
         unfoldFolder(innerFolderData);
       }
@@ -119,15 +119,15 @@ void ExportConfigLayerModel::unfoldFolder(std::shared_ptr<FolderData> folderData
   Q_EMIT foldStatusChange();
 }
 
-void ExportConfigLayerModel::foldFolder(std::shared_ptr<FolderData> folderData) {
+void ExportConfigLayerModel::foldFolder(const std::shared_ptr<FolderData>& folderData) {
   if (folderData == nullptr) {
     return;
   }
-  for (std::shared_ptr<ConfigLayerData> layerData : *folderData->layerData) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *folderData->layerData) {
     if (layerDataList->contains(layerData)) {
       layerDataList->removeOne(layerData);
       // 如果子级也是目录，则递归收折
-      if (typeid(*layerData.get()) == typeid(FolderData)) {
+      if (typeid(*layerData) == typeid(FolderData)) {
         auto innerFolderData = std::dynamic_pointer_cast<FolderData>(layerData);
         foldFolder(innerFolderData);
       }
@@ -138,13 +138,14 @@ void ExportConfigLayerModel::foldFolder(std::shared_ptr<FolderData> folderData) 
   Q_EMIT foldStatusChange();
 }
 
-bool ExportConfigLayerModel::setData(const QModelIndex& index, const QVariant& value, int role) {
+bool ExportConfigLayerModel::setData(const QModelIndex& index, const QVariant& value,
+                                     const int role) {
   if (!index.isValid()) {
     return false;
   }
   switch (role) {
     case IS_UNFOLD_ROLE: {
-      bool unfold = value.toBool();
+      const bool unfold = value.toBool();
       auto folerData = std::dynamic_pointer_cast<FolderData>(layerDataList->at(index.row()));
       if (folerData->isUnfold == unfold) {
         return true;
@@ -190,11 +191,11 @@ bool ExportConfigLayerModel::setData(const int row, const QVariant& value,
   return setData(modelIndex, value, role);
 }
 
-QmlCompositionData* ExportConfigLayerModel::get(int row) {
+QmlCompositionData* ExportConfigLayerModel::get(const int row) const {
   if (layerDataList == nullptr || row < 0 || row >= layerDataList->size()) {
     return new QmlCompositionData();
   }
-  QmlCompositionData* compositionData = new QmlCompositionData();
+  auto* compositionData = new QmlCompositionData();
   compositionData->layerName = data(index(row, 0), LAYER_NAME_ROLE).toString();
   compositionData->savePath = data(index(row, 0), SAVE_PATH_ROLE).toString();
   compositionData->isFolder = data(index(row, 0), IS_FOLDER_ROLE).toBool();
@@ -205,18 +206,18 @@ QmlCompositionData* ExportConfigLayerModel::get(int row) {
   return compositionData;
 }
 
-void ExportConfigLayerModel::handleSettingIconClick(int row) {
+void ExportConfigLayerModel::handleSettingIconClick(const int row) {
   auto aeData = data(index(row, 0), AE_ITEM_DATA_ROLE).value<std::shared_ptr<AEResource>>();
   Q_EMIT settingIconClicked(aeData);
 }
 
-void ExportConfigLayerModel::handlePreviewIconClick(int row) {
+void ExportConfigLayerModel::handlePreviewIconClick(const int row) {
   auto aeData = data(index(row, 0), AE_ITEM_DATA_ROLE).value<std::shared_ptr<AEResource>>();
   Q_EMIT previewIconClicked(aeData);
 }
 
-void ExportConfigLayerModel::handleSavePathClick(int row) {
-  auto modelIndex = index(row, 0);
+void ExportConfigLayerModel::handleSavePathClick(const int row) {
+  const auto modelIndex = index(row, 0);
   Q_EMIT savePathClicked(modelIndex);
 }
 
@@ -227,9 +228,9 @@ bool ExportConfigLayerModel::isLayerSelected() {
   return !getSelectedLayer()->empty();
 }
 
-bool ExportConfigLayerModel::isAllSelected() {
+bool ExportConfigLayerModel::isAllSelected() const {
   bool allSelected = true;
-  for (std::shared_ptr<ConfigLayerData> layerData : *layerDataList) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *layerDataList) {
     if (!layerData->isChecked()) {
       allSelected = false;
       break;
@@ -250,7 +251,8 @@ Qt::ItemFlags ExportConfigLayerModel::flags(const QModelIndex& index) const {
 }
 
 void ExportConfigLayerModel::setLayerData(
-    std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> dataList, bool forceRefresh) {
+    const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& dataList,
+    const bool forceRefresh) {
   beginResetModel();
   layerDataList = dataList;
   if (!originLayerData || forceRefresh) {
@@ -259,11 +261,10 @@ void ExportConfigLayerModel::setLayerData(
   endResetModel();
 }
 
-void ExportConfigLayerModel::searchCompositionsByName(QString name) {
-  std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> searchResultList =
-      std::make_shared<QList<std::shared_ptr<ConfigLayerData>>>();
-  QString lowercaseName = name.toLower();
-  for (auto configLayerData : *originLayerData) {
+void ExportConfigLayerModel::searchCompositionsByName(const QString& name) {
+  const auto searchResultList = std::make_shared<QList<std::shared_ptr<ConfigLayerData>>>();
+  const QString lowercaseName = name.toLower();
+  for (const auto& configLayerData : *originLayerData) {
     QString configLayerDataName = QString::fromStdString(configLayerData->name);
     if (configLayerDataName.toLower().indexOf(lowercaseName) != -1) {
       searchResultList->push_back(configLayerData);
@@ -282,18 +283,18 @@ void ExportConfigLayerModel::resetAfterNoSearch() {
   setLayerData(originLayerData);
 }
 
-void ExportConfigLayerModel::setAllChecked(bool checked) {
-  for (std::shared_ptr<ConfigLayerData> layerData : *layerDataList) {
+void ExportConfigLayerModel::setAllChecked(const bool checked) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *layerDataList) {
     layerData->setChecked(checked);
   }
   setLayerData(layerDataList);
   Q_EMIT compositionCheckChanged();
 }
 
-std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>
-ExportConfigLayerModel::getSelectedLayer() {
+std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> ExportConfigLayerModel::getSelectedLayer()
+    const {
   auto selectLayerlist = std::make_shared<QList<std::shared_ptr<ConfigLayerData>>>();
-  for (std::shared_ptr<ConfigLayerData> layerData : *layerDataList) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *layerDataList) {
     if (layerData->isChecked()) {
       selectLayerlist->append(layerData);
     }
@@ -301,9 +302,9 @@ ExportConfigLayerModel::getSelectedLayer() {
   return selectLayerlist;
 }
 
-void ExportConfigLayerModel::onTitleCheckBoxStateChange(int state) {
+void ExportConfigLayerModel::onTitleCheckBoxStateChange(const int state) {
   beginResetModel();
-  for (std::shared_ptr<ConfigLayerData> layerData : *this->layerDataList) {
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *this->layerDataList) {
     layerData->setChecked(state == Qt::Checked);
   }
   endResetModel();
@@ -311,8 +312,8 @@ void ExportConfigLayerModel::onTitleCheckBoxStateChange(int state) {
 
 void ExportConfigLayerModel::clearAllChecked() {
   int rowIndex = 0;
-  for (std::shared_ptr<ConfigLayerData> layerData : *layerDataList) {
-    bool needNotifyChange = layerData->isChecked();
+  for (const std::shared_ptr<ConfigLayerData>& layerData : *layerDataList) {
+    const bool needNotifyChange = layerData->isChecked();
     layerData->setChecked(false);
     if (needNotifyChange) {
       auto modelIndex = index(rowIndex, 0);
@@ -336,14 +337,13 @@ QHash<int, QByteArray> ExportConfigLayerModel::roleNames() const {
   return roles;
 }
 
-int ExportConfigLayerModel::getRoleFromName(const QString& roleAlias) {
+int ExportConfigLayerModel::getRoleFromName(const QString& roleAlias) const {
   if (roles.empty()) {
     return Qt::UserRole;
   }
   auto begin = roles.constBegin();
-  for (auto index = begin; index != roles.constEnd(); index++) {
-    QString roleName(index.value());
-    if (roleName == roleAlias) {
+  for (auto index = begin; index != roles.constEnd(); ++index) {
+    if (QString roleName(index.value()); roleName == roleAlias) {
       return index.key();
     }
   }

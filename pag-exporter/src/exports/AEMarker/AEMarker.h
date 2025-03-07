@@ -23,10 +23,10 @@
 
 class AEMarker {
  public:
-  static std::string GetKeyStringWithId(std::string key, pag::ID id) {
+  static std::string GetKeyStringWithId(const std::string& key, const pag::ID id) {
     return key + "-" + std::to_string(id);
   }
-  static void ExportMarkers(pagexporter::Context* context, const AEGP_LayerH& layerHandle,
+  static void ExportMarkers(const pagexporter::Context* context, const AEGP_LayerH& layerHandle,
                             std::vector<pag::Marker*>& markers);
   static void ParseMarkers(pag::Layer* layer);
   static void PrintMarkers(pag::Composition* composition);
@@ -39,41 +39,41 @@ class AEMarker {
                                  pag::Frame& timeStretchDuration, const AEGP_ItemH& itemH);
   static void SetTimeStretchInfo(pag::Enum timeStretchMode, pag::Frame timeStretchStart,
                                  pag::Frame timeStretchDuration, const AEGP_ItemH& itemH);
-  static void ExportTimeStretch(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
+  static void ExportTimeStretch(const std::shared_ptr<pag::File>& file, pagexporter::Context& context,
                                 const AEGP_ItemH& itemH);
-  static void ExportLayerEditable(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
+  static void ExportLayerEditable(const std::shared_ptr<pag::File>& file, pagexporter::Context& context,
                                   const AEGP_ItemH& itemH);
-  static bool FindMarkerFromLayer(const AEGP_LayerH& layerH, std::string key,
+  static bool FindMarkerFromLayer(const AEGP_LayerH& layerH, const std::string& key,
                                   cJSON** ppValue = nullptr);
-  static bool FindMarkerFromComposition(const AEGP_ItemH& itemH, std::string key,
+  static bool FindMarkerFromComposition(const AEGP_ItemH& itemH, const std::string& key,
                                         cJSON** ppValue = nullptr);
-  static void DeleteMarkersFromLayer(const AEGP_LayerH& layerH, std::string key);
-  static void DeleteMarkersFromCompostion(const AEGP_ItemH& itemH, std::string key);
-  static std::string GetMarkerFromCompostion(const AEGP_ItemH& itemH, std::string key);
+  static void DeleteMarkersFromLayer(const AEGP_LayerH& layerH, const std::string& key);
+  static void DeleteMarkersFromComposition(const AEGP_ItemH& itemH, const std::string& key);
+  static std::string GetMarkerFromComposition(const AEGP_ItemH& itemH, const std::string& key);
 
   static void AddMarkerToLayer(const AEGP_LayerH& layerH, cJSON* node);
-  static void AddMarkerToCompostion(const AEGP_ItemH& itemH, cJSON* node);
+  static void AddMarkerToComposition(const AEGP_ItemH& itemH, cJSON* node);
 
-  static cJSON* KeyValueToJsonNode(const std::string key, const std::string value);
-  static cJSON* KeyValueToJsonNode(const std::string key, int value);
-  static void ExportImageFillMode(std::shared_ptr<pag::File>& file, pagexporter::Context& context,
+  static cJSON* KeyValueToJsonNode(const std::string& key, const std::string& value);
+  static cJSON* KeyValueToJsonNode(const std::string& key, int value);
+  static void ExportImageFillMode(const std::shared_ptr<pag::File>& file, pagexporter::Context& context,
                                   const AEGP_ItemH& itemH);
 
  private:
-  static void AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, std::string comment,
+  static void AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::string& comment,
                                    A_Time keyTime = {0, 100}, A_Time durationTime = {-1, 100});
   static void AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* node,
                                    A_Time keyTime = {0, 100}, A_Time durationTime = {-1, 100});
   static void DeleteMarkerByIndex(const AEGP_StreamRefH& markerStreamH, int index);
-  static void SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index, std::string comment,
+  static void SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index, const std::string& comment,
                                A_Time durationTime = {-1, 100});
   static std::string GetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index);
   static bool MergeToMarkerWithKey(const AEGP_StreamRefH& markerStreamH, std::string& key,
                                    cJSON* node);
   static int MergeMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* node);
   static void AddMarkerToStream(const AEGP_StreamRefH& markerStreamH, cJSON* node);
-  static void DeleteMarkersFromStream(const AEGP_StreamRefH& markerStreamH, std::string key);
-  static bool FindMarkerFromStream(const AEGP_StreamRefH& markerStreamH, std::string key,
+  static void DeleteMarkersFromStream(const AEGP_StreamRefH& markerStreamH, const std::string& key);
+  static bool FindMarkerFromStream(const AEGP_StreamRefH& markerStreamH, const std::string& key,
                                    cJSON** ppValue = nullptr);
 };
 

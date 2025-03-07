@@ -47,10 +47,10 @@ void PlaceTextLayer::setEditable(bool flag) {
   AEMarker::DeleteMarkersFromLayer(layerH, "noReplace");
   auto keyString = AEMarker::GetKeyStringWithId("noReplace", AEUtils::GetLayerId(layerH));
   if (flag) {
-    AEMarker::DeleteMarkersFromCompostion(mainPanel->mainCompItemH, keyString);
+    AEMarker::DeleteMarkersFromComposition(mainPanel->mainCompItemH, keyString);
   } else {
     auto node = AEMarker::KeyValueToJsonNode(keyString, 1);
-    AEMarker::AddMarkerToCompostion(mainPanel->mainCompItemH, node);
+    AEMarker::AddMarkerToComposition(mainPanel->mainCompItemH, node);
   }
   editableFlag = flag;
 }

@@ -36,10 +36,10 @@ int PlaceholderModel::columnCount(const QModelIndex& parent) const {
 
 QVariant PlaceholderModel::data(const QModelIndex& index, int role) const {
   if (!index.isValid() || placeholderData == nullptr) {
-    return QVariant();
+    return {};
   }
 
-  PlaceImageLayer& itemData = placeholderData->at(index.row());
+  const PlaceImageLayer& itemData = placeholderData->at(index.row());
   switch (role) {
     case PLACEHOLDER_IMG_ROLE: {
       QString imageSource("image://PlaceHolderImg/");
@@ -62,10 +62,10 @@ QVariant PlaceholderModel::data(const QModelIndex& index, int role) const {
     case PLACEHOLDER_SELECTED_ROLE:
       return itemData.isSelected;
     case Qt::CheckStateRole: {
-      return QVariant(itemData.editableFlag);
+      return {itemData.editableFlag};
     }
     default:
-      return QVariant();
+      return {};
   }
 }
 
@@ -124,7 +124,7 @@ void PlaceholderModel::setPlaceHolderData(std::vector<PlaceImageLayer>* data, bo
   }
 }
 
-PlaceImageLayer& PlaceholderModel::getPlaceImageLayer(const QModelIndex& index) {
+PlaceImageLayer& PlaceholderModel::getPlaceImageLayer(const QModelIndex& index) const {
   if (index.row() < 0 || index.row() >= rowCount()) {
     qDebug() << "getPlaceImageLayer index invalid，index.row:" << index.row() << ", rowCount:" << rowCount();
   }
@@ -132,38 +132,38 @@ PlaceImageLayer& PlaceholderModel::getPlaceImageLayer(const QModelIndex& index) 
   return placeImageLayer;
 }
 
-PlaceImageLayer& PlaceholderModel::getImageLayer(int index) {
+PlaceImageLayer& PlaceholderModel::getImageLayer(const int index) const {
   PlaceImageLayer& placeImageLayer = placeholderData->at(index);
   return placeImageLayer;
 }
 
-void PlaceholderModel::onImageEditableStatusChange(int row, bool isChecked) {
+void PlaceholderModel::onImageEditableStatusChange(const int row, const bool isChecked) {
   PlaceImageLayer& placeImageLayer = placeholderData->at(row);
-  auto type = isChecked ? FillResourceType::Replace : FillResourceType::NoReplace;
+  const auto type = isChecked ? FillResourceType::Replace : FillResourceType::NoReplace;
   placeImageLayer.setResourceType(type);
-  auto modelIndex = index(row, 0);
+  const auto modelIndex = index(row, 0);
   Q_EMIT dataChanged(modelIndex, modelIndex);
 }
 
-void PlaceholderModel::onFillModeChanged(int row, int modeIndex) {
+void PlaceholderModel::onFillModeChanged(const int row, int modeIndex) {
   PlaceImageLayer& placeImageLayer = placeholderData->at(row);
-  ImageFillMode fillMode = static_cast<ImageFillMode>(modeIndex);
+  const auto fillMode = static_cast<ImageFillMode>(modeIndex);
   placeImageLayer.setFillMode(fillMode);
-  auto modelIndex = index(row, 0);
+  const auto modelIndex = index(row, 0);
   Q_EMIT dataChanged(modelIndex, modelIndex);
 }
 
-void PlaceholderModel::onAssetTypeChange(int row, int typeIndex) {
+void PlaceholderModel::onAssetTypeChange(const int row, int typeIndex) {
   PlaceImageLayer& placeImageLayer = placeholderData->at(row);
-  FillResourceType resourceType = static_cast<FillResourceType>(typeIndex);
+  const auto resourceType = static_cast<FillResourceType>(typeIndex);
   placeImageLayer.setResourceType(resourceType);
-  auto modelIndex = index(row, 0);
+  const auto modelIndex = index(row, 0);
   Q_EMIT dataChanged(modelIndex, modelIndex);
 }
 
-bool PlaceholderModel::isAllSelected() {
+bool PlaceholderModel::isAllSelected() const {
   bool allSelected = true;
-  for (auto& layer : *placeholderData) {
+  for (const auto& layer : *placeholderData) {
     if (!layer.editableFlag) {
       allSelected = false;
       break;
@@ -172,7 +172,7 @@ bool PlaceholderModel::isAllSelected() {
   return allSelected;
 }
 
-void PlaceholderModel::setAllChecked(bool checked) {
+void PlaceholderModel::setAllChecked(const bool checked) {
   for (auto& layer : *placeholderData) {
     auto type = checked ? FillResourceType::Replace : FillResourceType::NoReplace;
     layer.setResourceType(type);

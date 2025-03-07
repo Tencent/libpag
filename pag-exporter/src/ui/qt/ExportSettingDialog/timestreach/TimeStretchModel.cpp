@@ -26,33 +26,33 @@ TimeStretchModel::~TimeStretchModel() noexcept {
   timeStretchPanel = nullptr;
 }
 
-int TimeStretchModel::getStretchStartTime() {
+int TimeStretchModel::getStretchStartTime() const {
   return timeStretchPanel->timeStretchStart;
 }
 
-void TimeStretchModel::setStretchStartTime(int frame) {
+void TimeStretchModel::setStretchStartTime(const int frame) const {
   timeStretchPanel->setTimeStretchStart(frame);
 }
 
-int TimeStretchModel::getStretchDuration() {
+int TimeStretchModel::getStretchDuration() const {
   return timeStretchPanel->timeStretchDuration;
 }
 
-void TimeStretchModel::setStretchDuration(int frame) {
+void TimeStretchModel::setStretchDuration(const int frame) const {
   timeStretchPanel->setTimeStretchDuration(frame);
 }
 
-int TimeStretchModel::getCompositionDuration() {
+int TimeStretchModel::getCompositionDuration() const {
   return timeStretchPanel->compositionDuration;
 }
 
-int TimeStretchModel::getStretchMode() {
-  int modeIndex = static_cast<int>(timeStretchPanel->timeStretchMode);
+int TimeStretchModel::getStretchMode() const {
+  const int modeIndex = static_cast<int>(timeStretchPanel->timeStretchMode);
   return modeIndex;
 }
 
-void TimeStretchModel::setStretchMode(int mode) {
-  TimeStretchMode stretchMode = static_cast<TimeStretchMode>(mode);
+void TimeStretchModel::setStretchMode(int mode) const {
+  const auto stretchMode = static_cast<TimeStretchMode>(mode);
   timeStretchPanel->setTimeStretchMode(stretchMode);
 }
 

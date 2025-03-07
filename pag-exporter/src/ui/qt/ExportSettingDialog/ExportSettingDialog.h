@@ -31,14 +31,14 @@
 #include "src/utils/Panels/PlaceImagePanel.h"
 #include "src/utils/Panels/TextLayerEditablePanel.h"
 
-class ExportSettingDialog : public QObject {
+class ExportSettingDialog final : public QObject {
   Q_OBJECT
  public:
   explicit ExportSettingDialog(AEGP_ItemH& currentAEItem, QObject* parent = nullptr);
   ~ExportSettingDialog() override;
-  void show();
+  void show() const;
   void showPage();
-  void setAEItem(AEGP_ItemH& currentAEItem);
+  void setAEItem(const AEGP_ItemH& currentAEItem);
 
   Q_INVOKABLE void exit();
   Q_INVOKABLE int getPlaceHolderSize() const;

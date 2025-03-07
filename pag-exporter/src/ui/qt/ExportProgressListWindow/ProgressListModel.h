@@ -15,38 +15,38 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef PLACEHOLDERMODEL_H
-#define PLACEHOLDERMODEL_H
+#ifndef PROGRESSLISTMODEL_H
+#define PROGRESSLISTMODEL_H
 #include <QtCore/QAbstractListModel>
-#include "src/utils/Panels/PlaceImagePanel.h"
+#include <algorithm>
+#include "src/ui/qt/ExportCommonConfig.h"
+#include "src/utils/ExportProgressItem.h"
+#include "src/utils/AEResource.h"
 
-class PlaceholderModel final : public QAbstractListModel {
+class ProgressListModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  explicit PlaceholderModel(QObject* parent = nullptr);
+  explicit ProgressListModel(std::vector<std::shared_ptr<ExportProgressItem>> progressItems, QObject* parent = nullptr);
+  ~ProgressListModel() override;
 
   Q_INVOKABLE int rowCount(const QModelIndex& parent = QModelIndex()) const override;
-  Q_INVOKABLE int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+  Q_INVOKABLE int successCount() const;
   Q_INVOKABLE QVariant data(const QModelIndex& index, int role) const override;
-  Q_INVOKABLE bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
   Qt::ItemFlags flags(const QModelIndex& index) const override;
+  Q_INVOKABLE bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
+  Q_INVOKABLE bool setData(const int row, const QVariant& value, const QString& roleAlias);
+  Q_INVOKABLE void handlePreviewIconClick(int row);
   QHash<int, QByteArray> roleNames() const override;
-  void setPlaceHolderData(std::vector<PlaceImageLayer>* data, bool refresh = false);
+  int getRoleFromName(const QString& roleAlias) const;
+  Q_INVOKABLE bool isWindows();
 
-  PlaceImageLayer& getPlaceImageLayer(const QModelIndex& index) const;
-  PlaceImageLayer& getImageLayer(int index) const;
+  void setProgressList(std::vector<std::shared_ptr<ExportProgressItem>> progressList);
+  std::shared_ptr<ExportProgressItem> getProgressItem(const QModelIndex& index);
 
-  Q_INVOKABLE void onImageEditableStatusChange(int row, bool isChecked);
-  Q_INVOKABLE bool isAllSelected() const;
-  Q_INVOKABLE void setAllChecked(bool checked);
+  Q_SIGNAL void previewIconClicked(const QModelIndex& index);
 
-  Q_INVOKABLE void onFillModeChanged(int row, int modeIndex);
-  Q_INVOKABLE void onAssetTypeChange(int row, int typeIndex);
-
-  Q_SIGNAL void itemSelectChange(int fillModeIndex, int assetModeIndex);
 
 private:
-  std::vector<PlaceImageLayer>* placeholderData = nullptr;
-  mutable QHash<int, QByteArray> roles;
+  std::vector<std::shared_ptr<ExportProgressItem>> exportProgressList;
 };
-#endif //PLACEHOLDERMODEL_H
+#endif //PROGRESSLISTMODEL_H

@@ -19,8 +19,10 @@
 #include <codecvt>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <unordered_map>
+#include <utility>
 #include "AEUtils.h"
 #include "CommonMethod.h"
 #include "ConfigParam.h"
@@ -28,6 +30,9 @@
 #include "StringUtil.h"
 #include "src/exports/PAGDataTypes.h"
 #include "src/ui/qt/Progress/ProgressWindow.h"
+#include "src/utils/ByteArray.h"
+#include "src/utils/aep/AEPReader.h"
+#include "src/utils/aep/PsdTextParse.h"
 
 namespace pagexporter {
 void ScaleAndFpsListDefault(std::vector<std::pair<float, float>>& scaleAndFpsList) {
@@ -36,7 +41,7 @@ void ScaleAndFpsListDefault(std::vector<std::pair<float, float>>& scaleAndFpsLis
 }
 
 Context::Context(std::string outputPath)
-    : pluginID(PLUGIN_ID()), suites(SUITES()), outputPath(outputPath), alertInfos(this),
+    : pluginID(PLUGIN_ID()), suites(SUITES()), outputPath(std::move(outputPath)), alertInfos(this),
       bEarlyExit(false) {
   // 从config文件里获取配置参数
   ConfigParam configParam;
@@ -48,9 +53,7 @@ Context::Context(std::string outputPath)
 
 Context::~Context() {
   delete[] fileBytes;
-  if (progressWindow) {
-    delete progressWindow;
-  }
+  delete progressWindow;
 }
 
 void Context::setParam(ConfigParam* configParam) {
@@ -64,8 +67,8 @@ void Context::setParam(ConfigParam* configParam) {
   imageQuality = configParam->commonParam.imageQuality;
   imagePixelRatio = configParam->commonParam.imagePixelRatio;
 
-  for (auto& scaleAndFps : configParam->scaleAndFpsList) {
-    scaleAndFpsList.emplace_back(scaleAndFps.first, scaleAndFps.second);
+  for (auto& [fst, snd] : configParam->scaleAndFpsList) {
+    scaleAndFpsList.emplace_back(fst, snd);
   }
   sequenceType = configParam->sequenceType;
   sequenceSuffix = configParam->sequenceSuffix;
@@ -76,7 +79,7 @@ void Context::setParam(ConfigParam* configParam) {
 }
 
 void Context::checkParamValid() {
-  if (scaleAndFpsList.size() > 0) {
+  if (!scaleAndFpsList.empty()) {
     for (auto& scaleAndFps : scaleAndFpsList) {
       if (scaleAndFps.first >= 1.0) {  // scaleFactor
         scaleAndFps.first = 1.0;
@@ -129,7 +132,7 @@ void Context::checkParamValid() {
   }
 
   transform(sequenceSuffix.begin(), sequenceSuffix.end(), sequenceSuffix.begin(), ::tolower);
-  if (sequenceSuffix.length() <= 0) {
+  if (sequenceSuffix.empty()) {
     sequenceSuffix = "_bmp";
   }
   if (sequenceType != pag::CompositionType::Video && sequenceType != pag::CompositionType::Bitmap) {
@@ -173,13 +176,13 @@ inline float ExportLeading(const std::string& value, float fontSize) {
   if (value.empty()) {
     return 0;
   }
-  auto lines = StringUtil::Split(value, ",");
+  const auto lines = StringUtil::Split(value, ",");
   if (lines.size() < 6) {
     return 0;
   }
-  auto firstY = static_cast<float>(std::stod(lines[1]));
-  auto secondY = static_cast<float>(std::stod(lines[5]));
-  auto leading = roundf(secondY - firstY);
+  const auto firstY = static_cast<float>(std::stod(lines[1]));
+  const auto secondY = static_cast<float>(std::stod(lines[5]));
+  const auto leading = roundf(secondY - firstY);
   if (leading == roundf(fontSize * 1.2f)) {
     return 0;
   }
@@ -189,41 +192,21 @@ inline float ExportLeading(const std::string& value, float fontSize) {
   return leading;
 }
 
-inline float ExportFirstBaseLine(const std::string& value, float lineHeight, float baselineShift,
-                                 bool isVertical) {
+inline float ExportFirstBaseLine(const std::string& value, const float lineHeight,
+                                 const float baselineShift, const bool isVertical) {
   if (value.empty()) {
     return 0;
   }
-  auto lines = StringUtil::Split(value, ",");
+  const auto lines = StringUtil::Split(value, ",");
   if (lines.size() < 4) {
     return 0;
   }
 
-  /*
-    lines: TextDocument.baselineLocs
-    Array of floating-point values in the form of
-    [
-      line0.start_x,
-      line0.start_y,
-      line0.end_x,
-      line0.end_y,
-      line1.start_x,
-      line1.start_y,
-      line1.end_x,
-      line1.end_y,
-      ...
-      lineN-1.start_x,
-      lineN-1.start_y,
-      lineN-1.end_x,
-      lineN-1.end_y
-    ]
-  */
-
-  auto lineCount = floorf(lines.size() * 1.0f / 4);
+  const auto lineCount = floorf(lines.size() * 1.0f / 4);
   if (lineCount < 1) {
     return 0;
   }
-  auto index = static_cast<int>((lineCount - 1) * 4);
+  const auto index = static_cast<int>((lineCount - 1) * 4);
   //The first line or last line can randomly be a infinity value when there is only one char in each line.
   float firstBaseLine;
   if (isVertical) {
@@ -250,11 +233,11 @@ inline float ExportFirstBaseLine(const std::string& value, float lineHeight, flo
   }
 }
 
-inline pag::Color ToColor(const std::string& value, pag::Color defaultValue) {
+inline pag::Color ToColor(const std::string& value, const pag::Color defaultValue) {
   if (value.empty()) {
     return defaultValue;
   }
-  auto lines = StringUtil::Split(value, ",");
+  const auto lines = StringUtil::Split(value, ",");
   if (lines.size() < 3) {
     return defaultValue;
   }
@@ -269,7 +252,7 @@ inline pag::Point ToPoint(const std::string& value, pag::Point defaultValue) {
   if (value.empty()) {
     return defaultValue;
   }
-  auto lines = StringUtil::Split(value, ",");
+  const auto lines = StringUtil::Split(value, ",");
   if (lines.size() < 2) {
     return defaultValue;
   }
@@ -288,15 +271,14 @@ inline std::string FormatString(const std::string& value, const std::string& def
 
 inline std::string GetValue(const std::unordered_map<std::string, std::string>& map,
                             const std::string& key) {
-  auto result = map.find(key);
-  if (result != map.end()) {
+  if (const auto result = map.find(key); result != map.end()) {
     return result->second;
   }
   return "";
 }
 
-void Context::exportFontFile(pag::TextDocument* textDocument,
-                             std::unordered_map<std::string, std::string>& valueMap) {
+void Context::exportFontFile(const pag::TextDocument* textDocument,
+                             const std::unordered_map<std::string, std::string>& valueMap) {
   if (!this->enableFontFile) {
     return;
   }
@@ -309,12 +291,11 @@ void Context::exportFontFile(pag::TextDocument* textDocument,
     }
   }
   fontFilePathList.push_back(path);
-  auto fontLocation = FormatString(GetValue(valueMap, "fontLocation"), "");
-  auto cmd = "cp \"" + fontLocation + "\" \"" + path + "\"";
+  const auto fontLocation = FormatString(GetValue(valueMap, "fontLocation"), "");
+  const auto cmd = "cp \"" + fontLocation + "\" \"" + path + "\"";
   system(cmd.c_str());
 
-  int size = FileIO::GetFileSize(path);
-  if (size > 30 * 1000 * 1000) {
+  if (const int size = FileIO::GetFileSize(path); size > 30 * 1000 * 1000) {
     pushWarning(pagexporter::AlertInfoType::FontFileTooBig,
                 textDocument->fontFamily + ", " + std::to_string(size / 1000 / 1000));
   }
@@ -324,14 +305,14 @@ pag::TextDocumentHandle Context::currentTextDocument() {
   auto id = IDToString(curCompId);
   auto layer = ToString(layerIndex);
   auto keyframe = ToString(keyframeIndex);
-  std::string result = "";
+  std::string result;
   if (enableRunScript) {
     AEUtils::RegisterTextDocumentScript();
     auto code = "PAG.printTextDocuments(" + id + ", " + layer + ", " + keyframe + ");";
     result = RunScript(suites, pluginID, code);
   }
   if (result.empty()) {
-    return pag::TextDocumentHandle(new pag::TextDocument());
+    return std::make_shared<pag::TextDocument>();
   }
   std::unordered_map<std::string, std::string> valueMap;
   auto lines = StringUtil::Split(result, "\n");
@@ -378,9 +359,6 @@ pag::TextDocumentHandle Context::currentTextDocument() {
   textDocument->firstBaseLine = ExportFirstBaseLine(
       GetValue(valueMap, "baselineLocs"), lineHeight, textDocument->baselineShift,
       textDocument->direction == pag::TextDirection::Vertical);
-  //    textDocument->horizontalScale = ToFloat(GetValue(valueMap, "horizontalScale"), textDocument->horizontalScale);
-  //    textDocument->verticalScale = ToFloat(GetValue(valueMap, "verticalScale"), textDocument->verticalScale);
-
   exportFontFile(textDocument, valueMap);
 
   return pag::TextDocumentHandle(textDocument);
@@ -474,7 +452,7 @@ static std::vector<pag::ColorStop> ParseColorStops(const std::string& text) {
 }
 
 static pag::GradientColorHandle DefaultGradientColors() {
-  auto gradientColor = new pag::GradientColor();
+  const auto gradientColor = new pag::GradientColor();
   pag::AlphaStop stop = {};
   stop.position = 0.0f;
   gradientColor->alphaStops.push_back(stop);
@@ -511,105 +489,105 @@ static pag::GradientColorHandle ParseGradientColor(const std::string& text) {
 pag::GradientColorHandle Context::currentGradientColors(const std::vector<std::string>& matchNames,
                                                         int index) {
   auto fileBytes = getFileBytes();
-  // ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes), static_cast<uint32_t>(fileLength));
-  // bytes = aep::ReadBody(&bytes);
-  // auto compositions = aep::ReadCompositions(&bytes);
-  // ByteArray layerBytes;
-  // for (auto& composition : compositions) {
-  //   if (composition.id == static_cast<int>(curCompId)) {
-  //     auto layers = aep::ReadLayers(&composition.bytes);
-  //     if (static_cast<int>(layers.size()) > layerIndex) {
-  //       layerBytes = layers[layerIndex].bytes;
-  //     }
-  //     break;
-  //   }
-  // }
-  // if (layerBytes.empty()) {
-  //   return DefaultGradientColors();
-  // }
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes), static_cast<uint32_t>(fileLength));
+  bytes = aep::ReadBody(&bytes);
+  auto compositions = aep::ReadCompositions(&bytes);
+  ByteArray layerBytes;
+  for (auto& composition : compositions) {
+    if (composition.id == static_cast<int>(curCompId)) {
+      auto layers = aep::ReadLayers(&composition.bytes);
+      if (static_cast<int>(layers.size()) > layerIndex) {
+        layerBytes = layers[layerIndex].bytes;
+      }
+      break;
+    }
+  }
+  if (layerBytes.empty()) {
+    return DefaultGradientColors();
+  }
   int i = 0;
   std::string gradientText;
-  // while (layerBytes.bytesAvailable() > 0) {
-  //   auto tag = aep::ReadFirstGroupByMatchNames(&layerBytes, matchNames);
-  //   if (tag.bytes.empty()) {
-  //     break;
-  //   }
-  //   if (i == index) {
-  //     tag = aep::ReadFirstTagByName(&tag.bytes, "GCky");
-  //     if (tag.bytes.empty()) {
-  //       break;
-  //     }
-  //     int k = 0;
-  //     while (tag.bytes.bytesAvailable()) {
-  //       auto stringTag = aep::ReadTag(&tag.bytes);
-  //       if (stringTag.bytes.empty()) {
-  //         break;
-  //       }
-  //       if (k == keyframeIndex) {
-  //         gradientText = stringTag.bytes.readUTF8String();
-  //         break;
-  //       }
-  //       k++;
-  //     }
-  //     break;
-  //   }
-  //   i++;
-  // }
+  while (layerBytes.bytesAvailable() > 0) {
+    auto tag = aep::ReadFirstGroupByMatchNames(&layerBytes, matchNames);
+    if (tag.bytes.empty()) {
+      break;
+    }
+    if (i == index) {
+      tag = aep::ReadFirstTagByName(&tag.bytes, "GCky");
+      if (tag.bytes.empty()) {
+        break;
+      }
+      int k = 0;
+      while (tag.bytes.bytesAvailable()) {
+        auto [name, bytes] = aep::ReadTag(&tag.bytes);
+        if (bytes.empty()) {
+          break;
+        }
+        if (k == keyframeIndex) {
+          gradientText = bytes.readUTF8String();
+          break;
+        }
+        k++;
+      }
+      break;
+    }
+    i++;
+  }
   return ParseGradientColor(gradientText);
 }
 
 pag::Enum Context::currentTextDocumentDirection() {
-  // if (keyframeNum > 1 && recordCompId == curCompId && recordLayerId == curLayerId
-  //     && keyframeNum == static_cast<int>(textDirectList.size())) {
-  //   return textDirectList[keyframeIndex];
-  // }
-  // recordCompId = 0;
-  // recordLayerId = 0;
-  // textDirectList.clear();
-  //
-  // auto fileBytes = getFileBytes();
-  // ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes), static_cast<uint32_t>(fileLength));
-  // bytes = aep::ReadBody(&bytes);
-  // auto compositions = aep::ReadCompositions(&bytes);
-  // ByteArray layerBytes;
-  // for (auto& composition : compositions) {
-  //   if (composition.id == static_cast<int>(curCompId)) {
-  //     auto layers = aep::ReadLayers(&composition.bytes);
-  //     if (static_cast<int>(layers.size()) > layerIndex) {
-  //       layerBytes = layers[layerIndex].bytes;
-  //     }
-  //     break;
-  //   }
-  // }
-  // if (layerBytes.empty()) {
-  //   return pag::TextDirection::Horizontal;
-  // }
-  //
-  // auto tag = aep::ReadFirstGroupByMatchNames(&layerBytes, {"ADBE Text Document"});
-  // if (tag.bytes.empty()) {
-  //   return pag::TextDirection::Horizontal;
-  // }
-  //
-  // tag = aep::ReadFirstTagByName(&tag.bytes, "btdk");
-  // if (tag.bytes.empty()) {
-  //   return pag::TextDirection::Horizontal;
-  // }
-  //
-  // aep::PsdTextAttribute attribute(tag.bytes.length(), tag.bytes.data());
-  // attribute.getAttibute();
-  // for (int index = 0; index == 0 || index < keyframeNum; index++) {
-  //   int textDirect = -1;
-  //   int keys[] = {0, 0, 8, 0, index, 0, 2, 1};
-  //   auto flag = attribute.getIntegerByKeys(textDirect, keys, sizeof(keys) / sizeof(keys[0]));
-  //   if (flag && textDirect == 2) {
-  //     textDirectList.push_back(static_cast<pag::Enum>(pag::TextDirection::Vertical));
-  //   } else {
-  //     textDirectList.push_back(static_cast<pag::Enum>(pag::TextDirection::Horizontal));
-  //   }
-  // }
-  // recordCompId = curCompId;
-  // recordLayerId = curLayerId;
-  // return textDirectList[keyframeIndex];
+  if (keyframeNum > 1 && recordCompId == curCompId && recordLayerId == curLayerId &&
+      keyframeNum == static_cast<int>(textDirectList.size())) {
+    return textDirectList[keyframeIndex];
+  }
+  recordCompId = 0;
+  recordLayerId = 0;
+  textDirectList.clear();
+
+  const auto fileBytes = getFileBytes();
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes), static_cast<uint32_t>(fileLength));
+  bytes = aep::ReadBody(&bytes);
+  auto compositions = aep::ReadCompositions(&bytes);
+  ByteArray layerBytes;
+  for (auto& composition : compositions) {
+    if (composition.id == static_cast<int>(curCompId)) {
+      if (const auto layers = aep::ReadLayers(&composition.bytes);
+          static_cast<int>(layers.size()) > layerIndex) {
+        layerBytes = layers[layerIndex].bytes;
+      }
+      break;
+    }
+  }
+  if (layerBytes.empty()) {
+    return pag::TextDirection::Horizontal;
+  }
+
+  auto tag = aep::ReadFirstGroupByMatchNames(&layerBytes, {"ADBE Text Document"});
+  if (tag.bytes.empty()) {
+    return pag::TextDirection::Horizontal;
+  }
+
+  tag = aep::ReadFirstTagByName(&tag.bytes, "btdk");
+  if (tag.bytes.empty()) {
+    return pag::TextDirection::Horizontal;
+  }
+
+  aep::PsdTextAttribute attribute(tag.bytes.length(), tag.bytes.data());
+  attribute.getAttibute();
+  for (int index = 0; index == 0 || index < keyframeNum; index++) {
+    int textDirect = -1;
+    int keys[] = {0, 0, 8, 0, index, 0, 2, 1};
+    if (const auto flag = attribute.getIntegerByKeys(textDirect, keys, std::size(keys));
+        flag && textDirect == 2) {
+      textDirectList.push_back(static_cast<pag::Enum>(pag::TextDirection::Vertical));
+    } else {
+      textDirectList.push_back(static_cast<pag::Enum>(pag::TextDirection::Horizontal));
+    }
+  }
+  recordCompId = curCompId;
+  recordLayerId = curLayerId;
+  return textDirectList[keyframeIndex];
   return 0;
 }
 
@@ -634,14 +612,14 @@ char* Context::getFileBytes() {
     auto extension = filePath.substr(filePath.size() - 5, 5);
     isAEPX = StringUtil::ToLowerCase(extension) == ".aepx";
   }
-  TemporaryFileManager tempFileMgr;
   if (isDirty || isAEPX) {
     filePath = AEUtils::GetFolderTempName() + u8"/.PAGAutoSave.aep";
-    tempFileMgr.tempFilePath = filePath;
     auto path = convert.from_bytes(filePath);
     suites.ProjSuite6()->AEGP_SaveProjectToPath(projectHandle,
                                                 reinterpret_cast<const A_UTF16Char*>(path.c_str()));
   }
+  TemporaryFileManager tempFileMgr;
+  tempFileMgr.tempFilePath = filePath;
 
   filePath = std::string(filePath);
 
@@ -673,22 +651,22 @@ AEGP_ItemH Context::getCompItemHById(pag::ID id) {
   return nullptr;
 }
 
-bool Context::isVideoReplaceLayer(AEGP_LayerH layerH) {
-  auto id = AEUtils::GetItemIdFromLayer(layerH);
-  for (auto pair : imageLayerHList) {
-    if (id == AEUtils::GetItemIdFromLayer(pair.first)) {
-      return pair.second;
+bool Context::isVideoReplaceLayer(const AEGP_LayerH layerH) const {
+  const auto id = AEUtils::GetItemIdFromLayer(layerH);
+  for (auto [fst, snd] : imageLayerHList) {
+    if (id == AEUtils::GetItemIdFromLayer(fst)) {
+      return snd;
     }
   }
   return false;
 }
 
-void Context::pushWarning(pagexporter::AlertInfoType type, std::string addInfo) {
-  alertInfos.pushWarning(type, addInfo);
+void Context::pushWarning(const pagexporter::AlertInfoType type, std::string addInfo) {
+  alertInfos.pushWarning(type, std::move(addInfo));
 }
 
-void Context::pushWarning(pagexporter::AlertInfoType type, pag::ID compId, pag::ID layerId,
-                          std::string addInfo) {
+void Context::pushWarning(const pagexporter::AlertInfoType type, const pag::ID compId,
+                          const pag::ID layerId, const std::string& addInfo) {
   alertInfos.pushWarning(type, compId, layerId, addInfo);
 }
 }  // namespace pagexporter

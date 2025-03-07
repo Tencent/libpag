@@ -144,12 +144,12 @@ std::string AEResource::getStorePath() {
     return "";
   }
   auto defaultPath = GetDefaultStorePath();
-  auto findPath = AEMarker::GetMarkerFromCompostion(itemH, StorePathKey);
+  auto findPath = AEMarker::GetMarkerFromComposition(itemH, StorePathKey);
   if (findPath.empty()) {
     storePath = defaultPath;
   } else if (!AEUtils::IsExistPath(std::string(findPath))) {
     storePath = defaultPath;
-    AEMarker::DeleteMarkersFromCompostion(itemH, StorePathKey);
+    AEMarker::DeleteMarkersFromComposition(itemH, StorePathKey);
   } else {
     storePath = findPath;
   }
@@ -160,7 +160,7 @@ bool AEResource::getExportFlag() {
   if (type != AEResourceType::Composition) {
     return false;
   }
-  auto value = AEMarker::GetMarkerFromCompostion(itemH, ExportFlagKey);
+  auto value = AEMarker::GetMarkerFromComposition(itemH, ExportFlagKey);
   if (value == "1") {
     exportFlag = true;
   } else {
@@ -173,18 +173,18 @@ void AEResource::setExportFlag(bool flag) {
   if (type != AEResourceType::Composition) {
     return;
   }
-  auto value = AEMarker::GetMarkerFromCompostion(itemH, ExportFlagKey);
+  auto value = AEMarker::GetMarkerFromComposition(itemH, ExportFlagKey);
   if (flag) {
     if (value != "1") {
       if (!value.empty()) {
-        AEMarker::DeleteMarkersFromCompostion(itemH, ExportFlagKey);
+        AEMarker::DeleteMarkersFromComposition(itemH, ExportFlagKey);
       }
       auto node = AEMarker::KeyValueToJsonNode(ExportFlagKey, 1);
-      AEMarker::AddMarkerToCompostion(itemH, node);
+      AEMarker::AddMarkerToComposition(itemH, node);
     }
   } else {
     if (!value.empty()) {
-      AEMarker::DeleteMarkersFromCompostion(itemH, ExportFlagKey);
+      AEMarker::DeleteMarkersFromComposition(itemH, ExportFlagKey);
     }
   }
   exportFlag = flag;
@@ -296,11 +296,11 @@ void AEResource::setStorePath(std::string path) {
   if (type != AEResourceType::Composition) {
     return;
   }
-  auto findPath = AEMarker::GetMarkerFromCompostion(itemH, StorePathKey);
+  auto findPath = AEMarker::GetMarkerFromComposition(itemH, StorePathKey);
   auto defaultPath = GetDefaultStorePath();
   if (path.empty()) {
     if (!findPath.empty()) {
-      AEMarker::DeleteMarkersFromCompostion(itemH, StorePathKey);
+      AEMarker::DeleteMarkersFromComposition(itemH, StorePathKey);
     }
     path = defaultPath;
   } else if (!AEUtils::IsExistPath(std::string(path))) {
@@ -309,7 +309,7 @@ void AEResource::setStorePath(std::string path) {
   storePath = path;
   if (path == defaultPath) {
     if (!findPath.empty()) {
-      AEMarker::DeleteMarkersFromCompostion(itemH, StorePathKey);
+      AEMarker::DeleteMarkersFromComposition(itemH, StorePathKey);
     }
     return;
   }
@@ -317,10 +317,10 @@ void AEResource::setStorePath(std::string path) {
     return;
   }
   if (!findPath.empty()) {
-    AEMarker::DeleteMarkersFromCompostion(itemH, StorePathKey);
+    AEMarker::DeleteMarkersFromComposition(itemH, StorePathKey);
   }
   auto node = AEMarker::KeyValueToJsonNode(StorePathKey, path);
-  AEMarker::AddMarkerToCompostion(itemH, node);
+  AEMarker::AddMarkerToComposition(itemH, node);
 }
 
 bool AEResource::GetExportAudioFlag() {

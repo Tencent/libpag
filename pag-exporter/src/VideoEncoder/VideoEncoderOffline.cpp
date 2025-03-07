@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "VideoEncoderOffline.h"
-#include "src/cJSON/cJSON.h"
 #include "VideoEncoderX264.h"
+#include "src/cJSON/cJSON.h"
 #include "src/configparam/ConfigParam.h"
 #ifdef _WIN32
 #include <windows.h>
@@ -25,19 +25,22 @@
 #else
 #include <unistd.h>
 #endif
+#include <filesystem>
 
 #define SLEEP_US 1000
 #define SLEEP_COUNT 2000
 
+namespace fs = std::filesystem;
+
 static std::string GetH264EncoderToolsFolder() {
-  return GetRoamingPath() + "H264EncoderTools/";
+  return fs::path(GetRoamingPath()) / "H264EncoderTools/";
 }
 static std::string GetOfflineFolder() {
-  return GetH264EncoderToolsFolder() + "OffLineFolder/";
+  return fs::path(GetH264EncoderToolsFolder()) / "OffLineFolder/";
 }
 
-static int ReadFileData(std::string path, uint8_t data[]) {
-  auto fp = fopen(path.c_str(), "rb");
+static int ReadFileData(const std::string& path, uint8_t data[]) {
+  const auto fp = fopen(path.c_str(), "rb");
   if (fp == nullptr) {
     return 0;
   }
@@ -54,8 +57,11 @@ static int ReadFileData(std::string path, uint8_t data[]) {
 
 static bool WriteParamToFile(OffLineEncodeParam* param) {
   char text[1024] = {0};
-  snprintf(text, sizeof(text), "{ \"Width\": %d, \"Height\": %d, \"FrameRate\": %.2f, \"HasAlpha\": %d, \"MaxKeyFrameInterval\": %d, \"Quality\": %d }",
-           param->width, param->height, param->frameRate, param->hasAlpha, param->maxKeyFrameInterval, param->quality);
+  snprintf(text, sizeof(text),
+           "{ \"Width\": %d, \"Height\": %d, \"FrameRate\": %.2f, \"HasAlpha\": %d, "
+           "\"MaxKeyFrameInterval\": %d, \"Quality\": %d }",
+           param->width, param->height, param->frameRate, param->hasAlpha,
+           param->maxKeyFrameInterval, param->quality);
   auto path = GetOfflineFolder() + "EncoderParam.txt";
 
   auto fp = fopen(path.c_str(), "wt");
@@ -69,7 +75,7 @@ static bool WriteParamToFile(OffLineEncodeParam* param) {
 }
 
 static cJSON* ParseJsonFile(std::string path) {
-  char text[4*1024];
+  char text[4 * 1024];
   auto fp = fopen(path.c_str(), "rt");
   if (fp == nullptr) {
     return nullptr;
@@ -107,8 +113,8 @@ static bool WriteFrameInfo(FrameInfo& frameInfo, std::string path) {
   if (fp == nullptr) {
     return false;
   }
-  fprintf(fp, "{ \"FrameType\": %d, \"TimeStamp\": %.0f, \"FrameSize\": %d }",
-          frameInfo.frameType, (float)frameInfo.timeStamp, frameInfo.frameSize);
+  fprintf(fp, "{ \"FrameType\": %d, \"TimeStamp\": %.0f, \"FrameSize\": %d }", frameInfo.frameType,
+          (float)frameInfo.timeStamp, frameInfo.frameSize);
   fclose(fp);
   return true;
 }
@@ -153,19 +159,18 @@ static bool WriteEndParam(bool hasEnd, bool bEarlyExit, std::string path) {
   if (fp == nullptr) {
     return false;
   }
-  fprintf(fp, "{ \"HasEnd\": %d, \"EarlyExit\": %d }",
-          hasEnd ? 1 : 0,
-          bEarlyExit ? 1 : 0);
+  fprintf(fp, "{ \"HasEnd\": %d, \"EarlyExit\": %d }", hasEnd ? 1 : 0, bEarlyExit ? 1 : 0);
   fclose(fp);
   return true;
 }
 
-bool VideoEncoderOffline::open(int width, int height, double frameRate, bool hasAlpha, int maxKeyFrameInterval, int quality) {
+bool VideoEncoderOffline::open(int width, int height, double frameRate, bool hasAlpha,
+                               int maxKeyFrameInterval, int quality) {
   this->width = width;
   this->height = height;
   this->frameRate = frameRate;
 
-  h264Buf = new uint8_t[width*height+1024];
+  h264Buf = new uint8_t[width * height + 1024];
 
   param.width = width;
   param.height = height;
@@ -177,9 +182,9 @@ bool VideoEncoderOffline::open(int width, int height, double frameRate, bool has
   stride[0] = SIZE_ALIGN(width);
   stride[1] = SIZE_ALIGN(stride[0] / 2);
   stride[2] = stride[1];
-  data[0] = new uint8_t[stride[0] * (SIZE_ALIGN(height)/1)];
-  data[1] = new uint8_t[stride[1] * (SIZE_ALIGN(height)/2)];
-  data[2] = new uint8_t[stride[2] * (SIZE_ALIGN(height)/2)];
+  data[0] = new uint8_t[stride[0] * (SIZE_ALIGN(height) / 1)];
+  data[1] = new uint8_t[stride[1] * (SIZE_ALIGN(height) / 2)];
+  data[2] = new uint8_t[stride[2] * (SIZE_ALIGN(height) / 2)];
 
   // 清空YUV
   memset(data[0], 128, stride[0] * (SIZE_ALIGN(height) >> 0));
@@ -196,7 +201,8 @@ bool VideoEncoderOffline::open(int width, int height, double frameRate, bool has
   WriteParamToFile(&param);
 
   // enable x264
-  std::string cmd2 = "\'" + GetH264EncoderToolsFolder() + "H264EncoderTools\' \'" + GetOfflineFolder() + "\' &";
+  std::string cmd2 =
+      "\'" + GetH264EncoderToolsFolder() + "H264EncoderTools\' \'" + GetOfflineFolder() + "\' &";
   system(cmd2.c_str());
 
   //encoderX264 = new VideoEncoderX264();
@@ -233,7 +239,7 @@ void VideoEncoderOffline::getInputFrameBuf(uint8_t* data[], int stride[]) {
 
 static bool WriteYUVPlane(uint8_t* data, int stride, int width, int height, FILE* fp) {
   for (int j = 0; j < height; j++) {
-    auto size = fwrite(data + j*stride, 1, width, fp);
+    auto size = fwrite(data + j * stride, 1, width, fp);
     if (static_cast<int>(size) != width) {
       return false;
     }
@@ -248,23 +254,23 @@ static bool WriteYUVData(uint8_t* data[4], int stride[4], int width, int height,
     return false;
   }
   bool ret = true;
-  ret = ret && WriteYUVPlane(data[0], stride[0], width/1, height/1, fp);
-  ret = ret && WriteYUVPlane(data[1], stride[1], width/2, height/2, fp);
-  ret = ret && WriteYUVPlane(data[2], stride[2], width/2, height/2, fp);
+  ret = ret && WriteYUVPlane(data[0], stride[0], width / 1, height / 1, fp);
+  ret = ret && WriteYUVPlane(data[1], stride[1], width / 2, height / 2, fp);
+  ret = ret && WriteYUVPlane(data[2], stride[2], width / 2, height / 2, fp);
   fflush(fp);
   fclose(fp);
   return ret;
 }
 
 int VideoEncoderOffline::encodeFrame(uint8_t* data[], int stride[], uint8_t** pOutStream,
-                                  FrameType* pFrameType, int64_t* pOutTimeStamp) {
+                                     FrameType* pFrameType, int64_t* pOutTimeStamp) {
   if (data[0] != nullptr) {
     WriteYUVData(data, stride, width, height, rootPath + "YUV-" + std::to_string(frames) + ".yuv");
 
     FrameInfo frameInfo;
     frameInfo.frameType = *pFrameType;
     frameInfo.timeStamp = frames;
-    frameInfo.frameSize = width*height*3/2;
+    frameInfo.frameSize = width * height * 3 / 2;
 
     WriteFrameInfo(frameInfo, rootPath + "InFrameInfo-" + std::to_string(frames) + ".txt");
     frames++;
@@ -274,9 +280,10 @@ int VideoEncoderOffline::encodeFrame(uint8_t* data[], int stride[], uint8_t** pO
 
   for (int i = 0; i < SLEEP_COUNT; i++) {
     FrameInfo outFrameInfo;
-    auto ret = ReadFrameInfo(outFrameInfo, rootPath + "OutFrameInfo-" + std::to_string(outFrames) + ".txt");
+    auto ret = ReadFrameInfo(outFrameInfo,
+                             rootPath + "OutFrameInfo-" + std::to_string(outFrames) + ".txt");
     if (ret) {
-      int size = ReadFileData(rootPath + "H264-" + std::to_string(outFrames) + ".264" , h264Buf);
+      int size = ReadFileData(rootPath + "H264-" + std::to_string(outFrames) + ".264", h264Buf);
       if (size > 0 && size == outFrameInfo.frameSize) {
         printf("read frame=%d size = %d outSize = %d\n", outFrames, size, outFrameInfo.frameSize);
         *pOutStream = h264Buf;

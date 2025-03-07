@@ -20,19 +20,19 @@
 #include <QtCore/QObject>
 #include "src/utils/Panels/TimeStretchPanel.h"
 
-class TimeStretchModel : public QObject {
+class TimeStretchModel final : public QObject {
   Q_OBJECT
  public:
-  TimeStretchModel(AEGP_ItemH const& currentAEItem, QObject* parent = nullptr);
-  ~TimeStretchModel();
+  explicit TimeStretchModel(AEGP_ItemH const& currentAEItem, QObject* parent = nullptr);
+  ~TimeStretchModel() override;
 
-  Q_INVOKABLE int getStretchStartTime();
-  Q_INVOKABLE void setStretchStartTime(int frame);
-  Q_INVOKABLE int getStretchDuration();
-  Q_INVOKABLE void setStretchDuration(int frame);
-  Q_INVOKABLE int getCompositionDuration();
-  Q_INVOKABLE int getStretchMode();
-  Q_INVOKABLE void setStretchMode(int mode);
+  Q_INVOKABLE int getStretchStartTime() const;
+  Q_INVOKABLE void setStretchStartTime(int frame) const;
+  Q_INVOKABLE int getStretchDuration() const;
+  Q_INVOKABLE void setStretchDuration(int frame) const;
+  Q_INVOKABLE int getCompositionDuration() const;
+  Q_INVOKABLE int getStretchMode() const;
+  Q_INVOKABLE void setStretchMode(int mode) const;
   Q_INVOKABLE int getFps();
 
 private:

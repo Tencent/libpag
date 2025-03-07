@@ -22,7 +22,7 @@
 #include <QtWidgets/QItemDelegate>
 #include "AEResource.h"
 
-class QmlCompositionData : public QObject {
+class QmlCompositionData final : public QObject {
   Q_OBJECT
   Q_PROPERTY(QString layerName MEMBER layerName)
   Q_PROPERTY(QString savePath MEMBER savePath)
@@ -37,17 +37,17 @@ class QmlCompositionData : public QObject {
 
   QString layerName;
   QString savePath;
-  bool isFolder;
-  bool isUnFold;
-  int layerLevel;
-  bool itemChecked;
+  bool isFolder{};
+  bool isUnFold{};
+  int layerLevel{};
+  bool itemChecked{};
   QString itemBackColor;
-  int itemHeight;
+  int itemHeight{};
 };
 
 class ConfigLayerData {
  public:
-  ConfigLayerData(std::shared_ptr<AEResource> aeResource)
+  explicit ConfigLayerData(const std::shared_ptr<AEResource>& aeResource)
       : aeResource(aeResource), id(aeResource->id), name(aeResource->name) {
     layerData = std::make_shared<QList<std::shared_ptr<ConfigLayerData>>>();
   }
@@ -61,15 +61,15 @@ class ConfigLayerData {
     return data.id == this->id;
   }
 
-  bool hasParent() {
+  bool hasParent() const {
     return parent != nullptr;
   }
 
-  bool hasChild() {
+  bool hasChild() const {
     return !layerData->isEmpty();
   }
 
-  void addChild(std::shared_ptr<ConfigLayerData> child) {
+  void addChild(const std::shared_ptr<ConfigLayerData>& child) const {
     if (child == nullptr) {
       return;
     }
@@ -78,11 +78,11 @@ class ConfigLayerData {
     }
   }
 
-  bool isChecked() {
+  bool isChecked() const {
     return aeResource ? aeResource->getExportFlag() : false;
   }
 
-  void setChecked(bool checked) {
+  void setChecked(const bool checked) const {
     if (!aeResource) {
       return;
     }
@@ -96,13 +96,12 @@ class ConfigLayerData {
   std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> layerData;
 };
 
-class FolderData : public ConfigLayerData {
+class FolderData final : public ConfigLayerData {
  public:
-  FolderData(std::shared_ptr<AEResource> aeResource) : ConfigLayerData(aeResource) {
+  explicit FolderData(const std::shared_ptr<AEResource>& aeResource) : ConfigLayerData(aeResource) {
   }
 
-  ~FolderData() {
-  }
+  ~FolderData() override = default;
 
   bool isUnfold = true;  // 文件夹是否展开
 };
@@ -110,7 +109,7 @@ class FolderData : public ConfigLayerData {
 /**
  * 导出主面板，图层相关数据 model 层
  */
-class ExportConfigLayerModel : public QAbstractTableModel {
+class ExportConfigLayerModel final : public QAbstractTableModel {
   Q_OBJECT
  private:
   std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> layerDataList = nullptr;
@@ -118,8 +117,8 @@ class ExportConfigLayerModel : public QAbstractTableModel {
   bool isFolderData(const QModelIndex& index) const;
 
  public:
-  ExportConfigLayerModel(QObject* parent = nullptr);
-  ~ExportConfigLayerModel();
+  explicit ExportConfigLayerModel(QObject* parent = nullptr);
+  ~ExportConfigLayerModel() override;
 
   Q_INVOKABLE int rowCount(const QModelIndex& parent = QModelIndex()) const override;
   Q_INVOKABLE int columnCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -127,25 +126,25 @@ class ExportConfigLayerModel : public QAbstractTableModel {
   Q_INVOKABLE bool setData(const QModelIndex& index, const QVariant& value,
                            int role = Qt::EditRole);
   Q_INVOKABLE bool setData(const int row, const QVariant& value, const QString& roleAlias);
-  Q_INVOKABLE QmlCompositionData* get(int row);
+  Q_INVOKABLE QmlCompositionData* get(int row) const;
   Q_INVOKABLE void handleSettingIconClick(int row);
   Q_INVOKABLE void handlePreviewIconClick(int row);
   Q_INVOKABLE void handleSavePathClick(int row);
   Q_INVOKABLE bool isLayerSelected();
-  Q_INVOKABLE bool isAllSelected();
+  Q_INVOKABLE bool isAllSelected() const;
   Qt::ItemFlags flags(const QModelIndex& index) const override;
   QHash<int, QByteArray> roleNames() const override;
 
-  void setLayerData(std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> dataList,
+  void setLayerData(const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& dataList,
                     bool forceRefresh = false);
-  void searchCompositionsByName(QString name);
+  void searchCompositionsByName(const QString& name);
   void resetAfterNoSearch();
   void setAllChecked(bool checked);
 
   /**
    * 获取已经选中图层实体数据
    */
-  std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> getSelectedLayer();
+  std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>> getSelectedLayer() const;
 
   Q_SIGNAL void foldStatusChange();
   Q_SIGNAL void settingIconClicked(std::shared_ptr<AEResource> aeResource);
@@ -159,16 +158,16 @@ class ExportConfigLayerModel : public QAbstractTableModel {
  private:
   mutable QHash<int, QByteArray> roles;
 
-  int getRoleFromName(const QString& roleAlias);
+  int getRoleFromName(const QString& roleAlias) const;
 
   /**
    * 展开文件夹
    */
-  void unfoldFolder(std::shared_ptr<FolderData> folderData);
+  void unfoldFolder(const std::shared_ptr<FolderData>& folderData);
   /**
    * 收折文件夹
    */
-  void foldFolder(std::shared_ptr<FolderData> folderData);
+  void foldFolder(const std::shared_ptr<FolderData>& folderData);
   /**
    * 清空全部合成选择, 二期支持多选后，需要去掉
    */

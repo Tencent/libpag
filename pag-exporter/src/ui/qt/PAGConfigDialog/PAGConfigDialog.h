@@ -37,10 +37,10 @@
 #include <QWidget>
 #include "ConfigParam.h"
 
-class PAGConfigDialog : public QDialog {
+class PAGConfigDialog final : public QDialog {
   Q_OBJECT
  public:
-  PAGConfigDialog(QWidget* parent = nullptr);
+  explicit PAGConfigDialog(QWidget* parent = nullptr);
   ~PAGConfigDialog() override;
 
  private:
@@ -72,7 +72,7 @@ class PAGConfigDialog : public QDialog {
   QSpinBox* imageQualitySpinBox;
   QSpinBox* exportSizeLimitpinBox;
 
-  QSpinBox* maxFrameRateSpinBox;
+  QDoubleSpinBox* maxFrameRateSpinBox;
   QSpinBox* keyFrameIntervalSpinBox;
   QPushButton* cancelButton;
   QPushButton* confirmButton;

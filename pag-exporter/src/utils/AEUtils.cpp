@@ -3,6 +3,7 @@
 #include <io.h>  // windows for access
 #endif
 #include <QtWidgets/QFileDialog>
+#include <qdebug.h>
 #include <codecvt>
 #include <iostream>
 #include "RunScript.h"
@@ -13,90 +14,9 @@ AEGP_SuiteHandler* AEUtils::Suites = nullptr;
 std::string AEUtils::LastOutputPath;
 std::string AEUtils::LastFilePath;
 std::string AEUtils::SequenceSuffix = "_bmp";
-std::string AEUtils::AeVersion = "";
-std::string AEUtils::FolderDocumentsName = "";
-std::string AEUtils::FolderTempName = "";
-
-#define Script(text) #text;
-
-static const std::string TextDocumentScript =
-    Script(if (typeof PAG != = 'object') { PAG = {}; }(function() {
-             'use strict';
-
-             PAG.printTextDocuments = function(compositionID, layerIndex, keyframeIndex) {
-               var composition = null;
-               for (var i = 1; i <= app.project.numItems; i++) {
-                 var item = app.project.item(i);
-                 if (item instanceof CompItem && item.id == compositionID) {
-                   composition = item;
-                   break;
-                 }
-               }
-               if (composition == null) {
-                 return "";
-               }
-
-               if (layerIndex >= composition.layers.length) {
-                 return "";
-               }
-               var textLayer = composition.layers[layerIndex + 1];
-               var sourceText = textLayer.property("Source Text");
-               if (!sourceText) {
-                 return "";
-               }
-
-               var textDocument;
-               if (keyframeIndex == = 0 && sourceText.numKeys == = 0) {
-                 textDocument = sourceText.value;
-               } else {
-                 textDocument = sourceText.keyValue(keyframeIndex + 1);
-               }
-               if (!textDocument) {
-                 return "";
-               }
-
-               var result = [];
-               for (var key in textDocument) {
-                 if (!Object.prototype.hasOwnProperty.call(textDocument, key)) {
-                   continue;
-                 }
-                 try {
-                   var value = textDocument[key];
-                 } catch (e) {
-                   continue;
-                 }
-
-                 var text = key + " : ";
-                 switch (typeof value) {
-                   case 'string':
-                     value = value.split("\x03").join("\n");
-                     value = value.split("\r\n").join("\n");
-                     value = value.split("\r").join("\n");
-                     value = value.split("\n").join("\\n");
-                     text += value;
-                     break;
-                   case 'number':
-                   case 'boolean':
-                     text += String(value);
-                     break;
-                   case 'object':
-                     if (value && Object.prototype.toString.apply(value) == = '[object Array]') {
-                       var partial = [];
-                       var length = value.length;
-                       for (var i = 0; i < length; i += 1) {
-                         partial[i] = String(value[i]);
-                       }
-                       text += partial.join(',');
-                     }
-                     break;
-                 }
-                 if (text != = key + " : ") {
-                   result.push(text);
-                 }
-               }
-               return result.join("\n");
-             }
-           }()););
+std::string AEUtils::AeVersion;
+std::string AEUtils::FolderDocumentsName;
+std::string AEUtils::FolderTempName;
 
 void AEUtils::RegisterTextDocumentScript() {
   static bool hasInit = false;
@@ -459,7 +379,6 @@ AEGP_InstalledEffectKey AEUtils::GetInstalledEffectKey(std::string name) {
   auto& suites = SUITES();
   A_long num = 0;
   suites.EffectSuite4()->AEGP_GetNumInstalledEffects(&num);
-
   AEGP_InstalledEffectKey oldKey = AEGP_InstalledEffectKey_NONE;
   AEGP_InstalledEffectKey key = AEGP_InstalledEffectKey_NONE;
   for (int i = 0; i < num; i++) {

@@ -20,28 +20,27 @@
 #include <fstream>
 #include <unordered_map>
 #include <unordered_set>
-// #include "AudioSequence.h"
-#include "src/exports/ExportVerify/ExportVerify.h"
-#include "src/exports/Composition/BitmapComposition.h"
-// #include "ImageBytes.h"
-// #include "UI/CompressionOperate.h"
-// #include "UI/ProgressWindow.h"
-#include "src/ui/qt/ErrorList/AlertInfoUI.h"
-// #include "VideoComposition.h"
-// #include "exports/Marker.h"
-#include "AEMarker/AEMarker.h"
 #include "CommonMethod.h"
 #include "pag/file.h"
-// #include "utils/AEUtils.h"
-// #include "utils/BaseCommon.h"
-// #include "utils/FileAttributes.h"
-// #include "utils/UniqueID.h"
-// #include "report/PAGReport.h"
+#include "src/exports/AEMarker/AEMarker.h"
+#include "src/exports/Composition/BitmapComposition.h"
+#include "src/exports/Composition/VideoComposition.h"
+#include "src/exports/ExportVerify/ExportVerify.h"
+#include "src/exports/ImageBytes/ImageBytes.h"
+#include "src/exports/Sequence/AudioSequence.h"
+#include "src/ui/qt/CompressionOperate/CompressionOperate.h"
+#include "src/ui/qt/EnvConfig.h"
+#include "src/ui/qt/ErrorList/AlertInfoUI.h"
+#include "src/ui/qt/Progress//ProgressWindow.h"
+#include "src/utils/AEUtils.h"
+#include "src/utils/CommonMethod.h"
+#include "src/utils/FileAttributes.h"
+#include "src/utils/UniqueID.h"
 
 PAGExporter::PAGExporter(const AEGP_ItemH& activeItemH, std::string outputPath,
                          ProgressBase* progressBase)
     : context(outputPath), projectPlayTime(activeItemH, -100.0f) {
-  // context.progressWindow = ProgressWindow::MakeProgressWindow(&context, progressBase).release();
+  context.progressWindow = ProgressWindow::MakeProgressWindow(&context, progressBase).release();
 }
 
 static void reportExportFail() {
@@ -69,8 +68,8 @@ bool PAGExporter::ExportFile(const AEGP_ItemH& activeItemH, std::string outputPa
   if (exporter.context.progressWindow != nullptr) {
     auto nameStr = titleName.toStdString();
     auto tipStr = progressTips.toStdString();
-    // exporter.context.progressWindow->setTitleName(nameStr);
-    // exporter.context.progressWindow->setProgressTips(tipStr);
+    exporter.context.progressWindow->setTitleName(nameStr);
+    exporter.context.progressWindow->setProgressTips(tipStr);
   }
 
   auto pagFile = exporter.ExportPAG(activeItemH);
@@ -100,14 +99,14 @@ bool PAGExporter::ExportFile(const AEGP_ItemH& activeItemH, std::string outputPa
     out.write(reinterpret_cast<char*>(bytes->data()), bytes->length());
     out.close();
   } else {
-    // ErrorAlert(QObject::tr("PAG编码错误.").toStdString());
+    ErrorAlert(QObject::tr("PAG编码错误.").toStdString());
     reportExportFail();
     return false;
   }
 
   auto pagFileDecoded = pag::File::Load(bytes->data(), bytes->length());
   if (pagFileDecoded == nullptr) {
-    // ErrorAlert(QObject::tr("PAG解码错误.").toStdString());
+    ErrorAlert(QObject::tr("PAG解码错误.").toStdString());
     reportExportFail();
     return false;
   }
@@ -120,7 +119,7 @@ bool PAGExporter::ExportFile(const AEGP_ItemH& activeItemH, std::string outputPa
     printf("systemVersion=%s\n", fileAttributes2->systemVersion.c_str());
     printf("author=%s\n", fileAttributes2->author.c_str());
     printf("scene=%s\n", fileAttributes2->scene.c_str());
-    for (auto warning : fileAttributes2->warnings) {
+    for (const auto& warning : fileAttributes2->warnings) {
       printf("warning=%s\n", warning.c_str());
     }
   }
@@ -141,13 +140,13 @@ static pag::Point GetImageMaxScale(pag::Composition* composition, pag::ID imageI
   }
 
   pag::Point maxFactor = pag::Point::Zero();
-  for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+  for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
     pag::Point factor = pag::Point::Make(1.0f, 1.0f);
 
     if (layer->type() == pag::LayerType::PreCompose) {
-      factor = GetImageMaxScale(static_cast<pag::PreComposeLayer*>(layer)->composition, imageID);
+      factor = GetImageMaxScale(dynamic_cast<pag::PreComposeLayer*>(layer)->composition, imageID);
     } else if (layer->type() != pag::LayerType::Image ||
-               static_cast<pag::ImageLayer*>(layer)->imageBytes->id != imageID) {
+               dynamic_cast<pag::ImageLayer*>(layer)->imageBytes->id != imageID) {
       continue;
     }
 
@@ -163,11 +162,11 @@ static pag::Point GetImageMaxScale(pag::Composition* composition, pag::ID imageI
 }
 
 void PAGExporter::exportRescaleImages() {
-  if (context.imageBytesList.size() <= 0) {
+  if (context.imageBytesList.empty()) {
     return;
   }
 
-  auto mainComposition =
+  const auto mainComposition =
       context.compositions[context.compositions.size() - 1];  // get main composition
   context.factorList.clear();
   for (int index = 0;
@@ -187,17 +186,17 @@ void PAGExporter::exportRescaleImages() {
     factor = factor * refactor;
     context.factorList.push_back(factor);
     if (factor > 0.0) {
-      // ReExportImageBytes(&context, index, factor);
+      ReExportImageBytes(&context, index, factor);
     }
 
     if (context.progressWindow != nullptr) {
-      // context.progressWindow->increaseEncodedFrames();  // 更新进度
+      context.progressWindow->increaseEncodedFrames();  // 更新进度
     }
   }
 }
 
 static pag::Point GetBitmapCompositionMaxScale(pag::Composition* composition,
-                                               pag::ID compositionID) {
+                                               const pag::ID compositionID) {
   if (composition->type() == pag::CompositionType::Bitmap ||
       composition->type() == pag::CompositionType::Video) {
     if (composition->id == compositionID) {
@@ -208,10 +207,10 @@ static pag::Point GetBitmapCompositionMaxScale(pag::Composition* composition,
   }
 
   pag::Point maxFactor = pag::Point::Zero();
-  for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+  for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
     if (layer->type() == pag::LayerType::PreCompose) {
       auto factor = GetBitmapCompositionMaxScale(
-          static_cast<pag::PreComposeLayer*>(layer)->composition, compositionID);
+          dynamic_cast<pag::PreComposeLayer*>(layer)->composition, compositionID);
       auto layerFactor = layer->getMaxScaleFactor();
       factor.x *= layerFactor.x;
       factor.y *= layerFactor.y;
@@ -226,20 +225,21 @@ static pag::Point GetBitmapCompositionMaxScale(pag::Composition* composition,
 
 // 计算id被引用的次数（排除起始点相同的）
 static void GetRefCountFromCompostion(std::vector<double>& startTimes,
-                                      pag::Composition* composition, double startTime, pag::ID id) {
+                                      pag::Composition* composition, const double startTime,
+                                      const pag::ID id) {
   if (composition->id == id) {
-    for (auto time : startTimes) {
+    for (const auto time : startTimes) {
       if (fabs(time - startTime) < 1.0 / composition->frameRate / 2) {  // (diff time < half frame)
         return;
       }
     }
     startTimes.push_back(startTime);
   } else if (composition->type() == pag::CompositionType::Vector) {
-    for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+    for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
       if (layer->type() == pag::LayerType::PreCompose) {
-        auto layerStartTime = layer->startTime / composition->frameRate;
+        const auto layerStartTime = layer->startTime / composition->frameRate;
         GetRefCountFromCompostion(startTimes,
-                                  static_cast<pag::PreComposeLayer*>(layer)->composition,
+                                  dynamic_cast<pag::PreComposeLayer*>(layer)->composition,
                                   startTime + layerStartTime, id);
       }
     }
@@ -260,7 +260,7 @@ static void AdjustSequenceCompositionSize(pag::Composition* mainComposition) {
 }
 
 // 如果mainComposition是序列帧，则修改该compostion分辨率为sequences的最大分辨率
-static void AdjustCompositionSize(std::vector<pag::Composition*>& compositions) {
+static void AdjustCompositionSize(const std::vector<pag::Composition*>& compositions) {
   auto mainComposition = compositions[compositions.size() - 1];  // get main composition
   if (mainComposition->type() == pag::CompositionType::Bitmap) {
     AdjustSequenceCompositionSize<pag::BitmapComposition*>(mainComposition);
@@ -284,21 +284,23 @@ static void AdjustCompositionFramerate(pag::Composition* composition) {
   }
 }
 
-void PAGExporter::exportRescaleBitmapCompositions(std::vector<pag::Composition*>& compositions) {
-  auto mainComposition = compositions[compositions.size() - 1];  // get main composition
-  for (auto composition : compositions) {
+void PAGExporter::exportRescaleBitmapCompositions(
+    const std::vector<pag::Composition*>& compositions) {
+  const auto mainComposition = compositions[compositions.size() - 1];  // get main composition
+  for (const auto composition : compositions) {
     if (context.bEarlyExit) {
       break;
     }
     // AssignRecover<pag::ID> arCI(context.curCompId, composition->id);
     if (composition->type() == pag::CompositionType::Bitmap) {
-      auto point = GetBitmapCompositionMaxScale(mainComposition, composition->id);
-      float factor = std::max(point.x, point.y);
+      auto [x, y] = GetBitmapCompositionMaxScale(mainComposition, composition->id);
+      float factor = std::max(x, y);
       if (factor > 1.0) {
         factor = 1.0;
       }
 
-      // ReExportBitmapComposition(&context, static_cast<pag::BitmapComposition*>(composition), factor);
+      ReExportBitmapComposition(&context, dynamic_cast<pag::BitmapComposition*>(composition),
+                                factor);
 
       // 修改composition的帧率为sequence里的最大帧率，并相应修改duration
       AdjustCompositionFramerate<pag::BitmapComposition*>(composition);
@@ -307,20 +309,21 @@ void PAGExporter::exportRescaleBitmapCompositions(std::vector<pag::Composition*>
 }
 
 void PAGExporter::exportRescaleVideoCompositions(std::vector<pag::Composition*>& compositions) {
-  auto mainComposition = compositions[compositions.size() - 1];  // get main composition
-  for (auto composition : compositions) {
+  const auto mainComposition = compositions[compositions.size() - 1];  // get main composition
+  for (const auto composition : compositions) {
     if (context.bEarlyExit) {
       break;
     }
     AssignRecover<pag::ID> arCI(context.curCompId, composition->id);
     if (composition->type() == pag::CompositionType::Video) {
-      auto point = GetBitmapCompositionMaxScale(mainComposition, composition->id);
-      float factor = std::max(point.x, point.y);
+      auto [x, y] = GetBitmapCompositionMaxScale(mainComposition, composition->id);
+      float factor = std::max(x, y);
       if (factor > 1.0) {
         factor = 1.0;
       }
 
-      // ReExportVideoComposition(&context, compositions, static_cast<pag::VideoComposition*>(composition), factor);
+      ReExportVideoComposition(&context, compositions,
+                               dynamic_cast<pag::VideoComposition*>(composition), factor);
 
       // 修改composition的帧率为sequence里的最大帧率，并相应修改duration
       AdjustCompositionFramerate<pag::VideoComposition*>(composition);
@@ -328,8 +331,8 @@ void PAGExporter::exportRescaleVideoCompositions(std::vector<pag::Composition*>&
   }
 
   for (auto composition : context.tmpCompositions) {
-    auto layer = static_cast<pag::VectorComposition*>(composition)->layers[0];
-    auto id = static_cast<pag::PreComposeLayer*>(layer)->composition->id;
+    const auto layer = dynamic_cast<pag::VectorComposition*>(composition)->layers[0];
+    const auto id = dynamic_cast<pag::PreComposeLayer*>(layer)->composition->id;
     for (int index = 0; index < static_cast<int>(compositions.size()); index++) {
       if (compositions[index]->id == id) {
         compositions.insert(compositions.begin() + index + 1, composition);
@@ -340,16 +343,15 @@ void PAGExporter::exportRescaleVideoCompositions(std::vector<pag::Composition*>&
 }
 
 static int CalBitmapFrames(pagexporter::Context& context,
-                           std::vector<pag::Composition*>& compositions) {
+                           const std::vector<pag::Composition*>& compositions) {
   int totalFrames = 0;
 
   // 统计序列帧数目
   for (auto composition : compositions) {
     if (composition->type() == pag::CompositionType::Bitmap ||
         composition->type() == pag::CompositionType::Video) {
-      for (auto scaleAndFps : context.scaleAndFpsList) {
-        totalFrames +=
-            static_cast<int>(composition->duration * scaleAndFps.second / composition->frameRate);
+      for (auto [fst, snd] : context.scaleAndFpsList) {
+        totalFrames += static_cast<int>(composition->duration * snd / composition->frameRate);
       }
     }
   }
@@ -363,9 +365,9 @@ static int CalBitmapFrames(pagexporter::Context& context,
 static void CalRefCompositions(std::unordered_set<pag::Composition*>& refCompositions,
                                pag::Composition* composition) {
   if (composition->type() == pag::CompositionType::Vector) {
-    for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
-      auto preComposeLayer = static_cast<pag::PreComposeLayer*>(layer);
-      if (layer->type() == pag::LayerType::PreCompose && preComposeLayer->composition) {
+    for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
+      if (const auto preComposeLayer = dynamic_cast<pag::PreComposeLayer*>(layer);
+          layer->type() == pag::LayerType::PreCompose && preComposeLayer->composition) {
         CalRefCompositions(refCompositions, preComposeLayer->composition);
       }
     }
@@ -373,7 +375,8 @@ static void CalRefCompositions(std::unordered_set<pag::Composition*>& refComposi
   refCompositions.insert(composition);
 }
 
-std::vector<pag::Composition*> PAGExporter::ResortCompositions(pagexporter::Context& context) {
+std::vector<pag::Composition*> PAGExporter::ResortCompositions(
+    const pagexporter::Context& context) {
   std::vector<pag::Composition*> compositions;
   std::unordered_set<pag::Composition*> refCompositions;
   CalRefCompositions(refCompositions, context.compositions[context.compositions.size() - 1]);
@@ -398,10 +401,10 @@ static void RewriteLayerName(pagexporter::Context* context, pag::Composition* co
     return;
   }
 
-  for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+  for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
     layer->name = "";
     if (layer->type() == pag::LayerType::PreCompose) {
-      auto subCompostion = static_cast<pag::PreComposeLayer*>(layer)->composition;
+      auto subCompostion = dynamic_cast<pag::PreComposeLayer*>(layer)->composition;
       if (subCompostion->type() == pag::CompositionType::Vector) {
         RewriteLayerName(context, subCompostion);
       }
@@ -409,7 +412,7 @@ static void RewriteLayerName(pagexporter::Context* context, pag::Composition* co
   }
 }
 
-static void CombineAllAudioMarkers(std::vector<pag::Composition*>& compositions) {
+static void CombineAllAudioMarkers(const std::vector<pag::Composition*>& compositions) {
   auto mainComposition = compositions[compositions.size() - 1];
   for (int i = 0; i < static_cast<int>(compositions.size()) - 1; i++) {
     for (auto marker : compositions[i]->audioMarkers) {
@@ -420,35 +423,35 @@ static void CombineAllAudioMarkers(std::vector<pag::Composition*>& compositions)
 }
 
 void PAGExporter::exporterRescale(std::vector<pag::Composition*>& compositions) {
-  // auto compressionOperate = CompressionOperate::MakeCompressionOperate(&context).release();
-  // do {
-  //   exportRescaleImages();
-  //   exportRescaleBitmapCompositions(compositions);
-  //   exportRescaleVideoCompositions(compositions);
-  //   if (context.enableCompressionPanel && !context.bEarlyExit) {
-  //     if (compressionOperate->showPanel()) {
-  //       break;
-  //     } else {  //重新导出
-  //       if (context.progressWindow != nullptr) {
-  //         context.progressWindow->resetEncodedFrames();  // 进度归零
-  //       }
-  //     }
-  //   }
-  // } while (context.enableCompressionPanel && !context.bEarlyExit);
-  //
-  // delete compressionOperate;
+  const auto compressionOperate = CompressionOperate::MakeCompressionOperate(&context).release();
+  do {
+    exportRescaleImages();
+    exportRescaleBitmapCompositions(compositions);
+    exportRescaleVideoCompositions(compositions);
+    if (context.enableCompressionPanel && !context.bEarlyExit) {
+      if (compressionOperate->showPanel()) {
+        break;
+      } else {  //重新导出
+        if (context.progressWindow != nullptr) {
+          context.progressWindow->resetEncodedFrames();  // 进度归零
+        }
+      }
+    }
+  } while (context.enableCompressionPanel && !context.bEarlyExit);
+
+  delete compressionOperate;
 }
 
 std::vector<pag::ImageBytes*> PAGExporter::ResortImages(
-    pagexporter::Context& context, std::vector<pag::Composition*>& compositions) {
+    const pagexporter::Context& context, const std::vector<pag::Composition*>& compositions) {
   std::unordered_set<pag::ImageBytes*> refImages;
-  for (auto composition : compositions) {
+  for (const auto composition : compositions) {
     if (composition->type() != pag::CompositionType::Vector) {
       continue;
     }
-    for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
-      auto imageLayer = static_cast<pag::ImageLayer*>(layer);
-      if (layer->type() == pag::LayerType::Image && imageLayer->imageBytes) {
+    for (const auto layer : dynamic_cast<pag::VectorComposition*>(composition)->layers) {
+      if (auto imageLayer = dynamic_cast<pag::ImageLayer*>(layer);
+          layer->type() == pag::LayerType::Image && imageLayer->imageBytes) {
         refImages.insert(imageLayer->imageBytes);
       }
     }
@@ -465,17 +468,17 @@ std::vector<pag::ImageBytes*> PAGExporter::ResortImages(
 }
 
 void PAGExporter::processWorkArea(const AEGP_ItemH& activeItemH) {
-  auto& suites = SUITES();
-  auto mainComposition = context.compositions[context.compositions.size() - 1];
-  auto compHandle = AEUtils::GetCompFromItem(activeItemH);
+  const auto& suites = SUITES();
+  const auto mainComposition = context.compositions[context.compositions.size() - 1];
+  const auto compHandle = AEUtils::GetCompFromItem(activeItemH);
 
   // 获取工作区域
   A_Time workAreaStart = {};
   A_Time workAreaDuration = {};
   suites.CompSuite6()->AEGP_GetCompWorkAreaStart(compHandle, &workAreaStart);
   suites.CompSuite6()->AEGP_GetCompWorkAreaDuration(compHandle, &workAreaDuration);
-  pag::Frame start = ExportTime(workAreaStart, &context);
-  pag::Frame end = start + ExportTime(workAreaDuration, &context);
+  const pag::Frame start = ExportTime(workAreaStart, &context);
+  const pag::Frame end = start + ExportTime(workAreaDuration, &context);
   auto duration = mainComposition->duration;
   if (start == 0) {
     if (duration > end) {
@@ -486,8 +489,8 @@ void PAGExporter::processWorkArea(const AEGP_ItemH& activeItemH) {
 
   duration = end - start;
 
-  auto newComposition = new pag::VectorComposition();
-  auto newLayer = new pag::PreComposeLayer();
+  const auto newComposition = new pag::VectorComposition();
+  const auto newLayer = new pag::PreComposeLayer();
 
   // newLayer->id = GetLayerUniqueId(&context, context.compositions);
   newLayer->transform = new pag::Transform2D();
@@ -516,7 +519,7 @@ void PAGExporter::processWorkArea(const AEGP_ItemH& activeItemH) {
   newComposition->height = mainComposition->height;
   newComposition->duration = duration;
   newComposition->frameRate = mainComposition->frameRate;
-  // newComposition->id = GetCompositionUniqueId(&context, context.compositions);
+  newComposition->id = GetCompositionUniqueId(&context, context.compositions);
   newComposition->backgroundColor = mainComposition->backgroundColor;
 
   newComposition->audioBytes = mainComposition->audioBytes;
@@ -530,7 +533,7 @@ void PAGExporter::processWorkArea(const AEGP_ItemH& activeItemH) {
 }
 
 std::shared_ptr<pag::File> PAGExporter::ExportPAG(const AEGP_ItemH& activeItemH) {
-  auto id = AEUtils::GetItemId(activeItemH);
+  const auto id = AEUtils::GetItemId(activeItemH);
   AssignRecover<pag::ID> arCI(context.curCompId, id);  // 暂存当前compItemId
 
   ExportComposition(&context, activeItemH);
@@ -549,7 +552,7 @@ std::shared_ptr<pag::File> PAGExporter::ExportPAG(const AEGP_ItemH& activeItemH)
 
   if (context.enableAudio &&
       context.exportTagLevel >= static_cast<uint16_t>(pag::TagCode::AudioBytes)) {
-    // ExportAudioSequence(&context, activeItemH, compositions[compositions.size() - 1]);
+    ExportAudioSequence(&context, activeItemH, compositions[compositions.size() - 1]);
     if (compositions[compositions.size() - 1]->audioBytes != nullptr) {
       CombineAllAudioMarkers(compositions);
     }
@@ -561,13 +564,13 @@ std::shared_ptr<pag::File> PAGExporter::ExportPAG(const AEGP_ItemH& activeItemH)
 
   // 设置总帧数以便进度控制
   if (context.progressWindow != nullptr) {
-    int totalFrames = CalBitmapFrames(context, compositions);
-    // context.progressWindow->setTotalFrames(totalFrames);
+    const int totalFrames = CalBitmapFrames(context, compositions);
+    context.progressWindow->setTotalFrames(totalFrames);
   }
 
   auto images = ResortImages(context, compositions);
 
-  // ExportVerifyBefore(context, compositions, images);
+  ExportVerifyBefore(context, compositions, images);
   if (context.alertInfos.show(context.enableBeforeWarning && !context.disableShowAlert,
                               !context.disableShowAlert) ||
       context.bEarlyExit) {
@@ -585,7 +588,7 @@ std::shared_ptr<pag::File> PAGExporter::ExportPAG(const AEGP_ItemH& activeItemH)
 
   // AEMarker::PrintMarkers(compositions[compositions.size()-1]);
 
-  // ExportVerifyAfter(context, compositions, images);
+  ExportVerifyAfter(context, compositions, images);
   if (context.bEarlyExit) {
     return nullptr;
   }
@@ -598,7 +601,7 @@ std::shared_ptr<pag::File> PAGExporter::ExportPAG(const AEGP_ItemH& activeItemH)
     return nullptr;
   }
 
-  // CheckGraphicsMemery(context, pagFile);
+  CheckGraphicsMemery(context, pagFile);
 
   if (context.alertInfos.show(!context.disableShowAlert, !context.disableShowAlert)) {
     return nullptr;
@@ -607,7 +610,6 @@ std::shared_ptr<pag::File> PAGExporter::ExportPAG(const AEGP_ItemH& activeItemH)
   AEMarker::ExportTimeStretch(pagFile, context, activeItemH);
   AEMarker::ExportLayerEditable(pagFile, context, activeItemH);
   AEMarker::ExportImageFillMode(pagFile, context, activeItemH);
-  // GetFileAttributes(&(pagFile->fileAttributes), context);
 
   return pagFile;
 }

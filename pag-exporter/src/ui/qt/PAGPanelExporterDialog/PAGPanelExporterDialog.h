@@ -28,6 +28,7 @@
 #include "AEResource.h"
 #include "src/ui/qt/EnvConfig.h"
 #include "src/ui/qt/ErrorList/ErrorListModel.h"
+#include "src/ui/qt/ExportProgressListWindow/ExportProgressListWindow.h"
 #include "src/ui/qt/ExportSettingDialog/ExportSettingDialog.h"
 #include "src/ui/qt/PAGPanelExporterDialog/PanelExporterDataModel.h"
 #include "src/utils/ExportProgressItem.h"
@@ -38,27 +39,26 @@ class PAGPanelExporterDialog final : public QObject {
   explicit PAGPanelExporterDialog(QWidget* parent = nullptr);
   ~PAGPanelExporterDialog() override;
   void showMainPage();
-  void hide();
+  void hide() const;
   void translate();
   Q_INVOKABLE void show();
   Q_INVOKABLE void resetData();
-  Q_INVOKABLE void refreshErrorListView();
+  Q_INVOKABLE void refreshErrorListView() const;
   Q_INVOKABLE void exportFiles();
-  Q_INVOKABLE void exit();
-  Q_INVOKABLE bool isAudioExport();
+  Q_INVOKABLE void exit() const;
+  Q_INVOKABLE bool isAudioExport() const;
   Q_INVOKABLE void onExportAudioChange(bool checked);
-  Q_INVOKABLE void searchCompositionsByName(QString name);
-  Q_INVOKABLE void resetAfterNoSearch();
-  Q_INVOKABLE void setAllChecked(bool checked);
+  Q_INVOKABLE void searchCompositionsByName(const QString& name) const;
+  Q_INVOKABLE void resetAfterNoSearch() const;
+  Q_INVOKABLE void setAllChecked(bool checked) const;
 
  public Q_SLOTS:
-  void goToSettingDialog(std::shared_ptr<AEResource> aeResource);
-  void goToPreviewDialog(std::shared_ptr<AEResource> aeResource);
-  void onCancelBtnClick();
+  void goToSettingDialog(const std::shared_ptr<AEResource>& aeResource);
+  void goToPreviewDialog(const std::shared_ptr<AEResource>& aeResource);
   void onExportBtnClick();
-  void handleCompositionCheckBoxChange();
-  void onTitleCheckBoxStateChange(int state);
-  void onSavePathItemClick(const QModelIndex& index);
+  void handleCompositionCheckBoxChange() const;
+  void onTitleCheckBoxStateChange(int state) const;
+  void onSavePathItemClick(const QModelIndex& index) const;
   void refreshDialog();
 
  private:
@@ -68,16 +68,18 @@ class PAGPanelExporterDialog final : public QObject {
   void resetToLastSelected(
       const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) const;
   void showExportSettingDialog(AEGP_ItemH& currentAEItem);
+  void showProgressListWindow(std::vector<std::shared_ptr<ExportProgressItem>>& progressItems);
 
   QApplication* app = nullptr;
   QQmlApplicationEngine* engine = nullptr;
   QQuickWindow* window = nullptr;
   std::shared_ptr<AEResource> aeResource;
-  ExportConfigLayerModel* layerModel;
-  ErrorListModel* errorListModel;
-  QTranslator* translator;
+  ExportConfigLayerModel* layerModel = nullptr;
+  ErrorListModel* errorListModel = nullptr;
+  QTranslator* translator = nullptr;
   bool isExportAudio = false;
   ExportSettingDialog* settingDialog = nullptr;
+  ExportProgressListWindow* exportProgressListWindow = nullptr;
 };
 
 #endif  //PAGPANELEXPORTERDIALOG_H

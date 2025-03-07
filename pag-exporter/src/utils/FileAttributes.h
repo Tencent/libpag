@@ -15,13 +15,10 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef ENVCONFIG_H
-#define ENVCONFIG_H
-#include <QtWidgets/QApplication>
-#include <string>
-QApplication* SetupQT();
-QApplication* CurrentUseQtApp();
-std::string GetPAGExporterVersion(); // 获取导出插件的版本号
-std::string GetSystemVersion(); // 获取系统版本号
-std::string GetAuthorName(); // 获取用户名称
-#endif  //ENVCONFIG_H
+#ifndef FILEATTRIBUTES_H
+#define FILEATTRIBUTES_H
+#include "Context.h"
+
+void GetFileAttributes(pag::FileAttributes* fileAttributes, pagexporter::Context& context);
+
+#endif //FILEATTRIBUTES_H

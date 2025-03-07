@@ -18,7 +18,6 @@
 #include "ExportSettingDialog.h"
 #include <QtQml/QQmlContext>
 #include <QtQuick/QQuickWindow>
-#include "src/ui/qt/ExportCommonConfig.h"
 #include "src/ui/qt/TextEdit/TextEdit.h"
 #include "src/utils/AEUtils.h"
 
@@ -67,7 +66,7 @@ void ExportSettingDialog::showPage() {
   window->show();
 }
 
-void ExportSettingDialog::setAEItem(AEGP_ItemH& currentAEItem) {
+void ExportSettingDialog::setAEItem(const AEGP_ItemH& currentAEItem) {
   this->currentAEItem = currentAEItem;
   resetData(currentAEItem);
 }
@@ -103,7 +102,7 @@ void ExportSettingDialog::resetData(AEGP_ItemH const& currentAEItem) {
   }
 }
 
-void ExportSettingDialog::show() {
+void ExportSettingDialog::show() const {
   if (window) {
     window->show();
   }

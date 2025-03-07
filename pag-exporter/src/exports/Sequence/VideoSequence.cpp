@@ -148,8 +148,8 @@ void ExportVideoSequence(pagexporter::Context* context, const AEGP_ItemH& itemHa
   factor *= compositionFactor;
 
   if (context->bitmapMaxResolution > 0) {
-    int minLine = std::min(composition->width, composition->height) * compositionFactor;
-    if (minLine > context->bitmapMaxResolution) {
+    if (int minLine = std::min(composition->width, composition->height) * compositionFactor;
+        minLine > context->bitmapMaxResolution) {
       factor *= ((double)context->bitmapMaxResolution / minLine);
     }
   }

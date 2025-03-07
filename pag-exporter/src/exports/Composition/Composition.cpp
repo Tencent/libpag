@@ -150,8 +150,8 @@ pag::Composition* ExportComposition(pagexporter::Context* context, const AEGP_It
   context->compItemHList.insert(std::make_pair(id, itemH));
   AssignRecover<pag::ID> arCI(context->curCompId, id);
 
-  auto compHandle = AEUtils::GetCompFromItem(itemH);
-  auto compositionType = GetCompositionType(context, compHandle);
+  const auto compHandle = AEUtils::GetCompFromItem(itemH);
+  const auto compositionType = GetCompositionType(context, compHandle);
   if (context->bEarlyExit) {
     return nullptr;
   }
