@@ -22,7 +22,7 @@ elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/staticlib)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/sharedlib)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/executable)
-
+    set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks")
     set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X Deployment Version" FORCE)
 else()

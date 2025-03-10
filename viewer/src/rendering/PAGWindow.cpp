@@ -40,7 +40,7 @@ auto PAGWindow::Open() -> void {
 
 #if defined(QT_DEBUG)
 #if defined(PAG_MACOS)
-  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../../../../../src/resources/qml/MainWindow.qml";
+  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../../../../src/resources/qml/MainWindow.qml";
 #elif defined(PAG_WINDOWS)
   QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../src/resources/qml/MainWindow.qml";
 #endif

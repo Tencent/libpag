@@ -107,7 +107,10 @@ def build(cmakePrefixPath: str, rootDir: str, sourceDir: str, buildType: str):
     copyFileToDir(libs_generated_path, lib_out_path, os.path.join(sourceDir, 'out', arch))
 
     libs_generated_path = []
-    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, arch, 'tgfx', 'CMakeFiles', 'tgfx-vendor.dir', arch, f'libtgfx-vendor{suffix}'))
+    if current_os == "mac":
+        libs_generated_path.append(os.path.join(sourceDir, 'out', arch, 'libtgfx-vendor.a'))
+    elif current_os == "win":
+        libs_generated_path.append(os.path.join(sourceDir, 'out', arch, arch, 'tgfx', 'CMakeFiles', 'tgfx-vendor.dir', arch, f'libtgfx-vendor{suffix}'))
     copyFileToDir(libs_generated_path, lib_out_path)
 
     includes_generated_path = []

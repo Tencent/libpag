@@ -1,5 +1,3 @@
-execute_process(COMMAND sh ${CMAKE_SOURCE_DIR}/sync_deps.sh WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-
 file(GLOB_RECURSE PAG_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/*/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/*/*.c
@@ -147,6 +145,15 @@ elseif (PAG_MACOS)
 
   add_vendor_target(log4qt STATIC_VENDORS log4qt CONFIG_DIR ${CMAKE_SOURCE_DIR})
   add_vendor_target(sparkle STATIC_VENDORS sparkle CONFIG_DIR ${CMAKE_SOURCE_DIR})
+
+  add_custom_command(TARGET PAGViewer POST_BUILD
+  COMMENT "Copy librarys to output directory"
+  COMMAND ${deployqt} $<TARGET_BUNDLE_DIR:PAGViewer> -qmldir=${CMAKE_SOURCE_DIR}/src/resources/qml
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/third_party/out/sparkle/lib/Release/Sparkle.framework
+    $<TARGET_BUNDLE_DIR:PAGViewer>/Contents/Frameworks
+)
+
   add_dependencies(PAGViewer log4qt nlohman-json sodium sparkle pag)
 
   target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../src)

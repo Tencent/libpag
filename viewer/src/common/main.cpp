@@ -12,7 +12,7 @@
 #include "profiling/PAGRunTimeChartModel.h"
 #include "profiling/PAGRunTimeModelManager.h"
 #if defined(PAG_MACOS)
-#include "macos/PAGApplication.h"
+#include "common/PAGApplication.h"
 #elif defined(PAG_WINDOWS)
 #include "windows/SingleApplication.h"
 #endif
