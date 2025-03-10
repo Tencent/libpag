@@ -7,7 +7,7 @@
 
 namespace Utils {
 
-static std::string Translate(const char *sourceText, const char *arg = nullptr) {
+static std::string translate(const char *sourceText, const char *arg = nullptr) {
   auto translateWord = QCoreApplication::translate("QObject", sourceText);
   if (arg != nullptr) {
     translateWord = translateWord.arg(arg);

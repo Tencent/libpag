@@ -1,7 +1,7 @@
-execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/../ ${CMAKE_SOURCE_DIR}/third_party/libpag)
 execute_process(COMMAND sh ${CMAKE_SOURCE_DIR}/sync_deps.sh WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 file(GLOB_RECURSE PAG_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/*/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/*/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/*/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*/*.mm
@@ -13,26 +13,29 @@ file(GLOB_RECURSE PAG_INCLUDES
 )
 
 if (PAG_WINDOWS)
-  MESSAGE("This is PAG_WINDOWS")
+  execute_process(COMMAND cmd /c "${CMAKE_SOURCE_DIR}/tools/build_tools/libpag/create_symbol_link.bat" "${CMAKE_SOURCE_DIR}/third_party/libpag" "${CMAKE_SOURCE_DIR}/../")
   file(GLOB_RECURSE PAG_PLATFORM_SRCS
-      ${CMAKE_CURRENT_SOURCE_DIR}/macos/*.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/macos/*.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/macos/*.mm
       ${CMAKE_CURRENT_SOURCE_DIR}/macos/*.cpp
   )
   list(REMOVE_ITEM PAG_SRCS ${PAG_PLATFORM_SRCS})
 
   file(GLOB_RECURSE PAG_PLATFORM_INCLUDES
-      ${CMAKE_CURRENT_SOURCE_DIR}/mcaos/*.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/mcaos
   )
   list(REMOVE_ITEM PAG_INCLUDES ${PAG_PLATFORM_INCLUDES})
 elseif (PAG_MACOS)
+  execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/../ ${CMAKE_SOURCE_DIR}/third_party/libpag)
   file(GLOB_RECURSE PAG_PLATFORM_SRCS
+      ${CMAKE_CURRENT_SOURCE_DIR}/windows/*.h
       ${CMAKE_CURRENT_SOURCE_DIR}/windows/*.mm
       ${CMAKE_CURRENT_SOURCE_DIR}/windows/*.cpp
   )
   list(REMOVE_ITEM PAG_SRCS ${PAG_PLATFORM_SRCS})
 
   file(GLOB_RECURSE PAG_PLATFORM_INCLUDES
-      ${CMAKE_CURRENT_SOURCE_DIR}/windows/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/windows
   )
   list(REMOVE_ITEM PAG_INCLUDES ${PAG_PLATFORM_INCLUDES})
 endif()
@@ -62,13 +65,50 @@ target_sources(PAGViewer PRIVATE ${QT_RESOURCES})
 add_vendor_target(nlohman-json STATIC_VENDORS nlohman-json CONFIG_DIR ${CMAKE_SOURCE_DIR})
 add_vendor_target(sodium STATIC_VENDORS sodium CONFIG_DIR ${CMAKE_SOURCE_DIR})
 add_vendor_target(pag STATIC_VENDORS libpag CONFIG_DIR ${CMAKE_SOURCE_DIR})
-if (PAG_WINDOWS)
-  add_vendor_target(winsparkle STATIC_VENDORS winsparkle CONFIG_DIR ${CMAKE_SOURCE_DIR})
-  add_dependencies(PAGViewer nlohman-json sodium winsparkle libpag)
 
-  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/nlohman-json/include)
+get_deployqt(${CMAKE_PREFIX_PATH} deployqt)
+
+if (PAG_WINDOWS)
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+  set(SYSTEM_LIBRARIES
+      bcrypt
+      ws2_32
+      opengl32
+  )
+  # need to set corresponding path
+  pag_add_library(LIBRARIES ${SYSTEM_LIBRARIES}
+                  PATHS "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64"
+                  TARGET PAGViewer
+                  REQUIRED True)
+
+  add_vendor_target(winsparkle STATIC_VENDORS winsparkle CONFIG_DIR ${CMAKE_SOURCE_DIR})
+  add_custom_command(TARGET PAGViewer POST_BUILD
+    COMMENT "Copy librarys to output directory"
+    COMMAND ${deployqt} --qml --qmldir ${CMAKE_SOURCE_DIR}/src/resources/qml --quick  --quickcontrols2 --no-translations $<TARGET_FILE:PAGViewer>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      ${CMAKE_SOURCE_DIR}/third_party/out/sodium/lib/${CMAKE_BUILD_TYPE}/libsodium.dll
+      $<TARGET_FILE_DIR:PAGViewer>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      ${CMAKE_SOURCE_DIR}/third_party/out/winsparkle/lib/Release/WinSparkle.dll
+      $<TARGET_FILE_DIR:PAGViewer>
+  )
+  add_dependencies(PAGViewer nlohman-json sodium winsparkle pag)
+
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../src)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../third_party/out/rttr/mac/include)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../third_party/tgfx/include)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/libpag/include)
   target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/sodium/include)
-  # TODO
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/winsparkle/include)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/nlohman-json/include)
+
+  target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/sodium/lib/${CMAKE_BUILD_TYPE}/libsodium.lib)
+  target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/libpag/lib/${CMAKE_BUILD_TYPE}/libpag.lib)
+  target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/libpag/lib/${CMAKE_BUILD_TYPE}/libpag-vendor.lib)
+  target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/libpag/lib/${CMAKE_BUILD_TYPE}/libtgfx-vendor.lib)
+  if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/winsparkle/lib/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
+  endif ()
 
   set_target_properties(PAGViewer PROPERTIES WIN32_EXECUTABLE TRUE)
 elseif (PAG_MACOS)
@@ -109,12 +149,12 @@ elseif (PAG_MACOS)
   add_vendor_target(sparkle STATIC_VENDORS sparkle CONFIG_DIR ${CMAKE_SOURCE_DIR})
   add_dependencies(PAGViewer log4qt nlohman-json sodium sparkle pag)
 
-  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/nlohman-json/include)
-  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/sodium/include)
-  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/libpag/include)
   target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../src)
   target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../third_party/out/rttr/mac/include)
   target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/../third_party/tgfx/include)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/libpag/include)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/sodium/include)
+  target_include_directories(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/nlohman-json/include)
 
   target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/sodium/lib/${CMAKE_BUILD_TYPE}/libsodium.a)
   target_link_libraries(PAGViewer PRIVATE ${CMAKE_SOURCE_DIR}/third_party/out/log4qt/lib/${CMAKE_BUILD_TYPE}/liblog4qt.a)

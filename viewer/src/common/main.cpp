@@ -14,7 +14,7 @@
 #if defined(PAG_MACOS)
 #include "macos/PAGApplication.h"
 #elif defined(PAG_WINDOWS)
-
+#include "windows/SingleApplication.h"
 #endif
 
 void initReportConfig(const std::string& appVersion) {
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
   QApplication::setFont(defaultFonts);
   fallbackList = {"Microsoft YaHei"};
   pag::PAGFont::SetFallbackFontNames(fallbackList);
-  // TODO
+  SingleApplication app(argc, argv);
 #elif defined(PAG_MACOS)
   QFont defaultFonts("Helvetica Neue,PingFang SC");
   QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);

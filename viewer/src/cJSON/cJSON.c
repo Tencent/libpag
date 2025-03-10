@@ -158,9 +158,9 @@ static char* print_double(cJSON* item) {
   str = (char*)cJSON_malloc(64); /* This is a nice tradeoff. */
   if (str) {
     if (fabs(d) < 1.0e-6 || fabs(d) > 1.0e9)
-      sprintf(str, "%lf", d);
+      snprintf(str, 64, "%lf", d);
     else
-      sprintf(str, "%f", d);
+      snprintf(str, 64, "%f", d);
   }
   return str;
 }
@@ -171,15 +171,15 @@ static char* print_int(cJSON* item) {
   if (str) {
     if (item->sign == -1) {
       if ((int64)item->valueint <= (int64)INT_MAX && (int64)item->valueint >= (int64)INT_MIN) {
-        sprintf(str, "%d", (int32)item->valueint);
+        snprintf(str, 22, "%d", (int32)item->valueint);
       } else {
-        sprintf(str, "%ld", (int64)item->valueint);
+        snprintf(str, 22, "%lld", (int64)item->valueint);
       }
     } else {
       if (item->valueint <= (uint64)UINT_MAX) {
-        sprintf(str, "%u", (uint32)item->valueint);
+        snprintf(str, 22, "%u", (uint32)item->valueint);
       } else {
-        sprintf(str, "%lu", item->valueint);
+        snprintf(str, 22, "%llu", item->valueint);
       }
     }
   }
@@ -233,7 +233,9 @@ static const char* parse_string(cJSON* item, const char* str) {
           *ptr2++ = '\t';
           break;
         case 'u': /* transcode utf16 to utf8. */
-          sscanf(ptr + 1, "%4x", &uc);
+          if (sscanf_s(ptr + 1, "%4x", &uc) != 1) {
+            break;
+          }
           ptr += 4; /* get the unicode char. */
 
           if ((uc >= 0xDC00 && uc <= 0xDFFF) || uc == 0)
@@ -243,7 +245,9 @@ static const char* parse_string(cJSON* item, const char* str) {
           {
             if (ptr[1] != '\\' || ptr[2] != 'u')
               break;  // missing second-half of surrogate.
-            sscanf(ptr + 3, "%4x", &uc2);
+            if (sscanf_s(ptr + 3, "%4x", &uc2) != 1) {
+              break;
+            }
             ptr += 6;
             if (uc2 < 0xDC00 || uc2 > 0xDFFF)
               break;  // invalid second-half of surrogate.
@@ -342,7 +346,7 @@ static char* print_string_ptr(const char* str) {
           *ptr2++ = 't';
           break;
         default:
-          sprintf(ptr2, "u%04x", token);
+          snprintf(ptr2, 6, "u%04x", token);
           ptr2 += 5;
           break; /* escape and print */
       }
@@ -523,10 +527,16 @@ static char* print_array(cJSON* item, int depth, int fmt) {
   while (child && !fail) {
     ret = print_value(child, depth + 1, fmt);
     entries[i++] = ret;
-    if (ret)
-      len += strlen(ret) + 2 + (fmt ? 1 : 0);
-    else
+    if (ret) {
+      size_t ret_len = strlen(ret);
+      if (ret_len > INT_MAX - len - 3) {
+        fail = 1;
+      } else {
+        len += (int)(ret_len + 2 + (fmt ? 1 : 0));
+      }
+    } else {
       fail = 1;
+    }
     child = child->next;
   }
 
@@ -551,13 +561,15 @@ static char* print_array(cJSON* item, int depth, int fmt) {
   ptr = out + 1;
   *ptr = 0;
   for (i = 0; i < numentries; i++) {
-    strcpy(ptr, entries[i]);
+    strncpy_s(ptr, len - (ptr - out), entries[i], strlen(entries[i]) + 1);
     ptr += strlen(entries[i]);
     if (i != numentries - 1) {
-      *ptr++ = ',';
-      if (fmt)
-        *ptr++ = ' ';
-      *ptr = 0;
+      if (len - (ptr - out) >= 3) {  // 确保有足够空间放置 ",\0" 或 ", \0"
+        *ptr++ = ',';
+        if (fmt)
+          *ptr++ = ' ';
+        *ptr = 0;
+      }
     }
     cJSON_free(entries[i]);
   }
@@ -653,10 +665,17 @@ static char* print_object(cJSON* item, int depth, int fmt) {
   while (child) {
     names[i] = str = print_string_ptr(child->string);
     entries[i++] = ret = print_value(child, depth, fmt);
-    if (str && ret)
-      len += strlen(ret) + strlen(str) + 2 + (fmt ? 2 + depth : 0);
-    else
+    if (str && ret) {
+      size_t ret_len = strlen(ret);
+      size_t str_len = strlen(str);
+      if (ret_len > INT_MAX - len - str_len - 4 - depth) {
+        fail = 1;
+      } else {
+        len += (int)(ret_len + str_len + 2 + (fmt ? 2 + depth : 0));
+      }
+    } else {
       fail = 1;
+    }
     child = child->next;
   }
 
@@ -689,12 +708,12 @@ static char* print_object(cJSON* item, int depth, int fmt) {
     if (fmt)
       for (j = 0; j < depth; j++)
         *ptr++ = '\t';
-    strcpy(ptr, names[i]);
+    strncpy_s(ptr, len - (ptr - out), names[i], strlen(names[i]) + 1);
     ptr += strlen(names[i]);
     *ptr++ = ':';
     if (fmt)
       *ptr++ = '\t';
-    strcpy(ptr, entries[i]);
+    strncpy_s(ptr, len - (ptr - out), entries[i], strlen(entries[i]) + 1);
     ptr += strlen(entries[i]);
     if (i != numentries - 1)
       *ptr++ = ',';
@@ -997,4 +1016,3 @@ cJSON* cJSON_CreateStringArray(const char** strings, int count) {
   }
   return a;
 }
-

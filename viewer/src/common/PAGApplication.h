@@ -1,5 +1,5 @@
-#ifndef MACOS_PAGAPPLICATION_H_
-#define MACOS_PAGAPPLICATION_H_
+#ifndef COMMON_PAGAPPLICATION_H_
+#define COMMON_PAGAPPLICATION_H_
 
 #include <QApplication>
 
@@ -20,4 +20,4 @@ public:
   QString waitToOpenFile;
 };
 
-#endif // MACOS_PAGAPPLICATION_H_
+#endif // COMMON_PAGAPPLICATION_H_

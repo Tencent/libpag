@@ -79,7 +79,7 @@ void PAGRenderThread::renderNext() {
 
   if (needRender) {
     bool update = player->flush();
-    auto totalFrames = Utils::TimeToFrame(pagFile->duration(), pagFile->frameRate()) - 1;
+    auto totalFrames = Utils::timeToFrame(pagFile->duration(), pagFile->frameRate()) - 1;
     int frame = static_cast<int>(round(pagFile->getProgress() * static_cast<double>(totalFrames)));
     Q_EMIT pagWindow->frameMetricsReady(frame,static_cast<int>(player->renderingTime()),
       static_cast<int>(player->presentingTime()),

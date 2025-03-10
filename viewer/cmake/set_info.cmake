@@ -1,9 +1,15 @@
 function(pag_common_setting TARGET)
+    if (PAG_DEBUG)
+        target_compile_definitions(${TARGET} PRIVATE -DPAG_DEBUG)
+    endif ()
     if (PAG_WINDOWS)
         target_compile_definitions(${TARGET} PRIVATE -DPAG_WINDOWS)
         if (MSVC)
             set_target_properties(${TARGET} PROPERTIES LINK_FLAGS "/OPT:REF /OPT:ICF")
             target_compile_definitions(${TARGET} PRIVATE -DPAG_MSVC)
+            target_compile_options(${TARGET} PRIVATE 
+                /wd4068
+            )
             target_compile_options(${TARGET} PRIVATE /WX)
             target_compile_options(${TARGET} PRIVATE /bigobj)
             target_compile_options(${TARGET} PRIVATE
@@ -19,10 +25,13 @@ function(pag_common_setting TARGET)
     elseif (PAG_MACOS)
         target_link_options(${TARGET} PRIVATE -Wl,-dead_strip)
         target_compile_definitions(${TARGET} PRIVATE -DPAG_MACOS)
+        target_compile_options(${TARGET} PRIVATE
+            -Wno-unknown-pragmas
+        )
         target_compile_options(${TARGET} PRIVATE -Werror)
-    else()
+    else ()
         message(FATAL_ERROR "Unsupported Platform: ${CMAKE_SYSTEM_NAME}")
-    endif()
+    endif ()
 endfunction()
 
 macro(set_default_qt_dir)
@@ -39,14 +48,14 @@ macro(set_default_qt_dir)
             endif()
 
             set(CMAKE_PREFIX_PATH ${QT_DIR} ${CMAKE_PREFIX_PATH})
-        endif()
+        endif ()
     endif ()
 
     message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
 
     if (NOT EXISTS ${CMAKE_SOURCE_DIR}/QTCMAKE.cfg)
         file(WRITE ${CMAKE_SOURCE_DIR}/QTCMAKE.cfg "set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})")
-    endif()
+    endif ()
 endmacro()
 
 function(init_tools)

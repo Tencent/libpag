@@ -1,8 +1,26 @@
 #include "WindowsPluginInstaller.h"
-
-#define AE_LIB_PATH "C:\\PROGRA~1\\Adobe\\Common\\Plug-ins\\7.0\\MediaCore\\"
+#include <filesystem>
+#include <io.h>
+#include <tchar.h>
+#include <direct.h>
+#include <shlobj.h>
+#include <windows.h>
+#include <QString>
+#include "cJSON/cJSON.h"
+#include "common/version.h"
+#include "utils/File.h"
+#include "utils/Translate.h"
 
 #define MAX_PATH_SIZE 1024
+#define AE_LIB_PATH "C:\\PROGRA~1\\Adobe\\Common\\Plug-ins\\7.0\\MediaCore\\"
+
+#ifdef PAG_MSVC
+// TODO
+#pragma warning(push)
+#pragma warning(disable: 4996) 
+#pragma warning(disable: 4267)
+#endif
+
 
 static LPCWSTR StringToLPCWSTR(std::string str) {
   int len = str.length();
@@ -36,7 +54,7 @@ static void GetCurrentPath(char dstPath[], int size, bool onlyPath) {
     TCHAR szFilePath[MAX_PATH + 1] = { 0 };
     GetModuleFileName(NULL, szFilePath, MAX_PATH);
     if (onlyPath) {
-      (_tcsrchr(szFilePath, _T('\\')))[0] = 0; // 删除文件名，只获得路径字串
+      (_tcsrchr(szFilePath, _T('\\')))[0] = 0;
     }
 
     WideCharToMultiByte(CP_ACP, 0, reinterpret_cast<LPCWCH>(szFilePath), -1, dstPath, size, "\0", 0);
@@ -243,7 +261,7 @@ static int UserSlectFilePath(char paths[][MAX_PATH_SIZE], int count, int maxPath
         ZeroMemory(&bi, sizeof(BROWSEINFO));
         bi.hwndOwner = NULL;
         bi.pszDisplayName = szBuffer;
-        bi.lpszTitle = _TT(Translate("选择AE安装目录（AfterFX.exe所在目录）:").c_str());
+        bi.lpszTitle = _TT(Utils::translate("选择AE安装目录（AfterFX.exe所在目录）:").c_str());
         bi.ulFlags = BIF_RETURNFSANCESTORS;
         LPITEMIDLIST idl = SHBrowseForFolder(&bi);
         if (NULL == idl)
@@ -259,7 +277,7 @@ static int UserSlectFilePath(char paths[][MAX_PATH_SIZE], int count, int maxPath
         }
 
         // 第3步：如果选择目录不正确，则弹窗提示是否重试
-        auto ret = MessageBox(nullptr, _TT(Translate("该目录下未发现AE，请重新选择！").c_str()), _TT(Translate("AE安装目录选择错误 ").c_str()), MB_RETRYCANCEL);
+        auto ret = MessageBox(nullptr, _TT(Utils::translate("该目录下未发现AE，请重新选择！").c_str()), _TT(Utils::translate("AE安装目录选择错误 ").c_str()), MB_RETRYCANCEL);
         if (ret != IDRETRY) {
             break;
         }
@@ -594,33 +612,33 @@ static int CopyPlugins() {
     if (enablePluginPagExporter) {
         if (!hasPluginPagExporter) {
             hasError = true;
-            MessageBox(nullptr, _TT(Translate("安装失败：没有找到AE导出插件: PAGExporter.aex 和 QTdll 。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+            MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到AE导出插件: PAGExporter.aex 和 QTdll 。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         } else if (!hasAeInstallPath) {
             hasError = true;
-            MessageBox(nullptr, _TT(Translate("安装失败：没有找到AE安装目录。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+            MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到AE安装目录。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         } else if(!hasH264EncoderTools) {
           hasError = true;
-          MessageBox(nullptr, _TT(Translate("安装失败：没有找到H264编码工具。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+          MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到H264编码工具。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         }
     }
 
     if (!hasError && enablePluginTextBackground) {
         if (!hasPluginTextBackground) {
             hasError = true;
-            MessageBox(nullptr, _TT(Translate("安装失败：没有找到AE效果插件: TextBackground.aex 。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+            MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到AE效果插件: TextBackground.aex 。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         } else if (!hasAeCommonPath) {
             hasError = true;
-            MessageBox(nullptr, _TT(Translate("安装失败：没有找到AE公共目录。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+            MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到AE公共目录。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         }
     }
 
     if (!hasError && enablePluginImageFillRule) {
         if (!hasPluginImageFillRule) {
             hasError = true;
-            MessageBox(nullptr, _TT(Translate("安装失败：没有找到AE效果插件: ImageFillRule.aex  。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+            MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到AE效果插件: ImageFillRule.aex  。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         } else if (!hasAeCommonPath) {
             hasError = true;
-            MessageBox(nullptr, _TT(Translate("安装失败：没有找到AE公共目录。(论坛提问：https://bbs.pag.art/)").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+            MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到AE公共目录。(论坛提问：https://bbs.pag.art/)").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
         }
     }
 
@@ -644,11 +662,11 @@ static int CopyPlugins() {
         }
       }
       if(!std::filesystem::exists(h264EncoderToolsPath)) {
-        MessageBox(nullptr, _TT(Translate("安装失败：没有找到H264编码工具。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Translate("AE插件安装失败").c_str()), MB_OK);
+        MessageBox(nullptr, _TT(Utils::translate("安装失败：没有找到H264编码工具。(论坛提问：https://bbs.pag.art/) ").c_str()), _TT(Utils::translate("AE插件安装失败").c_str()), MB_OK);
       }
     }
     if (!hasError && num > 0 && ret != -1) {
-        MessageBox(nullptr, _TT(Translate("安装成功！ ").c_str()), _TT(Translate("AE插件安装成功 ").c_str()), MB_OK);
+        MessageBox(nullptr, _TT(Utils::translate("安装成功！ ").c_str()), _TT(Utils::translate("AE插件安装成功 ").c_str()), MB_OK);
         StorePluginVersion(aeInstallPaths, countPaths);
     }
 
@@ -754,3 +772,7 @@ auto WindowsPluginInstaller::InstallPlugins(bool bForceInstall) -> bool {
 auto WindowsPluginInstaller::UninstallPlugins() -> bool {
   return true;
 }
+
+#ifdef PAG_MSVC
+#pragma warning(pop)
+#endif

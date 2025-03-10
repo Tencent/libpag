@@ -1,6 +1,6 @@
 #include "PAGFileInfoModel.h"
 #include <pag/file.h>
-#include "utils/string.h"
+#include "utils/StringTransform.h"
 
 PAGFileInfo::PAGFileInfo(const QString& name, const QString& value, const QString& ext) : name(name), value(value), ext(ext) {
 

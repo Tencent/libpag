@@ -9,13 +9,20 @@ if common_module_dir not in sys.path:
 from common.utils import  *
 
 def build(cmakePrefixPath: str, rootDir: str, sourceDir: str, buildType: str):
+    arch = ''
+    suffix = ''
     current_os = ''
+    tgfx_archs = []
     if platform.system() == 'Windows':
+        arch = 'x64'
+        suffix = '.lib'
         current_os = 'win'
+        tgfx_archs = ['x64']
     else:
+        arch = 'universal'
+        suffix = '.a'
         current_os = 'mac'
-
-    arch = 'universal'
+        tgfx_archs = ['x64', 'arm64']
 
     lib_out_path = os.path.join(rootDir, 'third_party', 'out', 'libpag', 'lib', buildType)
     include_out_path = os.path.join(rootDir, 'third_party', 'out', 'libpag', 'include')
@@ -50,7 +57,7 @@ def build(cmakePrefixPath: str, rootDir: str, sourceDir: str, buildType: str):
 
     runCommand(' '.join(build_params))
 
-    tgfx_archs = ['x64', 'arm64']
+
     for tgfx_arch in tgfx_archs:
         build_params = []
         build_params.append('node')
@@ -81,13 +88,13 @@ def build(cmakePrefixPath: str, rootDir: str, sourceDir: str, buildType: str):
         runCommand(' '.join(build_params))
 
     if current_os == "mac":
-        lib_name = 'libtgfx-vendor.a'
+        lib_name = f'libtgfx-vendor{suffix}'
         x64_lib = os.path.join(sourceDir, 'out', 'x64', 'x64', 'tgfx', 'CMakeFiles', 'tgfx-vendor.dir', 'x64', lib_name)
         arm64_lib = os.path.join(sourceDir, 'out', 'arm64', 'arm64', 'tgfx', 'CMakeFiles', 'tgfx-vendor.dir', 'arm64', lib_name)
         command = f'lipo -create {x64_lib} {arm64_lib} -output {os.path.join(sourceDir, 'out', arch, lib_name)}'
         runCommand(command)
 
-        lib_name = 'libpag-vendor.a'
+        lib_name = f'libpag-vendor{suffix}'
         x64_lib = os.path.join(sourceDir, 'out', 'x64', lib_name)
         arm64_lib = os.path.join(sourceDir, 'out', 'arm64', lib_name)
         command = f'lipo -create {x64_lib} {arm64_lib} -output {os.path.join(sourceDir, 'out', arch, lib_name)}'
@@ -95,10 +102,13 @@ def build(cmakePrefixPath: str, rootDir: str, sourceDir: str, buildType: str):
 
 
     libs_generated_path = []
-    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, 'libpag.a'))
-    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, 'libpag-vendor.a'))
-    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, 'libtgfx-vendor.a'))
+    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, f'libpag{suffix}'))
+    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, f'libpag-vendor{suffix}'))
     copyFileToDir(libs_generated_path, lib_out_path, os.path.join(sourceDir, 'out', arch))
+
+    libs_generated_path = []
+    libs_generated_path.append(os.path.join(sourceDir, 'out', arch, arch, 'tgfx', 'CMakeFiles', 'tgfx-vendor.dir', arch, f'libtgfx-vendor{suffix}'))
+    copyFileToDir(libs_generated_path, lib_out_path)
 
     includes_generated_path = []
     includes_generated_path.append(os.path.join(sourceDir, 'include', 'pag'))
@@ -115,7 +125,7 @@ def main():
         print('Failed to get cmake prefix path')
         sys.exit(1)
 
-    build_types = ['Debug', 'Release']
+    build_types = ['Release', 'Debug']
 
     for build_type in build_types:
         build(cmake_prefix_path, root_dir, vendor_source_dir, build_type)

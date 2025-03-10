@@ -1,4 +1,5 @@
 #include "PAGWindow.h"
+#include <QFileInfo>
 #include <QQmlContext>
 #include <QCoreApplication>
 #include "license/LicenseDialog.h"
@@ -38,8 +39,12 @@ auto PAGWindow::Open() -> void {
 #endif
 
 #if defined(QT_DEBUG)
-  QString qmlPath = QCoreApplication::applicationDirPath() + "../../../../../../../src/resources/qml/MainWindow.qml";
-  qmlEngine->load(QUrl(qmlPath));
+#if defined(PAG_MACOS)
+  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../../../../../src/resources/qml/MainWindow.qml";
+#elif defined(PAG_WINDOWS)
+  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../src/resources/qml/MainWindow.qml";
+#endif
+  qmlEngine->load(QUrl::fromLocalFile(QFileInfo(qmlPath).absoluteFilePath()));
 #else
   qmlEngine->load(QUrl(QStringLiteral("qrc:/qml/MainWindow.qml")));
 #endif

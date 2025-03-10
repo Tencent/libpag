@@ -3,6 +3,9 @@
 #include <QFile>
 #include <QDebug>
 #include <QFileInfo>
+#include <QStandardPaths>
+#include <QCoreApplication>
+#include <QRegularExpression>
 #include "common/version.h"
 #if defined(PAG_MACOS)
 #include "macos/MacUpdater.h"
@@ -18,7 +21,7 @@ using Updater = MacUpdater;
 using AEPlugin = MacPluginInstaller;
 #elif defined(PAG_WINDOWS)
 using Updater = WindowsUpdater;
-using AEPlugin = pag::PluginInstall;
+using AEPlugin = WindowsPluginInstaller;
 #else
 static_assert(false, "Unsupported platform");
 #endif
@@ -112,8 +115,8 @@ auto PAGCheckUpdateModel::updatePreviousVersion() -> bool {
   QString dataText = data.readAll();
 
   bool replaced = false;
-  QRegularExpression regular = QRegularExpression(WINDOWS_REPO_URL_RELEASE_PLAYER);
-  QString replacementText = QString(WINDOWS_REPO_URL_TEST);
+  QRegularExpression regular = QRegularExpression(WINDOWS_REPO_URL_RELEASE_PLAYER.c_str());
+  QString replacementText = QString(WINDOWS_REPO_URL_TEST.c_str());
   QRegularExpressionMatchIterator iter = regular.globalMatch(dataText);
   while (iter.hasNext()) {
     QRegularExpressionMatch match = iter.next();
@@ -121,8 +124,8 @@ auto PAGCheckUpdateModel::updatePreviousVersion() -> bool {
 	  replaced = true;
   }
 
-  regular = QRegularExpression(WINDOWS_REPO_URL_TEST_PLAYER);
-  replacementText = QString(WINDOWS_REPO_URL_TEST);
+  regular = QRegularExpression(WINDOWS_REPO_URL_TEST_PLAYER.c_str());
+  replacementText = QString(WINDOWS_REPO_URL_TEST.c_str());
   iter = regular.globalMatch(dataText);
   while(iter.hasNext()) {
     QRegularExpressionMatch match = iter.next();

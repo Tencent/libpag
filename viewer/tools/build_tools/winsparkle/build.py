@@ -22,7 +22,7 @@ def build(rootDir: str, buildType: str):
     copyFileToDirByRule(libps_generated_match_rule, lib_out_path)
 
     includes_generated_match_rule = []
-    includes_generated_match_rule.append(os.path.join(source_dir, 'WinSparkle-*', 'include'))
+    includes_generated_match_rule.append(os.path.join(source_dir, 'WinSparkle-*', 'include', "*.h"))
     copyFileToDirByRule(includes_generated_match_rule, include_out_path)
 
 def main():

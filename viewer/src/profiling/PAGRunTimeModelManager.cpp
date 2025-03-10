@@ -66,7 +66,7 @@ void PAGRunTimeModelManager::updateDisplayData(int frame, int renderingTime, int
 }
 
 void PAGRunTimeModelManager::resetFile(const std::shared_ptr<pag::PAGFile>& pagFile, std::string filePath) {
-  totalFrame = Utils::TimeToFrame(pagFile->duration(), pagFile->frameRate());
+  totalFrame = Utils::timeToFrame(pagFile->duration(), pagFile->frameRate());
   dataMap.clear();
   chartModel.resetFile(pagFile->getFile());
   currentFrame = -1;
@@ -107,6 +107,9 @@ auto PAGRunTimeModelManager::updateChartModel() -> void {
 }
 
 auto PAGRunTimeModelManager::refreshChartModel() -> void {
+  if (totalFrame == 0) {
+    return;
+  }
   int maxKey = 0;
   auto keys = dataMap.keys();
   for (int & key : keys) {

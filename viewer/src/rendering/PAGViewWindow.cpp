@@ -214,23 +214,23 @@ auto PAGViewWindow::setFile(const QString& path) -> void {
     return;
   }
 
-  setProgress(0);
-  setVisible(false);
-  setIsPlaying(false);
-
   setSize(getPreferredSize());
   sizeChanged = true;
   renderThread->setPAGFile(pagFile);
+  Q_EMIT fileChanged(pagFile, strPath);
+  setIsPlaying(false);
+  setProgress(0);
 
   duration = pagFile->duration();
-  textCount = pagFile->getEditableIndices(pag::LayerType::Text).size();
-  imageCount = pagFile->getEditableIndices(pag::LayerType::Image).size();
+  textCount = static_cast<int>(pagFile->getEditableIndices(pag::LayerType::Text).size());
+  imageCount = static_cast<int>(pagFile->getEditableIndices(pag::LayerType::Image).size());
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
-  reportForOpenPAG(data->length());
 
-  Q_EMIT fileChanged(pagFile, strPath);
   Q_EMIT textCountChanged(textCount);
   Q_EMIT imageCountChanged(imageCount);
+  setVisible(false);
+
+  reportForOpenPAG(data->length());
 }
 
 auto PAGViewWindow::firstFrame() -> void {

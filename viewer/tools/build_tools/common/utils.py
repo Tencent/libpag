@@ -3,13 +3,21 @@ import re
 import sys
 import glob
 import json
+import codecs
 import shutil
+import platform
 import subprocess
 
 def runCommand(command: str, output_file="build.log"):
     file_handle = None
+    # sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    if platform.system() == 'Windows':
+        os.system('chcp 65001 > nul')
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+
     if output_file:
-        file_handle = open(output_file, 'w', buffering=1)
+        file_handle = open(output_file, 'w', encoding='utf-8', buffering=1)
         print(f'Run cmd[{command}] outoput will be wiritten to \"{os.path.abspath(output_file)}\"')
     
     try:
@@ -17,9 +25,11 @@ def runCommand(command: str, output_file="build.log"):
             command,
             shell=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,  # 合并标准错误到标准输出
+            stderr=subprocess.STDOUT,
+            encoding='utf-8',
+            errors='replace',
             text=True,
-            bufsize=1  # 行缓冲模式
+            bufsize=1
         )
 
         while True:
@@ -48,7 +58,14 @@ def copyFileToDir(files: list, targetDir: str, baseDir = None):
             exit(1)
 
         if baseDir == None:
-            shutil.copy2(file, targetDir)
+            if os.path.isdir(file):
+                dir_name = os.path.basename(file)
+                target_path = os.path.join(targetDir, dir_name)
+                if os.path.exists(target_path):
+                    shutil.rmtree(target_path)
+                shutil.copytree(file, target_path, symlinks=True, dirs_exist_ok=True)
+            else:
+                shutil.copy2(file, targetDir)
         elif os.path.isdir(file):
             dir_name = os.path.basename(file)
             target_path = os.path.join(targetDir, dir_name)
@@ -128,7 +145,7 @@ def getVisualStudioVersions():
             "-prerelease"
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
         if result.returncode == 0:
             vs_instances = json.loads(result.stdout)
             versions = []
