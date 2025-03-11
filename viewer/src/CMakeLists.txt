@@ -150,11 +150,9 @@ elseif (PAG_MACOS)
   add_dependencies(${APP_NAME} sodium log4qt nlohman-json sparkle pag)
 
   add_custom_command(TARGET ${APP_NAME} POST_BUILD
-  COMMENT "Copy librarys to output directory"
-  COMMAND ${deployqt} $<TARGET_BUNDLE_DIR:${APP_NAME}> -qmldir=${CMAKE_SOURCE_DIR}/src/resources/qml
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_SOURCE_DIR}/third_party/out/sparkle/lib/Release/Sparkle.framework
-    $<TARGET_BUNDLE_DIR:${APP_NAME}>/Contents/Frameworks
+    COMMENT "Copy librarys to output directory"
+    COMMAND ${deployqt} $<TARGET_BUNDLE_DIR:${APP_NAME}> -qmldir=${CMAKE_SOURCE_DIR}/src/resources/qml
+    COMMAND cp -fRP ${CMAKE_SOURCE_DIR}/third_party/out/sparkle/lib/Release/Sparkle.framework $<TARGET_BUNDLE_DIR:${APP_NAME}>/Contents/Frameworks/
   )
 
   target_include_directories(${APP_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/../src)
