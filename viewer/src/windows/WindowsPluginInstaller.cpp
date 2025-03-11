@@ -14,8 +14,8 @@
 #define MAX_PATH_SIZE 1024
 #define AE_LIB_PATH "C:\\PROGRA~1\\Adobe\\Common\\Plug-ins\\7.0\\MediaCore\\"
 
-#ifdef PAG_MSVC
-// TODO
+#if defined(PAG_WINDOWS)
+// TODO DELETE LATER
 #pragma warning(push)
 #pragma warning(disable: 4996) 
 #pragma warning(disable: 4267)
@@ -773,6 +773,6 @@ auto WindowsPluginInstaller::UninstallPlugins() -> bool {
   return true;
 }
 
-#ifdef PAG_MSVC
+#if defined(PAG_WINDOWS)
 #pragma warning(pop)
 #endif

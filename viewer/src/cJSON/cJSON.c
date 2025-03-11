@@ -32,6 +32,13 @@
 #include <ctype.h>
 #include "cJSON.h"
 
+#if defined(PAG_WINDOWS)
+#pragma warning(push)
+#pragma warning(disable: 4267)
+#pragma warning(disable: 4477)
+#pragma warning(disable: 4996)
+#endif
+
 #ifndef INT_MAX
 #define INT_MAX 2147483647
 #define INT_MIN (-INT_MAX - 1)
@@ -997,4 +1004,8 @@ cJSON* cJSON_CreateStringArray(const char** strings, int count) {
   }
   return a;
 }
+
+#if defined(PAG_WINDOWS)
+#pragma warning(pop)
+#endif
 
