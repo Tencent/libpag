@@ -93,6 +93,7 @@ class ConfigParamManager {
   ConfigParamManager() {
     init();
   }
+  ~ConfigParamManager()= default;
   ConfigParam configParam;
   std::string configFileSavePath;
 };

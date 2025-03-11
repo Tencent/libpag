@@ -29,6 +29,7 @@ void SnapshotCenter::initTimer() {
 }
 
 SnapshotCenter::~SnapshotCenter() noexcept {
+  delete compositionImageProvider;
   compositionImageProvider = nullptr;
 }
 

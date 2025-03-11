@@ -38,7 +38,7 @@ PAGPanelExporterDialog::PAGPanelExporterDialog(QWidget* parent) {
   int argc = 0;
   app = new QApplication(argc, nullptr);
   Q_INIT_RESOURCE(res);
-  engine = new QQmlApplicationEngine();
+  engine = new QQmlApplicationEngine(app);
 
   QQmlContext* ctx = engine->rootContext();
   ctx->setContextProperty("exportConfigDialog", this);
@@ -52,10 +52,18 @@ PAGPanelExporterDialog::PAGPanelExporterDialog(QWidget* parent) {
 }
 
 PAGPanelExporterDialog::~PAGPanelExporterDialog() {
-  if (settingDialog) {
-    settingDialog->deleteLater();
-    settingDialog = nullptr;
-  }
+  delete settingDialog;
+  settingDialog = nullptr;
+  delete layerModel;
+  layerModel = nullptr;
+  delete errorListModel;
+  errorListModel = nullptr;
+  delete window;
+  window = nullptr;
+  delete engine;
+  engine = nullptr;
+  delete app;
+  app = nullptr;
 }
 
 static void covertLayerData(const std::shared_ptr<AEResource>& root,
@@ -158,9 +166,8 @@ void PAGPanelExporterDialog::goToSettingDialog(const std::shared_ptr<AEResource>
 }
 
 void PAGPanelExporterDialog::goToPreviewDialog(const std::shared_ptr<AEResource>& aeResource) {
-  // hide();
   this->aeResource = aeResource;
-  // ShowExportPreviewDialog(aeResource->itemH, isExportAudio, true);
+  windowManager.showExportPreviewDialog(aeResource->itemH, isExportAudio, true);
 }
 
 void PAGPanelExporterDialog::onExportBtnClick() {
@@ -216,6 +223,7 @@ void PAGPanelExporterDialog::refreshErrorListView() const {
 }
 
 void PAGPanelExporterDialog::exit() const {
+  windowManager.exitPAGPanelExporterDialog();
   app->exit();
 }
 
@@ -281,7 +289,7 @@ void PAGPanelExporterDialog::translate() {
 }
 
 void PAGPanelExporterDialog::show() {
-  if (window) {
+  if (window && !window->isVisible()) {
     window->show();
   }
   translate();
@@ -319,4 +327,18 @@ void PAGPanelExporterDialog::refreshDialog() {
   resetData();
   refreshErrorListView();
   show();
+}
+
+bool PAGPanelExporterDialog::isActive() {
+  bool isActive = false;
+  if (window && window->isVisible()) {
+    isActive = true;
+  }
+  if (settingDialog && settingDialog->isActive() ) {
+    isActive = true;
+  }
+  if (exportProgressListWindow && exportProgressListWindow->isActive()) {
+    isActive = true;
+  }
+  return isActive;
 }

@@ -90,27 +90,6 @@ bool PlaceholderModel::setData(const QModelIndex& index, const QVariant& value, 
     return false;
   }
   PlaceImageLayer& itemData = placeholderData->at(index.row());
-  /*
-  switch (role) {
-    case PLACEHOLDER_SELECTED_ROLE: {
-      bool hasSelected = lastSelectIndex != -1;
-      if (hasSelected && index.row() == lastSelectIndex) {
-        return true;
-      }
-      if (hasSelected) {
-        PlaceImageLayer& lastItem = placeholderData->at(lastSelectIndex);
-        lastItem.isSelected = false;
-        auto lastModelIndex = this->index(lastSelectIndex, 0);
-        Q_EMIT dataChanged(lastModelIndex, lastModelIndex);
-      }
-      itemData.isSelected = value.toBool();
-      Q_EMIT dataChanged(index, index);
-      lastSelectIndex = index.row();
-      return true;
-    }
-    default:
-      return false;
-  }//*/
   return false;
 }
 

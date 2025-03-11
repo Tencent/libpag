@@ -46,6 +46,32 @@ extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long maj
                                                      AEGP_Menu_EXPORT, AEGP_MENU_INSERT_SORTED));
   ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(
       pluginID, AEGP_HP_BeforeAE, AEGP_Command_ALL, AECommand::OnClickPanel, nullptr));
+
+  // PAG File...
+  ERR(suites.CommandSuite1()->AEGP_GetUniqueCommand(&AECommand::PAGExporterCMD));
+  ERR(suites.CommandSuite1()->AEGP_InsertMenuCommand(AECommand::PAGExporterCMD,
+                                                     "PAG File...",
+                                                     AEGP_Menu_EXPORT,
+                                                     AEGP_MENU_INSERT_SORTED));
+  ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(pluginID,
+                                                        AEGP_HP_BeforeAE,
+                                                        AEGP_Command_ALL,
+                                                        AECommand::OnClickExporter,
+                                                        nullptr));
+
+  // PAG Preview...
+  ERR(suites.CommandSuite1()->AEGP_GetUniqueCommand(&AECommand::PAGPreviewCMD));
+  ERR(suites.CommandSuite1()->AEGP_InsertMenuCommand(AECommand::PAGPreviewCMD,
+                                                     "PAG Preview...",
+                                                     AEGP_Menu_EXPORT,
+                                                     AEGP_MENU_INSERT_SORTED));
+  ERR(suites.RegisterSuite5()->AEGP_RegisterCommandHook(pluginID,
+                                                        AEGP_HP_BeforeAE,
+                                                        AEGP_Command_ALL,
+                                                        AECommand::OnClickPreview,
+                                                        nullptr));
+
+
   ERR(suites.RegisterSuite5()->AEGP_RegisterUpdateMenuHook(pluginID, AECommand::OnUpdateMenu,
                                                            nullptr));
 

@@ -49,6 +49,7 @@ void CustomProgressBar::closeEvent(QCloseEvent*) {
 CustomProgressBar::~CustomProgressBar() {
   QApplication::restoreOverrideCursor();
   delete ui;
+  ui = nullptr;
 }
 
 void CustomProgressBar::setProgress(double progressValue) {

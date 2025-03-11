@@ -20,10 +20,11 @@
 #include <QtQuick/QQuickImageProvider>
 #include "src/utils/Panels/PlaceImagePanel.h"
 
-class PlaceHolderImageProvider : public QQuickImageProvider {
+class PlaceHolderImageProvider final : public QQuickImageProvider {
 public:
-  PlaceHolderImageProvider(std::vector<PlaceImageLayer>* placeImageLayers);
-  QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize);
+  explicit PlaceHolderImageProvider(std::vector<PlaceImageLayer>* placeImageLayers);
+  ~PlaceHolderImageProvider() override = default;
+  QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) override;
 
   void resetLayers(std::vector<PlaceImageLayer>* placeImageLayers);
 

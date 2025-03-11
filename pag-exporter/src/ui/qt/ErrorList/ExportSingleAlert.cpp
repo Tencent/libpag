@@ -37,6 +37,7 @@ ExportSingleAlert::ExportSingleAlert(const std::string& info, QWidget* parent)
 
 ExportSingleAlert::~ExportSingleAlert() {
   delete ui;
+  ui = nullptr;
 }
 
 void ExportSingleAlert::alertShow() {

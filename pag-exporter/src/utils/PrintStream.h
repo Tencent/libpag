@@ -15,20 +15,10 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef PROGRESSBASE_H
-#define PROGRESSBASE_H
-#include <QtCore/QString>
-#include "Context.h"
+#ifndef PRINTSTREAM_H
+#define PRINTSTREAM_H
+#include "AE_GeneralPlug.h"
+#include "AEGP_SuiteHandler.h"
 
-class ProgressBase {
- public:
-  ProgressBase() {};
-  virtual ~ProgressBase() = default;
-
-  virtual void setProgress(double progressValue) = 0;
-  virtual void setProgressTips(const QString& tip) = 0;
-  virtual void setProgressTitle(const QString& title) = 0;
-
-  pagexporter::Context* context = nullptr;
-};
-#endif  //PROGRESSBASE_H
+void PrintStream(const AEGP_StreamRefH& streamH, int indent = 0);
+#endif //PRINTSTREAM_H

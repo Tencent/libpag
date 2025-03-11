@@ -20,12 +20,12 @@
 #include "ProgressWindow.h"
 #include "ProgressBase.h"
 
-class ProgressWindowImp : public ProgressWindow {
+class ProgressWindowImp final : public ProgressWindow {
 public:
-  ~ProgressWindowImp();
-  ProgressWindowImp(pagexporter::Context* context = nullptr, ProgressBase* progressBase = nullptr);
+  ~ProgressWindowImp() override;
+ explicit ProgressWindowImp(pagexporter::Context* context = nullptr, ProgressBase* progressBase = nullptr);
   void setTitleName(std::string& title) override;
-  void setProgressTips(std::string& tips);
+  void setProgressTips(std::string& tips) override;
 
 private:
   void setProgress(double progress) override;

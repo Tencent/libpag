@@ -15,23 +15,36 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef EXPORTSINGLEALERT_H
-#define EXPORTSINGLEALERT_H
-#include <QtWidgets/QDialog>
-#include "ui_ExportSingleAlert.h"
+#ifndef WINDOWMANAGER_H
+#define WINDOWMANAGER_H
+#include "AE_GeneralPlug.h"
 
-class ExportSingleAlert : public QDialog {
-  Q_OBJECT
+class PAGPanelExporterDialog;
+class PAGConfigDialog;
+
+class WindowManager {
  public:
-  explicit ExportSingleAlert(const std::string& info, QWidget* parent = nullptr);
-  ~ExportSingleAlert() override;
+  static WindowManager& getInstance();
 
-  void alertShow();
+  WindowManager(const WindowManager&) = delete;
+  WindowManager& operator=(const WindowManager&) = delete;
+
+  void showPanelExporterDialog();
+  void showPAGConfigDialog();
+  void showExportPreviewDialog(AEGP_ItemH itemH, bool isExportAudio, bool needShowExport,
+                               bool isQWidget = false);
+  void exitPAGPanelExporterDialog();
+
+  bool PanelExporterDialogIsActive();
+
+  bool PAGConfigDialogIsActive();
 
  private:
-  Ui::ExportSingleAlert* ui = nullptr;
+  WindowManager() = default;
+  ~WindowManager();
 
- private Q_SLOTS:
-  void confirmPushButtonClicked();
+  PAGPanelExporterDialog* panelExporterDialog = nullptr;
+  PAGConfigDialog* configDialog = nullptr;
+  bool isConfigDialogDestroy = false;
 };
-#endif  //EXPORTSINGLEALERT_H
+#endif  //WINDOWMANAGER_H

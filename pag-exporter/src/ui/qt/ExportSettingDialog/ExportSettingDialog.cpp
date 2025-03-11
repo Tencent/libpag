@@ -38,12 +38,15 @@ ExportSettingDialog::ExportSettingDialog(AEGP_ItemH& currentAEItem, QObject* par
 }
 
 ExportSettingDialog::~ExportSettingDialog() {
-  compositionPanel = nullptr;
-  placeImagePanel = nullptr;
+  delete snapshotCenter;
   snapshotCenter = nullptr;
+  delete placeHolderImageProvider;
   placeHolderImageProvider = nullptr;
+  delete placeholderModel;
   placeholderModel = nullptr;
+  delete layerEditableModel;
   layerEditableModel = nullptr;
+  delete compositionModel;
   compositionModel = nullptr;
 }
 
@@ -131,4 +134,11 @@ void ExportSettingDialog::onBmpDataChange() {
   layerEditableModel->setPlaceHolderData(placeTextPanel->getList(), true);
 
   Q_EMIT bmpStatusChange();
+}
+
+bool ExportSettingDialog::isActive() {
+  if (window) {
+    return window->isVisible();
+  }
+  return false;
 }

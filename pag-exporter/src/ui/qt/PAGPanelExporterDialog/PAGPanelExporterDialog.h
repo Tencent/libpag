@@ -31,6 +31,7 @@
 #include "src/ui/qt/ExportProgressListWindow/ExportProgressListWindow.h"
 #include "src/ui/qt/ExportSettingDialog/ExportSettingDialog.h"
 #include "src/ui/qt/PAGPanelExporterDialog/PanelExporterDataModel.h"
+#include "src/ui/qt/WindowManager.h"
 #include "src/utils/ExportProgressItem.h"
 class PAGPanelExporterDialog final : public QObject {
   Q_OBJECT
@@ -60,6 +61,7 @@ class PAGPanelExporterDialog final : public QObject {
   void onTitleCheckBoxStateChange(int state) const;
   void onSavePathItemClick(const QModelIndex& index) const;
   void refreshDialog();
+  bool isActive();
 
  private:
   void initLayerTableView();
@@ -69,8 +71,7 @@ class PAGPanelExporterDialog final : public QObject {
       const std::shared_ptr<QList<std::shared_ptr<ConfigLayerData>>>& layerDataList) const;
   void showExportSettingDialog(AEGP_ItemH& currentAEItem);
   void showProgressListWindow(std::vector<std::shared_ptr<ExportProgressItem>>& progressItems);
-
-  QApplication* app = nullptr;
+  static inline QApplication* app = nullptr;
   QQmlApplicationEngine* engine = nullptr;
   QQuickWindow* window = nullptr;
   std::shared_ptr<AEResource> aeResource;
@@ -80,6 +81,7 @@ class PAGPanelExporterDialog final : public QObject {
   bool isExportAudio = false;
   ExportSettingDialog* settingDialog = nullptr;
   ExportProgressListWindow* exportProgressListWindow = nullptr;
+  WindowManager& windowManager = WindowManager::getInstance();
 };
 
 #endif  //PAGPANELEXPORTERDIALOG_H

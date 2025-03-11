@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef ALERTINFOUI_H
-#define ALERTINFO_H
+#define ALERTINFOUI_H
 #include "src/exports/PAGDataTypes.h"
 bool WarningsAlert(std::vector<std::string>& infos);
 

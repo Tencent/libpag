@@ -39,10 +39,8 @@ ExportProgressListWindow::ExportProgressListWindow(
 }
 
 ExportProgressListWindow::~ExportProgressListWindow() {
-  if (progressListModel) {
     delete progressListModel;
     progressListModel = nullptr;
-  }
 }
 
 int ExportProgressListWindow::progressCount() const {
@@ -67,6 +65,7 @@ void ExportProgressListWindow::exportWrong(const int index, const std::string& e
 void ExportProgressListWindow::exportAllProgressFinish() {
   exportFinish = true;
   Q_EMIT allProgressFinished();
+  window->setTitle(tr("PAG导出完成"));
 }
 
 void ExportProgressListWindow::initProgressListView() {
@@ -161,6 +160,13 @@ void ExportProgressListWindow::hide() const {
   if (window) {
     window->hide();
   }
+}
+
+bool ExportProgressListWindow::isActive() {
+  if (window) {
+    return window->isVisible();
+  }
+  return false;
 }
 
 ProgressItemWrapper::ProgressItemWrapper(ExportProgressListWindow* progressWindow, int index)

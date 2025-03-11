@@ -20,6 +20,7 @@
 
 ProgressWindowImp::~ProgressWindowImp() {
   delete handle;
+  handle = nullptr;
 }
 
 ProgressWindowImp::ProgressWindowImp(pagexporter::Context* context, ProgressBase* progressBase) {

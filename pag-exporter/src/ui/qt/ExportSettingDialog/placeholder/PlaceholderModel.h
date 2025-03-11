@@ -24,6 +24,7 @@ class PlaceholderModel final : public QAbstractListModel {
   Q_OBJECT
  public:
   explicit PlaceholderModel(QObject* parent = nullptr);
+  ~PlaceholderModel() override= default;
 
   Q_INVOKABLE int rowCount(const QModelIndex& parent = QModelIndex()) const override;
   Q_INVOKABLE int columnCount(const QModelIndex& parent = QModelIndex()) const override;

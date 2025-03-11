@@ -2,8 +2,9 @@
 #ifdef WIN32
 #include <io.h>  // windows for access
 #endif
-#include <QtWidgets/QFileDialog>
+#include <EnvConfig.h>
 #include <qdebug.h>
+#include <QtWidgets/QFileDialog>
 #include <codecvt>
 #include <iostream>
 #include "RunScript.h"
@@ -152,6 +153,44 @@ static void InsureStringSuffix(std::string& filePath, std::string suffix) {
   }
   filePath += suffix;
 }
+
+std::string AEUtils::BrowseForSave(bool useScript) {
+  auto& suites = SUITES();
+  auto pluginID = PLUGIN_ID();
+  AEGP_ItemH activeItemH = GetActiveCompositionItem();
+  if (activeItemH == nullptr) {
+    return "";
+  }
+
+  std::string itemName = GetItemName(activeItemH);
+
+  auto filePath = GetProjectPath();
+  filePath = filePath + itemName + ".pag";
+  auto defaultPath = filePath;
+  if (!LastOutputPath.empty() && LastFilePath == filePath) {
+    defaultPath = LastOutputPath;
+  }
+
+  std::string outputPath = "";
+  if (useScript) {
+    auto scriptText = "var file  = new File(\"" + defaultPath + "\");\n" + "var result = file.saveDlg();\n" +
+                      "result ? result.fsName : '';";
+    outputPath = RunScript(suites, pluginID, scriptText);
+  } else {
+    QString saveFilePath = QFileDialog::getSaveFileName(QApplication::topLevelWidgets().value(0),
+      QObject::tr("选择存储路径"), QString(defaultPath.c_str()));
+    outputPath = saveFilePath.toStdString();
+    printf("outputPath is:%s\n", outputPath.c_str());
+  }
+  if (!outputPath.empty()) {
+    LastFilePath = filePath;
+    LastOutputPath = outputPath;
+    outputPath = QStringToString(outputPath);
+    InsureStringSuffix(outputPath, ".pag");
+  }
+  return outputPath;
+}
+
 
 std::string AEUtils::GetItemName(const AEGP_ItemH& itemH) {
   if (itemH == nullptr) {

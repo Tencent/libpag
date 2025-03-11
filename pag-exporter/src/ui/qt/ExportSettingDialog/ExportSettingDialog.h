@@ -46,6 +46,8 @@ class ExportSettingDialog final : public QObject {
   Q_SLOT void onBmpDataChange();
   Q_SIGNAL void showExportConfigDialogSignal();
 
+  bool isActive();
+
  private:
   void initTabWidget();
   AEGP_ItemH& currentAEItem;

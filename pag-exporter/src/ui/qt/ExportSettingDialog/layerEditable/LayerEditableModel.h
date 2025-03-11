@@ -23,7 +23,8 @@
 class LayerEditableModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  LayerEditableModel(QObject* parent = nullptr);
+  explicit LayerEditableModel(QObject* parent = nullptr);
+  ~LayerEditableModel() override = default;
 
   Q_INVOKABLE int rowCount(const QModelIndex& parent = QModelIndex()) const override;
   Q_INVOKABLE int columnCount(const QModelIndex& parent = QModelIndex()) const override;

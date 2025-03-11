@@ -47,6 +47,8 @@ class ExportProgressListWindow final : public QObject {
   Q_SIGNAL void successProgressCountChanged();
   Q_SIGNAL void allProgressFinished();
 
+  bool isActive();
+
  public Q_SLOTS:
   void goToPreviewDialog(const QModelIndex& index);  // now mock
   void onCancelBtnClick();

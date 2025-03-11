@@ -21,6 +21,9 @@
 #include <QtGui/QSurfaceFormat>
 #include <QtQuick/QQuickWindow>
 #include <QtWidgets/QApplication>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QFile>
 static QApplication* gCurrentQtApp = nullptr;
 static int gAppIndex = 0;
 
@@ -80,4 +83,16 @@ std::string GetAuthorName() {
 
 std::string QStringToString(const std::string& str) {
   return QString::fromStdString(str).toLocal8Bit().toStdString();
+}
+
+void PreviewPagFile(const std::string& filePath) {
+  QString qFilePath = QString::fromStdString(filePath);
+
+  if (!QFile::exists(qFilePath)) {
+    qDebug() << "File does not exist:" << qFilePath;
+    return;
+  }
+  bool bOpen = QDesktopServices::openUrl(QUrl::fromLocalFile(qFilePath));
+  // 打印结果
+  qDebug() << "bOpen=" << bOpen << "file=" << qFilePath;
 }

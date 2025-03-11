@@ -35,7 +35,7 @@ class QTExportAlertDialog : public QDialog {
   bool isContinueExport();
 
  private:
-  Ui::ExportAlert* ui;
+  Ui::ExportAlert* ui = nullptr;
 
   QStandardItemModel* itemModel;
 

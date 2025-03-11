@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef PROGRESSWINDOW_H
 #define PROGRESSWINDOW_H
-#include "src/ui/qt/ProgressBase.h"
+#include "src/ui/qt/Progress/ProgressBase.h"
 #include "src/exports/PAGDataTypes.h"
 
 class ProgressWindow {

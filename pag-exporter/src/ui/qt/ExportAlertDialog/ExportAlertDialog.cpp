@@ -53,6 +53,9 @@ QTExportAlertDialog::QTExportAlertDialog(const std::vector<std::string>& infos, 
 
 QTExportAlertDialog::~QTExportAlertDialog() {
   delete itemModel;
+  itemModel = nullptr;
+  delete ui;
+  ui = nullptr;
 }
 
 void QTExportAlertDialog::setAlertTitle(const std::string& title) {

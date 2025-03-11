@@ -25,8 +25,8 @@
 class CompositionModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  CompositionModel(std::shared_ptr<AECompositionPanel> compositionPanel = nullptr, QObject* parent = nullptr);
-
+  explicit CompositionModel(std::shared_ptr<AECompositionPanel> compositionPanel = nullptr, QObject* parent = nullptr);
+  ~CompositionModel() override = default;
   int rowCount(const QModelIndex& parent = QModelIndex()) const override;
   int columnCount(const QModelIndex& parent = QModelIndex()) const override;
   QVariant data(const QModelIndex& index, int role) const override;

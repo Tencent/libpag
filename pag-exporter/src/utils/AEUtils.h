@@ -15,6 +15,7 @@ class AEUtils {
   static AEGP_ItemH GetActiveCompositionItem();
   static std::string GetProjectFileName();
   static std::string GetProjectPath();
+  static std::string BrowseForSave(bool useScript = false);
   static std::string GetItemName(const AEGP_ItemH& itemH);
   static std::string GetCompName(const AEGP_CompH& compH);
   static std::string GetLayerName(const AEGP_LayerH& layerH);

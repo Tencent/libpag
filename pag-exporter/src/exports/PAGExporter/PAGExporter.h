@@ -19,7 +19,7 @@
 #define PAGEXPORTER_H
 #include "src/exports/Composition/Composition.h"
 #include "src/exports/ProjectPlayTime.h"
-#include "src/ui/qt/ProgressBase.h"
+#include "src/ui/qt/Progress/ProgressBase.h"
 
 class PAGExporter {
  public:

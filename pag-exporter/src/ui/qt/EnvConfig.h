@@ -26,4 +26,6 @@ std::string GetSystemVersion(); // 获取系统版本号
 std::string GetAuthorName(); // 获取用户名称
 
 std::string QStringToString(const std::string& str);
+
+void PreviewPagFile(const std::string& filePath);
 #endif  //ENVCONFIG_H

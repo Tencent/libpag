@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "PlaceHolderImageProvider.h"
 #include <QtCore/QDebug>
-
 static int ICON_SIZE = 48;
 
 PlaceHolderImageProvider::PlaceHolderImageProvider(std::vector<PlaceImageLayer>* placeImageLayers)
-    : placeImageLayers(placeImageLayers), QQuickImageProvider(QQuickImageProvider::Image) {
+    : QQuickImageProvider(QQuickImageProvider::Image), placeImageLayers(placeImageLayers) {
 }
 
 void PlaceHolderImageProvider::resetLayers(std::vector<PlaceImageLayer>* placeImageLayers) {
@@ -29,16 +28,16 @@ void PlaceHolderImageProvider::resetLayers(std::vector<PlaceImageLayer>* placeIm
 }
 
 QImage PlaceHolderImageProvider::requestImage(const QString& id, QSize* size, const QSize& requestedSize) {
-  int row = id.split("/").first().toInt();
+  const int row = id.split("/").first().toInt();
   //  qDebug() << "requestImage id:" << id;
   if (row < 0 || row >= placeImageLayers->size()) {
     qDebug() << "requestImage row invalid";
-    return QImage();
+    return {};
   }
   ImageRgbaData& rgbaData = placeImageLayers->at(row).thumbnail;
   if (rgbaData.data == nullptr) {
     qDebug() << "requestImage rgbaData invalid";
-    return QImage();
+    return {};
   }
   QImage img(rgbaData.data.get(), ICON_SIZE, ICON_SIZE, QImage::Format_RGBA8888);
   return img;
