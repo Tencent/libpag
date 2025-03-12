@@ -17,95 +17,48 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlowFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
+#include "GlowBlurFilter.h"
+#include "GlowMergeFilter.h"
+#include "base/utils/Log.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/Canvas.h"
 
 namespace pag {
 GlowFilter::GlowFilter(Effect* effect) : effect(effect) {
-  blurFilterH = new GlowBlurFilter(BlurDirection::Horizontal);
-  blurFilterV = new GlowBlurFilter(BlurDirection::Vertical);
-  targetFilter = new GlowMergeFilter(effect);
 }
 
 GlowFilter::~GlowFilter() {
-  delete blurFilterH;
-  delete blurFilterV;
-  delete targetFilter;
 }
 
-bool GlowFilter::initialize(tgfx::Context* context) {
-  if (!blurFilterH->initialize(context)) {
-    return false;
-  }
-  if (!blurFilterV->initialize(context)) {
-    return false;
-  }
-  if (!targetFilter->initialize(context)) {
-    return false;
-  }
-  return true;
-}
-
-void GlowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
-                        const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
-  LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
-
+void GlowFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto glowEffect = static_cast<GlowEffect*>(effect);
   auto glowRadius = glowEffect->glowRadius->getValueAt(layerFrame);
   resizeRatio = 1.0f - glowRadius / 1500.f;
-  auto blurBounds = contentBounds;
-  blurBounds.scale(resizeRatio, resizeRatio);
-  blurBounds.offsetTo(contentBounds.left, contentBounds.top);
-  blurBounds.roundOut();
-  blurFilterV->update(frame, contentBounds, blurBounds, filterScale);
-  blurFilterH->update(frame, contentBounds, blurBounds, filterScale);
-  targetFilter->update(frame, contentBounds, transformedBounds, filterScale);
+  progress = glowEffect->glowThreshold->getValueAt(layerFrame);
 }
 
-bool GlowFilter::checkBuffer(tgfx::Context* context, int blurWidth, int blurHeight) {
-  if (blurFilterBufferH == nullptr || blurFilterBufferH->width() != blurWidth ||
-      blurFilterBufferH->height() != blurHeight) {
-    blurFilterBufferH = FilterBuffer::Make(context, blurWidth, blurHeight);
-  }
-  if (blurFilterBufferH == nullptr) {
-    return false;
-  }
-  if (blurFilterBufferV == nullptr || blurFilterBufferV->width() != blurWidth ||
-      blurFilterBufferV->height() != blurHeight) {
-    blurFilterBufferV = FilterBuffer::Make(context, blurWidth, blurHeight);
-  }
-  if (blurFilterBufferV == nullptr) {
-    blurFilterBufferH = nullptr;
-    return false;
-  }
-  return true;
-}
-
-void GlowFilter::draw(tgfx::Context* context, const FilterSource* source,
-                      const FilterTarget* target) {
-  if (source == nullptr || target == nullptr) {
+void GlowFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+  if (image == nullptr) {
     LOGE("GlowFilter::draw() can not draw filter");
     return;
   }
-  auto blurWidth = static_cast<int>(ceilf(source->width * resizeRatio));
-  auto blurHeight = static_cast<int>(ceilf(source->height * resizeRatio));
+  // tgfx::Point offset = tgfx::Point::Zero();
+  // auto image = MakeFromPicture(image, &offset);
+  auto blurWidth = ceil(image->width() * resizeRatio);
+  auto blurHeight = ceil(image->height() * resizeRatio);
+  auto blurFilterH = std::make_shared<GlowBlurRuntimeFilter>(BlurDirection::Horizontal,
+                                                             1.0f / blurWidth, resizeRatio);
+  auto imageFilterH = tgfx::ImageFilter::Runtime(blurFilterH);
+  auto blurFilterV =
+      std::make_shared<GlowBlurRuntimeFilter>(BlurDirection::Vertical, 1.0f / blurHeight, 1.0f);
+  auto imageFilterV = tgfx::ImageFilter::Runtime(blurFilterV);
+  auto blurFilter = tgfx::ImageFilter::Compose(imageFilterH, imageFilterV);
+  auto blurImage = image->makeWithFilter(std::move(blurFilter));
+  auto mergeFilter =
+      tgfx::ImageFilter::Runtime(std::make_shared<GlowMergeRuntimeFilter>(progress, blurImage));
 
-  if (!checkBuffer(context, blurWidth, blurHeight)) {
-    return;
-  }
-  blurFilterBufferH->clearColor();
-  blurFilterBufferV->clearColor();
-
-  auto targetH = blurFilterBufferH->toFilterTarget(tgfx::Matrix::I());
-  blurFilterH->updateOffset(1.0f / blurWidth);
-  blurFilterH->draw(context, source, targetH.get());
-
-  auto sourceV = blurFilterBufferH->toFilterSource(source->scale);
-  auto targetV = blurFilterBufferV->toFilterTarget(tgfx::Matrix::I());
-  blurFilterV->updateOffset(1.0f / blurHeight);
-  blurFilterV->draw(context, sourceV.get(), targetV.get());
-
-  targetFilter->updateTexture(blurFilterBufferV->getTexture());
-  targetFilter->draw(context, source, target);
+  tgfx::Paint paint;
+  paint.setImageFilter(mergeFilter);
+  canvas->drawImage(image, &paint);
 }
 }  // namespace pag

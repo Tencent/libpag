@@ -19,54 +19,46 @@
 #pragma once
 
 #include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "base/utils/TGFXCast.h"
+#include "codec/tags/effects/CornerPinEffect.h"
 
 namespace pag {
-class BulgeUniforms : public Uniforms {
+class CornerPinRuntimeFilter : public RuntimeFilter {
  public:
-  BulgeUniforms(tgfx::Context* context, unsigned program);
-
-  int horizontalRadiusHandle = -1;
-  int verticalRadiusHandle = -1;
-  int bulgeCenterHandle = -1;
-  int bulgeHeightHandle = -1;
-  int pinningHandle = -1;
-};
-
-class BulgeRuntimeFilter : public RuntimeFilter {
- public:
-  DEFINE_RUNTIME_EFFECT_TYPE
-  BulgeRuntimeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
-                     float bulgeHeight, float pinning);
+  DEFINE_RUNTIME_EFFECT_TYPE;
+  explicit CornerPinRuntimeFilter(const Point cornerPoints[4]) : RuntimeFilter(Type()) {
+    for (int i = 0; i < 4; i++) {
+      this->cornerPoints[i] = ToTGFX(cornerPoints[i]);
+    }
+    calculateVertexQs();
+  }
 
  protected:
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
-
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
-
   std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
                                      const tgfx::BackendRenderTarget& target,
                                      const tgfx::Point& offset) const override;
 
+  void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
+                    const std::vector<float>& points) const override;
+
+  int sampleCount() const override;
+
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 
  private:
-  float horizontalRadius = 0.f;
-  float verticalRadius = 0.f;
-  Point bulgeCenter = {};
-  float bulgeHeight = 0.f;
-  float pinning = 0.f;
+  void calculateVertexQs();
+  tgfx::Point cornerPoints[4] = {};
+  float vertexQs[4] = {};
 };
 
-class BulgeFilter : public EffectFilter {
+class CornerPinFilter : public EffectFilter {
  public:
-  explicit BulgeFilter(Effect* effect);
-  ~BulgeFilter() override = default;
+  explicit CornerPinFilter(Effect* effect);
 
   void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
 
@@ -75,6 +67,6 @@ class BulgeFilter : public EffectFilter {
 
  private:
   Effect* effect = nullptr;
-  std::shared_ptr<BulgeRuntimeFilter> currentFilter;
+  Point points[4] = {};
 };
 }  // namespace pag

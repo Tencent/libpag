@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerStylesFilter.h"
-#include "layerstyle/LayerStyleFilter.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "tgfx/core/Surface.h"
@@ -33,60 +32,47 @@ void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* fi
   }
 }
 
-bool LayerStylesFilter::initialize(tgfx::Context*) {
-  return true;
-}
-
-void LayerStylesFilter::update(const FilterList* list, const tgfx::Point& extraScale) {
-  filterList = list;
-  filterScale = extraScale;
-}
-
-void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
-                             const FilterTarget* target) {
-  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto sourceMatrix = ToMatrix(source->textureMatrix);
-  auto origin = tgfx::ImageOrigin::TopLeft;
-  if (!sourceMatrix.isIdentity()) {
-    origin = tgfx::ImageOrigin::BottomLeft;
-  }
-  auto sourceImage = tgfx::Image::MakeFrom(context, backendTexture, origin);
-  if (sourceImage == nullptr) {
-    return;
-  }
-
-  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
-  auto surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
-  if (surface == nullptr) {
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->concat(ToMatrix(target));
-  for (auto& layerStyle : filterList->layerStyles) {
+std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
+    const std::vector<LayerStyle*>& layerStyles) {
+  std::vector<std::unique_ptr<LayerStyleFilter>> blowFilters;
+  std::vector<std::unique_ptr<LayerStyleFilter>> aboveFilters;
+  for (auto& layerStyle : layerStyles) {
+    auto filter = LayerStyleFilter::Make(layerStyle);
+    if (!filter) {
+      continue;
+    }
     if (layerStyle->drawPosition() == LayerStylePosition::Blow) {
-      auto filter = LayerStyleFilter::Make(layerStyle);
-      if (filter) {
-        filter->update(filterList->layerFrame, filterScale, source->scale);
-        filter->draw(canvas, sourceImage);
-      }
+      blowFilters.push_back(std::move(filter));
+    } else {
+      aboveFilters.push_back(std::move(filter));
     }
   }
-
-  // The filter above source will draw the source with blend.
-  bool drawSource = true;
-  for (auto& layerStyle : filterList->layerStyles) {
-    if (layerStyle->drawPosition() == LayerStylePosition::Above) {
-      auto filter = LayerStyleFilter::Make(layerStyle);
-      if (filter) {
-        filter->update(filterList->layerFrame, filterScale, source->scale);
-        filter->draw(canvas, sourceImage);
-        drawSource = false;
-      }
-    }
+  if (blowFilters.empty() && aboveFilters.empty()) {
+    return nullptr;
   }
+  auto filter = std::make_shared<LayerStylesFilter>();
+  filter->layerStyleFilters = std::move(blowFilters);
+  filter->layerStyleFilters.insert(filter->layerStyleFilters.end(),
+                                   std::make_move_iterator(aboveFilters.begin()),
+                                   std::make_move_iterator(aboveFilters.end()));
+  // Above filters will draw the source image.
+  filter->drawSource = aboveFilters.empty();
+  return filter;
+}
 
-  if (drawSource) {
-    canvas->drawImage(sourceImage);
+void LayerStylesFilter::update(Frame layerFrame, const tgfx::Point& sourceScale) {
+  for (auto& layerStyleFilter : layerStyleFilters) {
+    layerStyleFilter->update(layerFrame, _filterScale, sourceScale);
   }
 }
+
+void LayerStylesFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+  for (const auto& layerStyleFilter : layerStyleFilters) {
+    layerStyleFilter->draw(canvas, image);
+  }
+  if (drawSource) {
+    canvas->drawImage(image);
+  }
+}
+
 }  // namespace pag

@@ -39,40 +39,34 @@ static const char FRAGMENT_SHADER[] = R"(
 MosaicFilter::MosaicFilter(pag::Effect* effect) : effect(effect) {
 }
 
-std::string MosaicFilter::onBuildFragmentShader() {
+std::string MosaicRuntimeFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-void MosaicFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
-  verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
-  sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
+std::unique_ptr<Uniforms> MosaicRuntimeFilter::onPrepareProgram(tgfx::Context* context,
+                                                                unsigned program) const {
+  return std::make_unique<MosaicUniforms>(context, program);
 }
 
-void MosaicFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                  const tgfx::Point&) {
+void MosaicRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                         const std::vector<tgfx::BackendTexture>&) const {
+  auto gl = tgfx::GLFunctions::Get(context);
+  auto uniform = static_cast<const MosaicUniforms*>(program->uniforms.get());
+  gl->uniform1f(uniform->horizontalBlocksHandle, horizontalBlocks);
+  gl->uniform1f(uniform->verticalBlocksHandle, verticalBlocks);
+  gl->uniform1f(uniform->sharpColorsHandle, sharpColors);
+}
+
+void MosaicFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
-  horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
-  verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
   sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
 
-  auto placeHolderWidth = static_cast<int>(contentBounds.left + contentBounds.right);
-  auto placeHolderHeight = static_cast<int>(contentBounds.top + contentBounds.bottom);
-  auto placeHolderRatio = 1.0f * placeHolderWidth / placeHolderHeight;
-
-  auto contentWidth = static_cast<int>(contentBounds.width());
-  auto contentHeight = static_cast<int>(contentBounds.height());
-  auto contentRatio = 1.0f * contentWidth / contentHeight;
-
-  if (placeHolderRatio > contentRatio) {
-    horizontalBlocks *= 1.0f * placeHolderWidth / contentWidth;
-  } else {
-    verticalBlocks *= 1.0f * placeHolderHeight / contentHeight;
-  }
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(horizontalBlocksHandle, horizontalBlocks);
-  gl->uniform1f(verticalBlocksHandle, verticalBlocks);
-  gl->uniform1f(sharpColorsHandle, sharpColors);
+  horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
+  verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
 }
+
+std::shared_ptr<tgfx::RuntimeEffect> MosaicFilter::createRuntimeEffect() {
+  return std::make_shared<MosaicRuntimeFilter>(horizontalBlocks, verticalBlocks, sharpColors);
+}
+
 }  // namespace pag

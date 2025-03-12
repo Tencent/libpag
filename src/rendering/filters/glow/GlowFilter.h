@@ -18,37 +18,22 @@
 
 #pragma once
 
-#include "GlowBlurFilter.h"
-#include "GlowMergeFilter.h"
-#include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
+#include "rendering/filters/EffectFilter.h"
 
 namespace pag {
-class GlowFilter : public LayerFilter {
+class GlowFilter : public EffectFilter {
  public:
   explicit GlowFilter(Effect* effect);
   ~GlowFilter() override;
 
-  bool initialize(tgfx::Context* context) override;
+  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
 
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
-
-  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
-              const tgfx::Point& filterScale) override;
+  void applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
   Effect* effect = nullptr;
 
   float resizeRatio = 1.0f;
-
-  GlowBlurFilter* blurFilterH = nullptr;
-  GlowBlurFilter* blurFilterV = nullptr;
-  GlowMergeFilter* targetFilter = nullptr;
-
-  std::shared_ptr<FilterBuffer> blurFilterBufferH = nullptr;
-  std::shared_ptr<FilterBuffer> blurFilterBufferV = nullptr;
-
-  bool checkBuffer(tgfx::Context* context, int blurWidth, int blurHeight);
+  float progress = 0.0f;
 };
 }  // namespace pag

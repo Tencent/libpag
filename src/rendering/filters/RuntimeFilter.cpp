@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeFilter.h"
+#include "base/utils/Log.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "tgfx/core/Canvas.h"
 
@@ -172,18 +173,16 @@ std::vector<float> RuntimeFilter::computeVertices(const std::vector<tgfx::Backen
                                                   const tgfx::BackendRenderTarget& target,
                                                   const tgfx::Point& offset) const {
   std::vector<float> vertices = {};
-  auto textureWidth = static_cast<float>(sources[0].width());
-  auto textureHeight = static_cast<float>(sources[0].height());
-  auto targetWidth = static_cast<float>(target.width());
-  auto targetHeight = static_cast<float>(target.height());
-  tgfx::Point contentPoint[4] = {{0, targetHeight},
-                                 {targetWidth, targetHeight},
-                                 {0, 0},
-                                 {targetWidth, 0}};
-  tgfx::Point texturePoints[4] = {{0.0f, textureHeight},
-                                  {textureWidth, textureHeight},
-                                  {0.0f, 0.0f},
-                                  {textureWidth, 0.0f}};
+  auto inputBounds = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
+  auto targetBounds = filterBounds(inputBounds);
+  tgfx::Point contentPoint[4] = {{targetBounds.left, targetBounds.bottom},
+                                 {targetBounds.right, targetBounds.bottom},
+                                 {targetBounds.left, targetBounds.top},
+                                 {targetBounds.right, targetBounds.top}};
+  tgfx::Point texturePoints[4] = {{inputBounds.left, inputBounds.bottom},
+                                  {inputBounds.right, inputBounds.bottom},
+                                  {inputBounds.left, inputBounds.top},
+                                  {inputBounds.right, inputBounds.top}};
 
   for (size_t i = 0; i < 4; i++) {
     auto vertexPoint = ToGLVertexPoint(target, contentPoint[i] + offset);

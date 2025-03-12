@@ -19,18 +19,11 @@
 #pragma once
 
 #include "pag/pag.h"
-#include "rendering/filters/FilterModifier.h"
+#include "rendering/filters/EffectFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
-struct FilterNode {
-  FilterNode(Filter* filter, const tgfx::Rect& bounds) : filter(filter), bounds(bounds) {
-  }
-
-  Filter* filter;
-  tgfx::Rect bounds;
-};
 
 struct FilterList {
   Layer* layer = nullptr;
@@ -59,16 +52,13 @@ class FilterRenderer {
   static tgfx::Rect GetContentBounds(const FilterList* filterList,
                                      std::shared_ptr<Graphic> content);
 
-  static bool MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
-                             const FilterList* filterList, RenderCache* renderCache,
+  static bool MakeEffectNode(RenderCache* cache, std::vector<std::shared_ptr<Filter>>& filterNodes,
+                             tgfx::Rect& clipBounds, const FilterList* filterList,
                              tgfx::Rect& filterBounds, tgfx::Point& effectScale, int clipIndex);
 
-  static std::vector<FilterNode> MakeFilterNodes(const FilterList* filterList,
-                                                 RenderCache* renderCache,
-                                                 tgfx::Rect* contentBounds,
-                                                 const tgfx::Rect& clipRect);
-
-  static std::shared_ptr<Graphic> GetDisplacementMapGraphic(const FilterList* filterList,
-                                                            Layer* mapLayer);
+  static std::vector<std::shared_ptr<Filter>> MakeFilterNodes(const FilterList* filterList,
+                                                              RenderCache* renderCache,
+                                                              tgfx::Rect* contentBounds,
+                                                              const tgfx::Rect& clipRect);
 };
 }  // namespace pag

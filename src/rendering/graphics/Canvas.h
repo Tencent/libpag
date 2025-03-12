@@ -189,6 +189,11 @@ class Canvas {
     canvas->drawAtlas(std::move(atlas), matrix, tex, colors, count, sampling, &realPaint);
   }
 
+  void drawPicture(std::shared_ptr<tgfx::Picture> picture, const tgfx::Paint* paint = nullptr) {
+    auto realPaint = createPaint(paint);
+    canvas->drawPicture(std::move(picture), nullptr, &realPaint);
+  }
+
  private:
   tgfx::Canvas* canvas = nullptr;
   RenderCache* cache = nullptr;

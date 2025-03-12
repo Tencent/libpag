@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include "EffectFilter.h"
+#include "layerstyle/LayerStyleFilter.h"
 #include "pag/pag.h"
 #include "rendering/filters/FilterModifier.h"
-#include "rendering/filters/LayerFilter.h"
 
 namespace pag {
 struct FilterList;
@@ -29,15 +30,14 @@ class LayerStylesFilter : public Filter {
  public:
   static void TransformBounds(tgfx::Rect* bounds, const FilterList* filterList);
 
-  bool initialize(tgfx::Context* context) override;
+  static std::shared_ptr<LayerStylesFilter> Make(const std::vector<LayerStyle*>& layerStyles);
 
-  void update(const FilterList* filterList, const tgfx::Point& filterScale);
+  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
 
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
+  void applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
-  const FilterList* filterList = nullptr;
-  tgfx::Point filterScale = {};
+  std::vector<std::unique_ptr<LayerStyleFilter>> layerStyleFilters = {};
+  bool drawSource = false;
 };
 }  // namespace pag

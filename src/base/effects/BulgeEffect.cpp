@@ -81,7 +81,7 @@ void AdjustLeft(const Point& bulgeCenterValue, float horizontalRadiusValue, floa
 
 void AdjustRight(const Point& bulgeCenterValue, float horizontalRadiusValue, float* right) {
   auto rightDiffer =
-      bulgeCenterValue.y < *right ? ((bulgeCenterValue.x + horizontalRadiusValue) - *right) : 0;
+      bulgeCenterValue.x < *right ? ((bulgeCenterValue.x + horizontalRadiusValue) - *right) : 0;
   if (rightDiffer > 0) {
     *right += rightDiffer;
   }

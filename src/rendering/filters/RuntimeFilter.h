@@ -94,8 +94,8 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
                                              const tgfx::BackendRenderTarget& target,
                                              const tgfx::Point& offset) const;
 
-  void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
-                    const std::vector<float>& points) const;
+  virtual void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
+                            const std::vector<float>& points) const;
 };
 
 }  // namespace pag

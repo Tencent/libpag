@@ -18,31 +18,61 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include <tgfx/layers/filters/LayerFilter.h>
+#include "EffectFilter.h"
 
 namespace pag {
-class MosaicFilter : public LayerFilter {
+
+class MosaicUniforms : public Uniforms {
+ public:
+  MosaicUniforms(tgfx::Context* context, unsigned program) : Uniforms(context, program) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
+    verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
+    sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
+  }
+
+  int horizontalBlocksHandle = -1;
+  int verticalBlocksHandle = -1;
+  int sharpColorsHandle = -1;
+};
+
+class MosaicRuntimeFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE
+
+  MosaicRuntimeFilter(float horizontalBlocks, float verticalBlocks, bool sharpColors)
+      : RuntimeFilter(Type()), horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
+        sharpColors(sharpColors) {
+  }
+
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>&) const override;
+
+ private:
+  float horizontalBlocks = 1;
+  float verticalBlocks = 1;
+  bool sharpColors = false;
+};
+
+class MosaicFilter : public EffectFilter {
  public:
   explicit MosaicFilter(Effect* effect);
-  ~MosaicFilter() override = default;
+
+  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
 
  protected:
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
+  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
 
  private:
   Effect* effect = nullptr;
   float horizontalBlocks = 1;
   float verticalBlocks = 1;
   bool sharpColors = false;
-
-  // Handle
-  int horizontalBlocksHandle = -1;
-  int verticalBlocksHandle = -1;
-  int sharpColorsHandle = -1;
 };
 }  // namespace pag

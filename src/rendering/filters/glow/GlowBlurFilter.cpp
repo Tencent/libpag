@@ -23,8 +23,6 @@ static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
     #version 100
     attribute vec2 aPosition;
     attribute vec2 aTextureCoord;
-    uniform mat3 uVertexMatrix;
-    uniform mat3 uTextureMatrix;
 
     uniform float textureOffsetH;
     uniform float textureOffsetV;
@@ -32,9 +30,9 @@ static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
     varying vec2 blurCoordinates[5];
 
     void main() {
-        vec3 position = uVertexMatrix * vec3(aPosition, 1);
+        vec3 position = vec3(aPosition, 1);
         gl_Position = vec4(position.xy, 0, 1);
-        vec3 colorPosition = uTextureMatrix * vec3(aTextureCoord, 1);
+        vec3 colorPosition = vec3(aTextureCoord, 1);
         vec2 singleStepOffset = vec2(textureOffsetH, textureOffsetV);
         blurCoordinates[0] = colorPosition.xy;
         blurCoordinates[1] = colorPosition.xy + singleStepOffset * 1.182425;
@@ -59,33 +57,48 @@ static const char GLOW_BLUR_FRAGMENT_SHADER[] = R"(
         gl_FragColor = sum;
     }
     )";
-
-GlowBlurFilter::GlowBlurFilter(BlurDirection direction) : blurDirection(direction) {
-}
-
-std::string GlowBlurFilter::onBuildVertexShader() {
-  return GLOW_BLUR_VERTEX_SHADER;
-}
-
-std::string GlowBlurFilter::onBuildFragmentShader() {
-  return GLOW_BLUR_FRAGMENT_SHADER;
-}
-
-void GlowBlurFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+GlowBlurUniforms::GlowBlurUniforms(tgfx::Context* context, unsigned program)
+    : Uniforms(context, program) {
   auto gl = tgfx::GLFunctions::Get(context);
   textureOffsetHHandle = gl->getUniformLocation(program, "textureOffsetH");
   textureOffsetVHandle = gl->getUniformLocation(program, "textureOffsetV");
 }
 
-void GlowBlurFilter::updateOffset(float offset) {
-  blurOffset = offset;
+GlowBlurRuntimeFilter::GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset,
+                                             float resizeRatio)
+    : RuntimeFilter(Type()), blurDirection(blurDirection), blurOffset(blurOffset),
+      resizeRatio(resizeRatio) {
 }
 
-void GlowBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&, const tgfx::Point&) {
+std::string GlowBlurRuntimeFilter::onBuildVertexShader() const {
+  return GLOW_BLUR_VERTEX_SHADER;
+}
+
+std::string GlowBlurRuntimeFilter::onBuildFragmentShader() const {
+  return GLOW_BLUR_FRAGMENT_SHADER;
+}
+
+std::unique_ptr<Uniforms> GlowBlurRuntimeFilter::onPrepareProgram(tgfx::Context* context,
+                                                                  unsigned program) const {
+  return std::make_unique<GlowBlurUniforms>(context, program);
+}
+
+void GlowBlurRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                           const std::vector<tgfx::BackendTexture>&) const {
   auto textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
   auto textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
   auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(textureOffsetHHandle, textureOffsetH);
-  gl->uniform1f(textureOffsetVHandle, textureOffsetV);
+  auto uniform = static_cast<GlowBlurUniforms*>(program->uniforms.get());
+  gl->uniform1f(uniform->textureOffsetHHandle, textureOffsetH);
+  gl->uniform1f(uniform->textureOffsetVHandle, textureOffsetV);
 }
+
+tgfx::Rect GlowBlurRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) const {
+  auto result = srcRect;
+  result.scale(resizeRatio, resizeRatio);
+  result.offsetTo(srcRect.left, srcRect.top);
+  result.roundOut();
+  return result;
+}
+
 }  // namespace pag

@@ -20,7 +20,6 @@
 
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "rendering/filters/utils/FilterHelper.h"
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace pag {
