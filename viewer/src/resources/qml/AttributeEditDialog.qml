@@ -31,7 +31,7 @@ Popup {
         Text {
             width: parent.width
             height: 52
-            text: qsTr("文本编辑")
+            text: qsTr("Text Edit")
             font.pixelSize: 12
             horizontalAlignment: Text.AlignLeft
             verticalAlignment: Text.AlignVCenter
@@ -125,7 +125,7 @@ Popup {
             }
 
             Text {
-                text: qsTr("保存")
+                text: qsTr("Save")
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -134,10 +134,7 @@ Popup {
             }
 
             onClicked: {
-                // TODO
-                // let saveResult = pagEditAttributeModel.savePAGFileAttribute(layerIdKey, markerIndexKey, attributeName, textInput.text)
-                // root.activated(saveResult, textInput.text)
-                // root.close()
+                // TODO Implement the function
             }
         }
 
@@ -158,7 +155,7 @@ Popup {
             }
 
             Text {
-                text: qsTr("JSON校验")
+                text: qsTr("JSON Check")
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -166,14 +163,7 @@ Popup {
                 color: "#FFFFFF"
             }
             onClicked: {
-                // TODO
-                // let errorList = pagEditAttributeModel.checkJsonStringIsValid(textInput.text)
-                // errorLabel.text = errorList[0]
-                // errorLabel.visible = true
-                // if (errorList[0] !== "no error occurred") {
-                //     textInput.cursorPosition = parseInt(errorList[1])
-                //     textInput.cursorVisible = true
-                // }
+                // TODO Implement the functions
             }
         }
 
@@ -181,7 +171,7 @@ Popup {
             id: errorLabel
 
             height: 17
-            text: qsTr("JSON校验信息")
+            text: qsTr("JSON Check Information")
             font.pixelSize: 12
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 2

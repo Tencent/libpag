@@ -1,5 +1,5 @@
 #include "PAGBenchmarkModel.h"
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
 #include <dirent.h>
 #endif
 #include <QStandardPaths>
@@ -14,21 +14,21 @@ PAGBenchmarkModel::~PAGBenchmarkModel() {
 }
 
 auto PAGBenchmarkModel::onBenchmarkTaskComplete(QString filePath, int result) -> void {
-  // TODO
+  // TODO Implement the function
 }
 
 auto PAGBenchmarkModel::onBenchmarkFromQRCTaskComplete(QString filePath, int result) -> void {
-  // TODO
+  // TODO Implement the function
 }
 
 auto PAGBenchmarkModel::startBenchmark() -> bool {
-  // TODO
+  // TODO Implement the function
 
   return true;
 }
 
 auto PAGBenchmarkModel::startBenchmarkFromQRC(bool isAuto) -> bool {
-  // TODO
+  // TODO Implement the function
 
   return true;
 }
@@ -36,7 +36,7 @@ auto PAGBenchmarkModel::startBenchmarkFromQRC(bool isAuto) -> bool {
 auto PAGBenchmarkModel::getAllPAGFiles(std::string path) -> std::vector<std::string> {
   std::vector<std::string> files;
 
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
   struct dirent *dirp;
   DIR* dir = opendir(path.c_str());
   std::string p;

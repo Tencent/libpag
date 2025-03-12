@@ -40,8 +40,7 @@ class PAGBenchmarkModel : public QObject {
   std::vector<int> maxRenderingTimes;
   std::vector<int> firstFrameRenderingTimes;
   std::vector<std::string> pagFiles;
-  // TODO
-  // std::map<std::string, PAGBenchmarkTask*> taskMap;
+  // TODO Store tasks
   std::map<std::string, int> avgRenderingTimeMap;
 };
 

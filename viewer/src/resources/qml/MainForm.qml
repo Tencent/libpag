@@ -22,8 +22,7 @@ PSplitView {
     property alias rightItem: rightItem
     property alias centerItem: centerItem
     property alias pagViewer: pagViewer
-    // TODO
-    // property alias taskFactory: taskFactory
+    // TODO implement taskFactory later
     property alias controlForm: controlForm
     property alias performance: performance
     property alias profilerForm: profilerForm
@@ -132,7 +131,7 @@ PSplitView {
 
             Text {
                 color: "#80ffffff"
-                text: qsTr("点击菜单，或拖放到这里打开一个 PAG 文件")
+                text: qsTr("Click the menu or drag-drop here to open a PAG file")
                 font.pixelSize: 20
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter
@@ -177,12 +176,7 @@ PSplitView {
             }
         }
 
-        // TODO
-        // FileTaskFactory {
-        //     id: taskFactory
-        //
-        //     objectName: "taskFactory"
-        // }
+        // TODO Add taskFactory
     }
 
     /* The Right Area */
@@ -221,7 +215,7 @@ PSplitView {
                 id: tabButton
 
                 height: 36
-                text: qsTr("图层编辑")
+                text: qsTr("Edit Layer")
                 font.pixelSize: 13
                 anchors.top: parent.top
                 anchors.topMargin: 0
@@ -245,7 +239,7 @@ PSplitView {
                 id: tab2Button
 
                 height: 36
-                text: qsTr("文件结构")
+                text: qsTr("File Structure")
                 font.pixelSize: 13
                 anchors.top: parent.top
                 anchors.topMargin: 0
@@ -347,7 +341,7 @@ PSplitView {
 
                             Text {
                                 color: "#80ffffff"
-                                text: qsTr("没有可以编辑的图层")
+                                text: qsTr("No layer was editable")
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
                                 horizontalAlignment: Text.AlignHCenter
@@ -398,7 +392,7 @@ PSplitView {
                                 id: titleText
 
                                 height: 20
-                                text: qsTr("文本编辑")
+                                text: qsTr("Edit Text")
                                 font.pixelSize: 12
                                 renderType: Text.NativeRendering
                                 verticalAlignment: Text.AlignVCenter
@@ -473,7 +467,7 @@ PSplitView {
                                 id: titleImage
 
                                 height: 20
-                                text: qsTr("图片编辑")
+                                text: qsTr("Edit Image")
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
                                 anchors.top: parent.top

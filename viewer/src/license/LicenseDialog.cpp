@@ -11,9 +11,6 @@
 #include <QPushButton>
 #include <QStandardPaths>
 
-// TODO
-// #include "MultiLanguageModel.h"
-
 QString LicenseDialog::licenseUrl = "http://rule.tencent.com/rule/202501170003";
 QString LicenseDialog::privacyUrl = "http://rule.tencent.com/rule/202501170004";
 
@@ -29,8 +26,8 @@ auto LicenseDialog::init() -> void {
   this->setFont(font);
   QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-  QString text = QString(tr("<p style='margin-bottom: 10px;'>欢迎使用PAGViewer！为了更好地保护您的合法权益，请您在使用前仔细阅读<a href=\"%1\">《%2》</a>与<a href=\"%3\">《%4》</a>条款，如您已阅读并同意上述条款，请勾选下方选项并点击\"%5\"按钮开始使用PAGViewer</p>"));
-  text = text.arg(LicenseDialog::licenseUrl).arg(tr("软件许可及服务协议")).arg(LicenseDialog::privacyUrl).arg(tr("隐私保护声明")).arg(tr("确认"));
+  QString text = QString(tr("<p style='margin-bottom: 10px;'>Welcome to PAGViewer! To better protect your rights and interests, please carefully read the <a href=\"%1\">\"%2\"</a> and <a href=\"%3\">\"%4\"</a> terms before using the application. If you have read and agree to these terms, please check the option below and click the \"%5\" button to start using PAGViewer.</p>"));
+  text = text.arg(LicenseDialog::licenseUrl).arg(tr("Software License and Service Agreement")).arg(LicenseDialog::privacyUrl).arg(tr("Privacy Protection Statement")).arg(tr("Confirm"));
 
   QLabel *textLabel = new QLabel(this);
   textLabel->setWordWrap(true);
@@ -53,12 +50,12 @@ auto LicenseDialog::init() -> void {
   textLabel->setFont(font);
   mainLayout->addWidget(textLabel);
 
-  QCheckBox *agreeCheckBox = new QCheckBox(tr("我已阅读并同意上述条款"), this);
+  QCheckBox *agreeCheckBox = new QCheckBox(tr("I have read and agree to the above terms"), this);
   agreeCheckBox->setFont(font);
   mainLayout->addWidget(agreeCheckBox);
 
   QHBoxLayout *buttonLayout = new QHBoxLayout();
-  QPushButton *agreeButton = new QPushButton(tr("确认"), this);
+  QPushButton *agreeButton = new QPushButton(tr("Confirm"), this);
   agreeButton->setStyleSheet(R"(
     QPushButton {
         color: white;
@@ -104,7 +101,7 @@ auto LicenseDialog::init() -> void {
   agreeButton->setFont(font);
   agreeButton->setEnabled(false);
   agreeButton->setDefault(true);
-  QPushButton *disagreeButton = new QPushButton(tr("关闭"), this);
+  QPushButton *disagreeButton = new QPushButton(tr("Close"), this);
   disagreeButton->setStyleSheet(R"(
     QPushButton {
         color: #000000;
@@ -156,11 +153,11 @@ auto LicenseDialog::init() -> void {
   connect(disagreeButton, &QPushButton::clicked, this, &QDialog::reject);
 
   setLayout(mainLayout);
-  setWindowTitle(tr("协议与声明"));
-#if defined(PAG_MACOS)
+  setWindowTitle(tr("Agreement and Statement"));
+#if defined(__APPLE__)
   setMinimumSize(QSize(290, 230));
   resize(380, 280);
-#elif defined(PAG_WINDOWS)
+#elif defined(WIN32)
   setMinimumSize(QSize(300, 230));
   resize(400, 280);
 #endif

@@ -9,6 +9,8 @@
 #include "rttr/registration.h"
 using namespace rttr;
 
+// TODO Consider using other solution to replace this file
+
 
 static std::map<std::string,std::map<std::string,pag::Enum>> PAG_Enums;
 static std::map<std::string,std::string> PAG_Enums_Usage;

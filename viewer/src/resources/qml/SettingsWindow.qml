@@ -13,7 +13,7 @@ PApplicationWindow {
     maximumHeight: height
     minimumWidth:width
     minimumHeight: height
-    title: qsTr("设置")
+    title: qsTr("Settings")
     canResize: false
 
     RectangleWithRadius {
@@ -57,7 +57,7 @@ PApplicationWindow {
                 y: -4
                 width: 387
                 height: 40
-                text: qsTr("显示文件中的视频序列帧")
+                text: qsTr("Show Video Sequence Frames Which in the File")
                 font.pixelSize: 22
                 focusPolicy: Qt.ClickFocus
                 scale: 0.6
@@ -85,7 +85,7 @@ PApplicationWindow {
                 y: 86
                 width: 387
                 height: 40
-                text: qsTr("使用英语(Use English) -重启后生效")
+                text: qsTr("Use English -Take Effect After Restart")
                 font.pixelSize: 22
                 checked: settingsWindow.useEnglish
                 scale: 0.6
@@ -113,7 +113,7 @@ PApplicationWindow {
                 y: 56
                 width: 387
                 height: 40
-                text: qsTr("使用 Beta 版本的 PAG 和 AE 导出工具")
+                text: qsTr("Use PAG and AE Export Plug-in in Beta Version")
                 font.pixelSize: 22
                 checked: settingsWindow.useBeta
                 scale: 0.6
@@ -141,7 +141,7 @@ PApplicationWindow {
                 y: 26
                 width: 387
                 height: 40
-                text: qsTr("自动检查更新")
+                text: qsTr("Check Updates Automatically")
                 font.pixelSize: 22
                 checked: settingsWindow.autoCheckUpdate
                 scale: 0.6

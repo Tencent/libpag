@@ -1,13 +1,13 @@
-#ifndef WINDOWS_WINDOWS_PLUGIN_INSTALLER_H_
-#define WINDOWS_WINDOWS_PLUGIN_INSTALLER_H_
+#ifndef PLATFORM_WINDOWS_PAG_PLUGIN_INSTALLER_H_
+#define PLATFORM_WINDOWS_PAG_PLUGIN_INSTALLER_H_
 
 #include <string>
 
-class WindowsPluginInstaller {
+class PAGPluginInstaller {
 public:
   static auto HasUpdate() -> bool;
   static auto InstallPlugins(bool bForceInstall = false) -> bool;
   static auto UninstallPlugins() -> bool;
 };
 
-#endif // WINDOWS_WINDOWS_PLUGIN_INSTALLER_H_
+#endif // PLATFORM_WINDOWS_PAG_PLUGIN_INSTALLER_H_

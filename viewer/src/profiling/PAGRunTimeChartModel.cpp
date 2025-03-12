@@ -99,7 +99,7 @@ auto PAGRunTimeChartModel::updateColumnItem(PAGChartData *data, int index) -> vo
   items[index]->renderValue = data->renderValue;
   items[index]->presentValue = data->presentValue;
   maxValue = 0;
-  // TODO 优化
+  // TODO Improve the code
   for (auto const& item : items) {
     int64_t sum = item->presentValue + item->renderValue + item->imageValue;
     maxValue = maxValue < sum ? sum : maxValue;

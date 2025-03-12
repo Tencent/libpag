@@ -11,16 +11,16 @@
 #include "profiling/PAGBenchmarkModel.h"
 #include "profiling/PAGRunTimeChartModel.h"
 #include "profiling/PAGRunTimeModelManager.h"
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
 #include "common/PAGApplication.h"
-#elif defined(PAG_WINDOWS)
+#elif defined(WIN32)
 #include "windows/SingleApplication.h"
 #endif
 
 void initReportConfig(const std::string& appVersion) {
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
   PAGReport::getInstance()->setAppKey("0MAC04NRHX4I60N9");
-#elif defined(PAG_WINDOWS)
+#elif defined(WIN32)
   PAGReport::getInstance()->setAppKey("0WIN0KMRHX4YCIW9");
 #endif
   PAGReport::getInstance()->setAppName("PAGViewer");
@@ -37,7 +37,6 @@ int main(int argc, char *argv[]) {
     if (arg == "-cpu") {
       cpuMode = true;
     } else if (arg == "-top") {
-      // TODO(markffan)
       PAGWindowHelper::SetTopWindow(true);
     } else if (argc > 1) {
       fileToOpen = arg;
@@ -59,14 +58,14 @@ int main(int argc, char *argv[]) {
   defaultFormat.setVersion(3, 2);
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
-#if defined(PAG_WINDOWS)
+#if defined(WIN32)
   QFont defaultFonts("Microsoft Yahei");
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
   fallbackList = {"Microsoft YaHei"};
   pag::PAGFont::SetFallbackFontNames(fallbackList);
   SingleApplication app(argc, argv);
-#elif defined(PAG_MACOS)
+#elif defined(__APPLE__)
   QFont defaultFonts("Helvetica Neue,PingFang SC");
   QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
   defaultFonts.setStyleHint(QFont::SansSerif);
@@ -78,20 +77,11 @@ int main(int argc, char *argv[]) {
   QApplication::setWindowIcon(QIcon(":/image/appicon.png"));
 
   qRegisterMetaType<std::string>("std::string");
-  // TODO
-  // qmlRegisterType<PAGUITask>("PAG", 1, 0, "PAGUITask");
-  // qmlRegisterType<ChartModel>("PAG", 1, 0, "ChartModel");
+  // TODO add other types
   qmlRegisterType<PAGChartData>("PAG", 1, 0, "PAGChartData");
   qmlRegisterType<PAGViewWindow>("PAG", 1, 0, "PAGViewWindow");
   qmlRegisterType<PAGBenchmarkModel>("PAG", 1, 0, "PAGBenchmarkModel");
-  // qmlRegisterType<PAGRunTimeChartModel>("PAG", 1, 0, "PAGRunTimeChartModel");
   qmlRegisterType<PAGRunTimeModelManager>("PAG", 1, 0, "PAGRunTimeModelManager");
-  // qmlRegisterType<RunTimeModel>("PAG", 1, 0, "RunTimeModel");
-  // qmlRegisterType<ChartColumModel>("PAG", 1, 0, "ChartColumModel");
-  // qmlRegisterType<FileTaskFactory>("PAG", 1, 0, "FileTaskFactory");
-  // qmlRegisterType<PAGBenchmarkModel>("PAG", 1, 0, "PAGBenchmarkModel");
-  // qmlRegisterUncreatableType<PAGFileTask>("PAG", 1, 0, "PAGFileTask", "");
-  // qmlRegisterUncreatableType<TextDocument>("PAG", 1, 0, "TextDocument", "");
 
   if (!LicenseDialog::isUserAgreeWithLicense() && !LicenseDialog::requestUserAgreement()) {
     qDebug() << "User disagree with license";

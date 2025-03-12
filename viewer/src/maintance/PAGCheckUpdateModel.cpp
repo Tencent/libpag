@@ -7,24 +7,8 @@
 #include <QCoreApplication>
 #include <QRegularExpression>
 #include "common/version.h"
-#if defined(PAG_MACOS)
-#include "macos/MacUpdater.h"
-#include "macos/MacPluginInstaller.h"
-#elif defined(PAG_WINDOWS)
-#include "windows/WindowsUpdater.h"
-#include "windows/WindowsPluginInstaller.h"
-#endif
-
-
-#if defined(PAG_MACOS)
-using Updater = MacUpdater;
-using AEPlugin = MacPluginInstaller;
-#elif defined(PAG_WINDOWS)
-using Updater = WindowsUpdater;
-using AEPlugin = WindowsPluginInstaller;
-#else
-static_assert(false, "Unsupported platform");
-#endif
+#include "PAGUpdater.h"
+#include "PAGPluginInstaller.h"
 
 const std::string MAC_REPO_URL_TEST = "aHR0cDovL2RsZGlyMS5xcS5jb20vcXFtaS9saWJwYWcvdGVzdC9wbGF5ZXJfbWFj";
 const std::string MAC_REPO_URL_RELEASE = "aHR0cDovL2RsZGlyMS5xcS5jb20vcXFtaS9saWJwYWcvcGxheWVyX21hYw==";
@@ -84,12 +68,12 @@ auto PAGCheckUpdateModel::setIsBetaVersion(bool isBetaVersion) -> bool {
 }
 
 auto PAGCheckUpdateModel::hasPluginUpdate() -> bool {
-  return AEPlugin::HasUpdate();
+  return PAGPluginInstaller::HasUpdate();
 }
 
 auto PAGCheckUpdateModel::checkPlayerUpdate(bool showUI, QString feedUrl) -> bool {
   auto url = feedUrl.toStdString();
-  Updater::checkUpdates(showUI, url);
+  PAGUpdater::checkUpdates(showUI, url);
   return false;
 }
 
@@ -98,10 +82,10 @@ auto PAGCheckUpdateModel::startUpdatePlayer() -> bool {
 }
 
 auto PAGCheckUpdateModel::updatePreviousVersion() -> bool {
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
   return true;
-#elif defined(PAG_WINDOWS)
-  // TODO
+#elif defined(WIN32)
+  // TODO Improve the code
   QString currentPath = qApp->applicationDirPath();
   if(currentPath.indexOf("PAGPlayer")<1){
       return true;
@@ -167,15 +151,15 @@ auto PAGCheckUpdateModel::updatePreviousVersion() -> bool {
 }
 
 auto PAGCheckUpdateModel::installAEPlugin(bool bForce) -> int{
-  return AEPlugin::InstallPlugins(bForce);
+  return PAGPluginInstaller::InstallPlugins(bForce);
 }
 
 auto PAGCheckUpdateModel::uninstallAEPlugin() -> int {
-  return AEPlugin::UninstallPlugins();
+  return PAGPluginInstaller::UninstallPlugins();
 }
 
 auto PAGCheckUpdateModel::revealInFinder(const QString &path) -> void {
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
   QFileInfo file(path);
   QStringList args;
   if (!file.isDir()) {
@@ -183,7 +167,7 @@ auto PAGCheckUpdateModel::revealInFinder(const QString &path) -> void {
   }
   args << path;
   QProcess::startDetached("open", args);
-#elif defined(PAG_MACOS)
+#elif defined(__APPLE__)
   auto localBitPath = path.toLocal8Bit().toStdString();
   QString currentPath = QString::fromLocal8Bit(localBitPath.c_str());
   QStringList args;

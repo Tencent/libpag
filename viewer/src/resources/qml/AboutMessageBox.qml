@@ -141,7 +141,7 @@ PApplicationWindow {
 
                 width: 75
                 height: 25
-                text: qsTr("确定")
+                text: qsTr("Confirm")
                 font.pixelSize: 12
                 visible: window.showOK
 
@@ -171,7 +171,7 @@ PApplicationWindow {
 
                 width: 75
                 height: 25
-                text: qsTr("取消")
+                text: qsTr("Cancel")
                 font.pixelSize: 12
                 visible: showCancel
 

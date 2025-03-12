@@ -20,7 +20,7 @@ class PAGRenderThread : public QThread {
   Q_SLOT void shutDown();
   Q_SLOT void renderNext();
 
-#if defined(PAG_WINDOWS)
+#if defined(WIN32)
   auto refreshTextCacheOnWindows() -> void;
 #endif
 

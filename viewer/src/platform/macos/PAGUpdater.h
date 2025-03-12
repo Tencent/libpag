@@ -1,10 +1,10 @@
-#ifndef MAC_MAC_UPDATER_H_
-#define MAC_MAC_UPDATER_H_
+#ifndef PLATFORM_MACOS_PAG_UPDATER_H_
+#define PLATFORM_MACOS_PAG_UPDATER_H_
 
 #include <string>
 #include <QWindow>
 
-class MacUpdater
+class PAGUpdater
 {
 public:
     static void initUpdater();
@@ -12,4 +12,4 @@ public:
     static void changeTitleBarColor(WId winId, double red, double green, double blue);
 };
 
-#endif // MAC_MAC_UPDATER_H_
+#endif // PLATFORM_MACOS_PAG_UPDATER_H_

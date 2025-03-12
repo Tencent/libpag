@@ -91,7 +91,7 @@ void PAGRenderThread::renderNext() {
   }
 
   if (shouldTriggerFirstFrame) {
-#if defined(PAG_WINDOWS)
+#if defined(WIN32)
     refreshTextCacheOnWindows();
 #endif
     Q_EMIT firstFrameReady();
@@ -99,7 +99,7 @@ void PAGRenderThread::renderNext() {
   }
 }
 
-#if defined(PAG_WINDOWS)
+#if defined(WIN32)
 auto PAGRenderThread::refreshTextCacheOnWindows() -> void {
   for (int i = 0; i < pagFile->numTexts(); i++) {
     auto textData = pagFile->getTextData(i);

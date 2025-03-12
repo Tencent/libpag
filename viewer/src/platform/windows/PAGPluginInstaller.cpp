@@ -1,4 +1,4 @@
-#include "WindowsPluginInstaller.h"
+#include "PAGPluginInstaller.h"
 #include <filesystem>
 #include <io.h>
 #include <tchar.h>
@@ -6,7 +6,7 @@
 #include <shlobj.h>
 #include <windows.h>
 #include <QString>
-#include "cJSON/cJSON.h"
+#include <cJSON.h>
 #include "common/version.h"
 #include "utils/File.h"
 #include "utils/Translate.h"
@@ -14,8 +14,8 @@
 #define MAX_PATH_SIZE 1024
 #define AE_LIB_PATH "C:\\PROGRA~1\\Adobe\\Common\\Plug-ins\\7.0\\MediaCore\\"
 
-#if defined(PAG_WINDOWS)
-// TODO DELETE LATER
+#if defined(WIN32)
+// TODO delete later
 #pragma warning(push)
 #pragma warning(disable: 4996) 
 #pragma warning(disable: 4267)
@@ -760,19 +760,19 @@ static bool HasNewVersion() {
   return hasOld || !hasNew;
 }
 
-auto WindowsPluginInstaller::HasUpdate() -> bool {
-  // TODO
+auto PAGPluginInstaller::HasUpdate() -> bool {
+  // Implement the function
   return true;
 }
 
-auto WindowsPluginInstaller::InstallPlugins(bool bForceInstall) -> bool {
+auto PAGPluginInstaller::InstallPlugins(bool bForceInstall) -> bool {
   return true;
 }
 
-auto WindowsPluginInstaller::UninstallPlugins() -> bool {
+auto PAGPluginInstaller::UninstallPlugins() -> bool {
   return true;
 }
 
-#if defined(PAG_WINDOWS)
+#if defined(WIN32)
 #pragma warning(pop)
 #endif

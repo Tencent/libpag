@@ -1,4 +1,4 @@
-#import "MacPluginInstaller.h"
+#import "PAGPluginInstaller.h"
 #import <inttypes.h>
 #import <Cocoa/Cocoa.h>
 #import <Foundation/Foundation.h>
@@ -12,7 +12,7 @@
 
 #define VERSION_SEPARATE(version) ((version>>48)&0xFFFF), ((version>>32)&0xFFFF), ((version>>16)&0xFFFF), ((version>>0)&0xFFFF)
 
-// TODO 完善代码
+// TODO Improve the code
 
 auto GetRoamingPath() -> std::string {
   NSArray* arr = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
@@ -299,7 +299,7 @@ static auto isAeOpened() -> bool {
     return false;
 }
 
-auto MacPluginInstaller::copyFileByCmd(char* originPath, char* targetPath) -> int {
+auto PAGPluginInstaller::copyFileByCmd(char* originPath, char* targetPath) -> int {
     int ret = 0;
     char cmd[1024];
 
@@ -313,7 +313,7 @@ auto MacPluginInstaller::copyFileByCmd(char* originPath, char* targetPath) -> in
     return ret;
 }
 
-auto MacPluginInstaller::InstallPlugin(std::string pluginName) -> int {
+auto PAGPluginInstaller::InstallPlugin(std::string pluginName) -> int {
     int ret = 0;
 
     if (isXcodeDebug()) {
@@ -354,7 +354,7 @@ auto MacPluginInstaller::InstallPlugin(std::string pluginName) -> int {
     return ret;
 }
 
-auto MacPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
+auto PAGPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
     int ret = 0;
     bool bCopyPagPlugin = false;
 
@@ -414,7 +414,7 @@ auto MacPluginInstaller::InstallPlugins(bool bForceInstall) -> int {
     return ret;
 }
 
-auto MacPluginInstaller::UninstallPlugins() -> int {
+auto PAGPluginInstaller::UninstallPlugins() -> int {
   while (isAeOpened()) {
     NSAlert *alert = [[NSAlert new] autorelease];
     [alert addButtonWithTitle:@(Utils::translate("重试").c_str())];
@@ -453,7 +453,7 @@ auto MacPluginInstaller::UninstallPlugins() -> int {
   return ret;
 }
 
-auto MacPluginInstaller::HasUpdate() -> bool {
+auto PAGPluginInstaller::HasUpdate() -> bool {
     return HasNewVersion(@"PAGExporter");
 }
 

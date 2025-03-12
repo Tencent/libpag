@@ -88,7 +88,7 @@ PListView {
                     anchors.fill: parent
 
                     Text {
-                        text: qsTr("编辑")
+                        text: qsTr("Edit")
                         font.pixelSize: 10
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter

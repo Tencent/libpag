@@ -1,12 +1,9 @@
 {
   "version": "1.3.12",
-  "vars": {
-    "PAG_GROUP": "https://github.com/libpag"
-  },
   "repos": {
     "common": [
       {
-        "url": "${PAG_GROUP}/vendor_tools.git",
+        "url": "https://github.com/libpag/vendor_tools.git",
         "commit": "dd40c12a603b747f912340aecbcd246a99c72ec9",
         "dir": "tools/vendor_tools"
       },
@@ -14,6 +11,11 @@
         "url": "https://github.com/jedisct1/libsodium.git",
         "commit": "9511c982fb1d046470a8b42aa36556cdb7da15de",
         "dir": "third_party/sodium"
+      },
+      {
+        "url": "https://github.com/DaveGamble/cJSON.git",
+        "commit": "76be8fcf15677ca7f6db7c770f5ae6bf8b41d78f",
+        "dir": "third_party/cjson"
       }
     ],
     "mac": [
@@ -30,13 +32,6 @@
     ]
   },
   "files": {
-    "common": [
-      {
-        "url": "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp",
-        "dir": "third_party/nlohman-json",
-        "unzip": false
-      }
-    ],
     "win": [
       {
         "url": "https://github.com/vslavik/winsparkle/releases/download/v0.8.3/WinSparkle-0.8.3.zip",

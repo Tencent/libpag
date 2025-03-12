@@ -170,7 +170,7 @@ Item {
         height: 44
         enabled: hasNewVersion
         visible: hasNewVersion
-        text: qsTr("更新")
+        text: qsTr("Update")
         focusPolicy: Qt.NoFocus
         display: AbstractButton.TextOnly
         anchors.verticalCenterOffset: 0
@@ -195,7 +195,7 @@ Item {
 
             ToolTip {
                 visible: parent.entered
-                text: qsTr("发现新版本，点击更新")
+                text: qsTr("Finding new version, click to update")
             }
 
             onEntered: {
@@ -218,7 +218,7 @@ Item {
         width: 44
         height: 44
         enabled: hasPAGFile
-        text: qsTr("背景")
+        text: qsTr("Background")
         focusPolicy: Qt.NoFocus
         display: AbstractButton.TextOnly
         anchors.verticalCenterOffset: 0
@@ -480,7 +480,7 @@ Item {
         z: 1
         width: 48
         height: 48
-        text: qsTr("")
+        text: qsTr("Pause")
         visible: isPlaying || (lastPlayStatus === true)
         enabled: hasPAGFile
         focusPolicy: Qt.NoFocus

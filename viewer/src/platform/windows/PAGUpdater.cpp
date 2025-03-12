@@ -1,4 +1,4 @@
-#include "WindowsUpdater.h"
+#include "PAGUpdater.h"
 #include <QWindow>
 #if !defined(PAG_DEBUG)
 #include <winsparkle.h>
@@ -22,7 +22,7 @@ static auto UpdateDidFindCallBack() -> void {
 #endif
 }
 
-auto WindowsUpdater::initUpdater(const wchar_t* version) -> void {
+auto PAGUpdater::initUpdater(const wchar_t* version) -> void {
 #if defined(PAG_DEBUG)
   return;
 #else
@@ -33,7 +33,7 @@ auto WindowsUpdater::initUpdater(const wchar_t* version) -> void {
 #endif
 }
 
-auto WindowsUpdater::checkUpdates(bool showUI, std::string feedUrl) -> void {
+auto PAGUpdater::checkUpdates(bool showUI, std::string feedUrl) -> void {
 #if defined(PAG_DEBUG)
   return;
 #else

@@ -1,9 +1,9 @@
-#ifndef MAC_MAC_PLUGIN_INSTALLER_H
-#define MAC_MAC_PLUGIN_INSTALLER_H
+#ifndef PLATFORM_MACOS_PAG_PLUGIN_INSTALLER_H_
+#define PLATFORM_MACOS_PAG_PLUGIN_INSTALLER_H_
 
 #include <string>
 
-class MacPluginInstaller {
+class PAGPluginInstaller {
 public:
   static auto HasUpdate() -> bool;
   static auto copyFileByCmd(char* originPath, char* targetPath) -> int;
@@ -12,4 +12,4 @@ public:
   static auto UninstallPlugins() -> int;
 };
 
-#endif // MAC_MAC_PLUGIN_INSTALLER_H
+#endif // PLATFORM_MACOS_PAG_PLUGIN_INSTALLER_H_

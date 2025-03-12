@@ -40,7 +40,7 @@ Popup {
 
             width: parent.width
             height: 52
-            text: qsTr("文本编辑")
+            text: qsTr("Text Edit")
             font.pixelSize: 12
             horizontalAlignment: Text.AlignLeft
             verticalAlignment: Text.AlignVCenter
@@ -72,7 +72,7 @@ Popup {
             x: 32
             width: 28
             height: 17
-            text: qsTr("字体")
+            text: qsTr("Font")
             font.pixelSize: 12
             color: "#9B9B9B"
             anchors.top: dialogTitle.bottom
@@ -187,7 +187,7 @@ Popup {
             x: 32
             width: 28
             height: 17
-            text: qsTr("风格")
+            text: qsTr("Style")
             font.pixelSize: 12
             color: "#9B9B9B"
             anchors.top: labelFont.bottom
@@ -304,7 +304,7 @@ Popup {
             x: 32
             width: 28
             height: 17
-            text: qsTr("字号")
+            text: qsTr("Size")
             font.pixelSize: 12
             anchors.top: labelFontStyle.bottom
             anchors.topMargin: 16
@@ -348,7 +348,7 @@ Popup {
         CheckBox {
             id: boldCheckBox
 
-            text: qsTr("粗体")
+            text: qsTr("Bold")
             font.pixelSize: 12
             checked: fauxBold
             spacing: 0
@@ -386,7 +386,7 @@ Popup {
         CheckBox {
             id: italicCheckBox
 
-            text: qsTr("斜体")
+            text: qsTr("Italic")
             font.pixelSize: 12
             anchors.top: labelFontStyle.bottom
             anchors.topMargin: 3
@@ -428,7 +428,7 @@ Popup {
             x: 32
             width: 28
             height: 17
-            text: qsTr("颜色")
+            text: qsTr("Color")
             font.pixelSize: 12
             anchors.top: labelFontSize.bottom
             anchors.topMargin: 16
@@ -492,7 +492,7 @@ Popup {
                 id: "strokeLabel"
 
                 height: 17
-                text: qsTr("描边颜色")
+                text: qsTr("Stroke")
                 font.pixelSize: 12
                 anchors.top: parent.top
                 anchors.topMargin: 2
@@ -579,7 +579,7 @@ Popup {
 
             Label {
                 height: parent.height
-                text: qsTr("宽")
+                text: qsTr("Width")
                 font.pixelSize: 12
                 verticalAlignment: Text.AlignVCenter
                 anchors.top: parent.top
@@ -595,7 +595,7 @@ Popup {
             x: 32
             width: 28
             height: 17
-            text: qsTr("文本")
+            text: qsTr("Text")
             font.pixelSize: 12
             anchors.top: labelFontColor.bottom
             anchors.topMargin: 16
@@ -677,7 +677,7 @@ Popup {
             }
 
             Text {
-                text: qsTr("确认")
+                text: qsTr("Confirm")
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -716,7 +716,7 @@ Popup {
     ColorDialog {
         id: colorDialog
 
-        title: qsTr("选择颜色")
+        title: qsTr("Select a color")
         color: "#AAAAAA"
 
         onAccepted: {
@@ -729,7 +729,7 @@ Popup {
     ColorDialog {
         id: borderColorDialog
 
-        title: qsTr("选择颜色")
+        title: qsTr("Select a color")
         color: "#AAAAAA"
 
         onAccepted: {

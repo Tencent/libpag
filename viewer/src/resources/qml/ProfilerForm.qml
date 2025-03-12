@@ -11,14 +11,14 @@ Item {
     property alias performanceWarnLeftDialog: performanceWarnLeftDialog
     property alias performanceWarnRightDialog: performanceWarnRightDialog
 
-    property var warn1: qsTr("UI 素材单个 PAG 文件必须为0，模板素材单个 PAG 文件必须小于等于2")
-    property var warn2: qsTr("视频序列帧比较消耗性能")
-    property var warn3: qsTr("内存占用过大，请控制在50M 以内")
-    property var warn4: qsTr("内存占用过大，请控制在10M 以内")
-    property var warn5: qsTr("可能和 Layer 图层数量过多有关，建议使用预合成的方式合并相同图层")
-    property var warn6: qsTr("可能和贴纸缩放大小有关，建议减少贴纸缩放程度")
-    property var warn7: qsTr("(运行一下性能基准测试，结果会更加准确)")
-    property var warn8: qsTr("Rendering 耗时过大，请控制在 %1 微秒以内")
+    property var warn1: qsTr("UI material pre PAG file must be 0, Template material pre PAG file must be less than or equal to 2")
+    property var warn2: qsTr("Video sequence frame comparison consumes performance")
+    property var warn3: qsTr("Memory usage is too large, suggest optimizing memory cost to under 50M")
+    property var warn4: qsTr("Memory usage is too large, suggest optimizing memory cost to under 10M")
+    property var warn5: qsTr("Too many layers, Suggest combining same layers into composition")
+    property var warn6: qsTr("Sticker scale is too large, suggest reducing sticker scale")
+    property var warn7: qsTr("(Run performance benchmark, results will be more accurate)")
+    property var warn8: qsTr("Rendering time too long, suggest optimizing time cost to under %1 us")
 
     width: 293
     height: 286
@@ -36,7 +36,7 @@ Item {
         anchors.leftMargin: 1
 
         Label {
-            text: qsTr("文件信息")
+            text: qsTr("File Info")
             font.pixelSize: 8
             color: "#FFFFFF"
             anchors.left: parent.left
@@ -70,7 +70,7 @@ Item {
             Text {
                 id: encryptionLabel
 
-                text: qsTr("未加密")
+                text: qsTr("Unencrypted")
                 font.pixelSize: 8
                 color: "#FFFFFF"
                 anchors.right: parent.right
@@ -81,7 +81,7 @@ Item {
         Text {
             id: virtualText1
 
-            text: qsTr("密码加密")
+            text: qsTr("Password Encryption")
             font.pixelSize: 8
             color: "#FFFFFF"
             visible: false
@@ -90,7 +90,7 @@ Item {
         Text {
             id: virtualText2
 
-            text: qsTr("证书加密")
+            text: qsTr("Certificate Encryption")
             font.pixelSize: 8
             color: "#FFFFFF"
             visible: false
@@ -99,7 +99,7 @@ Item {
         Text {
             id: virtualText3
 
-            text: qsTr("未加密")
+            text: qsTr("Unencrypted")
             font.pixelSize: 8
             color: "#FFFFFF"
             visible: false
@@ -108,7 +108,7 @@ Item {
         Text {
             id: virtualText4
 
-            text: qsTr("企业版")
+            text: qsTr("Enterprise Edition")
             font.pixelSize: 8
             color: "#FFFFFF"
             visible: false
@@ -517,7 +517,7 @@ Item {
 
     function changeEncryptedState(pagFilePath) {
         encryptionIcon.source = "qrc:/image/unencrypted.png";
-        encryptionLabel.text = qsTr("未加密");
+        encryptionLabel.text = qsTr("Unencrypted");
         encryptionItem.width = virtualText3.width + 14
     }
 

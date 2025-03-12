@@ -141,7 +141,7 @@ PListView {
                     anchors.fill: parent
 
                     Text {
-                        text: qsTr("替换")
+                        text: qsTr("Replace")
                         font.pixelSize: 10
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter

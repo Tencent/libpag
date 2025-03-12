@@ -9,19 +9,14 @@ MenuBar {
 
     signal command(string command)
 
-    // TODO
-    // Shortcuts {
-    //     id: shortcuts
-    //
-    //     visible:false
-    // }
+    // TODO Merge macos menu and windows menu
 
     Labs.Menu {
         title: "PAGViewer"
         visible: Qt.platform.os === "osx"
 
         Labs.MenuItem {
-            text: qsTr("了解企业版")
+            text: qsTr("About PAG Enterprise Edition")
             visible: windowActive
             role: "ApplicationSpecificRole"
 
@@ -31,7 +26,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("检查更新")
+            text: qsTr("Check Update Information")
             visible: windowActive
             role: "ApplicationSpecificRole"
 
@@ -41,7 +36,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("删除AE插件")
+            text: qsTr("Uninstall AE Plug-in")
             visible: windowActive
             role: "ApplicationSpecificRole"
             
@@ -51,7 +46,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("安装AE插件")
+            text: qsTr("Install AE Plug-in")
             visible: windowActive
             role: "ApplicationSpecificRole"
             
@@ -61,7 +56,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("偏好设置")
+            text: qsTr("Preference Settings")
             visible: windowActive
             role: "ApplicationSpecificRole"
             
@@ -71,7 +66,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("关于 PAGViewer")
+            text: qsTr("About PAGViewer")
             visible: windowActive
             role: "ApplicationSpecificRole"
             
@@ -81,7 +76,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("关闭")
+            text: qsTr("Close")
             visible: windowActive
             shortcut: Labs.StandardKey.Close
             role: "QuitRole"
@@ -94,11 +89,11 @@ MenuBar {
     }
 
     Labs.Menu {
-        title: qsTr("文件")
+        title: qsTr("File")
         visible: Qt.platform.os === "osx"
 
         Labs.MenuItem {
-            text: qsTr("打开...")
+            text: qsTr("Open...")
             visible: windowActive
             shortcut: Labs.StandardKey.Open
             
@@ -108,7 +103,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("性能校验")
+            text: qsTr("Performance Test")
             visible: windowActive
             enabled: hasPAGFile
             
@@ -118,7 +113,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("性能基准测试")
+            text: qsTr("Performance Benchmark Test")
             visible: windowActive
             enabled: hasPAGFile
             
@@ -128,9 +123,9 @@ MenuBar {
             }
         }
         Labs.Menu {
-            title: qsTr("导出")
+            title: qsTr("Export")
             Labs.MenuItem {
-                text: qsTr("导出 PNG 序列帧")
+                text: qsTr("Export as PNG Sequence Frames")
                 visible: windowActive
                 enabled: hasPAGFile
                 
@@ -140,7 +135,7 @@ MenuBar {
                 }
             }
             Labs.MenuItem {
-                text: qsTr("导出 APNG")
+                text: qsTr("Export as APNG")
                 visible: windowActive
                 enabled: hasPAGFile
                 
@@ -150,7 +145,7 @@ MenuBar {
                 }
             }
             Labs.MenuItem {
-                text: qsTr("导出当前帧为 PNG")
+                text: qsTr("Export Current Frame as PNG")
                 visible: windowActive
                 enabled: hasPAGFile
                 shortcut: "Meta+P"
@@ -164,11 +159,11 @@ MenuBar {
     }
 
     Labs.Menu {
-        title: qsTr("播放")
+        title: qsTr("Play")
         visible: Qt.platform.os === "osx"
 
         Labs.MenuItem {
-            text: qsTr("暂停并回到首帧")
+            text: qsTr("Pause and go back to the first frame")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: Labs.StandardKey.MoveToPreviousLine
@@ -179,7 +174,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("暂停并回到末帧")
+            text: qsTr("Pause and go back to the last frame")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: Labs.StandardKey.MoveToNextLine
@@ -190,7 +185,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("上一帧")
+            text: qsTr("Previous frame")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: Labs.StandardKey.MoveToPreviousChar
@@ -201,7 +196,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("下一帧")
+            text: qsTr("Next frame")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: Labs.StandardKey.MoveToNextChar
@@ -212,7 +207,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("暂停/播放")
+            text: qsTr("Pause/Play")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: " "
@@ -225,11 +220,11 @@ MenuBar {
     }
 
     Labs.Menu {
-        title: qsTr("视图")
+        title: qsTr("View")
         visible: Qt.platform.os === "osx"
 
         Labs.MenuItem {
-            text: qsTr("显示/隐藏 背景色")
+            text: qsTr("Show/Hide BackColor")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: "b"
@@ -240,7 +235,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("显示/隐藏 编辑面板")
+            text: qsTr("Show/Hide Edit Panel")
             visible: windowActive
             enabled: hasPAGFile
             shortcut: "l"
@@ -253,11 +248,11 @@ MenuBar {
     }
 
     Labs.Menu {
-        title: qsTr("窗口")
+        title: qsTr("Window")
         visible: Qt.platform.os === "osx"
 
         Labs.MenuItem {
-            text: qsTr("最小化")
+            text: qsTr("Minimize")
             visible: windowActive
             shortcut: "Ctrl+M"
             
@@ -267,7 +262,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("缩放")
+            text: qsTr("Zoom")
             visible: windowActive
             
             onTriggered: {
@@ -276,7 +271,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: isFullscreen? qsTr("退出全屏") : qsTr("全屏")
+            text: isFullscreen? qsTr("Exit the Full-screen") : qsTr("Full-screen")
             visible: windowActive
             
             onTriggered: {
@@ -287,11 +282,11 @@ MenuBar {
     }
 
     Labs.Menu {
-        title: qsTr("帮助")
+        title: qsTr("Help")
         visible: Qt.platform.os === "osx"
 
         Labs.MenuItem {
-            text: qsTr("PAGViewer 帮助")
+            text: qsTr("Help for PAGViewer")
             visible: windowActive
             
             onTriggered: {
@@ -300,7 +295,7 @@ MenuBar {
             }
         }
         Labs.MenuItem {
-            text: qsTr("问题反馈")
+            text: qsTr("Feedback")
             visible: windowActive
             
             onTriggered: {

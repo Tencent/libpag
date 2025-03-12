@@ -1,14 +1,14 @@
-#ifndef WINDOWS_WINDOWSUPDATER_H_
-#define WINDOWS_WINDOWSUPDATER_H_
+#ifndef PLATFORM_WINDOWS_PAG_UPDATER_H_
+#define PLATFORM_WINDOWS_PAG_UPDATER_H_
 
 #include <string>
 
-class WindowsUpdater
+class PAGUpdater
 {
 public:
   static auto initUpdater(const wchar_t* version) -> void;
   static auto checkUpdates(bool showUI, std::string feedUrl) -> void;
 };
 
-#endif // WINDOWS_WINDOWSUPDATER_H_
+#endif // PLATFORM_WINDOWS_PAG_UPDATER_H_
 

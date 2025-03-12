@@ -22,7 +22,7 @@ auto PAGWindow::Open() -> void {
   languageModel = new PAGLanguageModel();
   fileInfoModel = new PAGFileInfoModel();
   benchmarkModel = new PAGBenchmarkModel();
-  // TODO
+  // TODO Implement the functions
 
   auto context = qmlEngine->rootContext();
   context->setContextProperty("windowManager", this);
@@ -32,17 +32,17 @@ auto PAGWindow::Open() -> void {
   context->setContextProperty("benchmarkModel", benchmarkModel);
   context->setContextProperty("licenseUrl", LicenseDialog::licenseUrl);
   context->setContextProperty("privacyUrl", LicenseDialog::privacyUrl);
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
   context->setContextProperty("DefaultFontFamily", QString("PingFang SC"));
-#elif defined(PAG_WINDOWS)
+#elif defined(WIN32)
   context->setContextProperty("DefaultFontFamily", QString("Microsoft YaHei"));
 #endif
 
 #if defined(QT_DEBUG)
-#if defined(PAG_MACOS)
-  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../../../../src/resources/qml/MainWindow.qml";
-#elif defined(PAG_WINDOWS)
-  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../src/resources/qml/MainWindow.qml";
+#if defined(__APPLE__)
+  QString qmlPath = QCoreApplication::applicationDirPath() + "/../../../../src/resources/qml/MainWindow.qml";
+#elif defined(WIN32)
+  QString qmlPath = QCoreApplication::applicationDirPath() + "/../src/resources/qml/MainWindow.qml";
 #endif
   qmlEngine->load(QUrl::fromLocalFile(QFileInfo(qmlPath).absoluteFilePath()));
 #else
@@ -61,7 +61,6 @@ auto PAGWindow::Open() -> void {
   connect(viewWindow, &PAGViewWindow::frameMetricsReady, runTimeModelManager, &PAGRunTimeModelManager::updateDisplayData);
   connect(viewWindow, &PAGViewWindow::showVideoFramesChanged, this, &PAGWindow::onShowVideoFramesChanged);
   connect(quickWindow, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()), Qt::QueuedConnection);
-  // TODO
 }
 
 auto PAGWindow::getFilePath() -> QString {

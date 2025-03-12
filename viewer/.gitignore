@@ -1,4 +1,5 @@
 /third_party/
 __pycache__
 /.cache/
+/.idea/
 /src/common/version.h

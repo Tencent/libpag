@@ -8,7 +8,7 @@
 #include <QJsonDocument>
 #include <QNetworkRequest>
 #include <QNetworkAccessManager>
-#include "cJSON/cJSON.h"
+#include <cJSON.h>
 
 class HttpClient : public QObject {
     Q_OBJECT
@@ -59,9 +59,9 @@ std::string GetCurrentTimeInMilliseconds() {
 PAGReport *PAGReport::instance = nullptr;
 
 PAGReport::PAGReport() {
-#if defined(PAG_WINDOWS)
+#if defined(WIN32)
     appPlatform = "Windows";
-#elif defined(PAG_MACOS)
+#elif defined(__APPLE__)
     appPlatform = "macOS";
 #else
     appPlatform = "Unknown";

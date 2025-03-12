@@ -6,8 +6,8 @@
             "name": "libpag",
             "scripts": {
                 "mac": {
-                    "executor": "python",
-                    "file": "tools/build_tools/libpag/build.py",
+                    "executor": "bash",
+                    "file": "tools/build_tools/libpag/build.sh",
                     "arguments": []
                 },
                 "win": {
@@ -21,23 +21,8 @@
             "name": "log4qt",
             "scripts": {
                 "mac": {
-                    "executor": "python",
-                    "file": "tools/build_tools/log4qt/build.py",
-                    "arguments": []
-                }
-            }
-        },
-        {
-            "name": "nlohman-json",
-            "scripts": {
-                "mac": {
-                    "executor": "python",
-                    "file": "tools/build_tools/nlohman-json/build.py",
-                    "arguments": []
-                },
-                "win": {
-                    "executor": "python",
-                    "file": "tools/build_tools/nlohman-json/build.py",
+                    "executor": "bash",
+                    "file": "tools/build_tools/log4qt/build.sh",
                     "arguments": []
                 }
             }
@@ -46,8 +31,8 @@
             "name": "sodium",
             "scripts": {
                 "mac": {
-                    "executor": "python",
-                    "file": "tools/build_tools/sodium/build.py",
+                    "executor": "bash",
+                    "file": "tools/build_tools/sodium/build.sh",
                     "arguments": []
                 },
                 "win": {
@@ -61,8 +46,8 @@
             "name": "sparkle",
             "scripts": {
                 "mac": {
-                    "executor": "python",
-                    "file": "tools/build_tools/sparkle/build.py",
+                    "executor": "bash",
+                    "file": "tools/build_tools/sparkle/build.sh",
                     "arguments": []
                 }
             }
@@ -73,6 +58,16 @@
                 "win": {
                     "executor": "python",
                     "file": "tools/build_tools/winsparkle/build.py",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "cjson",
+            "scripts": {
+                "mac": {
+                    "executor": "bash",
+                    "file": "tools/build_tools/cjson/build.sh",
                     "arguments": []
                 }
             }

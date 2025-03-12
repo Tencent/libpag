@@ -9,7 +9,7 @@ import Qt.labs.platform as Lab11
 PApplicationWindow {
     id: mainWindow
 
-    property var warn1: qsTr("导出失败，错误码:")
+    property var warn1: qsTr("Export Failed, error code:")
     property var pagFilePath
     property var taskType
     property var exportLocation
@@ -243,8 +243,7 @@ PApplicationWindow {
                 mainForm.profilerForm.performanceWarnLeftDialog.close()
                 mainForm.profilerForm.performanceWarnRightDialog.close()
 
-                // TODO
-                // benchmarkTimer.start()
+                // TODO start benchmark
             }
         }
 
@@ -307,7 +306,7 @@ PApplicationWindow {
         id: openPagDialog
 
         visible: false
-        title: qsTr("打开 PAG 文件")
+        title: qsTr("Open PAG File")
         nameFilters: ["PAG files (*.pag)"]
         fileMode: Lab11.FileDialog.OpenFile
 
@@ -321,7 +320,7 @@ PApplicationWindow {
         id: taskFileDialog
 
         visible: false
-        title: qsTr("保存")
+        title: qsTr("Save")
         fileMode: Lab11.FileDialog.SaveFile
 
         onAccepted: {
@@ -394,8 +393,8 @@ PApplicationWindow {
 
         width: 500
         height: 130 + mainWindow.windowTitleBarHeight
-        title: qsTr("检查更新")
-        message: qsTr("PAGViewer 已经是最新版本")
+        title: qsTr("Check Update Information")
+        message: qsTr("The version of PAG you used is the newest")
         visible: false
     }
 
@@ -404,8 +403,8 @@ PApplicationWindow {
 
         width: 500
         height: 160 + mainWindow.windowTitleBarHeight
-        title: qsTr("检查更新")
-        message: qsTr("检查到 PAGViewer 有新版本，是否立刻更新？")
+        title: qsTr("heck Update Information")
+        message: qsTr("Finding new version for Adobe After Effects plug-in, updating it now or not?")
         visible: false
         showCancel: true
 
@@ -424,12 +423,12 @@ PApplicationWindow {
 
         width: settings.isUseEnglish ? 600 : 500
         height: 180 + mainWindow.windowTitleBarHeight
-        title: qsTr("关于 PAGViewer")
+        title: qsTr("About PAGViewer")
         message: "<b>PAGViewer</b> "+Qt.application.version+ "<br><br>Copyright © 2017-present Tencent. All rights reserved."
         textSize: 12
         visible: false
-        messageLicense: qsTr("软件许可及服务协议")
-        messagePrivacy: qsTr("隐私保护声明")
+        messageLicense: qsTr("Software License and Service Agreement")
+        messagePrivacy: qsTr("Privacy Protection Statement")
     }
 
     MessageBox {
@@ -437,8 +436,8 @@ PApplicationWindow {
 
         width: 500
         height: 130 + mainWindow.windowTitleBarHeight
-        title: qsTr("问题反馈")
-        message: qsTr("如果您在使用 PAGViewer 的过程中有任何问题，请在论坛提问")
+        title: qsTr("Feedback")
+        message: qsTr("PAG Support Community: https://bbs.pag.art/")
         textSize: 12
         visible: false
     }
@@ -448,7 +447,7 @@ PApplicationWindow {
 
         width: 600
         height: 130 + mainWindow.windowTitleBarHeight
-        title: qsTr("属性修改")
+        title: qsTr("Attribute Modify")
         message: ""
         textSize: 12
         visible: false
@@ -459,21 +458,13 @@ PApplicationWindow {
 
         width: 500
         height: 130 + mainWindow.windowTitleBarHeight
-        title: qsTr("性能基准测试")
-        message: qsTr("性能基准测试已完成")
+        title: qsTr("Performance Benchmark Test")
+        message: qsTr("Performance Benchmark Test Complete")
         textSize: 12
         visible: false
     }
 
-    // TODO
-    // CustomBusyIndicator{
-    //     id:busyLoading
-    //     visible: false
-    //     running: false
-    //     width:100
-    //     height:100
-    //     anchors.centerIn: parent
-    // }
+    // TODO add custom busy indicator
 
     /* Connection between task and process */
     Connections {
@@ -883,20 +874,8 @@ PApplicationWindow {
         mainForm.pagViewer.onFrameMetricsReady.connect(function(frame, m1, m2, m3) {
             currentFrame = frame
         })
-        // TODO
-        // mainForm.pagViewer.onFileNeedPassword.connect(function() {
-        //     decryptMessageBox.visible = true
-        // })
-        // mainForm.pagViewer.onFileNeedLicense.connect(function(name, info) {
-        //     certificateDecryptMessageBox.show(name, info)
-        // })
 
-        // TODO
-        // pagTreeViewModel.onModelReset.connect(function() {
-        //     mainForm.pagFileTreeView.expand(pagTreeViewModel.index(0,0))
-        // })
-        // checkUpdateModel.onCheckUpdateResult.connect(onGetCheckUpdateResult)
-        // checkUpdateModel.updatePreviousVersion()
+        // TODO connect signals
 
         timer.start()
         updateTimer.start()

@@ -1,6 +1,6 @@
 #include "PAGWindowHelper.h"
-#if defined(PAG_MACOS)
-#include "macos/MacUpdater.h"
+#if defined(__APPLE__)
+#include "PAGUpdater.h"
 #endif
 
 PAGWindowHelper::PAGWindowHelper (QObject* parent) : QObject(parent) {
@@ -13,9 +13,9 @@ auto PAGWindowHelper::setupWindowStyle(QQuickWindow *window) -> void {
   if (TopFlag && (window != nullptr)) {
     window->setFlags(window->flags() | Qt::WindowStaysOnTopHint);
   }
-#if defined(PAG_MACOS)
+#if defined(__APPLE__)
   if (window != nullptr) {
-    MacUpdater::changeTitleBarColor(window->winId(), 0.125, 0.125, 0.164);
+    PAGUpdater::changeTitleBarColor(window->winId(), 0.125, 0.125, 0.164);
   }
 #endif
 }

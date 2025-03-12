@@ -1,4 +1,4 @@
-#import "MacUpdater.h"
+#import "PAGUpdater.h"
 #import <QWindow>
 #import <Cocoa/Cocoa.h>
 #import <Sparkle/Sparkle.h>
@@ -51,7 +51,7 @@
 static PAGUpdaterDelegate* suDelegate = nil;
 static SPUStandardUpdaterController* updaterController = nil;
 
-void MacUpdater::initUpdater() {
+void PAGUpdater::initUpdater() {
     if (!suDelegate) {
         suDelegate = [[PAGUpdaterDelegate alloc] init];
     }
@@ -67,7 +67,7 @@ void MacUpdater::initUpdater() {
     }
 }
 
-void MacUpdater::checkUpdates(bool showUI, std::string feedUrl) {
+void PAGUpdater::checkUpdates(bool showUI, std::string feedUrl) {
     if (!updaterController) {
         qDebug() << "Error: Updater not initialized";
         return;
@@ -98,7 +98,7 @@ void MacUpdater::checkUpdates(bool showUI, std::string feedUrl) {
     }
 }
 
-void MacUpdater::changeTitleBarColor(WId winId, double red, double green, double blue) 
+void PAGUpdater::changeTitleBarColor(WId winId, double red, double green, double blue)
 {
     if (winId == 0) return;
     NSView* view = (NSView*)winId;

@@ -22,7 +22,7 @@ Item {
     required property string name
     required property string value
 
-    property var warn1: qsTr("PAGViewer 无法将修改保存到 %1 请检查您是否有修改该文件的权限。")
+    property var warn1: qsTr("You Don’t Have Permission to Save in This Location %1")
     property int innerWidth: 100
     property alias loaderItem: loader.item
 
