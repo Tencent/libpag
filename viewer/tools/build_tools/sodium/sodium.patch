@@ -1,0 +1,24 @@
+diff --git a/builds/msvc/build/buildbase.bat b/builds/msvc/build/buildbase.bat
+index 9335273..bb55cd3 100644
+--- a/builds/msvc/build/buildbase.bat
++++ b/builds/msvc/build/buildbase.bat
+@@ -15,6 +15,9 @@ IF %version% == 17 (
+     SET environment="%programfiles(x86)%\!tools!"
+     IF NOT EXIST !environment! (
+       SET tools=Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat
++      IF NOT EXIST !environment! (
++        SET tools=Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat
++      )
+     )
+   )
+ )
+@@ -26,6 +29,9 @@ IF %version% == 16 (
+     SET environment="%programfiles(x86)%\!tools!"
+     IF NOT EXIST !environment! (
+       SET tools=Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat
++      IF NOT EXIST !environment! (
++        SET tools=Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat
++      )
+     )
+   )
+ )

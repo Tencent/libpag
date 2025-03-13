@@ -1,0 +1,77 @@
+{
+    "source": "third_party",
+    "out": "third_party/out",
+    "vendors": [
+        {
+            "name": "libpag",
+            "scripts": {
+                "mac": {
+                    "executor": "bash",
+                    "file": "tools/build_tools/libpag/build.sh",
+                    "arguments": []
+                },
+                "win": {
+                    "file": "tools/build_tools/libpag/build.bat",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "log4qt",
+            "scripts": {
+                "mac": {
+                    "executor": "bash",
+                    "file": "tools/build_tools/log4qt/build.sh",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "sodium",
+            "scripts": {
+                "mac": {
+                    "executor": "bash",
+                    "file": "tools/build_tools/sodium/build.sh",
+                    "arguments": []
+                },
+                "win": {
+                    "file": "tools/build_tools/sodium/build.bat",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "sparkle",
+            "scripts": {
+                "mac": {
+                    "executor": "bash",
+                    "file": "tools/build_tools/sparkle/build.sh",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "winsparkle",
+            "scripts": {
+                "win": {
+                    "file": "tools/build_tools/winsparkle/build.bat",
+                    "arguments": []
+                }
+            }
+        },
+        {
+            "name": "cjson",
+            "scripts": {
+                "mac": {
+                    "executor": "bash",
+                    "file": "tools/build_tools/cjson/build.sh",
+                    "arguments": []
+                },
+                "win": {
+                    "file": "tools/build_tools/cjson/build.bat",
+                    "arguments": []
+                }
+            }
+        }
+    ]
+}

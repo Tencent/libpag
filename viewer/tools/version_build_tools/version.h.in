@@ -1,0 +1,11 @@
+
+#ifndef COMMON_VERSION_H_
+#define COMMON_VERSION_H_
+
+#include <string>
+
+const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@FixVersion@.@BuildNumber@";
+const std::string UpdateChannel = "@UpdateChannel@";
+const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@FixVersion@";
+
+#endif //COMMON_VERSION_H_

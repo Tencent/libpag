@@ -1,0 +1,4 @@
+/third_party/
+/.cache/
+/.idea/
+/src/common/version.h

@@ -1,0 +1,23 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index bf99ad8..ee29c80 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -151,12 +151,12 @@ add_custom_target(githubworkflows SOURCES
+ 
+ # Create a proper FindLog4Qt - module
+ set(CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/Log4Qt" )
+-install(EXPORT log4qt_targets
+-    DESTINATION "${CMAKECONFIG_INSTALL_DIR}"
+-    NAMESPACE Log4Qt::
+-    FILE Log4QtTargets.cmake
+-    COMPONENT Devel
+-)
++# install(EXPORT log4qt_targets
++#     DESTINATION "${CMAKECONFIG_INSTALL_DIR}"
++#     NAMESPACE Log4Qt::
++#     FILE Log4QtTargets.cmake
++#     COMPONENT Devel
++# )
+ configure_file(
+     "${Log4Qt_MODULE_DIR}/Log4QtConfig.cmake.in"
+     "${Log4Qt_BINARY_DIR}/Log4QtConfig.cmake"
