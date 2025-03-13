@@ -11,10 +11,9 @@
 #include "profiling/PAGBenchmarkModel.h"
 #include "profiling/PAGRunTimeChartModel.h"
 #include "profiling/PAGRunTimeModelManager.h"
-#if defined(__APPLE__)
 #include "common/PAGApplication.h"
-#elif defined(WIN32)
-#include "windows/SingleApplication.h"
+#if defined(WIN32)
+#include "SingleApplication.h"
 #endif
 
 void initReportConfig(const std::string& appVersion) {

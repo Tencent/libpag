@@ -11,8 +11,7 @@
                     "arguments": []
                 },
                 "win": {
-                    "executor": "python",
-                    "file": "tools/build_tools/libpag/build.py",
+                    "file": "tools/build_tools/libpag/build.bat",
                     "arguments": []
                 }
             }
@@ -36,8 +35,7 @@
                     "arguments": []
                 },
                 "win": {
-                    "executor": "python",
-                    "file": "tools/build_tools/sodium/build.py",
+                    "file": "tools/build_tools/sodium/build.bat",
                     "arguments": []
                 }
             }
@@ -56,8 +54,7 @@
             "name": "winsparkle",
             "scripts": {
                 "win": {
-                    "executor": "python",
-                    "file": "tools/build_tools/winsparkle/build.py",
+                    "file": "tools/build_tools/winsparkle/build.bat",
                     "arguments": []
                 }
             }
@@ -68,6 +65,10 @@
                 "mac": {
                     "executor": "bash",
                     "file": "tools/build_tools/cjson/build.sh",
+                    "arguments": []
+                },
+                "win": {
+                    "file": "tools/build_tools/cjson/build.bat",
                     "arguments": []
                 }
             }
