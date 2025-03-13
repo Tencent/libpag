@@ -57,11 +57,24 @@ if (NOT EXISTS ${CMAKE_SOURCE_DIR}/QTCMAKE.cfg)
 endif ()
 
 message(STATUS "Generate Version File")
-# TODO Do not use python to generate version file.
-execute_process(COMMAND python ${CMAKE_SOURCE_DIR}/tools/version_build_tools/main.py
-    --type cpp
-    --output ${CMAKE_SOURCE_DIR}/src/common/version.h
+set(MajorVersion $ENV{BK_CI_MAJOR_VERSION} 2)
+set(MinorVersion $ENV{BK_CI_MINOR_VERSION} 1)
+set(FixVersion $ENV{BK_CI_FIX_VERSION} 93)
+set(BuildNumber $ENV{BK_CI_BUILD_NO} 0)
+if ($ENV{isBetaVersion} MATCHES "false")
+    set(UpdateChannel "stable")    
+else ()
+    set(UpdateChannel "beta")
+endif()
+configure_file(${CMAKE_SOURCE_DIR}/tools/version_build_tools/version.h.in
+    ${CMAKE_SOURCE_DIR}/src/common/version.h
+    @ONLY
 )
+
+string(TIMESTAMP BuildTime "%Y-%m-%d %H:%M:%S")
+message(STATUS "Build TIme: ${BuildTime}")
+message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${FixVersion}.${BuildNumber}")
+message(STATUS "Update Channel: ${UpdateChannel}")
 
 function(find_include_dirs out)
     file(GLOB_RECURSE headers ${ARGN})
