@@ -153,9 +153,15 @@ bool RuntimeFilter::onDraw(const tgfx::RuntimeProgram* program,
   gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   gl->bindFramebuffer(GL_FRAMEBUFFER, targetInfo.id);
   gl->viewport(0, 0, target.width(), target.height());
+  if (needClearRenderTarget()) {
+    gl->clearColor(0, 0, 0, 0);
+    gl->clear(GL_COLOR_BUFFER_BIT);
+  }
   for (size_t i = 0; i < sources.size(); i++) {
     tgfx::GLTextureInfo sourceInfo;
-    sources[i].getGLTextureInfo(&sourceInfo);
+    if (!sources[i].getGLTextureInfo(&sourceInfo)) {
+      return false;
+    }
     ActiveGLTexture(context, static_cast<int>(i), &sourceInfo);
   }
   onUpdateParams(context, filterProgram, sources);

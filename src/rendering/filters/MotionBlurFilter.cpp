@@ -96,11 +96,7 @@ std::unique_ptr<Uniforms> MotionBlurRuntimeFilter::onPrepareProgram(tgfx::Contex
 
 void MotionBlurRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
                                              const std::vector<tgfx::BackendTexture>&) const {
-
-  auto previousMatrix = _previousMatrix;
-  auto currentMatrix = _currentMatrix;
-
-  auto scaling = (previousMatrix[0] != currentMatrix[0] || previousMatrix[4] != currentMatrix[4]);
+  auto scaling = _previousMatrix[0] != _currentMatrix[0] || _previousMatrix[4] != _currentMatrix[4];
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = static_cast<MotionBlurUniforms*>(program->uniforms.get());
   gl->uniformMatrix3fv(uniform->prevTransformHandle, 1, GL_FALSE, _previousMatrix.data());
@@ -161,8 +157,8 @@ void MotionBlurFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto currentMatrix = layerCache->getTransform(contentFrame)->matrix;
   previousMatrix.preTranslate(_contentBounds.left, _contentBounds.top);
   currentMatrix.preTranslate(_contentBounds.left, _contentBounds.top);
-  auto width = _contentBounds.width();
-  auto height = _contentBounds.height();
+  auto width = static_cast<int>(_contentBounds.width());
+  auto height = static_cast<int>(_contentBounds.height());
   previousGLMatrix = ToGLTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
   currentGLMatrix = ToGLTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
 }

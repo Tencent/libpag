@@ -76,6 +76,10 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
   virtual std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
                                                      unsigned program) const;
 
+  virtual bool needClearRenderTarget() const {
+    return false;
+  }
+
   /**
    * filter的给shader上传数据接口
    */

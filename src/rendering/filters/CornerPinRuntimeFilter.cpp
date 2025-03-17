@@ -64,8 +64,8 @@ tgfx::Rect CornerPinRuntimeFilter::filterBounds(const tgfx::Rect&) const {
 }
 
 static float calculateDistance(const tgfx::Point& intersection, const tgfx::Point& vertexPoint) {
-  return std::sqrtf(std::powf(fabsf(intersection.x - vertexPoint.x), 2) +
-                    std::powf(fabsf(intersection.y - vertexPoint.y), 2));
+  return std::sqrt(std::pow(fabsf(intersection.x - vertexPoint.x), 2.f) +
+                   std::pow(fabsf(intersection.y - vertexPoint.y), 2.f));
 }
 
 static bool PointIsBetween(const tgfx::Point& point, const tgfx::Point& start,

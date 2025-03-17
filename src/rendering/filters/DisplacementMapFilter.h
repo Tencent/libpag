@@ -82,6 +82,10 @@ class DisplacementMapRuntimeFilter : public RuntimeFilter {
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 
+  bool needClearRenderTarget() const override {
+    return true;
+  }
+
   Enum useForHorizontalDisplacement = DisplacementMapSource::Red;
   float maxHorizontalDisplacement = 0.f;
   Enum useForVerticalDisplacement = DisplacementMapSource::Red;
