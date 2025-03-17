@@ -320,7 +320,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          host: 'linux'
+          host: 'mac'
           target: 'desktop'
           version: '6.8.1'
           dir: '${{github.workspace}}/qt/'
