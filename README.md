@@ -219,7 +219,7 @@ you can download the precompiled libraries from [here](https://github.com/Tencen
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
 - CMake 3.13.0+
-- QT 5.13.0+
+- QT 6.2.0+
 - NDK 28+ (**28.0.13004108 recommended**)
 - Emscripten 3.1.58+
 
