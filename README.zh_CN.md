@@ -204,7 +204,7 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sd
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
 - CMake 3.13.0+
-- QT 5.13.0+
+- QT 6.2.0+
 - NDK 28+ (**推荐 28.0.13004108 版本**)
 - Emscripten 3.1.58+
 
