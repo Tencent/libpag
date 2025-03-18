@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAGViewer)
 
+include(../third_party/vendor_tools/vendor.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -44,24 +46,10 @@ if (QT_VERSION)
     endif ()
 endif ()
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick)
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
-if (${QT_VERSION} VERSION_LESS "5.15")
-    function(qt_add_resources outfiles)
-        qt5_add_resources("${outfiles}" ${ARGN})
-        if (TARGET ${outfiles})
-            cmake_parse_arguments(PARSE_ARGV 1 arg "" "OUTPUT_TARGETS" "")
-            if (arg_OUTPUT_TARGETS)
-                set(${arg_OUTPUT_TARGETS} ${${arg_OUTPUT_TARGETS}} PARENT_SCOPE)
-            endif ()
-        else ()
-            set("${outfiles}" "${${outfiles}}" PARENT_SCOPE)
-        endif ()
-    endfunction()
-endif ()
-
 qt_add_resources(QT_RESOURCES res.qrc)
 
 if (APPLE)
@@ -95,6 +83,8 @@ set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
 
 set(PAG_USE_QT ON)
+set(PAG_USE_RTTR ON)
+set(PAG_USE_LIBAVC OFF)
 set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_FRAMEWORK OFF)
 
@@ -102,5 +92,16 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
 add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
+if (APPLE)
+    add_vendor_target(viewer-vendor SHARED_VENDORS sparkle CONFIG_DIR ${CMAKE_SOURCE_DIR}/../)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/mac/include)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/../third_party/out/sparkle/lib/Sparkle.framework)
+elseif (WIN32)
+    add_vendor_target(viewer-vendor SHARED_VENDORS winsparkle CONFIG_DIR ${CMAKE_SOURCE_DIR}/../)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/win/include)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/winsparkle/include)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/../third_party/out/winsparkle/lib/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
+endif ()
+
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
-target_link_libraries(PAGViewer pag ${PAG_VIEWER_PLATFORM_LIBS})
+target_link_libraries(PAGViewer pag ${PAG_VIEWER_PLATFORM_LIBS} ${VIEWER_VENDOR_LIBRARIES})

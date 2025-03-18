@@ -35,12 +35,7 @@ int main(int argc, char* argv[]) {
   defaultFormat.setVersion(3, 2);
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-#else
-  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
 
   PAGViewer app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
