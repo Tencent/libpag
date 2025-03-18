@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DisplacementMapFilter.h"
-#include <tgfx/core/Recorder.h>
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/core/Recorder.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -191,7 +190,7 @@ void DisplacementMapRuntimeFilter::onUpdateParams(tgfx::Context* context,
     matrix.postScale(newW / w, newH / h);
     matrix.postTranslate(-expandX, -expandY);
   }
-  // matrix mean
+
   auto glMatrix = ToGLMatrix(matrix);
   gl->uniformMatrix3fv(uniform->inputMatrixHandle, 1, false, glMatrix.data());
 

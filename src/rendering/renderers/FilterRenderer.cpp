@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterRenderer.h"
-#include <tgfx/core/Recorder.h>
-#include <utility>
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
@@ -26,11 +24,8 @@
 #include "rendering/filters/FilterModifier.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
-#include "rendering/filters/MotionTileFilter.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
-#include "rendering/filters/utils/FilterHelper.h"
-#include "rendering/utils/SurfaceUtil.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/core/Recorder.h"
 
 namespace pag {
 

@@ -30,15 +30,13 @@ static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
     varying vec2 blurCoordinates[5];
 
     void main() {
-        vec3 position = vec3(aPosition, 1);
-        gl_Position = vec4(position.xy, 0, 1);
-        vec3 colorPosition = vec3(aTextureCoord, 1);
+        gl_Position = vec4(aPosition.xy, 0, 1);
         vec2 singleStepOffset = vec2(textureOffsetH, textureOffsetV);
-        blurCoordinates[0] = colorPosition.xy;
-        blurCoordinates[1] = colorPosition.xy + singleStepOffset * 1.182425;
-        blurCoordinates[2] = colorPosition.xy - singleStepOffset * 1.182425;
-        blurCoordinates[3] = colorPosition.xy + singleStepOffset * 3.029312;
-        blurCoordinates[4] = colorPosition.xy - singleStepOffset * 3.029312;
+        blurCoordinates[0] = aTextureCoord.xy;
+        blurCoordinates[1] = aTextureCoord.xy + singleStepOffset * 1.182425;
+        blurCoordinates[2] = aTextureCoord.xy - singleStepOffset * 1.182425;
+        blurCoordinates[3] = aTextureCoord.xy + singleStepOffset * 3.029312;
+        blurCoordinates[4] = aTextureCoord.xy - singleStepOffset * 3.029312;
     }
     )";
 

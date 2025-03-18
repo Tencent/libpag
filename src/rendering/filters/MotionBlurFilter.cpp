@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MotionBlurFilter.h"
-#include "MotionTileFilter.h"
-#include "base/utils/USE.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
@@ -35,10 +33,8 @@ static const char MOTIONBLUR_VERTEX_SHADER[] = R"(
         varying vec2 vCurrPosition;
         varying vec2 vPrevPosition;
         void main() {
-            vec3 position = vec3(aPosition, 1);
-            gl_Position = vec4(position.xy, 0, 1);
-            vec3 colorPosition = vec3(aTextureCoord, 1);
-            vertexColor = colorPosition.xy;
+            gl_Position = vec4(aPosition.xy, 0, 1);
+            vertexColor = aTextureCoord.xy;
             vCurrPosition = (uTransform * vec3(aTextureCoord, 1)).xy;
             vPrevPosition = (uPrevTransform * vec3(aTextureCoord, 1)).xy;
         }

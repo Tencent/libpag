@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EffectFilter.h"
-#include <tgfx/core/Canvas.h>
 #include "BrightnessContrastFilter.h"
 #include "BulgeFilter.h"
 #include "CornerPinFilter.h"
@@ -30,6 +29,7 @@
 #include "layerstyle/StrokeFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {

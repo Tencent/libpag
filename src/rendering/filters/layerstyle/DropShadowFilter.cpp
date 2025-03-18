@@ -21,7 +21,6 @@
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/layerstyle/SolidStrokeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
-#include "rendering/filters/utils/FilterHelper.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 

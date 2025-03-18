@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <tgfx/layers/filters/LayerFilter.h>
 #include "EffectFilter.h"
 
 namespace pag {

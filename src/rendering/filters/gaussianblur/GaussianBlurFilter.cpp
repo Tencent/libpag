@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GaussianBlurFilter.h"
-#include <tgfx/core/Canvas.h>
-#include "base/utils/Log.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {

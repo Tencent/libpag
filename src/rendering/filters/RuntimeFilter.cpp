@@ -19,7 +19,6 @@
 #include "RuntimeFilter.h"
 #include "base/utils/Log.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/core/Canvas.h"
 
 namespace pag {
 static constexpr char VERTEX_SHADER[] = R"(
@@ -28,9 +27,8 @@ static constexpr char VERTEX_SHADER[] = R"(
     attribute vec2 aTextureCoord;
     varying vec2 vertexColor;
     void main() {
-    vec3 position = vec3(aPosition, 1);
-    gl_Position = vec4(position.xy, 0, 1);
-    vertexColor = aTextureCoord;
+      gl_Position = vec4(aPosition.xy, 0, 1);
+      vertexColor = aTextureCoord;
     }
 )";
 

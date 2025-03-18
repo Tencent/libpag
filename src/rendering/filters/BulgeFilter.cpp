@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BulgeFilter.h"
-#include <sys/stat.h>
-#include <tgfx/core/ImageFilter.h>
 
 namespace pag {
 
@@ -96,12 +94,9 @@ static const char BULGE_VERTEX_SHADER[] = R"(
         varying vec2 vertexColor;
         varying vec2 bulgeCenter;
         void main() {
-            vec3 position = vec3(aPosition, 1);
-            gl_Position = vec4(position.xy, 0, 1);
-            vec3 colorPosition = vec3(aTextureCoord, 1);
-            vertexColor = colorPosition.xy;
-            vec3 bulgeCenterPosition = vec3(uBulgeCenter, 1);
-            bulgeCenter = bulgeCenterPosition.xy;
+            gl_Position = vec4(aPosition.xy, 0, 1);
+            vertexColor = aTextureCoord.xy;
+            bulgeCenter = uBulgeCenter.xy;
         }
     )";
 

@@ -18,7 +18,6 @@
 
 #include "FilterHelper.h"
 #include "base/utils/Log.h"
-#include "base/utils/USE.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 

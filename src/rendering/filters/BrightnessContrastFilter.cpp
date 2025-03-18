@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BrightnessContrastFilter.h"
-#include <tgfx/core/ImageFilter.h>
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(

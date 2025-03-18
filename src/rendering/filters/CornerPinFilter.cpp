@@ -26,8 +26,7 @@ static const char CORNER_PIN_VERTEX_SHADER[] = R"(
         attribute vec3 aTextureCoord;
         varying vec3 vertexColor;
         void main() {
-            vec3 position = vec3(aPosition, 1);
-            gl_Position = vec4(position.xy, 0, 1);
+            gl_Position = vec4(aPosition.xy, 0, 1);
             vertexColor = aTextureCoord;
         }
     )";
