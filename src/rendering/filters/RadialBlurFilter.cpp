@@ -55,22 +55,6 @@ static const char RADIAL_BLUR_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-RadialBlurFilter::RadialBlurFilter(Effect* effect) : effect(effect) {
-}
-
-void RadialBlurFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
-  amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
-  center = ToTGFX(radialBlurEffect->center->getValueAt(layerFrame));
-  center.x = center.x / _contentBounds.width();
-  center.y = center.y / _contentBounds.height();
-  amount = amount < 0.25 ? amount : 0.25;
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> RadialBlurFilter::createRuntimeEffect() {
-  return std::make_shared<RadialBlurRuntimeFilter>(amount, center);
-}
-
 std::string RadialBlurRuntimeFilter::onBuildFragmentShader() const {
   return RADIAL_BLUR_FRAGMENT_SHADER;
 }
@@ -86,6 +70,22 @@ void RadialBlurRuntimeFilter::onUpdateParams(tgfx::Context* context, const Runti
   auto uniforms = static_cast<RadialBlurUniforms*>(program->uniforms.get());
   gl->uniform1f(uniforms->amountHandle, amount);
   gl->uniform2f(uniforms->centerHandle, center.x, center.y);
+}
+
+RadialBlurFilter::RadialBlurFilter(Effect* effect) : effect(effect) {
+}
+
+void RadialBlurFilter::update(Frame layerFrame, const tgfx::Point&) {
+  auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
+  amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
+  center = ToTGFX(radialBlurEffect->center->getValueAt(layerFrame));
+  center.x = center.x / _contentBounds.width();
+  center.y = center.y / _contentBounds.height();
+  amount = amount < 0.25 ? amount : 0.25;
+}
+
+std::shared_ptr<tgfx::RuntimeEffect> RadialBlurFilter::createRuntimeEffect() {
+  return std::make_shared<RadialBlurRuntimeFilter>(amount, center);
 }
 
 }  // namespace pag

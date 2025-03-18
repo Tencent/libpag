@@ -85,9 +85,6 @@ static const char MOTIONTILE_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-MotionTileFilter::MotionTileFilter(Effect* effect) : effect(effect) {
-}
-
 std::string MotionTileRuntimeFilter::onBuildVertexShader() const {
   return MOTIONTILE_VERTEX_SHADER;
 }
@@ -121,6 +118,9 @@ tgfx::Rect MotionTileRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) cons
   auto x = srcRect.x() + (srcRect.width() - width) * 0.5f;
   auto y = srcRect.y() + (srcRect.height() - height) * 0.5f;
   return tgfx::Rect::MakeXYWH(x, y, width, height);
+}
+
+MotionTileFilter::MotionTileFilter(Effect* effect) : effect(effect) {
 }
 
 void MotionTileFilter::update(Frame layerFrame, const tgfx::Point&) {

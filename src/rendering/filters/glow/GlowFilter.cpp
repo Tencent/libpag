@@ -42,8 +42,6 @@ void GlowFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> 
     LOGE("GlowFilter::draw() can not draw filter");
     return;
   }
-  // tgfx::Point offset = tgfx::Point::Zero();
-  // auto image = MakeFromPicture(image, &offset);
   auto blurWidth = ceil(image->width() * resizeRatio);
   auto blurHeight = ceil(image->height() * resizeRatio);
   auto blurFilterH = std::make_shared<GlowBlurRuntimeFilter>(BlurDirection::Horizontal,

@@ -75,6 +75,10 @@ class BulgeFilter : public EffectFilter {
 
  private:
   Effect* effect = nullptr;
-  std::shared_ptr<BulgeRuntimeFilter> currentFilter;
+  float horizontalRadius = 0.f;
+  float verticalRadius = 0.f;
+  Point bulgeCenter = {};
+  float bulgeHeight = 0.f;
+  float pinning = 0.f;
 };
 }  // namespace pag

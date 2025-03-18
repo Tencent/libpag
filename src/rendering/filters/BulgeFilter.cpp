@@ -248,21 +248,18 @@ BulgeFilter::BulgeFilter(Effect* effect) : effect(effect) {
 
 void BulgeFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
-  auto horizontalRadius =
-      bulgeEffect->horizontalRadius->getValueAt(layerFrame) / _contentBounds.width();
-  auto verticalRadius =
-      bulgeEffect->verticalRadius->getValueAt(layerFrame) / _contentBounds.height();
-  auto bulgeCenter = bulgeEffect->bulgeCenter->getValueAt(layerFrame);
+  horizontalRadius = bulgeEffect->horizontalRadius->getValueAt(layerFrame) / _contentBounds.width();
+  verticalRadius = bulgeEffect->verticalRadius->getValueAt(layerFrame) / _contentBounds.height();
+  bulgeCenter = bulgeEffect->bulgeCenter->getValueAt(layerFrame);
   bulgeCenter.x = (bulgeCenter.x - _contentBounds.x()) / _contentBounds.width();
   bulgeCenter.y = (bulgeCenter.y - _contentBounds.y()) / _contentBounds.height();
-  auto bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
-  auto pinning = bulgeEffect->pinning->getValueAt(layerFrame);
-  currentFilter = std::make_shared<BulgeRuntimeFilter>(horizontalRadius, verticalRadius,
-                                                       bulgeCenter, bulgeHeight, pinning);
+  bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
+  pinning = bulgeEffect->pinning->getValueAt(layerFrame);
 }
 
 std::shared_ptr<tgfx::RuntimeEffect> BulgeFilter::createRuntimeEffect() {
-  return currentFilter;
+  return std::make_shared<BulgeRuntimeFilter>(horizontalRadius, verticalRadius, bulgeCenter,
+                                              bulgeHeight, pinning);
 }
 
 }  // namespace pag

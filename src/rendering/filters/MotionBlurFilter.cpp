@@ -150,6 +150,14 @@ void MotionBlurFilter::TransformBounds(tgfx::Rect* contentBounds, Layer* layer, 
   }
 }
 
+bool MotionBlurFilter::ShouldSkipFilter(Layer* layer, Frame layerFrame) {
+  auto layerCache = LayerCache::Get(layer);
+  auto contentFrame = layerFrame - layer->startTime;
+  auto previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
+  auto currentMatrix = layerCache->getTransform(contentFrame)->matrix;
+  return previousMatrix == currentMatrix;
+}
+
 void MotionBlurFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto contentFrame = layerFrame - layer->startTime;
   auto layerCache = LayerCache::Get(layer);
@@ -161,10 +169,6 @@ void MotionBlurFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto height = static_cast<int>(_contentBounds.height());
   previousGLMatrix = ToGLTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
   currentGLMatrix = ToGLTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
-}
-
-bool MotionBlurFilter::shouldSkipFilter() {
-  return previousGLMatrix == currentGLMatrix;
 }
 
 std::shared_ptr<tgfx::RuntimeEffect> MotionBlurFilter::createRuntimeEffect() {

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "EffectFilter.h"
 
 namespace pag {
@@ -74,12 +75,12 @@ class MotionBlurFilter : public EffectFilter {
  public:
   static void TransformBounds(tgfx::Rect* contentBounds, Layer* layer, Frame layerFrame);
 
+  static bool ShouldSkipFilter(Layer* layer, Frame layerFrame);
+
   explicit MotionBlurFilter(Layer* layer) : layer(layer) {
   }
 
   void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
-  bool shouldSkipFilter() override;
 
  protected:
   std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;

@@ -62,6 +62,7 @@ class BrightnessContrastFilter : public EffectFilter {
 
  private:
   Effect* effect = nullptr;
-  std::shared_ptr<BrightnessContrastRuntimeFilter> currentFilter;
+  float brightness = 0.f;
+  float contrast = 0.f;
 };
 }  // namespace pag

@@ -99,12 +99,12 @@ BrightnessContrastFilter::BrightnessContrastFilter(Effect* effect) : effect(effe
 
 void BrightnessContrastFilter::update(Frame layerFrame, const tgfx::Point&) {
   auto* brightnessContrastEffect = static_cast<const BrightnessContrastEffect*>(effect);
-  auto brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
-  auto contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);
-  currentFilter = std::make_shared<BrightnessContrastRuntimeFilter>(brightness, contrast);
+  brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
+  contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);
 }
+
 std::shared_ptr<tgfx::RuntimeEffect> BrightnessContrastFilter::createRuntimeEffect() {
-  return currentFilter;
+  return std::make_shared<BrightnessContrastRuntimeFilter>(brightness, contrast);
 }
 
 }  // namespace pag

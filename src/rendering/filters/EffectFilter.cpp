@@ -20,7 +20,7 @@
 #include <tgfx/core/Canvas.h>
 #include "BrightnessContrastFilter.h"
 #include "BulgeFilter.h"
-#include "CornerPinRuntimeFilter.h"
+#include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
 #include "HueSaturationFilter.h"
 #include "LevelsIndividualFilter.h"

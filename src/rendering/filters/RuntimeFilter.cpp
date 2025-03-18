@@ -153,10 +153,8 @@ bool RuntimeFilter::onDraw(const tgfx::RuntimeProgram* program,
   gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   gl->bindFramebuffer(GL_FRAMEBUFFER, targetInfo.id);
   gl->viewport(0, 0, target.width(), target.height());
-  if (needClearRenderTarget()) {
-    gl->clearColor(0, 0, 0, 0);
-    gl->clear(GL_COLOR_BUFFER_BIT);
-  }
+  gl->clearColor(0, 0, 0, 0);
+  gl->clear(GL_COLOR_BUFFER_BIT);
   for (size_t i = 0; i < sources.size(); i++) {
     tgfx::GLTextureInfo sourceInfo;
     if (!sources[i].getGLTextureInfo(&sourceInfo)) {
@@ -203,7 +201,6 @@ std::vector<float> RuntimeFilter::computeVertices(const std::vector<tgfx::Backen
 
 void RuntimeFilter::bindVertices(tgfx::Context* context, const RuntimeProgram* filterProgram,
                                  const std::vector<float>& points) const {
-
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = filterProgram->uniforms.get();
   if (filterProgram->vertexArray > 0) {

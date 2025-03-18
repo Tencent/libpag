@@ -99,60 +99,6 @@ std::unique_ptr<Uniforms> DisplacementMapRuntimeFilter::onPrepareProgram(tgfx::C
   return std::make_unique<DisplacementMapEffectUniforms>(context, program);
 }
 
-std::shared_ptr<tgfx::RuntimeEffect> DisplacementMapFilter::createRuntimeEffect() {
-  return runtimeFilter;
-}
-
-std::shared_ptr<Graphic> DisplacementMapFilter::GetDisplacementMapGraphic(Frame frame) {
-  auto mapLayer = static_cast<const DisplacementMapEffect*>(effect)->displacementMapLayer;
-  auto contentFrame = frame - mapLayer->startTime;
-  auto layerCache = LayerCache::Get(mapLayer);
-  auto content = layerCache->getContent(contentFrame);
-  return static_cast<GraphicContent*>(content)->graphic;
-}
-
-void DisplacementMapFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-  runtimeFilter = std::make_shared<DisplacementMapRuntimeFilter>(
-      pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
-      pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
-      pagEffect->useForVerticalDisplacement->getValueAt(layerFrame),
-      pagEffect->maxVerticalDisplacement->getValueAt(layerFrame),
-      pagEffect->displacementMapBehavior->getValueAt(layerFrame),
-      pagEffect->edgeBehavior->getValueAt(layerFrame),
-      pagEffect->expandOutput->getValueAt(layerFrame),
-      ToAlpha(pagEffect->effectOpacity->getValueAt(layerFrame)), _layerMatrix, _size,
-      _displacementSize, _contentBounds, _referenceImage);
-}
-
-void DisplacementMapFilter::updateMapTexture(Frame layerFrame, RenderCache* cache,
-                                             const Layer* layer, const tgfx::Matrix& layerMatrix) {
-  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-  auto bounds = layer->getBounds();
-  _size = tgfx::Size::Make(bounds.width(), bounds.height());
-  auto mapLayer = static_cast<const DisplacementMapEffect*>(effect)->displacementMapLayer;
-  bounds = mapLayer->getBounds();
-  _displacementSize = tgfx::Size::Make(bounds.width(), bounds.height());
-  _layerMatrix = layerMatrix;
-  auto displacementMapBehavior = pagEffect->displacementMapBehavior->getValueAt(layerFrame);
-
-  tgfx::Recorder recorder;
-  auto tgfxCanvas = recorder.beginRecording();
-  Canvas canvas(tgfxCanvas, cache);
-  if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
-    auto contentBounds = _contentBounds;
-    layerMatrix.mapRect(&contentBounds);
-    tgfx::Path path;
-    path.addRect(contentBounds);
-    canvas.clipPath(path);
-  }
-  auto graphic = GetDisplacementMapGraphic(layerFrame);
-  graphic->draw(&canvas);
-  auto picture = recorder.finishRecordingAsPicture();
-  _referenceImage = tgfx::Image::MakeFrom(picture, static_cast<int>(_displacementSize.width),
-                                          static_cast<int>(_displacementSize.height));
-}
-
 struct SelectorCoeffs {
   // displacement contribution
   float dr;
@@ -332,6 +278,60 @@ tgfx::Rect DisplacementMapRuntimeFilter::filterBounds(const tgfx::Rect& srcRect)
     rect.outset(expandX * scaleX, expandY * scaleY);
   }
   return rect;
+}
+
+std::shared_ptr<tgfx::RuntimeEffect> DisplacementMapFilter::createRuntimeEffect() {
+  return runtimeFilter;
+}
+
+std::shared_ptr<Graphic> DisplacementMapFilter::GetDisplacementMapGraphic(Frame frame) {
+  auto mapLayer = static_cast<const DisplacementMapEffect*>(effect)->displacementMapLayer;
+  auto contentFrame = frame - mapLayer->startTime;
+  auto layerCache = LayerCache::Get(mapLayer);
+  auto content = layerCache->getContent(contentFrame);
+  return static_cast<GraphicContent*>(content)->graphic;
+}
+
+void DisplacementMapFilter::update(Frame layerFrame, const tgfx::Point&) {
+  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
+  runtimeFilter = std::make_shared<DisplacementMapRuntimeFilter>(
+      pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
+      pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
+      pagEffect->useForVerticalDisplacement->getValueAt(layerFrame),
+      pagEffect->maxVerticalDisplacement->getValueAt(layerFrame),
+      pagEffect->displacementMapBehavior->getValueAt(layerFrame),
+      pagEffect->edgeBehavior->getValueAt(layerFrame),
+      pagEffect->expandOutput->getValueAt(layerFrame),
+      ToAlpha(pagEffect->effectOpacity->getValueAt(layerFrame)), _layerMatrix, _size,
+      _displacementSize, _contentBounds, _referenceImage);
+}
+
+void DisplacementMapFilter::updateMapTexture(Frame layerFrame, RenderCache* cache,
+                                             const Layer* layer, const tgfx::Matrix& layerMatrix) {
+  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
+  auto bounds = layer->getBounds();
+  _size = tgfx::Size::Make(bounds.width(), bounds.height());
+  auto mapLayer = static_cast<const DisplacementMapEffect*>(effect)->displacementMapLayer;
+  bounds = mapLayer->getBounds();
+  _displacementSize = tgfx::Size::Make(bounds.width(), bounds.height());
+  _layerMatrix = layerMatrix;
+  auto displacementMapBehavior = pagEffect->displacementMapBehavior->getValueAt(layerFrame);
+
+  tgfx::Recorder recorder;
+  auto tgfxCanvas = recorder.beginRecording();
+  Canvas canvas(tgfxCanvas, cache);
+  if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
+    auto contentBounds = _contentBounds;
+    layerMatrix.mapRect(&contentBounds);
+    tgfx::Path path;
+    path.addRect(contentBounds);
+    canvas.clipPath(path);
+  }
+  auto graphic = GetDisplacementMapGraphic(layerFrame);
+  graphic->draw(&canvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  _referenceImage = tgfx::Image::MakeFrom(picture, static_cast<int>(_displacementSize.width),
+                                          static_cast<int>(_displacementSize.height));
 }
 
 }  // namespace pag

@@ -16,8 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CornerPinRuntimeFilter.h"
-#include <tgfx/core/ImageFilter.h>
+#include "CornerPinFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {

@@ -169,6 +169,9 @@ static bool MakeMotionBlurNode(std::vector<std::shared_ptr<Filter>>& filterNodes
                                tgfx::Rect& clipBounds, const FilterList* filterList,
                                tgfx::Rect& filterBounds) {
   if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
+    if (MotionBlurFilter::ShouldSkipFilter(filterList->layer, filterList->layerFrame)) {
+      return true;
+    }
     auto filter = std::make_shared<MotionBlurFilter>(filterList->layer);
     filter->setContentBounds(filterBounds);
     MotionBlurFilter::TransformBounds(&filterBounds, filterList->layer, filterList->layerFrame);
@@ -300,9 +303,6 @@ static void ApplyFilters(Canvas* canvas, const std::vector<std::shared_ptr<Filte
   auto totalOffset = tgfx::Point::Zero();
   for (auto& filter : filters) {
     filter->update(layerFrame, sourceScale);
-    if (filter->shouldSkipFilter()) {
-      continue;
-    }
     tgfx::Recorder recorder;
     auto filterCanvas = recorder.beginRecording();
     filter->applyFilter(filterCanvas, source);

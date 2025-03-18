@@ -36,10 +36,6 @@ class Filter {
 
   virtual void update(Frame layerFrame, const tgfx::Point& sourceScale) = 0;
 
-  virtual bool shouldSkipFilter() {
-    return false;
-  }
-
   virtual void applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> source) = 0;
 
  protected:
