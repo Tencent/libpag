@@ -58,14 +58,6 @@
           "file": "scripts/build_sparkle.sh"
         }
       }
-    },
-    {
-      "name": "winsparkle",
-      "scripts": {
-        "win": {
-          "file": "scripts/build_winsparkle.bat"
-        }
-      }
     }
   ]
 }

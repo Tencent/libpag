@@ -29,6 +29,7 @@ Window {
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
 
     Rectangle {
+        z: 1
         visible: window.isWindows
         anchors.fill: parent
         radius: 5
@@ -274,6 +275,7 @@ Window {
         clip: true
     }
     MouseArea {
+        enabled: window.isWindows && window.canResize
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: {
@@ -299,6 +301,7 @@ Window {
     }
     DragHandler {
         id: resizeHandler
+        enabled: window.isWindows && window.canResize
         target: null
         grabPermissions: TapHandler.TakeOverForbidden
         onActiveChanged: if (active) {
@@ -321,18 +324,6 @@ Window {
         }
     }
 
-    function updateWidth(offset) {
-        let width = window.width;
-        let target = width + offset;
-        target = Math.max(window.minimumWidth, target);
-        window.width = target;
-    }
-    function updateHeight(offset) {
-        let height = window.height;
-        let target = height + offset;
-        target = Math.max(window.minimumHeight, target);
-        window.height = target;
-    }
     function setMaximized(maximized) {
         isMaximized = maximized;
         let useFake = Qt.platform.os === 'windows' && Screen.height === Screen.desktopAvailableHeight && Screen.width === Screen.desktopAvailableWidth && isWindows;
