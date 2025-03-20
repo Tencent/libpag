@@ -12,6 +12,7 @@ PAGWindow {
     height: 360
     minimumWidth: 400 + windowPadding
     minimumHeight: 320 + windowTitleBarHeight
+    resizeHandleSize: 5
 
     property string filePath
     property bool lastPlayStatusIsPlaying: false
@@ -34,6 +35,7 @@ PAGWindow {
     }
     MainForm {
         id: mainForm
+        resizeHandleSize: resizeHandleSize
         pagView {
             showVideoFrames: settings.isShowVideoFrames
             onProgressChanged: function (progress) {

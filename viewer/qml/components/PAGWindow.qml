@@ -6,6 +6,8 @@ Window {
     id: window
     default property alias contents: placeholder.data
 
+    required property int resizeHandleSize
+
     property bool isWindows: Qt.platform.os === "windows"
 
     property bool isMaximized: false
@@ -23,6 +25,7 @@ Window {
     property int windowLastHeight: 0
 
     property int titleBarHeight: 32
+
     visible: true
     color: "#00000000"
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
@@ -80,6 +83,7 @@ Window {
                 property int windowWidth: 0
                 height: 40
                 anchors.fill: parent
+                anchors.topMargin: resizeHandleSize
                 onPressed: {
                     mouseLastX = mouseX;
                     mouseLastY = mouseY;
@@ -142,6 +146,7 @@ Window {
                 source: "qrc:/images/window-icon-32x.png"
             }
             Row {
+                id: windowControlRow
                 anchors.right: parent.right
 
                 PAGRectangle {
@@ -270,86 +275,51 @@ Window {
         anchors.bottomMargin: window.isWindows ? 1 : 0
         clip: true
     }
-    PAGResizeArea {
-        id: topResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionTop
-        onPositionChanged: {
-            window.y += (mouseY - startY);
-            updateHeight(startY - mouseY);
-            ensurePositionMovable();
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: {
+            const pos = Qt.point(mouseX, mouseY);
+            const offset = resizeHandleSize;
+            if ((pos.x < offset) && (pos.y >= (height - offset))) {
+                return Qt.SizeBDiagCursor;
+            }
+            if ((pos.x < offset) && (pos.y < offset)) {
+                return Qt.SizeFDiagCursor;
+            }
+            if ((pos.x >= (width - offset)) && (pos.y >= (height - offset))) {
+                return Qt.SizeFDiagCursor;
+            }
+            if ((pos.x < offset) || ((pos.x >= (width - offset)) && (pos.y > titleBarHeight))) {
+                return Qt.SizeHorCursor;
+            }
+            if ((pos.y > (height - offset)) || ((pos.y < offset) && (pos.x < (width - 120)))) {
+                return Qt.SizeVerCursor;
+            }
         }
+        acceptedButtons: Qt.NoButton
     }
-    PAGResizeArea {
-        id: bottomResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionBottom
-        onPositionChanged: {
-            updateHeight(mouseY - startY);
-            ensurePositionMovable();
-        }
-    }
-    PAGResizeArea {
-        id: leftResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionLeft
-        onPositionChanged: {
-            window.x += (mouseX - startX);
-            updateWidth(startX - mouseX);
-            ensurePositionMovable();
-        }
-    }
-    PAGResizeArea {
-        id: rightResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionRight
-        onPositionChanged: {
-            updateWidth(mouseX - startX);
-            ensurePositionMovable();
-        }
-    }
-    PAGResizeArea {
-        id: leftTopResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionLeft & directionTop
-        onPositionChanged: {
-            window.x += (mouseX - startX);
-            window.y += (mouseY - startY);
-            updateWidth(startX - mouseX);
-            updateHeight(startY - mouseY);
-            ensurePositionMovable();
-        }
-    }
-    PAGResizeArea {
-        id: rightTopResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionRight & directionTop
-        onPositionChanged: {
-            window.y += (mouseY - startY);
-            updateWidth(mouseX - startX);
-            updateHeight(startY - mouseY);
-            ensurePositionMovable();
-        }
-    }
-    PAGResizeArea {
-        id: leftBottomResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionLeft & directionBottom
-        onPositionChanged: {
-            window.x += (mouseX - startX);
-            updateWidth(startX - mouseX);
-            updateHeight(mouseY - startY);
-            ensurePositionMovable();
-        }
-    }
-    PAGResizeArea {
-        id: rightBottomResizeHandle
-        isEnable: window.isWindows && window.canResize
-        direction: directionRight & directionBottom
-        onPositionChanged: {
-            updateWidth(mouseX - startX);
-            updateHeight(mouseY - startY);
-            ensurePositionMovable();
+    DragHandler {
+        id: resizeHandler
+        target: null
+        grabPermissions: TapHandler.TakeOverForbidden
+        onActiveChanged: if (active) {
+            const pos = resizeHandler.centroid.position;
+            const offset = resizeHandleSize + 10;
+            let edges = 0;
+            if (pos.x < offset) {
+                edges |= Qt.LeftEdge;
+            }
+            if (pos.x >= (width - offset)) {
+                edges += Qt.RightEdge;
+            }
+            if (pos.y < offset) {
+                edges |= Qt.TopEdge;
+            }
+            if (pos.y >= (height - offset)) {
+                edges |= Qt.BottomEdge;
+            }
+            window.startSystemResize(edges);
         }
     }
 

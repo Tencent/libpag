@@ -26,6 +26,5 @@
         <file>qml/ControlForm.qml</file>
         <file>qml/components/PAGWindow.qml</file>
         <file>qml/components/PAGRectangle.qml</file>
-        <file>qml/components/PAGResizeArea.qml</file>
     </qresource>
 </RCC>
