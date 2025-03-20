@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RadialBlurFilter.h"
+#include "base/utils/TGFXCast.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 
@@ -54,29 +56,35 @@ static const char RADIAL_BLUR_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-RadialBlurFilter::RadialBlurFilter(Effect* effect) : effect(effect) {
+std::shared_ptr<tgfx::Image> RadialBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                     Effect* effect, Frame layerFrame,
+                                                     const tgfx::Rect& contentBounds,
+                                                     tgfx::Point* offset) {
+  auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
+  auto amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
+  auto center = ToTGFX(radialBlurEffect->center->getValueAt(layerFrame));
+  center.x = center.x / contentBounds.width();
+  center.y = center.y / contentBounds.height();
+  amount = amount < 0.25 ? amount : 0.25;
+  auto filter = std::make_shared<RadialBlurFilter>(amount, center);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
-std::string RadialBlurFilter::onBuildFragmentShader() {
+std::string RadialBlurFilter::onBuildFragmentShader() const {
   return RADIAL_BLUR_FRAGMENT_SHADER;
 }
 
-void RadialBlurFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  amountHandle = gl->getUniformLocation(program, "uAmount");
-  centerHandle = gl->getUniformLocation(program, "uCenter");
+std::unique_ptr<Uniforms> RadialBlurFilter::onPrepareProgram(tgfx::Context* context,
+                                                             unsigned program) const {
+  return std::make_unique<RadialBlurUniforms>(context, program);
 }
 
-void RadialBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                      const tgfx::Point&) {
-  auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
-  auto amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
-  auto center = radialBlurEffect->center->getValueAt(layerFrame);
-
-  amount = amount < 0.25 ? amount : 0.25;
+void RadialBlurFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                      const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(amountHandle, amount);
-  gl->uniform2f(centerHandle, (center.x - contentBounds.x()) / contentBounds.width(),
-                (center.y - contentBounds.y()) / contentBounds.height());
+  auto uniforms = static_cast<RadialBlurUniforms*>(program->uniforms.get());
+  gl->uniform1f(uniforms->amountHandle, amount);
+  gl->uniform2f(uniforms->centerHandle, center.x, center.y);
 }
+
 }  // namespace pag

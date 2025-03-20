@@ -18,21 +18,15 @@
 
 #pragma once
 
-#include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
+#include "pag/file.h"
+#include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
-class GaussianBlurFilter : public LayerFilter {
+
+class GaussianBlurFilter {
  public:
-  explicit GaussianBlurFilter(Effect* effect) : effect(effect) {
-  }
-
-  bool initialize(tgfx::Context* context) override;
-
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
-
- private:
-  Effect* effect = nullptr;
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Point& filterScale,
+                                            const tgfx::Point& sourceScale, tgfx::Point* offset);
 };
 }  // namespace pag

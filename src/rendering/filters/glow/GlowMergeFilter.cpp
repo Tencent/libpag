@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlowMergeFilter.h"
+#include <utility>
 
 namespace pag {
 static const char GLOW_TARGET_FRAGMENT_SHADER[] = R"(
@@ -42,34 +43,30 @@ static const char GLOW_TARGET_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-GlowMergeFilter::GlowMergeFilter(Effect* effect) : effect(effect) {
+GlowMergeUniforms::GlowMergeUniforms(tgfx::Context* context, unsigned program)
+    : Uniforms(context, program) {
+  auto gl = tgfx::GLFunctions::Get(context);
+  progressHandle = gl->getUniformLocation(program, "progress");
+}
+GlowMergeRuntimeFilter::GlowMergeRuntimeFilter(float progress,
+                                               std::shared_ptr<tgfx::Image> blurImage)
+    : RuntimeFilter(Type(), {std::move(blurImage)}), progress(progress) {
 }
 
-std::string GlowMergeFilter::onBuildFragmentShader() {
+std::string GlowMergeRuntimeFilter::onBuildFragmentShader() const {
   return GLOW_TARGET_FRAGMENT_SHADER;
 }
 
-void GlowMergeFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  inputTextureHandle = gl->getUniformLocation(program, "inputImageTexture");
-  blurTextureHandle = gl->getUniformLocation(program, "blurImageTexture");
-  progressHandle = gl->getUniformLocation(program, "progress");
+std::unique_ptr<Uniforms> GlowMergeRuntimeFilter::onPrepareProgram(tgfx::Context* context,
+                                                                   unsigned program) const {
+  return std::make_unique<GlowMergeUniforms>(context, program);
 }
 
-void GlowMergeFilter::updateTexture(const tgfx::GLTextureInfo& sampler) {
-  blurTexture = sampler;
+void GlowMergeRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                            const std::vector<tgfx::BackendTexture>&) const {
+  auto gl = tgfx::GLFunctions::Get(context);
+  auto uniform = static_cast<GlowMergeUniforms*>(program->uniforms.get());
+  gl->uniform1f(uniform->progressHandle, progress);
 }
 
-void GlowMergeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
-                                     const tgfx::Point&) {
-  auto glowEffect = static_cast<GlowEffect*>(effect);
-  auto glowThreshold = glowEffect->glowThreshold->getValueAt(layerFrame);
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(progressHandle, glowThreshold);
-  gl->uniform1i(inputTextureHandle, 0);
-  // TODO(domrjchen): 下面这行之前写成了 gl->uniform1i(progressHandle, 1), 会导致 glError,
-  // 暂时注释掉。目前的发光效果跟 AE 也没有对齐，后面重写发光效果时时再修复。
-  //  gl->uniform1i(blurTextureHandle, 1);
-  ActiveGLTexture(context, 1, &blurTexture);
-}
 }  // namespace pag

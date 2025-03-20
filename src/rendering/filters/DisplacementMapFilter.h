@@ -18,45 +18,28 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 #include "tgfx/core/Size.h"
 
 namespace pag {
 class RenderCache;
-class DisplacementMapFilter : public LayerFilter {
+
+class DisplacementMapEffectUniforms : public Uniforms {
  public:
-  explicit DisplacementMapFilter(Effect* effect);
-  ~DisplacementMapFilter() override = default;
-
-  void update(Frame layerFrame, const tgfx::Rect& contentBounds,
-              const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) override;
-
-  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const tgfx::Size& size,
-                        const tgfx::Size& displacementSize, const tgfx::Matrix& layerMatrix,
-                        const tgfx::Rect& contentBounds);
-
- protected:
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-  Enum useForHorizontalDisplacement = DisplacementMapSource::Red;
-  float maxHorizontalDisplacement = 0.f;
-  Enum useForVerticalDisplacement = DisplacementMapSource::Red;
-  float maxVerticalDisplacement = 0.f;
-  Enum displacementMapBehavior = DisplacementMapBehavior::CenterMap;
-  bool edgeBehavior = false;
-  bool expandOutput = true;
-  float effectOpacity = 1.f;
-  tgfx::Size _size = tgfx::Size::MakeEmpty();
-  tgfx::Size _displacementSize = tgfx::Size::MakeEmpty();
-  tgfx::Matrix _layerMatrix = tgfx::Matrix::I();
-  std::shared_ptr<tgfx::Surface> mapSurface = nullptr;
+  DisplacementMapEffectUniforms(tgfx::Context* context, unsigned program)
+      : Uniforms(context, program) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    mapTextureHandle = gl->getUniformLocation(program, "mapTexture");
+    flagsHandle = gl->getUniformLocation(program, "uFlags");
+    inputMatrixHandle = gl->getUniformLocation(program, "uInputMatrix");
+    mapMatrixHandle = gl->getUniformLocation(program, "uMapMatrix");
+    inputSizeHandle = gl->getUniformLocation(program, "uInputSize");
+    selectorMatrixRGBAHandle = gl->getUniformLocation(program, "uSelectorMatrixRGBA");
+    selectorMatrixHSLAHandle = gl->getUniformLocation(program, "uSelectorMatrixHSLA");
+    selectorOffsetHandle = gl->getUniformLocation(program, "uSelectorOffset");
+    effectOpacityHandle = gl->getUniformLocation(program, "uEffectOpacity");
+  }
 
   int flagsHandle = 0;
   int inputMatrixHandle = 0;
@@ -68,4 +51,54 @@ class DisplacementMapFilter : public LayerFilter {
   int mapTextureHandle = 0;
   int effectOpacityHandle = 0;
 };
+
+class DisplacementMapFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Layer* layer, RenderCache* cache,
+                                            const tgfx::Matrix& layerMatrix, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
+
+  DisplacementMapFilter(Enum useForHorizontalDisplacement, float maxHorizontalDisplacement,
+                        Enum useForVerticalDisplacement, float maxVerticalDisplacement,
+                        Enum displacementMapBehavior, Enum edgeBehavior, bool expandOutput,
+                        float effectOpacity, tgfx::Matrix layerMatrix, tgfx::Size size,
+                        tgfx::Size displacementSize, tgfx::Rect contentBounds,
+                        std::shared_ptr<tgfx::Image> sourceImage)
+      : RuntimeFilter(Type(), {std::move(sourceImage)}),
+        useForHorizontalDisplacement(useForHorizontalDisplacement),
+        maxHorizontalDisplacement(maxHorizontalDisplacement),
+        useForVerticalDisplacement(useForVerticalDisplacement),
+        maxVerticalDisplacement(maxVerticalDisplacement),
+        displacementMapBehavior(displacementMapBehavior), edgeBehavior(edgeBehavior),
+        expandOutput(expandOutput), effectOpacity(effectOpacity), layerMatrix(layerMatrix),
+        size(size), displacementSize(displacementSize), contentBounds(contentBounds) {
+  }
+
+ protected:
+  std::string onBuildFragmentShader() const override;
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>& sources) const override;
+
+  tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
+
+  Enum useForHorizontalDisplacement = DisplacementMapSource::Red;
+  float maxHorizontalDisplacement = 0.f;
+  Enum useForVerticalDisplacement = DisplacementMapSource::Red;
+  float maxVerticalDisplacement = 0.f;
+  Enum displacementMapBehavior = DisplacementMapBehavior::CenterMap;
+  bool edgeBehavior = false;
+  bool expandOutput = true;
+  float effectOpacity = 1.f;
+  tgfx::Matrix layerMatrix = tgfx::Matrix::I();
+  tgfx::Size size = {0, 0};
+  tgfx::Size displacementSize = {0, 0};
+  tgfx::Rect contentBounds = {0, 0, 0, 0};
+};
+
 }  // namespace pag

@@ -794,10 +794,6 @@ class PAG_API MosaicEffect : public Effect {
     return EffectType::Mosaic;
   }
 
-  bool processVisibleAreaOnly() const override {
-    return true;
-  }
-
   bool visibleAt(Frame layerFrame) const override;
 
   void transformBounds(Rect* contentBounds, const Point& filterScale,

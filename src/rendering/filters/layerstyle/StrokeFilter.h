@@ -31,7 +31,7 @@ class StrokeFilter : public LayerStyleFilter {
   void update(Frame layerFrame, const tgfx::Point& filterScale,
               const tgfx::Point& sourceScale) override;
 
-  bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
+  bool draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
 
  private:
   StrokeStyle* layerStyle = nullptr;

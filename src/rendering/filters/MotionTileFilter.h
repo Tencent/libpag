@@ -18,27 +18,25 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
-class MotionTileFilter : public LayerFilter {
+
+class MotionTileUniforms : public Uniforms {
  public:
-  explicit MotionTileFilter(Effect* effect);
-  ~MotionTileFilter() override = default;
-
- protected:
-  std::string onBuildVertexShader() override;
-
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-
+  explicit MotionTileUniforms(tgfx::Context* context, unsigned program)
+      : Uniforms(context, program) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
+    tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
+    tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
+    outputWidthHandle = gl->getUniformLocation(program, "uOutputWidth");
+    outputHeightHandle = gl->getUniformLocation(program, "uOutputHeight");
+    mirrorEdgesHandle = gl->getUniformLocation(program, "uMirrorEdges");
+    phaseHandle = gl->getUniformLocation(program, "uPhase");
+    isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
+  }
   int tileCenterHandle = 0;
   int tileWidthHandle = 0;
   int tileHeightHandle = 0;
@@ -48,4 +46,46 @@ class MotionTileFilter : public LayerFilter {
   int phaseHandle = 0;
   int isHorizontalPhaseShiftHandle = 0;
 };
+
+class MotionTileFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE;
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
+
+  explicit MotionTileFilter(Point tileCenter, float tileWidth, float tileHeight, float outputWidth,
+                            float outputHeight, bool mirrorEdges, float phase,
+                            bool horizontalPhaseShift)
+      : RuntimeFilter(Type()), tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
+        outputWidth(outputWidth), outputHeight(outputHeight), mirrorEdges(mirrorEdges),
+        phase(phase), horizontalPhaseShift(horizontalPhaseShift) {
+  }
+  ~MotionTileFilter() override = default;
+
+ protected:
+  std::string onBuildVertexShader() const override;
+
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>&) const override;
+
+  tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
+
+ private:
+  Point tileCenter = {};
+  float tileWidth = 0.f;
+  float tileHeight = 0.f;
+  float outputWidth = 0.f;
+  float outputHeight = 0.f;
+  bool mirrorEdges = false;
+  float phase = 0.f;
+  bool horizontalPhaseShift = false;
+};
+
 }  // namespace pag

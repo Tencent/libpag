@@ -18,18 +18,16 @@
 
 #include "GaussianBlurFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
-bool GaussianBlurFilter::initialize(tgfx::Context*) {
-  return true;
-}
 
-void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source,
-                              const FilterTarget* target) {
-  if (source == nullptr || target == nullptr) {
-    LOGE("GaussianBlurFilter::draw() can not draw filter");
-    return;
-  }
+std::shared_ptr<tgfx::Image> GaussianBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                       Effect* effect, Frame layerFrame,
+                                                       const tgfx::Point& filterScale,
+                                                       const tgfx::Point& sourceScale,
+                                                       tgfx::Point* offset) {
   auto* blurEffect = static_cast<FastBlurEffect*>(effect);
   auto repeatEdgePixels = blurEffect->repeatEdgePixels->getValueAt(layerFrame);
   auto blurDimensions = blurEffect->blurDimensions->getValueAt(layerFrame);
@@ -40,34 +38,16 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   } else if (blurDimensions == BlurDimensionsDirection::Vertical) {
     blurrinessX = 0;
   }
-  blurrinessX *= filterScale.x * source->scale.x;
-  blurrinessY *= filterScale.y * source->scale.y;
-
-  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
-  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
-  auto targetCanvas = targetSurface->getCanvas();
-  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto image = tgfx::Image::MakeFrom(context, backendTexture);
-  if (image == nullptr) {
-    LOGE("GaussianBlurFilter::draw() failed to create an Image from the backend texture!");
-    return;
-  }
-  tgfx::Point offset = tgfx::Point::Zero();
+  blurrinessX *= filterScale.x * sourceScale.x;
+  blurrinessY *= filterScale.y * sourceScale.y;
+  std::shared_ptr<tgfx::ImageFilter> filter;
   if (repeatEdgePixels) {
-    auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
-    image = image->makeWithFilter(std::move(blurFilter), &offset);
-    image = image->makeSubset(tgfx::Rect::MakeXYWH(-offset.x, -offset.y,
-                                                   static_cast<float>(source->width),
-                                                   static_cast<float>(source->height)));
-    offset = tgfx::Point::Zero();
-  } else {
-    auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
-    image = image->makeWithFilter(std::move(blurFilter), &offset);
+    filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
+    tgfx::Rect clipBounds = tgfx::Rect::MakeWH(input->width(), input->height());
+    return input->makeWithFilter(filter, offset, &clipBounds);
   }
-  targetCanvas->save();
-  targetCanvas->setMatrix(ToMatrix(target));
-  targetCanvas->drawImage(std::move(image), offset.x, offset.y);
-  targetCanvas->restore();
-  context->flush();
+  filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
+  return input->makeWithFilter(filter, offset);
 }
+
 }  // namespace pag

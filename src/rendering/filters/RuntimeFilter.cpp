@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeFilter.h"
+#include "base/utils/Log.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/core/Canvas.h"
 
 namespace pag {
 static constexpr char VERTEX_SHADER[] = R"(
@@ -27,9 +27,8 @@ static constexpr char VERTEX_SHADER[] = R"(
     attribute vec2 aTextureCoord;
     varying vec2 vertexColor;
     void main() {
-    vec3 position = vec3(aPosition, 1);
-    gl_Position = vec4(position.xy, 0, 1);
-    vertexColor = aTextureCoord;
+      gl_Position = vec4(aPosition.xy, 0, 1);
+      vertexColor = aTextureCoord;
     }
 )";
 
@@ -43,6 +42,27 @@ static constexpr char FRAGMENT_SHADER[] = R"(
         gl_FragColor = texture2D(sTexture, vertexColor);
     }
 )";
+
+std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
+                                                              const tgfx::Rect& outputBounds) {
+  std::vector<tgfx::Point> vertices = {};
+  tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
+                                 {outputBounds.right, outputBounds.bottom},
+                                 {outputBounds.left, outputBounds.top},
+                                 {outputBounds.right, outputBounds.top}};
+  auto deltaX = outputBounds.left - inputBounds.left;
+  auto deltaY = outputBounds.top - inputBounds.top;
+  tgfx::Point texturePoints[4] = {
+      {deltaX, (outputBounds.height() + deltaY)},
+      {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
+      {deltaX, deltaY},
+      {(outputBounds.width() + deltaX), deltaY}};
+  for (int ii = 0; ii < 4; ii++) {
+    vertices.push_back(contentPoint[ii]);
+    vertices.push_back(texturePoints[ii]);
+  }
+  return vertices;
+}
 
 std::unique_ptr<RuntimeProgram> RuntimeProgram::Make(tgfx::Context* context,
                                                      const std::string& vertex,
@@ -152,9 +172,13 @@ bool RuntimeFilter::onDraw(const tgfx::RuntimeProgram* program,
   gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   gl->bindFramebuffer(GL_FRAMEBUFFER, targetInfo.id);
   gl->viewport(0, 0, target.width(), target.height());
+  gl->clearColor(0, 0, 0, 0);
+  gl->clear(GL_COLOR_BUFFER_BIT);
   for (size_t i = 0; i < sources.size(); i++) {
     tgfx::GLTextureInfo sourceInfo;
-    sources[i].getGLTextureInfo(&sourceInfo);
+    if (!sources[i].getGLTextureInfo(&sourceInfo)) {
+      return false;
+    }
     ActiveGLTexture(context, static_cast<int>(i), &sourceInfo);
   }
   onUpdateParams(context, filterProgram, sources);
@@ -172,18 +196,16 @@ std::vector<float> RuntimeFilter::computeVertices(const std::vector<tgfx::Backen
                                                   const tgfx::BackendRenderTarget& target,
                                                   const tgfx::Point& offset) const {
   std::vector<float> vertices = {};
-  auto textureWidth = static_cast<float>(sources[0].width());
-  auto textureHeight = static_cast<float>(sources[0].height());
-  auto targetWidth = static_cast<float>(target.width());
-  auto targetHeight = static_cast<float>(target.height());
-  tgfx::Point contentPoint[4] = {{0, targetHeight},
-                                 {targetWidth, targetHeight},
-                                 {0, 0},
-                                 {targetWidth, 0}};
-  tgfx::Point texturePoints[4] = {{0.0f, textureHeight},
-                                  {textureWidth, textureHeight},
-                                  {0.0f, 0.0f},
-                                  {textureWidth, 0.0f}};
+  auto inputBounds = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
+  auto targetBounds = filterBounds(inputBounds);
+  tgfx::Point contentPoint[4] = {{targetBounds.left, targetBounds.bottom},
+                                 {targetBounds.right, targetBounds.bottom},
+                                 {targetBounds.left, targetBounds.top},
+                                 {targetBounds.right, targetBounds.top}};
+  tgfx::Point texturePoints[4] = {{inputBounds.left, inputBounds.bottom},
+                                  {inputBounds.right, inputBounds.bottom},
+                                  {inputBounds.left, inputBounds.top},
+                                  {inputBounds.right, inputBounds.top}};
 
   for (size_t i = 0; i < 4; i++) {
     auto vertexPoint = ToGLVertexPoint(target, contentPoint[i] + offset);
@@ -198,7 +220,6 @@ std::vector<float> RuntimeFilter::computeVertices(const std::vector<tgfx::Backen
 
 void RuntimeFilter::bindVertices(tgfx::Context* context, const RuntimeProgram* filterProgram,
                                  const std::vector<float>& points) const {
-
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = filterProgram->uniforms.get();
   if (filterProgram->vertexArray > 0) {

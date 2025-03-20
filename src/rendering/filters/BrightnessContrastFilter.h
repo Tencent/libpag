@@ -18,27 +18,39 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
-class BrightnessContrastFilter : public LayerFilter {
+class BrightnessContrastUniforms : public Uniforms {
  public:
-  explicit BrightnessContrastFilter(Effect* effect);
-  ~BrightnessContrastFilter() override = default;
+  BrightnessContrastUniforms(tgfx::Context* context, unsigned program);
 
- protected:
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-
-  // Handle
   int brightnessBlocksHandle = -1;
   int contrastHandle = -1;
+};
+
+class BrightnessContrastFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
+
+  BrightnessContrastFilter(float brightness, float contrast)
+      : RuntimeFilter(Type()), brightness(brightness), contrast(contrast) {
+  }
+
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>& sources) const override;
+
+ private:
+  float brightness = 0.f;
+  float contrast = 0.f;
 };
 }  // namespace pag

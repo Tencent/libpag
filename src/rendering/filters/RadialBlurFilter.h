@@ -18,26 +18,48 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
-class RadialBlurFilter : public LayerFilter {
+
+class RadialBlurUniforms : public Uniforms {
  public:
-  explicit RadialBlurFilter(Effect* effect);
-  ~RadialBlurFilter() override = default;
-
- protected:
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-
+  explicit RadialBlurUniforms(tgfx::Context* context, unsigned program)
+      : Uniforms(context, program) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    amountHandle = gl->getUniformLocation(program, "uAmount");
+    centerHandle = gl->getUniformLocation(program, "uCenter");
+  }
   int amountHandle = -1;
   int centerHandle = -1;
 };
+
+class RadialBlurFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE;
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
+
+  explicit RadialBlurFilter(double amount, const tgfx::Point& center)
+      : RuntimeFilter(Type()), amount(amount), center(center) {
+  }
+  ~RadialBlurFilter() override = default;
+
+ protected:
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>& sources) const override;
+
+ private:
+  double amount = 0.f;
+  tgfx::Point center = tgfx::Point::Zero();
+};
+
 }  // namespace pag

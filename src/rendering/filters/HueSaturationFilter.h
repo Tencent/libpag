@@ -18,26 +18,15 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
-class HueSaturationFilter : public LayerFilter {
+
+class HueSaturationUniform : public Uniforms {
  public:
-  explicit HueSaturationFilter(Effect* effect);
-  ~HueSaturationFilter() override = default;
+  HueSaturationUniform(tgfx::Context* context, unsigned program);
 
- protected:
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-
-  // Handle
   int hueHandle = -1;
   int saturationHandle = -1;
   int lightnessHandle = -1;
@@ -46,4 +35,32 @@ class HueSaturationFilter : public LayerFilter {
   int colorizeSaturationHandle = -1;
   int colorizeLightnessHandle = -1;
 };
+
+class HueSaturationFilter : public RuntimeFilter {
+ public:
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
+  DEFINE_RUNTIME_EFFECT_TYPE
+  HueSaturationFilter(float hue, float saturation, float lightness, float colorize,
+                      float colorizeHue, float colorizeSaturation, float colorizeLightness);
+
+ protected:
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>& sources) const override;
+
+ private:
+  float hue = 0.f;
+  float saturation = 0.f;
+  float lightness = 0.f;
+  float colorize = 0.f;
+  float colorizeHue = 0.f;
+  float colorizeSaturation = 0.f;
+  float colorizeLightness = 0.f;
+};
+
 }  // namespace pag

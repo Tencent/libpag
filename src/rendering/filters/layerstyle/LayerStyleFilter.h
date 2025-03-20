@@ -20,7 +20,7 @@
 
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/graphics/Canvas.h"
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace pag {
@@ -34,7 +34,7 @@ class LayerStyleFilter {
   virtual void update(Frame layerFrame, const tgfx::Point& filterScale,
                       const tgfx::Point& sourceScale) = 0;
 
-  virtual bool draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) = 0;
+  virtual bool draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) = 0;
 };
 
 }  // namespace pag

@@ -18,24 +18,20 @@
 
 #include "MotionTileFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char MOTIONTILE_VERTEX_SHADER[] = R"(
         #version 100
         attribute vec2 aPosition;
         attribute vec2 aTextureCoord;
-        uniform mat3 uVertexMatrix;
-        uniform mat3 uTextureMatrix;
         uniform vec2 uTileCenter;
         varying vec2 vertexColor;
         varying vec2 tileCenter;
         void main() {
-            vec3 position = uVertexMatrix * vec3(aPosition, 1);
-            gl_Position = vec4(position.xy, 0, 1);
-            vec3 colorPosition = uTextureMatrix * vec3(aTextureCoord, 1);
-            vertexColor = colorPosition.xy;
-            vec3 tileCenterPosition = uTextureMatrix * vec3(uTileCenter, 1);
-            tileCenter = tileCenterPosition.xy;
+            gl_Position = vec4(aPosition.xy, 0, 1);
+            vertexColor = aTextureCoord.xy;
+            tileCenter = uTileCenter.xy;
         }
     )";
 
@@ -87,49 +83,60 @@ static const char MOTIONTILE_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-MotionTileFilter::MotionTileFilter(Effect* effect) : effect(effect) {
-}
-
-std::string MotionTileFilter::onBuildVertexShader() {
-  return MOTIONTILE_VERTEX_SHADER;
-}
-
-std::string MotionTileFilter::onBuildFragmentShader() {
-  return MOTIONTILE_FRAGMENT_SHADER;
-}
-
-void MotionTileFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
-  tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
-  tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
-  outputWidthHandle = gl->getUniformLocation(program, "uOutputWidth");
-  outputHeightHandle = gl->getUniformLocation(program, "uOutputHeight");
-  mirrorEdgesHandle = gl->getUniformLocation(program, "uMirrorEdges");
-  phaseHandle = gl->getUniformLocation(program, "uPhase");
-  isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
-}
-
-void MotionTileFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                      const tgfx::Point&) {
+std::shared_ptr<tgfx::Image> MotionTileFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                     Effect* effect, Frame layerFrame,
+                                                     const tgfx::Rect& contentBounds,
+                                                     tgfx::Point* offset) {
   auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
   auto tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
+  tileCenter.x = (tileCenter.x - contentBounds.x()) / contentBounds.width();
+  tileCenter.y = (tileCenter.y - contentBounds.y()) / contentBounds.height();
   auto tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);
   auto tileHeight = pagEffect->tileHeight->getValueAt(layerFrame);
   auto outputWidth = pagEffect->outputWidth->getValueAt(layerFrame);
   auto outputHeight = pagEffect->outputHeight->getValueAt(layerFrame);
   auto mirrorEdges = pagEffect->mirrorEdges->getValueAt(layerFrame);
   auto phase = pagEffect->phase->getValueAt(layerFrame);
-  auto isHorizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform2f(tileCenterHandle, (tileCenter.x - contentBounds.x()) / contentBounds.width(),
-                (tileCenter.y - contentBounds.y()) / contentBounds.height());
-  gl->uniform1f(tileWidthHandle, tileWidth / 100.f);
-  gl->uniform1f(tileHeightHandle, tileHeight / 100.f);
-  gl->uniform1f(outputWidthHandle, outputWidth / 100.f);
-  gl->uniform1f(outputHeightHandle, outputHeight / 100.f);
-  gl->uniform1i(mirrorEdgesHandle, mirrorEdges);
-  gl->uniform1f(phaseHandle, phase);
-  gl->uniform1i(isHorizontalPhaseShiftHandle, isHorizontalPhaseShift);
+  auto horizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
+  auto filter = std::shared_ptr<RuntimeFilter>(
+      new MotionTileFilter(tileCenter, tileWidth, tileHeight, outputWidth, outputHeight,
+                           mirrorEdges, phase, horizontalPhaseShift));
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
+
+std::string MotionTileFilter::onBuildVertexShader() const {
+  return MOTIONTILE_VERTEX_SHADER;
+}
+
+std::string MotionTileFilter::onBuildFragmentShader() const {
+  return MOTIONTILE_FRAGMENT_SHADER;
+}
+
+std::unique_ptr<Uniforms> MotionTileFilter::onPrepareProgram(tgfx::Context* context,
+                                                             unsigned program) const {
+  return std::make_unique<MotionTileUniforms>(context, program);
+}
+
+void MotionTileFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                      const std::vector<tgfx::BackendTexture>&) const {
+  auto uniform = static_cast<MotionTileUniforms*>(program->uniforms.get());
+  auto gl = tgfx::GLFunctions::Get(context);
+  gl->uniform2f(uniform->tileCenterHandle, tileCenter.x, tileCenter.y);
+  gl->uniform1f(uniform->tileWidthHandle, tileWidth / 100.f);
+  gl->uniform1f(uniform->tileHeightHandle, tileHeight / 100.f);
+  gl->uniform1f(uniform->outputWidthHandle, outputWidth / 100.f);
+  gl->uniform1f(uniform->outputHeightHandle, outputHeight / 100.f);
+  gl->uniform1i(uniform->mirrorEdgesHandle, mirrorEdges);
+  gl->uniform1f(uniform->phaseHandle, phase);
+  gl->uniform1i(uniform->isHorizontalPhaseShiftHandle, horizontalPhaseShift);
+}
+
+tgfx::Rect MotionTileFilter::filterBounds(const tgfx::Rect& srcRect) const {
+  auto width = srcRect.width() * outputWidth / 100.0f;
+  auto height = srcRect.height() * outputHeight / 100.0f;
+  auto x = srcRect.x() + (srcRect.width() - width) * 0.5f;
+  auto y = srcRect.y() + (srcRect.height() - height) * 0.5f;
+  return tgfx::Rect::MakeXYWH(x, y, width, height);
+}
+
 }  // namespace pag

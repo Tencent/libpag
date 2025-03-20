@@ -18,30 +18,32 @@
 
 #pragma once
 
-#include "rendering/filters/LayerFilter.h"
+#include "pag/file.h"
+#include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
-class GlowMergeFilter : public LayerFilter {
- public:
-  explicit GlowMergeFilter(Effect* effect);
-  ~GlowMergeFilter() override = default;
 
-  void updateTexture(const tgfx::GLTextureInfo& sampler);
+class GlowMergeUniforms : public Uniforms {
+ public:
+  GlowMergeUniforms(tgfx::Context* context, unsigned program);
+  int progressHandle = -1;
+};
+
+class GlowMergeRuntimeFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE
+  GlowMergeRuntimeFilter(float progress, std::shared_ptr<tgfx::Image> blurImage);
 
  protected:
-  std::string onBuildFragmentShader() override;
+  std::string onBuildFragmentShader() const override;
 
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
 
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>& sources) const override;
 
  private:
-  Effect* effect = nullptr;
-
-  int inputTextureHandle = -1;
-  int blurTextureHandle = -1;
-  int progressHandle = -1;
-  tgfx::GLTextureInfo blurTexture = {};
+  float progress = 0.f;
 };
 }  // namespace pag

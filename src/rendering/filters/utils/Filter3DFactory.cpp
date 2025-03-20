@@ -20,13 +20,10 @@
 
 namespace pag {
 
-bool Make3DLayerNode(std::vector<FilterNode>&, tgfx::Rect&, const FilterList*, RenderCache*,
-                     tgfx::Rect&, tgfx::Point&) {
-  return true;
-}
-
-Filter* Make3DFilter(tgfx::Context*) {
-  return nullptr;
+std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, const FilterList*,
+                                            const tgfx::Rect&, tgfx::Rect*, tgfx::Point* offset) {
+  offset->set(0, 0);
+  return input;
 }
 
 bool Has3DSupport() {
