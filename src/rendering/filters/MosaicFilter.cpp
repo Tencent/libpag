@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MosaicFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -36,37 +37,35 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-MosaicFilter::MosaicFilter(pag::Effect* effect) : effect(effect) {
+std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                                 Frame layerFrame, tgfx::Point* offset) {
+  auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
+  auto sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
+
+  auto horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
+  auto verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
+
+  auto filter = std::make_shared<MosaicFilter>(horizontalBlocks, verticalBlocks, sharpColors);
+
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
-std::string MosaicRuntimeFilter::onBuildFragmentShader() const {
+std::string MosaicFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> MosaicRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                unsigned program) const {
+std::unique_ptr<Uniforms> MosaicFilter::onPrepareProgram(tgfx::Context* context,
+                                                         unsigned program) const {
   return std::make_unique<MosaicUniforms>(context, program);
 }
 
-void MosaicRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                         const std::vector<tgfx::BackendTexture>&) const {
+void MosaicFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                  const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = static_cast<const MosaicUniforms*>(program->uniforms.get());
   gl->uniform1f(uniform->horizontalBlocksHandle, horizontalBlocks);
   gl->uniform1f(uniform->verticalBlocksHandle, verticalBlocks);
   gl->uniform1f(uniform->sharpColorsHandle, sharpColors);
-}
-
-void MosaicFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
-  sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
-
-  horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
-  verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> MosaicFilter::createRuntimeEffect() {
-  return std::make_shared<MosaicRuntimeFilter>(horizontalBlocks, verticalBlocks, sharpColors);
 }
 
 }  // namespace pag

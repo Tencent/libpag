@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
 #include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 
@@ -47,18 +47,22 @@ class MotionTileUniforms : public Uniforms {
   int isHorizontalPhaseShiftHandle = 0;
 };
 
-class MotionTileRuntimeFilter : public RuntimeFilter {
+class MotionTileFilter : public RuntimeFilter {
+ public:
   DEFINE_RUNTIME_EFFECT_TYPE;
 
- public:
-  explicit MotionTileRuntimeFilter(Point tileCenter, float tileWidth, float tileHeight,
-                                   float outputWidth, float outputHeight, bool mirrorEdges,
-                                   float phase, bool horizontalPhaseShift)
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
+
+  explicit MotionTileFilter(Point tileCenter, float tileWidth, float tileHeight, float outputWidth,
+                            float outputHeight, bool mirrorEdges, float phase,
+                            bool horizontalPhaseShift)
       : RuntimeFilter(Type()), tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
         outputWidth(outputWidth), outputHeight(outputHeight), mirrorEdges(mirrorEdges),
         phase(phase), horizontalPhaseShift(horizontalPhaseShift) {
   }
-  ~MotionTileRuntimeFilter() override = default;
+  ~MotionTileFilter() override = default;
 
  protected:
   std::string onBuildVertexShader() const override;
@@ -84,24 +88,4 @@ class MotionTileRuntimeFilter : public RuntimeFilter {
   bool horizontalPhaseShift = false;
 };
 
-class MotionTileFilter : public EffectFilter {
- public:
-  explicit MotionTileFilter(Effect* effect);
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
-  Point tileCenter = {};
-  float tileHeight = 0.f;
-  float tileWidth = 0.f;
-  float outputWidth = 0.f;
-  float outputHeight = 0.f;
-  bool mirrorEdges = false;
-  float phase = 0.f;
-  bool horizontalPhaseShift = false;
-};
 }  // namespace pag

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LevelsIndividualFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -113,18 +114,53 @@ LevelsIndividualUniforms::LevelsIndividualUniforms(tgfx::Context* context, unsig
   blueOutputWhiteHandle = gl->getUniformLocation(program, "blueOutputWhite");
 }
 
-std::string LevelsIndividualRuntimeFilter::onBuildFragmentShader() const {
+std::shared_ptr<tgfx::Image> LevelsIndividualFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                           Effect* effect, Frame layerFrame,
+                                                           tgfx::Point* offset) {
+  auto levelsIndividualEffect = static_cast<LevelsIndividualEffect*>(effect);
+  constexpr int redChannel = 0;
+  constexpr int greenChannel = 1;
+  constexpr int blueChannel = 2;
+  constexpr int globalChannel = 3;
+  LevelsIndividualFilterParam param;
+  param.inBlack[redChannel] = levelsIndividualEffect->redInputBlack->getValueAt(layerFrame);
+  param.inWhite[redChannel] = levelsIndividualEffect->redInputWhite->getValueAt(layerFrame);
+  param.gamma[redChannel] = levelsIndividualEffect->redGamma->getValueAt(layerFrame);
+  param.outBlack[redChannel] = levelsIndividualEffect->redOutputBlack->getValueAt(layerFrame);
+  param.outWhite[redChannel] = levelsIndividualEffect->redOutputWhite->getValueAt(layerFrame);
+
+  param.inBlack[greenChannel] = levelsIndividualEffect->greenInputBlack->getValueAt(layerFrame);
+  param.inWhite[greenChannel] = levelsIndividualEffect->greenInputWhite->getValueAt(layerFrame);
+  param.gamma[greenChannel] = levelsIndividualEffect->greenGamma->getValueAt(layerFrame);
+  param.outBlack[greenChannel] = levelsIndividualEffect->greenOutputBlack->getValueAt(layerFrame);
+  param.outWhite[greenChannel] = levelsIndividualEffect->greenOutputWhite->getValueAt(layerFrame);
+
+  param.inBlack[blueChannel] = levelsIndividualEffect->blueInputBlack->getValueAt(layerFrame);
+  param.inWhite[blueChannel] = levelsIndividualEffect->blueInputWhite->getValueAt(layerFrame);
+  param.gamma[blueChannel] = levelsIndividualEffect->blueGamma->getValueAt(layerFrame);
+  param.outBlack[blueChannel] = levelsIndividualEffect->blueOutputBlack->getValueAt(layerFrame);
+  param.outWhite[blueChannel] = levelsIndividualEffect->blueOutputWhite->getValueAt(layerFrame);
+
+  param.inBlack[globalChannel] = levelsIndividualEffect->inputBlack->getValueAt(layerFrame);
+  param.inWhite[globalChannel] = levelsIndividualEffect->inputWhite->getValueAt(layerFrame);
+  param.gamma[globalChannel] = levelsIndividualEffect->gamma->getValueAt(layerFrame);
+  param.outBlack[globalChannel] = levelsIndividualEffect->outputBlack->getValueAt(layerFrame);
+  param.outWhite[globalChannel] = levelsIndividualEffect->outputWhite->getValueAt(layerFrame);
+  auto filter = std::make_shared<LevelsIndividualFilter>(param);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+std::string LevelsIndividualFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> LevelsIndividualRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                          unsigned program) const {
+std::unique_ptr<Uniforms> LevelsIndividualFilter::onPrepareProgram(tgfx::Context* context,
+                                                                   unsigned program) const {
   return std::make_unique<LevelsIndividualUniforms>(context, program);
 }
 
-void LevelsIndividualRuntimeFilter::onUpdateParams(tgfx::Context* context,
-                                                   const RuntimeProgram* program,
-                                                   const std::vector<tgfx::BackendTexture>&) const {
+void LevelsIndividualFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                            const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = static_cast<LevelsIndividualUniforms*>(program->uniforms.get());
   constexpr int redChannel = 0;
@@ -155,44 +191,4 @@ void LevelsIndividualRuntimeFilter::onUpdateParams(tgfx::Context* context,
   gl->uniform1f(uniform->blueOutputBlackHandle, param.outBlack[blueChannel]);
   gl->uniform1f(uniform->blueOutputWhiteHandle, param.outWhite[blueChannel]);
 }
-
-LevelsIndividualFilter::LevelsIndividualFilter(Effect* effect) : effect(effect) {
-}
-
-void LevelsIndividualFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto levelsIndividualEffect = static_cast<LevelsIndividualEffect*>(this->effect);
-  // red
-  constexpr int redChannel = 0;
-  constexpr int greenChannel = 1;
-  constexpr int blueChannel = 2;
-  constexpr int globalChannel = 3;
-  param.inBlack[redChannel] = levelsIndividualEffect->redInputBlack->getValueAt(layerFrame);
-  param.inWhite[redChannel] = levelsIndividualEffect->redInputWhite->getValueAt(layerFrame);
-  param.gamma[redChannel] = levelsIndividualEffect->redGamma->getValueAt(layerFrame);
-  param.outBlack[redChannel] = levelsIndividualEffect->redOutputBlack->getValueAt(layerFrame);
-  param.outWhite[redChannel] = levelsIndividualEffect->redOutputWhite->getValueAt(layerFrame);
-
-  param.inBlack[greenChannel] = levelsIndividualEffect->greenInputBlack->getValueAt(layerFrame);
-  param.inWhite[greenChannel] = levelsIndividualEffect->greenInputWhite->getValueAt(layerFrame);
-  param.gamma[greenChannel] = levelsIndividualEffect->greenGamma->getValueAt(layerFrame);
-  param.outBlack[greenChannel] = levelsIndividualEffect->greenOutputBlack->getValueAt(layerFrame);
-  param.outWhite[greenChannel] = levelsIndividualEffect->greenOutputWhite->getValueAt(layerFrame);
-
-  param.inBlack[blueChannel] = levelsIndividualEffect->blueInputBlack->getValueAt(layerFrame);
-  param.inWhite[blueChannel] = levelsIndividualEffect->blueInputWhite->getValueAt(layerFrame);
-  param.gamma[blueChannel] = levelsIndividualEffect->blueGamma->getValueAt(layerFrame);
-  param.outBlack[blueChannel] = levelsIndividualEffect->blueOutputBlack->getValueAt(layerFrame);
-  param.outWhite[blueChannel] = levelsIndividualEffect->blueOutputWhite->getValueAt(layerFrame);
-
-  param.inBlack[globalChannel] = levelsIndividualEffect->inputBlack->getValueAt(layerFrame);
-  param.inWhite[globalChannel] = levelsIndividualEffect->inputWhite->getValueAt(layerFrame);
-  param.gamma[globalChannel] = levelsIndividualEffect->gamma->getValueAt(layerFrame);
-  param.outBlack[globalChannel] = levelsIndividualEffect->outputBlack->getValueAt(layerFrame);
-  param.outWhite[globalChannel] = levelsIndividualEffect->outputWhite->getValueAt(layerFrame);
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> LevelsIndividualFilter::createRuntimeEffect() {
-  return std::make_shared<LevelsIndividualRuntimeFilter>(param);
-}
-
 }  // namespace pag

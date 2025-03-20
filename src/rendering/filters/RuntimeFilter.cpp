@@ -43,6 +43,27 @@ static constexpr char FRAGMENT_SHADER[] = R"(
     }
 )";
 
+std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
+                                                              const tgfx::Rect& outputBounds) {
+  std::vector<tgfx::Point> vertices = {};
+  tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
+                                 {outputBounds.right, outputBounds.bottom},
+                                 {outputBounds.left, outputBounds.top},
+                                 {outputBounds.right, outputBounds.top}};
+  auto deltaX = outputBounds.left - inputBounds.left;
+  auto deltaY = outputBounds.top - inputBounds.top;
+  tgfx::Point texturePoints[4] = {
+      {deltaX, (outputBounds.height() + deltaY)},
+      {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
+      {deltaX, deltaY},
+      {(outputBounds.width() + deltaX), deltaY}};
+  for (int ii = 0; ii < 4; ii++) {
+    vertices.push_back(contentPoint[ii]);
+    vertices.push_back(texturePoints[ii]);
+  }
+  return vertices;
+}
+
 std::unique_ptr<RuntimeProgram> RuntimeProgram::Make(tgfx::Context* context,
                                                      const std::string& vertex,
                                                      const std::string& fragment) {

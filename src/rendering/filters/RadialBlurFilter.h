@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
 #include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 
@@ -35,14 +35,18 @@ class RadialBlurUniforms : public Uniforms {
   int centerHandle = -1;
 };
 
-class RadialBlurRuntimeFilter : public RuntimeFilter {
+class RadialBlurFilter : public RuntimeFilter {
+ public:
   DEFINE_RUNTIME_EFFECT_TYPE;
 
- public:
-  explicit RadialBlurRuntimeFilter(double amount, const tgfx::Point& center)
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
+
+  explicit RadialBlurFilter(double amount, const tgfx::Point& center)
       : RuntimeFilter(Type()), amount(amount), center(center) {
   }
-  ~RadialBlurRuntimeFilter() override = default;
+  ~RadialBlurFilter() override = default;
 
  protected:
   std::string onBuildFragmentShader() const override;
@@ -54,21 +58,6 @@ class RadialBlurRuntimeFilter : public RuntimeFilter {
                       const std::vector<tgfx::BackendTexture>& sources) const override;
 
  private:
-  double amount = 0.f;
-  tgfx::Point center = tgfx::Point::Zero();
-};
-
-class RadialBlurFilter : public EffectFilter {
- public:
-  explicit RadialBlurFilter(Effect* effect);
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
   double amount = 0.f;
   tgfx::Point center = tgfx::Point::Zero();
 };

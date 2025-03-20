@@ -27,7 +27,6 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
-#include "rendering/filters/EffectFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
 #include "rendering/graphics/ImageProxy.h"

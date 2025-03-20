@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 
@@ -59,10 +60,15 @@ struct LevelsIndividualFilterParam {
   float outBlack[4] = {};
   float outWhite[4] = {};
 };
-class LevelsIndividualRuntimeFilter : public RuntimeFilter {
+
+class LevelsIndividualFilter : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE
-  explicit LevelsIndividualRuntimeFilter(const LevelsIndividualFilterParam& param)
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
+
+  explicit LevelsIndividualFilter(const LevelsIndividualFilterParam& param)
       : RuntimeFilter(Type()), param(param) {
   }
 
@@ -76,19 +82,6 @@ class LevelsIndividualRuntimeFilter : public RuntimeFilter {
                       const std::vector<tgfx::BackendTexture>&) const override;
 
  private:
-  LevelsIndividualFilterParam param;
-};
-class LevelsIndividualFilter : public EffectFilter {
- public:
-  explicit LevelsIndividualFilter(Effect* effect);
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
   LevelsIndividualFilterParam param;
 };
 }  // namespace pag

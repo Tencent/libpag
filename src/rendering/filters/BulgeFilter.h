@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 class BulgeUniforms : public Uniforms {
@@ -32,11 +33,16 @@ class BulgeUniforms : public Uniforms {
   int pinningHandle = -1;
 };
 
-class BulgeRuntimeFilter : public RuntimeFilter {
+class BulgeFilter : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE
-  BulgeRuntimeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
-                     float bulgeHeight, float pinning);
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
+
+  BulgeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
+              float bulgeHeight, float pinning);
 
  protected:
   std::string onBuildVertexShader() const override;
@@ -63,22 +69,4 @@ class BulgeRuntimeFilter : public RuntimeFilter {
   float pinning = 0.f;
 };
 
-class BulgeFilter : public EffectFilter {
- public:
-  explicit BulgeFilter(Effect* effect);
-  ~BulgeFilter() override = default;
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
-  float horizontalRadius = 0.f;
-  float verticalRadius = 0.f;
-  Point bulgeCenter = {};
-  float bulgeHeight = 0.f;
-  float pinning = 0.f;
-};
 }  // namespace pag

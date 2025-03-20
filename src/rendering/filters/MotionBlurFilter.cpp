@@ -77,61 +77,6 @@ static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-std::string MotionBlurRuntimeFilter::onBuildVertexShader() const {
-  return MOTIONBLUR_VERTEX_SHADER;
-}
-
-std::string MotionBlurRuntimeFilter::onBuildFragmentShader() const {
-  return MOTIONBLUR_FRAGMENT_SHADER;
-}
-
-std::unique_ptr<Uniforms> MotionBlurRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                    unsigned program) const {
-  return std::make_unique<MotionBlurUniforms>(context, program);
-}
-
-void MotionBlurRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                             const std::vector<tgfx::BackendTexture>&) const {
-  auto scaling = _previousMatrix[0] != _currentMatrix[0] || _previousMatrix[4] != _currentMatrix[4];
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<MotionBlurUniforms*>(program->uniforms.get());
-  gl->uniformMatrix3fv(uniform->prevTransformHandle, 1, GL_FALSE, _previousMatrix.data());
-  gl->uniformMatrix3fv(uniform->transformHandle, 1, GL_FALSE, _currentMatrix.data());
-  gl->uniform1f(uniform->velCenterHandle, scaling ? 0.0f : 0.5f);
-  gl->uniform1f(uniform->maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
-}
-
-std::vector<float> MotionBlurRuntimeFilter::computeVertices(
-    const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
-    const tgfx::Point& offset) const {
-  auto inputRect = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
-  auto outputRect = filterBounds(inputRect);
-  auto vertices = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
-  std::vector<float> result;
-  result.reserve(vertices.size() * 4);
-  for (size_t i = 0; i < vertices.size();) {
-    auto vertexPoint = ToGLVertexPoint(target, vertices[i++] + offset);
-    result.push_back(vertexPoint.x);
-    result.push_back(vertexPoint.y);
-    auto texturePoint = ToGLTexturePoint(&sources[0], vertices[i++]);
-    result.push_back(texturePoint.x);
-    result.push_back(texturePoint.y);
-  }
-  return result;
-}
-
-tgfx::Rect MotionBlurRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) const {
-  auto result = srcRect;
-  if (_previousMatrix != _currentMatrix) {
-    auto width = srcRect.width() * MOTION_BLUR_SCALE_FACTOR;
-    auto height = srcRect.height() * MOTION_BLUR_SCALE_FACTOR;
-    auto x = srcRect.x() + (srcRect.width() - width) * 0.5f;
-    auto y = srcRect.y() + (srcRect.height() - height) * 0.5f;
-    result.setXYWH(x, y, width, height);
-  }
-  return result;
-}
-
 void MotionBlurFilter::TransformBounds(tgfx::Rect* contentBounds, Layer* layer, Frame layerFrame) {
   auto contentFrame = layerFrame - layer->startTime;
   auto layerCache = LayerCache::Get(layer);
@@ -154,20 +99,79 @@ bool MotionBlurFilter::ShouldSkipFilter(Layer* layer, Frame layerFrame) {
   return previousMatrix == currentMatrix;
 }
 
-void MotionBlurFilter::update(Frame layerFrame, const tgfx::Point&) {
+std::shared_ptr<tgfx::Image> MotionBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                     Layer* layer, Frame layerFrame,
+                                                     const tgfx::Rect& contentBounds,
+                                                     tgfx::Point* offset) {
   auto contentFrame = layerFrame - layer->startTime;
   auto layerCache = LayerCache::Get(layer);
   auto previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
   auto currentMatrix = layerCache->getTransform(contentFrame)->matrix;
-  previousMatrix.preTranslate(_contentBounds.left, _contentBounds.top);
-  currentMatrix.preTranslate(_contentBounds.left, _contentBounds.top);
-  auto width = static_cast<int>(_contentBounds.width());
-  auto height = static_cast<int>(_contentBounds.height());
-  previousGLMatrix = ToGLTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
-  currentGLMatrix = ToGLTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
+  previousMatrix.preTranslate(contentBounds.left, contentBounds.top);
+  currentMatrix.preTranslate(contentBounds.left, contentBounds.top);
+  auto width = static_cast<int>(contentBounds.width());
+  auto height = static_cast<int>(contentBounds.height());
+  auto previousGLMatrix =
+      ToGLTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
+  auto currentGLMatrix =
+      ToGLTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
+  auto filter = std::make_shared<MotionBlurFilter>(previousGLMatrix, currentGLMatrix);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
-std::shared_ptr<tgfx::RuntimeEffect> MotionBlurFilter::createRuntimeEffect() {
-  return std::make_shared<MotionBlurRuntimeFilter>(previousGLMatrix, currentGLMatrix);
+std::string MotionBlurFilter::onBuildVertexShader() const {
+  return MOTIONBLUR_VERTEX_SHADER;
 }
+
+std::string MotionBlurFilter::onBuildFragmentShader() const {
+  return MOTIONBLUR_FRAGMENT_SHADER;
+}
+
+std::unique_ptr<Uniforms> MotionBlurFilter::onPrepareProgram(tgfx::Context* context,
+                                                             unsigned program) const {
+  return std::make_unique<MotionBlurUniforms>(context, program);
+}
+
+void MotionBlurFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                      const std::vector<tgfx::BackendTexture>&) const {
+  auto scaling = _previousMatrix[0] != _currentMatrix[0] || _previousMatrix[4] != _currentMatrix[4];
+  auto gl = tgfx::GLFunctions::Get(context);
+  auto uniform = static_cast<MotionBlurUniforms*>(program->uniforms.get());
+  gl->uniformMatrix3fv(uniform->prevTransformHandle, 1, GL_FALSE, _previousMatrix.data());
+  gl->uniformMatrix3fv(uniform->transformHandle, 1, GL_FALSE, _currentMatrix.data());
+  gl->uniform1f(uniform->velCenterHandle, scaling ? 0.0f : 0.5f);
+  gl->uniform1f(uniform->maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
+}
+
+std::vector<float> MotionBlurFilter::computeVertices(
+    const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
+    const tgfx::Point& offset) const {
+  auto inputRect = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
+  auto outputRect = filterBounds(inputRect);
+  auto vertices = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
+  std::vector<float> result;
+  result.reserve(vertices.size() * 4);
+  for (size_t i = 0; i < vertices.size();) {
+    auto vertexPoint = ToGLVertexPoint(target, vertices[i++] + offset);
+    result.push_back(vertexPoint.x);
+    result.push_back(vertexPoint.y);
+    auto texturePoint = ToGLTexturePoint(&sources[0], vertices[i++]);
+    result.push_back(texturePoint.x);
+    result.push_back(texturePoint.y);
+  }
+  return result;
+}
+
+tgfx::Rect MotionBlurFilter::filterBounds(const tgfx::Rect& srcRect) const {
+  auto result = srcRect;
+  if (_previousMatrix != _currentMatrix) {
+    auto width = srcRect.width() * MOTION_BLUR_SCALE_FACTOR;
+    auto height = srcRect.height() * MOTION_BLUR_SCALE_FACTOR;
+    auto x = srcRect.x() + (srcRect.width() - width) * 0.5f;
+    auto y = srcRect.y() + (srcRect.height() - height) * 0.5f;
+    result.setXYWH(x, y, width, height);
+  }
+  return result;
+}
+
 }  // namespace pag

@@ -19,7 +19,6 @@
 #pragma once
 
 #include "pag/pag.h"
-#include "rendering/filters/EffectFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/graphics/Recorder.h"
 
@@ -52,13 +51,10 @@ class FilterRenderer {
   static tgfx::Rect GetContentBounds(const FilterList* filterList,
                                      std::shared_ptr<Graphic> content);
 
-  static bool MakeEffectNode(RenderCache* cache, std::vector<std::shared_ptr<Filter>>& filterNodes,
-                             tgfx::Rect& clipBounds, const FilterList* filterList,
-                             tgfx::Rect& filterBounds, tgfx::Point& effectScale, int clipIndex);
-
-  static std::vector<std::shared_ptr<Filter>> MakeFilterNodes(const FilterList* filterList,
-                                                              RenderCache* renderCache,
-                                                              tgfx::Rect* contentBounds,
-                                                              const tgfx::Rect& clipRect);
+  static std::shared_ptr<tgfx::Image> ApplyFilters(std::shared_ptr<tgfx::Image> content,
+                                                   RenderCache* cache, const FilterList* filterList,
+                                                   const tgfx::Point& contentScale,
+                                                   tgfx::Rect contentBounds, tgfx::Rect clipBounds,
+                                                   int clipStartIndex, tgfx::Point* offset);
 };
 }  // namespace pag

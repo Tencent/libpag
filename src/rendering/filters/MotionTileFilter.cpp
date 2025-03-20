@@ -18,6 +18,7 @@
 
 #include "MotionTileFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char MOTIONTILE_VERTEX_SHADER[] = R"(
@@ -82,21 +83,42 @@ static const char MOTIONTILE_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-std::string MotionTileRuntimeFilter::onBuildVertexShader() const {
+std::shared_ptr<tgfx::Image> MotionTileFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                     Effect* effect, Frame layerFrame,
+                                                     const tgfx::Rect& contentBounds,
+                                                     tgfx::Point* offset) {
+  auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
+  auto tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
+  tileCenter.x = (tileCenter.x - contentBounds.x()) / contentBounds.width();
+  tileCenter.y = (tileCenter.y - contentBounds.y()) / contentBounds.height();
+  auto tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);
+  auto tileHeight = pagEffect->tileHeight->getValueAt(layerFrame);
+  auto outputWidth = pagEffect->outputWidth->getValueAt(layerFrame);
+  auto outputHeight = pagEffect->outputHeight->getValueAt(layerFrame);
+  auto mirrorEdges = pagEffect->mirrorEdges->getValueAt(layerFrame);
+  auto phase = pagEffect->phase->getValueAt(layerFrame);
+  auto horizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
+  auto filter = std::shared_ptr<RuntimeFilter>(
+      new MotionTileFilter(tileCenter, tileWidth, tileHeight, outputWidth, outputHeight,
+                           mirrorEdges, phase, horizontalPhaseShift));
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+std::string MotionTileFilter::onBuildVertexShader() const {
   return MOTIONTILE_VERTEX_SHADER;
 }
 
-std::string MotionTileRuntimeFilter::onBuildFragmentShader() const {
+std::string MotionTileFilter::onBuildFragmentShader() const {
   return MOTIONTILE_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> MotionTileRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                    unsigned program) const {
+std::unique_ptr<Uniforms> MotionTileFilter::onPrepareProgram(tgfx::Context* context,
+                                                             unsigned program) const {
   return std::make_unique<MotionTileUniforms>(context, program);
 }
 
-void MotionTileRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                             const std::vector<tgfx::BackendTexture>&) const {
+void MotionTileFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                      const std::vector<tgfx::BackendTexture>&) const {
   auto uniform = static_cast<MotionTileUniforms*>(program->uniforms.get());
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(uniform->tileCenterHandle, tileCenter.x, tileCenter.y);
@@ -109,35 +131,12 @@ void MotionTileRuntimeFilter::onUpdateParams(tgfx::Context* context, const Runti
   gl->uniform1i(uniform->isHorizontalPhaseShiftHandle, horizontalPhaseShift);
 }
 
-tgfx::Rect MotionTileRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) const {
+tgfx::Rect MotionTileFilter::filterBounds(const tgfx::Rect& srcRect) const {
   auto width = srcRect.width() * outputWidth / 100.0f;
   auto height = srcRect.height() * outputHeight / 100.0f;
   auto x = srcRect.x() + (srcRect.width() - width) * 0.5f;
   auto y = srcRect.y() + (srcRect.height() - height) * 0.5f;
   return tgfx::Rect::MakeXYWH(x, y, width, height);
-}
-
-MotionTileFilter::MotionTileFilter(Effect* effect) : effect(effect) {
-}
-
-void MotionTileFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
-  tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
-  tileCenter.x = (tileCenter.x - _contentBounds.x()) / _contentBounds.width();
-  tileCenter.y = (tileCenter.y - _contentBounds.y()) / _contentBounds.height();
-  tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);
-  tileHeight = pagEffect->tileHeight->getValueAt(layerFrame);
-  outputWidth = pagEffect->outputWidth->getValueAt(layerFrame);
-  outputHeight = pagEffect->outputHeight->getValueAt(layerFrame);
-  mirrorEdges = pagEffect->mirrorEdges->getValueAt(layerFrame);
-  phase = pagEffect->phase->getValueAt(layerFrame);
-  horizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> MotionTileFilter::createRuntimeEffect() {
-  return std::shared_ptr<RuntimeFilter>(
-      new MotionTileRuntimeFilter(tileCenter, tileWidth, tileHeight, outputWidth, outputHeight,
-                                  mirrorEdges, phase, horizontalPhaseShift));
 }
 
 }  // namespace pag

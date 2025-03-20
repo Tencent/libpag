@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "rendering/filters/EffectFilter.h"
+#include "pag/file.h"
+#include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
 

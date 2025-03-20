@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 
@@ -36,11 +37,14 @@ class MosaicUniforms : public Uniforms {
   int sharpColorsHandle = -1;
 };
 
-class MosaicRuntimeFilter : public RuntimeFilter {
+class MosaicFilter : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE
 
-  MosaicRuntimeFilter(float horizontalBlocks, float verticalBlocks, bool sharpColors)
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
+
+  MosaicFilter(float horizontalBlocks, float verticalBlocks, bool sharpColors)
       : RuntimeFilter(Type()), horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
         sharpColors(sharpColors) {
   }
@@ -59,19 +63,4 @@ class MosaicRuntimeFilter : public RuntimeFilter {
   bool sharpColors = false;
 };
 
-class MosaicFilter : public EffectFilter {
- public:
-  explicit MosaicFilter(Effect* effect);
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
-  float horizontalBlocks = 1;
-  float verticalBlocks = 1;
-  bool sharpColors = false;
-};
 }  // namespace pag

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
 #include "RuntimeFilter.h"
+#include "pag/file.h"
 #include "tgfx/core/Size.h"
 
 namespace pag {
@@ -52,16 +52,21 @@ class DisplacementMapEffectUniforms : public Uniforms {
   int effectOpacityHandle = 0;
 };
 
-class DisplacementMapRuntimeFilter : public RuntimeFilter {
+class DisplacementMapFilter : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE
 
-  DisplacementMapRuntimeFilter(Enum useForHorizontalDisplacement, float maxHorizontalDisplacement,
-                               Enum useForVerticalDisplacement, float maxVerticalDisplacement,
-                               Enum displacementMapBehavior, Enum edgeBehavior, bool expandOutput,
-                               float effectOpacity, tgfx::Matrix layerMatrix, tgfx::Size size,
-                               tgfx::Size displacementSize, tgfx::Rect contentBounds,
-                               std::shared_ptr<tgfx::Image> sourceImage)
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Layer* layer, RenderCache* cache,
+                                            const tgfx::Matrix& layerMatrix, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
+
+  DisplacementMapFilter(Enum useForHorizontalDisplacement, float maxHorizontalDisplacement,
+                        Enum useForVerticalDisplacement, float maxVerticalDisplacement,
+                        Enum displacementMapBehavior, Enum edgeBehavior, bool expandOutput,
+                        float effectOpacity, tgfx::Matrix layerMatrix, tgfx::Size size,
+                        tgfx::Size displacementSize, tgfx::Rect contentBounds,
+                        std::shared_ptr<tgfx::Image> sourceImage)
       : RuntimeFilter(Type(), {std::move(sourceImage)}),
         useForHorizontalDisplacement(useForHorizontalDisplacement),
         maxHorizontalDisplacement(maxHorizontalDisplacement),
@@ -96,27 +101,4 @@ class DisplacementMapRuntimeFilter : public RuntimeFilter {
   tgfx::Rect contentBounds = {0, 0, 0, 0};
 };
 
-class DisplacementMapFilter : public EffectFilter {
- public:
-  explicit DisplacementMapFilter(Effect* effect);
-  ~DisplacementMapFilter() override = default;
-
-  void updateMapTexture(Frame layerFrame, RenderCache* cache, const Layer* layer,
-                        const tgfx::Matrix& layerMatrix);
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  std::shared_ptr<Graphic> GetDisplacementMapGraphic(Frame frame);
-  Effect* effect = nullptr;
-
-  tgfx::Matrix _layerMatrix = tgfx::Matrix::I();
-  std::shared_ptr<tgfx::Image> _referenceImage;
-  std::shared_ptr<DisplacementMapRuntimeFilter> runtimeFilter;
-  tgfx::Size _size = {0, 0};
-  tgfx::Size _displacementSize = {0, 0};
-};
 }  // namespace pag

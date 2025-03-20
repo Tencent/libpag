@@ -24,26 +24,15 @@
 #include "tgfx/core/Canvas.h"
 
 namespace pag {
-GlowFilter::GlowFilter(Effect* effect) : effect(effect) {
-}
 
-GlowFilter::~GlowFilter() {
-}
-
-void GlowFilter::update(Frame layerFrame, const tgfx::Point&) {
+std::shared_ptr<tgfx::Image> GlowFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                               Frame layerFrame, tgfx::Point* offset) {
   auto glowEffect = static_cast<GlowEffect*>(effect);
   auto glowRadius = glowEffect->glowRadius->getValueAt(layerFrame);
-  resizeRatio = 1.0f - glowRadius / 1500.f;
-  progress = glowEffect->glowThreshold->getValueAt(layerFrame);
-}
-
-void GlowFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
-  if (image == nullptr) {
-    LOGE("GlowFilter::draw() can not draw filter");
-    return;
-  }
-  auto blurWidth = ceil(image->width() * resizeRatio);
-  auto blurHeight = ceil(image->height() * resizeRatio);
+  auto resizeRatio = 1.0f - glowRadius / 1500.f;
+  auto progress = glowEffect->glowThreshold->getValueAt(layerFrame);
+  auto blurWidth = ceil(input->width() * resizeRatio);
+  auto blurHeight = ceil(input->height() * resizeRatio);
   auto blurFilterH = std::make_shared<GlowBlurRuntimeFilter>(BlurDirection::Horizontal,
                                                              1.0f / blurWidth, resizeRatio);
   auto imageFilterH = tgfx::ImageFilter::Runtime(blurFilterH);
@@ -51,12 +40,9 @@ void GlowFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> 
       std::make_shared<GlowBlurRuntimeFilter>(BlurDirection::Vertical, 1.0f / blurHeight, 1.0f);
   auto imageFilterV = tgfx::ImageFilter::Runtime(blurFilterV);
   auto blurFilter = tgfx::ImageFilter::Compose(imageFilterH, imageFilterV);
-  auto blurImage = image->makeWithFilter(std::move(blurFilter));
+  auto blurImage = input->makeWithFilter(std::move(blurFilter));
   auto mergeFilter =
       tgfx::ImageFilter::Runtime(std::make_shared<GlowMergeRuntimeFilter>(progress, blurImage));
-
-  tgfx::Paint paint;
-  paint.setImageFilter(mergeFilter);
-  canvas->drawImage(image, &paint);
+  return input->makeWithFilter(std::move(mergeFilter), offset);
 }
 }  // namespace pag

@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 
@@ -35,11 +36,13 @@ class HueSaturationUniform : public Uniforms {
   int colorizeLightnessHandle = -1;
 };
 
-class HueSaturationRuntimeFilter : public RuntimeFilter {
+class HueSaturationFilter : public RuntimeFilter {
  public:
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
   DEFINE_RUNTIME_EFFECT_TYPE
-  HueSaturationRuntimeFilter(float hue, float saturation, float lightness, float colorize,
-                             float colorizeHue, float colorizeSaturation, float colorizeLightness);
+  HueSaturationFilter(float hue, float saturation, float lightness, float colorize,
+                      float colorizeHue, float colorizeSaturation, float colorizeLightness);
 
  protected:
   std::string onBuildFragmentShader() const override;
@@ -60,24 +63,4 @@ class HueSaturationRuntimeFilter : public RuntimeFilter {
   float colorizeLightness = 0.f;
 };
 
-class HueSaturationFilter : public EffectFilter {
- public:
-  explicit HueSaturationFilter(Effect* effect);
-  ~HueSaturationFilter() override = default;
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
-  float hue = 0.f;
-  float saturation = 0.f;
-  float lightness = 0.f;
-  float colorize = 0.f;
-  float colorizeHue = 0.f;
-  float colorizeSaturation = 0.f;
-  float colorizeLightness = 0.f;
-};
 }  // namespace pag

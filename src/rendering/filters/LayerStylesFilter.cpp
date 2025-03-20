@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerStylesFilter.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "tgfx/core/Surface.h"
@@ -33,7 +34,8 @@ void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* fi
 }
 
 std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
-    const std::vector<LayerStyle*>& layerStyles) {
+    const std::vector<LayerStyle*>& layerStyles, Frame layerFrame, float sourceScale,
+    const tgfx::Point& filterScale) {
   std::vector<std::unique_ptr<LayerStyleFilter>> blowFilters;
   std::vector<std::unique_ptr<LayerStyleFilter>> aboveFilters;
   for (auto& layerStyle : layerStyles) {
@@ -41,6 +43,7 @@ std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
     if (!filter) {
       continue;
     }
+    filter->update(layerFrame, filterScale, {sourceScale, sourceScale});
     if (layerStyle->drawPosition() == LayerStylePosition::Blow) {
       blowFilters.push_back(std::move(filter));
     } else {
@@ -60,13 +63,7 @@ std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
   return filter;
 }
 
-void LayerStylesFilter::update(Frame layerFrame, const tgfx::Point& sourceScale) {
-  for (auto& layerStyleFilter : layerStyleFilters) {
-    layerStyleFilter->update(layerFrame, _filterScale, sourceScale);
-  }
-}
-
-void LayerStylesFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+void LayerStylesFilter::applyFilter(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   for (const auto& layerStyleFilter : layerStyleFilters) {
     layerStyleFilter->draw(canvas, image);
   }

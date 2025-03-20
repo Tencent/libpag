@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "rendering/filters/EffectFilter.h"
+#include "rendering/filters/RuntimeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
 
 namespace pag {

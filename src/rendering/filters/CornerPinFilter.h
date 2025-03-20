@@ -18,16 +18,20 @@
 
 #pragma once
 
-#include "EffectFilter.h"
 #include "RuntimeFilter.h"
 #include "base/utils/TGFXCast.h"
 #include "codec/tags/effects/CornerPinEffect.h"
 
 namespace pag {
-class CornerPinRuntimeFilter : public RuntimeFilter {
+class CornerPinFilter : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE;
-  explicit CornerPinRuntimeFilter(const Point cornerPoints[4]) : RuntimeFilter(Type()) {
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Point& sourceScale,
+                                            tgfx::Point* offset);
+
+  explicit CornerPinFilter(const Point cornerPoints[4]) : RuntimeFilter(Type()) {
     for (int i = 0; i < 4; i++) {
       this->cornerPoints[i] = ToTGFX(cornerPoints[i]);
     }
@@ -56,17 +60,4 @@ class CornerPinRuntimeFilter : public RuntimeFilter {
   float vertexQs[4] = {};
 };
 
-class CornerPinFilter : public EffectFilter {
- public:
-  explicit CornerPinFilter(Effect* effect);
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
-  Point points[4] = {};
-};
 }  // namespace pag

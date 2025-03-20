@@ -52,7 +52,7 @@ void DropShadowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
   }
 }
 
-bool DropShadowFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+bool DropShadowFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (spread == 0.f) {
     filter = getDropShadowFilter();

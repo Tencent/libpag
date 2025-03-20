@@ -23,9 +23,13 @@
 
 namespace pag {
 
-void GaussianBlurFilter::update(Frame layerFrame, const tgfx::Point& sourceScale) {
+std::shared_ptr<tgfx::Image> GaussianBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                       Effect* effect, Frame layerFrame,
+                                                       const tgfx::Point& filterScale,
+                                                       const tgfx::Point& sourceScale,
+                                                       tgfx::Point* offset) {
   auto* blurEffect = static_cast<FastBlurEffect*>(effect);
-  repeatEdgePixels = blurEffect->repeatEdgePixels->getValueAt(layerFrame);
+  auto repeatEdgePixels = blurEffect->repeatEdgePixels->getValueAt(layerFrame);
   auto blurDimensions = blurEffect->blurDimensions->getValueAt(layerFrame);
   auto blurrinessX = blurEffect->blurriness->getValueAt(layerFrame);
   auto blurrinessY = blurrinessX;
@@ -34,27 +38,16 @@ void GaussianBlurFilter::update(Frame layerFrame, const tgfx::Point& sourceScale
   } else if (blurDimensions == BlurDimensionsDirection::Vertical) {
     blurrinessX = 0;
   }
-  blurrinessX *= _filterScale.x * sourceScale.x;
-  blurrinessY *= _filterScale.y * sourceScale.y;
+  blurrinessX *= filterScale.x * sourceScale.x;
+  blurrinessY *= filterScale.y * sourceScale.y;
+  std::shared_ptr<tgfx::ImageFilter> filter;
   if (repeatEdgePixels) {
-    currentFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
-  } else {
-    currentFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
+    filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
+    tgfx::Rect clipBounds = tgfx::Rect::MakeWH(input->width(), input->height());
+    return input->makeWithFilter(filter, offset, &clipBounds);
   }
-}
-
-void GaussianBlurFilter::applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
-  if (currentFilter == nullptr) {
-    return;
-  }
-  canvas->save();
-  if (repeatEdgePixels) {
-    canvas->clipRect(tgfx::Rect::MakeWH(image->width(), image->height()));
-  }
-  tgfx::Paint paint;
-  paint.setImageFilter(currentFilter);
-  canvas->drawImage(image, &paint);
-  canvas->restore();
+  filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
+  return input->makeWithFilter(filter, offset);
 }
 
 }  // namespace pag

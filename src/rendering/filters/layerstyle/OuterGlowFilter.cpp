@@ -41,7 +41,7 @@ void OuterGlowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
   range = layerStyle->range->getValueAt(layerFrame);
 }
 
-bool OuterGlowFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+bool OuterGlowFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (spread == 0.f) {
     filter = getDropShadowFilter();

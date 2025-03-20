@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BulgeFilter.h"
+#include "tgfx/core/ImageFilter.h"
+#include "utils/FilterHelper.h"
 
 namespace pag {
 
@@ -152,27 +154,45 @@ BulgeUniforms::BulgeUniforms(tgfx::Context* context, unsigned program)
   pinningHandle = gl->getUniformLocation(program, "uPinning");
 }
 
-BulgeRuntimeFilter::BulgeRuntimeFilter(float horizontalRadius, float verticalRadius,
-                                       const Point& bulgeCenter, float bulgeHeight, float pinning)
+std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                                Frame layerFrame, const tgfx::Rect& contentBounds,
+                                                tgfx::Point* offset) {
+  auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
+  auto horizontalRadius =
+      bulgeEffect->horizontalRadius->getValueAt(layerFrame) / contentBounds.width();
+  auto verticalRadius =
+      bulgeEffect->verticalRadius->getValueAt(layerFrame) / contentBounds.height();
+  auto bulgeCenter = bulgeEffect->bulgeCenter->getValueAt(layerFrame);
+  bulgeCenter.x = (bulgeCenter.x - contentBounds.x()) / contentBounds.width();
+  bulgeCenter.y = (bulgeCenter.y - contentBounds.y()) / contentBounds.height();
+  auto bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
+  auto pinning = bulgeEffect->pinning->getValueAt(layerFrame);
+  auto filter = std::make_shared<BulgeFilter>(horizontalRadius, verticalRadius, bulgeCenter,
+                                              bulgeHeight, pinning);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+BulgeFilter::BulgeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
+                         float bulgeHeight, float pinning)
     : RuntimeFilter(Type()), horizontalRadius(horizontalRadius), verticalRadius(verticalRadius),
       bulgeCenter(bulgeCenter), bulgeHeight(bulgeHeight), pinning(pinning) {
 }
 
-std::string BulgeRuntimeFilter::onBuildVertexShader() const {
+std::string BulgeFilter::onBuildVertexShader() const {
   return BULGE_VERTEX_SHADER;
 }
 
-std::string BulgeRuntimeFilter::onBuildFragmentShader() const {
+std::string BulgeFilter::onBuildFragmentShader() const {
   return BULGE_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> BulgeRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                               unsigned program) const {
+std::unique_ptr<Uniforms> BulgeFilter::onPrepareProgram(tgfx::Context* context,
+                                                        unsigned program) const {
   return std::make_unique<BulgeUniforms>(context, program);
 }
 
-void BulgeRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                        const std::vector<tgfx::BackendTexture>&) const {
+void BulgeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                 const std::vector<tgfx::BackendTexture>&) const {
 
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = static_cast<BulgeUniforms*>(program->uniforms.get());
@@ -183,9 +203,9 @@ void BulgeRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimePro
   gl->uniform1i(uniform->pinningHandle, pinning);
 }
 
-std::vector<float> BulgeRuntimeFilter::computeVertices(
-    const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
-    const tgfx::Point& offset) const {
+std::vector<float> BulgeFilter::computeVertices(const std::vector<tgfx::BackendTexture>& sources,
+                                                const tgfx::BackendRenderTarget& target,
+                                                const tgfx::Point& offset) const {
   auto inputRect = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
   auto outputRect = filterBounds(inputRect);
   auto vertices = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
@@ -202,7 +222,7 @@ std::vector<float> BulgeRuntimeFilter::computeVertices(
   return result;
 }
 
-tgfx::Rect BulgeRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) const {
+tgfx::Rect BulgeFilter::filterBounds(const tgfx::Rect& srcRect) const {
   // 凸出特效固定开启的话，不改变尺寸。
   if (pinning || bulgeHeight == 0) {
     return srcRect;
@@ -236,25 +256,6 @@ tgfx::Rect BulgeRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) const {
   AdjustTop(originBulgeCenter, originVerticalRadius, &top);
   AdjustBottom(originBulgeCenter, originVerticalRadius, &bottom);
   return tgfx::Rect::MakeLTRB(left, top, right, bottom);
-}
-
-BulgeFilter::BulgeFilter(Effect* effect) : effect(effect) {
-}
-
-void BulgeFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
-  horizontalRadius = bulgeEffect->horizontalRadius->getValueAt(layerFrame) / _contentBounds.width();
-  verticalRadius = bulgeEffect->verticalRadius->getValueAt(layerFrame) / _contentBounds.height();
-  bulgeCenter = bulgeEffect->bulgeCenter->getValueAt(layerFrame);
-  bulgeCenter.x = (bulgeCenter.x - _contentBounds.x()) / _contentBounds.width();
-  bulgeCenter.y = (bulgeCenter.y - _contentBounds.y()) / _contentBounds.height();
-  bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
-  pinning = bulgeEffect->pinning->getValueAt(layerFrame);
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> BulgeFilter::createRuntimeEffect() {
-  return std::make_shared<BulgeRuntimeFilter>(horizontalRadius, verticalRadius, bulgeCenter,
-                                              bulgeHeight, pinning);
 }
 
 }  // namespace pag

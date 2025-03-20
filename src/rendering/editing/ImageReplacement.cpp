@@ -18,6 +18,7 @@
 
 #include "ImageReplacement.h"
 #include "base/utils/MatrixUtil.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Recorder.h"
 

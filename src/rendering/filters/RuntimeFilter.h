@@ -23,6 +23,9 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 namespace pag {
 
+std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
+                                                              const tgfx::Rect& outputBounds);
+
 class Uniforms {
  public:
   Uniforms(tgfx::Context* context, unsigned program) {

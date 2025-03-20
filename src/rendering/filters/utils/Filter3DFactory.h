@@ -23,11 +23,10 @@
 
 namespace pag {
 
-bool Make3DLayerNode(std::vector<std::shared_ptr<Filter>>& filterNodes, tgfx::Rect& clipBounds,
-                     const FilterList* filterList, tgfx::Rect& filterBounds,
-                     tgfx::Point& effectScale);
-
-Filter* Make3DFilter(tgfx::Context* context);
+std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input,
+                                            const FilterList* filterList,
+                                            const tgfx::Rect& clipBounds, tgfx::Rect* filterBounds,
+                                            tgfx::Point* offset);
 
 bool Has3DSupport();
 

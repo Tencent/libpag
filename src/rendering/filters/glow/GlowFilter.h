@@ -17,23 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "rendering/filters/EffectFilter.h"
+#include "pag/file.h"
+#include "tgfx/core/Image.h"
 
 namespace pag {
-class GlowFilter : public EffectFilter {
+class GlowFilter {
  public:
-  explicit GlowFilter(Effect* effect);
-  ~GlowFilter() override;
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
-  void applyFilter(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) override;
-
- private:
-  Effect* effect = nullptr;
-
-  float resizeRatio = 1.0f;
-  float progress = 0.0f;
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
 };
 }  // namespace pag

@@ -18,6 +18,7 @@
 
 #include "CornerPinFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char CORNER_PIN_VERTEX_SHADER[] = R"(
@@ -41,15 +42,33 @@ static const char CORNER_PIN_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-std::string CornerPinRuntimeFilter::onBuildVertexShader() const {
+std::shared_ptr<tgfx::Image> CornerPinFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                    Effect* effect, Frame layerFrame,
+                                                    const tgfx::Point& sourceScale,
+                                                    tgfx::Point* offset) {
+  auto cornerPinEffect = reinterpret_cast<const CornerPinEffect*>(effect);
+  Point points[4] = {};
+  points[0] = cornerPinEffect->lowerLeft->getValueAt(layerFrame);
+  points[1] = cornerPinEffect->lowerRight->getValueAt(layerFrame);
+  points[2] = cornerPinEffect->upperLeft->getValueAt(layerFrame);
+  points[3] = cornerPinEffect->upperRight->getValueAt(layerFrame);
+  for (auto& point : points) {
+    point.x *= sourceScale.x;
+    point.y *= sourceScale.y;
+  }
+  auto filter = std::shared_ptr<CornerPinFilter>(new CornerPinFilter(points));
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+std::string CornerPinFilter::onBuildVertexShader() const {
   return CORNER_PIN_VERTEX_SHADER;
 }
 
-std::string CornerPinRuntimeFilter::onBuildFragmentShader() const {
+std::string CornerPinFilter::onBuildFragmentShader() const {
   return CORNER_PIN_FRAGMENT_SHADER;
 }
 
-tgfx::Rect CornerPinRuntimeFilter::filterBounds(const tgfx::Rect&) const {
+tgfx::Rect CornerPinFilter::filterBounds(const tgfx::Rect&) const {
   auto& lowerLeft = cornerPoints[0];
   auto& lowerRight = cornerPoints[1];
   auto& upperLeft = cornerPoints[2];
@@ -75,7 +94,7 @@ static bool PointIsBetween(const tgfx::Point& point, const tgfx::Point& start,
   return minX <= point.x && point.x <= maxX && minY <= point.y && point.y <= maxY;
 }
 
-void CornerPinRuntimeFilter::calculateVertexQs() {
+void CornerPinFilter::calculateVertexQs() {
   // https://www.reedbeta.com/blog/quadrilateral-interpolation-part-1/
   // 计算2条对角线的交点：y1 = k1 * x1 + b1; y2 = k2 * x2 + b2
   auto lowerLeft = cornerPoints[0];
@@ -110,7 +129,7 @@ void CornerPinRuntimeFilter::calculateVertexQs() {
   }
 }
 
-std::vector<float> CornerPinRuntimeFilter::computeVertices(
+std::vector<float> CornerPinFilter::computeVertices(
     const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
     const tgfx::Point& offset) const {
   const auto& source = sources[0];
@@ -133,8 +152,8 @@ std::vector<float> CornerPinRuntimeFilter::computeVertices(
   return vertices;
 }
 
-void CornerPinRuntimeFilter::bindVertices(tgfx::Context* context, const RuntimeProgram* program,
-                                          const std::vector<float>& points) const {
+void CornerPinFilter::bindVertices(tgfx::Context* context, const RuntimeProgram* program,
+                                   const std::vector<float>& points) const {
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = program->uniforms.get();
   if (program->vertexArray > 0) {
@@ -153,27 +172,8 @@ void CornerPinRuntimeFilter::bindVertices(tgfx::Context* context, const RuntimeP
   gl->bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-int CornerPinRuntimeFilter::sampleCount() const {
+int CornerPinFilter::sampleCount() const {
   return 4;
-}
-
-CornerPinFilter::CornerPinFilter(Effect* effect) : effect(effect) {
-}
-
-void CornerPinFilter::update(Frame layerFrame, const tgfx::Point& sourceScale) {
-  auto cornerPinEffect = reinterpret_cast<const CornerPinEffect*>(effect);
-  points[0] = cornerPinEffect->lowerLeft->getValueAt(layerFrame);
-  points[1] = cornerPinEffect->lowerRight->getValueAt(layerFrame);
-  points[2] = cornerPinEffect->upperLeft->getValueAt(layerFrame);
-  points[3] = cornerPinEffect->upperRight->getValueAt(layerFrame);
-  for (auto& point : points) {
-    point.x *= sourceScale.x;
-    point.y *= sourceScale.y;
-  }
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> CornerPinFilter::createRuntimeEffect() {
-  return std::shared_ptr<CornerPinRuntimeFilter>(new CornerPinRuntimeFilter(points));
 }
 
 }  // namespace pag

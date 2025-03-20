@@ -19,7 +19,8 @@
 #pragma once
 
 #include <array>
-#include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 
@@ -39,15 +40,21 @@ class MotionBlurUniforms : public Uniforms {
   int maxDistanceHandle = 0;
 };
 
-class MotionBlurRuntimeFilter : public RuntimeFilter {
+class MotionBlurFilter : public RuntimeFilter {
  public:
+  static void TransformBounds(tgfx::Rect* contentBounds, Layer* layer, Frame layerFrame);
+
+  static bool ShouldSkipFilter(Layer* layer, Frame layerFrame);
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Layer* layer,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
   DEFINE_RUNTIME_EFFECT_TYPE
 
-  MotionBlurRuntimeFilter(const std::array<float, 9>& preMatrix,
-                          const std::array<float, 9>& curMatrix)
+  MotionBlurFilter(const std::array<float, 9>& preMatrix, const std::array<float, 9>& curMatrix)
       : RuntimeFilter(Type()), _previousMatrix(preMatrix), _currentMatrix(curMatrix) {
   }
-  ~MotionBlurRuntimeFilter() override = default;
+  ~MotionBlurFilter() override = default;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 
@@ -69,25 +76,5 @@ class MotionBlurRuntimeFilter : public RuntimeFilter {
  private:
   std::array<float, 9> _previousMatrix = {};
   std::array<float, 9> _currentMatrix = {};
-};
-
-class MotionBlurFilter : public EffectFilter {
- public:
-  static void TransformBounds(tgfx::Rect* contentBounds, Layer* layer, Frame layerFrame);
-
-  static bool ShouldSkipFilter(Layer* layer, Frame layerFrame);
-
-  explicit MotionBlurFilter(Layer* layer) : layer(layer) {
-  }
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Layer* layer = nullptr;
-  std::array<float, 9> previousGLMatrix = {};
-  std::array<float, 9> currentGLMatrix = {};
 };
 }  // namespace pag

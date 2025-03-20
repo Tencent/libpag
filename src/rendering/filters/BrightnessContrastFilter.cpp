@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BrightnessContrastFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -74,36 +75,32 @@ BrightnessContrastUniforms::BrightnessContrastUniforms(tgfx::Context* context, u
   contrastHandle = gl->getUniformLocation(program, "mContrast");
 }
 
-std::string BrightnessContrastRuntimeFilter::onBuildFragmentShader() const {
+std::shared_ptr<tgfx::Image> BrightnessContrastFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                             Effect* effect, Frame layerFrame,
+                                                             tgfx::Point* offset) {
+  auto* brightnessContrastEffect = static_cast<const BrightnessContrastEffect*>(effect);
+  auto brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
+  auto contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);
+  auto filter = std::make_shared<BrightnessContrastFilter>(brightness, contrast);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+std::string BrightnessContrastFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> BrightnessContrastRuntimeFilter::onPrepareProgram(
-    tgfx::Context* context, unsigned program) const {
+std::unique_ptr<Uniforms> BrightnessContrastFilter::onPrepareProgram(tgfx::Context* context,
+                                                                     unsigned program) const {
   return std::make_unique<BrightnessContrastUniforms>(context, program);
 }
 
-void BrightnessContrastRuntimeFilter::onUpdateParams(
-    tgfx::Context* context, const RuntimeProgram* program,
-    const std::vector<tgfx::BackendTexture>&) const {
+void BrightnessContrastFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                              const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = static_cast<BrightnessContrastUniforms*>(program->uniforms.get());
   gl->uniform1f(uniform->brightnessBlocksHandle,
                 brightness > 0 ? brightness / 250.f : brightness / 650.f);
   gl->uniform1f(uniform->contrastHandle, 1.0f + contrast / 300.f);
-}
-
-BrightnessContrastFilter::BrightnessContrastFilter(Effect* effect) : effect(effect) {
-}
-
-void BrightnessContrastFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* brightnessContrastEffect = static_cast<const BrightnessContrastEffect*>(effect);
-  brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
-  contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);
-}
-
-std::shared_ptr<tgfx::RuntimeEffect> BrightnessContrastFilter::createRuntimeEffect() {
-  return std::make_shared<BrightnessContrastRuntimeFilter>(brightness, contrast);
 }
 
 }  // namespace pag

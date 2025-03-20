@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"

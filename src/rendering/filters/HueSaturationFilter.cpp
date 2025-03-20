@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HueSaturationFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -92,27 +93,42 @@ HueSaturationUniform::HueSaturationUniform(tgfx::Context* context, unsigned prog
   colorizeLightnessHandle = gl->getUniformLocation(program, "mColorizeLightness");
 }
 
-HueSaturationRuntimeFilter::HueSaturationRuntimeFilter(float hue, float saturation, float lightness,
-                                                       float colorize, float colorizeHue,
-                                                       float colorizeSaturation,
-                                                       float colorizeLightness)
+std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                        Effect* effect, Frame layerFrame,
+                                                        tgfx::Point* offset) {
+  auto* hueSaturationEffect = reinterpret_cast<const HueSaturationEffect*>(effect);
+  auto channelControl = hueSaturationEffect->channelControl;
+  auto hue = hueSaturationEffect->hue[channelControl];
+  auto saturation = hueSaturationEffect->saturation[channelControl];
+  auto lightness = hueSaturationEffect->lightness[channelControl];
+  auto colorize = hueSaturationEffect->colorize;
+  auto colorizeHue = hueSaturationEffect->colorizeHue->getValueAt(layerFrame);
+  auto colorizeSaturation = hueSaturationEffect->colorizeSaturation->getValueAt(layerFrame);
+  auto colorizeLightness = hueSaturationEffect->colorizeLightness->getValueAt(layerFrame);
+  auto filter = std::make_shared<HueSaturationFilter>(
+      hue, saturation, lightness, colorize, colorizeHue, colorizeSaturation, colorizeLightness);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+HueSaturationFilter::HueSaturationFilter(float hue, float saturation, float lightness,
+                                         float colorize, float colorizeHue,
+                                         float colorizeSaturation, float colorizeLightness)
     : RuntimeFilter(Type()), hue(hue), saturation(saturation), lightness(lightness),
       colorize(colorize), colorizeHue(colorizeHue), colorizeSaturation(colorizeSaturation),
       colorizeLightness(colorizeLightness) {
 }
 
-std::string HueSaturationRuntimeFilter::onBuildFragmentShader() const {
+std::string HueSaturationFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> HueSaturationRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                       unsigned program) const {
+std::unique_ptr<Uniforms> HueSaturationFilter::onPrepareProgram(tgfx::Context* context,
+                                                                unsigned program) const {
   return std::make_unique<HueSaturationUniform>(context, program);
 }
 
-void HueSaturationRuntimeFilter::onUpdateParams(tgfx::Context* context,
-                                                const RuntimeProgram* program,
-                                                const std::vector<tgfx::BackendTexture>&) const {
+void HueSaturationFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                         const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
   auto uniform = static_cast<HueSaturationUniform*>(program->uniforms.get());
   gl->uniform1f(uniform->hueHandle, hue / 360.f);
@@ -123,24 +139,4 @@ void HueSaturationRuntimeFilter::onUpdateParams(tgfx::Context* context,
   gl->uniform1f(uniform->colorizeSaturationHandle, colorizeSaturation / 100.f);
   gl->uniform1f(uniform->colorizeLightnessHandle, colorizeLightness / 100.f);
 }
-
-HueSaturationFilter::HueSaturationFilter(pag::Effect* effect) : effect(effect) {
-}
-std::shared_ptr<tgfx::RuntimeEffect> HueSaturationFilter::createRuntimeEffect() {
-  return std::make_shared<HueSaturationRuntimeFilter>(
-      hue, saturation, lightness, colorize, colorizeHue, colorizeSaturation, colorizeLightness);
-}
-
-void HueSaturationFilter::update(Frame layerFrame, const tgfx::Point&) {
-  auto* hueSaturationEffect = reinterpret_cast<const HueSaturationEffect*>(effect);
-  auto channelControl = hueSaturationEffect->channelControl;
-  hue = hueSaturationEffect->hue[channelControl];
-  saturation = hueSaturationEffect->saturation[channelControl];
-  lightness = hueSaturationEffect->lightness[channelControl];
-  colorize = hueSaturationEffect->colorize;
-  colorizeHue = hueSaturationEffect->colorizeHue->getValueAt(layerFrame);
-  colorizeSaturation = hueSaturationEffect->colorizeSaturation->getValueAt(layerFrame);
-  colorizeLightness = hueSaturationEffect->colorizeLightness->getValueAt(layerFrame);
-}
-
 }  // namespace pag

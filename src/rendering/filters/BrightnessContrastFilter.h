@@ -18,22 +18,26 @@
 
 #pragma once
 
-#include "EffectFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
 class BrightnessContrastUniforms : public Uniforms {
  public:
   BrightnessContrastUniforms(tgfx::Context* context, unsigned program);
 
-  // Handle
   int brightnessBlocksHandle = -1;
   int contrastHandle = -1;
 };
 
-class BrightnessContrastRuntimeFilter : public RuntimeFilter {
+class BrightnessContrastFilter : public RuntimeFilter {
  public:
   DEFINE_RUNTIME_EFFECT_TYPE
-  BrightnessContrastRuntimeFilter(float brightness, float contrast)
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
+
+  BrightnessContrastFilter(float brightness, float contrast)
       : RuntimeFilter(Type()), brightness(brightness), contrast(contrast) {
   }
 
@@ -46,22 +50,6 @@ class BrightnessContrastRuntimeFilter : public RuntimeFilter {
                       const std::vector<tgfx::BackendTexture>& sources) const override;
 
  private:
-  float brightness = 0.f;
-  float contrast = 0.f;
-};
-
-class BrightnessContrastFilter : public EffectFilter {
- public:
-  explicit BrightnessContrastFilter(Effect* effect);
-  ~BrightnessContrastFilter() override = default;
-
-  void update(Frame layerFrame, const tgfx::Point& sourceScale) override;
-
- protected:
-  std::shared_ptr<tgfx::RuntimeEffect> createRuntimeEffect() override;
-
- private:
-  Effect* effect = nullptr;
   float brightness = 0.f;
   float contrast = 0.f;
 };
