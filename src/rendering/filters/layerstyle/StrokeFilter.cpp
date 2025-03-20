@@ -56,7 +56,7 @@ void StrokeFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
   alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
 }
 
-bool StrokeFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+bool StrokeFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
 
   std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (strokeOption.position == StrokePosition::Outside) {

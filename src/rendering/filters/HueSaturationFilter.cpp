@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HueSaturationFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -80,14 +81,8 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-HueSaturationFilter::HueSaturationFilter(pag::Effect* effect) : effect(effect) {
-}
-
-std::string HueSaturationFilter::onBuildFragmentShader() {
-  return FRAGMENT_SHADER;
-}
-
-void HueSaturationFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+HueSaturationUniform::HueSaturationUniform(tgfx::Context* context, unsigned program)
+    : Uniforms(context, program) {
   auto gl = tgfx::GLFunctions::Get(context);
   hueHandle = gl->getUniformLocation(program, "mHue");
   saturationHandle = gl->getUniformLocation(program, "mSaturation");
@@ -98,8 +93,9 @@ void HueSaturationFilter::onPrepareProgram(tgfx::Context* context, unsigned int 
   colorizeLightnessHandle = gl->getUniformLocation(program, "mColorizeLightness");
 }
 
-void HueSaturationFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
-                                         const tgfx::Point&) {
+std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                        Effect* effect, Frame layerFrame,
+                                                        tgfx::Point* offset) {
   auto* hueSaturationEffect = reinterpret_cast<const HueSaturationEffect*>(effect);
   auto channelControl = hueSaturationEffect->channelControl;
   auto hue = hueSaturationEffect->hue[channelControl];
@@ -109,14 +105,38 @@ void HueSaturationFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rec
   auto colorizeHue = hueSaturationEffect->colorizeHue->getValueAt(layerFrame);
   auto colorizeSaturation = hueSaturationEffect->colorizeSaturation->getValueAt(layerFrame);
   auto colorizeLightness = hueSaturationEffect->colorizeLightness->getValueAt(layerFrame);
+  auto filter = std::make_shared<HueSaturationFilter>(
+      hue, saturation, lightness, colorize, colorizeHue, colorizeSaturation, colorizeLightness);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
 
+HueSaturationFilter::HueSaturationFilter(float hue, float saturation, float lightness,
+                                         float colorize, float colorizeHue,
+                                         float colorizeSaturation, float colorizeLightness)
+    : RuntimeFilter(Type()), hue(hue), saturation(saturation), lightness(lightness),
+      colorize(colorize), colorizeHue(colorizeHue), colorizeSaturation(colorizeSaturation),
+      colorizeLightness(colorizeLightness) {
+}
+
+std::string HueSaturationFilter::onBuildFragmentShader() const {
+  return FRAGMENT_SHADER;
+}
+
+std::unique_ptr<Uniforms> HueSaturationFilter::onPrepareProgram(tgfx::Context* context,
+                                                                unsigned program) const {
+  return std::make_unique<HueSaturationUniform>(context, program);
+}
+
+void HueSaturationFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                         const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(hueHandle, hue / 360.f);
-  gl->uniform1f(saturationHandle, saturation / 100.f);
-  gl->uniform1f(lightnessHandle, lightness / 100.f);
-  gl->uniform1f(colorizeHandle, colorize);
-  gl->uniform1f(colorizeHueHandle, colorizeHue / 360.f);
-  gl->uniform1f(colorizeSaturationHandle, colorizeSaturation / 100.f);
-  gl->uniform1f(colorizeLightnessHandle, colorizeLightness / 100.f);
+  auto uniform = static_cast<HueSaturationUniform*>(program->uniforms.get());
+  gl->uniform1f(uniform->hueHandle, hue / 360.f);
+  gl->uniform1f(uniform->saturationHandle, saturation / 100.f);
+  gl->uniform1f(uniform->lightnessHandle, lightness / 100.f);
+  gl->uniform1f(uniform->colorizeHandle, colorize);
+  gl->uniform1f(uniform->colorizeHueHandle, colorizeHue / 360.f);
+  gl->uniform1f(uniform->colorizeSaturationHandle, colorizeSaturation / 100.f);
+  gl->uniform1f(uniform->colorizeLightnessHandle, colorizeLightness / 100.f);
 }
 }  // namespace pag

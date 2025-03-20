@@ -18,34 +18,46 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "base/utils/TGFXCast.h"
+#include "codec/tags/effects/CornerPinEffect.h"
 
 namespace pag {
-class CornerPinFilter : public LayerFilter {
+class CornerPinFilter : public RuntimeFilter {
  public:
-  explicit CornerPinFilter(Effect* effect);
-  ~CornerPinFilter() override = default;
+  DEFINE_RUNTIME_EFFECT_TYPE;
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, const tgfx::Point& sourceScale,
+                                            tgfx::Point* offset);
+
+  explicit CornerPinFilter(const Point cornerPoints[4]) : RuntimeFilter(Type()) {
+    for (int i = 0; i < 4; i++) {
+      this->cornerPoints[i] = ToTGFX(cornerPoints[i]);
+    }
+    calculateVertexQs();
+  }
 
  protected:
-  std::string onBuildVertexShader() override;
+  std::string onBuildVertexShader() const override;
 
-  std::string onBuildFragmentShader() override;
+  std::string onBuildFragmentShader() const override;
 
-  std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
-                                           const tgfx::Rect& transformedBounds,
-                                           const tgfx::Point& filterScale) override;
+  std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
+                                     const tgfx::BackendRenderTarget& target,
+                                     const tgfx::Point& offset) const override;
 
-  void bindVertices(tgfx::Context* context, const FilterSource* source, const FilterTarget* target,
-                    const std::vector<tgfx::Point>& points) override;
+  void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
+                    const std::vector<float>& points) const override;
 
-  bool needsMSAA() const override {
-    return true;
-  }
+  int sampleCount() const override;
+
+  tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 
  private:
   void calculateVertexQs();
-
-  Effect* effect = nullptr;
-  float vertexQs[4] = {1.0f};
+  tgfx::Point cornerPoints[4] = {};
+  float vertexQs[4] = {};
 };
+
 }  // namespace pag

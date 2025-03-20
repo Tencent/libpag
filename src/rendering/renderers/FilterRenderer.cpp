@@ -20,15 +20,22 @@
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/filters/BrightnessContrastFilter.h"
+#include "rendering/filters/BulgeFilter.h"
+#include "rendering/filters/CornerPinFilter.h"
 #include "rendering/filters/DisplacementMapFilter.h"
 #include "rendering/filters/FilterModifier.h"
+#include "rendering/filters/HueSaturationFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
+#include "rendering/filters/LevelsIndividualFilter.h"
+#include "rendering/filters/MosaicFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
+#include "rendering/filters/MotionTileFilter.h"
+#include "rendering/filters/RadialBlurFilter.h"
+#include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
+#include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
-#include "rendering/filters/utils/FilterBuffer.h"
-#include "rendering/filters/utils/FilterHelper.h"
-#include "rendering/utils/SurfaceUtil.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/core/Recorder.h"
 
 namespace pag {
 
@@ -44,6 +51,21 @@ static bool DoesProcessVisibleAreaOnly(Layer* layer) {
     }
   }
   return true;
+}
+
+std::shared_ptr<tgfx::Image> CreatePictureImage(std::shared_ptr<tgfx::Picture> picture,
+                                                tgfx::Point* offset, tgfx::Rect* sourceBounds) {
+  auto bounds = sourceBounds ? *sourceBounds : picture->getBounds();
+  bounds.roundOut();
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto matrix = tgfx::Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  auto image = tgfx::Image::MakeFrom(std::move(picture), width, height, &matrix);
+  if (offset) {
+    offset->x = bounds.x();
+    offset->y = bounds.y();
+  }
+  return image;
 }
 
 std::unique_ptr<FilterList> FilterRenderer::MakeFilterList(const FilterModifier* modifier) {
@@ -107,8 +129,7 @@ void TransformFilterBounds(tgfx::Rect* filterBounds, const FilterList* filterLis
   }
 
   if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
-    MotionBlurFilter::TransformBounds(filterBounds, filterList->effectScale, filterList->layer,
-                                      filterList->layerFrame);
+    MotionBlurFilter::TransformBounds(filterBounds, filterList->layer, filterList->layerFrame);
   }
 
   if (!filterList->layerStyles.empty()) {
@@ -145,85 +166,89 @@ tgfx::Rect GetClipBounds(Canvas* canvas, const FilterList* filterList) {
   return clip.getBounds();
 }
 
-std::shared_ptr<Graphic> FilterRenderer::GetDisplacementMapGraphic(const FilterList* filterList,
-                                                                   Layer* mapLayer) {
-  auto contentFrame = filterList->layerFrame - mapLayer->startTime;
-  auto layerCache = LayerCache::Get(mapLayer);
-  auto content = layerCache->getContent(contentFrame);
-  return static_cast<GraphicContent*>(content)->graphic;
-}
-
-static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
-                               const FilterList* filterList, RenderCache* renderCache,
-                               tgfx::Rect& filterBounds) {
-  if (!filterList->layerStyles.empty()) {
-    auto filter = renderCache->getLayerStylesFilter(filterList->layer);
-    if (nullptr == filter) {
-      return false;
-    }
-    auto layerStyleScale = filterList->layerStyleScale;
-    LayerStylesFilter::TransformBounds(&filterBounds, filterList);
-    filterBounds.roundOut();
-    if (!filterBounds.intersect(clipBounds)) {
-      return false;
-    }
-    filter->update(filterList, layerStyleScale);
-    filterNodes.emplace_back(filter, filterBounds);
-  }
-  return true;
-}
-
-static bool MakeMotionBlurNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
-                               const FilterList* filterList, RenderCache* renderCache,
-                               tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
+static std::shared_ptr<tgfx::Image> ApplyMotionBlur(std::shared_ptr<tgfx::Image> input,
+                                                    const FilterList* filterList,
+                                                    const tgfx::Rect& clipBounds,
+                                                    tgfx::Rect* filterBounds, tgfx::Point* offset) {
+  offset->set(0, 0);
   if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
-    auto filter = renderCache->getMotionBlurFilter();
-    if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
-      auto oldBounds = filterBounds;
-      MotionBlurFilter::TransformBounds(&filterBounds, effectScale, filterList->layer,
-                                        filterList->layerFrame);
-      filterBounds.roundOut();
-      filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
-      if (!filterBounds.intersect(clipBounds)) {
-        return false;
-      }
-      filterNodes.emplace_back(filter, filterBounds);
+    if (MotionBlurFilter::ShouldSkipFilter(filterList->layer, filterList->layerFrame)) {
+      return input;
     }
+    auto oldBounds = *filterBounds;
+    MotionBlurFilter::TransformBounds(filterBounds, filterList->layer, filterList->layerFrame);
+    filterBounds->roundOut();
+    if (!filterBounds->intersect(clipBounds)) {
+      return nullptr;
+    }
+    return MotionBlurFilter::Apply(input, filterList->layer, filterList->layerFrame, oldBounds,
+                                   offset);
   }
-  return true;
+  return input;
 }
 
-bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
-                                    const FilterList* filterList, RenderCache* renderCache,
-                                    tgfx::Rect& filterBounds, tgfx::Point& effectScale,
-                                    int clipIndex) {
+std::shared_ptr<tgfx::Image> ApplyFilter(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                         Layer* layer, RenderCache* cache,
+                                         const tgfx::Matrix& layerMatrix, Frame layerFrame,
+                                         const tgfx::Rect& filterBounds,
+                                         const tgfx::Point& effectScale,
+                                         const tgfx::Point& sourceScale, tgfx::Point* offset) {
+  switch (effect->type()) {
+    case EffectType::CornerPin:
+      return CornerPinFilter::Apply(std::move(input), effect, layerFrame, sourceScale, offset);
+    case EffectType::Bulge:
+      return BulgeFilter::Apply(std::move(input), effect, layerFrame, filterBounds, offset);
+    case EffectType::MotionTile:
+      return MotionTileFilter::Apply(std::move(input), effect, layerFrame, filterBounds, offset);
+    case EffectType::Glow:
+      return GlowFilter::Apply(std::move(input), effect, layerFrame, offset);
+    case EffectType::LevelsIndividual:
+      return LevelsIndividualFilter::Apply(std::move(input), effect, layerFrame, offset);
+    case EffectType::FastBlur:
+      return GaussianBlurFilter::Apply(std::move(input), effect, layerFrame, effectScale,
+                                       sourceScale, offset);
+    case EffectType::DisplacementMap:
+      return DisplacementMapFilter::Apply(std::move(input), effect, layer, cache, layerMatrix,
+                                          layerFrame, filterBounds, offset);
+    case EffectType::RadialBlur:
+      return RadialBlurFilter::Apply(std::move(input), effect, layerFrame, filterBounds, offset);
+    case EffectType::Mosaic:
+      return MosaicFilter::Apply(std::move(input), effect, layerFrame, offset);
+    case EffectType::BrightnessContrast:
+      return BrightnessContrastFilter::Apply(std::move(input), effect, layerFrame, offset);
+    case EffectType::HueSaturation:
+      return HueSaturationFilter::Apply(std::move(input), effect, layerFrame, offset);
+    default:
+      return nullptr;
+  }
+}
+
+std::shared_ptr<tgfx::Image> ApplyEffects(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                          const FilterList* filterList,
+                                          const tgfx::Rect& clipBounds,
+                                          const tgfx::Point& sourceScale, int clipStartIndex,
+                                          tgfx::Rect* filterBounds, tgfx::Point* outputOffset) {
   auto effectIndex = 0;
+  outputOffset->set(0, 0);
   for (auto& effect : filterList->effects) {
-    auto filter = static_cast<LayerFilter*>(renderCache->getFilterCache(effect));
-    if (filter) {
-      auto oldBounds = filterBounds;
-      effect->transformBounds(ToPAG(&filterBounds), ToPAG(effectScale), filterList->layerFrame);
-      filterBounds.roundOut();
-      filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
-      if (effect->type() == EffectType::DisplacementMap) {
-        auto mapEffect = static_cast<DisplacementMapEffect*>(effect);
-        auto mapFilter = static_cast<DisplacementMapFilter*>(filter);
-        auto graphic = GetDisplacementMapGraphic(filterList, mapEffect->displacementMapLayer);
-        auto bounds = filterList->layer->getBounds();
-        auto size = tgfx::Size::Make(bounds.width(), bounds.height());
-        bounds = mapEffect->displacementMapLayer->getBounds();
-        auto displacementSize = tgfx::Size::Make(bounds.width(), bounds.height());
-        mapFilter->updateMapTexture(renderCache, graphic.get(), size, displacementSize,
-                                    filterList->layerMatrix, oldBounds);
-      }
-      if (effectIndex >= clipIndex && !filterBounds.intersect(clipBounds)) {
-        return false;
-      }
-      filterNodes.emplace_back(filter, filterBounds);
+    auto oldBounds = *filterBounds;
+    effect->transformBounds(ToPAG(filterBounds), ToPAG(filterList->effectScale),
+                            filterList->layerFrame);
+    if (effectIndex >= clipStartIndex && !filterBounds->intersect(clipBounds)) {
+      return nullptr;
     }
+    filterBounds->roundOut();
+    tgfx::Point filterOffset = {0, 0};
+    input = ApplyFilter(std::move(input), effect, filterList->layer, cache, filterList->layerMatrix,
+                        filterList->layerFrame, oldBounds, filterList->effectScale, sourceScale,
+                        &filterOffset);
+    if (!input) {
+      return nullptr;
+    }
+    *outputOffset += filterOffset;
     effectIndex++;
   }
-  return true;
+  return input;
 }
 
 static bool NeedToSkipClipBounds(const FilterList* filterList) {
@@ -248,169 +273,43 @@ static bool NeedToSkipClipBounds(const FilterList* filterList) {
   return false;
 }
 
-std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filterList,
-                                                        RenderCache* renderCache,
-                                                        tgfx::Rect* contentBounds,
-                                                        const tgfx::Rect& clipRect) {
-  // 滤镜应用顺序：Effects->PAGFilter->motionBlur/3DLayer->LayerStyles
-  std::vector<FilterNode> filterNodes = {};
-  int clipIndex = -1;
-  for (int i = static_cast<int>(filterList->effects.size()) - 1; i >= 0; i--) {
-    auto effect = filterList->effects[i];
+static int GetClipStartIndex(const std::vector<Effect*>& effects) {
+  for (int i = static_cast<int>(effects.size()) - 1; i >= 0; i--) {
+    const auto& effect = effects[i];
     if (!effect->processVisibleAreaOnly()) {
-      clipIndex = i;
-      break;
+      return i;
     }
   }
-  auto clipBounds = clipRect;
-  auto filterBounds = *contentBounds;
-  auto effectScale = filterList->effectScale;
-  bool skipClipBounds = NeedToSkipClipBounds(filterList);
-
-  // MotionBlur Fragment Shader中需要用到裁切区域外的像素，
-  // 因此默认先把裁切区域过一次TransformBounds
-  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
-    MotionBlurFilter::TransformBounds(&clipBounds, effectScale, filterList->layer,
-                                      filterList->layerFrame);
-    clipBounds.roundOut();
-  }
-  if (!skipClipBounds && clipIndex == -1 && !contentBounds->intersect(clipBounds)) {
-    return {};
-  }
-
-  if (!MakeEffectNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale,
-                      clipIndex)) {
-    return {};
-  }
-
-  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds,
-                       effectScale)) {
-    return {};
-  }
-
-  if (!MakeMotionBlurNode(filterNodes, clipBounds, filterList, renderCache, filterBounds,
-                          effectScale)) {
-    return {};
-  }
-
-  if (!MakeLayerStyleNode(filterNodes, clipBounds, filterList, renderCache, filterBounds)) {
-    return {};
-  }
-  return filterNodes;
+  return -1;
 }
 
-static void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
-                         const tgfx::Rect& contentBounds, FilterSource* filterSource,
-                         FilterTarget* filterTarget) {
-  auto scale = filterSource->scale;
-  std::shared_ptr<FilterBuffer> freeBuffer = nullptr;
-  std::shared_ptr<FilterBuffer> lastBuffer = nullptr;
-  std::shared_ptr<FilterSource> lastSource = nullptr;
-  auto lastBounds = contentBounds;
-  auto lastUseMSAA = false;
-  auto size = static_cast<int>(filterNodes.size());
-  for (int i = 0; i < size; i++) {
-    auto& node = filterNodes[i];
-    auto source = lastSource == nullptr ? filterSource : lastSource.get();
-    if (i == size - 1) {
-      node.filter->draw(context, source, filterTarget);
-      break;
-    }
-    std::shared_ptr<FilterBuffer> currentBuffer = nullptr;
-    if (freeBuffer && node.bounds.width() == lastBounds.width() &&
-        node.bounds.height() == lastBounds.height() && node.filter->needsMSAA() == lastUseMSAA) {
-      currentBuffer = freeBuffer;
-    } else {
-      currentBuffer = FilterBuffer::Make(
-          context, static_cast<int>(ceilf(node.bounds.width() * scale.x)),
-          static_cast<int>(ceilf(node.bounds.height() * scale.y)), node.filter->needsMSAA());
-    }
-    if (currentBuffer == nullptr) {
-      return;
-    }
-    currentBuffer->clearColor();
-    auto offsetMatrix = tgfx::Matrix::MakeTrans((lastBounds.left - node.bounds.left) * scale.x,
-                                                (lastBounds.top - node.bounds.top) * scale.y);
-    auto currentTarget = currentBuffer->toFilterTarget(offsetMatrix);
-    node.filter->draw(context, source, currentTarget.get());
-    lastSource = currentBuffer->toFilterSource(scale);
-    freeBuffer = lastBuffer;
-    lastBuffer = currentBuffer;
-    lastBounds = node.bounds;
-    lastUseMSAA = currentBuffer->useMSAA();
-  }
-}
+std::shared_ptr<tgfx::Image> FilterRenderer::ApplyFilters(
+    std::shared_ptr<tgfx::Image> input, RenderCache* cache, const FilterList* filterList,
+    const tgfx::Point& contentScale, tgfx::Rect contentBounds, tgfx::Rect clipBounds,
+    int clipStartIndex, tgfx::Point* outputOffset) {
+  auto output = input;
+  auto filterBounds = contentBounds;
 
-static bool HasComplexPaint(Canvas* parentCanvas, const tgfx::Rect& drawingBounds) {
-  if (parentCanvas->getAlpha() != 1.0f) {
-    return true;
+  auto offset = tgfx::Point::Zero();
+  output = ApplyEffects(output, cache, filterList, clipBounds, contentScale, clipStartIndex,
+                        &filterBounds, &offset);
+  if (!output) {
+    return input;
   }
-  if (parentCanvas->getBlendMode() != tgfx::BlendMode::SrcOver) {
-    return true;
-  }
-  auto bounds = drawingBounds;
-  auto matrix = parentCanvas->getMatrix();
-  matrix.mapRect(&bounds);
-  auto surface = parentCanvas->getSurface();
-  auto surfaceBounds = tgfx::Rect::MakeWH(surface->width(), surface->height());
-  bounds.intersect(surfaceBounds);
-  auto clip = parentCanvas->getTotalClip();
-  if (!clip.contains(bounds)) {
-    return true;
-  }
-  return false;
-}
+  *outputOffset += offset;
 
-static std::unique_ptr<FilterTarget> GetDirectFilterTarget(
-    Canvas* parentCanvas, const FilterList* filterList, const std::vector<FilterNode>& filterNodes,
-    const tgfx::Rect& contentBounds, const tgfx::Point& sourceScale) {
-  // 在高分辨率下，模糊滤镜的开销会增大，需要降采样降低开销；当模糊为最后一个滤镜时，需要离屏绘制
-  if (!filterList->effects.empty() && filterList->effects.back()->type() == EffectType::FastBlur) {
-    return nullptr;
+  output = Apply3DEffects(output, filterList, clipBounds, &filterBounds, &offset);
+  if (!output) {
+    return input;
   }
-  if (filterNodes.back().filter->needsMSAA()) {
-    return nullptr;
-  }
-  if (filterList->layer->transform3D) {
-    return nullptr;
-  }
-  // 是否能直接上屏，应该用没有经过裁切的transformBounds来判断，
-  // 因为计算filter的顶点位置的bounds都是没有经过裁切的
-  auto transformBounds = contentBounds;
-  TransformFilterBounds(&transformBounds, filterList);
-  if (HasComplexPaint(parentCanvas, transformBounds)) {
-    return nullptr;
-  }
-  auto surface = parentCanvas->getSurface();
-  auto totalMatrix = parentCanvas->getMatrix();
-  if (totalMatrix.getSkewX() != 0 || totalMatrix.getSkewY() != 0) {
-    return nullptr;
-  }
-  auto secondToLastBounds =
-      filterNodes.size() > 1 ? filterNodes[filterNodes.size() - 2].bounds : contentBounds;
-  totalMatrix.preTranslate(secondToLastBounds.left, secondToLastBounds.top);
-  totalMatrix.preScale(1.0f / sourceScale.x, 1.0f / sourceScale.y);
-  return ToFilterTarget(surface, totalMatrix);
-}
+  *outputOffset += offset;
 
-static std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(
-    tgfx::Surface* surface, const std::vector<FilterNode>& filterNodes,
-    const tgfx::Rect& contentBounds, const tgfx::Point& sourceScale) {
-  auto finalBounds = filterNodes.back().bounds;
-  auto secondToLastBounds =
-      filterNodes.size() > 1 ? filterNodes[filterNodes.size() - 2].bounds : contentBounds;
-  auto totalMatrix =
-      tgfx::Matrix::MakeTrans((secondToLastBounds.left - finalBounds.left) * sourceScale.x,
-                              (secondToLastBounds.top - finalBounds.top) * sourceScale.y);
-  return ToFilterTarget(surface, totalMatrix);
-}
-
-static std::unique_ptr<FilterSource> ToFilterSource(Canvas* canvas) {
-  auto surface = canvas->getSurface();
-  auto texture = surface->getBackendTexture();
-  tgfx::Point scale = {};
-  scale.x = scale.y = GetMaxScaleFactor(canvas->getMatrix());
-  return ToFilterSource(texture, surface->origin(), scale);
+  output = ApplyMotionBlur(output, filterList, clipBounds, &filterBounds, &offset);
+  if (!output) {
+    return input;
+  }
+  *outputOffset += offset;
+  return output;
 }
 
 static float GetScaleFactor(FilterList* filterList, const tgfx::Rect& contentBounds) {
@@ -422,6 +321,38 @@ static float GetScaleFactor(FilterList* filterList, const tgfx::Rect& contentBou
   return scale;
 }
 
+#define CONTENT_SCALE_STEP 20.0f
+
+float GetContentScale(Canvas* parentCanvas, float scaleFactorLimit, float scale) {
+  auto maxScale = GetMaxScaleFactor(parentCanvas->getMatrix());
+  maxScale *= scale;
+  if (maxScale > scaleFactorLimit) {
+    maxScale = scaleFactorLimit;
+  } else {
+    // Snap the scale value to 1/20 to prevent edge shaking when rendering zoom-in animations.
+    maxScale = ceilf(maxScale * CONTENT_SCALE_STEP) / CONTENT_SCALE_STEP;
+  }
+  return maxScale;
+}
+
+tgfx::Matrix GetLayerMatrix(const FilterList* filterList, float contentScale) {
+  auto matrix = tgfx::Matrix::MakeScale(contentScale);
+  if (filterList->useParentSizeInput) {
+    matrix.preConcat(filterList->layerMatrix);
+  }
+  return matrix;
+}
+
+static std::shared_ptr<tgfx::Picture> CreateSource(RenderCache* cache, const tgfx::Matrix& matrix,
+                                                   std::shared_ptr<Graphic> content) {
+  tgfx::Recorder recorder;
+  auto canvas = recorder.beginRecording();
+  auto contentCanvas = Canvas(canvas, cache);
+  contentCanvas.concat(matrix);
+  content->draw(&contentCanvas);
+  return recorder.finishRecordingAsPicture();
+}
+
 void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* modifier,
                                     std::shared_ptr<Graphic> content) {
   auto cache = parentCanvas->getCache();
@@ -429,58 +360,59 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   auto contentBounds = GetContentBounds(filterList.get(), content);
   // 相对于content Bounds的clip Bounds
   auto clipBounds = GetClipBounds(parentCanvas, filterList.get());
-  auto filterNodes = MakeFilterNodes(filterList.get(), cache, &contentBounds, clipBounds);
-  if (filterNodes.empty()) {
-    content->draw(parentCanvas);
-    return;
-  }
-  if (filterList->useParentSizeInput) {
-    tgfx::Matrix inverted = tgfx::Matrix::I();
-    filterList->layerMatrix.invert(&inverted);
-    parentCanvas->concat(inverted);
-  }
-  auto scale = GetScaleFactor(filterList.get(), contentBounds);
-  auto contentSurface = SurfaceUtil::MakeContentSurface(parentCanvas, contentBounds,
-                                                        filterList->scaleFactorLimit, scale);
-  if (contentSurface == nullptr) {
-    return;
-  }
-  Canvas contentCanvas(contentSurface.get(), cache);
-  if (filterList->useParentSizeInput) {
-    contentCanvas.concat(filterList->layerMatrix);
-  }
-  content->draw(&contentCanvas);
-  auto filterSource = ToFilterSource(&contentCanvas);
-  std::shared_ptr<tgfx::Surface> targetSurface = nullptr;
-  std::unique_ptr<FilterTarget> filterTarget = GetDirectFilterTarget(
-      parentCanvas, filterList.get(), filterNodes, contentBounds, filterSource->scale);
-  if (filterTarget == nullptr) {
-    // 需要离屏绘制
-    targetSurface = SurfaceUtil::MakeContentSurface(parentCanvas, filterNodes.back().bounds,
-                                                    filterList->scaleFactorLimit, scale,
-                                                    filterNodes.back().filter->needsMSAA());
-    if (targetSurface == nullptr) {
-      return;
-    }
-    filterTarget = GetOffscreenFilterTarget(targetSurface.get(), filterNodes, contentBounds,
-                                            filterSource->scale);
+
+  auto contentScale = GetContentScale(parentCanvas, filterList->scaleFactorLimit,
+                                      GetScaleFactor(filterList.get(), contentBounds));
+
+  int clipStartIndex = GetClipStartIndex(filterList->effects);
+  bool skipClipBounds = NeedToSkipClipBounds(filterList.get());
+  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
+    // MotionBlur Fragment Shader中需要用到裁切区域外的像素，
+    // 因此默认先把裁切区域过一次TransformBounds
+    MotionBlurFilter::TransformBounds(&clipBounds, filterList->layer, filterList->layerFrame);
+    clipBounds.roundOut();
   }
 
-  auto context = parentCanvas->getContext();
-  // 必须要flush，要不然framebuffer还没真正画到canvas，就被其他图层的filter串改了该framebuffer
-  context->flush();
-  ApplyFilters(context, filterNodes, contentBounds, filterSource.get(), filterTarget.get());
-  // contentSurface在函数结束时析构，防止filter仍然使用contentSurface，需要在最后flush一下
-  context->flush();
-  // Reset the GL states stored in the context, they may be modified during the filter being applied.
-  context->resetState();
-  if (targetSurface) {
-    tgfx::Matrix drawingMatrix = {};
-    auto targetCanvas = targetSurface->getCanvas();
-    if (!targetCanvas->getMatrix().invert(&drawingMatrix)) {
-      drawingMatrix.setIdentity();
-    }
-    parentCanvas->drawImage(targetSurface->makeImageSnapshot(), drawingMatrix);
+  auto filterBounds = contentBounds;  // filterBounds使用contentBounds未裁剪的初始值
+  if (!skipClipBounds && clipStartIndex == -1 && !contentBounds.intersect(clipBounds)) {
+    // 裁剪后的内容区域为空，直接绘制原始内容
+    return content->draw(parentCanvas);
   }
+
+  auto contentMatrix = GetLayerMatrix(filterList.get(), contentScale);
+
+  auto sourcePicture = CreateSource(cache, contentMatrix, content);
+  if (sourcePicture == nullptr) {
+    return;
+  }
+
+  tgfx::Point sourceScale = {};
+  sourceScale.x = sourceScale.y = GetMaxScaleFactor(contentMatrix);
+
+  auto totalOffset = tgfx::Point::Zero();
+  auto offset = tgfx::Point::Zero();
+  auto inputBounds = contentBounds;
+  inputBounds.scale(sourceScale.x, sourceScale.y);
+  auto input = CreatePictureImage(sourcePicture, &totalOffset, &inputBounds);
+
+  auto output = ApplyFilters(input, cache, filterList.get(), sourceScale, filterBounds, clipBounds,
+                             clipStartIndex, &offset);
+  totalOffset += offset;
+
+  parentCanvas->save();
+  tgfx::Matrix inverted = tgfx::Matrix::I();
+  contentMatrix.invert(&inverted);
+  parentCanvas->concat(inverted);
+  if (!filterList->layerStyles.empty()) {
+    parentCanvas->translate(totalOffset.x, totalOffset.y);
+    auto filter = LayerStylesFilter::Make(filterList->layerStyles, filterList->layerFrame,
+                                          contentScale, filterList->layerStyleScale);
+    filter->applyFilter(parentCanvas, std::move(output));
+  } else if (input == output) {
+    parentCanvas->drawPicture(sourcePicture);
+  } else {
+    parentCanvas->drawImage(output, totalOffset.x, totalOffset.y);
+  }
+  parentCanvas->restore();
 }
 }  // namespace pag

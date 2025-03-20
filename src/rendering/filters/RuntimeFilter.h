@@ -23,6 +23,9 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 namespace pag {
 
+std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
+                                                              const tgfx::Rect& outputBounds);
+
 class Uniforms {
  public:
   Uniforms(tgfx::Context* context, unsigned program) {
@@ -94,8 +97,8 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
                                              const tgfx::BackendRenderTarget& target,
                                              const tgfx::Point& offset) const;
 
-  void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
-                    const std::vector<float>& points) const;
+  virtual void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
+                            const std::vector<float>& points) const;
 };
 
 }  // namespace pag

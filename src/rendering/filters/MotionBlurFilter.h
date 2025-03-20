@@ -18,40 +18,63 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include <array>
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
-class MotionBlurFilter : public LayerFilter {
+
+class MotionBlurUniforms : public Uniforms {
  public:
-  static void TransformBounds(tgfx::Rect* bounds, const tgfx::Point& filterScale, Layer* layer,
-                              Frame layerFrame);
-
-  MotionBlurFilter();
-  ~MotionBlurFilter() override = default;
-
-  bool updateLayer(Layer* layer, Frame layerFrame);
-
- protected:
-  std::string onBuildVertexShader() override;
-
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
-  std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
-                                           const tgfx::Rect& transformedBounds,
-                                           const tgfx::Point& filterScale) override;
-
- private:
-  tgfx::Matrix previousMatrix = tgfx::Matrix::I();
-  tgfx::Matrix currentMatrix = tgfx::Matrix::I();
+  MotionBlurUniforms(tgfx::Context* context, unsigned program) : Uniforms(context, program) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    prevTransformHandle = gl->getUniformLocation(program, "uPrevTransform");
+    transformHandle = gl->getUniformLocation(program, "uTransform");
+    velCenterHandle = gl->getUniformLocation(program, "uVelCenter");
+    maxDistanceHandle = gl->getUniformLocation(program, "maxDistance");
+  }
 
   int prevTransformHandle = 0;
   int transformHandle = 0;
   int velCenterHandle = 0;
   int maxDistanceHandle = 0;
+};
+
+class MotionBlurFilter : public RuntimeFilter {
+ public:
+  static void TransformBounds(tgfx::Rect* contentBounds, Layer* layer, Frame layerFrame);
+
+  static bool ShouldSkipFilter(Layer* layer, Frame layerFrame);
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Layer* layer,
+                                            Frame layerFrame, const tgfx::Rect& contentBounds,
+                                            tgfx::Point* offset);
+  DEFINE_RUNTIME_EFFECT_TYPE
+
+  MotionBlurFilter(const std::array<float, 9>& preMatrix, const std::array<float, 9>& curMatrix)
+      : RuntimeFilter(Type()), _previousMatrix(preMatrix), _currentMatrix(curMatrix) {
+  }
+  ~MotionBlurFilter() override = default;
+
+  tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
+
+ protected:
+  std::string onBuildVertexShader() const override;
+
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>&) const override;
+
+  std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
+                                     const tgfx::BackendRenderTarget& target,
+                                     const tgfx::Point& offset) const override;
+
+ private:
+  std::array<float, 9> _previousMatrix = {};
+  std::array<float, 9> _currentMatrix = {};
 };
 }  // namespace pag

@@ -61,13 +61,6 @@ void RenderCache::setVideoEnabled(bool value) {
   clearAllSequenceCaches();
 }
 
-bool RenderCache::initFilter(Filter* filter) {
-  tgfx::Clock clock = {};
-  auto result = filter->initialize(getContext());
-  programCompilingTime += clock.measure();
-  return result;
-}
-
 void RenderCache::prepareLayers() {
   int64_t timeDistance = DECODING_VISIBLE_DISTANCE;
 #ifdef PAG_BUILD_FOR_WEB
@@ -183,7 +176,6 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
     assetImages.erase(assetID);
     decodedAssetImages.erase(assetID);
     clearSequenceCache(assetID);
-    clearFilterCache(assetID);
     removeTextAtlas(assetID);
   }
 }
@@ -193,14 +185,6 @@ void RenderCache::releaseAll() {
   clearAllTextAtlas();
   graphicsMemory = 0;
   clearAllSequenceCaches();
-  for (auto& item : filterCaches) {
-    delete item.second;
-  }
-  filterCaches.clear();
-  delete motionBlurFilter;
-  motionBlurFilter = nullptr;
-  delete transform3DFilter;
-  transform3DFilter = nullptr;
   contextID = 0;
 }
 
@@ -565,75 +549,6 @@ void RenderCache::clearSequenceCache(ID uniqueID) {
       delete queue;
     }
     sequenceCaches.erase(result);
-  }
-}
-
-//===================================== filter caches =====================================
-
-LayerFilter* RenderCache::getFilterCache(Effect* effect) {
-  return getLayerFilterCache(effect->uniqueID,
-                             [=]() -> LayerFilter* { return LayerFilter::Make(effect).release(); });
-}
-
-LayerFilter* RenderCache::getLayerFilterCache(ID uniqueID,
-                                              const std::function<LayerFilter*()>& makeFilter) {
-  LayerFilter* filter = nullptr;
-  auto result = filterCaches.find(uniqueID);
-  if (result == filterCaches.end()) {
-    filter = makeFilter();
-    if (filter && !initFilter(filter)) {
-      delete filter;
-      filter = nullptr;
-    }
-    if (filter != nullptr) {
-      filterCaches.insert(std::make_pair(uniqueID, filter));
-    }
-  } else {
-    filter = static_cast<LayerFilter*>(result->second);
-  }
-  return filter;
-}
-
-Filter* RenderCache::getTransform3DFilter() {
-  if (transform3DFilter == nullptr) {
-    transform3DFilter = Make3DFilter(getContext());
-  }
-  return transform3DFilter;
-}
-
-MotionBlurFilter* RenderCache::getMotionBlurFilter() {
-  if (motionBlurFilter == nullptr) {
-    motionBlurFilter = new MotionBlurFilter();
-    if (!initFilter(motionBlurFilter)) {
-      delete motionBlurFilter;
-      motionBlurFilter = nullptr;
-    }
-  }
-  return motionBlurFilter;
-}
-
-LayerStylesFilter* RenderCache::getLayerStylesFilter(Layer* layer) {
-  LayerStylesFilter* filter = nullptr;
-  auto result = filterCaches.find(layer->uniqueID);
-  if (result == filterCaches.end()) {
-    filter = new LayerStylesFilter();
-    if (initFilter(filter)) {
-      filterCaches.insert(std::make_pair(layer->uniqueID, filter));
-    } else {
-      delete filter;
-      filter = nullptr;
-    }
-  } else {
-    filter = static_cast<LayerStylesFilter*>(result->second);
-  }
-  return filter;
-}
-
-void RenderCache::clearFilterCache(ID uniqueID) {
-  auto result = filterCaches.find(uniqueID);
-  if (result != filterCaches.end()) {
-    delete result->second;
-    filterCaches.erase(result);
   }
 }
 

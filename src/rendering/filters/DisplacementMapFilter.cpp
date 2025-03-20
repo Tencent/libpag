@@ -20,7 +20,7 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/core/Recorder.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -86,68 +86,64 @@ void main() {
 }
 )";
 
-DisplacementMapFilter::DisplacementMapFilter(Effect* effect) : effect(effect) {
+std::shared_ptr<Graphic> GetDisplacementMapGraphic(const DisplacementMapEffect* effect,
+                                                   Frame frame) {
+  auto mapLayer = effect->displacementMapLayer;
+  auto contentFrame = frame - mapLayer->startTime;
+  auto layerCache = LayerCache::Get(mapLayer);
+  auto content = layerCache->getContent(contentFrame);
+  return static_cast<GraphicContent*>(content)->graphic;
 }
 
-std::string DisplacementMapFilter::onBuildFragmentShader() {
+std::shared_ptr<tgfx::Image> DisplacementMapFilter::Apply(
+    std::shared_ptr<tgfx::Image> input, Effect* effect, Layer* layer, RenderCache* cache,
+    const tgfx::Matrix& layerMatrix, Frame layerFrame, const tgfx::Rect& contentBounds,
+    tgfx::Point* offset) {
+
+  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
+  auto bounds = layer->getBounds();
+  auto size = tgfx::Size::Make(bounds.width(), bounds.height());
+  auto mapLayer = static_cast<const DisplacementMapEffect*>(effect)->displacementMapLayer;
+  bounds = mapLayer->getBounds();
+  auto displacementSize = tgfx::Size::Make(bounds.width(), bounds.height());
+  auto displacementMapBehavior = pagEffect->displacementMapBehavior->getValueAt(layerFrame);
+
+  tgfx::Recorder recorder;
+  auto tgfxCanvas = recorder.beginRecording();
+  Canvas canvas(tgfxCanvas, cache);
+  if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
+    auto clipBounds = contentBounds;
+    layerMatrix.mapRect(&clipBounds);
+    tgfx::Path path;
+    path.addRect(clipBounds);
+    canvas.clipPath(path);
+  }
+  auto graphic = GetDisplacementMapGraphic(pagEffect, layerFrame);
+  graphic->draw(&canvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  auto referenceImage = tgfx::Image::MakeFrom(picture, static_cast<int>(displacementSize.width),
+                                              static_cast<int>(displacementSize.height));
+
+  auto filter = std::make_shared<DisplacementMapFilter>(
+      pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
+      pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
+      pagEffect->useForVerticalDisplacement->getValueAt(layerFrame),
+      pagEffect->maxVerticalDisplacement->getValueAt(layerFrame),
+      pagEffect->displacementMapBehavior->getValueAt(layerFrame),
+      pagEffect->edgeBehavior->getValueAt(layerFrame),
+      pagEffect->expandOutput->getValueAt(layerFrame),
+      ToAlpha(pagEffect->effectOpacity->getValueAt(layerFrame)), layerMatrix, size,
+      displacementSize, contentBounds, referenceImage);
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
+}
+
+std::string DisplacementMapFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-void DisplacementMapFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  mapTextureHandle = gl->getUniformLocation(program, "mapTexture");
-  flagsHandle = gl->getUniformLocation(program, "uFlags");
-  inputMatrixHandle = gl->getUniformLocation(program, "uInputMatrix");
-  mapMatrixHandle = gl->getUniformLocation(program, "uMapMatrix");
-  inputSizeHandle = gl->getUniformLocation(program, "uInputSize");
-  selectorMatrixRGBAHandle = gl->getUniformLocation(program, "uSelectorMatrixRGBA");
-  selectorMatrixHSLAHandle = gl->getUniformLocation(program, "uSelectorMatrixHSLA");
-  selectorOffsetHandle = gl->getUniformLocation(program, "uSelectorOffset");
-  effectOpacityHandle = gl->getUniformLocation(program, "uEffectOpacity");
-}
-
-void DisplacementMapFilter::update(Frame layerFrame, const tgfx::Rect& contentBounds,
-                                   const tgfx::Rect& transformedBounds,
-                                   const tgfx::Point& filterScale) {
-  LayerFilter::update(layerFrame, contentBounds, transformedBounds, filterScale);
-  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-  useForHorizontalDisplacement = pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame);
-  maxHorizontalDisplacement = pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame);
-  useForVerticalDisplacement = pagEffect->useForVerticalDisplacement->getValueAt(layerFrame);
-  maxVerticalDisplacement = pagEffect->maxVerticalDisplacement->getValueAt(layerFrame);
-  displacementMapBehavior = pagEffect->displacementMapBehavior->getValueAt(layerFrame);
-  edgeBehavior = pagEffect->edgeBehavior->getValueAt(layerFrame);
-  expandOutput = pagEffect->expandOutput->getValueAt(layerFrame);
-  effectOpacity = ToAlpha(pagEffect->effectOpacity->getValueAt(layerFrame));
-}
-
-void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* mapGraphic,
-                                             const tgfx::Size& size,
-                                             const tgfx::Size& displacementSize,
-                                             const tgfx::Matrix& layerMatrix,
-                                             const tgfx::Rect& contentBounds) {
-  _size = size;
-  _layerMatrix = layerMatrix;
-  if (mapSurface == nullptr || _displacementSize != displacementSize) {
-    _displacementSize = displacementSize;
-    mapSurface = tgfx::Surface::Make(cache->getContext(), static_cast<int>(displacementSize.width),
-                                     static_cast<int>(displacementSize.height));
-  }
-  Canvas canvas(mapSurface.get(), cache);
-  canvas.clear();
-  if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
-    canvas.save();
-    auto bounds = contentBounds;
-    layerMatrix.mapRect(&bounds);
-    tgfx::Path path;
-    path.addRect(bounds);
-    canvas.clipPath(path);
-  }
-  mapGraphic->draw(&canvas);
-  if (displacementMapBehavior == DisplacementMapBehavior::TileMap) {
-    canvas.restore();
-  }
-  cache->getContext()->flush();
+std::unique_ptr<Uniforms> DisplacementMapFilter::onPrepareProgram(tgfx::Context* context,
+                                                                  unsigned program) const {
+  return std::make_unique<DisplacementMapEffectUniforms>(context, program);
 }
 
 struct SelectorCoeffs {
@@ -217,21 +213,19 @@ static bool IsRGB(Enum sel) {
          sel == DisplacementMapSource::Blue;
 }
 
-void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                           const tgfx::Point&) {
+void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                           const std::vector<tgfx::BackendTexture>&) const {
+
   std::array<float, 4> flags = {0, 0, 0, 0};
   flags[0] = DisplacementWrapMode(displacementMapBehavior);
-  auto texture = mapSurface->getBackendTexture();
-  tgfx::GLTextureInfo glSampler = {};
-  texture.getGLTextureInfo(&glSampler);
-  ActiveGLTexture(context, 1, &glSampler);
   auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1i(mapTextureHandle, 1);
+  auto uniform = static_cast<DisplacementMapEffectUniforms*>(program->uniforms.get());
+  gl->uniform1i(uniform->mapTextureHandle, 1);
   flags[1] = InputWrapMode(edgeBehavior);
 
   float w = contentBounds.width();
   float h = contentBounds.height();
-  gl->uniform2f(inputSizeHandle, w, h);
+  gl->uniform2f(uniform->inputSizeHandle, w, h);
 
   auto matrix = tgfx::Matrix::I();
   matrix.postScale(w, h);
@@ -243,20 +237,21 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
     matrix.postScale(newW / w, newH / h);
     matrix.postTranslate(-expandX, -expandY);
   }
+
   auto glMatrix = ToGLMatrix(matrix);
-  gl->uniformMatrix3fv(inputMatrixHandle, 1, false, glMatrix.data());
+  gl->uniformMatrix3fv(uniform->inputMatrixHandle, 1, false, glMatrix.data());
 
   matrix.postTranslate(contentBounds.left, contentBounds.top);
-  matrix.postConcat(_layerMatrix);
-  auto rect = tgfx::Rect::MakeSize(_size);
-  _layerMatrix.mapRect(&rect);
+  matrix.postConcat(layerMatrix);
+  auto rect = tgfx::Rect::MakeSize(size);
+  layerMatrix.mapRect(&rect);
   auto size = tgfx::Size::Make(rect.width(), rect.height());
-  auto mapMatrix = DisplacementMatrix(displacementMapBehavior, size, _displacementSize);
+  auto mapMatrix = DisplacementMatrix(displacementMapBehavior, size, displacementSize);
   mapMatrix.invert(&mapMatrix);
   matrix.postConcat(mapMatrix);
-  matrix.postScale(1.f / _displacementSize.width, 1.f / _displacementSize.height);
+  matrix.postScale(1.f / displacementSize.width, 1.f / displacementSize.height);
   glMatrix = ToGLMatrix(matrix);
-  gl->uniformMatrix3fv(mapMatrixHandle, 1, false, glMatrix.data());
+  gl->uniformMatrix3fv(uniform->mapMatrixHandle, 1, false, glMatrix.data());
 
   auto xc = Coeffs(useForHorizontalDisplacement);
   auto yc = Coeffs(useForVerticalDisplacement);
@@ -286,7 +281,8 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   if (isHorizontalHSL || isVerticalHSL) {
     if ((isHorizontalHSL && isVerticalHSL) ||
         (!IsRGB(useForHorizontalDisplacement) && !IsRGB(useForVerticalDisplacement))) {
-      gl->uniformMatrix4fv(selectorMatrixHSLAHandle, 1, GL_FALSE, selectorMatrixRGBA.data());
+      gl->uniformMatrix4fv(uniform->selectorMatrixHSLAHandle, 1, GL_FALSE,
+                           selectorMatrixRGBA.data());
       flags[3] = 1.f;
     } else {
       static const int horizontalIndices[] = {0, 4, 8, 12, 14};
@@ -297,12 +293,14 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
       }
       flags[2] = 1.f;
       flags[3] = 1.f;
-      gl->uniformMatrix4fv(selectorMatrixRGBAHandle, 1, GL_FALSE, selectorMatrixRGBA.data());
-      gl->uniformMatrix4fv(selectorMatrixHSLAHandle, 1, GL_FALSE, selectorMatrixHSLA.data());
+      gl->uniformMatrix4fv(uniform->selectorMatrixRGBAHandle, 1, GL_FALSE,
+                           selectorMatrixRGBA.data());
+      gl->uniformMatrix4fv(uniform->selectorMatrixHSLAHandle, 1, GL_FALSE,
+                           selectorMatrixHSLA.data());
     }
   } else {
     flags[2] = 1.f;
-    gl->uniformMatrix4fv(selectorMatrixRGBAHandle, 1, GL_FALSE, selectorMatrixRGBA.data());
+    gl->uniformMatrix4fv(uniform->selectorMatrixRGBAHandle, 1, GL_FALSE, selectorMatrixRGBA.data());
   }
 
   const float selectorOffset[] = {
@@ -311,8 +309,21 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
       xc.cOffset,
       yc.cOffset,
   };
-  gl->uniform4fv(selectorOffsetHandle, 1, selectorOffset);
-  gl->uniform4fv(flagsHandle, 1, flags.data());
-  gl->uniform1f(effectOpacityHandle, effectOpacity);
+  gl->uniform4fv(uniform->selectorOffsetHandle, 1, selectorOffset);
+  gl->uniform4fv(uniform->flagsHandle, 1, flags.data());
+  gl->uniform1f(uniform->effectOpacityHandle, effectOpacity);
 }
+
+tgfx::Rect DisplacementMapFilter::filterBounds(const tgfx::Rect& srcRect) const {
+  tgfx::Rect rect = srcRect;
+  if (expandOutput) {
+    float expandX = std::abs(maxHorizontalDisplacement);
+    float expandY = std::abs(maxVerticalDisplacement);
+    float scaleX = srcRect.width() / contentBounds.width();
+    float scaleY = srcRect.height() / contentBounds.height();
+    rect.outset(expandX * scaleX, expandY * scaleY);
+  }
+  return rect;
+}
+
 }  // namespace pag

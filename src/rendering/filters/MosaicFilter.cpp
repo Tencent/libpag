@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MosaicFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -36,43 +37,35 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-MosaicFilter::MosaicFilter(pag::Effect* effect) : effect(effect) {
+std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                                 Frame layerFrame, tgfx::Point* offset) {
+  auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
+  auto sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
+
+  auto horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
+  auto verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
+
+  auto filter = std::make_shared<MosaicFilter>(horizontalBlocks, verticalBlocks, sharpColors);
+
+  return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
-std::string MosaicFilter::onBuildFragmentShader() {
+std::string MosaicFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-void MosaicFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
-  verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
-  sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
+std::unique_ptr<Uniforms> MosaicFilter::onPrepareProgram(tgfx::Context* context,
+                                                         unsigned program) const {
+  return std::make_unique<MosaicUniforms>(context, program);
 }
 
-void MosaicFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                  const tgfx::Point&) {
-  auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
-  horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
-  verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
-  sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
-
-  auto placeHolderWidth = static_cast<int>(contentBounds.left + contentBounds.right);
-  auto placeHolderHeight = static_cast<int>(contentBounds.top + contentBounds.bottom);
-  auto placeHolderRatio = 1.0f * placeHolderWidth / placeHolderHeight;
-
-  auto contentWidth = static_cast<int>(contentBounds.width());
-  auto contentHeight = static_cast<int>(contentBounds.height());
-  auto contentRatio = 1.0f * contentWidth / contentHeight;
-
-  if (placeHolderRatio > contentRatio) {
-    horizontalBlocks *= 1.0f * placeHolderWidth / contentWidth;
-  } else {
-    verticalBlocks *= 1.0f * placeHolderHeight / contentHeight;
-  }
+void MosaicFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                                  const std::vector<tgfx::BackendTexture>&) const {
   auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(horizontalBlocksHandle, horizontalBlocks);
-  gl->uniform1f(verticalBlocksHandle, verticalBlocks);
-  gl->uniform1f(sharpColorsHandle, sharpColors);
+  auto uniform = static_cast<const MosaicUniforms*>(program->uniforms.get());
+  gl->uniform1f(uniform->horizontalBlocksHandle, horizontalBlocks);
+  gl->uniform1f(uniform->verticalBlocksHandle, verticalBlocks);
+  gl->uniform1f(uniform->sharpColorsHandle, sharpColors);
 }
+
 }  // namespace pag

@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/TGFXCast.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
 #include "rendering/FileReporter.h"

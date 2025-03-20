@@ -27,7 +27,6 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
-#include "rendering/filters/LayerFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
 #include "rendering/graphics/ImageProxy.h"
@@ -153,14 +152,6 @@ class RenderCache : public Performance {
   std::shared_ptr<tgfx::Image> getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
                                                 Frame targetFrame);
 
-  LayerFilter* getFilterCache(Effect* effect);
-
-  MotionBlurFilter* getMotionBlurFilter();
-
-  Filter* getTransform3DFilter();
-
-  LayerStylesFilter* getLayerStylesFilter(Layer* layer);
-
   std::shared_ptr<File> getFileByAssetID(ID assetID);
 
   void recordImageDecodingTime(int64_t decodingTime);
@@ -191,9 +182,6 @@ class RenderCache : public Performance {
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
   std::unordered_map<ID, std::vector<SequenceImageQueue*>> sequenceCaches = {};
   std::unordered_map<ID, std::unordered_map<Frame, SequenceImageQueue*>> usedSequences = {};
-  std::unordered_map<ID, Filter*> filterCaches;
-  MotionBlurFilter* motionBlurFilter = nullptr;
-  Filter* transform3DFilter = nullptr;
 
   // decoded image caches:
   void clearExpiredDecodedImages();
@@ -213,11 +201,6 @@ class RenderCache : public Performance {
   void clearAllSequenceCaches();
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();
-
-  // filter caches:
-  LayerFilter* getLayerFilterCache(ID uniqueID, const std::function<LayerFilter*()>& makeFilter);
-  void clearFilterCache(ID uniqueID);
-  bool initFilter(Filter* filter);
 
   // text atlas caches:
   void clearAllTextAtlas();

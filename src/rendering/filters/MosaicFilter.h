@@ -18,31 +18,49 @@
 
 #pragma once
 
-#include "LayerFilter.h"
+#include "RuntimeFilter.h"
+#include "pag/file.h"
 
 namespace pag {
-class MosaicFilter : public LayerFilter {
+
+class MosaicUniforms : public Uniforms {
  public:
-  explicit MosaicFilter(Effect* effect);
-  ~MosaicFilter() override = default;
+  MosaicUniforms(tgfx::Context* context, unsigned program) : Uniforms(context, program) {
+    auto gl = tgfx::GLFunctions::Get(context);
+    horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
+    verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
+    sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
+  }
 
- protected:
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-  float horizontalBlocks = 1;
-  float verticalBlocks = 1;
-  bool sharpColors = false;
-
-  // Handle
   int horizontalBlocksHandle = -1;
   int verticalBlocksHandle = -1;
   int sharpColorsHandle = -1;
 };
+
+class MosaicFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE
+
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+                                            Frame layerFrame, tgfx::Point* offset);
+
+  MosaicFilter(float horizontalBlocks, float verticalBlocks, bool sharpColors)
+      : RuntimeFilter(Type()), horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
+        sharpColors(sharpColors) {
+  }
+
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>&) const override;
+
+ private:
+  float horizontalBlocks = 1;
+  float verticalBlocks = 1;
+  bool sharpColors = false;
+};
+
 }  // namespace pag

@@ -40,7 +40,7 @@ void GradientOverlayFilter::update(Frame layerFrame, const tgfx::Point& filterSc
   _filterScale = filterScale;
 }
 
-bool GradientOverlayFilter::draw(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> source) {
+bool GradientOverlayFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> source) {
   auto width = static_cast<float>(source->width());
   auto height = static_cast<float>(source->height());
 

@@ -18,31 +18,39 @@
 
 #pragma once
 
-#include "rendering/filters/LayerFilter.h"
+#include "rendering/filters/RuntimeFilter.h"
 #include "rendering/filters/utils/BlurTypes.h"
 
 namespace pag {
-class GlowBlurFilter : public LayerFilter {
+class GlowBlurUniforms : public Uniforms {
  public:
-  explicit GlowBlurFilter(BlurDirection blurDirection);
-  ~GlowBlurFilter() override = default;
+  explicit GlowBlurUniforms(tgfx::Context* context, unsigned program);
 
-  void updateOffset(float blurOffset);
-
- protected:
-  std::string onBuildVertexShader() override;
-
-  std::string onBuildFragmentShader() override;
-
-  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
-
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale) override;
-
- private:
   int textureOffsetHHandle = -1;
   int textureOffsetVHandle = -1;
-  BlurDirection blurDirection;
+};
+
+class GlowBlurRuntimeFilter : public RuntimeFilter {
+ public:
+  DEFINE_RUNTIME_EFFECT_TYPE
+  GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset, float resizeRatio);
+
+ protected:
+  std::string onBuildVertexShader() const override;
+
+  std::string onBuildFragmentShader() const override;
+
+  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
+                                             unsigned program) const override;
+
+  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
+                      const std::vector<tgfx::BackendTexture>&) const override;
+
+  tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
+
+ private:
+  BlurDirection blurDirection = BlurDirection::Horizontal;
   float blurOffset = 0.0f;
+  float resizeRatio = 1.0f;
 };
 }  // namespace pag

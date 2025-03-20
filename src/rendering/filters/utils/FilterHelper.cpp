@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterHelper.h"
+#include "base/utils/Log.h"
 #include "base/utils/USE.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
@@ -66,71 +68,10 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
   return ToGLMatrix(result);
 }
 
-tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
-  tgfx::Matrix matrix = ToMatrix(target->vertexMatrix);
-  if (flipY) {
-    matrix.postScale(1.0f, -1.0f);
-  }
-  tgfx::Matrix convertMatrix = {};
-  // 以下等价于：
-  // convertMatrix.setScale(2f/width, 2f/height);
-  // convertMatrix.postTranslate(-1.0f, -1.0f);
-  convertMatrix.setAll(2.0f / static_cast<float>(target->width), 0.0f, -1.0f, 0.0f,
-                       2.0f / static_cast<float>(target->height), -1.0f);
-  matrix.preConcat(convertMatrix);
-  if (convertMatrix.invert(&convertMatrix)) {
-    matrix.postConcat(convertMatrix);
-  }
-  return matrix;
-}
-
 tgfx::Matrix ToMatrix(const std::array<float, 9>& values) {
   tgfx::Matrix result = {};
   result.setAll(values[0], values[3], values[6], values[1], values[4], values[7]);
   return result;
-}
-
-std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& backendTexture,
-                                             tgfx::ImageOrigin origin, const tgfx::Point& scale) {
-  if (!backendTexture.isValid()) {
-    return nullptr;
-  }
-  auto filterSource = new FilterSource();
-  backendTexture.getGLTextureInfo(&filterSource->sampler);
-  filterSource->width = backendTexture.width();
-  filterSource->height = backendTexture.height();
-  filterSource->scale = scale;
-  filterSource->textureMatrix =
-      ToGLTextureMatrix(tgfx::Matrix::I(), backendTexture.width(), backendTexture.height(), origin);
-  return std::unique_ptr<FilterSource>(filterSource);
-}
-
-std::unique_ptr<FilterTarget> ToFilterTarget(tgfx::Surface* surface,
-                                             const tgfx::Matrix& drawingMatrix) {
-  if (surface == nullptr) {
-    return nullptr;
-  }
-  auto renderTarget = surface->getBackendRenderTarget();
-  auto filterTarget = new FilterTarget();
-  renderTarget.getGLFramebufferInfo(&filterTarget->frameBuffer);
-  filterTarget->width = surface->width();
-  filterTarget->height = surface->height();
-  filterTarget->vertexMatrix =
-      ToGLVertexMatrix(drawingMatrix, surface->width(), surface->height(), surface->origin());
-  return std::unique_ptr<FilterTarget>(filterTarget);
-}
-
-tgfx::Point ToGLTexturePoint(const FilterSource* source, const tgfx::Point& texturePoint) {
-  return {texturePoint.x * source->scale.x / static_cast<float>(source->width),
-          texturePoint.y * source->scale.y / static_cast<float>(source->height)};
-}
-
-tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
-                            const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint) {
-  tgfx::Point vertexPoint = {(contentPoint.x - contentBounds.left) * source->scale.x,
-                             (contentPoint.y - contentBounds.top) * source->scale.y};
-  return {2.0f * vertexPoint.x / static_cast<float>(target->width) - 1.0f,
-          2.0f * vertexPoint.y / static_cast<float>(target->height) - 1.0f};
 }
 
 tgfx::Point ToGLTexturePoint(const tgfx::BackendTexture* source, const tgfx::Point& texturePoint) {
