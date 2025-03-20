@@ -1,6 +1,31 @@
 <RCC>
     <qresource prefix="/">
+        <!-- image -->
+        <file>images/play.png</file>
+        <file>images/next.png</file>
+        <file>images/pause.png</file>
+        <file>images/tiles.png</file>
+        <file>images/previous.png</file>
+        <file>images/panels-on.png</file>
+        <file>images/panels-off.png</file>
         <file>images/window-icon.png</file>
+        <file>images/window-icon-32x.png</file>
+        <file>images/update-red.png</file>
+        <file>images/background-on.png</file>
+        <file>images/background-off.png</file>
+
+        <!-- svg -->
+        <file>images/close-dark.svg</file>
+        <file>images/restore-dark.svg</file>
+        <file>images/maximize-dark.svg</file>
+        <file>images/minimize-dark.svg</file>
+
+        <!-- qml -->
         <file>qml/Main.qml</file>
+        <file>qml/MainForm.qml</file>
+        <file>qml/ControlForm.qml</file>
+        <file>qml/components/PAGWindow.qml</file>
+        <file>qml/components/PAGRectangle.qml</file>
+        <file>qml/components/PAGResizeArea.qml</file>
     </qresource>
 </RCC>

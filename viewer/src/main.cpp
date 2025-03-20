@@ -16,16 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <QApplication>
 #include <QFileInfo>
-#include <QGraphicsScene>
-#include <QGraphicsView>
-#include <QQmlApplicationEngine>
-#include <QQmlContext>
-#include <QThread>
-#include "PAGView.h"
+#include <QQuickStyle>
+#include <QQuickWindow>
+#include <QSGRendererInterface>
 #include "PAGViewer.h"
-#include "qobject.h"
+#include "rendering/PAGView.h"
 
 int main(int argc, char* argv[]) {
   QApplication::setApplicationName("PAGViewer");
@@ -36,12 +32,18 @@ int main(int argc, char* argv[]) {
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+  QQuickStyle::setStyle("Universal");
+  QFont defaultFonts("Helvetica Neue,PingFang SC");
+  defaultFonts.setStyleHint(QFont::SansSerif);
+  QApplication::setFont(defaultFonts);
+  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji"};
+  pag::PAGFont::SetFallbackFontNames(fallbackList);
 
   PAGViewer app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
-  app.OpenFile(rootPath + "/assets/test2.pag");
+  app.openFile(rootPath + "/assets/test2.pag");
   return QApplication::exec();
 }

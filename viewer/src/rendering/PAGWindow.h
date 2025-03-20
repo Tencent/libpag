@@ -18,36 +18,30 @@
 
 #pragma once
 
-#include <QOpenGLContext>
-#include <QQuickItem>
-#include "pag/pag.h"
+#include <QQmlApplicationEngine>
+#include <QString>
+#include "PAGView.h"
 
-namespace pag {
-class RenderThread;
-
-class GPUDrawable;
-
-class PAGView : public QQuickItem {
+class PAGWindow : public QObject {
   Q_OBJECT
  public:
-  explicit PAGView(QQuickItem* parent = nullptr);
-  ~PAGView() override;
+  explicit PAGWindow(QObject* parent = nullptr);
+  ~PAGWindow() override;
 
-  void setFile(const std::shared_ptr<PAGFile> pagFile);
+  Q_SIGNAL void destroyWindow(PAGWindow* window);
 
-  QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
+  Q_SLOT void openFile(QString path);
+  Q_SLOT void onPAGViewerDestroyed();
+
+  auto open() -> void;
+  auto getFilePath() -> QString;
+
+  static QList<PAGWindow*> AllWindows;
 
  private:
-  int64_t startTime = 0;
-  bool isPlaying = true;
-  qreal lastPixelRatio = 1;
-  qreal lastWidth = 0;
-  qreal lastHeight = 0;
-  QString filePath = "";
-  PAGPlayer* pagPlayer = nullptr;
-  RenderThread* renderThread = nullptr;
-  std::shared_ptr<GPUDrawable> drawable = nullptr;
-
-  friend class RenderThread;
+  QString filePath;
+  QQuickWindow* window = nullptr;
+  pag::PAGView* pagView = nullptr;
+  QThread* renderThread = nullptr;
+  QQmlApplicationEngine* engine = nullptr;
 };
-}  // namespace pag
