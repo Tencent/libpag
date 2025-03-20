@@ -7,7 +7,6 @@ Window {
     default property alias contents: placeholder.data
 
     required property int resizeHandleSize
-
     property bool isWindows: Qt.platform.os === "windows"
 
     property bool isMaximized: false
@@ -25,7 +24,6 @@ Window {
     property int windowLastHeight: 0
 
     property int titleBarHeight: 32
-
     visible: true
     color: "#00000000"
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window

@@ -5,9 +5,7 @@ import "components"
 
 SplitView {
     id: splitView
-
     required property int resizeHandleSize
-
     property bool hasPAGFile: pagView.filePath !== ""
 
     property bool isBackgroundOn: false

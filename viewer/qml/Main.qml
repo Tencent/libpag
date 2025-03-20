@@ -36,6 +36,7 @@ PAGWindow {
     MainForm {
         id: mainForm
         resizeHandleSize: resizeHandleSize
+
         pagView {
             showVideoFrames: settings.isShowVideoFrames
             onProgressChanged: function (progress) {
