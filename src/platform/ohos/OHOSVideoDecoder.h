@@ -87,6 +87,7 @@ class OHOSVideoDecoder : public VideoDecoder {
   bool isValid = false;
   OH_AVCodec* videoCodec = nullptr;
   CodecUserData* codecUserData = nullptr;
+  CodecBufferInfo lastCodecBufferInfo = {0, nullptr};
   CodecBufferInfo codecBufferInfo = {0, nullptr};
   VideoFormat videoFormat{};
   std::list<int64_t> pendingFrames{};

@@ -194,6 +194,13 @@ DecodingResult OHOSVideoDecoder::onEndOfStream() {
 }
 
 DecodingResult OHOSVideoDecoder::onDecodeFrame() {
+  if (lastCodecBufferInfo.bufferIndex != 0) {
+    int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, lastCodecBufferInfo.bufferIndex);
+    if (ret != AV_ERR_OK) {
+      LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
+      return DecodingResult::Error;
+    }
+  }
   std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
   codecUserData->outputCondition.wait(lock, [this]() {
     // In the PAG file, video sequence frame software decoding testing requires sending additional
@@ -204,6 +211,7 @@ DecodingResult OHOSVideoDecoder::onDecodeFrame() {
                                        (codecCategory == SOFTWARE ? 1 : 0);
   });
   if (codecUserData->outputBufferInfoQueue.size() > 0) {
+    lastCodecBufferInfo = codecBufferInfo;
     codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
     codecUserData->outputBufferInfoQueue.pop();
     lock.unlock();
@@ -214,11 +222,6 @@ DecodingResult OHOSVideoDecoder::onDecodeFrame() {
   } else {
     lock.unlock();
     return DecodingResult::Success;
-  }
-  int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
-  if (ret != AV_ERR_OK) {
-    LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
-    return DecodingResult::Error;
   }
   if (codecBufferInfo.attr.flags == AVCODEC_BUFFER_FLAGS_EOS) {
     return DecodingResult::EndOfStream;
@@ -233,6 +236,7 @@ void OHOSVideoDecoder::onFlush() {
   }
   codecUserData->clearQueue();
   pendingFrames.clear();
+  lastCodecBufferInfo = {0, nullptr};
   codecBufferInfo = {0, nullptr};
   start();
 }
