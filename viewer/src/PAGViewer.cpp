@@ -26,7 +26,7 @@ PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
 
 auto PAGViewer::event(QEvent* event) -> bool {
   if (event->type() == QEvent::FileOpen) {
-    auto openEvent = dynamic_cast<QFileOpenEvent*>(event);
+    auto openEvent = static_cast<QFileOpenEvent*>(event);
     auto path = openEvent->file();
     openFile(path);
   }

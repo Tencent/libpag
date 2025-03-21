@@ -11,11 +11,12 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
 endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
+    add_compile_options(/GR-)
 endif (MSVC)
 
 # Sets flags

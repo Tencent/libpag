@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGView.h"
-#include <QGuiApplication>
-#include <QQuickWindow>
 #include <QSGImageNode>
 #include "pag/file.h"
 #include "rendering/PAGRenderThread.h"
@@ -46,14 +44,14 @@ PAGView::~PAGView() {
 
 auto PAGView::getPAGWidth() const -> int {
   if (pagFile == nullptr) {
-    return 100;
+    return -1;
   }
   return pagFile->width();
 }
 
 auto PAGView::getPAGHeight() const -> int {
   if (pagFile == nullptr) {
-    return 100;
+    return -1;
   }
   return pagFile->height();
 }
@@ -62,7 +60,7 @@ auto PAGView::getTotalFrame() const -> int {
   if (pagFile == nullptr) {
     return 0;
   }
-  int totalFrames = static_cast<int>((getDuration() * pagFile->frameRate() + 500) / 1000);
+  int totalFrames = static_cast<int>(std::round(getDuration() * pagFile->frameRate() / 1000.0));
   if (totalFrames < 1) {
     totalFrames = 1;
   }
@@ -102,7 +100,7 @@ auto PAGView::getFilePath() const -> QString {
 
 auto PAGView::getBackgroundColor() const -> QColor {
   if (pagFile == nullptr) {
-    return QColor::fromRgb(0, 0, 0);
+    return QColorConstants::Black;
   }
 
   auto color = pagFile->getFile()->getRootLayer()->composition->backgroundColor;
@@ -111,7 +109,7 @@ auto PAGView::getBackgroundColor() const -> QColor {
 
 auto PAGView::getPreferredSize() const -> QSizeF {
   if (pagFile == nullptr) {
-    return {200, 200};
+    return {0, 0};
   }
 
   auto quickWindow = window();
@@ -209,7 +207,7 @@ auto PAGView::nextFrame() -> void {
   setIsPlaying(false);
   auto progress = this->progress + progressPerFrame;
   if (progress > 1) {
-    progress = 0;
+    progress = 0.0;
   }
   setProgress(progress);
 }
@@ -221,7 +219,7 @@ auto PAGView::previousFrame() -> void {
   setIsPlaying(false);
   auto progress = this->progress - progressPerFrame;
   if (progress < 0) {
-    progress = 1;
+    progress = 1.0;
   }
   setProgress(progress);
 }
@@ -242,7 +240,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     }
   }
 
-  auto node = dynamic_cast<QSGImageNode*>(oldNode);
+  auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = drawable->getTexture();
   if (texture) {
     if (node == nullptr) {

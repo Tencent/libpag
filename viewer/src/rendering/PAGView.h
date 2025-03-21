@@ -79,7 +79,7 @@ class PAGView : public QQuickItem {
   qreal lastPixelRatio = 1;
   double progress = 0.0;
   double progressPerFrame = 0.0;
-  QString filePath;
+  QString filePath = "";
   PAGPlayer* pagPlayer = nullptr;
   PAGRenderThread* renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;

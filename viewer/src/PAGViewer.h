@@ -19,8 +19,7 @@
 #pragma once
 
 #include <QApplication>
-
-class PAGWindow;
+#include "rendering/PAGWindow.h"
 
 class PAGViewer : public QApplication {
   Q_OBJECT

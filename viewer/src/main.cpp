@@ -24,6 +24,22 @@
 #include "rendering/PAGView.h"
 
 int main(int argc, char* argv[]) {
+  bool cpuMode = false;
+  std::string filePath;
+
+  for (int i = 0; i < argc; i++) {
+    auto arg = std::string(argv[i]);
+    if (arg == "-cpu") {
+      cpuMode = true;
+    } else if (argc > 1) {
+      filePath = arg;
+    }
+  }
+
+  if (cpuMode) {
+    QApplication::setAttribute(Qt::AA_UseSoftwareOpenGL);
+  }
+
   QApplication::setApplicationName("PAGViewer");
   QApplication::setOrganizationName("Tencent");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
@@ -42,8 +58,7 @@ int main(int argc, char* argv[]) {
   PAGViewer app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
-  auto rootPath = QApplication::applicationDirPath();
-  rootPath = QFileInfo(rootPath + "/../../").absolutePath();
-  app.openFile(rootPath + "/assets/test2.pag");
+  app.openFile(filePath.data());
+
   return QApplication::exec();
 }
