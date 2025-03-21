@@ -49,15 +49,6 @@
           "linux"
         ]
       }
-    },
-    {
-      "name": "sparkle",
-      "scripts": {
-        "mac": {
-          "executor": "bash",
-          "file": "scripts/build_sparkle.sh"
-        }
-      }
     }
   ]
 }
