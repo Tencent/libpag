@@ -97,9 +97,11 @@ class OHOSVideoDecoder : public VideoDecoder {
   int64_t yBufferSize = 0;
   int64_t uvBufferSize = 0;
   std::weak_ptr<OHOSVideoDecoder> weakThis;
+  int lastOutputBufferIndex = -1;
 
   explicit OHOSVideoDecoder(const VideoFormat& format, bool hardware);
   bool initDecoder(const OH_AVCodecCategory avCodecCategory);
   bool start();
+  void releaseOutputBuffer();
 };
 }  // namespace pag

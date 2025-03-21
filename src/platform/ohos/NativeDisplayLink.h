@@ -18,6 +18,7 @@
 
 #pragma once
 #include <native_vsync/native_vsync.h>
+#include <cstdint>
 #include <functional>
 #include <mutex>
 #include "rendering/utils/DisplayLink.h"
