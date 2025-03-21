@@ -35,7 +35,7 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(void* nativeWindow, void* s
 }
 
 GPUDrawable::GPUDrawable(void* nativeWindow, void* sharedContext)
-  : nativeWindow(nativeWindow), sharedContext(sharedContext) {
+    : nativeWindow(nativeWindow), sharedContext(sharedContext) {
   GPUDrawable::updateSize();
 }
 
@@ -84,4 +84,4 @@ void GPUDrawable::onFreeSurface() {
 void GPUDrawable::present(tgfx::Context* context) {
   window->present(context);
 }
-} // namespace pag
+}  // namespace pag
