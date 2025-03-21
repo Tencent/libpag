@@ -22,11 +22,12 @@
 
 namespace tgfx {
 class EGLWindow;
+class WGLWindow;
 }
 
 namespace pag {
 class GPUDrawable : public Drawable {
- public:
+public:
   static std::shared_ptr<GPUDrawable> FromWindow(void* nativeWindow, void* sharedContext = nullptr);
 
   int width() const override {
@@ -43,18 +44,22 @@ class GPUDrawable : public Drawable {
 
   void present(tgfx::Context* context) override;
 
- protected:
+protected:
   std::shared_ptr<tgfx::Surface> onCreateSurface(tgfx::Context* context) override;
 
   void onFreeSurface() override;
 
- private:
+private:
   int _width = 0;
   int _height = 0;
+#ifdef PAG_USE_ANGLE
   std::shared_ptr<tgfx::EGLWindow> window = nullptr;
+#else
+  std::shared_ptr<tgfx::WGLWindow> window = nullptr;
+#endif
   void* nativeWindow = nullptr;
   void* sharedContext = nullptr;
 
   GPUDrawable(void* nativeWindow, void* sharedContext);
 };
-}  // namespace pag
+} // namespace pag
