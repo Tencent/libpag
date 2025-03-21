@@ -22,7 +22,8 @@
 
 namespace tgfx {
 class EGLWindow;
-}
+class WGLWindow;
+}  // namespace tgfx
 
 namespace pag {
 class GPUDrawable : public Drawable {
@@ -51,7 +52,11 @@ class GPUDrawable : public Drawable {
  private:
   int _width = 0;
   int _height = 0;
+#ifdef PAG_USE_ANGLE
   std::shared_ptr<tgfx::EGLWindow> window = nullptr;
+#else
+  std::shared_ptr<tgfx::WGLWindow> window = nullptr;
+#endif
   void* nativeWindow = nullptr;
   void* sharedContext = nullptr;
 

@@ -152,8 +152,12 @@ void FilterRenderer::MeasureFilterBounds(tgfx::Rect* bounds, const FilterModifie
   }
 }
 
-tgfx::Rect GetClipBounds(Canvas* canvas, const FilterList* filterList) {
+tgfx::Rect GetClipBounds(Canvas* canvas, const FilterList* filterList,
+                         const tgfx::Rect& contentBounds) {
   auto clip = canvas->getTotalClip();
+  if (clip.isInverseFillType()) {
+    return contentBounds;
+  }
   auto matrix = canvas->getMatrix();
   if (filterList->useParentSizeInput) {
     tgfx::Matrix inverted = tgfx::Matrix::I();
@@ -359,7 +363,7 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   auto filterList = MakeFilterList(modifier);
   auto contentBounds = GetContentBounds(filterList.get(), content);
   // 相对于content Bounds的clip Bounds
-  auto clipBounds = GetClipBounds(parentCanvas, filterList.get());
+  auto clipBounds = GetClipBounds(parentCanvas, filterList.get(), contentBounds);
 
   auto contentScale = GetContentScale(parentCanvas, filterList->scaleFactorLimit,
                                       GetScaleFactor(filterList.get(), contentBounds));
