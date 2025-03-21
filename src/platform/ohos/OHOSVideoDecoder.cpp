@@ -312,6 +312,7 @@ void OHOSVideoDecoder::releaseOutputBuffer() {
     if (ret != AV_ERR_OK) {
       LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
     }
+    codecBufferInfo.buffer = nullptr;    
   }
 }
 
