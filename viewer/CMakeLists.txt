@@ -11,11 +11,12 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
 endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
+    add_compile_options(/GR-)
 endif (MSVC)
 
 # Sets flags
@@ -47,9 +48,10 @@ if (QT_VERSION)
 endif ()
 
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick QuickControls2)
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
+        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
+        Qt${QT_VERSION_MAJOR}::QuickControls2)
 qt_add_resources(QT_RESOURCES res.qrc)
 
 if (APPLE)
@@ -93,14 +95,12 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
 add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
 if (APPLE)
-    add_vendor_target(viewer-vendor SHARED_VENDORS sparkle CONFIG_DIR ${CMAKE_SOURCE_DIR}/../)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/mac/include)
-    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/../third_party/out/sparkle/lib/Sparkle.framework)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/../vendor/sparkle/mac/Sparkle.framework)
 elseif (WIN32)
-    add_vendor_target(viewer-vendor SHARED_VENDORS winsparkle CONFIG_DIR ${CMAKE_SOURCE_DIR}/../)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/win/include)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/winsparkle/include)
-    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/../third_party/out/winsparkle/lib/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
+    list(APPEND PAG_VIEWER_INCLUDES ../vendor/winsparkle/include)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/../vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
 endif ()
 
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})

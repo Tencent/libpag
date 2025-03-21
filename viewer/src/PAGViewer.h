@@ -19,16 +19,15 @@
 #pragma once
 
 #include <QApplication>
-#include <QList>
-#include <QObject>
-#include "PAGWindow.h"
+#include "rendering/PAGWindow.h"
 
 class PAGViewer : public QApplication {
   Q_OBJECT
  public:
   PAGViewer(int& argc, char** argv);
 
-  void OpenFile(QString path);
+  auto event(QEvent* event) -> bool override;
+  auto openFile(QString path) -> void;
+
   Q_SLOT void onWindowDestroyed(PAGWindow* window);
-  bool event(QEvent* event) override;
 };

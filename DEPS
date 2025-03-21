@@ -35,20 +35,6 @@
         "commit": "5ff839680134437dbf4678f3d0c7b371d84f4964",
         "dir": "third_party/lz4"
       }
-    ],
-    "mac": [
-      {
-        "url": "https://github.com/sparkle-project/Sparkle.git",
-        "commit": "e9726ff718cffb2d045d84ede9548e38ea48fa01",
-        "dir": "third_party/sparkle"
-      }
-    ],
-    "win": [
-      {
-        "url": "https://github.com/vslavik/winsparkle.git",
-        "commit": "4e6b30b9750b938b184b125d05a664413c72e671",
-        "dir": "third_party/winsparkle"
-      }
     ]
   },
   "actions": {

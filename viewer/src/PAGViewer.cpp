@@ -17,21 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGViewer.h"
+#include <QEvent>
 #include <QObject>
+#include "rendering/PAGWindow.h"
 
 PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
 }
 
-bool PAGViewer::event(QEvent* event) {
+auto PAGViewer::event(QEvent* event) -> bool {
   if (event->type() == QEvent::FileOpen) {
     auto openEvent = static_cast<QFileOpenEvent*>(event);
     auto path = openEvent->file();
-    OpenFile(path);
+    openFile(path);
   }
   return QApplication::event(event);
 }
 
-void PAGViewer::OpenFile(QString path) {
+auto PAGViewer::openFile(QString path) -> void {
   PAGWindow* window = nullptr;
   for (int i = 0; i < PAGWindow::AllWindows.count(); i++) {
     auto win = PAGWindow::AllWindows[i];
@@ -44,16 +46,16 @@ void PAGViewer::OpenFile(QString path) {
 
   if (!window) {
     window = new PAGWindow();
-    window->Open();
+    window->open();
     PAGWindow::AllWindows.append(window);
-    QObject::connect(window, &PAGWindow::DestroyWindow, this, &PAGViewer::onWindowDestroyed,
+    QObject::connect(window, &PAGWindow::destroyWindow, this, &PAGViewer::onWindowDestroyed,
                      Qt::UniqueConnection);
   }
 
-  window->OpenFile(path);
+  window->openFile(path);
 }
 
-void PAGViewer::onWindowDestroyed(PAGWindow* window) {
+auto PAGViewer::onWindowDestroyed(PAGWindow* window) -> void {
   PAGWindow::AllWindows.removeOne(window);
   window->deleteLater();
 }
