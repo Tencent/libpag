@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+// clang-format off
+#include <stdint.h>
 #include <native_vsync/native_vsync.h>
-#include <cstdint>
+// clang-format on
 #include <functional>
 #include <mutex>
 #include "rendering/utils/DisplayLink.h"
