@@ -275,7 +275,7 @@ std::vector<int> PAGAnimator::doAdvance() {
 
 void PAGAnimator::doUpdate(bool setStartTime) {
   locker.lock();
-  if (task != nullptr && task->executing()) {
+  if (task != nullptr && task->status() == tgfx::TaskStatus::Executing) {
     locker.unlock();
     return;
   }
