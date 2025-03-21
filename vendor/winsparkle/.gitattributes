@@ -1,0 +1,4 @@
+win/x64/Release/WinSparkle.dll filter=lfs diff=lfs merge=lfs -text
+win/x64/Release/WinSparkle.lib filter=lfs diff=lfs merge=lfs -text
+win/x64/Debug/WinSparkle.dll filter=lfs diff=lfs merge=lfs -text
+win/x64/Debug/WinSparkle.lib filter=lfs diff=lfs merge=lfs -text

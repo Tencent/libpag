@@ -49,23 +49,6 @@
           "linux"
         ]
       }
-    },
-    {
-      "name": "sparkle",
-      "scripts": {
-        "mac": {
-          "executor": "bash",
-          "file": "scripts/build_sparkle.sh"
-        }
-      }
-    },
-    {
-      "name": "winsparkle",
-      "scripts": {
-        "win": {
-          "file": "scripts/build_winsparkle.bat"
-        }
-      }
     }
   ]
 }
