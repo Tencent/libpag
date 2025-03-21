@@ -208,7 +208,6 @@ DecodingResult OHOSVideoDecoder::onDecodeFrame() {
     codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
     codecUserData->outputBufferInfoQueue.pop();
     lock.unlock();
-    lastOutputBufferIndex = codecBufferInfo.bufferIndex;
     pendingFrames.remove(codecBufferInfo.attr.pts);
     if (codecBufferInfo.buffer == nullptr) {
       return DecodingResult::Error;
@@ -230,7 +229,6 @@ void OHOSVideoDecoder::onFlush() {
   }
   codecUserData->clearQueue();
   pendingFrames.clear();
-  lastOutputBufferIndex = -1;
   codecBufferInfo = {0, nullptr};
   start();
 }
@@ -309,12 +307,12 @@ std::shared_ptr<tgfx::ImageBuffer> OHOSVideoDecoder::onRenderFrame() {
 }
 
 void OHOSVideoDecoder::releaseOutputBuffer() {
-  if (lastOutputBufferIndex != -1) {
+  if (codecBufferInfo.buffer) {
     int ret = OH_VideoDecoder_FreeOutputBuffer(videoCodec, codecBufferInfo.bufferIndex);
     if (ret != AV_ERR_OK) {
       LOGE("OH_VideoDecoder_FreeOutputBuffer failed, ret:%d", ret);
     }
-    lastOutputBufferIndex = -1;
+    codecBufferInfo = {0, nullptr};
   }
 }
 
