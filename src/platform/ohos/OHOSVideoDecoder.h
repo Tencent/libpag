@@ -101,5 +101,6 @@ class OHOSVideoDecoder : public VideoDecoder {
   explicit OHOSVideoDecoder(const VideoFormat& format, bool hardware);
   bool initDecoder(const OH_AVCodecCategory avCodecCategory);
   bool start();
+  void releaseOutputBuffer();
 };
 }  // namespace pag

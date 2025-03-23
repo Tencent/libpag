@@ -19,7 +19,11 @@
 #include "GPUDrawable.h"
 #include <windows.h>
 #include "base/utils/Log.h"
+#ifdef PAG_USE_ANGLE
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#else
+#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
+#endif
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(void* nativeWindow, void* sharedContext) {
@@ -56,8 +60,13 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
+#ifdef PAG_USE_ANGLE
     window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow),
                                        sharedContext);
+#else
+    window = tgfx::WGLWindow::MakeFrom(reinterpret_cast<HWND>(nativeWindow),
+                                       reinterpret_cast<HGLRC>(sharedContext));
+#endif
   }
   return window ? window->getDevice() : nullptr;
 }
