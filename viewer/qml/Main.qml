@@ -13,6 +13,7 @@ PAGWindow {
     minimumWidth: 400 + windowPadding
     minimumHeight: 320 + windowTitleBarHeight
     resizeHandleSize: 5
+    titleBarHeight: windowTitleBarHeight
 
     property string filePath
     property bool lastPlayStatusIsPlaying: false

@@ -7,6 +7,7 @@ Window {
     default property alias contents: placeholder.data
 
     required property int resizeHandleSize
+    required property int titleBarHeight
     property bool isWindows: Qt.platform.os === "windows"
 
     property bool isMaximized: false
@@ -22,14 +23,14 @@ Window {
     property int windowLastWidth: 0
 
     property int windowLastHeight: 0
-
-    property int titleBarHeight: 32
     visible: true
     color: "#00000000"
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
 
     Loader {
+        id: windowsTitleBarLoader
         active: window.isWindows
+        anchors.fill: parent
         sourceComponent: Component {
             Rectangle {
                 z: 1
@@ -241,41 +242,34 @@ Window {
             }
         }
     }
-
     Loader {
+        id: macTitleLoader
         active: !window.isWindows
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: window.titleBarHeight
         sourceComponent: Component {
             Rectangle {
-                visible: !window.isWindows
-                height: window.titleBarHeight
+                anchors.fill: parent
                 color: "#20202a"
-                anchors.top: parent.top
-                anchors.topMargin: 0
-                anchors.left: parent.left
-                anchors.leftMargin: 0
-                anchors.right: parent.right
-                anchors.rightMargin: 0
 
                 Text {
                     id: macTitleText
-                    y: 3
                     height: 16
+                    anchors.fill: parent
                     color: "#DDDDDD"
                     text: window.title
                     verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
                     font.weight: Font.Medium
                     elide: Text.ElideRight
-                    anchors.left: parent.left
-                    anchors.leftMargin: 0
-                    anchors.right: parent.right
-                    anchors.rightMargin: 0
-                    horizontalAlignment: Text.AlignHCenter
                     font.pixelSize: 12
+                    renderType: Text.NativeRendering
                 }
             }
         }
     }
-
     Item {
         id: placeholder
         anchors.fill: parent
@@ -285,7 +279,6 @@ Window {
         anchors.bottomMargin: window.isWindows ? 1 : 0
         clip: true
     }
-
     Loader {
         active: window.isWindows && window.canResize
         sourceComponent: Component {
@@ -294,8 +287,6 @@ Window {
                 anchors.fill: parent
                 hoverEnabled: window.isWindows && window.canResize
                 cursorShape: {
-                    console.log("MouseArea::cursorShape")
-                    console.log("window.isWindows && window.canResize: " + (window.isWindows && window.canResize))
                     const pos = Qt.point(mouseX, mouseY);
                     const offset = resizeHandleSize;
                     if ((pos.x < offset) && (pos.y >= (height - offset))) {
@@ -313,9 +304,6 @@ Window {
                     if ((pos.y > (height - offset)) || ((pos.y < offset) && (pos.x < (width - 120)))) {
                         return Qt.SizeVerCursor;
                     }
-                }
-                onClicked: {
-                    console.log("width: " + width + " height: " + height)
                 }
                 acceptedButtons: Qt.NoButton
             }
