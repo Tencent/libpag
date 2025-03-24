@@ -29,7 +29,42 @@ Window {
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
 
     Loader {
+        active: window.isWindows && window.canResize
+        anchors.fill: parent
+        sourceComponent: Component {
+            MouseArea {
+                enabled: window.canResize
+                anchors.fill: parent
+                hoverEnabled: window.canResize
+                cursorShape: {
+                    const pos = Qt.point(mouseX, mouseY);
+                    const offset = resizeHandleSize;
+                    if ((pos.x < offset) && (pos.y >= (height - offset))) {
+                        return Qt.SizeBDiagCursor;
+                    }
+                    if ((pos.x < offset) && (pos.y < offset)) {
+                        return Qt.SizeFDiagCursor;
+                    }
+                    if ((pos.x >= (width - offset)) && (pos.y >= (height - offset))) {
+                        return Qt.SizeFDiagCursor;
+                    }
+                    if ((pos.x < offset) || ((pos.x >= (width - offset)) && (pos.y > titleBarHeight))) {
+                        return Qt.SizeHorCursor;
+                    }
+                    if ((pos.y > (height - offset)) || ((pos.y < offset) && (pos.x < (width - 120)))) {
+                        return Qt.SizeVerCursor;
+                    }
+                }
+                acceptedButtons: Qt.NoButton
+            }
+        }
+    }
+
+    Loader {
+        id: windowsControlsLoader
         active: window.isWindows
+        anchors.fill: parent
+
         sourceComponent: Component {
             Rectangle {
                 z: 1
@@ -238,6 +273,33 @@ Window {
                         }
                     }
                 }
+
+                DragHandler {
+                    id: resizeHandler
+                    enabled: window.canResize
+                    target: null
+                    grabPermissions: TapHandler.TakeOverForbidden
+                    onActiveChanged: {
+                        if (active) {
+                            const pos = resizeHandler.centroid.position;
+                            const offset = resizeHandleSize + 10;
+                            let edges = 0;
+                            if (pos.x < offset) {
+                                edges |= Qt.LeftEdge;
+                            }
+                            if (pos.x >= (width - offset)) {
+                                edges += Qt.RightEdge;
+                            }
+                            if (pos.y < offset) {
+                                edges |= Qt.TopEdge;
+                            }
+                            if (pos.y >= (height - offset)) {
+                                edges |= Qt.BottomEdge;
+                            }
+                            window.startSystemResize(edges);
+                        }
+                    }
+                }
             }
         }
     }
@@ -284,73 +346,6 @@ Window {
         anchors.rightMargin: window.isWindows ? 1 : 0
         anchors.bottomMargin: window.isWindows ? 1 : 0
         clip: true
-    }
-
-    Loader {
-        active: window.isWindows && window.canResize
-        sourceComponent: Component {
-            MouseArea {
-                enabled: window.isWindows && window.canResize
-                anchors.fill: parent
-                hoverEnabled: window.isWindows && window.canResize
-                cursorShape: {
-                    console.log("MouseArea::cursorShape")
-                    console.log("window.isWindows && window.canResize: " + (window.isWindows && window.canResize))
-                    const pos = Qt.point(mouseX, mouseY);
-                    const offset = resizeHandleSize;
-                    if ((pos.x < offset) && (pos.y >= (height - offset))) {
-                        return Qt.SizeBDiagCursor;
-                    }
-                    if ((pos.x < offset) && (pos.y < offset)) {
-                        return Qt.SizeFDiagCursor;
-                    }
-                    if ((pos.x >= (width - offset)) && (pos.y >= (height - offset))) {
-                        return Qt.SizeFDiagCursor;
-                    }
-                    if ((pos.x < offset) || ((pos.x >= (width - offset)) && (pos.y > titleBarHeight))) {
-                        return Qt.SizeHorCursor;
-                    }
-                    if ((pos.y > (height - offset)) || ((pos.y < offset) && (pos.x < (width - 120)))) {
-                        return Qt.SizeVerCursor;
-                    }
-                }
-                onClicked: {
-                    console.log("width: " + width + " height: " + height)
-                }
-                acceptedButtons: Qt.NoButton
-            }
-        }
-    }
-    Loader {
-        active: window.isWindows && window.canResize
-        sourceComponent: Component {
-            DragHandler {
-                id: resizeHandler
-                enabled: window.isWindows && window.canResize
-                target: null
-                grabPermissions: TapHandler.TakeOverForbidden
-                onActiveChanged: {
-                    if (active) {
-                        const pos = resizeHandler.centroid.position;
-                        const offset = resizeHandleSize + 10;
-                        let edges = 0;
-                        if (pos.x < offset) {
-                            edges |= Qt.LeftEdge;
-                        }
-                        if (pos.x >= (width - offset)) {
-                            edges += Qt.RightEdge;
-                        }
-                        if (pos.y < offset) {
-                            edges |= Qt.TopEdge;
-                        }
-                        if (pos.y >= (height - offset)) {
-                            edges |= Qt.BottomEdge;
-                        }
-                        window.startSystemResize(edges);
-                    }
-                }
-            }
-        }
     }
 
     function setMaximized(maximized) {
