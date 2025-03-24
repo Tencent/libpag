@@ -7,6 +7,7 @@ Window {
     default property alias contents: placeholder.data
 
     required property int resizeHandleSize
+    required property int titleBarHeight
     property bool isWindows: Qt.platform.os === "windows"
 
     property bool isMaximized: false
@@ -22,8 +23,6 @@ Window {
     property int windowLastWidth: 0
 
     property int windowLastHeight: 0
-
-    property int titleBarHeight: 32
     visible: true
     color: "#00000000"
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
@@ -303,41 +302,34 @@ Window {
             }
         }
     }
-
     Loader {
+        id: macTitleLoader
         active: !window.isWindows
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: window.titleBarHeight
         sourceComponent: Component {
             Rectangle {
-                visible: !window.isWindows
-                height: window.titleBarHeight
+                anchors.fill: parent
                 color: "#20202a"
-                anchors.top: parent.top
-                anchors.topMargin: 0
-                anchors.left: parent.left
-                anchors.leftMargin: 0
-                anchors.right: parent.right
-                anchors.rightMargin: 0
 
                 Text {
                     id: macTitleText
-                    y: 3
                     height: 16
+                    anchors.fill: parent
                     color: "#DDDDDD"
                     text: window.title
                     verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
                     font.weight: Font.Medium
                     elide: Text.ElideRight
-                    anchors.left: parent.left
-                    anchors.leftMargin: 0
-                    anchors.right: parent.right
-                    anchors.rightMargin: 0
-                    horizontalAlignment: Text.AlignHCenter
                     font.pixelSize: 12
+                    renderType: Text.NativeRendering
                 }
             }
         }
     }
-
     Item {
         id: placeholder
         anchors.fill: parent
