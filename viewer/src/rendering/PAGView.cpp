@@ -62,7 +62,7 @@ auto PAGView::getTotalFrame() const -> int {
   }
   int totalFrames = static_cast<int>(std::round(getDuration() * pagFile->frameRate() / 1000.0));
   if (totalFrames < 1) {
-    totalFrames = 1;
+    totalFrames = 0;
   }
   return totalFrames;
 }
@@ -72,8 +72,8 @@ auto PAGView::getCurrentFrame() const -> int {
   return static_cast<int>(std::round(getProgress() * (totalFrames - 1)));
 }
 
-auto PAGView::getIsPlaying() const -> bool {
-  return isPlaying;
+auto PAGView::isPlaying() const -> bool {
+  return isPlaying_;
 }
 
 auto PAGView::getShowVideoFrames() const -> bool {
@@ -85,7 +85,7 @@ auto PAGView::getShowVideoFrames() const -> bool {
 
 auto PAGView::getDuration() const -> double {
   if (pagPlayer == nullptr) {
-    return 1.0;
+    return 0.0;
   }
   return static_cast<double>(pagPlayer->duration()) / 1000.0;
 }
@@ -113,30 +113,26 @@ auto PAGView::getPreferredSize() const -> QSizeF {
   }
 
   auto quickWindow = window();
-  qreal scaleRatio = quickWindow->devicePixelRatio();
   int pagWidth = getPAGWidth();
   int pagHeight = getPAGHeight();
   auto screen = quickWindow->screen();
   QSize screenSize = screen->availableVirtualSize();
-  while ((pagHeight / scaleRatio) > (screenSize.height() * 0.9)) {
-    scaleRatio *= 1.2;
-  }
-  while ((pagWidth / scaleRatio) > screenSize.width()) {
-    scaleRatio *= 1.2;
+  qreal maxHeight = screenSize.height() * 0.8;
+  qreal minHeight = quickWindow->minimumHeight();
+  qreal width = 0;
+  qreal height = 0;
+
+  if (pagWidth < minHeight) {
+    height = minHeight;
+    width = pagWidth * height / pagHeight;
+  } else {
+    height = pagHeight;
+    width = pagWidth;
   }
 
-  auto height = pagHeight / scaleRatio;
-  auto width = pagWidth / scaleRatio;
-  if ((height < quickWindow->minimumHeight()) && (width < quickWindow->minimumWidth())) {
-    if (height > width) {
-      height = quickWindow->minimumHeight();
-      scaleRatio = pagHeight / height;
-      width = pagWidth / scaleRatio;
-    } else {
-      width = quickWindow->minimumWidth();
-      scaleRatio = pagWidth / width;
-      height = pagHeight / scaleRatio;
-    }
+  if (height > maxHeight) {
+    width = width * maxHeight / height;
+    height = maxHeight;
   }
 
   return {width, height};
@@ -146,10 +142,10 @@ auto PAGView::setIsPlaying(bool isPlaying) -> void {
   if (pagFile == nullptr) {
     return;
   }
-  if (this->isPlaying == isPlaying) {
+  if (this->isPlaying_ == isPlaying) {
     return;
   }
-  this->isPlaying = isPlaying;
+  this->isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
   if (isPlaying) {
     lastPlayTime = tgfx::Clock::Now();
@@ -255,7 +251,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto displayTime = timeNow - lastPlayTime;
   lastPlayTime = timeNow;
 
-  if (isPlaying) {
+  if (isPlaying_) {
     auto duration = pagPlayer->duration();
     if (duration > 0) {
       auto progress =

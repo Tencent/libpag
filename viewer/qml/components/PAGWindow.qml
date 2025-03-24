@@ -28,243 +28,254 @@ Window {
     color: "#00000000"
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
 
-    Rectangle {
-        z: 1
-        visible: window.isWindows
-        anchors.fill: parent
-        radius: 5
-        clip: true
-        border.width: 0
-        border.color: "#00FFFFFF"
-        color: "#15FFFFFF"
-
-        PAGRectangle {
-            id: titleBar
-            height: window.titleBarHeight
-            color: "#22FFFFFF"
-            radius: 5
-            leftTopRadius: !window.isMaximized
-            rightTopRadius: !window.isMaximized
-            rightBottomRadius: false
-            leftBottomRadius: false
-            anchors.top: parent.top
-            anchors.topMargin: 0
-            anchors.left: parent.left
-            anchors.leftMargin: 1
-            anchors.right: parent.right
-            anchors.rightMargin: 1
-
-            PAGRectangle {
-                height: window.titleBarHeight - 1
-                color: "#20202a"
+    Loader {
+        active: window.isWindows
+        sourceComponent: Component {
+            Rectangle {
+                z: 1
+                anchors.fill: parent
                 radius: 5
-                leftTopRadius: !window.isMaximized
-                rightTopRadius: !window.isMaximized
-                rightBottomRadius: false
-                leftBottomRadius: false
+                clip: true
+                border.width: 0
+                border.color: "#00FFFFFF"
+                color: "#15FFFFFF"
+
+                PAGRectangle {
+                    id: titleBar
+                    height: window.titleBarHeight
+                    color: "#22FFFFFF"
+                    radius: 5
+                    leftTopRadius: !window.isMaximized
+                    rightTopRadius: !window.isMaximized
+                    rightBottomRadius: false
+                    leftBottomRadius: false
+                    anchors.top: parent.top
+                    anchors.topMargin: 0
+                    anchors.left: parent.left
+                    anchors.leftMargin: 1
+                    anchors.right: parent.right
+                    anchors.rightMargin: 1
+
+                    PAGRectangle {
+                        height: window.titleBarHeight - 1
+                        color: "#20202a"
+                        radius: 5
+                        leftTopRadius: !window.isMaximized
+                        rightTopRadius: !window.isMaximized
+                        rightBottomRadius: false
+                        leftBottomRadius: false
+                        anchors.top: parent.top
+                        anchors.topMargin: 1
+                        anchors.left: parent.left
+                        anchors.leftMargin: 0
+                        anchors.right: parent.right
+                        anchors.rightMargin: 0
+                    }
+                    MouseArea {
+                        id: mouseArea
+                        property int mouseLastX: 0
+
+                        property int mouseLastY: 0
+
+                        property int windowX: 0
+
+                        property int windowY: 0
+
+                        property int windowWidth: 0
+                        height: 40
+                        anchors.fill: parent
+                        anchors.topMargin: resizeHandleSize
+                        onPressed: {
+                            mouseLastX = mouseX;
+                            mouseLastY = mouseY;
+                            windowX = window.x;
+                            windowY = window.y;
+                            windowWidth = window.width;
+                        }
+                        onPositionChanged: {
+                            let offsetX = mouseX - mouseLastX;
+                            let offsetY = mouseY - mouseLastY;
+                            if (((windowX - window.x) === offsetX) && ((windowY - window.y) === offsetY)) {
+                                return;
+                            }
+                            if (window.isMaximized) {
+                                setMaximized(false);
+                                let sourceX = (mouseLastX - 240) / (windowWidth - 240 - 120);
+                                let targetX = (window.width - 240 - 120) * sourceX + 240;
+                                let xChange = mouseLastX - targetX;
+                                window.x += xChange;
+                                mouseLastX = targetX;
+                            }
+                            if (offsetX !== 0) {
+                                window.x += offsetX;
+                            }
+                            if (offsetY !== 0) {
+                                window.y += offsetY;
+                            }
+                            ensurePositionMovable();
+                        }
+                        onDoubleClicked: {
+                            setMaximized(!window.isMaximized);
+                        }
+                    }
+                    Text {
+                        id: windowsTitleText
+                        visible: window.width > (window.hasMenu ? 400 : 150)
+                        y: 8
+                        height: 16
+                        color: "#DDDDDD"
+                        text: window.title
+                        verticalAlignment: Text.AlignVCenter
+                        font.weight: Font.Bold
+                        renderType: Text.NativeRendering
+                        elide: Text.ElideRight
+                        anchors.left: parent.left
+                        anchors.leftMargin: window.hasMenu ? (window.width < 600 ? 220 : 0) : 0
+                        anchors.right: parent.right
+                        anchors.rightMargin: window.hasMenu ? (window.width < 600 ? 120 : 0) : 0
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: 12
+                        font.family: "Microsoft Yahei"
+                    }
+                    Image {
+                        id: iconImage
+                        x: 10
+                        y: 8
+                        width: 16
+                        height: 16
+                        fillMode: Image.PreserveAspectFit
+                        source: "qrc:/images/window-icon-32x.png"
+                    }
+                    Row {
+                        id: windowControlRow
+                        anchors.right: parent.right
+
+                        PAGRectangle {
+                            id: minButton
+                            width: 40
+                            height: window.titleBarHeight - 1
+                            border.width: 0
+                            color: minMouseArea.containsMouse ? "#33FFFFFF" : "#00ffffff"
+
+                            Image {
+                                id: minImage
+                                width: 10
+                                height: 10
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                sourceSize.height: 24
+                                sourceSize.width: 24
+                                fillMode: Image.PreserveAspectFit
+                                source: "qrc:/images/minimize-dark.svg"
+                            }
+                            MouseArea {
+                                id: minMouseArea
+                                hoverEnabled: true
+                                anchors.fill: parent
+                                onClicked: {
+                                    window.visibility = Window.Minimized;
+                                    window.isMaximized = false;
+                                }
+                            }
+                        }
+                        PAGRectangle {
+                            id: zoomButton
+                            width: 40
+                            height: window.titleBarHeight - 1
+                            color: zoomMouseArea.containsMouse ? "#33FFFFFF" : "#00ffffff"
+                            border.width: 0
+
+                            Image {
+                                id: zoomImage
+                                width: 10
+                                height: 10
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                sourceSize.height: 24
+                                sourceSize.width: 24
+                                fillMode: Image.PreserveAspectFit
+                                source: window.isMaximized ? "qrc:/images/restore-dark.svg" : "qrc:/images/maximize-dark.svg"
+                            }
+                            MouseArea {
+                                id: zoomMouseArea
+                                hoverEnabled: true
+                                anchors.fill: parent
+                                onClicked: {
+                                    setMaximized(!window.isMaximized);
+                                }
+                            }
+                        }
+                        PAGRectangle {
+                            id: closeButton
+                            width: 40
+                            height: window.titleBarHeight - 1
+                            color: closeMouseArea.containsMouse ? "#FFDD0000" : "#00ffffff"
+                            border.width: 0
+                            radius: titleBar.radius
+                            leftTopRadius: false
+                            leftBottomRadius: false
+                            rightBottomRadius: false
+
+                            Image {
+                                id: closeImage
+                                width: 10
+                                height: 10
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                sourceSize.height: 24
+                                sourceSize.width: 24
+                                fillMode: Image.PreserveAspectFit
+                                source: "qrc:/images/close-dark.svg"
+                            }
+                            MouseArea {
+                                id: closeMouseArea
+                                hoverEnabled: true
+                                anchors.fill: parent
+                                onClicked: {
+                                    window.close();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Loader {
+        active: !window.isWindows
+        sourceComponent: Component {
+            Rectangle {
+                visible: !window.isWindows
+                height: window.titleBarHeight
+                color: "#20202a"
                 anchors.top: parent.top
-                anchors.topMargin: 1
+                anchors.topMargin: 0
                 anchors.left: parent.left
                 anchors.leftMargin: 0
                 anchors.right: parent.right
                 anchors.rightMargin: 0
-            }
-            MouseArea {
-                id: mouseArea
-                property int mouseLastX: 0
 
-                property int mouseLastY: 0
-
-                property int windowX: 0
-
-                property int windowY: 0
-
-                property int windowWidth: 0
-                height: 40
-                anchors.fill: parent
-                anchors.topMargin: resizeHandleSize
-                onPressed: {
-                    mouseLastX = mouseX;
-                    mouseLastY = mouseY;
-                    windowX = window.x;
-                    windowY = window.y;
-                    windowWidth = window.width;
-                }
-                onPositionChanged: {
-                    let offsetX = mouseX - mouseLastX;
-                    let offsetY = mouseY - mouseLastY;
-                    if (((windowX - window.x) === offsetX) && ((windowY - window.y) === offsetY)) {
-                        return;
-                    }
-                    if (window.isMaximized) {
-                        setMaximized(false);
-                        let sourceX = (mouseLastX - 240) / (windowWidth - 240 - 120);
-                        let targetX = (window.width - 240 - 120) * sourceX + 240;
-                        let xChange = mouseLastX - targetX;
-                        window.x += xChange;
-                        mouseLastX = targetX;
-                    }
-                    if (offsetX !== 0) {
-                        window.x += offsetX;
-                    }
-                    if (offsetY !== 0) {
-                        window.y += offsetY;
-                    }
-                    ensurePositionMovable();
-                }
-                onDoubleClicked: {
-                    setMaximized(!window.isMaximized);
-                }
-            }
-            Text {
-                id: windowsTitleText
-                visible: window.width > (window.hasMenu ? 400 : 150)
-                y: 8
-                height: 16
-                color: "#DDDDDD"
-                text: window.title
-                verticalAlignment: Text.AlignVCenter
-                font.weight: Font.Bold
-                renderType: Text.NativeRendering
-                elide: Text.ElideRight
-                anchors.left: parent.left
-                anchors.leftMargin: window.hasMenu ? (window.width < 600 ? 220 : 0) : 0
-                anchors.right: parent.right
-                anchors.rightMargin: window.hasMenu ? (window.width < 600 ? 120 : 0) : 0
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 12
-                font.family: "Microsoft Yahei"
-            }
-            Image {
-                id: iconImage
-                x: 10
-                y: 8
-                width: 16
-                height: 16
-                fillMode: Image.PreserveAspectFit
-                source: "qrc:/images/window-icon-32x.png"
-            }
-            Row {
-                id: windowControlRow
-                anchors.right: parent.right
-
-                PAGRectangle {
-                    id: minButton
-                    width: 40
-                    height: window.titleBarHeight - 1
-                    border.width: 0
-                    color: minMouseArea.containsMouse ? "#33FFFFFF" : "#00ffffff"
-
-                    Image {
-                        id: minImage
-                        width: 10
-                        height: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        sourceSize.height: 24
-                        sourceSize.width: 24
-                        fillMode: Image.PreserveAspectFit
-                        source: "qrc:/images/minimize-dark.svg"
-                    }
-                    MouseArea {
-                        id: minMouseArea
-                        hoverEnabled: true
-                        anchors.fill: parent
-                        onClicked: {
-                            window.visibility = Window.Minimized;
-                            window.isMaximized = false;
-                        }
-                    }
-                }
-                PAGRectangle {
-                    id: zoomButton
-                    width: 40
-                    height: window.titleBarHeight - 1
-                    color: zoomMouseArea.containsMouse ? "#33FFFFFF" : "#00ffffff"
-                    border.width: 0
-
-                    Image {
-                        id: zoomImage
-                        width: 10
-                        height: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        sourceSize.height: 24
-                        sourceSize.width: 24
-                        fillMode: Image.PreserveAspectFit
-                        source: window.isMaximized ? "qrc:/images/restore-dark.svg" : "qrc:/images/maximize-dark.svg"
-                    }
-                    MouseArea {
-                        id: zoomMouseArea
-                        hoverEnabled: true
-                        anchors.fill: parent
-                        onClicked: {
-                            setMaximized(!window.isMaximized);
-                        }
-                    }
-                }
-                PAGRectangle {
-                    id: closeButton
-                    width: 40
-                    height: window.titleBarHeight - 1
-                    color: closeMouseArea.containsMouse ? "#FFDD0000" : "#00ffffff"
-                    border.width: 0
-                    radius: titleBar.radius
-                    leftTopRadius: false
-                    leftBottomRadius: false
-                    rightBottomRadius: false
-
-                    Image {
-                        id: closeImage
-                        width: 10
-                        height: 10
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        sourceSize.height: 24
-                        sourceSize.width: 24
-                        fillMode: Image.PreserveAspectFit
-                        source: "qrc:/images/close-dark.svg"
-                    }
-                    MouseArea {
-                        id: closeMouseArea
-                        hoverEnabled: true
-                        anchors.fill: parent
-                        onClicked: {
-                            window.close();
-                        }
-                    }
+                Text {
+                    id: macTitleText
+                    y: 3
+                    height: 16
+                    color: "#DDDDDD"
+                    text: window.title
+                    verticalAlignment: Text.AlignVCenter
+                    font.weight: Font.Medium
+                    elide: Text.ElideRight
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: 12
                 }
             }
         }
     }
-    Rectangle {
-        visible: !window.isWindows
-        height: window.titleBarHeight
-        color: "#20202a"
-        anchors.top: parent.top
-        anchors.topMargin: 0
-        anchors.left: parent.left
-        anchors.leftMargin: 0
-        anchors.right: parent.right
-        anchors.rightMargin: 0
 
-        Text {
-            id: macTitleText
-            y: 3
-            height: 16
-            color: "#DDDDDD"
-            text: window.title
-            verticalAlignment: Text.AlignVCenter
-            font.weight: Font.Medium
-            elide: Text.ElideRight
-            anchors.left: parent.left
-            anchors.leftMargin: 0
-            anchors.right: parent.right
-            anchors.rightMargin: 0
-            horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: 12
-        }
-    }
     Item {
         id: placeholder
         anchors.fill: parent

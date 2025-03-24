@@ -30,7 +30,6 @@ auto PAGRenderThread::flush() -> void {
 }
 
 auto PAGRenderThread::shutDown() -> void {
-  exit();
   if (QGuiApplication::instance()) {
     auto mainThread = QGuiApplication::instance()->thread();
     if (pagView->drawable) {
@@ -38,6 +37,7 @@ auto PAGRenderThread::shutDown() -> void {
     }
     moveToThread(mainThread);
   }
+  exit();
 }
 
 }  // namespace pag

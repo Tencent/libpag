@@ -37,7 +37,7 @@ class PAGView : public QQuickItem {
   Q_PROPERTY(int pagHeight READ getPAGHeight)
   Q_PROPERTY(int totalFrame READ getTotalFrame)
   Q_PROPERTY(int currentFrame READ getCurrentFrame)
-  Q_PROPERTY(bool isPlaying READ getIsPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
+  Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
   Q_PROPERTY(bool showVideoFrames READ getShowVideoFrames WRITE setShowVideoFrames)
   Q_PROPERTY(double duration READ getDuration)
   Q_PROPERTY(double progress READ getProgress WRITE setProgress NOTIFY progressChanged)
@@ -49,7 +49,7 @@ class PAGView : public QQuickItem {
   auto getPAGHeight() const -> int;
   auto getTotalFrame() const -> int;
   auto getCurrentFrame() const -> int;
-  auto getIsPlaying() const -> bool;
+  auto isPlaying() const -> bool;
   auto getShowVideoFrames() const -> bool;
   auto getDuration() const -> double;
   auto getProgress() const -> double;
@@ -73,7 +73,7 @@ class PAGView : public QQuickItem {
 
  private:
   int64_t lastPlayTime = 0;
-  bool isPlaying = true;
+  bool isPlaying_ = true;
   qreal lastWidth = 0;
   qreal lastHeight = 0;
   qreal lastPixelRatio = 1;
