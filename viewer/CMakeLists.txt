@@ -11,11 +11,12 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+    add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
 endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
+    add_compile_options(/GR-)
 endif (MSVC)
 
 # Sets flags
@@ -47,9 +48,10 @@ if (QT_VERSION)
 endif ()
 
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick QuickControls2)
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
+        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
+        Qt${QT_VERSION_MAJOR}::QuickControls2)
 qt_add_resources(QT_RESOURCES res.qrc)
 
 if (APPLE)

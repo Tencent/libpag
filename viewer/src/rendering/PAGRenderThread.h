@@ -18,16 +18,20 @@
 
 #pragma once
 
-#include <QApplication>
-#include "rendering/PAGWindow.h"
+#include <QThread>
+#include "rendering/PAGView.h"
 
-class PAGViewer : public QApplication {
+namespace pag {
+
+class PAGRenderThread : public QThread {
   Q_OBJECT
  public:
-  PAGViewer(int& argc, char** argv);
+  explicit PAGRenderThread(PAGView* pagView);
 
-  auto event(QEvent* event) -> bool override;
-  auto openFile(QString path) -> void;
+  Q_SLOT void flush();
+  Q_SLOT void shutDown();
 
-  Q_SLOT void onWindowDestroyed(PAGWindow* window);
+ private:
+  PAGView* pagView = nullptr;
 };
+}  // namespace pag

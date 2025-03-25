@@ -16,18 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <QApplication>
 #include <QFileInfo>
-#include <QGraphicsScene>
-#include <QGraphicsView>
-#include <QQmlApplicationEngine>
-#include <QQmlContext>
-#include <QThread>
-#include "PAGView.h"
+#include <QQuickStyle>
+#include <QQuickWindow>
+#include <QSGRendererInterface>
 #include "PAGViewer.h"
-#include "qobject.h"
+#include "rendering/PAGView.h"
 
 int main(int argc, char* argv[]) {
+  bool cpuMode = false;
+  std::string filePath;
+
+  for (int i = 0; i < argc; i++) {
+    auto arg = std::string(argv[i]);
+    auto lowerArg = arg;
+    std::transform(lowerArg.begin(), lowerArg.end(), lowerArg.begin(), ::tolower);
+    if (lowerArg == "-cpu") {
+      cpuMode = true;
+    } else if (argc > 1) {
+      filePath = arg;
+    }
+  }
+
+  if (cpuMode) {
+    QApplication::setAttribute(Qt::AA_UseSoftwareOpenGL);
+  }
+
   QApplication::setApplicationName("PAGViewer");
   QApplication::setOrganizationName("Tencent");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
@@ -36,12 +50,17 @@ int main(int argc, char* argv[]) {
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+  QQuickStyle::setStyle("Universal");
+  QFont defaultFonts("Helvetica Neue,PingFang SC");
+  defaultFonts.setStyleHint(QFont::SansSerif);
+  QApplication::setFont(defaultFonts);
+  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji"};
+  pag::PAGFont::SetFallbackFontNames(fallbackList);
 
   PAGViewer app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
-  auto rootPath = QApplication::applicationDirPath();
-  rootPath = QFileInfo(rootPath + "/../../").absolutePath();
-  app.OpenFile(rootPath + "/assets/test2.pag");
+  app.openFile(filePath.data());
+
   return QApplication::exec();
 }

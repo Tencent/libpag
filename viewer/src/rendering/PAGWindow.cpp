@@ -30,44 +30,35 @@ PAGWindow::~PAGWindow() {
   delete engine;
 }
 
-void PAGWindow::onPAGViewerDestroyed() {
-  Q_EMIT DestroyWindow(this);
+auto PAGWindow::openFile(QString path) -> void {
+  bool result = pagView->setFile(path);
+  if (!result) {
+    return;
+  }
+  filePath = path;
+  window->raise();
+  window->requestActivate();
 }
 
-void PAGWindow::Open() {
+auto PAGWindow::onPAGViewerDestroyed() -> void {
+  Q_EMIT destroyWindow(this);
+}
+
+auto PAGWindow::open() -> void {
   engine = new QQmlApplicationEngine;
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
+
   window = static_cast<QQuickWindow*>(engine->rootObjects().at(0));
-  pagView = window->findChild<pag::PAGView*>("pagView");
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
+  window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+
+  pagView = window->findChild<pag::PAGView*>("pagView");
+
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
 }
 
-void PAGWindow::OpenFile(QString path) {
-  auto strPath = std::string(path.toLocal8Bit());
-  if (path.startsWith("file://")) {
-    strPath = std::string(QUrl(path).toLocalFile().toLocal8Bit());
-  }
-  auto byteData = pag::ByteData::FromPath(strPath);
-  if (byteData == nullptr) {
-    return;
-  }
-  auto pagFile = pag::PAGFile::Load(byteData->data(), byteData->length());
-  if (pagFile == nullptr) {
-    return;
-  }
-  filePath = path;
-  pagView->setFile(pagFile);
-  auto width = pagFile->width();
-  auto height = pagFile->height();
-  if (height > 800) {
-    float scale = static_cast<float>(800) / static_cast<float>(height);
-    height = 800;
-    width = static_cast<int>(static_cast<float>(width) * scale);
-  }
-  window->resize(width, height);
-  window->raise();
-  window->requestActivate();
+auto PAGWindow::getFilePath() -> QString {
+  return filePath;
 }

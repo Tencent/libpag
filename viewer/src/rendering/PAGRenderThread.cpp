@@ -16,34 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PAGRenderThread.h"
+#include <QGuiApplication>
 
-#include <QQmlApplicationEngine>
-#include <QQuickWindow>
-#include <QString>
-#include "PAGView.h"
+namespace pag {
 
-class PAGWindow : public QObject {
-  Q_OBJECT
- public:
-  PAGWindow(QObject* parent = nullptr);
-  ~PAGWindow();
+PAGRenderThread::PAGRenderThread(PAGView* pagView) : pagView(pagView) {
+}
 
-  static QList<PAGWindow*> AllWindows;
+auto PAGRenderThread::flush() -> void {
+  pagView->pagPlayer->flush();
+  QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
+}
 
-  void Open();
-  QString getFilePath() {
-    return filePath;
+auto PAGRenderThread::shutDown() -> void {
+  if (QGuiApplication::instance()) {
+    auto mainThread = QGuiApplication::instance()->thread();
+    if (pagView->drawable) {
+      pagView->drawable->moveToThread(mainThread);
+    }
+    moveToThread(mainThread);
   }
+  exit();
+}
 
-  Q_SLOT void OpenFile(QString path);
-  Q_SLOT void onPAGViewerDestroyed();
-  Q_SIGNAL void DestroyWindow(PAGWindow* window);
-
- private:
-  QString filePath = "";
-  QQmlApplicationEngine* engine = nullptr;
-  pag::PAGView* pagView = nullptr;
-  QQuickWindow* window = nullptr;
-  QThread* renderThread = nullptr;
-};
+}  // namespace pag
