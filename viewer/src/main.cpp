@@ -29,7 +29,9 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < argc; i++) {
     auto arg = std::string(argv[i]);
-    if (arg == "-cpu") {
+    auto lowerArg = arg;
+    std::transform(lowerArg.begin(), lowerArg.end(), lowerArg.begin(), ::tolower);
+    if (lowerArg == "-cpu") {
       cpuMode = true;
     } else if (argc > 1) {
       filePath = arg;

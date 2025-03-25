@@ -122,7 +122,7 @@ auto PAGView::getPreferredSize() const -> QSizeF {
   qreal width = 0;
   qreal height = 0;
 
-  if (pagWidth < minHeight) {
+  if (pagHeight < minHeight) {
     height = minHeight;
     width = pagWidth * height / pagHeight;
   } else {
@@ -259,7 +259,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       if (progress > 1) {
         progress = 0.0;
       }
-      pagPlayer->setProgress(progress);
       setProgress(progress);
     }
     QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
