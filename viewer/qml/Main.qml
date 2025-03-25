@@ -1,8 +1,6 @@
 import PAG
 import QtCore
 import QtQuick
-import QtQuick.Window
-import Qt.labs.platform as Lab11
 import "components"
 
 PAGWindow {
@@ -29,6 +27,8 @@ PAGWindow {
         property bool isEditPanelOpen: false
 
         property bool isShowVideoFrames: true
+
+        property bool isUseEnglish: true
 
         property double lastX: 0
 
@@ -125,6 +125,13 @@ PAGWindow {
 
     Component.onCompleted: {
         viewWindow.title = "PAGViewer";
+
+        let component = Qt.createComponent("Menu.qml");
+        let menuBar = component.createObject(viewWindow, {
+            hasPAGFile: Qt.binding(function() { return mainForm.hasPAGFile; }),
+            isUseEnglish: Qt.binding(function() { return settings.isUseEnglish; })
+        });
+        menuBar.command.connect(onCommand);
     }
 
     function updateProgress() {
@@ -156,5 +163,9 @@ PAGWindow {
         if (mainForm.controlForm.panelsButton.checked !== willOpen) {
             mainForm.controlForm.panelsButton.checked = willOpen;
         }
+    }
+    function onCommand(command) {
+        console.log(`Get command: [${command}]`);
+
     }
 }

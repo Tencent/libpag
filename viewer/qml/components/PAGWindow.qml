@@ -12,7 +12,7 @@ Window {
 
     property bool isMaximized: false
 
-    property bool hasMenu: false
+    property bool hasMenu: isWindows
 
     property bool canResize: true
 

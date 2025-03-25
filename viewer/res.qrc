@@ -22,8 +22,11 @@
 
         <!-- qml -->
         <file>qml/Main.qml</file>
+        <file>qml/Menu.qml</file>>
         <file>qml/MainForm.qml</file>
         <file>qml/ControlForm.qml</file>
+        <file>qml/components/PAGMenu.qml</file>
+        <file>qml/components/PAGMenuBar.qml</file>
         <file>qml/components/PAGWindow.qml</file>
         <file>qml/components/PAGRectangle.qml</file>
     </qresource>
