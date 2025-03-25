@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import Qt.labs.platform as Platform
 import "components"
 
 Item {
@@ -7,6 +8,8 @@ Item {
 
     required property bool hasPAGFile
     required property bool isUseEnglish
+    required property bool windowActive
+    required property bool isFullScreen
     signal command(string command)
 
     Loader {
@@ -29,20 +32,20 @@ Item {
                     text: qsTr("Open...")
                     shortcut: "Ctrl+O"
                     onTriggered: {
-                        root.command("open-pag-file")
+                        root.command("open-pag-file");
                     }
                 }
                 Action {
                     text: qsTr("Close")
                     shortcut: "Ctrl+Q"
                     onTriggered: {
-                        root.command("close-window")
+                        root.command("close-window");
                     }
                 }
                 Action {
                     text: qsTr("Settings...")
                     onTriggered: {
-                        root.command("open-preferences")
+                        root.command("open-preferences");
                     }
                 }
             }
@@ -55,7 +58,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: StandardKey.MoveToPreviousLine
                     onTriggered: {
-                        root.command('first-frame')
+                        root.command("first-frame");
                     }
                 }
                 Action {
@@ -63,7 +66,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: StandardKey.MoveToNextLine
                     onTriggered: {
-                        root.command('last-frame')
+                        root.command("last-frame");
                     }
                 }
                 Action {
@@ -71,7 +74,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: StandardKey.MoveToPreviousChar
                     onTriggered: {
-                        root.command('previous-frame')
+                        root.command("previous-frame");
                     }
                 }
                 Action {
@@ -79,7 +82,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: StandardKey.MoveToNextChar
                     onTriggered: {
-                        root.command('next-frame')
+                        root.command("next-frame");
                     }
                 }
                 Action {
@@ -87,7 +90,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: "space"
                     onTriggered: {
-                        root.command('pause-or-play')
+                        root.command("pause-or-play");
                     }
                 }
             }
@@ -100,7 +103,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: "B"
                     onTriggered: {
-                        root.command('toggle-background')
+                        root.command("toggle-background");
                     }
                 }
                 Action {
@@ -108,7 +111,7 @@ Item {
                     enabled: root.hasPAGFile
                     shortcut: "L"
                     onTriggered: {
-                        root.command('toggle-edit-panel')
+                        root.command("toggle-edit-panel");
                     }
                 }
             }
@@ -119,25 +122,185 @@ Item {
                 Action {
                     text: qsTr("Help for PAGViewer")
                     onTriggered: {
-                        root.command('open-help')
+                        root.command("open-help");
                     }
                 }
                 Action {
                     text: qsTr("About PAGViewer")
                     onTriggered: {
-                        root.command('open-about')
+                        root.command("open-about");
                     }
                 }
                 Action {
                     text: qsTr("Feedback")
                     onTriggered: {
-                        root.command('open-feedback')
+                        root.command("open-feedback");
                     }
                 }
                 Action {
                     text: qsTr("About PAG Enterprise Edition")
                     onTriggered: {
-                        root.command('open-commerce-page')
+                        root.command("open-commerce-page");
+                    }
+                }
+            }
+        }
+    }
+
+    Loader {
+        id: macosMenuBarLoader
+        active: Qt.platform.os !== "windows"
+        sourceComponent: Platform.MenuBar {
+            id: macosMenuBar
+            Platform.Menu {
+                title: qsTr("PAGViewer")
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("About PAG Enterprise Edition")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("open-commerce-page");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("Preference Settings")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("open-preferences");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("About PAGViewer")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("open-about");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Close")
+                    shortcut: StandardKey.Close
+                    role: "QuitRole"
+                    onTriggered: {
+                        root.command("close-window");
+                    }
+                }
+            }
+            Platform.Menu {
+                title: qsTr("File")
+                Platform.MenuItem {
+                    text: qsTr("Open...")
+                    shortcut: StandardKey.Open
+                    onTriggered: {
+                        root.command("open-pag-file");
+                    }
+                }
+            }
+            Platform.Menu {
+                title: qsTr("Play")
+                Platform.MenuItem {
+                    text: qsTr("Pause and go to the first frame")
+                    enabled: root.hasPAGFile
+                    shortcut: StandardKey.MoveToPreviousLine
+                    onTriggered: {
+                        root.command("first-frame");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Pause and go to the last frame")
+                    enabled: root.hasPAGFile
+                    shortcut: StandardKey.MoveToNextLine
+                    onTriggered: {
+                        root.command("last-frame");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Previous frame")
+                    enabled: root.hasPAGFile
+                    shortcut: StandardKey.MoveToPreviousChar
+                    onTriggered: {
+                        root.command("previous-frame");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Next frame")
+                    enabled: root.hasPAGFile
+                    shortcut: StandardKey.MoveToNextChar
+                    onTriggered: {
+                        root.command("next-frame");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Pause/Play")
+                    enabled: root.hasPAGFile
+                    shortcut: "space"
+                    onTriggered: {
+                        root.command("pause-or-play");
+                    }
+                }
+            }
+            Platform.Menu {
+                title: qsTr("View")
+                Platform.MenuItem {
+                    text: qsTr("Show/Hide Background")
+                    enabled: root.hasPAGFile
+                    shortcut: "B"
+                    onTriggered: {
+                        root.command("toggle-background");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Show/Hide Edit Panel")
+                    enabled: root.hasPAGFile
+                    shortcut: "L"
+                    onTriggered: {
+                        root.command("toggle-edit-panel");
+                    }
+                }
+            }
+            Platform.Menu {
+                title: qsTr("Window")
+                Platform.MenuItem {
+                    text: qsTr("Minimize")
+                    shortcut: "Ctrl+M"
+                    onTriggered: {
+                        root.command("minimize-window");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Zoom")
+                    onTriggered: {
+                        root.command("zoom-window");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Exit Fullscreen")
+                    visible: root.isFullScreen
+                    onTriggered: {
+                        root.command("fullscreen-window");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Fullscreen")
+                    visible: !root.isFullScreen
+                    onTriggered: {
+                        root.command("fullscreen-window");
+                    }
+                }
+            }
+            Platform.Menu {
+                title: qsTr("Help")
+                Platform.MenuItem {
+                    text: qsTr("Help for PAGViewer")
+                    onTriggered: {
+                        root.command("open-help");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Feedback")
+                    onTriggered: {
+                        root.command("open-feedback");
                     }
                 }
             }

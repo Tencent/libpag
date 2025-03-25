@@ -2,10 +2,9 @@ import QtQuick
 import QtQuick.Controls
 
 Menu {
+    id: pagMenu
     required property int menuWidth
     property int itemHeight: 30
-
-    id: pagMenu
     background: Rectangle {
         implicitWidth: menuWidth
         implicitHeight: pagMenu.contentHeight + 8

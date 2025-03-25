@@ -1,6 +1,7 @@
 import PAG
 import QtCore
 import QtQuick
+import Qt.labs.settings
 import "components"
 
 PAGWindow {
@@ -128,8 +129,18 @@ PAGWindow {
 
         let component = Qt.createComponent("Menu.qml");
         let menuBar = component.createObject(viewWindow, {
-            hasPAGFile: Qt.binding(function() { return mainForm.hasPAGFile; }),
-            isUseEnglish: Qt.binding(function() { return settings.isUseEnglish; })
+            hasPAGFile: Qt.binding(function () {
+                return mainForm.hasPAGFile;
+            }),
+            windowActive: Qt.binding(function () {
+                return viewWindow.active;
+            }),
+            isUseEnglish: Qt.binding(function () {
+                return settings.isUseEnglish;
+            }),
+            isFullScreen: Qt.binding(function () {
+                return viewWindow.visibility === 5;
+            })
         });
         menuBar.command.connect(onCommand);
     }
@@ -166,6 +177,5 @@ PAGWindow {
     }
     function onCommand(command) {
         console.log(`Get command: [${command}]`);
-
     }
 }

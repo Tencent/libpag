@@ -3,11 +3,10 @@ import QtQuick
 import QtQuick.Controls
 
 MenuBar {
+    id: baseMenuBar
     property int barHeight: 32
     property int itemHeight: 30
     property int itemWidth: 30
-
-    id: baseMenuBar
     height: barHeight
     contentWidth: itemWidth
     contentHeight: itemHeight
