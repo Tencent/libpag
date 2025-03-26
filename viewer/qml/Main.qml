@@ -132,9 +132,9 @@ PAGWindow {
         visible: false
         title: qsTr("Open PAG File")
         fileMode: FileDialog.OpenFile
-        nameFilters: [ "PAG files(*.pag)" ]
+        nameFilters: ["PAG files(*.pag)"]
         onAccepted: {
-            let filePath = openPAGFileDialog.selectedFile
+            let filePath = openPAGFileDialog.selectedFile;
             mainForm.pagView.setFile(filePath);
         }
     }
@@ -214,68 +214,68 @@ PAGWindow {
     function onCommand(command) {
         console.log(`Get command: [${command}]`);
         switch (command) {
-            case "open-pag-file":
-                if (mainForm.hasPAGFile) {
-                    let filePath = mainForm.pagView.filePath;
-                    openPAGFileDialog.currentFolder = Utils.getFileDir(filePath);
-                } else {
-                    openPAGFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
-                }
-                openPAGFileDialog.open();
-                break;
-            case "close-window":
-                viewWindow.close();
-                break;
-            case "open-preferences":
-                settingsWindow.visible = true;
-                settingsWindow.raise();
-                break;
-            case "first-frame":
-                mainForm.pagView.firstFrame();
-                break;
-            case "last-frame":
-                mainForm.pagView.lastFrame();
-                break;
-            case "previous-frame":
-                mainForm.pagView.previousFrame();
-                break;
-            case "next-frame":
-                mainForm.pagView.nextFrame();
-                break;
-            case "pause-or-play":
-                mainForm.pagView.isPlaying = !mainForm.pagView.isPlaying;
-                break;
-            case "toggle-background":
-                toggleBackground();
-                break;
-            case "toggle-edit-panel":
-                toggleEditPanel();
-                break;
-            case "open-help":
-                Qt.openUrlExternally("https://pag.art/#pag-player");
-                break;
-            case "open-about":
-                aboutWindow.visible = true;
-                aboutWindow.raise();
-                break;
-            case "open-feedback":
-                Qt.openUrlExternally("https://github.com/Tencent/libpag/discussions");
-                break;
-            case "open-commerce-page":
-                Qt.openUrlExternally("https://pag.io/product.html#pag-enterprise-edition");
-                break;
-            case "minimize-window":
-                viewWindow.showMinimized();
-                break;
-            case "zoom-window":
-                viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
-                break;
-            case "fullscreen-window":
-                viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
-                break;
-            default:
-                console.log(`Undefined command: [${command}]`)
-                break;
+        case "open-pag-file":
+            if (mainForm.hasPAGFile) {
+                let filePath = mainForm.pagView.filePath;
+                openPAGFileDialog.currentFolder = Utils.getFileDir(filePath);
+            } else {
+                openPAGFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
+            }
+            openPAGFileDialog.open();
+            break;
+        case "close-window":
+            viewWindow.close();
+            break;
+        case "open-preferences":
+            settingsWindow.visible = true;
+            settingsWindow.raise();
+            break;
+        case "first-frame":
+            mainForm.pagView.firstFrame();
+            break;
+        case "last-frame":
+            mainForm.pagView.lastFrame();
+            break;
+        case "previous-frame":
+            mainForm.pagView.previousFrame();
+            break;
+        case "next-frame":
+            mainForm.pagView.nextFrame();
+            break;
+        case "pause-or-play":
+            mainForm.pagView.isPlaying = !mainForm.pagView.isPlaying;
+            break;
+        case "toggle-background":
+            toggleBackground();
+            break;
+        case "toggle-edit-panel":
+            toggleEditPanel();
+            break;
+        case "open-help":
+            Qt.openUrlExternally("https://pag.art/#pag-player");
+            break;
+        case "open-about":
+            aboutWindow.visible = true;
+            aboutWindow.raise();
+            break;
+        case "open-feedback":
+            Qt.openUrlExternally("https://github.com/Tencent/libpag/discussions");
+            break;
+        case "open-commerce-page":
+            Qt.openUrlExternally("https://pag.io/product.html#pag-enterprise-edition");
+            break;
+        case "minimize-window":
+            viewWindow.showMinimized();
+            break;
+        case "zoom-window":
+            viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
+            break;
+        case "fullscreen-window":
+            viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
+            break;
+        default:
+            console.log(`Undefined command: [${command}]`);
+            break;
         }
     }
 }

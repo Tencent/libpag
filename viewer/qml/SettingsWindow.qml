@@ -86,7 +86,7 @@ PAGWindow {
                         if (settingsWindow.useEnglish === useEnglishCheckBox.checked) {
                             return;
                         }
-                        settingsWindow.useEnglish = useEnglishCheckBox.checked
+                        settingsWindow.useEnglish = useEnglishCheckBox.checked;
                     }
                 }
             }

@@ -345,7 +345,7 @@ Window {
     }
 
     onVisibleChanged: {
-        if (visible && typeof(windowHelper) !== "undefined") {
+        if (visible && typeof (windowHelper) !== "undefined") {
             windowHelper.setWindowStyle(window, 0.125, 0.125, 0.164);
         }
     }
