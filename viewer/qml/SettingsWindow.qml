@@ -13,6 +13,7 @@ PAGWindow {
     maximumHeight: height
     hasMenu: false
     canResize: false
+    titleBarHeight: isWindows ? 32 : 22
 
     PAGRectangle {
         id: rectangle

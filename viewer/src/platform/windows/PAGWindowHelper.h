@@ -8,7 +8,7 @@ class PAGWindowHelper : public QObject {
   Q_OBJECT
  public:
   explicit PAGWindowHelper(QObject* parent = nullptr);
-  auto setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue) -> void;
+  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
 };
 
 }  // namespace pag

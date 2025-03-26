@@ -143,7 +143,7 @@ PAGWindow {
         id: settingsWindow
         visible: false
         width: 500
-        height: 160
+        height: 160 + windowTitleBarHeight
         title: qsTr("Settings")
         useEnglish: settings.isUseEnglish
         onUseEnglishChanged: {
