@@ -275,15 +275,8 @@ Item {
                     }
                 }
                 Platform.MenuItem {
-                    text: qsTr("Exit Fullscreen")
+                    text: root.isFullScreen ? qsTr("Exit Fullscreen") : qsTr("Fullscreen")
                     visible: root.isFullScreen
-                    onTriggered: {
-                        root.command("fullscreen-window");
-                    }
-                }
-                Platform.MenuItem {
-                    text: qsTr("Fullscreen")
-                    visible: !root.isFullScreen
                     onTriggered: {
                         root.command("fullscreen-window");
                     }

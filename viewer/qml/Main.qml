@@ -1,8 +1,10 @@
 import PAG
 import QtCore
 import QtQuick
+import QtQuick.Dialogs
 import Qt.labs.settings
 import "components"
+import "utils"
 
 PAGWindow {
     id: viewWindow
@@ -11,6 +13,7 @@ PAGWindow {
     height: 360
     minimumWidth: 400 + windowPadding
     minimumHeight: 320 + windowTitleBarHeight
+    hasMenu: true
     resizeHandleSize: 5
     titleBarHeight: windowTitleBarHeight
 
@@ -124,6 +127,42 @@ PAGWindow {
         }
     }
 
+    FileDialog {
+        id: openPAGFileDialog
+        visible: false
+        title: qsTr("Open PAG File")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [ "PAG files(*.pag)" ]
+        onAccepted: {
+            let filePath = openPAGFileDialog.selectedFile
+            mainForm.pagView.setFile(filePath);
+        }
+    }
+
+    SettingsWindow {
+        id: settingsWindow
+        visible: false
+        width: 500
+        height: 160
+        title: qsTr("Settings")
+        useEnglish: settings.isUseEnglish
+        onUseEnglishChanged: {
+            if (!settingsWindow.visible || settingsWindow.useEnglish === settings.isUseEnglish) {
+                return;
+            }
+            settings.isUseEnglish = settingsWindow.useEnglish;
+        }
+    }
+
+    AboutWindow {
+        id: aboutWindow
+        visible: false
+        width: settings.isUseEnglish ? 600 : 500
+        height: 160 + windowTitleBarHeight
+        title: qsTr("About PAGViewer")
+        aboutMessage: "<b>PAGViewer</b> " + Qt.application.version + "<br><br>Copyright © 2017-present Tencent. All rights reserved."
+    }
+
     Component.onCompleted: {
         viewWindow.title = "PAGViewer";
 
@@ -139,7 +178,7 @@ PAGWindow {
                 return settings.isUseEnglish;
             }),
             isFullScreen: Qt.binding(function () {
-                return viewWindow.visibility === 5;
+                return viewWindow.visibility === Window.FullScreen;
             })
         });
         menuBar.command.connect(onCommand);
@@ -148,17 +187,11 @@ PAGWindow {
     function updateProgress() {
         let duration = mainForm.pagView.duration;
         let displayedTime = duration * mainForm.pagView.progress;
-        mainForm.controlForm.timeDisplayedText.text = msToTime(displayedTime);
+        mainForm.controlForm.timeDisplayedText.text = Utils.msToTime(displayedTime);
         mainForm.controlForm.currentFrameText.text = mainForm.pagView.currentFrame;
         mainForm.controlForm.totalFrameText.text = mainForm.pagView.totalFrame;
     }
-    function msToTime(duration) {
-        let seconds = parseInt((duration / 1000) % 60);
-        let minutes = parseInt((duration / (1000 * 60)) % 60);
-        minutes = (minutes < 10) ? "0" + minutes : minutes;
-        seconds = (seconds < 10) ? "0" + seconds : seconds;
-        return minutes + ":" + seconds;
-    }
+
     function toggleBackground(checked) {
         if (checked === undefined) {
             checked = !mainForm.isBackgroundOn;
@@ -167,15 +200,82 @@ PAGWindow {
             mainForm.isBackgroundOn = checked;
         }
     }
+
     function toggleEditPanel(willOpen) {
         if (willOpen === undefined) {
-            willOpen = !mainForm.isEditPanelOpen;
+            willOpen = !settings.isEditPanelOpen;
         }
         if (mainForm.controlForm.panelsButton.checked !== willOpen) {
             mainForm.controlForm.panelsButton.checked = willOpen;
         }
+        settings.isEditPanelOpen = willOpen;
     }
+
     function onCommand(command) {
         console.log(`Get command: [${command}]`);
+        switch (command) {
+            case "open-pag-file":
+                if (mainForm.hasPAGFile) {
+                    let filePath = mainForm.pagView.filePath;
+                    openPAGFileDialog.currentFolder = Utils.getFileDir(filePath);
+                } else {
+                    openPAGFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
+                }
+                openPAGFileDialog.open();
+                break;
+            case "close-window":
+                viewWindow.close();
+                break;
+            case "open-preferences":
+                settingsWindow.visible = true;
+                settingsWindow.raise();
+                break;
+            case "first-frame":
+                mainForm.pagView.firstFrame();
+                break;
+            case "last-frame":
+                mainForm.pagView.lastFrame();
+                break;
+            case "previous-frame":
+                mainForm.pagView.previousFrame();
+                break;
+            case "next-frame":
+                mainForm.pagView.nextFrame();
+                break;
+            case "pause-or-play":
+                mainForm.pagView.isPlaying = !mainForm.pagView.isPlaying;
+                break;
+            case "toggle-background":
+                toggleBackground();
+                break;
+            case "toggle-edit-panel":
+                toggleEditPanel();
+                break;
+            case "open-help":
+                Qt.openUrlExternally("https://pag.art/#pag-player");
+                break;
+            case "open-about":
+                aboutWindow.visible = true;
+                aboutWindow.raise();
+                break;
+            case "open-feedback":
+                Qt.openUrlExternally("https://github.com/Tencent/libpag/discussions");
+                break;
+            case "open-commerce-page":
+                Qt.openUrlExternally("https://pag.io/product.html#pag-enterprise-edition");
+                break;
+            case "minimize-window":
+                viewWindow.showMinimized();
+                break;
+            case "zoom-window":
+                viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
+                break;
+            case "fullscreen-window":
+                viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
+                break;
+            default:
+                console.log(`Undefined command: [${command}]`)
+                break;
+        }
     }
 }

@@ -21,6 +21,8 @@
 #include <QApplication>
 #include "rendering/PAGWindow.h"
 
+namespace pag {
+
 class PAGViewer : public QApplication {
   Q_OBJECT
  public:
@@ -31,3 +33,5 @@ class PAGViewer : public QApplication {
 
   Q_SLOT void onWindowDestroyed(PAGWindow* window);
 };
+
+}  // namespace pag
