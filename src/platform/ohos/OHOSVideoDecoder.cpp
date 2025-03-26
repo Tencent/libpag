@@ -146,6 +146,15 @@ bool OHOSVideoDecoder::initDecoder(const OH_AVCodecCategory avCodecCategory) {
     LOGE("video decoder prepare failed!, ret:%d", ret);
     return false;
   }
+  /**
+   * According to HarmonyOS recommendations, temporarily modify the maximum number of hardware
+   * decoding frames to 16 and the maximum number of software decoding frames to maxReorderSize + 1
+   * to avoid stuttering on some HarmonyOS devices due to insufficient decoding data. However, this
+   * modification will increase memory usage. Subsequent adjustments will be made once the
+   * HarmonyOS system is improved.
+   */
+  maxPendingFramesCount =
+      (codecCategory == HARDWARE) ? 16 : static_cast<size_t>(videoFormat.maxReorderSize) + 1;
   if (!start()) {
     LOGE("video decoder start failed!, ret:%d", ret);
     return false;
@@ -197,12 +206,8 @@ DecodingResult OHOSVideoDecoder::onDecodeFrame() {
   releaseOutputBuffer();
   std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
   codecUserData->outputCondition.wait(lock, [this]() {
-    /**
-     * According to HarmonyOS recommendations, temporarily modify the maximum frame delivery count to 16 to avoid 
-     * freezing issues caused by the lack of decoded data on certain HarmonyOS devices. However, this change will 
-     * result in increased memory usage. Once HarmonyOS are improved, appropriate adjustments will be made here.
-     */
-    return codecUserData->outputBufferInfoQueue.size() > 0 || pendingFrames.size() <= 16;
+    return codecUserData->outputBufferInfoQueue.size() > 0 ||
+           pendingFrames.size() <= maxPendingFramesCount;
   });
   if (codecUserData->outputBufferInfoQueue.size() > 0) {
     codecBufferInfo = codecUserData->outputBufferInfoQueue.front();
