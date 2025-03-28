@@ -149,7 +149,7 @@ Item {
 
     Loader {
         id: macosMenuBarLoader
-        active: Qt.platform.os !== "windows"
+        active: Qt.platform.os === "osx"
         sourceComponent: Platform.MenuBar {
             id: macosMenuBar
             Platform.Menu {

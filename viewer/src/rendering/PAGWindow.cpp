@@ -30,6 +30,7 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 PAGWindow::~PAGWindow() {
   delete pagView;
   delete engine;
+  delete windowHelper;
 }
 
 auto PAGWindow::openFile(QString path) -> void {
@@ -48,7 +49,7 @@ auto PAGWindow::onPAGViewerDestroyed() -> void {
 
 auto PAGWindow::open() -> void {
   engine = new QQmlApplicationEngine;
-  windowHelper = new PAGWindowHelper(this);
+  windowHelper = new PAGWindowHelper();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper);
