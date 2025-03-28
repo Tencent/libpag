@@ -1,3 +1,4 @@
+import PAG
 import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
@@ -6,8 +7,6 @@ Window {
     id: window
     default property alias contents: placeholder.data
 
-    required property int resizeHandleSize
-    required property int titleBarHeight
     property bool isWindows: Qt.platform.os === "windows"
 
     property bool isMaximized: false
@@ -23,6 +22,11 @@ Window {
     property int windowLastWidth: 0
 
     property int windowLastHeight: 0
+
+    property int titleBarHeight: 0
+
+    property int resizeHandleSize: 5
+
     visible: true
     color: "#00000000"
     flags: isWindows ? (Qt.FramelessWindowHint | Qt.Window | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint) : Qt.Window
@@ -338,6 +342,12 @@ Window {
         anchors.rightMargin: window.isWindows ? 1 : 0
         anchors.bottomMargin: window.isWindows ? 1 : 0
         clip: true
+    }
+
+    onVisibleChanged: {
+        if (visible && typeof (windowHelper) !== "undefined") {
+            windowHelper.setWindowStyle(window, 0.125, 0.125, 0.164);
+        }
     }
 
     function setMaximized(maximized) {

@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji"};
   pag::PAGFont::SetFallbackFontNames(fallbackList);
 
-  PAGViewer app(argc, argv);
+  pag::PAGViewer app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   app.openFile(filePath.data());

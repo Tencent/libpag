@@ -196,6 +196,22 @@ auto PAGView::setFile(const QString& filePath) -> bool {
   return true;
 }
 
+auto PAGView::firstFrame() -> void {
+  if (pagFile == nullptr) {
+    return;
+  }
+  setIsPlaying(false);
+  setProgress(0);
+}
+
+auto PAGView::lastFrame() -> void {
+  if (pagFile == nullptr) {
+    return;
+  }
+  setIsPlaying(false);
+  setProgress(1);
+}
+
 auto PAGView::nextFrame() -> void {
   if (pagFile == nullptr) {
     return;

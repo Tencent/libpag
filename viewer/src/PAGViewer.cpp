@@ -21,6 +21,8 @@
 #include <QObject>
 #include "rendering/PAGWindow.h"
 
+namespace pag {
+
 PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
 }
 
@@ -59,3 +61,5 @@ auto PAGViewer::onWindowDestroyed(PAGWindow* window) -> void {
   PAGWindow::AllWindows.removeOne(window);
   window->deleteLater();
 }
+
+}  // namespace pag
