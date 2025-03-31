@@ -28,7 +28,6 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 PAGWindow::~PAGWindow() {
-  delete pagView;
   delete engine;
   delete windowHelper;
 }
