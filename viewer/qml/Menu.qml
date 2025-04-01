@@ -48,6 +48,31 @@ Item {
                         root.command("open-preferences");
                     }
                 }
+                PAGMenu {
+                    title: qsTr("Export")
+                    Action {
+                        text: qsTr("Export as PNG Sequence Frames")
+                        enabled: root.hasPAGFile
+                        onTriggered: {
+                            root.command('export-as-png-sequence');
+                        }
+                    }
+                    Action {
+                        text: qsTr("Export as APNG")
+                        enabled: root.hasPAGFile
+                        onTriggered: {
+                            root.command('export-as-apng');
+                        }
+                    }
+                    Action {
+                        text: qsTr("Export current frame as PNG")
+                        enabled: root.hasPAGFile
+                        shortcut: "Ctrl+P"
+                        onTriggered: {
+                            root.command('export-frame-as-png');
+                        }
+                    }
+                }
             }
 
             PAGMenu {
@@ -194,6 +219,31 @@ Item {
                     shortcut: StandardKey.Open
                     onTriggered: {
                         root.command("open-pag-file");
+                    }
+                }
+                Platform.Menu {
+                    title: qsTr("Export")
+                    Platform.MenuItem {
+                        text: qsTr("Export as PNG Sequence Frames")
+                        enabled: root.hasPAGFile
+                        onTriggered: {
+                            root.command('export-as-png-sequence');
+                        }
+                    }
+                    Platform.MenuItem {
+                        text: qsTr("Export as APNG")
+                        enabled: root.hasPAGFile
+                        onTriggered: {
+                            root.command('export-as-apng');
+                        }
+                    }
+                    Platform.MenuItem {
+                        text: qsTr("Export current frame as PNG")
+                        enabled: root.hasPAGFile
+                        shortcut: "Meta+P"
+                        onTriggered: {
+                            root.command('export-frame-as-png');
+                        }
                     }
                 }
             }

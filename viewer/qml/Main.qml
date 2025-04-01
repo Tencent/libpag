@@ -2,7 +2,9 @@ import PAG
 import QtCore
 import QtQuick
 import QtQuick.Dialogs
+import QtQuick.Controls
 import Qt.labs.settings
+import Qt.labs.platform as Platform
 import "components"
 import "utils"
 
@@ -127,18 +129,6 @@ PAGWindow {
         }
     }
 
-    FileDialog {
-        id: openPAGFileDialog
-        visible: false
-        title: qsTr("Open PAG File")
-        fileMode: FileDialog.OpenFile
-        nameFilters: ["PAG files(*.pag)"]
-        onAccepted: {
-            let filePath = openPAGFileDialog.selectedFile;
-            mainForm.pagView.setFile(filePath);
-        }
-    }
-
     SettingsWindow {
         id: settingsWindow
         visible: false
@@ -161,6 +151,108 @@ PAGWindow {
         height: 160 + windowTitleBarHeight
         title: qsTr("About PAGViewer")
         aboutMessage: "<b>PAGViewer</b> " + Qt.application.version + "<br><br>Copyright © 2017-present Tencent. All rights reserved."
+    }
+
+    PAGTaskFactory {
+        id: taskFactory
+        objectName: "taskFactory"
+    }
+
+    FileDialog {
+        id: openFileDialog
+
+        property var currentAcceptHandler: null
+
+        visible: false
+        title: ""
+        fileMode: FileDialog.OpenFile
+        nameFilters: []
+    }
+
+    Platform.FolderDialog {
+        id: openFolderDialog
+
+        property var currentAcceptHandler: null
+
+        visible: false
+        title: qsTr("Select Save Path")
+    }
+
+    PAGWindow {
+        id: progressWindow
+
+        property var task
+        property alias progressBar: progressBar
+
+        width: 300
+        height: 64
+        hasMenu: false
+        canResize: false
+        titleBarHeight: windowTitleBarHeight
+        visible: false
+
+        ProgressBar {
+            id: progressBar
+            width: parent.width - 24
+            height: 30
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.horizontalCenter: parent.horizontalCenter
+            value: 0
+
+            contentItem: Item {
+                Rectangle {
+                    width: parent.width
+                    height: 15
+                    radius: 5
+                    color: "#DDDDDD"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Rectangle {
+                    width: progressBar.visualPosition * parent.width
+                    height: 15
+                    radius: 5
+                    color: "#448EF9"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: Math.round(progressBar.value * 100) + "%"
+                    color: progressBar.value > 0.5 ? "white" : "black"  // 根据进度自动调整文字颜色
+                    font.pixelSize: 12
+                }
+            }
+        }
+
+        onClosing: {
+            if (task) {
+                task.stop();
+            }
+        }
+    }
+
+    Connections {
+        id: taskConnections
+        onProgressChanged: function (progress) {
+            console.log("progress: " + progress);
+            progressWindow.progressBar.value = progress;
+        }
+
+        onVisibleChanged: function (visible) {
+            console.log("visible: " + visible);
+            progressWindow.visible = visible;
+        }
+
+        onTaskFinished: function (filePath, result) {
+            if (result !== 0) {
+                let errStr = qsTr("Export failed, error code: ");
+                alert(errStr + result);
+            }
+            progressWindow.task = null;
+            progressWindow.progressBar.value = 0;
+            progressWindow.visible = false;
+        }
     }
 
     Component.onCompleted: {
@@ -217,11 +309,19 @@ PAGWindow {
         case "open-pag-file":
             if (mainForm.hasPAGFile) {
                 let filePath = mainForm.pagView.filePath;
-                openPAGFileDialog.currentFolder = Utils.getFileDir(filePath);
+                openFileDialog.currentFolder = Utils.getFileDir(filePath);
             } else {
-                openPAGFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
+                openFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
             }
-            openPAGFileDialog.open();
+            openFileDialog.accepted.disconnect();
+            openFileDialog.fileMode = FileDialog.OpenFile;
+            openFileDialog.title = qsTr("Open PAG File");
+            openFileDialog.nameFilters = ["PAG files(*.pag)"];
+            openFileDialog.accepted.connect(function () {
+                let filePath = openFileDialog.selectedFile;
+                mainForm.pagView.setFile(filePath);
+            });
+            openFileDialog.open();
             break;
         case "close-window":
             viewWindow.close();
@@ -272,6 +372,80 @@ PAGWindow {
             break;
         case "fullscreen-window":
             viewWindow.visibility = viewWindow.visibility !== Window.Maximized ? Window.Maximized : Window.AutomaticVisibility;
+            break;
+        case "export-frame-as-png":
+            if (openFileDialog.currentAcceptHandler) {
+                openFileDialog.accepted.disconnect(openFileDialog.currentAcceptHandler);
+            }
+            openFileDialog.fileMode = FileDialog.SaveFile;
+            openFileDialog.title = qsTr("Select save path");
+            openFileDialog.nameFilters = ["PNG files(*.png)"];
+            openFileDialog.defaultSuffix = "png";
+            openFileDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
+            openFileDialog.currentAcceptHandler = function () {
+                let filePath = openFileDialog.selectedFile;
+                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath, {
+                    "exportFrame": mainForm.pagView.currentFrame
+                });
+                if (task) {
+                    taskConnections.target = task;
+                    progressWindow.title = qsTr("Exporting");
+                    progressWindow.task = task;
+                    progressWindow.visible = true;
+                    progressWindow.raise();
+                    task.start();
+                }
+            };
+            openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
+            openFileDialog.open();
+            break;
+        case "export-as-png-sequence":
+            if (openFolderDialog.currentAcceptHandler) {
+                openFolderDialog.accepted.disconnect(openFolderDialog.currentAcceptHandler);
+            }
+            openFolderDialog.title = qsTr("Select save path");
+            openFolderDialog.currentFolder = Utils.getNativeFilePath(Utils.getFileDir(mainForm.pagView.filePath));
+            console.log("openFolderDialog.folder: " + openFolderDialog.folder);
+            openFolderDialog.currentAcceptHandler = function () {
+                let filePath = openFolderDialog.folder;
+                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath, {});
+                if (task) {
+                    taskConnections.target = task;
+                    progressWindow.title = qsTr("Exporting");
+                    progressWindow.progressBar.value = 0;
+                    progressWindow.task = task;
+                    progressWindow.visible = true;
+                    progressWindow.raise();
+                    task.start();
+                }
+            };
+            openFolderDialog.accepted.connect(openFolderDialog.currentAcceptHandler);
+            openFolderDialog.open();
+            break;
+        case "export-as-apng":
+            if (openFileDialog.currentAcceptHandler) {
+                openFileDialog.accepted.disconnect(openFileDialog.currentAcceptHandler);
+            }
+            openFileDialog.fileMode = FileDialog.SaveFile;
+            openFileDialog.title = qsTr("Select save path");
+            openFileDialog.nameFilters = ["PNG files(*.png)"];
+            openFileDialog.defaultSuffix = "png";
+            openFileDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
+            openFileDialog.currentAcceptHandler = function () {
+                let filePath = openFileDialog.selectedFile;
+                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportAPNG, filePath, {});
+                if (task) {
+                    taskConnections.target = task;
+                    progressWindow.title = qsTr("Exporting");
+                    progressWindow.progressBar.value = 0;
+                    progressWindow.task = task;
+                    progressWindow.visible = true;
+                    progressWindow.raise();
+                    task.start();
+                }
+            };
+            openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
+            openFileDialog.open();
             break;
         default:
             console.log(`Undefined command: [${command}]`);

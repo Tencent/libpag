@@ -22,6 +22,7 @@
 #include <QSGRendererInterface>
 #include "PAGViewer.h"
 #include "rendering/PAGView.h"
+#include "task/PAGTaskFactory.h"
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;
@@ -60,6 +61,7 @@ int main(int argc, char* argv[]) {
   pag::PAGViewer app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
+  qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
   app.openFile(filePath.data());
 
   return QApplication::exec();

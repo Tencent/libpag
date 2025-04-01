@@ -20,6 +20,8 @@
 #include <QQmlContext>
 #include <QThread>
 #include "PAGWindowHelper.h"
+#include "task/PAGTaskFactory.h"
+
 namespace pag {
 
 QList<PAGWindow*> PAGWindow::AllWindows;
@@ -28,7 +30,6 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 PAGWindow::~PAGWindow() {
-  delete pagView;
   delete engine;
   delete windowHelper;
 }
@@ -62,9 +63,11 @@ auto PAGWindow::open() -> void {
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
 
   pagView = window->findChild<pag::PAGView*>("pagView");
+  auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
+  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
 }
 
 auto PAGWindow::getFilePath() -> QString {
