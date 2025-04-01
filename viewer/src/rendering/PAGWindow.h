@@ -21,7 +21,9 @@
 #include <QQmlApplicationEngine>
 #include <QString>
 #include "PAGView.h"
+#include "PAGWindowHelper.h"
 
+namespace pag {
 class PAGWindow : public QObject {
   Q_OBJECT
  public:
@@ -41,7 +43,10 @@ class PAGWindow : public QObject {
  private:
   QString filePath;
   QQuickWindow* window = nullptr;
-  pag::PAGView* pagView = nullptr;
+  PAGView* pagView = nullptr;
   QThread* renderThread = nullptr;
+  PAGWindowHelper* windowHelper = nullptr;
   QQmlApplicationEngine* engine = nullptr;
 };
+
+}  // namespace pag

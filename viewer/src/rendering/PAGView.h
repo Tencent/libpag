@@ -66,6 +66,8 @@ class PAGView : public QQuickItem {
   Q_SIGNAL void fileChanged(std::shared_ptr<pag::PAGFile> pagFile, std::string filePath);
 
   Q_INVOKABLE bool setFile(const QString& filePath);
+  Q_INVOKABLE void firstFrame();
+  Q_INVOKABLE void lastFrame();
   Q_INVOKABLE void nextFrame();
   Q_INVOKABLE void previousFrame();
 

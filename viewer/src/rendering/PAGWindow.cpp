@@ -19,6 +19,8 @@
 #include "PAGWindow.h"
 #include <QQmlContext>
 #include <QThread>
+#include "PAGWindowHelper.h"
+namespace pag {
 
 QList<PAGWindow*> PAGWindow::AllWindows;
 
@@ -26,8 +28,8 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 PAGWindow::~PAGWindow() {
-  delete pagView;
   delete engine;
+  delete windowHelper;
 }
 
 auto PAGWindow::openFile(QString path) -> void {
@@ -46,6 +48,11 @@ auto PAGWindow::onPAGViewerDestroyed() -> void {
 
 auto PAGWindow::open() -> void {
   engine = new QQmlApplicationEngine;
+  windowHelper = new PAGWindowHelper();
+
+  auto context = engine->rootContext();
+  context->setContextProperty("windowHelper", windowHelper);
+
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
   window = static_cast<QQuickWindow*>(engine->rootObjects().at(0));
@@ -62,3 +69,5 @@ auto PAGWindow::open() -> void {
 auto PAGWindow::getFilePath() -> QString {
   return filePath;
 }
+
+}  // namespace pag
