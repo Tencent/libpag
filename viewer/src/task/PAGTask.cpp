@@ -104,9 +104,10 @@ auto PAGFileTask::releaseResource() -> void {
       frameBuffer->release();
       delete frameBuffer;
       frameBuffer = nullptr;
+      context->doneCurrent();
     }
-    context->doneCurrent();
-    delete frameBuffer;
+    delete context;
+    context = nullptr;
   }
   if (offscreenSurface != nullptr) {
     delete offscreenSurface;
