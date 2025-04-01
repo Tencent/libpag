@@ -232,7 +232,7 @@ PAGWindow {
                     Text {
                         anchors.centerIn: parent
                         text: Math.round(progressBar.value * 100) + "%"
-                        color: progressBar.value > 0.5 ? "white" : "black"  // 根据进度自动调整文字颜色
+                        color: progressBar.value > 0.5 ? "white" : "black"
                         font.pixelSize: 12
                     }
                 }
@@ -253,7 +253,6 @@ PAGWindow {
         }
 
         onVisibleChanged: function (visible) {
-            console.log("visible: " + visible);
             progressWindow.visible = visible;
         }
 
