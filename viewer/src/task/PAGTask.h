@@ -80,6 +80,7 @@ class PAGFileTask : public PAGTask {
   auto initOpenGLEnvironment() -> void;
 
  protected:
+  bool openAfterExport = true;
   Frame currentFrame = 0;
   QString filePath;
   PAGPlayer* pagPlayer = nullptr;

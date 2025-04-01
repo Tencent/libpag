@@ -1,6 +1,7 @@
 #include "PAGUtilsImpl.h"
 #include <shlobj_core.h>
 #include <windows.h>
+#include <QDir>
 
 namespace pag::Utils {
 
@@ -10,27 +11,40 @@ auto openFileInFinder(QFileInfo& fileInfo) -> void {
     return;
   }
 
-  bool success = false;
-  PIDLIST_ABSOLUTE pidlFolder = ILCreateFromPathW(fileInfo.absolutePath().toStdWString().c_str());
-  PIDLIST_ABSOLUTE pidlFile = ILCreateFromPathW(fileInfo.absoluteFilePath().toStdWString().c_str());
-  if (pidlFolder && pidlFile) {
-    PCUITEMID_CHILD pidlChild = ILFindChild(pidlFolder, pidlFile);
-    if (pidlChild) {
-      PCUITEMID_CHILD_ARRAY pidls = const_cast<PCUITEMID_CHILD_ARRAY>(&pidlChild);
-      hr = SHOpenFolderAndSelectItems(pidlFolder, 1, pidls, 0);
-      success = SUCCEEDED(hr);
+  QString folderPath = QDir::toNativeSeparators(fileInfo.absolutePath());
+  QString filePath = QDir::toNativeSeparators(fileInfo.absoluteFilePath());
+
+  std::wstring folderWPath = folderPath.toStdWString();
+  std::wstring fileWPath = filePath.toStdWString();
+
+  PIDLIST_ABSOLUTE pidlFolder(ILCreateFromPathW(folderWPath.c_str()));
+  PIDLIST_ABSOLUTE pidlFile(ILCreateFromPathW(fileWPath.c_str()));
+
+  if (!pidlFolder || !pidlFile) {
+    if (pidlFolder) {
+      ILFree(pidlFolder);
     }
+    if (pidlFile) {
+      ILFree(pidlFile);
+    }
+    CoUninitialize();
+    return;
   }
 
-  if (pidlFolder) {
+  PCUITEMID_CHILD pidlChild = ILFindChild(pidlFolder, pidlFile);
+  if (!pidlChild) {
     ILFree(pidlFolder);
-  }
-  if (pidlFile) {
     ILFree(pidlFile);
+    CoUninitialize();
+    return;
   }
-  CoUninitialize();
 
-  return;
+  PCUITEMID_CHILD_ARRAY pidls = const_cast<PCUITEMID_CHILD_ARRAY>(&pidlChild);
+  SHOpenFolderAndSelectItems(pidlFolder, 1, pidls, 0);
+
+  ILFree(pidlFolder);
+  ILFree(pidlFile);
+  CoUninitialize();
 }
 
 }  // namespace pag::Utils

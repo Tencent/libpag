@@ -49,6 +49,7 @@ Item {
                     }
                 }
                 PAGMenu {
+                    menuWidth: windowsMenuBar.menuWidth
                     title: qsTr("Export")
                     Action {
                         text: qsTr("Export as PNG Sequence Frames")

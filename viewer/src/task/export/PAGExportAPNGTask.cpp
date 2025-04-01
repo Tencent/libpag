@@ -26,6 +26,7 @@ namespace pag {
 PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
                                      const QString& pngFilePath)
     : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
+  openAfterExport = false;
 }
 
 auto PAGExportAPNGTask::onFrameFlush(double progress) -> void {

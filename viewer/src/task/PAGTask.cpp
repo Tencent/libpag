@@ -135,7 +135,9 @@ auto PAGFileTask::startInternal() -> void {
   currentFrame = 0;
   releaseResource();
   Q_EMIT taskFinished(result, filePath);
-  Utils::openInFinder(filePath, true);
+  if (openAfterExport) {
+    Utils::openInFinder(filePath, true);
+  }
   workerThread.exit(0);
 }
 

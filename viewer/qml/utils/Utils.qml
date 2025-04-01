@@ -32,13 +32,4 @@ QtObject {
 
         return str.substring(0, lastIndex) + newPara + str.substring(lastIndex + oldPara.length);
     }
-
-    function getNativeFilePath(str) {
-        str = str.replace(/\\/ig, '/');
-        let schema = "file://";
-        if (Qt.platform.os === "windows") {
-            schema += "/";
-        }
-        return schema + str;
-    }
 }

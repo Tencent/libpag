@@ -186,41 +186,55 @@ PAGWindow {
 
         width: 300
         height: 64
+        minimumWidth: width
+        maximumWidth: width
+        minimumHeight: height
+        maximumHeight: height
         hasMenu: false
         canResize: false
         titleBarHeight: windowTitleBarHeight
         visible: false
 
-        ProgressBar {
-            id: progressBar
-            width: parent.width - 24
-            height: 30
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.horizontalCenter: parent.horizontalCenter
-            value: 0
+        PAGRectangle {
+            id: rectangle
 
-            contentItem: Item {
-                Rectangle {
-                    width: parent.width
-                    height: 15
-                    radius: 5
-                    color: "#DDDDDD"
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+            color: "#2D2D37"
+            anchors.fill: parent
+            leftTopRadius: false
+            rightTopRadius: false
+            radius: 5
 
-                Rectangle {
-                    width: progressBar.visualPosition * parent.width
-                    height: 15
-                    radius: 5
-                    color: "#448EF9"
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+            ProgressBar {
+                id: progressBar
+                width: parent.width - 24
+                height: 30
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.horizontalCenter: parent.horizontalCenter
+                value: 0
 
-                Text {
-                    anchors.centerIn: parent
-                    text: Math.round(progressBar.value * 100) + "%"
-                    color: progressBar.value > 0.5 ? "white" : "black"  // 根据进度自动调整文字颜色
-                    font.pixelSize: 12
+                contentItem: Item {
+                    Rectangle {
+                        width: parent.width
+                        height: 15
+                        radius: 5
+                        color: "#DDDDDD"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Rectangle {
+                        width: progressBar.visualPosition * parent.width
+                        height: 15
+                        radius: 5
+                        color: "#448EF9"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: Math.round(progressBar.value * 100) + "%"
+                        color: progressBar.value > 0.5 ? "white" : "black"  // 根据进度自动调整文字颜色
+                        font.pixelSize: 12
+                    }
                 }
             }
         }
@@ -235,7 +249,6 @@ PAGWindow {
     Connections {
         id: taskConnections
         onProgressChanged: function (progress) {
-            console.log("progress: " + progress);
             progressWindow.progressBar.value = progress;
         }
 
@@ -404,8 +417,7 @@ PAGWindow {
                 openFolderDialog.accepted.disconnect(openFolderDialog.currentAcceptHandler);
             }
             openFolderDialog.title = qsTr("Select save path");
-            openFolderDialog.currentFolder = Utils.getNativeFilePath(Utils.getFileDir(mainForm.pagView.filePath));
-            console.log("openFolderDialog.folder: " + openFolderDialog.folder);
+            openFolderDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
             openFolderDialog.currentAcceptHandler = function () {
                 let filePath = openFolderDialog.folder;
                 let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath, {});
