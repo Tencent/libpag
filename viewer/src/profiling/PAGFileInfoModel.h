@@ -18,35 +18,43 @@
 
 #pragma once
 
-#include <QQmlApplicationEngine>
-#include <QString>
-#include "PAGView.h"
-#include "PAGWindowHelper.h"
+#include <QAbstractListModel>
+#include "pag/pag.h"
 
 namespace pag {
-class PAGWindow : public QObject {
-  Q_OBJECT
+class PAGFileInfo {
  public:
-  explicit PAGWindow(QObject* parent = nullptr);
-  ~PAGWindow() override;
+  explicit PAGFileInfo(const QString& name = "", const QString& value = "", const QString& ext = "");
 
-  Q_SIGNAL void destroyWindow(PAGWindow* window);
+  auto getExt() const -> QString;
+  auto getName() const -> QString;
+  auto getValue() const -> QString;
 
-  Q_SLOT void openFile(QString path);
-  Q_SLOT void onPAGViewerDestroyed();
-
-  auto open() -> void;
-  auto getFilePath() -> QString;
-
-  static QList<PAGWindow*> AllWindows;
-
- private:
-  QString filePath;
-  QQuickWindow* window = nullptr;
-  PAGView* pagView = nullptr;
-  PAGRenderThread* renderThread = nullptr;
-  PAGWindowHelper* windowHelper = nullptr;
-  QQmlApplicationEngine* engine = nullptr;
+ public:
+  QString name;
+  QString value;
+  QString ext;
 };
 
-}  // namespace pag
+class PAGFileInfoModel : public QAbstractListModel {
+  Q_OBJECT
+ public:
+  enum PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, ExtRole };
+
+  explicit PAGFileInfoModel(QObject* parent = nullptr);
+
+  auto data(const QModelIndex& index, int role) const -> QVariant override;
+  auto rowCount(const QModelIndex& parent) const -> int override;
+  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath) -> void;
+
+ protected:
+  auto roleNames() const -> QHash<int, QByteArray> override;
+
+ private:
+  auto updateFileInfo(const PAGFileInfo& fileInfo) -> void;
+
+ private:
+  QList<PAGFileInfo> fileInfoList;
+};
+
+} // namespace pag

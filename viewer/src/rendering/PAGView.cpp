@@ -267,7 +267,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto displayTime = timeNow - lastPlayTime;
   lastPlayTime = timeNow;
 
-  if (isPlaying_) {
+  if ((pagFile != nullptr) && isPlaying_) {
     auto duration = pagPlayer->duration();
     if (duration > 0) {
       auto progress =

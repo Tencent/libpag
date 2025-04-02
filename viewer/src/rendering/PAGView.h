@@ -73,6 +73,9 @@ class PAGView : public QQuickItem {
 
   auto updatePaintNode(QSGNode*, UpdatePaintNodeData*) -> QSGNode* override;
 
+ public:
+  PAGRenderThread* renderThread = nullptr;
+
  private:
   int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
@@ -83,7 +86,6 @@ class PAGView : public QQuickItem {
   double progressPerFrame = 0.0;
   QString filePath = "";
   PAGPlayer* pagPlayer = nullptr;
-  PAGRenderThread* renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
 

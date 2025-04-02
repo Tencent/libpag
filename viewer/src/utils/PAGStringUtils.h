@@ -18,35 +18,15 @@
 
 #pragma once
 
-#include <QQmlApplicationEngine>
 #include <QString>
-#include "PAGView.h"
-#include "PAGWindowHelper.h"
 
-namespace pag {
-class PAGWindow : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindow(QObject* parent = nullptr);
-  ~PAGWindow() override;
+namespace pag::Utils {
 
-  Q_SIGNAL void destroyWindow(PAGWindow* window);
+auto toQString(double num) -> QString;
+auto toQString(int32_t num) -> QString;
+auto toQString(int64_t num) -> QString;
+auto getMemorySizeUnit(int64_t size) -> QString;
+auto getMemorySizeNumString(int64_t size) -> QString;
+auto tagCodeToVersion(uint16_t tagCode) -> std::string;
 
-  Q_SLOT void openFile(QString path);
-  Q_SLOT void onPAGViewerDestroyed();
-
-  auto open() -> void;
-  auto getFilePath() -> QString;
-
-  static QList<PAGWindow*> AllWindows;
-
- private:
-  QString filePath;
-  QQuickWindow* window = nullptr;
-  PAGView* pagView = nullptr;
-  PAGRenderThread* renderThread = nullptr;
-  PAGWindowHelper* windowHelper = nullptr;
-  QQmlApplicationEngine* engine = nullptr;
-};
-
-}  // namespace pag
+}  // namespace pag::Utils
