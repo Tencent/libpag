@@ -18,15 +18,16 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include <QString>
 
-namespace pag {
+namespace pag::Utils {
 
-class PAGWindowHelper : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
-};
+auto openInFinder(const QString& path, bool select = true) -> void;
 
-}  // namespace pag
+auto deleteFile(const QString& path) -> bool;
+
+auto deleteDir(const QString& path) -> bool;
+
+auto makeDir(const QString& path, bool isDir = true) -> bool;
+
+}  // namespace pag::Utils

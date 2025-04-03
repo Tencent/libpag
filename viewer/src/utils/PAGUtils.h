@@ -18,15 +18,11 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include <iostream>
 
-namespace pag {
+namespace pag::Utils {
 
-class PAGWindowHelper : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
-};
+auto exportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
+                               int frameRate) -> int;
 
-}  // namespace pag
+}  // namespace pag::Utils

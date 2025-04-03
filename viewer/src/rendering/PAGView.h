@@ -22,10 +22,9 @@
 #include <QQuickItem>
 #include "pag/pag.h"
 #include "platform/qt/GPUDrawable.h"
+#include "rendering/PAGRenderThread.h"
 
 namespace pag {
-
-class PAGRenderThread;
 
 class PAGView : public QQuickItem {
   Q_OBJECT
@@ -82,8 +81,8 @@ class PAGView : public QQuickItem {
   double progress = 0.0;
   double progressPerFrame = 0.0;
   QString filePath = "";
-  PAGPlayer* pagPlayer = nullptr;
-  PAGRenderThread* renderThread = nullptr;
+  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
+  std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
 

@@ -23,4 +23,13 @@ QtObject {
         let fileName = urlObject.pathname.split('/').pop();
         return fileName;
     }
+
+    function replaceLastIndexOf(str, oldPara, newPara) {
+        let lastIndex = str.lastIndexOf(oldPara);
+        if (lastIndex !== -1) {
+            return str;
+        }
+
+        return str.substring(0, lastIndex) + newPara + str.substring(lastIndex + oldPara.length);
+    }
 }

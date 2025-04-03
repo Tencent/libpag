@@ -18,15 +18,10 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include <QFileInfo>
 
-namespace pag {
+namespace pag::Utils {
 
-class PAGWindowHelper : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
-};
+auto openFileInFinder(QFileInfo& fileInfo) -> void;
 
-}  // namespace pag
+}  // namespace pag::Utils

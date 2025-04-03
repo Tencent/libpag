@@ -16,17 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PAGUtils.h"
+#include "utils/apng/APNGAssembler.h"
 
-#include <QQuickWindow>
+namespace pag::Utils {
 
-namespace pag {
+auto exportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
+                               int frameRate) -> int {
+  auto apngAssembler = APNGAssembler();
 
-class PAGWindowHelper : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
-};
+  return apngAssembler.exportFromPNGSequence(outPath, firstPNGPath, frameRate);
+}
 
-}  // namespace pag
+}  // namespace pag::Utils

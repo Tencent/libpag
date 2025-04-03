@@ -20,6 +20,8 @@
 #include <QQmlContext>
 #include <QThread>
 #include "PAGWindowHelper.h"
+#include "task/PAGTaskFactory.h"
+
 namespace pag {
 
 QList<PAGWindow*> PAGWindow::AllWindows;
@@ -28,8 +30,8 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 PAGWindow::~PAGWindow() {
-  delete engine;
-  delete windowHelper;
+  engine.reset();
+  windowHelper.reset();
 }
 
 auto PAGWindow::openFile(QString path) -> void {
@@ -47,11 +49,11 @@ auto PAGWindow::onPAGViewerDestroyed() -> void {
 }
 
 auto PAGWindow::open() -> void {
-  engine = new QQmlApplicationEngine;
-  windowHelper = new PAGWindowHelper();
+  engine = std::make_unique<QQmlApplicationEngine>();
+  windowHelper = std::make_unique<PAGWindowHelper>();
 
   auto context = engine->rootContext();
-  context->setContextProperty("windowHelper", windowHelper);
+  context->setContextProperty("windowHelper", windowHelper.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
@@ -61,9 +63,11 @@ auto PAGWindow::open() -> void {
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
 
   pagView = window->findChild<pag::PAGView*>("pagView");
+  auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
+  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
 }
 
 auto PAGWindow::getFilePath() -> QString {
