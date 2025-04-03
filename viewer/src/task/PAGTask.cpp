@@ -145,7 +145,8 @@ auto PAGPlayTask::initOpenGLEnvironment() -> void {
   offscreenSurface->setFormat(context->format());
   offscreenSurface->create();
   context->makeCurrent(offscreenSurface.get());
-  frameBuffer = std::make_unique<QOpenGLFramebufferObject>(QSize(pagFile->width(), pagFile->height()), GL_TEXTURE_2D);
+  frameBuffer = std::make_unique<QOpenGLFramebufferObject>(
+      QSize(pagFile->width(), pagFile->height()), GL_TEXTURE_2D);
   GLFrameBufferInfo frameBufferInfo;
   frameBufferInfo.id = frameBuffer->handle();
   BackendRenderTarget renderTarget =
