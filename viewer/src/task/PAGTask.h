@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QOffscreenSurface>
+#include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
 #include <QThread>
 #include <atomic>
