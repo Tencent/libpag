@@ -22,10 +22,9 @@
 #include <QQuickItem>
 #include "pag/pag.h"
 #include "platform/qt/GPUDrawable.h"
+#include "rendering/PAGRenderThread.h"
 
 namespace pag {
-
-class PAGRenderThread;
 
 class PAGView : public QQuickItem {
   Q_OBJECT

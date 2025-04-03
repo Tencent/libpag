@@ -19,7 +19,6 @@
 #include "PAGView.h"
 #include <QSGImageNode>
 #include "pag/file.h"
-#include "rendering/PAGRenderThread.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
