@@ -25,14 +25,15 @@ namespace pag {
 
 PAGExportPNGTask::PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
                                    int exportFrame)
-    : PAGFileTask(pagFile, filePath), exportFrame(exportFrame) {
-  if (!filePath.endsWith(".png")) {
+    : PAGPlayTask(pagFile, filePath), exportFrame(exportFrame) {
+  QString lowerFilePath = filePath.toLower();
+  if (!lowerFilePath.endsWith(".png")) {
     Utils::makeDir(filePath);
   }
 }
 
 auto PAGExportPNGTask::onFrameFlush(double progress) -> void {
-  PAGFileTask::onFrameFlush(progress);
+  PAGPlayTask::onFrameFlush(progress);
   QString outPath;
   if (exportFrame >= 0) {
     outPath = filePath;
@@ -50,7 +51,7 @@ auto PAGExportPNGTask::isNeedRenderCurrentFrame() -> bool {
 }
 
 auto PAGExportPNGTask::exportCurrentFrameAsPNG(const QString& outPath) -> void {
-  context->makeCurrent(offscreenSurface);
+  context->makeCurrent(offscreenSurface.get());
   auto image = frameBuffer->toImage(false);
   bool result = image.save(outPath, "PNG");
   if (!result) {

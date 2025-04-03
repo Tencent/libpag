@@ -38,8 +38,8 @@ class PAGTaskFactory : public QObject {
 
  private:
   PAGTask* task = nullptr;
-  std::string filePath;
-  std::shared_ptr<PAGFile> pagFile;
+  std::string filePath = "";
+  std::shared_ptr<PAGFile> pagFile = nullptr;
 };
 
 }  // namespace pag

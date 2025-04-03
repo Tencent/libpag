@@ -22,7 +22,7 @@
 
 namespace pag {
 
-class PAGExportPNGTask : public PAGFileTask {
+class PAGExportPNGTask : public PAGPlayTask {
   Q_OBJECT
  public:
   explicit PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,

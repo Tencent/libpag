@@ -30,8 +30,8 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
 PAGWindow::~PAGWindow() {
-  delete engine;
-  delete windowHelper;
+  engine.reset();
+  windowHelper.reset();
 }
 
 auto PAGWindow::openFile(QString path) -> void {
@@ -49,11 +49,11 @@ auto PAGWindow::onPAGViewerDestroyed() -> void {
 }
 
 auto PAGWindow::open() -> void {
-  engine = new QQmlApplicationEngine;
-  windowHelper = new PAGWindowHelper();
+  engine = std::make_unique<QQmlApplicationEngine>();
+  windowHelper = std::make_unique<PAGWindowHelper>();
 
   auto context = engine->rootContext();
-  context->setContextProperty("windowHelper", windowHelper);
+  context->setContextProperty("windowHelper", windowHelper.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 

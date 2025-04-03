@@ -18,8 +18,8 @@
 
 #include "PAGTask.h"
 #include <QOpenGLContext>
+#include "base/utils/TimeUtil.h"
 #include "utils/PAGFileUtils.h"
-#include "utils/PAGTimeUtils.h"
 
 namespace pag {
 
@@ -34,21 +34,21 @@ auto PAGTask::getProgress() const -> double {
   return progress;
 }
 
-PAGFileTask::PAGFileTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
+PAGPlayTask::PAGPlayTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
     : filePath(filePath), pagFile(pagFile) {
-  QObject::connect(&workerThread, &QThread::started, this, &PAGFileTask::startInternal,
+  QObject::connect(&workerThread, &QThread::started, this, &PAGPlayTask::startInternal,
                    Qt::DirectConnection);
 }
 
-PAGFileTask::~PAGFileTask() {
+PAGPlayTask::~PAGPlayTask() {
   if (workerThread.isRunning()) {
     workerThread.quit();
   }
-  QObject::disconnect(&workerThread, &QThread::started, this, &PAGFileTask::startInternal);
+  QObject::disconnect(&workerThread, &QThread::started, this, &PAGPlayTask::startInternal);
   releaseResource();
 }
 
-auto PAGFileTask::start() -> void {
+auto PAGPlayTask::start() -> void {
   if (pagFile == nullptr) {
     return;
   }
@@ -57,12 +57,12 @@ auto PAGFileTask::start() -> void {
   workerThread.start();
 }
 
-auto PAGFileTask::pause() -> void {
+auto PAGPlayTask::pause() -> void {
   isWorking = false;
   currentFrame = 0;
 }
 
-auto PAGFileTask::stop() -> void {
+auto PAGPlayTask::stop() -> void {
   bool isWorking = this->isWorking;
   this->isWorking = false;
   if (isWorking) {
@@ -71,56 +71,48 @@ auto PAGFileTask::stop() -> void {
   currentFrame = 0;
 }
 
-auto PAGFileTask::onBegin() -> void {
+auto PAGPlayTask::onBegin() -> void {
   initOpenGLEnvironment();
   visible = true;
   Q_EMIT visibleChanged(visible);
 }
 
-auto PAGFileTask::onFinish() -> int {
+auto PAGPlayTask::onFinish() -> int {
   visible = false;
   Q_EMIT visibleChanged(visible);
   return 0;
 }
 
-auto PAGFileTask::onFrameFlush(double progress) -> void {
+auto PAGPlayTask::onFrameFlush(double progress) -> void {
   this->progress = progress;
   Q_EMIT progressChanged(progress);
 }
 
-auto PAGFileTask::isNeedRenderCurrentFrame() -> bool {
+auto PAGPlayTask::isNeedRenderCurrentFrame() -> bool {
   return currentFrame >= 0;
 }
 
-auto PAGFileTask::releaseResource() -> void {
-  if (pagPlayer != nullptr) {
-    delete pagPlayer;
-    pagPlayer = nullptr;
-  }
-  surface = nullptr;
+auto PAGPlayTask::releaseResource() -> void {
+  pagPlayer.reset();
+  surface.reset();
   if (context != nullptr) {
     if (frameBuffer != nullptr) {
-      context->makeCurrent(offscreenSurface);
+      context->makeCurrent(offscreenSurface.get());
       frameBuffer->release();
-      delete frameBuffer;
-      frameBuffer = nullptr;
+      frameBuffer.reset();
       context->doneCurrent();
     }
-    delete context;
-    context = nullptr;
+    context.reset();
   }
-  if (offscreenSurface != nullptr) {
-    delete offscreenSurface;
-    offscreenSurface = nullptr;
-  }
+  offscreenSurface.reset();
 }
 
-auto PAGFileTask::startInternal() -> void {
+auto PAGPlayTask::startInternal() -> void {
   float frameRate = pagFile->frameRate();
-  pag::Frame totalFrame = Utils::usToFrame(pagFile->duration(), frameRate);
+  Frame totalFrame = TimeToFrame(pagFile->duration(), frameRate);
   while (currentFrame < totalFrame) {
     if (isNeedRenderCurrentFrame()) {
-      pagFile->setCurrentTime(Utils::frameToUs(currentFrame, frameRate));
+      pagFile->setCurrentTime(FrameToTime(currentFrame, frameRate));
       pagPlayer->flush();
       onFrameFlush(pagPlayer->getProgress());
     }
@@ -142,19 +134,18 @@ auto PAGFileTask::startInternal() -> void {
   workerThread.exit(0);
 }
 
-auto PAGFileTask::initOpenGLEnvironment() -> void {
+auto PAGPlayTask::initOpenGLEnvironment() -> void {
   if (surface != nullptr) {
     return;
   }
-  pagPlayer = new pag::PAGPlayer();
-  context = new QOpenGLContext();
+  pagPlayer = std::make_unique<PAGPlayer>();
+  context = std::make_unique<QOpenGLContext>();
   context->create();
-  offscreenSurface = new QOffscreenSurface();
+  offscreenSurface = std::make_unique<QOffscreenSurface>();
   offscreenSurface->setFormat(context->format());
   offscreenSurface->create();
-  context->makeCurrent(offscreenSurface);
-  frameBuffer =
-      new QOpenGLFramebufferObject(QSize(pagFile->width(), pagFile->height()), GL_TEXTURE_2D);
+  context->makeCurrent(offscreenSurface.get());
+  frameBuffer = std::make_unique<QOpenGLFramebufferObject>(QSize(pagFile->width(), pagFile->height()), GL_TEXTURE_2D);
   GLFrameBufferInfo frameBufferInfo;
   frameBufferInfo.id = frameBuffer->handle();
   BackendRenderTarget renderTarget =
