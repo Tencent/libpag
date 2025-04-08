@@ -37,8 +37,6 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
 PAGView::~PAGView() {
   QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
   renderThread->wait();
-  renderThread.reset();
-  pagPlayer.reset();
 }
 
 auto PAGView::getPAGWidth() const -> int {
