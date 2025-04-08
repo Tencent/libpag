@@ -18,15 +18,25 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include "task/PAGTask.h"
 
 namespace pag {
 
-class PAGWindowHelper : public QObject {
+class PAGExportPNGTask : public PAGPlayTask {
   Q_OBJECT
  public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
+  explicit PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
+                            int exportFrame = -1);
+
+ protected:
+  auto onFrameFlush(double progress) -> void override;
+  auto isNeedRenderCurrentFrame() -> bool override;
+
+ private:
+  auto exportCurrentFrameAsPNG(const QString& outPath) -> void;
+
+ private:
+  int exportFrame = -1;
 };
 
 }  // namespace pag

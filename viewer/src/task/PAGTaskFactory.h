@@ -18,15 +18,28 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include <QObject>
+#include "PAGTask.h"
+#include "pag/pag.h"
 
 namespace pag {
 
-class PAGWindowHelper : public QObject {
+class PAGTaskFactory : public QObject {
   Q_OBJECT
  public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
+  Q_ENUMS(PAGTaskType)
+
+  enum PAGTaskType { PAGTaskType_None, PAGTaskType_ExportPNG, PAGTaskType_ExportAPNG };
+
+  Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
+                                  const QVariantMap& extraParams);
+
+  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath) -> void;
+
+ private:
+  PAGTask* task = nullptr;
+  std::string filePath = "";
+  std::shared_ptr<PAGFile> pagFile = nullptr;
 };
 
 }  // namespace pag

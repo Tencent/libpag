@@ -16,29 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGRenderThread.h"
-#include <QGuiApplication>
-#include "rendering/PAGView.h"
+#include "PAGExportAPNGTask.h"
+#include <QDebug>
+#include "utils/PAGFileUtils.h"
+#include "utils/PAGUtils.h"
 
 namespace pag {
 
-PAGRenderThread::PAGRenderThread(PAGView* pagView) : pagView(pagView) {
+PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
+                                     const QString& pngFilePath)
+    : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
+  openAfterExport = false;
 }
 
-auto PAGRenderThread::flush() -> void {
-  pagView->pagPlayer->flush();
-  QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
+auto PAGExportAPNGTask::onFrameFlush(double progress) -> void {
+  PAGExportPNGTask::onFrameFlush(progress * 0.9);
 }
 
-auto PAGRenderThread::shutDown() -> void {
-  if (QGuiApplication::instance()) {
-    auto mainThread = QGuiApplication::instance()->thread();
-    if (pagView->drawable) {
-      pagView->drawable->moveToThread(mainThread);
-    }
-    moveToThread(mainThread);
-  }
-  exit();
+auto PAGExportAPNGTask::onFinish() -> int {
+  std::string outPath = apngFilePath.toStdString();
+  std::string firstPNGPath = QString("%1/1.png").arg(filePath).toStdString();
+  int frameRate = static_cast<int>(pagFile->frameRate());
+  Utils::exportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
+  PAGExportPNGTask::onFrameFlush(1.0);
+  Utils::deleteDir(filePath);
+  Utils::openInFinder(apngFilePath, true);
+  return PAGExportPNGTask::onFinish();
 }
 
 }  // namespace pag

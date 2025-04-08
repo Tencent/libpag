@@ -16,17 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PAGUtilsImpl.h"
+#import <AppKit/AppKit.h>
 
-#include <QQuickWindow>
+namespace pag::Utils {
 
-namespace pag {
+auto openFileInFinder(QFileInfo& fileInfo) -> void {
+  if (!fileInfo.exists()) {
+    return;
+  }
+  @autoreleasepool {
+    NSString* filePath =
+        [NSString stringWithUTF8String:fileInfo.absoluteFilePath().toUtf8().constData()];
+    NSURL* fileUrl = [NSURL fileURLWithPath:filePath];
+    if (!fileUrl) {
+      return;
+    }
+    fileUrl = [fileUrl URLByStandardizingPath];
+    [[NSWorkspace sharedWorkspace] selectFile:filePath
+                     inFileViewerRootedAtPath:[[fileUrl URLByDeletingLastPathComponent] path]];
+  }
+}
 
-class PAGWindowHelper : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
-};
-
-}  // namespace pag
+}  // namespace pag::Utils
