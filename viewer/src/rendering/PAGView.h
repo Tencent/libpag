@@ -62,7 +62,8 @@ class PAGView : public QQuickItem {
 
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
-  Q_SIGNAL void fileChanged(std::shared_ptr<pag::PAGFile> pagFile, std::string filePath);
+  Q_SIGNAL void fileChanged(const std::shared_ptr<pag::PAGFile>& pagFile,
+                            const std::string& filePath);
 
   Q_INVOKABLE bool setFile(const QString& filePath);
   Q_INVOKABLE void firstFrame();

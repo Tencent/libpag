@@ -23,11 +23,13 @@
 
 namespace pag {
 
+const std::string ExportPNGFileSuffix = "png";
+
 PAGExportPNGTask::PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
                                    int exportFrame)
     : PAGPlayTask(pagFile, filePath), exportFrame(exportFrame) {
   QString lowerFilePath = filePath.toLower();
-  if (!lowerFilePath.endsWith(".png")) {
+  if (!lowerFilePath.endsWith(QString(".%1").arg(ExportPNGFileSuffix.c_str()))) {
     Utils::makeDir(filePath);
   }
 }
@@ -53,7 +55,7 @@ auto PAGExportPNGTask::isNeedRenderCurrentFrame() -> bool {
 auto PAGExportPNGTask::exportCurrentFrameAsPNG(const QString& outPath) -> void {
   context->makeCurrent(offscreenSurface.get());
   auto image = frameBuffer->toImage(false);
-  bool result = image.save(outPath, "PNG");
+  bool result = image.save(outPath, ExportPNGFileSuffix.c_str());
   if (!result) {
     qDebug() << "Failed to save image to path: " << outPath;
   }

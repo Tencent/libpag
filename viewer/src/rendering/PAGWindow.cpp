@@ -29,10 +29,7 @@ QList<PAGWindow*> PAGWindow::AllWindows;
 PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
-PAGWindow::~PAGWindow() {
-  engine.reset();
-  windowHelper.reset();
-}
+PAGWindow::~PAGWindow() = default;
 
 auto PAGWindow::openFile(QString path) -> void {
   bool result = pagView->setFile(path);

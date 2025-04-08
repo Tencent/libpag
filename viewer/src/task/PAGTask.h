@@ -44,7 +44,6 @@ class PAGTask : public QObject {
   Q_SIGNAL void progressChanged(double progress);
 
   Q_INVOKABLE virtual void start() = 0;
-  Q_INVOKABLE virtual void pause() = 0;
   Q_INVOKABLE virtual void stop() = 0;
 
  protected:
@@ -66,7 +65,6 @@ class PAGPlayTask : public PAGTask {
   ~PAGPlayTask() override;
 
   auto start() -> void override;
-  auto pause() -> void override;
   auto stop() -> void override;
 
  protected:

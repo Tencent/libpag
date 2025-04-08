@@ -56,17 +56,8 @@ auto PAGPlayTask::start() -> void {
   workerThread.start();
 }
 
-auto PAGPlayTask::pause() -> void {
-  isWorking = false;
-  currentFrame = 0;
-}
-
 auto PAGPlayTask::stop() -> void {
-  bool isWorking = this->isWorking;
   this->isWorking = false;
-  if (isWorking) {
-    onFinish();
-  }
   currentFrame = 0;
 }
 
