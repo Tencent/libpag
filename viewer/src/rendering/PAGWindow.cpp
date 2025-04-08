@@ -30,10 +30,7 @@ QList<PAGWindow*> PAGWindow::AllWindows;
 PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
-PAGWindow::~PAGWindow() {
-  delete engine;
-  delete windowHelper;
-}
+PAGWindow::~PAGWindow() = default;
 
 auto PAGWindow::openFile(QString path) -> void {
   bool result = pagView->setFile(path);
@@ -50,11 +47,11 @@ auto PAGWindow::onPAGViewerDestroyed() -> void {
 }
 
 auto PAGWindow::open() -> void {
-  engine = new QQmlApplicationEngine;
-  windowHelper = new PAGWindowHelper();
+  engine = std::make_unique<QQmlApplicationEngine>();
+  windowHelper = std::make_unique<PAGWindowHelper>();
 
   auto context = engine->rootContext();
-  context->setContextProperty("windowHelper", windowHelper);
+  context->setContextProperty("windowHelper", windowHelper.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
@@ -66,7 +63,7 @@ auto PAGWindow::open() -> void {
   pagView = window->findChild<pag::PAGView*>("pagView");
   auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
   auto* runTimeModelManager = window->findChild<PAGRunTimeModelManager*>("runTimeModelManager");
-  renderThread = pagView->renderThread;
+  PAGRenderThread* renderThread = pagView->getRenderThread();
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);

@@ -41,12 +41,11 @@ class PAGWindow : public QObject {
   static QList<PAGWindow*> AllWindows;
 
  private:
-  QString filePath;
+  QString filePath = "";
   QQuickWindow* window = nullptr;
   PAGView* pagView = nullptr;
-  PAGRenderThread* renderThread = nullptr;
-  PAGWindowHelper* windowHelper = nullptr;
-  QQmlApplicationEngine* engine = nullptr;
+  std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
+  std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
 };
 
 }  // namespace pag

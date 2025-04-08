@@ -26,7 +26,7 @@ namespace pag::Utils {
 
 auto openInFinder(const QString& path, bool select) -> void {
   QFileInfo fileInfo(path);
-  if (fileInfo.exists() == false) {
+  if (!fileInfo.exists()) {
     return;
   }
 
@@ -51,7 +51,7 @@ auto deleteDir(const QString& path) -> bool {
     return true;
   }
 
-  dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
+  dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
   QFileInfoList fileList = dir.entryInfoList();
   for (auto& fileInfo : fileList) {
     if (fileInfo.isFile()) {

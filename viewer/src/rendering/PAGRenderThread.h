@@ -19,9 +19,10 @@
 #pragma once
 
 #include <QThread>
-#include "rendering/PAGView.h"
 
 namespace pag {
+
+class PAGView;
 
 class PAGRenderThread : public QThread {
   Q_OBJECT

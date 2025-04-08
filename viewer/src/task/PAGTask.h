@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QOffscreenSurface>
+#include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
 #include <QThread>
 #include <atomic>
@@ -43,7 +44,6 @@ class PAGTask : public QObject {
   Q_SIGNAL void progressChanged(double progress);
 
   Q_INVOKABLE virtual void start() = 0;
-  Q_INVOKABLE virtual void pause() = 0;
   Q_INVOKABLE virtual void stop() = 0;
 
  protected:
@@ -58,14 +58,13 @@ class PAGTask : public QObject {
   double progress = 0.0;
 };
 
-class PAGFileTask : public PAGTask {
+class PAGPlayTask : public PAGTask {
   Q_OBJECT
  public:
-  explicit PAGFileTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
-  ~PAGFileTask() override;
+  explicit PAGPlayTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
+  ~PAGPlayTask() override;
 
   auto start() -> void override;
-  auto pause() -> void override;
   auto stop() -> void override;
 
  protected:
@@ -82,13 +81,13 @@ class PAGFileTask : public PAGTask {
  protected:
   bool openAfterExport = true;
   Frame currentFrame = 0;
-  QString filePath;
-  PAGPlayer* pagPlayer = nullptr;
-  QOpenGLContext* context = nullptr;
-  QOffscreenSurface* offscreenSurface = nullptr;
-  QOpenGLFramebufferObject* frameBuffer = nullptr;
+  QString filePath = "";
   std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
   std::shared_ptr<PAGSurface> surface = nullptr;
+  std::unique_ptr<QOpenGLContext> context = nullptr;
+  std::unique_ptr<QOffscreenSurface> offscreenSurface = nullptr;
+  std::unique_ptr<QOpenGLFramebufferObject> frameBuffer = nullptr;
 
  private:
   QThread workerThread;

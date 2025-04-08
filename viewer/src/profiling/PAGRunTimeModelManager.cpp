@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGRunTimeModelManager.h"
+#include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
-#include "utils/PAGTimeUtils.h"
 
 namespace pag {
 
@@ -76,7 +76,7 @@ auto PAGRunTimeModelManager::updateData(int currentFrame, int renderTime, int pr
 }
 
 auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath) -> void {
-  totalFrame = static_cast<int>(Utils::usToFrame(pagFile->duration(), pagFile->frameRate()));
+  totalFrame = static_cast<int>(TimeToFrame(pagFile->duration(), pagFile->frameRate()));
   currentFrame = -1;
   frameTimeMetricsMap.clear();
   fileInfoModel.resetFile(pagFile, filePath);

@@ -468,7 +468,7 @@ PAGWindow {
             }
             openFileDialog.fileMode = FileDialog.SaveFile;
             openFileDialog.title = qsTr("Select save path");
-            openFileDialog.nameFilters = ["PNG files(*.png)"];
+            openFileDialog.nameFilters = ["APNG files(*.png)"];
             openFileDialog.defaultSuffix = "png";
             openFileDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
             openFileDialog.currentAcceptHandler = function () {

@@ -19,7 +19,6 @@
 #include "PAGView.h"
 #include <QSGImageNode>
 #include "pag/file.h"
-#include "rendering/PAGRenderThread.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
@@ -27,19 +26,17 @@ namespace pag {
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   drawable = GPUDrawable::MakeFrom(this);
-  pagPlayer = new PAGPlayer();
+  pagPlayer = std::make_unique<PAGPlayer>();
   auto pagSurface = PAGSurface::MakeFrom(drawable);
   pagPlayer->setSurface(pagSurface);
-  renderThread = new PAGRenderThread(this);
-  renderThread->moveToThread(renderThread);
-  drawable->moveToThread(renderThread);
+  renderThread = std::make_unique<PAGRenderThread>(this);
+  renderThread->moveToThread(renderThread.get());
+  drawable->moveToThread(renderThread.get());
 }
 
 PAGView::~PAGView() {
-  QMetaObject::invokeMethod(renderThread, "shutDown", Qt::QueuedConnection);
+  QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
   renderThread->wait();
-  delete renderThread;
-  delete pagPlayer;
 }
 
 auto PAGView::getPAGWidth() const -> int {
@@ -149,7 +146,7 @@ auto PAGView::setIsPlaying(bool isPlaying) -> void {
   Q_EMIT isPlayingChanged(isPlaying);
   if (isPlaying) {
     lastPlayTime = tgfx::Clock::Now();
-    QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
 }
 
@@ -167,7 +164,7 @@ auto PAGView::setProgress(double progress) -> void {
   pagPlayer->setProgress(progress);
   this->progress = progress;
   Q_EMIT progressChanged(progress);
-  QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
 auto PAGView::setFile(const QString& filePath) -> bool {
@@ -277,8 +274,12 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       }
       setProgress(progress);
     }
-    QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
+}
+
+auto PAGView::getRenderThread() const -> PAGRenderThread* {
+  return renderThread.get();
 }
 }  // namespace pag

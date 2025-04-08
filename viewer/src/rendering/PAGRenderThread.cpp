@@ -18,6 +18,7 @@
 
 #include "PAGRenderThread.h"
 #include <QGuiApplication>
+#include "rendering/PAGView.h"
 
 namespace pag {
 
