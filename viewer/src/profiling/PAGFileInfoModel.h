@@ -24,7 +24,8 @@
 namespace pag {
 class PAGFileInfo {
  public:
-  explicit PAGFileInfo(const QString& name = "", const QString& value = "", const QString& ext = "");
+  explicit PAGFileInfo(const QString& name = "", const QString& value = "",
+                       const QString& ext = "");
 
   auto getExt() const -> QString;
   auto getName() const -> QString;
@@ -57,4 +58,4 @@ class PAGFileInfoModel : public QAbstractListModel {
   QList<PAGFileInfo> fileInfoList;
 };
 
-} // namespace pag
+}  // namespace pag

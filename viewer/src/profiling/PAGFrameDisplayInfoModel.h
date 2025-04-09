@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <QString>
 #include <QAbstractListModel>
+#include <QString>
 
 namespace pag {
 
@@ -44,19 +44,26 @@ class FrameDisplayInfo {
 class PAGFrameDisplayInfoModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  enum PAGFrameDisplayInfoRoles { NameRole = Qt::UserRole + 1, ColorRole, CurrentRole, AvgRole, MaxRole };
+  enum PAGFrameDisplayInfoRoles {
+    NameRole = Qt::UserRole + 1,
+    ColorRole,
+    CurrentRole,
+    AvgRole,
+    MaxRole
+  };
 
   explicit PAGFrameDisplayInfoModel(QObject* parent = nullptr);
 
   auto data(const QModelIndex& index, int role) const -> QVariant override;
   auto rowCount(const QModelIndex& parent) const -> int override;
-  auto updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present, const FrameDisplayInfo& imageDecode) -> void;
+  auto updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present,
+                  const FrameDisplayInfo& imageDecode) -> void;
 
-protected:
+ protected:
   auto roleNames() const -> QHash<int, QByteArray> override;
 
-private:
+ private:
   QList<FrameDisplayInfo> displayInfoList;
 };
 
-} // namespace pag
+}  // namespace pag

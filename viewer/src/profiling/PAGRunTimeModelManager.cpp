@@ -65,7 +65,8 @@ auto PAGRunTimeModelManager::setCurrentFrame(int currentFrame) -> void {
   Q_EMIT dataChanged();
 }
 
-auto PAGRunTimeModelManager::updateData(int currentFrame, int renderTime, int presentTime, int imageDecodeTime) -> void {
+auto PAGRunTimeModelManager::updateData(int currentFrame, int renderTime, int presentTime,
+                                        int imageDecodeTime) -> void {
   if (this->currentFrame == currentFrame) {
     return;
   }
@@ -75,7 +76,8 @@ auto PAGRunTimeModelManager::updateData(int currentFrame, int renderTime, int pr
   Q_EMIT dataChanged();
 }
 
-auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath) -> void {
+auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
+                                       std::string filePath) -> void {
   totalFrame = static_cast<int>(TimeToFrame(pagFile->duration(), pagFile->frameRate()));
   currentFrame = -1;
   frameTimeMetricsMap.clear();
@@ -84,7 +86,8 @@ auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile, 
   Q_EMIT dataChanged();
 }
 
-auto PAGRunTimeModelManager::updateFrameDisplayInfo(int renderTime, int presentTime, int imageDecodeTime) -> void {
+auto PAGRunTimeModelManager::updateFrameDisplayInfo(int renderTime, int presentTime,
+                                                    int imageDecodeTime) -> void {
   int renderAvg = 0;
   int renderMax = 0;
   int renderTotal = 0;
@@ -114,8 +117,9 @@ auto PAGRunTimeModelManager::updateFrameDisplayInfo(int renderTime, int presentT
 
   FrameDisplayInfo renderInfo("Render", "#0096D8", renderTime, renderAvg, renderMax);
   FrameDisplayInfo presentInfo("Present", "#DDB259", presentTime, presentAvg, presentMax);
-  FrameDisplayInfo imageDecodeInfo("Image", "#74AD59", imageDecodeTime, imageDecodeAvg, imageDecodeMax);
+  FrameDisplayInfo imageDecodeInfo("Image", "#74AD59", imageDecodeTime, imageDecodeAvg,
+                                   imageDecodeMax);
   frameDisplayInfoModel.updateData(renderInfo, presentInfo, imageDecodeInfo);
 }
 
-} // namespace pag
+}  // namespace pag

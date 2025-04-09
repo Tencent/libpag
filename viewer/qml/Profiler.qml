@@ -198,9 +198,7 @@ Item {
                     anchors.bottom: parent.bottom
                     renderStrategy: Canvas.Cooperative
 
-                    onPaint: {
-
-                    }
+                    onPaint: {}
                 }
                 Text {
                     id: currentFrameText

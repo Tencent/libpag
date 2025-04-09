@@ -23,8 +23,8 @@
 
 namespace pag {
 
-PAGFileInfo::PAGFileInfo(const QString& name, const QString& value, const QString& ext) :
-  name(name), value(value), ext(ext) {
+PAGFileInfo::PAGFileInfo(const QString& name, const QString& value, const QString& ext)
+    : name(name), value(value), ext(ext) {
 }
 
 auto PAGFileInfo::getExt() const -> QString {
@@ -74,7 +74,8 @@ auto PAGFileInfoModel::rowCount(const QModelIndex& parent) const -> int {
   return static_cast<int>(fileInfoList.count());
 }
 
-auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath) -> void {
+auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath)
+    -> void {
   Q_UNUSED(filePath);
   beginResetModel();
   updateFileInfo(PAGFileInfo("Duration", Utils::toQString(pagFile->duration() / 1000000.0)));
@@ -83,7 +84,7 @@ auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile, std::s
   updateFileInfo(PAGFileInfo("Height", Utils::toQString(pagFile->height())));
   auto memorySize = CalculateGraphicsMemory(pagFile->getFile());
   updateFileInfo(PAGFileInfo("Graphics", Utils::getMemorySizeNumString(memorySize),
-                                    Utils::getMemorySizeUnit(memorySize)));
+                             Utils::getMemorySizeUnit(memorySize)));
   updateFileInfo(PAGFileInfo("Videos", Utils::toQString(pagFile->numVideos())));
   updateFileInfo(PAGFileInfo("Layers", Utils::toQString(pagFile->getFile()->numLayers())));
   auto version = Utils::tagCodeToVersion(pagFile->tagLevel());
@@ -111,4 +112,4 @@ auto PAGFileInfoModel::updateFileInfo(const PAGFileInfo& fileInfo) -> void {
   }
 }
 
-}
+}  // namespace pag

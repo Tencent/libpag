@@ -21,9 +21,9 @@
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include "PAGViewer.h"
+#include "profiling/PAGRunTimeModelManager.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
-#include "profiling/PAGRunTimeModelManager.h"
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;

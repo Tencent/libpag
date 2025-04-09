@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #include "PAGFrameDisplayInfoModel.h"
 
 namespace pag {
 
-FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, int current, int avg, int max) :
-    name(name), color(color), current(current), avg(avg), max(max) {
+FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, int current, int avg,
+                                   int max)
+    : name(name), color(color), current(current), avg(avg), max(max) {
 }
 
 auto FrameDisplayInfo::getAVG() const -> int {
@@ -44,7 +44,6 @@ auto FrameDisplayInfo::getName() const -> QString {
 auto FrameDisplayInfo::getColor() const -> QString {
   return color;
 }
-
 
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel(QObject* parent) : QAbstractListModel(parent) {
 }
@@ -81,7 +80,9 @@ auto PAGFrameDisplayInfoModel::rowCount(const QModelIndex& parent) const -> int 
   return static_cast<int>(displayInfoList.size());
 }
 
-auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present, const FrameDisplayInfo& imageDecode) -> void {
+auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
+                                          const FrameDisplayInfo& present,
+                                          const FrameDisplayInfo& imageDecode) -> void {
 
   beginResetModel();
   displayInfoList.clear();
@@ -92,13 +93,13 @@ auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render, const 
 }
 
 auto PAGFrameDisplayInfoModel::roleNames() const -> QHash<int, QByteArray> {
-   QHash<int, QByteArray> roles;
-   roles[NameRole] = "name";
-   roles[ColorRole] = "colorCode";
-   roles[CurrentRole] = "current";
-   roles[AvgRole] = "avg";
-   roles[MaxRole] = "max";
-   return roles;
+  QHash<int, QByteArray> roles;
+  roles[NameRole] = "name";
+  roles[ColorRole] = "colorCode";
+  roles[CurrentRole] = "current";
+  roles[AvgRole] = "avg";
+  roles[MaxRole] = "max";
+  return roles;
 }
 
-} // namespace pag
+}  // namespace pag

@@ -69,7 +69,8 @@ auto PAGWindow::open() -> void {
           Qt::QueuedConnection);
   connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
   connect(pagView, &PAGView::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
-  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager, &PAGRunTimeModelManager::updateData);
+  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager,
+          &PAGRunTimeModelManager::updateData);
 }
 
 auto PAGWindow::getFilePath() -> QString {
