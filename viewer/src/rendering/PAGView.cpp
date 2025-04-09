@@ -264,7 +264,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto displayTime = timeNow - lastPlayTime;
   lastPlayTime = timeNow;
 
-  if (isPlaying_) {
+  if ((pagFile != nullptr) && isPlaying_) {
     auto duration = pagPlayer->duration();
     if (duration > 0) {
       auto progress =
@@ -277,5 +277,9 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
+}
+
+auto PAGView::getRenderThread() const -> PAGRenderThread* {
+  return renderThread.get();
 }
 }  // namespace pag

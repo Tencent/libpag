@@ -13,6 +13,7 @@
         <file>images/update-red.png</file>
         <file>images/background-on.png</file>
         <file>images/background-off.png</file>
+        <file>images/un-encryption.png</file>
 
         <!-- svg -->
         <file>images/close-dark.svg</file>
@@ -24,6 +25,7 @@
         <file>qml/Main.qml</file>
         <file>qml/Menu.qml</file>
         <file>qml/MainForm.qml</file>
+        <file>qml/Profiler.qml</file>
         <file>qml/AboutWindow.qml</file>
         <file>qml/ControlForm.qml</file>
         <file>qml/SettingsWindow.qml</file>

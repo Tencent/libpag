@@ -72,6 +72,7 @@ class PAGView : public QQuickItem {
   Q_INVOKABLE void previousFrame();
 
   auto updatePaintNode(QSGNode*, UpdatePaintNodeData*) -> QSGNode* override;
+  auto getRenderThread() const -> PAGRenderThread*;
 
  private:
   int64_t lastPlayTime = 0;
