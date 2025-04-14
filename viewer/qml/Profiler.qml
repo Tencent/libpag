@@ -63,33 +63,6 @@ Item {
                     Layout.fillWidth: true
                     height: 1
                 }
-
-                Image {
-                    id: fileEncryptionImage
-                    Layout.preferredWidth: 11
-                    Layout.preferredHeight: 11
-                    Layout.alignment: Qt.AlignVCenter
-                    source: "qrc:/images/un-encryption.png"
-                    fillMode: Image.PreserveAspectFit
-                }
-
-                Item {
-                    width: 5
-                    height: 1
-                }
-
-                Text {
-                    id: encryptionLabel
-                    Layout.alignment: Qt.AlignVCenter
-                    text: qsTr("Unencrypted")
-                    color: "#FFFFFF"
-                    font.pixelSize: 10
-                }
-
-                Item {
-                    width: 10
-                    height: 1
-                }
             }
         }
 
