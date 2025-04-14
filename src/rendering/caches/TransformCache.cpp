@@ -51,10 +51,29 @@ Transform* TransformCache::createCache(Frame layerFrame) {
   }
   RenderTransform(transform, layer->transform, layerFrame);
   auto parent = layer->parent;
-  while (parent != nullptr && parent->transform != nullptr) {
-    Transform parentTransform = {};
-    RenderTransform(&parentTransform, parent->transform, layerFrame);
-    transform->matrix.postConcat(parentTransform.matrix);
+  while (parent != nullptr && (parent->transform != nullptr || parent->transform3D != nullptr)) {
+    if (parent->transform != nullptr) {
+      Transform parentTransform = {};
+      RenderTransform(&parentTransform, parent->transform, layerFrame);
+      transform->matrix.postConcat(parentTransform.matrix);
+    }else if (parent->transform3D != nullptr) {
+      auto anchorPointP = parent->transform3D->anchorPoint->getValueAt(layerFrame);
+      Point3D positionP;
+      if (parent->transform3D->position) {
+        positionP = parent->transform3D->position->getValueAt(layerFrame);
+      } else {
+        positionP.x = parent->transform3D->xPosition->getValueAt(layerFrame);
+        positionP.y = parent->transform3D->yPosition->getValueAt(layerFrame);
+      }
+      auto scaleP = parent->transform3D->scale->getValueAt(layerFrame);
+      auto zRotationP = parent->transform3D->zRotation->getValueAt(layerFrame);
+      tgfx::Matrix parentMatrix2D;
+      parentMatrix2D.setTranslate(-anchorPointP.x, -anchorPointP.y);
+      parentMatrix2D.postScale(scaleP.x, scaleP.y);
+      parentMatrix2D.postRotate(zRotationP);
+      parentMatrix2D.postTranslate(positionP.x, positionP.y);
+      transform->matrix.postConcat(parentMatrix2D);
+    }
     parent = parent->parent;
   }
   return transform;
