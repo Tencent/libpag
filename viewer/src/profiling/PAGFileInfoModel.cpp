@@ -23,47 +23,38 @@
 
 namespace pag {
 
-PAGFileInfo::PAGFileInfo(const QString& name, const QString& value, const QString& ext)
-    : name(name), value(value), ext(ext) {
-}
-
-auto PAGFileInfo::getExt() const -> QString {
-  return ext;
-}
-
-auto PAGFileInfo::getName() const -> QString {
-  return name;
-}
-
-auto PAGFileInfo::getValue() const -> QString {
-  return value;
+PAGFileInfo::PAGFileInfo(const QString& name, const QString& value, const QString& unit)
+    : name(name), value(value), unit(unit) {
 }
 
 PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent) {
   beginResetModel();
-  fileInfoList.append(PAGFileInfo("Duration", "", "s"));
-  fileInfoList.append(PAGFileInfo("FrameRate", "", "FPS"));
-  fileInfoList.append(PAGFileInfo("Width"));
-  fileInfoList.append(PAGFileInfo("Height"));
-  fileInfoList.append(PAGFileInfo("Graphics"));
-  fileInfoList.append(PAGFileInfo("Videos"));
-  fileInfoList.append(PAGFileInfo("Layers"));
-  fileInfoList.append(PAGFileInfo("SDK Version"));
+  fileInfos.emplace_back("Duration", "", "s");
+  fileInfos.emplace_back("FrameRate", "", "FPS");
+  fileInfos.emplace_back("Width");
+  fileInfos.emplace_back("Height");
+  fileInfos.emplace_back("Graphics");
+  fileInfos.emplace_back("Videos");
+  fileInfos.emplace_back("Layers");
+  fileInfos.emplace_back("SDK Version");
   endResetModel();
 }
 
 auto PAGFileInfoModel::data(const QModelIndex& index, int role) const -> QVariant {
-  if ((index.row() < 0) || (index.row() >= fileInfoList.count())) {
+  if ((index.row() < 0) || (index.row() >= static_cast<int>(fileInfos.size()))) {
     return {};
   }
 
-  const PAGFileInfo& fileInfo = fileInfoList[index.row()];
-  if (role == NameRole) {
-    return fileInfo.getName();
-  } else if (role == ValueRole) {
-    return fileInfo.getValue();
-  } else if (role == ExtRole) {
-    return fileInfo.getExt();
+  const PAGFileInfo& fileInfo = fileInfos[index.row()];
+  auto fileInfoRole = static_cast<PAGFileInfoRoles>(role);
+  if (fileInfoRole == PAGFileInfoRoles::NameRole) {
+    return fileInfo.name;
+  }
+  if (fileInfoRole == PAGFileInfoRoles::ValueRole) {
+    return fileInfo.value;
+  }
+  if (fileInfoRole == PAGFileInfoRoles::UnitRole) {
+    return fileInfo.unit;
   }
 
   return {};
@@ -71,45 +62,33 @@ auto PAGFileInfoModel::data(const QModelIndex& index, int role) const -> QVarian
 
 auto PAGFileInfoModel::rowCount(const QModelIndex& parent) const -> int {
   Q_UNUSED(parent);
-  return static_cast<int>(fileInfoList.count());
+  return static_cast<int>(fileInfos.size());
 }
 
-auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath)
-    -> void {
+auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile,
+                                 const std::string& filePath) -> void {
   Q_UNUSED(filePath);
   beginResetModel();
-  updateFileInfo(PAGFileInfo("Duration", Utils::toQString(pagFile->duration() / 1000000.0)));
-  updateFileInfo(PAGFileInfo("FrameRate", Utils::toQString(pagFile->frameRate())));
-  updateFileInfo(PAGFileInfo("Width", Utils::toQString(pagFile->width())));
-  updateFileInfo(PAGFileInfo("Height", Utils::toQString(pagFile->height())));
+  fileInfos.clear();
+  fileInfos.emplace_back("Duration", Utils::toQString(pagFile->duration() / 1000000.0), "s");
+  fileInfos.emplace_back("FrameRate", Utils::toQString(pagFile->frameRate()), "FPS");
+  fileInfos.emplace_back("Width", Utils::toQString(pagFile->width()));
+  fileInfos.emplace_back("Height", Utils::toQString(pagFile->height()));
   auto memorySize = CalculateGraphicsMemory(pagFile->getFile());
-  updateFileInfo(PAGFileInfo("Graphics", Utils::getMemorySizeNumString(memorySize),
-                             Utils::getMemorySizeUnit(memorySize)));
-  updateFileInfo(PAGFileInfo("Videos", Utils::toQString(pagFile->numVideos())));
-  updateFileInfo(PAGFileInfo("Layers", Utils::toQString(pagFile->getFile()->numLayers())));
+  fileInfos.emplace_back("Graphics", Utils::getMemorySizeNumString(memorySize),
+                         Utils::getMemorySizeUnit(memorySize));
+  fileInfos.emplace_back("Videos", Utils::toQString(pagFile->numVideos()));
+  fileInfos.emplace_back("Layers", Utils::toQString(pagFile->getFile()->numLayers()));
   auto version = Utils::tagCodeToVersion(pagFile->tagLevel());
-  updateFileInfo(PAGFileInfo("SDK Version", version.c_str()));
+  fileInfos.emplace_back("SDK Version", version.c_str());
   endResetModel();
 }
 
 auto PAGFileInfoModel::roleNames() const -> QHash<int, QByteArray> {
-  QHash<int, QByteArray> roles;
-  roles[NameRole] = "name";
-  roles[ValueRole] = "value";
-  roles[ExtRole] = "ext";
+  static QHash<int, QByteArray> roles = {{static_cast<int>(PAGFileInfoRoles::NameRole), "name"},
+                                         {static_cast<int>(PAGFileInfoRoles::ValueRole), "value"},
+                                         {static_cast<int>(PAGFileInfoRoles::UnitRole), "unit"}};
   return roles;
-}
-
-auto PAGFileInfoModel::updateFileInfo(const PAGFileInfo& fileInfo) -> void {
-  for (auto& info : fileInfoList) {
-    if (info.getName().compare(fileInfo.getName()) == 0) {
-      info.value = fileInfo.getValue();
-      if (!fileInfo.getExt().isEmpty()) {
-        info.ext = fileInfo.getExt();
-      }
-      break;
-    }
-  }
 }
 
 }  // namespace pag

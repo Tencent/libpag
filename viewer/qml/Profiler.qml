@@ -129,7 +129,7 @@ Item {
                     Text {
                         id: extText
                         color: "#9b9b9b"
-                        text: ext
+                        text: unit
                         font.pixelSize: 9
                         renderType: Text.NativeRendering
                         anchors.bottom: parent.bottom

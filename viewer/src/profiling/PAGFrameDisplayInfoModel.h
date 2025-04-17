@@ -27,24 +27,17 @@ class FrameDisplayInfo {
  public:
   FrameDisplayInfo(const QString& name, const QString& color, int current, int avg, int max);
 
-  auto getAVG() const -> int;
-  auto getMAX() const -> int;
-  auto getCurrent() const -> int;
-  auto getName() const -> QString;
-  auto getColor() const -> QString;
-
- public:
-  QString name;
-  QString color;
-  int current;
-  int avg;
-  int max;
+  QString name{};
+  QString color{};
+  int current{0};
+  int avg{0};
+  int max{0};
 };
 
 class PAGFrameDisplayInfoModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  enum PAGFrameDisplayInfoRoles {
+  enum class PAGFrameDisplayInfoRoles {
     NameRole = Qt::UserRole + 1,
     ColorRole,
     CurrentRole,
@@ -63,7 +56,7 @@ class PAGFrameDisplayInfoModel : public QAbstractListModel {
   auto roleNames() const -> QHash<int, QByteArray> override;
 
  private:
-  QList<FrameDisplayInfo> displayInfoList;
+  std::vector<FrameDisplayInfo> diplayInfos{};
 };
 
 }  // namespace pag

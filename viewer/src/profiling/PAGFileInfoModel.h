@@ -24,38 +24,29 @@
 namespace pag {
 class PAGFileInfo {
  public:
-  explicit PAGFileInfo(const QString& name = "", const QString& value = "",
-                       const QString& ext = "");
+  explicit PAGFileInfo(const QString& name, const QString& value = "", const QString& unit = "");
 
-  auto getExt() const -> QString;
-  auto getName() const -> QString;
-  auto getValue() const -> QString;
-
- public:
-  QString name;
-  QString value;
-  QString ext;
+  QString name{};
+  QString value{};
+  QString unit{};
 };
 
 class PAGFileInfoModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  enum PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, ExtRole };
+  enum class PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, UnitRole };
 
   explicit PAGFileInfoModel(QObject* parent = nullptr);
 
   auto data(const QModelIndex& index, int role) const -> QVariant override;
   auto rowCount(const QModelIndex& parent) const -> int override;
-  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath) -> void;
+  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath) -> void;
 
  protected:
   auto roleNames() const -> QHash<int, QByteArray> override;
 
  private:
-  auto updateFileInfo(const PAGFileInfo& fileInfo) -> void;
-
- private:
-  QList<PAGFileInfo> fileInfoList;
+  std::vector<PAGFileInfo> fileInfos{};
 };
 
 }  // namespace pag

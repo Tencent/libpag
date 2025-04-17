@@ -25,50 +25,30 @@ FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, in
     : name(name), color(color), current(current), avg(avg), max(max) {
 }
 
-auto FrameDisplayInfo::getAVG() const -> int {
-  return avg;
-}
-
-auto FrameDisplayInfo::getMAX() const -> int {
-  return max;
-}
-
-auto FrameDisplayInfo::getCurrent() const -> int {
-  return current;
-}
-
-auto FrameDisplayInfo::getName() const -> QString {
-  return name;
-}
-
-auto FrameDisplayInfo::getColor() const -> QString {
-  return color;
-}
-
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel(QObject* parent) : QAbstractListModel(parent) {
 }
 
 auto PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const -> QVariant {
-  if ((index.row() < 0) || (index.row() >= displayInfoList.count())) {
+  if ((index.row() < 0) || (index.row() >= static_cast<int>(diplayInfos.size()))) {
     return {};
   }
 
-  const auto& item = displayInfoList.at(index.row());
-  switch (role) {
-    case NameRole: {
-      return item.getName();
+  const auto& item = diplayInfos.at(index.row());
+  switch (static_cast<PAGFrameDisplayInfoRoles>(role)) {
+    case PAGFrameDisplayInfoRoles::NameRole: {
+      return item.name;
     }
-    case ColorRole: {
-      return item.getColor();
+    case PAGFrameDisplayInfoRoles::ColorRole: {
+      return item.color;
     }
-    case CurrentRole: {
-      return item.getCurrent();
+    case PAGFrameDisplayInfoRoles::CurrentRole: {
+      return item.current;
     }
-    case AvgRole: {
-      return item.getAVG();
+    case PAGFrameDisplayInfoRoles::AvgRole: {
+      return item.avg;
     }
-    case MaxRole: {
-      return item.getMAX();
+    case PAGFrameDisplayInfoRoles::MaxRole: {
+      return item.max;
     }
     default:
       return {};
@@ -77,7 +57,7 @@ auto PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const ->
 
 auto PAGFrameDisplayInfoModel::rowCount(const QModelIndex& parent) const -> int {
   Q_UNUSED(parent);
-  return static_cast<int>(displayInfoList.size());
+  return static_cast<int>(diplayInfos.size());
 }
 
 auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
@@ -85,20 +65,20 @@ auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
                                           const FrameDisplayInfo& imageDecode) -> void {
 
   beginResetModel();
-  displayInfoList.clear();
-  displayInfoList.append(render);
-  displayInfoList.append(imageDecode);
-  displayInfoList.append(present);
+  diplayInfos.clear();
+  diplayInfos.push_back(render);
+  diplayInfos.push_back(imageDecode);
+  diplayInfos.push_back(present);
   endResetModel();
 }
 
 auto PAGFrameDisplayInfoModel::roleNames() const -> QHash<int, QByteArray> {
-  QHash<int, QByteArray> roles;
-  roles[NameRole] = "name";
-  roles[ColorRole] = "colorCode";
-  roles[CurrentRole] = "current";
-  roles[AvgRole] = "avg";
-  roles[MaxRole] = "max";
+  static const QHash<int, QByteArray> roles = {
+      {static_cast<int>(PAGFrameDisplayInfoRoles::NameRole), "name"},
+      {static_cast<int>(PAGFrameDisplayInfoRoles::ColorRole), "colorCode"},
+      {static_cast<int>(PAGFrameDisplayInfoRoles::CurrentRole), "current"},
+      {static_cast<int>(PAGFrameDisplayInfoRoles::AvgRole), "avg"},
+      {static_cast<int>(PAGFrameDisplayInfoRoles::MaxRole), "max"}};
   return roles;
 }
 

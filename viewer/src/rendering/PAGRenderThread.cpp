@@ -32,9 +32,7 @@ auto PAGRenderThread::flush() -> void {
   int renderingTime = static_cast<int>(pagView->pagPlayer->renderingTime());
   int presentingTime = static_cast<int>(pagView->pagPlayer->presentingTime());
   int imageDecodingTime = static_cast<int>(pagView->pagPlayer->imageDecodingTime());
-  if (renderingTime || presentingTime || imageDecodingTime) {
-    Q_EMIT frameTimeMetricsReady(currentFrame, renderingTime, presentingTime, imageDecodingTime);
-  }
+  Q_EMIT frameTimeMetricsReady(currentFrame, renderingTime, presentingTime, imageDecodingTime);
   QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
 }
 

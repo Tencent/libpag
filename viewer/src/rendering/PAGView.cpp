@@ -34,6 +34,12 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   drawable->moveToThread(renderThread.get());
 }
 
+auto PAGView::flush() const -> void {
+  if (pagFile != nullptr && isPlaying_) {
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  }
+}
+
 PAGView::~PAGView() {
   QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
   renderThread->wait();
@@ -274,7 +280,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       }
       setProgress(progress);
     }
-    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
 }

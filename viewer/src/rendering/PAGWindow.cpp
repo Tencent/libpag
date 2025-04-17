@@ -59,6 +59,9 @@ auto PAGWindow::open() -> void {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  auto surfaceFormat = window->format();
+  surfaceFormat.setSwapInterval(1);
+  window->setFormat(surfaceFormat);
 
   pagView = window->findChild<pag::PAGView*>("pagView");
   auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
@@ -67,6 +70,7 @@ auto PAGWindow::open() -> void {
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
+  connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
   connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
   connect(pagView, &PAGView::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
   connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager,

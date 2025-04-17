@@ -32,9 +32,9 @@ class FrameTimeMetrics {
   auto operator=(const FrameTimeMetrics& other) -> FrameTimeMetrics&;
 
  public:
-  int renderTime = 0;
-  int presentTime = 0;
-  int imageDecodeTime = 0;
+  int renderTime{0};
+  int presentTime{0};
+  int imageDecodeTime{0};
 };
 
 class PAGRunTimeModelManager : public QObject {
@@ -44,14 +44,14 @@ class PAGRunTimeModelManager : public QObject {
 
   Q_PROPERTY(int totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
   Q_PROPERTY(int currentFrame READ getCurrentFrame WRITE setCurrentFrame NOTIFY currentFrameChanged)
-  Q_PROPERTY(PAGFileInfoModel* fileInfoModel READ getFileInfoModel NOTIFY fileInfoModelChanged)
-  Q_PROPERTY(PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel NOTIFY
+  Q_PROPERTY(const PAGFileInfoModel* fileInfoModel READ getFileInfoModel NOTIFY fileInfoModelChanged)
+  Q_PROPERTY(const PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel NOTIFY
                  frameDisplayInfoModelChanged)
 
   auto getTotalFrame() const -> int;
   auto getCurrentFrame() const -> int;
-  auto getFileInfoModel() const -> PAGFileInfoModel*;
-  auto getFrameDisplayInfoModel() const -> PAGFrameDisplayInfoModel*;
+  auto getFileInfoModel() const -> const PAGFileInfoModel*;
+  auto getFrameDisplayInfoModel() const -> const PAGFrameDisplayInfoModel*;
 
   auto setCurrentFrame(int currentFrame) -> void;
 
@@ -63,16 +63,16 @@ class PAGRunTimeModelManager : public QObject {
 
   Q_SLOT void updateData(int currentFrame, int renderTime, int presentTime, int imageDecodeTime);
 
-  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, std::string filePath) -> void;
+  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath) -> void;
 
  private:
   auto updateFrameDisplayInfo(int renderTime, int presentTime, int imageDecodeTime) -> void;
 
  private:
-  int totalFrame = -1;
-  int currentFrame = -1;
-  PAGFileInfoModel fileInfoModel;
-  PAGFrameDisplayInfoModel frameDisplayInfoModel;
-  QMap<int, FrameTimeMetrics> frameTimeMetricsMap;
+  int totalFrame{-1};
+  int currentFrame{-1};
+  PAGFileInfoModel fileInfoModel{};
+  PAGFrameDisplayInfoModel frameDisplayInfoModel{};
+  QMap<int, FrameTimeMetrics> frameTimeMetricsMap{};
 };
 }  // namespace pag
