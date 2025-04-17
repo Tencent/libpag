@@ -25,13 +25,14 @@ namespace pag {
 
 class FrameDisplayInfo {
  public:
-  FrameDisplayInfo(const QString& name, const QString& color, int current, int avg, int max);
+  FrameDisplayInfo(const QString& name, const QString& color, int64_t current, int64_t avg,
+                   int64_t max);
 
   QString name{};
   QString color{};
-  int current{0};
-  int avg{0};
-  int max{0};
+  int64_t current{0};
+  int64_t avg{0};
+  int64_t max{0};
 };
 
 class PAGFrameDisplayInfoModel : public QAbstractListModel {

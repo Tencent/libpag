@@ -20,8 +20,8 @@
 
 namespace pag {
 
-FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, int current, int avg,
-                                   int max)
+FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, int64_t current,
+                                   int64_t avg, int64_t max)
     : name(name), color(color), current(current), avg(avg), max(max) {
 }
 
@@ -42,13 +42,13 @@ auto PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const ->
       return item.color;
     }
     case PAGFrameDisplayInfoRoles::CurrentRole: {
-      return item.current;
+      return QString::number(item.current);
     }
     case PAGFrameDisplayInfoRoles::AvgRole: {
-      return item.avg;
+      return QString::number(item.avg);
     }
     case PAGFrameDisplayInfoRoles::MaxRole: {
-      return item.max;
+      return QString::number(item.max);
     }
     default:
       return {};

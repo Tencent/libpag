@@ -29,8 +29,8 @@ class PAGRenderThread : public QThread {
  public:
   explicit PAGRenderThread(PAGView* pagView);
 
-  Q_SIGNAL void frameTimeMetricsReady(int frame, int renderTime, int presentTime,
-                                      int imageDecodeTime);
+  Q_SIGNAL void frameTimeMetricsReady(int64_t frame, int64_t renderTime, int64_t presentTime,
+                                      int64_t imageDecodeTime);
 
   Q_SLOT void flush();
   Q_SLOT void shutDown();

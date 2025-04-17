@@ -59,20 +59,22 @@ auto PAGView::getPAGHeight() const -> int {
   return pagFile->height();
 }
 
-auto PAGView::getTotalFrame() const -> int {
+auto PAGView::getTotalFrame() const -> QString {
   if (pagFile == nullptr) {
-    return 0;
+    return "0";
   }
-  int totalFrames = static_cast<int>(std::round(getDuration() * pagFile->frameRate() / 1000.0));
+  int64_t totalFrames =
+      static_cast<int64_t>(std::round(getDuration().toLongLong() * pagFile->frameRate() / 1000.0));
   if (totalFrames < 1) {
     totalFrames = 0;
   }
-  return totalFrames;
+  return QString::number(totalFrames);
 }
 
-auto PAGView::getCurrentFrame() const -> int {
-  int totalFrames = getTotalFrame();
-  return static_cast<int>(std::round(getProgress() * (totalFrames - 1)));
+auto PAGView::getCurrentFrame() const -> QString {
+  int64_t totalFrames = getTotalFrame().toLongLong();
+  int64_t currentFrame = static_cast<int64_t>(std::round(getProgress() * (totalFrames - 1)));
+  return QString::number(currentFrame);
 }
 
 auto PAGView::isPlaying() const -> bool {
@@ -86,11 +88,11 @@ auto PAGView::getShowVideoFrames() const -> bool {
   return pagPlayer->videoEnabled();
 }
 
-auto PAGView::getDuration() const -> double {
+auto PAGView::getDuration() const -> QString {
   if (pagPlayer == nullptr) {
-    return 0.0;
+    return "0";
   }
-  return static_cast<double>(pagPlayer->duration()) / 1000.0;
+  return QString::number(pagPlayer->duration() / 1000);
 }
 
 auto PAGView::getProgress() const -> double {
@@ -99,6 +101,19 @@ auto PAGView::getProgress() const -> double {
 
 auto PAGView::getFilePath() const -> QString {
   return filePath;
+}
+
+auto PAGView::getDisplayedTime() const -> QString {
+  if (pagFile == nullptr) {
+    return "00:00";
+  }
+  int64_t displayedTime =
+      static_cast<int64_t>(std::round(getProgress() * getDuration().toLongLong() / 1000.0));
+  int64_t displayedSeconds = displayedTime % 60;
+  int64_t displayedMinutes = (displayedTime / 60) % 60;
+  return QString("%1:%2")
+      .arg(displayedMinutes, 2, 10, QChar('0'))
+      .arg(displayedSeconds, 2, 10, QChar('0'));
 }
 
 auto PAGView::getBackgroundColor() const -> QColor {

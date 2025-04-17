@@ -28,13 +28,13 @@ class FrameTimeMetrics {
  public:
   FrameTimeMetrics();
   FrameTimeMetrics(const FrameTimeMetrics& data);
-  FrameTimeMetrics(int renderTime, int presentTime, int imageDecodeTime);
+  FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
   auto operator=(const FrameTimeMetrics& other) -> FrameTimeMetrics&;
 
  public:
-  int renderTime{0};
-  int presentTime{0};
-  int imageDecodeTime{0};
+  int64_t renderTime{0};
+  int64_t presentTime{0};
+  int64_t imageDecodeTime{0};
 };
 
 class PAGRunTimeModelManager : public QObject {
@@ -42,19 +42,20 @@ class PAGRunTimeModelManager : public QObject {
  public:
   explicit PAGRunTimeModelManager(QObject* parent = nullptr);
 
-  Q_PROPERTY(int totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
-  Q_PROPERTY(int currentFrame READ getCurrentFrame WRITE setCurrentFrame NOTIFY currentFrameChanged)
+  Q_PROPERTY(QString totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
+  Q_PROPERTY(
+      QString currentFrame READ getCurrentFrame WRITE setCurrentFrame NOTIFY currentFrameChanged)
   Q_PROPERTY(
       const PAGFileInfoModel* fileInfoModel READ getFileInfoModel NOTIFY fileInfoModelChanged)
   Q_PROPERTY(const PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel
                  NOTIFY frameDisplayInfoModelChanged)
 
-  auto getTotalFrame() const -> int;
-  auto getCurrentFrame() const -> int;
+  auto getTotalFrame() const -> QString;
+  auto getCurrentFrame() const -> QString;
   auto getFileInfoModel() const -> const PAGFileInfoModel*;
   auto getFrameDisplayInfoModel() const -> const PAGFrameDisplayInfoModel*;
 
-  auto setCurrentFrame(int currentFrame) -> void;
+  auto setCurrentFrame(const QString& currentFrame) -> void;
 
   Q_SIGNAL void totalFrameChanged();
   Q_SIGNAL void currentFrameChanged();
@@ -62,18 +63,20 @@ class PAGRunTimeModelManager : public QObject {
   Q_SIGNAL void frameDisplayInfoModelChanged();
   Q_SIGNAL void dataChanged();
 
-  Q_SLOT void updateData(int currentFrame, int renderTime, int presentTime, int imageDecodeTime);
+  Q_SLOT void updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
+                         int64_t imageDecodeTime);
 
   auto resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath) -> void;
 
  private:
-  auto updateFrameDisplayInfo(int renderTime, int presentTime, int imageDecodeTime) -> void;
+  auto updateFrameDisplayInfo(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime)
+      -> void;
 
  private:
-  int totalFrame{-1};
-  int currentFrame{-1};
+  int64_t totalFrame{-1};
+  int64_t currentFrame{-1};
   PAGFileInfoModel fileInfoModel{};
   PAGFrameDisplayInfoModel frameDisplayInfoModel{};
-  QMap<int, FrameTimeMetrics> frameTimeMetricsMap{};
+  QMap<int64_t, FrameTimeMetrics> frameTimeMetricsMap{};
 };
 }  // namespace pag

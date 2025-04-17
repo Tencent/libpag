@@ -294,9 +294,7 @@ PAGWindow {
     }
 
     function updateProgress() {
-        let duration = mainForm.pagView.duration;
-        let displayedTime = duration * mainForm.pagView.progress;
-        mainForm.controlForm.timeDisplayedText.text = Utils.msToTime(displayedTime);
+        mainForm.controlForm.timeDisplayedText.text = mainForm.pagView.displayedTime;
         mainForm.controlForm.currentFrameText.text = mainForm.pagView.currentFrame;
         mainForm.controlForm.totalFrameText.text = mainForm.pagView.totalFrame;
     }
