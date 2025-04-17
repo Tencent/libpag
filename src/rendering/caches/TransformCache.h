@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "FrameCache.h"
 #include "rendering/utils/Transform.h"
 
@@ -25,6 +26,8 @@ namespace pag {
 class TransformCache : public FrameCache<Transform> {
  public:
   explicit TransformCache(Layer* layer);
+
+  std::shared_ptr<Transform> getTransform3D(Frame layerFrame);
 
  protected:
   Transform* createCache(Frame layerFrame) override;

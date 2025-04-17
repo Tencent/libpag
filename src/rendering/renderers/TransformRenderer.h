@@ -23,4 +23,6 @@
 
 namespace pag {
 void RenderTransform(Transform* transform, Transform2D* transform2D, Frame layerFrame);
+
+void RenderTransform3D(Transform* transform, Transform3D* transform3D, Frame layerFrame);
 }

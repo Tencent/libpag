@@ -38,4 +38,31 @@ void RenderTransform(Transform* transform, Transform2D* transform2D, Frame layer
   matrix.postRotate(rotation);
   matrix.postTranslate(position.x, position.y);
 }
+
+void RenderTransform3D(Transform* transform, Transform3D* transform3D, Frame layerFrame) {
+  auto& matrix = transform->matrix;
+  auto anchorPoint = transform3D->anchorPoint->getValueAt(layerFrame);
+  auto scale = transform3D->scale->getValueAt(layerFrame);
+
+  Point position = {};
+  if (transform3D->position != nullptr) {
+    auto pos3D = transform3D->position->getValueAt(layerFrame);
+    position.x = pos3D.x;
+    position.y = pos3D.y;
+  } else {
+    position.x = transform3D->xPosition->getValueAt(layerFrame);
+    position.y = transform3D->yPosition->getValueAt(layerFrame);
+  }
+
+  auto rotation = transform3D->zRotation->getValueAt(layerFrame);
+
+  transform->alpha = ToAlpha(transform3D->opacity->getValueAt(layerFrame));
+
+  matrix.postTranslate(-anchorPoint.x, -anchorPoint.y);
+  matrix.postScale(scale.x, scale.y);
+  matrix.postRotate(rotation);
+  matrix.postTranslate(position.x, position.y);
+}
+
+
 }  // namespace pag

@@ -126,8 +126,16 @@ bool LayerCache::contentVisible(Frame contentFrame) {
   if (contentFrame < 0 || contentFrame >= layer->duration) {
     return false;
   }
-  if (layer->transform3D && !Has3DSupport()) {
-    return false;
+  if (layer->transform3D) {
+  if(!Has3DSupport()){
+      return false;
+    }else{
+      // layerTransform3D仅用于判断当前图层是否可见，用于解决3D图层渲染时可见范围有误的问题
+      // 将layerTransform3D用于Recorder::concat的传入参数时会导致3D图层渲染异常
+      // 因此，其它场景下若要获取layerTransform，请使用LayerCache::getTransform
+      auto layerTransform3D=transformCache->getTransform3D(contentFrame);
+      return layerTransform3D->visible();
+    }
   }
   auto layerTransform = getTransform(contentFrame);
   return layerTransform->visible();

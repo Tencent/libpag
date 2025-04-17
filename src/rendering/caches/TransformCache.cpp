@@ -46,7 +46,7 @@ TransformCache::TransformCache(Layer* layer)
 
 Transform* TransformCache::createCache(Frame layerFrame) {
   auto transform = new Transform();
-  if (layer->transform == nullptr) {
+ if (layer->transform == nullptr) {
     return transform;
   }
   RenderTransform(transform, layer->transform, layerFrame);
@@ -56,7 +56,7 @@ Transform* TransformCache::createCache(Frame layerFrame) {
       Transform parentTransform = {};
       RenderTransform(&parentTransform, parent->transform, layerFrame);
       transform->matrix.postConcat(parentTransform.matrix);
-    }else if (parent->transform3D != nullptr) {
+    } else if (parent->transform3D != nullptr) {
       auto anchorPointP = parent->transform3D->anchorPoint->getValueAt(layerFrame);
       Point3D positionP;
       if (parent->transform3D->position) {
@@ -78,4 +78,14 @@ Transform* TransformCache::createCache(Frame layerFrame) {
   }
   return transform;
 }
+
+std::shared_ptr<Transform> TransformCache::getTransform3D(Frame layerFrame){
+  auto transform = std::make_shared<Transform>();
+  if (layer->transform3D != nullptr) {
+    RenderTransform3D(transform.get(), layer->transform3D, layerFrame);
+  }
+  return transform;
+}
+
+
 }  // namespace pag
