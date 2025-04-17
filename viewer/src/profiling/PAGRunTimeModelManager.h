@@ -44,9 +44,10 @@ class PAGRunTimeModelManager : public QObject {
 
   Q_PROPERTY(int totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
   Q_PROPERTY(int currentFrame READ getCurrentFrame WRITE setCurrentFrame NOTIFY currentFrameChanged)
-  Q_PROPERTY(const PAGFileInfoModel* fileInfoModel READ getFileInfoModel NOTIFY fileInfoModelChanged)
-  Q_PROPERTY(const PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel NOTIFY
-                 frameDisplayInfoModelChanged)
+  Q_PROPERTY(
+      const PAGFileInfoModel* fileInfoModel READ getFileInfoModel NOTIFY fileInfoModelChanged)
+  Q_PROPERTY(const PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel
+                 NOTIFY frameDisplayInfoModelChanged)
 
   auto getTotalFrame() const -> int;
   auto getCurrentFrame() const -> int;
