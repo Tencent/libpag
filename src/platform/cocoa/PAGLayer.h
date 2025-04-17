@@ -165,4 +165,10 @@ PAG_API @interface PAGLayer : NSObject
  */
 - (void)setExcludedFromTimeline:(BOOL)value;
 
+/**
+ * Set the alpha of the layer, which will be concatenated to the current animation opacity for
+ * displaying.
+ */
+- (void)setAlpha:(float)value;
+
 @end

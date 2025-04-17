@@ -72,4 +72,6 @@
 
 - (void)setExcludedFromTimeline:(BOOL)value;
 
+- (void)setAlpha:(float)value;
+
 @end

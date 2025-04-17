@@ -133,6 +133,10 @@
   [(PAGLayerImpl*)_impl setExcludedFromTimeline:value];
 }
 
+- (void)setAlpha:(float)value{
+  [(PAGLayerImpl*)_impl setAlpha:value];
+}
+
 - (void)dealloc {
   [_impl release];
   [super dealloc];
