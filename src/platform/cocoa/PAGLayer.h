@@ -171,4 +171,9 @@ PAG_API @interface PAGLayer : NSObject
  */
 - (void)setAlpha:(float)value;
 
+/**
+ * Returns the current alpha of the layer if previously set.
+ */
+- (float)alpha;
+
 @end

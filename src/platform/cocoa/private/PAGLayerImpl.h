@@ -74,4 +74,6 @@
 
 - (void)setAlpha:(float)value;
 
+- (float)alpha;
+
 @end

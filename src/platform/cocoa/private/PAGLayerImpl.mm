@@ -258,4 +258,8 @@
   _pagLayer->setAlpha(value);
 }
 
+- (float)alpha {
+  return _pagLayer->alpha();
+}
+
 @end

@@ -178,6 +178,11 @@ public class PAGLayer {
      */
     public native void setAlpha(float value);
 
+    /**
+    * Returns the current alpha of the layer if previously set.
+    */
+    public native float alpha();
+
     private native void nativeRelease();
 
     protected long nativeContext;
