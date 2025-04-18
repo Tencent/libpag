@@ -18,24 +18,47 @@
 
 #pragma once
 
-#include <QThread>
+#include <QAbstractListModel>
+#include <QString>
 
 namespace pag {
 
-class PAGView;
+class FrameDisplayInfo {
+ public:
+  FrameDisplayInfo(const QString& name, const QString& color, int64_t current, int64_t avg,
+                   int64_t max);
 
-class PAGRenderThread : public QThread {
+  QString name = "";
+  QString color = "";
+  int64_t current = 0;
+  int64_t avg = 0;
+  int64_t max = 0;
+};
+
+class PAGFrameDisplayInfoModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  explicit PAGRenderThread(PAGView* pagView);
+  enum class PAGFrameDisplayInfoRoles {
+    NameRole = Qt::UserRole + 1,
+    ColorRole,
+    CurrentRole,
+    AvgRole,
+    MaxRole
+  };
 
-  Q_SIGNAL void frameTimeMetricsReady(int64_t frame, int64_t renderTime, int64_t presentTime,
-                                      int64_t imageDecodeTime);
+  PAGFrameDisplayInfoModel();
+  explicit PAGFrameDisplayInfoModel(QObject* parent);
 
-  Q_SLOT void flush();
-  Q_SLOT void shutDown();
+  auto data(const QModelIndex& index, int role) const -> QVariant override;
+  auto rowCount(const QModelIndex& parent) const -> int override;
+  auto updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present,
+                  const FrameDisplayInfo& imageDecode) -> void;
+
+ protected:
+  auto roleNames() const -> QHash<int, QByteArray> override;
 
  private:
-  PAGView* pagView = nullptr;
+  std::vector<FrameDisplayInfo> diplayInfos = {};
 };
+
 }  // namespace pag

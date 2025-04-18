@@ -18,8 +18,9 @@
 
 #include "PAGWindow.h"
 #include <QQmlContext>
-#include <QThread>
+#include "PAGRenderThread.h"
 #include "PAGWindowHelper.h"
+#include "profiling/PAGRunTimeModelManager.h"
 #include "task/PAGTaskFactory.h"
 
 namespace pag {
@@ -58,13 +59,22 @@ auto PAGWindow::open() -> void {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  auto surfaceFormat = window->format();
+  surfaceFormat.setSwapInterval(1);
+  window->setFormat(surfaceFormat);
 
   pagView = window->findChild<pag::PAGView*>("pagView");
   auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
+  auto* runTimeModelManager = window->findChild<PAGRunTimeModelManager*>("runTimeModelManager");
+  PAGRenderThread* renderThread = pagView->getRenderThread();
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
+  connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
   connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
+  connect(pagView, &PAGView::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
+  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager,
+          &PAGRunTimeModelManager::updateData);
 }
 
 auto PAGWindow::getFilePath() -> QString {
