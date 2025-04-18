@@ -173,8 +173,8 @@ public class PAGLayer {
     public native void setExcludedFromTimeline(boolean value);
 
     /**
-    * Returns the current alpha of the layer if previously set.
-    */
+     * Returns the current alpha of the layer if previously set.
+     */
     public native float alpha();
 
     /**
