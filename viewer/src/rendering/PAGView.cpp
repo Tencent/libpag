@@ -104,9 +104,6 @@ auto PAGView::getFilePath() const -> QString {
 }
 
 auto PAGView::getDisplayedTime() const -> QString {
-  if (pagFile == nullptr) {
-    return "00:00";
-  }
   int64_t displayedTime =
       static_cast<int64_t>(std::round(getProgress() * getDuration().toLongLong() / 1000.0));
   int64_t displayedSeconds = displayedTime % 60;
@@ -126,10 +123,6 @@ auto PAGView::getBackgroundColor() const -> QColor {
 }
 
 auto PAGView::getPreferredSize() const -> QSizeF {
-  if (pagFile == nullptr) {
-    return {0, 0};
-  }
-
   auto quickWindow = window();
   int pagWidth = getPAGWidth();
   int pagHeight = getPAGHeight();
@@ -157,9 +150,6 @@ auto PAGView::getPreferredSize() const -> QSizeF {
 }
 
 auto PAGView::setIsPlaying(bool isPlaying) -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
   if (this->isPlaying_ == isPlaying) {
     return;
   }
@@ -215,25 +205,16 @@ auto PAGView::setFile(const QString& filePath) -> bool {
 }
 
 auto PAGView::firstFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
   setIsPlaying(false);
   setProgress(0);
 }
 
 auto PAGView::lastFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
   setIsPlaying(false);
   setProgress(1);
 }
 
 auto PAGView::nextFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
   setIsPlaying(false);
   auto progress = this->progress + progressPerFrame;
   if (progress > 1) {
@@ -243,9 +224,6 @@ auto PAGView::nextFrame() -> void {
 }
 
 auto PAGView::previousFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
   setIsPlaying(false);
   auto progress = this->progress - progressPerFrame;
   if (progress < 0) {
