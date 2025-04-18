@@ -352,14 +352,17 @@ PAGWindow {
             } else {
                 openFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
             }
-            openFileDialog.accepted.disconnect();
+            if (openFileDialog.currentAcceptHandler) {
+                openFileDialog.accepted.disconnect(openFileDialog.currentAcceptHandler);
+            }
             openFileDialog.fileMode = FileDialog.OpenFile;
             openFileDialog.title = qsTr("Open PAG File");
             openFileDialog.nameFilters = ["PAG files(*.pag)"];
-            openFileDialog.accepted.connect(function () {
+            openFileDialog.currentAcceptHandler = function () {
                 let filePath = openFileDialog.selectedFile;
                 mainForm.pagView.setFile(filePath);
-            });
+            };
+            openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
             openFileDialog.open();
             break;
         case "close-window":
