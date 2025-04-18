@@ -254,4 +254,12 @@
   _pagLayer->setExcludedFromTimeline(value);
 }
 
+- (float)alpha {
+  return _pagLayer->alpha();
+}
+
+- (void)setAlpha:(float)value {
+  _pagLayer->setAlpha(value);
+}
+
 @end
