@@ -298,15 +298,6 @@ PAG_API void Java_org_libpag_PAGLayer_setExcludedFromTimeline(JNIEnv* env, jobje
   pagLayer->setExcludedFromTimeline(value);
 }
 
-PAG_API void Java_org_libpag_PAGLayer_setAlpha(JNIEnv* env, jobject thiz, jfloat value) {
-  auto pagLayer = GetPAGLayer(env, thiz);
-  if (pagLayer == nullptr) {
-    return;
-  }
-
-  pagLayer->setAlpha(value);
-}
-
 PAG_API jfloat Java_org_libpag_PAGLayer_alpha(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
@@ -314,5 +305,14 @@ PAG_API jfloat Java_org_libpag_PAGLayer_alpha(JNIEnv* env, jobject thiz) {
   }
 
   return pagLayer->alpha();
+}
+
+PAG_API void Java_org_libpag_PAGLayer_setAlpha(JNIEnv* env, jobject thiz, jfloat value) {
+  auto pagLayer = GetPAGLayer(env, thiz);
+  if (pagLayer == nullptr) {
+    return;
+  }
+
+  pagLayer->setAlpha(value);
 }
 }

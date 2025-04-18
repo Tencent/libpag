@@ -173,15 +173,15 @@ public class PAGLayer {
     public native void setExcludedFromTimeline(boolean value);
 
     /**
+    * Returns the current alpha of the layer if previously set.
+    */
+    public native float alpha();
+
+    /**
      * Set the alpha of the layer, which will be concatenated to the current animation opacity for
      * displaying.
      */
     public native void setAlpha(float value);
-
-    /**
-    * Returns the current alpha of the layer if previously set.
-    */
-    public native float alpha();
 
     private native void nativeRelease();
 
