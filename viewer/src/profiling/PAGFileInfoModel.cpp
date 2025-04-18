@@ -27,6 +27,9 @@ PAGFileInfo::PAGFileInfo(const QString& name, const QString& value, const QStrin
     : name(name), value(value), unit(unit) {
 }
 
+PAGFileInfoModel::PAGFileInfoModel() : QAbstractListModel(nullptr) {
+}
+
 PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent) {
   beginResetModel();
   fileInfos.emplace_back("Duration", "", "s");

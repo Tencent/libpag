@@ -32,9 +32,9 @@ class FrameTimeMetrics {
   auto operator=(const FrameTimeMetrics& other) -> FrameTimeMetrics&;
 
  public:
-  int64_t renderTime{0};
-  int64_t presentTime{0};
-  int64_t imageDecodeTime{0};
+  int64_t renderTime = 0;
+  int64_t presentTime = 0;
+  int64_t imageDecodeTime = 0;
 };
 
 class PAGRunTimeModelManager : public QObject {
@@ -73,10 +73,10 @@ class PAGRunTimeModelManager : public QObject {
       -> void;
 
  private:
-  int64_t totalFrame{-1};
-  int64_t currentFrame{-1};
-  PAGFileInfoModel fileInfoModel{};
-  PAGFrameDisplayInfoModel frameDisplayInfoModel{};
-  QMap<int64_t, FrameTimeMetrics> frameTimeMetricsMap{};
+  int64_t totalFrame = -1;
+  int64_t currentFrame = -1;
+  PAGFileInfoModel fileInfoModel = {};
+  PAGFrameDisplayInfoModel frameDisplayInfoModel = {};
+  QMap<int64_t, FrameTimeMetrics> frameTimeMetricsMap = {};
 };
 }  // namespace pag

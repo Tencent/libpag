@@ -28,11 +28,11 @@ class FrameDisplayInfo {
   FrameDisplayInfo(const QString& name, const QString& color, int64_t current, int64_t avg,
                    int64_t max);
 
-  QString name{};
-  QString color{};
-  int64_t current{0};
-  int64_t avg{0};
-  int64_t max{0};
+  QString name = "";
+  QString color = "";
+  int64_t current = 0;
+  int64_t avg = 0;
+  int64_t max = 0;
 };
 
 class PAGFrameDisplayInfoModel : public QAbstractListModel {
@@ -46,7 +46,8 @@ class PAGFrameDisplayInfoModel : public QAbstractListModel {
     MaxRole
   };
 
-  explicit PAGFrameDisplayInfoModel(QObject* parent = nullptr);
+  PAGFrameDisplayInfoModel();
+  explicit PAGFrameDisplayInfoModel(QObject* parent);
 
   auto data(const QModelIndex& index, int role) const -> QVariant override;
   auto rowCount(const QModelIndex& parent) const -> int override;
@@ -57,7 +58,7 @@ class PAGFrameDisplayInfoModel : public QAbstractListModel {
   auto roleNames() const -> QHash<int, QByteArray> override;
 
  private:
-  std::vector<FrameDisplayInfo> diplayInfos{};
+  std::vector<FrameDisplayInfo> diplayInfos = {};
 };
 
 }  // namespace pag

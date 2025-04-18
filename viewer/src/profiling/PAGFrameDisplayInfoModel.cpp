@@ -25,6 +25,9 @@ FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, in
     : name(name), color(color), current(current), avg(avg), max(max) {
 }
 
+PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel() : QAbstractListModel(nullptr) {
+}
+
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel(QObject* parent) : QAbstractListModel(parent) {
 }
 
@@ -33,7 +36,7 @@ auto PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const ->
     return {};
   }
 
-  const auto& item = diplayInfos.at(index.row());
+  const auto& item = diplayInfos[index.row()];
   switch (static_cast<PAGFrameDisplayInfoRoles>(role)) {
     case PAGFrameDisplayInfoRoles::NameRole: {
       return item.name;
