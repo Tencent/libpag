@@ -506,11 +506,41 @@ if (PAG_EXCLUDE_FILES)
     list(REMOVE_ITEM PAG_FILES ${PAG_EXCLUDE_FILES})
 endif ()
 
+function(find_emscripten_version VERSION_OUTPUT)
+    set(${VERSION_OUTPUT} "" PARENT_SCOPE)
+    execute_process(
+            COMMAND emcc --version
+            OUTPUT_VARIABLE EMCC_OUTPUT
+            ERROR_VARIABLE EMCC_ERROR
+            RESULT_VARIABLE EMCC_RESULT
+    )
+    if (NOT EMCC_RESULT EQUAL 0)
+        message(WARNING "Failed to execute emcc --version: ${EMCC_ERROR}")
+        return()
+    endif ()
+
+    string(REGEX MATCH "emcc \\(.*\\) ([0-9]+\\.[0-9]+\\.[0-9]+)" VERSION_MATCH "${EMCC_OUTPUT}")
+    if (VERSION_MATCH)
+        set(${VERSION_OUTPUT} ${CMAKE_MATCH_1} PARENT_SCOPE)
+    else ()
+        message(WARNING "Could not parse Emscripten version from emcc --version output")
+    endif ()
+endfunction()
+
 if (WEB)
     add_executable(pag ${PAG_FILES})
     list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='Hello2D' -sWASM=1 -sASYNCIFY
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify'] -sALLOW_MEMORY_GROWTH=1
-            -sMODULARIZE=1 -sENVIRONMENT='web,worker' -sEXPORT_ES6=1 -sUSE_ES6_IMPORT_META=0)
+            -sMODULARIZE=1 -sENVIRONMENT='web,worker' -sEXPORT_ES6=1)
+    find_emscripten_version(EMSCRIPTEN_VERSION)
+    if(NOT EMSCRIPTEN_VERSION)
+        message(FATAL_ERROR "Failed to get emsdk version. Please ensure emsdk is properly installed and configured.")
+    endif()
+    if (EMSCRIPTEN_VERSION AND ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.4")
+        list(APPEND PAG_LINK_OPTIONS -sUSE_ES6_IMPORT_META=0)
+    elseif (EMSCRIPTEN_VERSION AND ${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "4.0.4" AND ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.6")
+        message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported. Please upgrade to 4.0.6 or higher.")
+    endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         list(APPEND PAG_COMPILE_OPTIONS -O0 -g3)
         list(APPEND PAG_LINK_OPTIONS -O0 -g3 -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
