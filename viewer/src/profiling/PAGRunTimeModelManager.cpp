@@ -76,6 +76,8 @@ auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
                                        const std::string& filePath) -> void {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
+  frameTimeMetricsVector.clear();
+  frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.resize(totalFrame);
   frameTimeMetricsVector.clear();
   fileInfoModel.resetFile(pagFile, filePath);
