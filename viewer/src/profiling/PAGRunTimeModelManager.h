@@ -26,10 +26,7 @@ namespace pag {
 
 class FrameTimeMetrics {
  public:
-  FrameTimeMetrics();
-  FrameTimeMetrics(const FrameTimeMetrics& data);
-  FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
-  auto operator=(const FrameTimeMetrics& other) -> FrameTimeMetrics&;
+  FrameTimeMetrics(int64_t renderTime = 0, int64_t presentTime = 0, int64_t imageDecodeTime = 0);
 
   int64_t renderTime = 0;
   int64_t presentTime = 0;
