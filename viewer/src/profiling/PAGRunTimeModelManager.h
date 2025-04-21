@@ -26,7 +26,7 @@ namespace pag {
 
 class FrameTimeMetrics {
  public:
-  FrameTimeMetrics(int64_t renderTime = 0, int64_t presentTime = 0, int64_t imageDecodeTime = 0);
+  FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
 
   int64_t renderTime = 0;
   int64_t presentTime = 0;
@@ -73,6 +73,6 @@ class PAGRunTimeModelManager : public QObject {
   int64_t currentFrame = -1;
   PAGFileInfoModel fileInfoModel = {};
   PAGFrameDisplayInfoModel frameDisplayInfoModel = {};
-  QMap<int64_t, FrameTimeMetrics> frameTimeMetricsMap = {};
+  QVector<FrameTimeMetrics> frameTimeMetricsVector = {};
 };
 }  // namespace pag

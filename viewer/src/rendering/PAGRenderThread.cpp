@@ -26,6 +26,9 @@ PAGRenderThread::PAGRenderThread(PAGView* pagView) : pagView(pagView) {
 }
 
 auto PAGRenderThread::flush() -> void {
+  if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
+    return;
+  }
   pagView->pagPlayer->flush();
   double progress = pagView->pagFile->getProgress();
   int64_t currentFrame =

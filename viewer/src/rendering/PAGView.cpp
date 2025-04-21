@@ -35,7 +35,7 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
 }
 
 auto PAGView::flush() const -> void {
-  if (pagFile != nullptr && isPlaying_) {
+  if (isPlaying_) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
 }

@@ -62,7 +62,12 @@ auto PAGRunTimeModelManager::updateData(int64_t currentFrame, int64_t renderTime
     return;
   }
   this->currentFrame = currentFrame;
-  frameTimeMetricsMap[currentFrame] = FrameTimeMetrics(renderTime, presentTime, imageDecodeTime);
+  if (currentFrame >= frameTimeMetricsVector.size()) {
+    frameTimeMetricsVector.push_back(FrameTimeMetrics(renderTime, presentTime, imageDecodeTime));
+  } else {
+    frameTimeMetricsVector[currentFrame] =
+        FrameTimeMetrics(renderTime, presentTime, imageDecodeTime);
+  }
   updateFrameDisplayInfo(renderTime, presentTime, imageDecodeTime);
   Q_EMIT dataChanged();
 }
@@ -71,7 +76,8 @@ auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
                                        const std::string& filePath) -> void {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
-  frameTimeMetricsMap.clear();
+  frameTimeMetricsVector.clear();
+  frameTimeMetricsVector.reserve(totalFrame);
   fileInfoModel.resetFile(pagFile, filePath);
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT dataChanged();
@@ -88,20 +94,17 @@ auto PAGRunTimeModelManager::updateFrameDisplayInfo(int64_t renderTime, int64_t 
   int64_t imageDecodeAvg = 0;
   int64_t imageDecodeMax = 0;
   int64_t imageDecodeTotal = 0;
-  int64_t size = static_cast<int64_t>(frameTimeMetricsMap.size());
+  int64_t size = static_cast<int64_t>(frameTimeMetricsVector.size());
 
   if (size > 0) {
-    auto iter = frameTimeMetricsMap.begin();
-    while (iter != frameTimeMetricsMap.end()) {
-      renderTotal += iter->renderTime;
-      renderMax = std::max(iter->renderTime, renderMax);
-      presentTotal += iter->presentTime;
-      presentMax = std::max(iter->presentTime, presentMax);
-      imageDecodeTotal += iter->imageDecodeTime;
-      imageDecodeMax = std::max(iter->imageDecodeTime, imageDecodeMax);
-      ++iter;
+    for (auto& item : frameTimeMetricsVector) {
+      renderTotal += item.renderTime;
+      renderMax = std::max(item.renderTime, renderMax);
+      presentTotal += item.presentTime;
+      presentMax = std::max(item.presentTime, presentMax);
+      imageDecodeTotal += item.imageDecodeTime;
+      imageDecodeMax = std::max(item.imageDecodeTime, imageDecodeMax);
     }
-
     renderAvg = renderTotal / size;
     presentAvg = presentTotal / size;
     imageDecodeAvg = imageDecodeTotal / size;
