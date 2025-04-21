@@ -31,7 +31,6 @@ class FrameTimeMetrics {
   FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
   auto operator=(const FrameTimeMetrics& other) -> FrameTimeMetrics&;
 
- public:
   int64_t renderTime = 0;
   int64_t presentTime = 0;
   int64_t imageDecodeTime = 0;
