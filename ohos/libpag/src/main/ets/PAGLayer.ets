@@ -82,8 +82,8 @@ export class PAGLayer {
   /**
    * Returns the layer's display matrix by combining its matrix) property with the current animation
    * matrix from the AE timeline. This does not include the parent layer's matrix.
-   * To calculate the final bounds relative to the PAGSurface,
-   * use the PAGPlayer::getBounds(PAGLayer layer) method directly.
+   * To calculate the final bounds relative to the PAGSurface, use the PAGPlayer::getBounds(PAGLayer layer)
+   * method directly.
    */
   getTotalMatrix(): Matrix4 {
     return PAGUtils.ToTsMatrix(this.nativeLayer.getTotalMatrix());

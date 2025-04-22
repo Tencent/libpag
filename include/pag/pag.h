@@ -288,8 +288,8 @@ class PAG_API PAGLayer : public Content {
   /**
    * Returns the layer's display matrix by combining its matrix) property with the current animation
    * matrix from the AE timeline. This does not include the parent layer's matrix.
-   * To calculate the final bounds relative to the PAGSurface,
-   * use the PAGPlayer::getBounds(PAGLayer layer) method directly.
+   * To calculate the final bounds relative to the PAGSurface, use the PAGPlayer::getBounds(PAGLayer layer)
+   * method directly.
    */
   Matrix getTotalMatrix();
 

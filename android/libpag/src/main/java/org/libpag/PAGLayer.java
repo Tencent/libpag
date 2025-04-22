@@ -62,11 +62,11 @@ public class PAGLayer {
     public native void resetMatrix();
 
     /**
-    * Returns the layer's display matrix by combining its matrix) property with the current animation
-    * matrix from the AE timeline. This does not include the parent layer's matrix.
-    * To calculate the final bounds relative to the PAGSurface,
-    * use the PAGPlayer::getBounds(PAGLayer layer) method directly.
-    */
+     * Returns the layer's display matrix by combining its matrix) property with the current animation
+     * matrix from the AE timeline. This does not include the parent layer's matrix.
+     * To calculate the final bounds relative to the PAGSurface, use the PAGPlayer::getBounds(PAGLayer layer)
+     * method directly.
+     */
     public Matrix getTotalMatrix() {
         float[] data = new float[9];
         getTotalMatrix(data);
