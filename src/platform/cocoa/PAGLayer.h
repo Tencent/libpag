@@ -59,12 +59,12 @@ PAG_API @interface PAGLayer : NSObject
  */
 - (void)resetMatrix;
 
-  /**
-   * The final matrix for displaying, it is the combination of the matrix property and current
-   * matrix from animation, This matrix does not include the matrix of the parent layer.
-   * If you need to calculate the final bounds size relative to the PAGSurface screen, you can
-   * directly use the PAGPlayer::getBounds(PAGLayer) method
-   */
+/**
+ * The final matrix for displaying, it is the combination of the matrix property and current
+ * matrix from animation, This matrix does not include the matrix of the parent layer.
+ * If you need to calculate the final bounds size relative to the PAGSurface screen, you can
+ * directly use the PAGPlayer::getBounds(PAGLayer) method
+ */
 - (CGAffineTransform)getTotalMatrix;
 
 /**
