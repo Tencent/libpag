@@ -489,7 +489,12 @@ if (WEB)
     add_executable(pag ${PAG_FILES})
     list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='Hello2D' -sWASM=1 -sASYNCIFY
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify'] -sALLOW_MEMORY_GROWTH=1
-            -sMODULARIZE=1 -sENVIRONMENT='web,worker' -sEXPORT_ES6=1 -sUSE_ES6_IMPORT_META=0)
+            -sMODULARIZE=1 -sENVIRONMENT='web,worker' -sEXPORT_ES6=1)
+    if (${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.4")
+        list(APPEND PAG_LINK_OPTIONS -sUSE_ES6_IMPORT_META=0)
+    elseif (${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "4.0.4" AND ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.6")
+        message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported. Please upgrade to 4.0.6 or higher.")
+    endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         list(APPEND PAG_COMPILE_OPTIONS -O0 -g3)
         list(APPEND PAG_LINK_OPTIONS -O0 -g3 -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
