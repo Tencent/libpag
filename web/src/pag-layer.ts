@@ -53,10 +53,10 @@ export class PAGLayer {
     this.wasmIns._resetMatrix();
   }
   /**
-   * The final matrix for displaying, it is the combination of the matrix property and current
-   * matrix from animation, This matrix does not include the matrix of the parent layer.
-   * If you need to calculate the final bounds size relative to the PAGSurface screen, you can
-   * directly use the PAGPlayer::getBounds(PAGLayer) method
+   * Returns the layer's display matrix by combining its matrix) property with the current animation
+   * matrix from the AE timeline. This does not include the parent layer's matrix.
+   * To calculate the final bounds relative to the PAGSurface,
+   * use the PAGPlayer::getBounds(PAGLayer layer) method directly.
    */
   public getTotalMatrix(): Matrix {
     const wasmIns = this.wasmIns._getTotalMatrix();
