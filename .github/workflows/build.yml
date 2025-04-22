@@ -322,9 +322,10 @@ jobs:
         with:
           host: 'mac'
           target: 'desktop'
-          version: '6.8.1'
+          version: '6.8.3'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
+          aqtversion: '==3.2.1'
           cache: 'true'
           cache-key-prefix: 'install-qt-action'
 
