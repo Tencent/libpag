@@ -22,9 +22,6 @@
 
 namespace pag {
 
-FrameTimeMetrics::FrameTimeMetrics() : renderTime(0), presentTime(0), imageDecodeTime(0) {
-}
-
 FrameTimeMetrics::FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime)
     : renderTime(renderTime), presentTime(presentTime), imageDecodeTime(imageDecodeTime) {
 }
@@ -76,7 +73,7 @@ auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
                                        const std::string& filePath) -> void {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
-  frameTimeMetricsVector.resize(totalFrame);
+  frameTimeMetricsVector.resize(totalFrame, {0, 0, 0});
   frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.clear();
   fileInfoModel.resetFile(pagFile, filePath);

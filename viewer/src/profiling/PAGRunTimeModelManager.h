@@ -26,7 +26,6 @@ namespace pag {
 
 class FrameTimeMetrics {
  public:
-  FrameTimeMetrics();
   FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
 
   int64_t renderTime = 0;
