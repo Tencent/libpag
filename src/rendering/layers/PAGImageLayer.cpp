@@ -682,9 +682,17 @@ int PAGImageLayer::getDefaultScaleMode() {
   if (imageLayer && imageLayer->imageFillRule) {
     return imageLayer->imageFillRule->scaleMode;
   }
-  int index = editableIndex();
-  if (index >= 0 && file && file->imageScaleModes && !file->imageScaleModes->empty()) {
-    return file->imageScaleModes->at(index);
+  if (file && file->editableImages != nullptr) {
+    int index = -1;
+    for (size_t i = 0; i < file->editableImages->size(); i++) {
+      if (file->editableImages->at(i) == editableIndex()) {
+        index = i;
+        break;
+      }
+    }
+    if (index >= 0 && file->imageScaleModes != nullptr && file->imageScaleModes->size() > static_cast<size_t>(index)) {
+      return file->imageScaleModes->at(index);
+    }
   }
 
   return PAGScaleMode::LetterBox;
