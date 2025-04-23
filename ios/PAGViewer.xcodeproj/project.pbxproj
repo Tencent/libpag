@@ -352,7 +352,6 @@
 				TargetAttributes = {
 					F2ED889D1FCBEDF100555707 = {
 						CreatedOnToolsVersion = 9.1;
-						ProvisioningStyle = Manual;
 					};
 				};
 			};
@@ -611,8 +610,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMPRESS_PNG_FILES = YES;
 				DEVELOPMENT_TEAM = 36588GHG2N;
 				EXPORTED_SYMBOLS_FILE = "";
@@ -631,7 +630,7 @@
 				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = io.pag.viewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = PAG_Development;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRIP_PNG_TEXT = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = "";
@@ -644,8 +643,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMPRESS_PNG_FILES = YES;
 				DEVELOPMENT_TEAM = 36588GHG2N;
 				EXPORTED_SYMBOLS_FILE = "";
@@ -664,7 +663,7 @@
 				OTHER_LDFLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = io.pag.viewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = PAG_Development;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRIP_PNG_TEXT = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				USER_HEADER_SEARCH_PATHS = "";
