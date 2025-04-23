@@ -682,17 +682,11 @@ int PAGImageLayer::getDefaultScaleMode() {
   if (imageLayer && imageLayer->imageFillRule) {
     return imageLayer->imageFillRule->scaleMode;
   }
-  if (file && file->editableImages != nullptr) {
-    int index = -1;
+  if (file && file->editableImages != nullptr && file->imageScaleModes != nullptr) {
     for (size_t i = 0; i < file->editableImages->size(); i++) {
-      if (file->editableImages->at(i) == editableIndex()) {
-        index = i;
-        break;
+      if (file->editableImages->at(i) == editableIndex() && file->imageScaleModes->size() > i) {
+        return file->imageScaleModes->at(i);
       }
-    }
-    if (index >= 0 && file->imageScaleModes != nullptr &&
-        file->imageScaleModes->size() > static_cast<size_t>(index)) {
-      return file->imageScaleModes->at(index);
     }
   }
 
