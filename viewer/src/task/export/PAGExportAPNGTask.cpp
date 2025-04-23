@@ -18,8 +18,8 @@
 
 #include "PAGExportAPNGTask.h"
 #include <QDebug>
-#include "utils/PAGFileUtils.h"
-#include "utils/PAGUtils.h"
+#include "utils/FileUtils.h"
+#include "utils/Utils.h"
 
 namespace pag {
 

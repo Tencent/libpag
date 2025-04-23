@@ -185,8 +185,8 @@ endif ()
 
 if (PAG_USE_QT)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
-    # set(CMAKE_PREFIX_PATH /Users/username/Qt5.13.0/5.13.0/clang_64/lib/cmake)
-    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+    # set(CMAKE_PREFIX_PATH /Users/username/Qt6.2.0/Qt6.2.0/clang_64/lib/cmake)
+    find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
     find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets OpenGL Quick)
     list(APPEND PAG_SHARED_LIBS Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::OpenGL
             Qt${QT_VERSION_MAJOR}::Quick)

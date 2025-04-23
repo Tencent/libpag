@@ -18,24 +18,36 @@
 
 #pragma once
 
-#include <QThread>
+#include <QAbstractListModel>
+#include "pag/pag.h"
 
 namespace pag {
+class PAGFileInfo {
+ public:
+  explicit PAGFileInfo(const QString& name, const QString& value = "", const QString& unit = "");
 
-class PAGView;
+  QString name = "";
+  QString value = "";
+  QString unit = "";
+};
 
-class PAGRenderThread : public QThread {
+class PAGFileInfoModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  explicit PAGRenderThread(PAGView* pagView);
+  enum class PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, UnitRole };
 
-  Q_SIGNAL void frameTimeMetricsReady(int64_t frame, int64_t renderTime, int64_t presentTime,
-                                      int64_t imageDecodeTime);
+  PAGFileInfoModel();
+  explicit PAGFileInfoModel(QObject* parent);
 
-  Q_SLOT void flush();
-  Q_SLOT void shutDown();
+  auto data(const QModelIndex& index, int role) const -> QVariant override;
+  auto rowCount(const QModelIndex& parent) const -> int override;
+  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath) -> void;
+
+ protected:
+  auto roleNames() const -> QHash<int, QByteArray> override;
 
  private:
-  PAGView* pagView = nullptr;
+  std::vector<PAGFileInfo> fileInfos = {};
 };
+
 }  // namespace pag

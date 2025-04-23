@@ -26,7 +26,17 @@ PAGRenderThread::PAGRenderThread(PAGView* pagView) : pagView(pagView) {
 }
 
 auto PAGRenderThread::flush() -> void {
+  if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
+    return;
+  }
   pagView->pagPlayer->flush();
+  double progress = pagView->pagFile->getProgress();
+  int64_t currentFrame =
+      static_cast<int64_t>(std::round((pagView->getTotalFrame().toDouble() - 1) * progress));
+  int64_t renderingTime = pagView->pagPlayer->renderingTime();
+  int64_t presentingTime = pagView->pagPlayer->presentingTime();
+  int64_t imageDecodingTime = pagView->pagPlayer->imageDecodingTime();
+  Q_EMIT frameTimeMetricsReady(currentFrame, renderingTime, presentingTime, imageDecodingTime);
   QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
 }
 

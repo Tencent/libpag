@@ -19,7 +19,7 @@
 #include "task/export/PAGExportPNGTask.h"
 #include <QImage>
 #include <QOpenGLContext>
-#include "utils/PAGFileUtils.h"
+#include "utils/FileUtils.h"
 
 namespace pag {
 
