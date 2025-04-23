@@ -62,7 +62,10 @@ public class PAGLayer {
     public native void resetMatrix();
 
     /**
-     * The final matrix for displaying, it is the combination of the matrix property and current matrix from animation.
+     * Returns the layer's display matrix by combining its matrix) property with the current animation
+     * matrix from the AE timeline. This does not include the parent layer's matrix.
+     * To calculate the final bounds relative to the PAGSurface, use the PAGPlayer::getBounds(PAGLayer layer)
+     * method directly.
      */
     public Matrix getTotalMatrix() {
         float[] data = new float[9];
@@ -171,6 +174,17 @@ public class PAGLayer {
      * Set the excludedFromTimeline flag of this layer.
      */
     public native void setExcludedFromTimeline(boolean value);
+
+    /**
+     * Returns the current alpha of the layer if previously set.
+     */
+    public native float alpha();
+
+    /**
+     * Set the alpha of the layer, which will be concatenated to the current animation opacity for
+     * displaying.
+     */
+    public native void setAlpha(float value);
 
     private native void nativeRelease();
 

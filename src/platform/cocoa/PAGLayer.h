@@ -60,8 +60,10 @@ PAG_API @interface PAGLayer : NSObject
 - (void)resetMatrix;
 
 /**
- * The final matrix for displaying, it is the combination of the matrix property and current matrix
- * from animation.
+ * Returns the layer's display matrix by combining its matrix) property with the current animation
+ * matrix from the AE timeline. This does not include the parent layer's matrix.
+ * To calculate the final bounds relative to the PAGSurface, use the PAGPlayer::getBounds(PAGLayer
+ * layer) method directly.
  */
 - (CGAffineTransform)getTotalMatrix;
 
@@ -164,5 +166,16 @@ PAG_API @interface PAGLayer : NSObject
  * Set the excludedFromTimeline flag of this layer.
  */
 - (void)setExcludedFromTimeline:(BOOL)value;
+
+/**
+ * Returns the current alpha of the layer if previously set.
+ */
+- (float)alpha;
+
+/**
+ * Set the alpha of the layer, which will be concatenated to the current animation opacity for
+ * displaying.
+ */
+- (void)setAlpha:(float)value;
 
 @end
