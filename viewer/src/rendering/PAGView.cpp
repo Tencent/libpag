@@ -47,14 +47,14 @@ PAGView::~PAGView() {
 
 auto PAGView::getPAGWidth() const -> int {
   if (pagFile == nullptr) {
-    return -1;
+    return 0;
   }
   return pagFile->width();
 }
 
 auto PAGView::getPAGHeight() const -> int {
   if (pagFile == nullptr) {
-    return -1;
+    return 0;
   }
   return pagFile->height();
 }
