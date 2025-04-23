@@ -19,7 +19,7 @@
 #include "PAGFileInfoModel.h"
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "utils/PAGStringUtils.h"
+#include "utils/StringUtils.h"
 
 namespace pag {
 

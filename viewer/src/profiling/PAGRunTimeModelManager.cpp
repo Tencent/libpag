@@ -22,11 +22,11 @@
 
 namespace pag {
 
-FrameTimeMetrics::FrameTimeMetrics(int64_t renderTime, int64_t presentTime,
-                                   int64_t imageDecodeTime) {
-  this->renderTime = renderTime;
-  this->presentTime = presentTime;
-  this->imageDecodeTime = imageDecodeTime;
+FrameTimeMetrics::FrameTimeMetrics() : renderTime(0), presentTime(0), imageDecodeTime(0) {
+}
+
+FrameTimeMetrics::FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime)
+    : renderTime(renderTime), presentTime(presentTime), imageDecodeTime(imageDecodeTime) {
 }
 
 PAGRunTimeModelManager::PAGRunTimeModelManager(QObject* parent) : QObject(parent) {
