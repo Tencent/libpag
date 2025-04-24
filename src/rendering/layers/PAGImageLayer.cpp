@@ -683,10 +683,12 @@ int PAGImageLayer::getDefaultScaleMode() {
     return imageLayer->imageFillRule->scaleMode;
   }
   if (file && file->editableImages != nullptr && file->imageScaleModes != nullptr) {
-    for (size_t i = 0; i < file->editableImages->size(); i++) {
-      if (file->editableImages->at(i) == editableIndex() && file->imageScaleModes->size() > i) {
-        return file->imageScaleModes->at(i);
-      }
+    auto iter =
+        std::find(file->editableImages->begin(), file->editableImages->end(), editableIndex());
+    auto distance = std::distance(file->editableImages->begin(), iter);
+    if (iter != file->editableImages->end() &&
+        static_cast<size_t>(distance) < file->imageScaleModes->size()) {
+      return file->imageScaleModes->at(distance);
     }
   }
 
