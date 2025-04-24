@@ -1,0 +1,78 @@
+
+// %t Type Integration
+
+bool operator==(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<std::underlying_type<gl::%t>::type>(a) == b;
+}
+
+bool operator!=(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<std::underlying_type<gl::%t>::type>(a) != b;
+}
+
+bool operator<(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<std::underlying_type<gl::%t>::type>(a) < b;
+}
+
+bool operator<=(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<std::underlying_type<gl::%t>::type>(a) <= b;
+}
+
+bool operator>(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<std::underlying_type<gl::%t>::type>(a) > b;
+}
+
+bool operator>=(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<std::underlying_type<gl::%t>::type>(a) >= b;
+}
+
+bool operator==(std::underlying_type<gl::%t>::type a, const gl::%t & b)
+{
+    return a == static_cast<std::underlying_type<gl::%t>::type>(b);
+}
+
+bool operator!=(std::underlying_type<gl::%t>::type a, const gl::%t & b)
+{
+    return a != static_cast<std::underlying_type<gl::%t>::type>(b);
+}
+
+bool operator<(std::underlying_type<gl::%t>::type a, const gl::%t & b)
+{
+    return a < static_cast<std::underlying_type<gl::%t>::type>(b);
+}
+
+bool operator<=(std::underlying_type<gl::%t>::type a, const gl::%t & b)
+{
+    return a <= static_cast<std::underlying_type<gl::%t>::type>(b);
+}
+
+bool operator>(std::underlying_type<gl::%t>::type a, const gl::%t & b)
+{
+    return a > static_cast<std::underlying_type<gl::%t>::type>(b);
+}
+
+bool operator>=(std::underlying_type<gl::%t>::type a, const gl::%t & b)
+{
+    return a >= static_cast<std::underlying_type<gl::%t>::type>(b);
+}
+
+gl::%t operator+(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<gl::%t>(static_cast<std::underlying_type<gl::%t>::type>(a) + b);
+}
+
+gl::%t operator-(const gl::%t & a, std::underlying_type<gl::%t>::type b)
+{
+    return static_cast<gl::%t>(static_cast<std::underlying_type<gl::%t>::type>(a) - b);
+}
+
+std::ostream & operator<<(std::ostream & stream, const gl::%t & value)
+{
+    stream << gl::Meta::getString(value);
+    return stream;
+}

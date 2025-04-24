@@ -1,0 +1,379 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D7B73A951B6C243D00BCC010 /* AbstractFunction.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A741B6C243D00BCC010 /* AbstractFunction.cpp */; };
+		D7B73A961B6C243D00BCC010 /* AbstractValue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A751B6C243D00BCC010 /* AbstractValue.cpp */; };
+		D7B73A971B6C243D00BCC010 /* Binding_objects.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A761B6C243D00BCC010 /* Binding_objects.cpp */; };
+		D7B73A981B6C243D00BCC010 /* Binding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A771B6C243D00BCC010 /* Binding.cpp */; };
+		D7B73A991B6C243D00BCC010 /* callbacks_private.h in Headers */ = {isa = PBXBuildFile; fileRef = D7B73A781B6C243D00BCC010 /* callbacks_private.h */; };
+		D7B73A9A1B6C243D00BCC010 /* callbacks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A791B6C243D00BCC010 /* callbacks.cpp */; };
+		D7B73A9B1B6C243D00BCC010 /* ContextHandle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A7A1B6C243D00BCC010 /* ContextHandle.cpp */; };
+		D7B73A9C1B6C243D00BCC010 /* ContextInfo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A7B1B6C243D00BCC010 /* ContextInfo.cpp */; };
+		D7B73A9D1B6C243D00BCC010 /* functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A7D1B6C243D00BCC010 /* functions.cpp */; };
+		D7B73A9E1B6C243D00BCC010 /* types.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A7E1B6C243D00BCC010 /* types.cpp */; };
+		D7B73A9F1B6C243D00BCC010 /* glrevision.h in Headers */ = {isa = PBXBuildFile; fileRef = D7B73A7F1B6C243D00BCC010 /* glrevision.h */; };
+		D7B73AA01B6C243D00BCC010 /* logging_private.h in Headers */ = {isa = PBXBuildFile; fileRef = D7B73A801B6C243D00BCC010 /* logging_private.h */; };
+		D7B73AA11B6C243D00BCC010 /* logging.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A811B6C243D00BCC010 /* logging.cpp */; };
+		D7B73AA21B6C243D00BCC010 /* Meta_BitfieldsByString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A821B6C243D00BCC010 /* Meta_BitfieldsByString.cpp */; };
+		D7B73AA31B6C243D00BCC010 /* Meta_BooleansByString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A831B6C243D00BCC010 /* Meta_BooleansByString.cpp */; };
+		D7B73AA41B6C243D00BCC010 /* Meta_EnumsByString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A841B6C243D00BCC010 /* Meta_EnumsByString.cpp */; };
+		D7B73AA51B6C243D00BCC010 /* Meta_ExtensionsByFunctionString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A851B6C243D00BCC010 /* Meta_ExtensionsByFunctionString.cpp */; };
+		D7B73AA61B6C243D00BCC010 /* Meta_ExtensionsByString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A861B6C243D00BCC010 /* Meta_ExtensionsByString.cpp */; };
+		D7B73AA71B6C243D00BCC010 /* Meta_FunctionStringsByExtension.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A871B6C243D00BCC010 /* Meta_FunctionStringsByExtension.cpp */; };
+		D7B73AA81B6C243D00BCC010 /* Meta_Maps.h in Headers */ = {isa = PBXBuildFile; fileRef = D7B73A881B6C243D00BCC010 /* Meta_Maps.h */; };
+		D7B73AA91B6C243D00BCC010 /* Meta_ReqVersionsByExtension.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A891B6C243D00BCC010 /* Meta_ReqVersionsByExtension.cpp */; };
+		D7B73AAA1B6C243D00BCC010 /* Meta_StringsByBitfield.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A8A1B6C243D00BCC010 /* Meta_StringsByBitfield.cpp */; };
+		D7B73AAB1B6C243D00BCC010 /* Meta_StringsByBoolean.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A8B1B6C243D00BCC010 /* Meta_StringsByBoolean.cpp */; };
+		D7B73AAC1B6C243D00BCC010 /* Meta_StringsByEnum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A8C1B6C243D00BCC010 /* Meta_StringsByEnum.cpp */; };
+		D7B73AAD1B6C243D00BCC010 /* Meta_StringsByExtension.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A8D1B6C243D00BCC010 /* Meta_StringsByExtension.cpp */; };
+		D7B73AAE1B6C243D00BCC010 /* Meta.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A8E1B6C243D00BCC010 /* Meta.cpp */; };
+		D7B73AAF1B6C243D00BCC010 /* ProcAddress.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A8F1B6C243D00BCC010 /* ProcAddress.cpp */; };
+		D7B73AB01B6C243D00BCC010 /* RingBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = D7B73A901B6C243D00BCC010 /* RingBuffer.h */; };
+		D7B73AB11B6C243D00BCC010 /* RingBuffer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = D7B73A911B6C243D00BCC010 /* RingBuffer.hpp */; };
+		D7B73AB21B6C243D00BCC010 /* Value.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A921B6C243D00BCC010 /* Value.cpp */; };
+		D7B73AB31B6C243D00BCC010 /* Version_ValidVersions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A931B6C243D00BCC010 /* Version_ValidVersions.cpp */; };
+		D7B73AB41B6C243D00BCC010 /* Version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D7B73A941B6C243D00BCC010 /* Version.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		D7B73A451B6C20AC00BCC010 /* libglbinding.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libglbinding.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7B73A741B6C243D00BCC010 /* AbstractFunction.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AbstractFunction.cpp; path = ../../glbinding/source/glbinding/source/AbstractFunction.cpp; sourceTree = "<group>"; };
+		D7B73A751B6C243D00BCC010 /* AbstractValue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AbstractValue.cpp; path = ../../glbinding/source/glbinding/source/AbstractValue.cpp; sourceTree = "<group>"; };
+		D7B73A761B6C243D00BCC010 /* Binding_objects.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Binding_objects.cpp; path = ../../glbinding/source/glbinding/source/Binding_objects.cpp; sourceTree = "<group>"; };
+		D7B73A771B6C243D00BCC010 /* Binding.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Binding.cpp; path = ../../glbinding/source/glbinding/source/Binding.cpp; sourceTree = "<group>"; };
+		D7B73A781B6C243D00BCC010 /* callbacks_private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = callbacks_private.h; path = ../../glbinding/source/glbinding/source/callbacks_private.h; sourceTree = "<group>"; };
+		D7B73A791B6C243D00BCC010 /* callbacks.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = callbacks.cpp; path = ../../glbinding/source/glbinding/source/callbacks.cpp; sourceTree = "<group>"; };
+		D7B73A7A1B6C243D00BCC010 /* ContextHandle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ContextHandle.cpp; path = ../../glbinding/source/glbinding/source/ContextHandle.cpp; sourceTree = "<group>"; };
+		D7B73A7B1B6C243D00BCC010 /* ContextInfo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ContextInfo.cpp; path = ../../glbinding/source/glbinding/source/ContextInfo.cpp; sourceTree = "<group>"; };
+		D7B73A7D1B6C243D00BCC010 /* functions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = functions.cpp; sourceTree = "<group>"; };
+		D7B73A7E1B6C243D00BCC010 /* types.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = types.cpp; sourceTree = "<group>"; };
+		D7B73A7F1B6C243D00BCC010 /* glrevision.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = glrevision.h; path = ../../glbinding/source/glbinding/source/glrevision.h; sourceTree = "<group>"; };
+		D7B73A801B6C243D00BCC010 /* logging_private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = logging_private.h; path = ../../glbinding/source/glbinding/source/logging_private.h; sourceTree = "<group>"; };
+		D7B73A811B6C243D00BCC010 /* logging.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = logging.cpp; path = ../../glbinding/source/glbinding/source/logging.cpp; sourceTree = "<group>"; };
+		D7B73A821B6C243D00BCC010 /* Meta_BitfieldsByString.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_BitfieldsByString.cpp; path = ../../glbinding/source/glbinding/source/Meta_BitfieldsByString.cpp; sourceTree = "<group>"; };
+		D7B73A831B6C243D00BCC010 /* Meta_BooleansByString.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_BooleansByString.cpp; path = ../../glbinding/source/glbinding/source/Meta_BooleansByString.cpp; sourceTree = "<group>"; };
+		D7B73A841B6C243D00BCC010 /* Meta_EnumsByString.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_EnumsByString.cpp; path = ../../glbinding/source/glbinding/source/Meta_EnumsByString.cpp; sourceTree = "<group>"; };
+		D7B73A851B6C243D00BCC010 /* Meta_ExtensionsByFunctionString.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_ExtensionsByFunctionString.cpp; path = ../../glbinding/source/glbinding/source/Meta_ExtensionsByFunctionString.cpp; sourceTree = "<group>"; };
+		D7B73A861B6C243D00BCC010 /* Meta_ExtensionsByString.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_ExtensionsByString.cpp; path = ../../glbinding/source/glbinding/source/Meta_ExtensionsByString.cpp; sourceTree = "<group>"; };
+		D7B73A871B6C243D00BCC010 /* Meta_FunctionStringsByExtension.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_FunctionStringsByExtension.cpp; path = ../../glbinding/source/glbinding/source/Meta_FunctionStringsByExtension.cpp; sourceTree = "<group>"; };
+		D7B73A881B6C243D00BCC010 /* Meta_Maps.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Meta_Maps.h; path = ../../glbinding/source/glbinding/source/Meta_Maps.h; sourceTree = "<group>"; };
+		D7B73A891B6C243D00BCC010 /* Meta_ReqVersionsByExtension.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_ReqVersionsByExtension.cpp; path = ../../glbinding/source/glbinding/source/Meta_ReqVersionsByExtension.cpp; sourceTree = "<group>"; };
+		D7B73A8A1B6C243D00BCC010 /* Meta_StringsByBitfield.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_StringsByBitfield.cpp; path = ../../glbinding/source/glbinding/source/Meta_StringsByBitfield.cpp; sourceTree = "<group>"; };
+		D7B73A8B1B6C243D00BCC010 /* Meta_StringsByBoolean.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_StringsByBoolean.cpp; path = ../../glbinding/source/glbinding/source/Meta_StringsByBoolean.cpp; sourceTree = "<group>"; };
+		D7B73A8C1B6C243D00BCC010 /* Meta_StringsByEnum.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_StringsByEnum.cpp; path = ../../glbinding/source/glbinding/source/Meta_StringsByEnum.cpp; sourceTree = "<group>"; };
+		D7B73A8D1B6C243D00BCC010 /* Meta_StringsByExtension.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta_StringsByExtension.cpp; path = ../../glbinding/source/glbinding/source/Meta_StringsByExtension.cpp; sourceTree = "<group>"; };
+		D7B73A8E1B6C243D00BCC010 /* Meta.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Meta.cpp; path = ../../glbinding/source/glbinding/source/Meta.cpp; sourceTree = "<group>"; };
+		D7B73A8F1B6C243D00BCC010 /* ProcAddress.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = ProcAddress.cpp; path = ../../glbinding/source/glbinding/source/ProcAddress.cpp; sourceTree = "<group>"; };
+		D7B73A901B6C243D00BCC010 /* RingBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RingBuffer.h; path = ../../glbinding/source/glbinding/source/RingBuffer.h; sourceTree = "<group>"; };
+		D7B73A911B6C243D00BCC010 /* RingBuffer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = RingBuffer.hpp; path = ../../glbinding/source/glbinding/source/RingBuffer.hpp; sourceTree = "<group>"; };
+		D7B73A921B6C243D00BCC010 /* Value.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Value.cpp; path = ../../glbinding/source/glbinding/source/Value.cpp; sourceTree = "<group>"; };
+		D7B73A931B6C243D00BCC010 /* Version_ValidVersions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Version_ValidVersions.cpp; path = ../../glbinding/source/glbinding/source/Version_ValidVersions.cpp; sourceTree = "<group>"; };
+		D7B73A941B6C243D00BCC010 /* Version.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Version.cpp; path = ../../glbinding/source/glbinding/source/Version.cpp; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D7B73A421B6C20AC00BCC010 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D7B73A3C1B6C20AC00BCC010 = {
+			isa = PBXGroup;
+			children = (
+				D7B73A741B6C243D00BCC010 /* AbstractFunction.cpp */,
+				D7B73A751B6C243D00BCC010 /* AbstractValue.cpp */,
+				D7B73A761B6C243D00BCC010 /* Binding_objects.cpp */,
+				D7B73A771B6C243D00BCC010 /* Binding.cpp */,
+				D7B73A781B6C243D00BCC010 /* callbacks_private.h */,
+				D7B73A791B6C243D00BCC010 /* callbacks.cpp */,
+				D7B73A7A1B6C243D00BCC010 /* ContextHandle.cpp */,
+				D7B73A7B1B6C243D00BCC010 /* ContextInfo.cpp */,
+				D7B73A7C1B6C243D00BCC010 /* gl */,
+				D7B73A7F1B6C243D00BCC010 /* glrevision.h */,
+				D7B73A801B6C243D00BCC010 /* logging_private.h */,
+				D7B73A811B6C243D00BCC010 /* logging.cpp */,
+				D7B73A821B6C243D00BCC010 /* Meta_BitfieldsByString.cpp */,
+				D7B73A831B6C243D00BCC010 /* Meta_BooleansByString.cpp */,
+				D7B73A841B6C243D00BCC010 /* Meta_EnumsByString.cpp */,
+				D7B73A851B6C243D00BCC010 /* Meta_ExtensionsByFunctionString.cpp */,
+				D7B73A861B6C243D00BCC010 /* Meta_ExtensionsByString.cpp */,
+				D7B73A871B6C243D00BCC010 /* Meta_FunctionStringsByExtension.cpp */,
+				D7B73A881B6C243D00BCC010 /* Meta_Maps.h */,
+				D7B73A891B6C243D00BCC010 /* Meta_ReqVersionsByExtension.cpp */,
+				D7B73A8A1B6C243D00BCC010 /* Meta_StringsByBitfield.cpp */,
+				D7B73A8B1B6C243D00BCC010 /* Meta_StringsByBoolean.cpp */,
+				D7B73A8C1B6C243D00BCC010 /* Meta_StringsByEnum.cpp */,
+				D7B73A8D1B6C243D00BCC010 /* Meta_StringsByExtension.cpp */,
+				D7B73A8E1B6C243D00BCC010 /* Meta.cpp */,
+				D7B73A8F1B6C243D00BCC010 /* ProcAddress.cpp */,
+				D7B73A901B6C243D00BCC010 /* RingBuffer.h */,
+				D7B73A911B6C243D00BCC010 /* RingBuffer.hpp */,
+				D7B73A921B6C243D00BCC010 /* Value.cpp */,
+				D7B73A931B6C243D00BCC010 /* Version_ValidVersions.cpp */,
+				D7B73A941B6C243D00BCC010 /* Version.cpp */,
+				D7B73A461B6C20AC00BCC010 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D7B73A461B6C20AC00BCC010 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D7B73A451B6C20AC00BCC010 /* libglbinding.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D7B73A7C1B6C243D00BCC010 /* gl */ = {
+			isa = PBXGroup;
+			children = (
+				D7B73A7D1B6C243D00BCC010 /* functions.cpp */,
+				D7B73A7E1B6C243D00BCC010 /* types.cpp */,
+			);
+			name = gl;
+			path = ../../glbinding/source/glbinding/source/gl;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		D7B73A431B6C20AC00BCC010 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D7B73AB11B6C243D00BCC010 /* RingBuffer.hpp in Headers */,
+				D7B73AA81B6C243D00BCC010 /* Meta_Maps.h in Headers */,
+				D7B73AA01B6C243D00BCC010 /* logging_private.h in Headers */,
+				D7B73A9F1B6C243D00BCC010 /* glrevision.h in Headers */,
+				D7B73AB01B6C243D00BCC010 /* RingBuffer.h in Headers */,
+				D7B73A991B6C243D00BCC010 /* callbacks_private.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		D7B73A441B6C20AC00BCC010 /* glbinding */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7B73A491B6C20AC00BCC010 /* Build configuration list for PBXNativeTarget "glbinding" */;
+			buildPhases = (
+				D7B73A411B6C20AC00BCC010 /* Sources */,
+				D7B73A421B6C20AC00BCC010 /* Frameworks */,
+				D7B73A431B6C20AC00BCC010 /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = glbinding;
+			productName = glbinding;
+			productReference = D7B73A451B6C20AC00BCC010 /* libglbinding.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D7B73A3D1B6C20AC00BCC010 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0500;
+				ORGANIZATIONNAME = "Alexandre Parenteau";
+			};
+			buildConfigurationList = D7B73A401B6C20AC00BCC010 /* Build configuration list for PBXProject "glbinding" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				en,
+				"zh-Hans",
+			);
+			mainGroup = D7B73A3C1B6C20AC00BCC010;
+			productRefGroup = D7B73A461B6C20AC00BCC010 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D7B73A441B6C20AC00BCC010 /* glbinding */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D7B73A411B6C20AC00BCC010 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D7B73AAE1B6C243D00BCC010 /* Meta.cpp in Sources */,
+				D7B73AB31B6C243D00BCC010 /* Version_ValidVersions.cpp in Sources */,
+				D7B73A951B6C243D00BCC010 /* AbstractFunction.cpp in Sources */,
+				D7B73AAA1B6C243D00BCC010 /* Meta_StringsByBitfield.cpp in Sources */,
+				D7B73AAF1B6C243D00BCC010 /* ProcAddress.cpp in Sources */,
+				D7B73A971B6C243D00BCC010 /* Binding_objects.cpp in Sources */,
+				D7B73AA71B6C243D00BCC010 /* Meta_FunctionStringsByExtension.cpp in Sources */,
+				D7B73AA21B6C243D00BCC010 /* Meta_BitfieldsByString.cpp in Sources */,
+				D7B73A9C1B6C243D00BCC010 /* ContextInfo.cpp in Sources */,
+				D7B73A9A1B6C243D00BCC010 /* callbacks.cpp in Sources */,
+				D7B73AAC1B6C243D00BCC010 /* Meta_StringsByEnum.cpp in Sources */,
+				D7B73A9B1B6C243D00BCC010 /* ContextHandle.cpp in Sources */,
+				D7B73AB41B6C243D00BCC010 /* Version.cpp in Sources */,
+				D7B73A961B6C243D00BCC010 /* AbstractValue.cpp in Sources */,
+				D7B73A981B6C243D00BCC010 /* Binding.cpp in Sources */,
+				D7B73AA41B6C243D00BCC010 /* Meta_EnumsByString.cpp in Sources */,
+				D7B73AA11B6C243D00BCC010 /* logging.cpp in Sources */,
+				D7B73AA91B6C243D00BCC010 /* Meta_ReqVersionsByExtension.cpp in Sources */,
+				D7B73AA61B6C243D00BCC010 /* Meta_ExtensionsByString.cpp in Sources */,
+				D7B73AA51B6C243D00BCC010 /* Meta_ExtensionsByFunctionString.cpp in Sources */,
+				D7B73AAB1B6C243D00BCC010 /* Meta_StringsByBoolean.cpp in Sources */,
+				D7B73AA31B6C243D00BCC010 /* Meta_BooleansByString.cpp in Sources */,
+				D7B73A9D1B6C243D00BCC010 /* functions.cpp in Sources */,
+				D7B73AAD1B6C243D00BCC010 /* Meta_StringsByExtension.cpp in Sources */,
+				D7B73A9E1B6C243D00BCC010 /* types.cpp in Sources */,
+				D7B73AB21B6C243D00BCC010 /* Value.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D7B73A471B6C20AC00BCC010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					"../../glbinding/source/glbinding/include/**",
+				);
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		D7B73A481B6C20AC00BCC010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					"../../glbinding/source/glbinding/include/**",
+				);
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		D7B73A4A1B6C20AC00BCC010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				EXECUTABLE_PREFIX = lib;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					_DEBUG,
+					STRINGS_BY_GL,
+					GLBINDING_STATIC,
+					"$(inherited)",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		D7B73A4B1B6C20AC00BCC010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				EXECUTABLE_PREFIX = lib;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					NDEBUG,
+					STRINGS_BY_GL,
+					GLBINDING_STATIC,
+					"$(inherited)",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D7B73A401B6C20AC00BCC010 /* Build configuration list for PBXProject "glbinding" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7B73A471B6C20AC00BCC010 /* Debug */,
+				D7B73A481B6C20AC00BCC010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D7B73A491B6C20AC00BCC010 /* Build configuration list for PBXNativeTarget "glbinding" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D7B73A4A1B6C20AC00BCC010 /* Debug */,
+				D7B73A4B1B6C20AC00BCC010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D7B73A3D1B6C20AC00BCC010 /* Project object */;
+}

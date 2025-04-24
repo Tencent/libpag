@@ -1,0 +1,19 @@
+
+#include "Meta_Maps.h"
+
+#include <glbinding/gl/enum.h>
+
+
+using namespace gl; // ToDo: multiple APIs?
+
+namespace glbinding
+{
+
+const std::unordered_map<GLenum, std::string> Meta_StringsByEnum
+{
+#ifdef STRINGS_BY_GL
+    %s
+#endif
+};
+
+} // namespace glbinding

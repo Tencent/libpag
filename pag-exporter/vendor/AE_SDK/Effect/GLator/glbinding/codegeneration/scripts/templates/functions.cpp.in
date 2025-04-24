@@ -1,0 +1,11 @@
+#include <glbinding/gl/functions.h>
+
+#include <glbinding/Binding.h>
+
+
+namespace %a
+{
+
+%s
+
+} // namespace %a

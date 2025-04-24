@@ -1,0 +1,16 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+
+namespace %a
+{
+
+enum class GLextension : int // GLextension is not a type introduced by OpenGL API so far
+{
+    UNKNOWN = -1,
+    %s
+};
+
+} // namespace %a
+

@@ -1,0 +1,15 @@
+<p>
+    glbinding is a generated, cross-platform C++ binding for OpenGL which is solely based on the new xml-based OpenGL API specification (gl.xml).
+    It is a fully fledged OpenGL API binding compatible with current code based on other C bindings, e.g., GLEW.
+    The binding is generated using python scripts and templates, that can be easily adapted to fit custom needs.
+    glbinding can be used as an alternative to GLEW and other projects, e.g., glad, gl3w, glLoadGen, glload, and flextGL.
+</p>
+
+<p>
+    glbinding leverages modern C++11 features like enum classes, lambdas, and variadic templates, instead of relying on macros (all OpenGL symbols are real functions and variables).
+    It provides type-safe parameters, per feature API header, lazy function resolution, multi-context and multi-thread support, global function callbacks, meta information about the generated OpenGL binding and the OpenGL runtime, as well as multiple examples for quick-starting your projects.
+</p>
+
+<p>
+    Current gl code, written with a typical C binding for OpenGL is fully compatible for the use with glbinding. Just replace all includes to the old binding and use the appropriate api namespace.
+</p>

@@ -1,0 +1,33 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+#include <glbinding/glbinding_api.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <array>
+
+#include <functional>
+#include <ostream>
+#include <string>
+
+#ifdef _MSC_VER
+#define GL_APIENTRY __stdcall
+#else
+#define GL_APIENTRY
+#endif
+
+
+namespace %a
+{
+
+enum class GLextension : int;
+%s
+%s
+
+} // namespace %a
+
+
+// Type Integrations
+
+%s

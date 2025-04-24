@@ -1,0 +1,15 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+#include <glbinding/%a/boolean.h>
+
+
+namespace %a%f
+{
+
+// import booleans to namespace
+
+%s
+
+} // namespace %a%f

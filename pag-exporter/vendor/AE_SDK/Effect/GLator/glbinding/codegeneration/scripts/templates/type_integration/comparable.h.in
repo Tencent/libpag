@@ -1,0 +1,14 @@
+
+GLBINDING_API bool operator==(const gl::%t & a, std::underlying_type<gl::%t>::type b);
+GLBINDING_API bool operator!=(const gl::%t & a, std::underlying_type<gl::%t>::type b);
+GLBINDING_API bool operator< (const gl::%t & a, std::underlying_type<gl::%t>::type b);
+GLBINDING_API bool operator<=(const gl::%t & a, std::underlying_type<gl::%t>::type b);
+GLBINDING_API bool operator> (const gl::%t & a, std::underlying_type<gl::%t>::type b);
+GLBINDING_API bool operator>=(const gl::%t & a, std::underlying_type<gl::%t>::type b);
+
+GLBINDING_API bool operator==(std::underlying_type<gl::%t>::type a, const gl::%t & b);
+GLBINDING_API bool operator!=(std::underlying_type<gl::%t>::type a, const gl::%t & b);
+GLBINDING_API bool operator< (std::underlying_type<gl::%t>::type a, const gl::%t & b);
+GLBINDING_API bool operator<=(std::underlying_type<gl::%t>::type a, const gl::%t & b);
+GLBINDING_API bool operator> (std::underlying_type<gl::%t>::type a, const gl::%t & b);
+GLBINDING_API bool operator>=(std::underlying_type<gl::%t>::type a, const gl::%t & b);

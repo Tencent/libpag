@@ -1,0 +1,6 @@
+
+std::ostream & operator<<(std::ostream & stream, const gl::%t & value)
+{
+    stream << glbinding::Meta::getString(value);
+    return stream;
+}

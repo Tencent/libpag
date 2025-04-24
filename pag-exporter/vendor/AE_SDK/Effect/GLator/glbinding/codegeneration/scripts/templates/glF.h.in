@@ -1,0 +1,11 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+#include <glbinding/%a/extension.h>
+#include <glbinding/%a%d/types%f.h>%s
+#include <glbinding/%a%d/boolean%f.h>%s
+#include <glbinding/%a%d/values%f.h>%s
+#include <glbinding/%a%d/bitfield%f.h>%s
+#include <glbinding/%a%d/enum%f.h>%s
+#include <glbinding/%a%d/functions%f.h>%s

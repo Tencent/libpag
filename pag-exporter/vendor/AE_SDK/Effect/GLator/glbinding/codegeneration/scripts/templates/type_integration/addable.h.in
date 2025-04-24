@@ -1,0 +1,3 @@
+
+GLBINDING_API gl::%t operator+(const gl::%t & a, std::underlying_type<gl::%t>::type b);
+GLBINDING_API gl::%t operator-(const gl::%t & a, std::underlying_type<gl::%t>::type b);

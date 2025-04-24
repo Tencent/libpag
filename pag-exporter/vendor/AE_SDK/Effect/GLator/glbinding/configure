@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Default options
+BUILD_DIR="build"
+CMAKE_GENERATOR="Unix Makefiles"
+BUILD_TYPE="Release"
+INSTALL_OPTIONS=""
+EXTRA_OPTIONS=""
+
+# Create default configs
+if [ ! -d "./.localconfig" ]
+then
+    mkdir ".localconfig"
+
+    touch ".localconfig/default"
+    echo "#!/bin/bash" >> ".localconfig/default"
+    echo "" >> ".localconfig/default"
+    echo "# Default configuration for configure (is always sourced)" >> ".localconfig/default"
+    echo "" >> ".localconfig/default"
+    echo "# CMake generator" >> ".localconfig/default"
+    echo "CMAKE_GENERATOR=\"Unix Makefiles\"" >> ".localconfig/default"
+    echo "" >> ".localconfig/default"
+    echo "# Build directory and build type" >> ".localconfig/default"
+    echo "BUILD_DIR=\"build\"" >> ".localconfig/default"
+    echo "BUILD_TYPE=\"Release\"" >> ".localconfig/default"
+    echo "" >> ".localconfig/default"
+    echo "# CMake installation options" >> ".localconfig/default"
+    echo "INSTALL_OPTIONS=\"\"" >> ".localconfig/default"
+    echo "" >> ".localconfig/default"
+    echo "# Additional CMake options" >> ".localconfig/default"
+    echo "EXTRA_OPTIONS=\"\"" >> ".localconfig/default"
+    echo "" >> ".localconfig/default"
+    echo "# Environment variables (e.g., search paths for external libraries)" >> ".localconfig/default"
+    echo "#export CMAKE_PREFIX_PATH=\"/opt/Qt5.2.1/5.2.1/gcc_64/\"" >> ".localconfig/default"
+    echo "#export GMOCK_HOME=/opt/gmock-1.7.0" >> ".localconfig/default"
+    echo "#export GTEST_HOME=/opt/gtest-1.7.0" >> ".localconfig/default"
+
+    touch ".localconfig/debug"
+    echo "#!/bin/bash" >> ".localconfig/debug"
+    echo "" >> ".localconfig/debug"
+    echo "# Configuration option 'debug'" >> ".localconfig/debug"
+    echo "" >> ".localconfig/debug"
+    echo "# Build directory and build type" >> ".localconfig/debug"
+    echo "BUILD_DIR=\"build-debug\"" >> ".localconfig/debug"
+    echo "BUILD_TYPE=\"Debug\"" >> ".localconfig/debug"
+
+    touch ".localconfig/portable"
+    echo "#!/bin/bash" >> ".localconfig/portable"
+    echo "" >> ".localconfig/portable"
+    echo "# Configuration option 'portable'" >> ".localconfig/portable"
+    echo "" >> ".localconfig/portable"
+    echo "# Enable portable installation" >> ".localconfig/portable"
+    echo "INSTALL_OPTIONS=\"-DCMAKE_INSTALL_PREFIX:PATH=./install -DOPTION_PORTABLE_INSTALL=ON\"" >> ".localconfig/portable"
+
+    echo "Default configuration has been written to .localconfig"
+    echo "Please review and adjust the configuration, then run again"
+    echo "  ./configure"
+    exit
+fi
+
+# Read local default options
+if [ -f "./.localconfig/default" ]
+then
+    . ./.localconfig/default
+fi
+
+# Parse command line arguments
+for ARG in "$@"
+do
+    # Read in configuration for that command-line argument
+    CONFIGFILE="./.localconfig/$ARG"
+    if [ -f "$CONFIGFILE" ]
+    then
+        . "$CONFIGFILE"
+    fi
+done
+
+# Configure build
+echo "Configuring ..."
+
+# Create build directory
+if [ ! -d "./$BUILD_DIR" ]
+then
+    mkdir $BUILD_DIR
+fi
+
+# Configure project
+cd $BUILD_DIR
+cmake -G "$CMAKE_GENERATOR" "-DCMAKE_BUILD_TYPE=$BUILD_TYPE" $INSTALL_OPTIONS $EXTRA_OPTIONS ..
+if [ $? == 0 ]
+then
+    echo "Project configured. To build the project, use";
+    echo "  cd $BUILD_DIR"
+    echo "  make"
+else
+    echo "Configuration failed.";
+fi
+
+cd ..

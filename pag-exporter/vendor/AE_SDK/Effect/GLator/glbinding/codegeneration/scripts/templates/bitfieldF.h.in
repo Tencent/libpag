@@ -1,0 +1,13 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+#include <glbinding/%a/bitfield.h>
+
+namespace %a%f
+{
+
+// import bitfields to namespace
+%s
+
+} // namespace %a%f

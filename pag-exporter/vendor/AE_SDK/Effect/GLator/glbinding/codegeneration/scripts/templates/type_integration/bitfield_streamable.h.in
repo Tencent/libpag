@@ -1,0 +1,1 @@
+GLBINDING_API std::ostream & operator<<(std::ostream & stream, const gl::%t & value);

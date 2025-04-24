@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.adobe.AfterEffects.Queuebert</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Queuebert</string>
+	<key>CFBundleExecutable</key>
+	<string>Queuebert</string>
+	<key>CFBundlePackageType</key>
+	<string>AEgx</string>
+	<key>CFBundleSignature</key>
+	<string>FXTC</string>
+	<key>NSAppleScriptEnabled</key>
+	<string>No</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 1992-2006 Adobe Systems Incorporated</string>
+	<key>LSRequiresCarbon</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,18 @@
+#pragma once
+
+#include <glbinding/no%a.h>
+
+
+namespace %a
+{
+
+enum class GLenum : unsigned int
+{
+%s
+};
+
+// import enums to namespace
+
+%s
+
+} // namespace %a

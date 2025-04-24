@@ -1,0 +1,34 @@
+{
+  "source": "./",
+  "out": "third_party/out",
+  "vendors": [
+    {
+      "name": "AE_SDK",
+      "dir": "vendor/AE_SDK",
+      "cmake": {
+        "targets": [
+          "ae_sdk_util"
+        ],
+        "platforms": [
+          "mac",
+          "win"
+        ]
+      }
+    },
+    {
+      "name": "ffmpeg",
+      "dir": "third_party/ffmpeg",
+      "scripts": {
+        "mac": {
+          "executor": "bash",
+          "file": "scripts/mac/build_ffmpeg.sh",
+          "arguments": []
+        },
+        "win": {
+          "executor": "cmd.exe",
+          "file": "scripts/mac/build_ffmpeg.bat"
+        }
+      }
+    }
+  ]
+}
