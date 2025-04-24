@@ -682,9 +682,14 @@ int PAGImageLayer::getDefaultScaleMode() {
   if (imageLayer && imageLayer->imageFillRule) {
     return imageLayer->imageFillRule->scaleMode;
   }
-  int index = editableIndex();
-  if (index >= 0 && file && file->imageScaleModes && !file->imageScaleModes->empty()) {
-    return file->imageScaleModes->at(index);
+  if (file && file->editableImages != nullptr && file->imageScaleModes != nullptr) {
+    auto iter =
+        std::find(file->editableImages->begin(), file->editableImages->end(), editableIndex());
+    auto distance = std::distance(file->editableImages->begin(), iter);
+    if (iter != file->editableImages->end() &&
+        static_cast<size_t>(distance) < file->imageScaleModes->size()) {
+      return file->imageScaleModes->at(distance);
+    }
   }
 
   return PAGScaleMode::LetterBox;
