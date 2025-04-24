@@ -29,23 +29,23 @@ FrameTimeMetrics::FrameTimeMetrics(int64_t renderTime, int64_t presentTime, int6
 PAGRunTimeModelManager::PAGRunTimeModelManager(QObject* parent) : QObject(parent) {
 }
 
-auto PAGRunTimeModelManager::getTotalFrame() const -> QString {
+QString PAGRunTimeModelManager::getTotalFrame() const {
   return QString::number(totalFrame);
 }
 
-auto PAGRunTimeModelManager::getCurrentFrame() const -> QString {
+QString PAGRunTimeModelManager::getCurrentFrame() const {
   return QString::number(currentFrame);
 }
 
-auto PAGRunTimeModelManager::getFileInfoModel() const -> const PAGFileInfoModel* {
+const PAGFileInfoModel* PAGRunTimeModelManager::getFileInfoModel() const {
   return &fileInfoModel;
 }
 
-auto PAGRunTimeModelManager::getFrameDisplayInfoModel() const -> const PAGFrameDisplayInfoModel* {
+const PAGFrameDisplayInfoModel* PAGRunTimeModelManager::getFrameDisplayInfoModel() const {
   return &frameDisplayInfoModel;
 }
 
-auto PAGRunTimeModelManager::setCurrentFrame(const QString& currentFrame) -> void {
+void PAGRunTimeModelManager::setCurrentFrame(const QString& currentFrame) {
   if (this->currentFrame == currentFrame.toLongLong()) {
     return;
   }
@@ -53,8 +53,8 @@ auto PAGRunTimeModelManager::setCurrentFrame(const QString& currentFrame) -> voi
   Q_EMIT dataChanged();
 }
 
-auto PAGRunTimeModelManager::updateData(int64_t currentFrame, int64_t renderTime,
-                                        int64_t presentTime, int64_t imageDecodeTime) -> void {
+void PAGRunTimeModelManager::updateData(int64_t currentFrame, int64_t renderTime,
+                                        int64_t presentTime, int64_t imageDecodeTime) {
   if (this->currentFrame == currentFrame) {
     return;
   }
@@ -69,8 +69,8 @@ auto PAGRunTimeModelManager::updateData(int64_t currentFrame, int64_t renderTime
   Q_EMIT dataChanged();
 }
 
-auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
-                                       const std::string& filePath) -> void {
+void PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
+                                       const std::string& filePath) {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
   frameTimeMetricsVector.resize(totalFrame, {0, 0, 0});
@@ -81,8 +81,8 @@ auto PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
   Q_EMIT dataChanged();
 }
 
-auto PAGRunTimeModelManager::updateFrameDisplayInfo(int64_t renderTime, int64_t presentTime,
-                                                    int64_t imageDecodeTime) -> void {
+void PAGRunTimeModelManager::updateFrameDisplayInfo(int64_t renderTime, int64_t presentTime,
+                                                    int64_t imageDecodeTime) {
   int64_t renderAvg = 0;
   int64_t renderMax = 0;
   int64_t renderTotal = 0;

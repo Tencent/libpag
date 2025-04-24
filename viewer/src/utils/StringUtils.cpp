@@ -21,23 +21,23 @@
 
 namespace pag::Utils {
 
-auto toQString(double num) -> QString {
+QString toQString(double num) {
   QString result;
   return result.setNum(num, 'f', 2);
   ;
 }
 
-auto toQString(int32_t num) -> QString {
+QString toQString(int32_t num) {
   QString result;
   return result.setNum(num);
 }
 
-auto toQString(int64_t num) -> QString {
+QString toQString(int64_t num) {
   QString result;
   return result.setNum(num);
 }
 
-auto getMemorySizeUnit(int64_t size) -> QString {
+QString getMemorySizeUnit(int64_t size) {
   constexpr int64_t kbThreshold = 1024;
   constexpr int64_t mbThreshold = 1024 * 1024;
   constexpr int64_t gbThreshold = 1024 * 1024 * 1024;
@@ -53,7 +53,7 @@ auto getMemorySizeUnit(int64_t size) -> QString {
   return "GB";
 }
 
-auto getMemorySizeNumString(int64_t size) -> QString {
+QString getMemorySizeNumString(int64_t size) {
   constexpr double kbThreshold = 1024;
   constexpr double mbThreshold = 1024 * 1024;
   constexpr double gbThreshold = 1024 * 1024 * 1024;
@@ -76,7 +76,7 @@ static const std::vector<TagCodeVersionPair> TagCodeVersionList = {
     {pag::TagCode::MosaicEffect, "3.2"},   {pag::TagCode::GradientOverlayStyle, "4.1"},
     {pag::TagCode::CameraOption, "4.2"},   {pag::TagCode::ImageScaleModes, "4.3"}};
 
-auto tagCodeToVersion(uint16_t tagCode) -> std::string {
+std::string tagCodeToVersion(uint16_t tagCode) {
   for (const auto& pair : TagCodeVersionList) {
     if (tagCode <= static_cast<uint16_t>(pair.first)) {
       return pair.second;

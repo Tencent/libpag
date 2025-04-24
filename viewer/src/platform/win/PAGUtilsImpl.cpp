@@ -23,7 +23,7 @@
 
 namespace pag::Utils {
 
-auto openFileInFinder(QFileInfo& fileInfo) -> void {
+void openFileInFinder(QFileInfo& fileInfo) {
   HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   if (FAILED(hr)) {
     return;

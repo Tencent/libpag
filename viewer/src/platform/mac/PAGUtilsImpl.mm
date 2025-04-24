@@ -21,7 +21,7 @@
 
 namespace pag::Utils {
 
-auto openFileInFinder(QFileInfo& fileInfo) -> void {
+void openFileInFinder(QFileInfo& fileInfo) {
   if (!fileInfo.exists()) {
     return;
   }

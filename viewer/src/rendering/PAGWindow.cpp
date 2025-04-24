@@ -32,7 +32,7 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 
 PAGWindow::~PAGWindow() = default;
 
-auto PAGWindow::openFile(QString path) -> void {
+void PAGWindow::openFile(QString path) {
   bool result = pagView->setFile(path);
   if (!result) {
     return;
@@ -42,11 +42,11 @@ auto PAGWindow::openFile(QString path) -> void {
   window->requestActivate();
 }
 
-auto PAGWindow::onPAGViewerDestroyed() -> void {
+void PAGWindow::onPAGViewerDestroyed() {
   Q_EMIT destroyWindow(this);
 }
 
-auto PAGWindow::open() -> void {
+void PAGWindow::open() {
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
 
@@ -77,7 +77,7 @@ auto PAGWindow::open() -> void {
           &PAGRunTimeModelManager::updateData);
 }
 
-auto PAGWindow::getFilePath() -> QString {
+QString PAGWindow::getFilePath() {
   return filePath;
 }
 
