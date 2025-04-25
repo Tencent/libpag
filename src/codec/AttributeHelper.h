@@ -22,7 +22,7 @@
 #include "base/Keyframes.h"
 
 namespace pag {
-static constexpr int MAX_KEYFRAMES = 5184000;
+static constexpr int MAX_KEYFRAMES = 5184000;  // 60 frames per second, 24 hours
 enum class AttributeType {
   Value,
   FixedValue,  // always exists, no need to store a flag.
