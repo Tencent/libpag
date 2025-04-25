@@ -24,6 +24,9 @@ void ReadFontTables(DecodeStream* stream) {
   auto context = static_cast<CodecContext*>(stream->context);
   auto fontIDMap = &(context->fontIDMap);
   for (uint32_t id = 0; id < count; id++) {
+    if (stream->context->hasException()) {
+      break;
+    }
     auto fontData = new FontDescriptor();
     fontData->id = id;
     fontData->fontFamily = stream->readUTF8String();
