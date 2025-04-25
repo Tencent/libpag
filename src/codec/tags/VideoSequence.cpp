@@ -38,35 +38,35 @@ VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha) {
 
   auto count = stream->readEncodedUint32();
   for (uint32_t i = 0; i < count; i++) {
+    if (stream->context->hasException()) {
+      delete sequence;
+      return nullptr;
+    }
     auto videoFrame = new VideoFrame();
     sequence->frames.push_back(videoFrame);
     videoFrame->isKeyframe = stream->readBitBoolean();
+  }
+  for (uint32_t i = 0; i < count; i++) {
     if (stream->context->hasException()) {
       delete sequence;
       return nullptr;
     }
-  }
-  for (uint32_t i = 0; i < count; i++) {
     auto videoFrame = sequence->frames[i];
     videoFrame->frame = ReadTime(stream);
     videoFrame->fileBytes = ReadByteDataWithStartCode(stream).release();
-    if (stream->context->hasException()) {
-      delete sequence;
-      return nullptr;
-    }
   }
 
   if (stream->bytesAvailable() > 0) {
     count = stream->readEncodedUint32();
     for (uint32_t i = 0; i < count; i++) {
-      TimeRange staticTimeRange = {};
-      staticTimeRange.start = ReadTime(stream);
-      staticTimeRange.end = ReadTime(stream);
-      sequence->staticTimeRanges.push_back(staticTimeRange);
       if (stream->context->hasException()) {
         delete sequence;
         return nullptr;
       }
+      TimeRange staticTimeRange = {};
+      staticTimeRange.start = ReadTime(stream);
+      staticTimeRange.end = ReadTime(stream);
+      sequence->staticTimeRanges.push_back(staticTimeRange);
     }
   }
 

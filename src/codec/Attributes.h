@@ -97,9 +97,6 @@ class AttributeConfig<bool> : public AttributeConfigBase<bool> {
   void readValueList(DecodeStream* stream, bool* list, uint32_t count) const override {
     for (uint32_t i = 0; i < count; i++) {
       list[i] = stream->readBitBoolean();
-      if (stream->context->hasException()) {
-        break;
-      }
     }
   }
 
@@ -256,9 +253,6 @@ class AttributeConfig<Point> : public AttributeConfigBase<Point> {
     } else {
       for (uint32_t i = 0; i < count; i++) {
         list[i] = ReadPoint(stream);
-        if (stream->context->hasException()) {
-          break;
-        }
       }
     }
   }
@@ -309,9 +303,6 @@ class AttributeConfig<Point3D> : public AttributeConfigBase<Point3D> {
     } else {
       for (uint32_t i = 0; i < count; i++) {
         list[i] = ReadPoint3D(stream);
-        if (stream->context->hasException()) {
-          break;
-        }
       }
     }
   }

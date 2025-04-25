@@ -25,10 +25,10 @@ void ReadImageScaleModes(DecodeStream* stream) {
   if (count > 0) {
     context->imageScaleModes = new std::vector<Enum>(count);
     for (uint32_t i = 0; i < count; i++) {
-      context->imageScaleModes->at(i) = stream->readEncodedUint32();
       if (stream->context->hasException()) {
         break;
       }
+      context->imageScaleModes->at(i) = stream->readEncodedUint32();
     }
   }
 }

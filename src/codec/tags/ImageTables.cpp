@@ -23,11 +23,11 @@ namespace pag {
 void ReadImageTables(DecodeStream* stream, std::vector<ImageBytes*>* images) {
   auto count = stream->readEncodedUint32();
   for (uint32_t i = 0; i < count; i++) {
-    auto imageBytes = ReadImageBytes(stream);
-    images->push_back(imageBytes);
     if (stream->context->hasException()) {
       break;
     }
+    auto imageBytes = ReadImageBytes(stream);
+    images->push_back(imageBytes);
   }
 }
 

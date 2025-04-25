@@ -25,11 +25,11 @@ void ReadMarkerList(DecodeStream* stream, std::vector<Marker*>* markers) {
 
   auto count = stream->readEncodedUint32();
   for (size_t i = 0; i < count; i++) {
-    auto hasDuration = stream->readBitBoolean();
-    flagList.push_back(hasDuration);
     if (stream->context->hasException()) {
       break;
     }
+    auto hasDuration = stream->readBitBoolean();
+    flagList.push_back(hasDuration);
   }
 
   for (auto hasDuration : flagList) {
