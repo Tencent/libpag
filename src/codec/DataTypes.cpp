@@ -131,6 +131,9 @@ static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum r
   auto& verbs = value->verbs;
   auto& points = value->points;
   for (uint32_t i = 0; i < numVerbs; i++) {
+    if (stream->context->hasException()) {
+      break;
+    }
     auto pathRecord = records[i];
     switch (pathRecord) {
       case PathRecord::Close:
@@ -205,8 +208,7 @@ PathHandle ReadPath(DecodeStream* stream) {
   auto records = new Enum[static_cast<size_t>(numVerbs)];
   for (uint32_t i = 0; i < numVerbs; i++) {
     if (stream->context->hasException()) {
-      delete[] records;
-      return PathHandle(value);
+      break;
     }
     records[i] = static_cast<Enum>(stream->readUBits(3));
   }

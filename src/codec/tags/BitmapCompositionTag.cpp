@@ -29,10 +29,8 @@ void ReadTagsOfBitmapComposition(DecodeStream* stream, TagCode code,
   switch (code) {
     case TagCode::BitmapSequence: {
       auto sequence = ReadBitmapSequence(stream);
-      if (sequence) {
-        sequence->composition = composition;
-        composition->sequences.push_back(sequence);
-      }
+      sequence->composition = composition;
+      composition->sequences.push_back(sequence);
     } break;
     default:
       ReadTagsOfComposition(stream, code, composition);

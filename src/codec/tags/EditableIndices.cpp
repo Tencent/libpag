@@ -24,17 +24,11 @@ void ReadEditableIndices(DecodeStream* stream) {
   auto count = stream->readEncodedUint32();
   context->editableImages = new std::vector<int>(count);
   for (uint32_t i = 0; i < count; i++) {
-    if (stream->context->hasException()) {
-      return;
-    }
     context->editableImages->at(i) = stream->readEncodedInt32();
   }
   count = stream->readEncodedUint32();
   context->editableTexts = new std::vector<int>(count);
   for (uint32_t i = 0; i < count; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
     context->editableTexts->at(i) = stream->readEncodedInt32();
   }
 }

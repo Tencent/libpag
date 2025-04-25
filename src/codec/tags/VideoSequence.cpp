@@ -39,8 +39,7 @@ VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha) {
   auto count = stream->readEncodedUint32();
   for (uint32_t i = 0; i < count; i++) {
     if (stream->context->hasException()) {
-      delete sequence;
-      return nullptr;
+      return sequence;
     }
     auto videoFrame = new VideoFrame();
     sequence->frames.push_back(videoFrame);
@@ -48,8 +47,7 @@ VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha) {
   }
   for (uint32_t i = 0; i < count; i++) {
     if (stream->context->hasException()) {
-      delete sequence;
-      return nullptr;
+      return sequence;
     }
     auto videoFrame = sequence->frames[i];
     videoFrame->frame = ReadTime(stream);
@@ -60,8 +58,7 @@ VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha) {
     count = stream->readEncodedUint32();
     for (uint32_t i = 0; i < count; i++) {
       if (stream->context->hasException()) {
-        delete sequence;
-        return nullptr;
+        return sequence;
       }
       TimeRange staticTimeRange = {};
       staticTimeRange.start = ReadTime(stream);
