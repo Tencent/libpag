@@ -29,6 +29,9 @@ void ReadFontTables(DecodeStream* stream) {
     fontData->fontFamily = stream->readUTF8String();
     fontData->fontStyle = stream->readUTF8String();
     fontIDMap->insert(std::make_pair(id, fontData));
+    if (stream->context->hasException()) {
+      break;
+    }
   }
 }
 

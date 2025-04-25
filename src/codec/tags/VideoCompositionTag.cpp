@@ -31,8 +31,10 @@ void ReadTagsOfVideoComposition(DecodeStream* stream, TagCode code,
   switch (code) {
     case TagCode::VideoSequence: {
       auto sequence = ReadVideoSequence(stream, hasAlpha);
-      sequence->composition = composition;
-      composition->sequences.push_back(sequence);
+      if (sequence) {
+        sequence->composition = composition;
+        composition->sequences.push_back(sequence);
+      }
     } break;
     case TagCode::Mp4Header: {
       for (auto sequence : composition->sequences) {

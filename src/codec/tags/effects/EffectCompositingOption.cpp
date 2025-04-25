@@ -25,6 +25,9 @@ void ReadEffectCompositingMasks(DecodeStream* stream, void* target) {
   for (uint32_t i = 0; i < length; i++) {
     auto mask = ReadMaskID(stream);
     effect->maskReferences.push_back(mask);
+    if (stream->context->hasException()) {
+      break;
+    }
   }
 }
 

@@ -25,6 +25,9 @@ void ReadImageTables(DecodeStream* stream, std::vector<ImageBytes*>* images) {
   for (uint32_t i = 0; i < count; i++) {
     auto imageBytes = ReadImageBytes(stream);
     images->push_back(imageBytes);
+    if (stream->context->hasException()) {
+      break;
+    }
   }
 }
 

@@ -29,6 +29,10 @@ BitmapSequence* ReadBitmapSequence(DecodeStream* stream) {
     auto bitmapFrame = new BitmapFrame();
     sequence->frames.push_back(bitmapFrame);
     bitmapFrame->isKeyframe = stream->readBitBoolean();
+    if (stream->context->hasException()) {
+      delete sequence;
+      return nullptr;
+    }
   }
   for (uint32_t i = 0; i < count; i++) {
     auto bitmapFrame = sequence->frames[i];
@@ -39,6 +43,10 @@ BitmapSequence* ReadBitmapSequence(DecodeStream* stream) {
       bitmap->x = stream->readEncodedInt32();
       bitmap->y = stream->readEncodedInt32();
       bitmap->fileBytes = stream->readByteData().release();
+      if (stream->context->hasException()) {
+        delete sequence;
+        return nullptr;
+      }
     }
   }
   return sequence;

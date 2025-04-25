@@ -133,6 +133,9 @@ std::vector<Keyframe<T>*> ReadKeyframes(DecodeStream* stream, const AttributeCon
       keyframe = new Keyframe<T>();
     } else {
       auto interpolationType = static_cast<Enum>(stream->readUBits(2));
+      if (stream->context->hasException()) {
+        return keyframes;
+      }
       if (interpolationType == KeyframeInterpolationType::Hold) {
         keyframe = new Keyframe<T>();
       } else {

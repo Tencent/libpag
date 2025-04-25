@@ -193,6 +193,9 @@ static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum r
       default:
         break;
     }
+    if (stream->context->hasException()) {
+      break;
+    }
   }
 }
 
@@ -205,6 +208,10 @@ PathHandle ReadPath(DecodeStream* stream) {
   auto records = new Enum[static_cast<size_t>(numVerbs)];
   for (uint32_t i = 0; i < numVerbs; i++) {
     records[i] = static_cast<Enum>(stream->readUBits(3));
+    if (stream->context->hasException()) {
+      delete[] records;
+      return PathHandle(value);
+    }
   }
   ReadPathInternal(stream, value, records, numVerbs);
   delete[] records;
@@ -305,6 +312,9 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
     stop.opacity = stream->readUint8();
+    if (stream->context->hasException()) {
+      break;
+    }
     alphaStops.push_back(stop);
   }
   for (uint32_t i = 0; i < colorCount; i++) {
@@ -312,6 +322,9 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
     stop.color = ReadColor(stream);
+    if (stream->context->hasException()) {
+      break;
+    }
     colorStops.push_back(stop);
   }
   std::sort(alphaStops.begin(), alphaStops.end(),
