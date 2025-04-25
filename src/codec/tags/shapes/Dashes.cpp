@@ -28,12 +28,18 @@ Property<float>* ReadDashes(DecodeStream* stream, std::vector<Property<float>*>&
   auto dashOffsetFlag = ReadAttributeFlag(stream, &dashOffsetConfig);
   std::vector<AttributeFlag> dashFlags;
   for (uint64_t i = 0; i < dashLength; i++) {
+    if (stream->context->hasException()) {
+      return nullptr;
+    }
     auto flag = ReadAttributeFlag(stream, &dashConfig);
     dashFlags.push_back(flag);
   }
   Property<float>* dashOffset = nullptr;
   dashOffsetConfig.readAttribute(stream, dashOffsetFlag, &dashOffset);
   for (uint64_t i = 0; i < dashLength; i++) {
+    if (stream->context->hasException()) {
+      return dashOffset;
+    }
     Property<float>* dash = nullptr;
     dashConfig.readAttribute(stream, dashFlags[i], &dash);
     dashes.push_back(dash);
