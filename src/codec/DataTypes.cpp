@@ -207,9 +207,6 @@ PathHandle ReadPath(DecodeStream* stream) {
   }
   auto records = new Enum[static_cast<size_t>(numVerbs)];
   for (uint32_t i = 0; i < numVerbs; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
     records[i] = static_cast<Enum>(stream->readUBits(3));
   }
   ReadPathInternal(stream, value, records, numVerbs);
