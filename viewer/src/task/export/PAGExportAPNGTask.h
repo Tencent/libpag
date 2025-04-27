@@ -29,8 +29,8 @@ class PAGExportAPNGTask : public PAGExportPNGTask {
                              const QString& pngFilePath);
 
  protected:
-  auto onFrameFlush(double progress) -> void override;
-  auto onFinish() -> int override;
+  void onFrameFlush(double progress) override;
+  int onFinish() override;
 
  private:
   QString apngFilePath = "";

@@ -34,68 +34,86 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   drawable->moveToThread(renderThread.get());
 }
 
+void PAGView::flush() const {
+  if (isPlaying_) {
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  }
+}
+
 PAGView::~PAGView() {
   QMetaObject::invokeMethod(renderThread.get(), "shutDown", Qt::QueuedConnection);
   renderThread->wait();
 }
 
-auto PAGView::getPAGWidth() const -> int {
+int PAGView::getPAGWidth() const {
   if (pagFile == nullptr) {
-    return -1;
+    return 0;
   }
   return pagFile->width();
 }
 
-auto PAGView::getPAGHeight() const -> int {
+int PAGView::getPAGHeight() const {
   if (pagFile == nullptr) {
-    return -1;
+    return 0;
   }
   return pagFile->height();
 }
 
-auto PAGView::getTotalFrame() const -> int {
+QString PAGView::getTotalFrame() const {
   if (pagFile == nullptr) {
-    return 0;
+    return "0";
   }
-  int totalFrames = static_cast<int>(std::round(getDuration() * pagFile->frameRate() / 1000.0));
+  int64_t totalFrames =
+      static_cast<int64_t>(std::round(getDuration().toLongLong() * pagFile->frameRate() / 1000.0));
   if (totalFrames < 1) {
     totalFrames = 0;
   }
-  return totalFrames;
+  return QString::number(totalFrames);
 }
 
-auto PAGView::getCurrentFrame() const -> int {
-  int totalFrames = getTotalFrame();
-  return static_cast<int>(std::round(getProgress() * (totalFrames - 1)));
+QString PAGView::getCurrentFrame() const {
+  int64_t totalFrames = getTotalFrame().toLongLong();
+  int64_t currentFrame = static_cast<int64_t>(std::round(getProgress() * (totalFrames - 1)));
+  return QString::number(currentFrame);
 }
 
-auto PAGView::isPlaying() const -> bool {
+bool PAGView::isPlaying() const {
   return isPlaying_;
 }
 
-auto PAGView::getShowVideoFrames() const -> bool {
+bool PAGView::getShowVideoFrames() const {
   if (pagPlayer == nullptr) {
     return false;
   }
   return pagPlayer->videoEnabled();
 }
 
-auto PAGView::getDuration() const -> double {
+QString PAGView::getDuration() const {
   if (pagPlayer == nullptr) {
-    return 0.0;
+    return "0";
   }
-  return static_cast<double>(pagPlayer->duration()) / 1000.0;
+  return QString::number(pagPlayer->duration() / 1000);
 }
 
-auto PAGView::getProgress() const -> double {
+double PAGView::getProgress() const {
   return progress;
 }
 
-auto PAGView::getFilePath() const -> QString {
+QString PAGView::getFilePath() const {
   return filePath;
 }
 
-auto PAGView::getBackgroundColor() const -> QColor {
+QString PAGView::getDisplayedTime() const {
+  int64_t displayedTime =
+      static_cast<int64_t>(std::round(getProgress() * getDuration().toLongLong() / 1000.0));
+  int64_t displayedSeconds = displayedTime % 60;
+  int64_t displayedMinutes = (displayedTime / 60) % 60;
+  return QString("%1:%2")
+      .arg(displayedMinutes, 2, 10, QChar('0'))
+      .arg(displayedSeconds, 2, 10, QChar('0'));
+}
+
+QColor PAGView::getBackgroundColor() const {
   if (pagFile == nullptr) {
     return QColorConstants::Black;
   }
@@ -104,11 +122,7 @@ auto PAGView::getBackgroundColor() const -> QColor {
   return QColor::fromRgb((int32_t)color.red, (int32_t)color.green, (int32_t)color.blue);
 }
 
-auto PAGView::getPreferredSize() const -> QSizeF {
-  if (pagFile == nullptr) {
-    return {0, 0};
-  }
-
+QSizeF PAGView::getPreferredSize() const {
   auto quickWindow = window();
   int pagWidth = getPAGWidth();
   int pagHeight = getPAGHeight();
@@ -135,10 +149,7 @@ auto PAGView::getPreferredSize() const -> QSizeF {
   return {width, height};
 }
 
-auto PAGView::setIsPlaying(bool isPlaying) -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
+void PAGView::setIsPlaying(bool isPlaying) {
   if (this->isPlaying_ == isPlaying) {
     return;
   }
@@ -150,14 +161,14 @@ auto PAGView::setIsPlaying(bool isPlaying) -> void {
   }
 }
 
-auto PAGView::setShowVideoFrames(bool isShow) -> void {
+void PAGView::setShowVideoFrames(bool isShow) {
   if (pagPlayer == nullptr) {
     return;
   }
   pagPlayer->setVideoEnabled(isShow);
 }
 
-auto PAGView::setProgress(double progress) -> void {
+void PAGView::setProgress(double progress) {
   if (this->progress == progress) {
     return;
   }
@@ -167,7 +178,7 @@ auto PAGView::setProgress(double progress) -> void {
   QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
-auto PAGView::setFile(const QString& filePath) -> bool {
+bool PAGView::setFile(const QString& filePath) {
   auto strPath = std::string(filePath.toLocal8Bit());
   if (filePath.startsWith("file://")) {
     strPath = std::string(QUrl(filePath).toLocalFile().toLocal8Bit());
@@ -193,26 +204,17 @@ auto PAGView::setFile(const QString& filePath) -> bool {
   return true;
 }
 
-auto PAGView::firstFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
+void PAGView::firstFrame() {
   setIsPlaying(false);
   setProgress(0);
 }
 
-auto PAGView::lastFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
+void PAGView::lastFrame() {
   setIsPlaying(false);
   setProgress(1);
 }
 
-auto PAGView::nextFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
+void PAGView::nextFrame() {
   setIsPlaying(false);
   auto progress = this->progress + progressPerFrame;
   if (progress > 1) {
@@ -221,10 +223,7 @@ auto PAGView::nextFrame() -> void {
   setProgress(progress);
 }
 
-auto PAGView::previousFrame() -> void {
-  if (pagFile == nullptr) {
-    return;
-  }
+void PAGView::previousFrame() {
   setIsPlaying(false);
   auto progress = this->progress - progressPerFrame;
   if (progress < 0) {
@@ -274,8 +273,11 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       }
       setProgress(progress);
     }
-    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
+}
+
+PAGRenderThread* PAGView::getRenderThread() const {
+  return renderThread.get();
 }
 }  // namespace pag

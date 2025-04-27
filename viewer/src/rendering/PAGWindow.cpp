@@ -18,8 +18,9 @@
 
 #include "PAGWindow.h"
 #include <QQmlContext>
-#include <QThread>
+#include "PAGRenderThread.h"
 #include "PAGWindowHelper.h"
+#include "profiling/PAGRunTimeModelManager.h"
 #include "task/PAGTaskFactory.h"
 
 namespace pag {
@@ -31,7 +32,7 @@ PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 
 PAGWindow::~PAGWindow() = default;
 
-auto PAGWindow::openFile(QString path) -> void {
+void PAGWindow::openFile(QString path) {
   bool result = pagView->setFile(path);
   if (!result) {
     return;
@@ -41,11 +42,11 @@ auto PAGWindow::openFile(QString path) -> void {
   window->requestActivate();
 }
 
-auto PAGWindow::onPAGViewerDestroyed() -> void {
+void PAGWindow::onPAGViewerDestroyed() {
   Q_EMIT destroyWindow(this);
 }
 
-auto PAGWindow::open() -> void {
+void PAGWindow::open() {
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
 
@@ -58,16 +59,25 @@ auto PAGWindow::open() -> void {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  auto surfaceFormat = window->format();
+  surfaceFormat.setSwapInterval(1);
+  window->setFormat(surfaceFormat);
 
   pagView = window->findChild<pag::PAGView*>("pagView");
   auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
+  auto* runTimeModelManager = window->findChild<PAGRunTimeModelManager*>("runTimeModelManager");
+  PAGRenderThread* renderThread = pagView->getRenderThread();
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
+  connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
   connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
+  connect(pagView, &PAGView::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
+  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager,
+          &PAGRunTimeModelManager::updateData);
 }
 
-auto PAGWindow::getFilePath() -> QString {
+QString PAGWindow::getFilePath() {
   return filePath;
 }
 

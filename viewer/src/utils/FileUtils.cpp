@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "utils/PAGFileUtils.h"
+#include "FileUtils.h"
 #include <QDesktopServices>
 #include <QDir>
 #include <QUrl>
@@ -24,7 +24,7 @@
 
 namespace pag::Utils {
 
-auto openInFinder(const QString& path, bool select) -> void {
+void openInFinder(const QString& path, bool select) {
   QFileInfo fileInfo(path);
   if (!fileInfo.exists()) {
     return;
@@ -37,7 +37,7 @@ auto openInFinder(const QString& path, bool select) -> void {
   }
 }
 
-auto deleteFile(const QString& path) -> bool {
+bool deleteFile(const QString& path) {
   QFile file(path);
   if (!file.exists()) {
     return true;
@@ -45,7 +45,7 @@ auto deleteFile(const QString& path) -> bool {
   return file.remove();
 }
 
-auto deleteDir(const QString& path) -> bool {
+bool deleteDir(const QString& path) {
   QDir dir(path);
   if (!dir.exists()) {
     return true;
@@ -68,7 +68,7 @@ auto deleteDir(const QString& path) -> bool {
   return dir.rmdir(path);
 }
 
-auto makeDir(const QString& path, bool isDir) -> bool {
+bool makeDir(const QString& path, bool isDir) {
   QString dirPath;
   QFileInfo fileInfo(path);
   if (isDir) {

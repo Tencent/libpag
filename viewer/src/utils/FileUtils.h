@@ -18,11 +18,16 @@
 
 #pragma once
 
-#include <iostream>
+#include <QString>
 
 namespace pag::Utils {
 
-auto exportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
-                               int frameRate) -> int;
+void openInFinder(const QString& path, bool select = true);
+
+bool deleteFile(const QString& path);
+
+bool deleteDir(const QString& path);
+
+bool makeDir(const QString& path, bool isDir = true);
 
 }  // namespace pag::Utils

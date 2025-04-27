@@ -14,6 +14,8 @@ SplitView {
 
     property int minPlayerWidth: 360
 
+    property int minPanelWidth: 300
+
     property int splitHandleWidth: 0
 
     property int splitHandleHeight: 0
@@ -25,6 +27,8 @@ SplitView {
     property alias dropArea: dropArea
 
     property alias centerItem: centerItem
+
+    property alias rightItem: rightItem
 
     property alias controlForm: controlForm
     anchors.fill: parent
@@ -109,6 +113,41 @@ SplitView {
                 anchors.fill: parent
                 font.pixelSize: 20
                 wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    PAGRectangle {
+        id: rightItem
+        visible: isEditPanelOpen
+        SplitView.minimumWidth: minPanelWidth
+        SplitView.preferredWidth: minPanelWidth
+        color: "#16161d"
+        radius: 5
+        leftTopRadius: false
+        rightTopRadius: false
+        rightBottomRadius: false
+
+        PAGRectangle {
+            id: performance
+            color: "#16161D"
+            clip: true
+            anchors.top: parent.top
+            anchors.topMargin: 0
+            anchors.right: parent.right
+            anchors.rightMargin: 0
+            anchors.left: parent.left
+            anchors.leftMargin: 0
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 0
+            radius: 5
+            leftTopRadius: false
+            rightTopRadius: false
+            leftBottomRadius: false
+
+            Profiler {
+                id: profilerForm
+                anchors.fill: parent
             }
         }
     }

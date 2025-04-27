@@ -28,6 +28,8 @@ PAGWindow {
 
     property int windowTitleBarHeight: isWindows ? 32 : 22
 
+    property int minWindowHeightWithEditPanel: 650
+
     Settings {
         id: settings
         property bool isEditPanelOpen: false
@@ -67,6 +69,9 @@ PAGWindow {
                 let preferredSize = pagView.preferredSize;
                 let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
                 let height = Math.max(viewWindow.minimumHeight, preferredSize.height);
+                if (settings.isEditPanelOpen) {
+                    width += mainForm.rightItem.width + mainForm.splitHandleWidth;
+                }
                 let x = Math.max(0, oldX - ((width - oldWidth) / 2));
                 let y = Math.max(50, oldY - ((height - oldHeight) / 2));
                 settings.lastX = x;
@@ -289,9 +294,7 @@ PAGWindow {
     }
 
     function updateProgress() {
-        let duration = mainForm.pagView.duration;
-        let displayedTime = duration * mainForm.pagView.progress;
-        mainForm.controlForm.timeDisplayedText.text = Utils.msToTime(displayedTime);
+        mainForm.controlForm.timeDisplayedText.text = mainForm.pagView.displayedTime;
         mainForm.controlForm.currentFrameText.text = mainForm.pagView.currentFrame;
         mainForm.controlForm.totalFrameText.text = mainForm.pagView.totalFrame;
     }
@@ -312,7 +315,31 @@ PAGWindow {
         if (mainForm.controlForm.panelsButton.checked !== willOpen) {
             mainForm.controlForm.panelsButton.checked = willOpen;
         }
+
+        if (willOpen) {
+            let widthChange = (mainForm.rightItem.width === 0) ? mainForm.minPanelWidth : mainForm.rightItem.width;
+            widthChange += mainForm.splitHandleWidth;
+            if (viewWindow.visibility === Window.FullScreen) {
+                mainForm.centerItem.width = viewWindow.width - widthChange;
+            } else {
+                viewWindow.width = viewWindow.width + widthChange;
+            }
+            mainForm.rightItem.width = widthChange;
+            if (viewWindow.height < minWindowHeightWithEditPanel) {
+                viewWindow.height = minWindowHeightWithEditPanel;
+            }
+        } else {
+            let widthChange = -1 * mainForm.rightItem.width;
+            if ((viewWindow.width + widthChange) < viewWindow.minimumWidth) {
+                viewWindow.width = viewWindow.minimumWidth;
+            } else {
+                viewWindow.width = viewWindow.width + widthChange;
+            }
+            mainForm.rightItem.width = 0;
+        }
+
         settings.isEditPanelOpen = willOpen;
+        mainForm.isEditPanelOpen = willOpen;
     }
 
     function onCommand(command) {
@@ -325,14 +352,17 @@ PAGWindow {
             } else {
                 openFileDialog.currentFolder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation);
             }
-            openFileDialog.accepted.disconnect();
+            if (openFileDialog.currentAcceptHandler) {
+                openFileDialog.accepted.disconnect(openFileDialog.currentAcceptHandler);
+            }
             openFileDialog.fileMode = FileDialog.OpenFile;
             openFileDialog.title = qsTr("Open PAG File");
             openFileDialog.nameFilters = ["PAG files(*.pag)"];
-            openFileDialog.accepted.connect(function () {
+            openFileDialog.currentAcceptHandler = function () {
                 let filePath = openFileDialog.selectedFile;
                 mainForm.pagView.setFile(filePath);
-            });
+            };
+            openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
             openFileDialog.open();
             break;
         case "close-window":

@@ -34,36 +34,41 @@ class PAGView : public QQuickItem {
 
   Q_PROPERTY(int pagWidth READ getPAGWidth)
   Q_PROPERTY(int pagHeight READ getPAGHeight)
-  Q_PROPERTY(int totalFrame READ getTotalFrame)
-  Q_PROPERTY(int currentFrame READ getCurrentFrame)
   Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
   Q_PROPERTY(bool showVideoFrames READ getShowVideoFrames WRITE setShowVideoFrames)
-  Q_PROPERTY(double duration READ getDuration)
   Q_PROPERTY(double progress READ getProgress WRITE setProgress NOTIFY progressChanged)
+  Q_PROPERTY(QString totalFrame READ getTotalFrame)
+  Q_PROPERTY(QString currentFrame READ getCurrentFrame)
+  Q_PROPERTY(QString duration READ getDuration)
   Q_PROPERTY(QString filePath READ getFilePath NOTIFY fileChanged)
+  Q_PROPERTY(QString displayedTime READ getDisplayedTime)
   Q_PROPERTY(QColor backgroundColor READ getBackgroundColor)
   Q_PROPERTY(QSizeF preferredSize READ getPreferredSize)
 
-  auto getPAGWidth() const -> int;
-  auto getPAGHeight() const -> int;
-  auto getTotalFrame() const -> int;
-  auto getCurrentFrame() const -> int;
-  auto isPlaying() const -> bool;
-  auto getShowVideoFrames() const -> bool;
-  auto getDuration() const -> double;
-  auto getProgress() const -> double;
-  auto getFilePath() const -> QString;
-  auto getBackgroundColor() const -> QColor;
-  auto getPreferredSize() const -> QSizeF;
+  int getPAGWidth() const;
+  int getPAGHeight() const;
 
-  auto setIsPlaying(bool isPlaying) -> void;
-  auto setShowVideoFrames(bool isShow) -> void;
-  auto setProgress(double progress) -> void;
+  bool isPlaying() const;
+  bool getShowVideoFrames() const;
+  double getProgress() const;
+  QString getTotalFrame() const;
+  QString getCurrentFrame() const;
+  QString getDuration() const;
+  QString getFilePath() const;
+  QString getDisplayedTime() const;
+  QColor getBackgroundColor() const;
+  QSizeF getPreferredSize() const;
+
+  void setIsPlaying(bool isPlaying);
+  void setShowVideoFrames(bool isShow);
+  void setProgress(double progress);
 
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
   Q_SIGNAL void fileChanged(const std::shared_ptr<pag::PAGFile>& pagFile,
                             const std::string& filePath);
+
+  Q_SLOT void flush() const;
 
   Q_INVOKABLE bool setFile(const QString& filePath);
   Q_INVOKABLE void firstFrame();
@@ -71,7 +76,8 @@ class PAGView : public QQuickItem {
   Q_INVOKABLE void nextFrame();
   Q_INVOKABLE void previousFrame();
 
-  auto updatePaintNode(QSGNode*, UpdatePaintNodeData*) -> QSGNode* override;
+  QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
+  PAGRenderThread* getRenderThread() const;
 
  private:
   int64_t lastPlayTime = 0;

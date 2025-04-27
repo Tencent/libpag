@@ -18,24 +18,15 @@
 
 #pragma once
 
-#include <QThread>
+#include <QString>
 
-namespace pag {
+namespace pag::Utils {
 
-class PAGView;
+QString toQString(double num);
+QString toQString(int32_t num);
+QString toQString(int64_t num);
+QString getMemorySizeUnit(int64_t size);
+QString getMemorySizeNumString(int64_t size);
+std::string tagCodeToVersion(uint16_t tagCode);
 
-class PAGRenderThread : public QThread {
-  Q_OBJECT
- public:
-  explicit PAGRenderThread(PAGView* pagView);
-
-  Q_SIGNAL void frameTimeMetricsReady(int64_t frame, int64_t renderTime, int64_t presentTime,
-                                      int64_t imageDecodeTime);
-
-  Q_SLOT void flush();
-  Q_SLOT void shutDown();
-
- private:
-  PAGView* pagView = nullptr;
-};
-}  // namespace pag
+}  // namespace pag::Utils

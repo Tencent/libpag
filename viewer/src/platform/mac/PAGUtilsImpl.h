@@ -22,6 +22,6 @@
 
 namespace pag::Utils {
 
-auto openFileInFinder(QFileInfo& fileInfo) -> void;
+void openFileInFinder(QFileInfo& fileInfo);
 
 }  // namespace pag::Utils

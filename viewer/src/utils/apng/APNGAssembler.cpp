@@ -35,8 +35,8 @@ APNGAssembler::APNGAssembler() = default;
 
 APNGAssembler::~APNGAssembler() = default;
 
-auto APNGAssembler::exportFromPNGSequence(const std::string& outPath,
-                                          const std::string& firstPNGPath, int frameRate) -> int {
+int APNGAssembler::exportFromPNGSequence(const std::string& outPath,
+                                         const std::string& firstPNGPath, int frameRate) {
   std::string str1 = outPath;
   std::string str2 = firstPNGPath;
   char* szOut = str1.data();
@@ -86,8 +86,8 @@ auto APNGAssembler::exportFromPNGSequence(const std::string& outPath,
   return 0;
 };
 
-auto APNGAssembler::write_chunk(FILE* f, const char* name, unsigned char* data, unsigned int length)
-    -> void {
+void APNGAssembler::write_chunk(FILE* f, const char* name, unsigned char* data,
+                                unsigned int length) {
   unsigned char buf[4];
   unsigned int crc = (unsigned int)crc32(0, Z_NULL, 0);
 
@@ -112,8 +112,8 @@ auto APNGAssembler::write_chunk(FILE* f, const char* name, unsigned char* data, 
   fwrite(buf, 1, 4, f);
 }
 
-auto APNGAssembler::write_IDATs(FILE* f, unsigned int frame, unsigned char* data,
-                                unsigned int length, unsigned int idat_size) -> void {
+void APNGAssembler::write_IDATs(FILE* f, unsigned int frame, unsigned char* data,
+                                unsigned int length, unsigned int idat_size) {
   unsigned int z_cmf = data[0];
   if ((z_cmf & 0x0f) == 8 && (z_cmf & 0xf0) <= 0x70) {
     if (length >= 2) {
@@ -145,8 +145,8 @@ auto APNGAssembler::write_IDATs(FILE* f, unsigned int frame, unsigned char* data
   }
 }
 
-auto APNGAssembler::deflate_rect_op(Image* image, int x, int y, int w, int h, int bpp,
-                                    int zbuf_size, int n) -> void {
+void APNGAssembler::deflate_rect_op(Image* image, int x, int y, int w, int h, int bpp,
+                                    int zbuf_size, int n) {
   op_zstream1.data_type = Z_BINARY;
   op_zstream1.next_out = op_zbuf1;
   op_zstream1.avail_out = zbuf_size;
@@ -177,9 +177,9 @@ auto APNGAssembler::deflate_rect_op(Image* image, int x, int y, int w, int h, in
   deflateReset(&op_zstream2);
 }
 
-auto APNGAssembler::deflate_rect_fin([[maybe_unused]] int deflate_method, [[maybe_unused]] int iter,
+void APNGAssembler::deflate_rect_fin([[maybe_unused]] int deflate_method, [[maybe_unused]] int iter,
                                      unsigned char* zbuf, unsigned int* zsize, int bpp,
-                                     unsigned char* dest, int zbuf_size, int n) -> void {
+                                     unsigned char* dest, int zbuf_size, int n) {
   Image* image = op[n].image;
   int xbytes = op[n].x * bpp;
   int rowbytes = op[n].w * bpp;
@@ -214,9 +214,9 @@ auto APNGAssembler::deflate_rect_fin([[maybe_unused]] int deflate_method, [[mayb
   deflateEnd(&fin_zstream);
 }
 
-auto APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Image* image2,
+void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Image* image2,
                              Image* temp, unsigned int bpp, int zbuf_size, unsigned int has_tcolor,
-                             unsigned int tcolor, int n) -> void {
+                             unsigned int tcolor, int n) {
   unsigned int i, j, x0, y0, w0, h0;
   unsigned int x_min = w - 1;
   unsigned int y_min = h - 1;
@@ -330,8 +330,8 @@ auto APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
   if (over_is_possible) deflate_rect_op(temp, x0, y0, w0, h0, bpp, zbuf_size, n * 2 + 1);
 }
 
-auto APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, int h, int bpp,
-                                 unsigned char* dest) -> void {
+void APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, int h, int bpp,
+                                 unsigned char* dest) {
   int i, j, v;
   int a, b, c, pa, pb, pc, p;
   unsigned char* prev = NULL;
@@ -440,9 +440,9 @@ auto APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, 
   }
 }
 
-auto APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned int first,
-                                        std::vector<Image>& img, int delay_num, int delay_den,
-                                        unsigned char* coltype) -> int {
+int APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned int first,
+                                       std::vector<Image>& img, int delay_num, int delay_den,
+                                       unsigned char* coltype) {
   char szFormat[256];
   char szNext[256];
   char* szExt = strrchr(szImage, '.');
@@ -531,9 +531,8 @@ auto APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned
   return 0;
 }
 
-auto APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigned int loops,
-                              unsigned int first, int deflate_method, [[maybe_unused]] int iter)
-    -> int {
+int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigned int loops,
+                             unsigned int first, int deflate_method, [[maybe_unused]] int iter) {
   unsigned char coltype = img[0].type;
   unsigned int has_tcolor = 0;
   unsigned int tcolor = 0;

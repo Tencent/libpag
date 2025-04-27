@@ -16,36 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageTables.h"
-#include "ImageBytes.h"
+#pragma once
+
+#include <QAbstractListModel>
+#include "pag/pag.h"
 
 namespace pag {
-void ReadImageTables(DecodeStream* stream, std::vector<ImageBytes*>* images) {
-  auto count = stream->readEncodedUint32();
-  for (uint32_t i = 0; i < count; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
-    auto imageBytes = ReadImageBytes(stream);
-    images->push_back(imageBytes);
-  }
-}
+class PAGFileInfo {
+ public:
+  explicit PAGFileInfo(const QString& name, const QString& value = "", const QString& unit = "");
 
-TagCode WriteImageTables(EncodeStream* stream, const std::vector<pag::ImageBytes*>* images) {
-  uint32_t imageCount = 0;
-  for (auto& imageBytes : *images) {
-    if (imageBytes->fileBytes == nullptr || imageBytes->fileBytes->length() == 0) {
-      continue;
-    }
-    imageCount++;
-  }
-  stream->writeEncodedUint32(imageCount);
-  for (auto& imageBytes : *images) {
-    if (imageBytes->fileBytes == nullptr || imageBytes->fileBytes->length() == 0) {
-      continue;
-    }
-    WriteImageBytes(stream, imageBytes);
-  }
-  return TagCode::ImageTables;
-}
+  QString name = "";
+  QString value = "";
+  QString unit = "";
+};
+
+class PAGFileInfoModel : public QAbstractListModel {
+  Q_OBJECT
+ public:
+  enum class PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, UnitRole };
+
+  PAGFileInfoModel();
+  explicit PAGFileInfoModel(QObject* parent);
+
+  QVariant data(const QModelIndex& index, int role) const override;
+  int rowCount(const QModelIndex& parent) const override;
+  void resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+
+ protected:
+  QHash<int, QByteArray> roleNames() const override;
+
+ private:
+  std::vector<PAGFileInfo> fileInfos = {};
+};
+
 }  // namespace pag

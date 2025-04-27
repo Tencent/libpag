@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGUtils.h"
+#include "Utils.h"
 #include "utils/apng/APNGAssembler.h"
 
 namespace pag::Utils {
 
-auto exportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
-                               int frameRate) -> int {
+int exportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
+                              int frameRate) {
   auto apngAssembler = APNGAssembler();
 
   return apngAssembler.exportFromPNGSequence(outPath, firstPNGPath, frameRate);

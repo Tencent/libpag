@@ -30,6 +30,9 @@ void ReadFileAttributes(DecodeStream* stream, pag::FileAttributes* fileAttribute
 
   auto warningCount = static_cast<int>(stream->readEncodedUint32());
   for (int i = 0; i < warningCount; i++) {
+    if (stream->context->hasException()) {
+      break;
+    }
     auto warning = stream->readUTF8String();
     fileAttributes->warnings.push_back(warning);
   }

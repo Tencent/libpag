@@ -36,8 +36,8 @@ class PAGTask : public QObject {
   Q_PROPERTY(bool visible READ getVisible NOTIFY visibleChanged)
   Q_PROPERTY(double progress READ getProgress NOTIFY progressChanged)
 
-  virtual auto getVisible() const -> bool;
-  virtual auto getProgress() const -> double;
+  virtual bool getVisible() const;
+  virtual double getProgress() const;
 
   Q_SIGNAL void taskFinished(int result, QString filePath);
   Q_SIGNAL void visibleChanged(bool visible);
@@ -47,11 +47,11 @@ class PAGTask : public QObject {
   Q_INVOKABLE virtual void stop() = 0;
 
  protected:
-  virtual auto onBegin() -> void = 0;
-  virtual auto onFinish() -> int = 0;
+  virtual void onBegin() = 0;
+  virtual int onFinish() = 0;
 
  private:
-  virtual auto startInternal() -> void = 0;
+  virtual void startInternal() = 0;
 
  protected:
   bool visible = false;
@@ -64,19 +64,19 @@ class PAGPlayTask : public PAGTask {
   explicit PAGPlayTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
   ~PAGPlayTask() override;
 
-  auto start() -> void override;
-  auto stop() -> void override;
+  void start() override;
+  void stop() override;
 
  protected:
-  auto onBegin() -> void override;
-  auto onFinish() -> int override;
-  virtual auto onFrameFlush(double progress) -> void;
-  virtual auto isNeedRenderCurrentFrame() -> bool;
-  auto releaseResource() -> void;
+  void onBegin() override;
+  int onFinish() override;
+  virtual void onFrameFlush(double progress);
+  virtual bool isNeedRenderCurrentFrame();
+  void releaseResource();
 
  private:
-  auto startInternal() -> void override;
-  auto initOpenGLEnvironment() -> void;
+  void startInternal() override;
+  void initOpenGLEnvironment();
 
  protected:
   bool openAfterExport = true;
