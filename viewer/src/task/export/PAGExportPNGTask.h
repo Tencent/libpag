@@ -29,11 +29,11 @@ class PAGExportPNGTask : public PAGPlayTask {
                             int exportFrame = -1);
 
  protected:
-  auto onFrameFlush(double progress) -> void override;
-  auto isNeedRenderCurrentFrame() -> bool override;
+  void onFrameFlush(double progress) override;
+  bool isNeedRenderCurrentFrame() override;
 
  private:
-  auto exportCurrentFrameAsPNG(const QString& outPath) -> void;
+  void exportCurrentFrameAsPNG(const QString& outPath);
 
  private:
   int exportFrame = -1;

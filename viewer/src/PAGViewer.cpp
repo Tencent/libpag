@@ -26,7 +26,7 @@ namespace pag {
 PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
 }
 
-auto PAGViewer::event(QEvent* event) -> bool {
+bool PAGViewer::event(QEvent* event) {
   if (event->type() == QEvent::FileOpen) {
     auto openEvent = static_cast<QFileOpenEvent*>(event);
     auto path = openEvent->file();
@@ -35,7 +35,7 @@ auto PAGViewer::event(QEvent* event) -> bool {
   return QApplication::event(event);
 }
 
-auto PAGViewer::openFile(QString path) -> void {
+void PAGViewer::openFile(QString path) {
   PAGWindow* window = nullptr;
   for (int i = 0; i < PAGWindow::AllWindows.count(); i++) {
     auto win = PAGWindow::AllWindows[i];
@@ -57,7 +57,7 @@ auto PAGViewer::openFile(QString path) -> void {
   window->openFile(path);
 }
 
-auto PAGViewer::onWindowDestroyed(PAGWindow* window) -> void {
+void PAGViewer::onWindowDestroyed(PAGWindow* window) {
   PAGWindow::AllWindows.removeOne(window);
   window->deleteLater();
 }

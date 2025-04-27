@@ -25,11 +25,11 @@ namespace pag {
 PAGTask::PAGTask() : QObject(nullptr) {
 }
 
-auto PAGTask::getVisible() const -> bool {
+bool PAGTask::getVisible() const {
   return visible;
 }
 
-auto PAGTask::getProgress() const -> double {
+double PAGTask::getProgress() const {
   return progress;
 }
 
@@ -47,7 +47,7 @@ PAGPlayTask::~PAGPlayTask() {
   releaseResource();
 }
 
-auto PAGPlayTask::start() -> void {
+void PAGPlayTask::start() {
   if (pagFile == nullptr) {
     return;
   }
@@ -56,33 +56,33 @@ auto PAGPlayTask::start() -> void {
   workerThread.start();
 }
 
-auto PAGPlayTask::stop() -> void {
+void PAGPlayTask::stop() {
   this->isWorking = false;
   currentFrame = 0;
 }
 
-auto PAGPlayTask::onBegin() -> void {
+void PAGPlayTask::onBegin() {
   initOpenGLEnvironment();
   visible = true;
   Q_EMIT visibleChanged(visible);
 }
 
-auto PAGPlayTask::onFinish() -> int {
+int PAGPlayTask::onFinish() {
   visible = false;
   Q_EMIT visibleChanged(visible);
   return 0;
 }
 
-auto PAGPlayTask::onFrameFlush(double progress) -> void {
+void PAGPlayTask::onFrameFlush(double progress) {
   this->progress = progress;
   Q_EMIT progressChanged(progress);
 }
 
-auto PAGPlayTask::isNeedRenderCurrentFrame() -> bool {
+bool PAGPlayTask::isNeedRenderCurrentFrame() {
   return currentFrame >= 0;
 }
 
-auto PAGPlayTask::releaseResource() -> void {
+void PAGPlayTask::releaseResource() {
   pagPlayer.reset();
   surface.reset();
   if (context != nullptr) {
@@ -97,7 +97,7 @@ auto PAGPlayTask::releaseResource() -> void {
   offscreenSurface.reset();
 }
 
-auto PAGPlayTask::startInternal() -> void {
+void PAGPlayTask::startInternal() {
   float frameRate = pagFile->frameRate();
   Frame totalFrame = TimeToFrame(pagFile->duration(), frameRate);
   while (currentFrame < totalFrame) {
@@ -124,7 +124,7 @@ auto PAGPlayTask::startInternal() -> void {
   workerThread.exit(0);
 }
 
-auto PAGPlayTask::initOpenGLEnvironment() -> void {
+void PAGPlayTask::initOpenGLEnvironment() {
   if (surface != nullptr) {
     return;
   }

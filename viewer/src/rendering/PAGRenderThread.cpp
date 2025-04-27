@@ -25,7 +25,7 @@ namespace pag {
 PAGRenderThread::PAGRenderThread(PAGView* pagView) : pagView(pagView) {
 }
 
-auto PAGRenderThread::flush() -> void {
+void PAGRenderThread::flush() {
   if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
     return;
   }
@@ -40,7 +40,7 @@ auto PAGRenderThread::flush() -> void {
   QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
 }
 
-auto PAGRenderThread::shutDown() -> void {
+void PAGRenderThread::shutDown() {
   if (QGuiApplication::instance()) {
     auto mainThread = QGuiApplication::instance()->thread();
     if (pagView->drawable) {

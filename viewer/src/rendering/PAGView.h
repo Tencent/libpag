@@ -45,23 +45,23 @@ class PAGView : public QQuickItem {
   Q_PROPERTY(QColor backgroundColor READ getBackgroundColor)
   Q_PROPERTY(QSizeF preferredSize READ getPreferredSize)
 
-  auto getPAGWidth() const -> int;
-  auto getPAGHeight() const -> int;
+  int getPAGWidth() const;
+  int getPAGHeight() const;
 
-  auto isPlaying() const -> bool;
-  auto getShowVideoFrames() const -> bool;
-  auto getProgress() const -> double;
-  auto getTotalFrame() const -> QString;
-  auto getCurrentFrame() const -> QString;
-  auto getDuration() const -> QString;
-  auto getFilePath() const -> QString;
-  auto getDisplayedTime() const -> QString;
-  auto getBackgroundColor() const -> QColor;
-  auto getPreferredSize() const -> QSizeF;
+  bool isPlaying() const;
+  bool getShowVideoFrames() const;
+  double getProgress() const;
+  QString getTotalFrame() const;
+  QString getCurrentFrame() const;
+  QString getDuration() const;
+  QString getFilePath() const;
+  QString getDisplayedTime() const;
+  QColor getBackgroundColor() const;
+  QSizeF getPreferredSize() const;
 
-  auto setIsPlaying(bool isPlaying) -> void;
-  auto setShowVideoFrames(bool isShow) -> void;
-  auto setProgress(double progress) -> void;
+  void setIsPlaying(bool isPlaying);
+  void setShowVideoFrames(bool isShow);
+  void setProgress(double progress);
 
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
@@ -76,8 +76,8 @@ class PAGView : public QQuickItem {
   Q_INVOKABLE void nextFrame();
   Q_INVOKABLE void previousFrame();
 
-  auto updatePaintNode(QSGNode*, UpdatePaintNodeData*) -> QSGNode* override;
-  auto getRenderThread() const -> PAGRenderThread*;
+  QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
+  PAGRenderThread* getRenderThread() const;
 
  private:
   int64_t lastPlayTime = 0;

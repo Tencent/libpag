@@ -46,12 +46,12 @@ class PAGRunTimeModelManager : public QObject {
   Q_PROPERTY(const PAGFrameDisplayInfoModel* frameDisplayInfoModel READ getFrameDisplayInfoModel
                  NOTIFY frameDisplayInfoModelChanged)
 
-  auto getTotalFrame() const -> QString;
-  auto getCurrentFrame() const -> QString;
-  auto getFileInfoModel() const -> const PAGFileInfoModel*;
-  auto getFrameDisplayInfoModel() const -> const PAGFrameDisplayInfoModel*;
+  QString getTotalFrame() const;
+  QString getCurrentFrame() const;
+  const PAGFileInfoModel* getFileInfoModel() const;
+  const PAGFrameDisplayInfoModel* getFrameDisplayInfoModel() const;
 
-  auto setCurrentFrame(const QString& currentFrame) -> void;
+  void setCurrentFrame(const QString& currentFrame);
 
   Q_SIGNAL void totalFrameChanged();
   Q_SIGNAL void currentFrameChanged();
@@ -62,11 +62,10 @@ class PAGRunTimeModelManager : public QObject {
   Q_SLOT void updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
                          int64_t imageDecodeTime);
 
-  auto resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath) -> void;
+  void resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
 
  private:
-  auto updateFrameDisplayInfo(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime)
-      -> void;
+  void updateFrameDisplayInfo(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
 
  private:
   int64_t totalFrame = -1;

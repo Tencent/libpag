@@ -49,13 +49,13 @@ class PAGFrameDisplayInfoModel : public QAbstractListModel {
   PAGFrameDisplayInfoModel();
   explicit PAGFrameDisplayInfoModel(QObject* parent);
 
-  auto data(const QModelIndex& index, int role) const -> QVariant override;
-  auto rowCount(const QModelIndex& parent) const -> int override;
-  auto updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present,
-                  const FrameDisplayInfo& imageDecode) -> void;
+  QVariant data(const QModelIndex& index, int role) const override;
+  int rowCount(const QModelIndex& parent) const override;
+  void updateData(const FrameDisplayInfo& render, const FrameDisplayInfo& present,
+                  const FrameDisplayInfo& imageDecode);
 
  protected:
-  auto roleNames() const -> QHash<int, QByteArray> override;
+  QHash<int, QByteArray> roleNames() const override;
 
  private:
   std::vector<FrameDisplayInfo> diplayInfos = {};

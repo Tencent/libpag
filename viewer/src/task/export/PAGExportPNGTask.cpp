@@ -34,7 +34,7 @@ PAGExportPNGTask::PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QStr
   }
 }
 
-auto PAGExportPNGTask::onFrameFlush(double progress) -> void {
+void PAGExportPNGTask::onFrameFlush(double progress) {
   PAGPlayTask::onFrameFlush(progress);
   QString outPath;
   if (exportFrame >= 0) {
@@ -45,14 +45,14 @@ auto PAGExportPNGTask::onFrameFlush(double progress) -> void {
   exportCurrentFrameAsPNG(outPath);
 }
 
-auto PAGExportPNGTask::isNeedRenderCurrentFrame() -> bool {
+bool PAGExportPNGTask::isNeedRenderCurrentFrame() {
   if (exportFrame < 0) {
     return true;
   }
   return exportFrame == currentFrame;
 }
 
-auto PAGExportPNGTask::exportCurrentFrameAsPNG(const QString& outPath) -> void {
+void PAGExportPNGTask::exportCurrentFrameAsPNG(const QString& outPath) {
   context->makeCurrent(offscreenSurface.get());
   auto image = frameBuffer->toImage(false);
   bool result = image.save(outPath, ExportPNGFileSuffix.c_str());

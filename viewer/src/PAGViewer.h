@@ -28,8 +28,8 @@ class PAGViewer : public QApplication {
  public:
   PAGViewer(int& argc, char** argv);
 
-  auto event(QEvent* event) -> bool override;
-  auto openFile(QString path) -> void;
+  bool event(QEvent* event) override;
+  void openFile(QString path);
 
   Q_SLOT void onWindowDestroyed(PAGWindow* window);
 };

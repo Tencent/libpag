@@ -35,8 +35,8 @@ class PAGWindow : public QObject {
   Q_SLOT void openFile(QString path);
   Q_SLOT void onPAGViewerDestroyed();
 
-  auto open() -> void;
-  auto getFilePath() -> QString;
+  void open();
+  QString getFilePath();
 
   static QList<PAGWindow*> AllWindows;
 

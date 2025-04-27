@@ -31,7 +31,7 @@ PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel() : QAbstractListModel(nullpt
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel(QObject* parent) : QAbstractListModel(parent) {
 }
 
-auto PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const -> QVariant {
+QVariant PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const {
   if ((index.row() < 0) || (index.row() >= static_cast<int>(diplayInfos.size()))) {
     return {};
   }
@@ -58,14 +58,14 @@ auto PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const ->
   }
 }
 
-auto PAGFrameDisplayInfoModel::rowCount(const QModelIndex& parent) const -> int {
+int PAGFrameDisplayInfoModel::rowCount(const QModelIndex& parent) const {
   Q_UNUSED(parent);
   return static_cast<int>(diplayInfos.size());
 }
 
-auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
+void PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
                                           const FrameDisplayInfo& present,
-                                          const FrameDisplayInfo& imageDecode) -> void {
+                                          const FrameDisplayInfo& imageDecode) {
 
   beginResetModel();
   diplayInfos.clear();
@@ -75,7 +75,7 @@ auto PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
   endResetModel();
 }
 
-auto PAGFrameDisplayInfoModel::roleNames() const -> QHash<int, QByteArray> {
+QHash<int, QByteArray> PAGFrameDisplayInfoModel::roleNames() const {
   static const QHash<int, QByteArray> roles = {
       {static_cast<int>(PAGFrameDisplayInfoRoles::NameRole), "name"},
       {static_cast<int>(PAGFrameDisplayInfoRoles::ColorRole), "colorCode"},

@@ -25,8 +25,8 @@
 
 namespace pag {
 
-auto PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath,
-                                const QVariantMap& extraParams) -> PAGTask* {
+PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath,
+                                    const QVariantMap& extraParams) {
   if (pagFile == nullptr) {
     return nullptr;
   }
@@ -61,8 +61,8 @@ auto PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath,
   return task;
 }
 
-auto PAGTaskFactory::resetFile([[maybe_unused]] const std::shared_ptr<PAGFile>& pagFile,
-                               const std::string& filePath) -> void {
+void PAGTaskFactory::resetFile([[maybe_unused]] const std::shared_ptr<PAGFile>& pagFile,
+                               const std::string& filePath) {
   this->pagFile = PAGFile::Load(filePath);
   this->filePath = filePath;
 }

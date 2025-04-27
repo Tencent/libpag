@@ -43,7 +43,7 @@ PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent)
   endResetModel();
 }
 
-auto PAGFileInfoModel::data(const QModelIndex& index, int role) const -> QVariant {
+QVariant PAGFileInfoModel::data(const QModelIndex& index, int role) const {
   if ((index.row() < 0) || (index.row() >= static_cast<int>(fileInfos.size()))) {
     return {};
   }
@@ -63,13 +63,13 @@ auto PAGFileInfoModel::data(const QModelIndex& index, int role) const -> QVarian
   return {};
 }
 
-auto PAGFileInfoModel::rowCount(const QModelIndex& parent) const -> int {
+int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
   Q_UNUSED(parent);
   return static_cast<int>(fileInfos.size());
 }
 
-auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile,
-                                 const std::string& filePath) -> void {
+void PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile,
+                                 const std::string& filePath) {
   Q_UNUSED(filePath);
   beginResetModel();
   fileInfos.clear();
@@ -87,7 +87,7 @@ auto PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile,
   endResetModel();
 }
 
-auto PAGFileInfoModel::roleNames() const -> QHash<int, QByteArray> {
+QHash<int, QByteArray> PAGFileInfoModel::roleNames() const {
   static QHash<int, QByteArray> roles = {{static_cast<int>(PAGFileInfoRoles::NameRole), "name"},
                                          {static_cast<int>(PAGFileInfoRoles::ValueRole), "value"},
                                          {static_cast<int>(PAGFileInfoRoles::UnitRole), "unit"}};

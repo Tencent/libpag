@@ -22,12 +22,12 @@
 
 namespace pag::Utils {
 
-auto openInFinder(const QString& path, bool select = true) -> void;
+void openInFinder(const QString& path, bool select = true);
 
-auto deleteFile(const QString& path) -> bool;
+bool deleteFile(const QString& path);
 
-auto deleteDir(const QString& path) -> bool;
+bool deleteDir(const QString& path);
 
-auto makeDir(const QString& path, bool isDir = true) -> bool;
+bool makeDir(const QString& path, bool isDir = true);
 
 }  // namespace pag::Utils
