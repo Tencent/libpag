@@ -61,11 +61,13 @@ class DisplacementMapFilter : public RuntimeFilter {
                                             const tgfx::Matrix& layerMatrix, Frame layerFrame,
                                             const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  DisplacementMapFilter(Enum useForHorizontalDisplacement, float maxHorizontalDisplacement,
-                        Enum useForVerticalDisplacement, float maxVerticalDisplacement,
-                        Enum displacementMapBehavior, Enum edgeBehavior, bool expandOutput,
-                        float effectOpacity, tgfx::Matrix layerMatrix, tgfx::Size size,
-                        tgfx::Size displacementSize, tgfx::Rect contentBounds,
+  DisplacementMapFilter(DisplacementMapSource useForHorizontalDisplacement,
+                        float maxHorizontalDisplacement,
+                        DisplacementMapSource useForVerticalDisplacement,
+                        float maxVerticalDisplacement,
+                        DisplacementMapBehavior displacementMapBehavior, Enum edgeBehavior,
+                        bool expandOutput, float effectOpacity, tgfx::Matrix layerMatrix,
+                        tgfx::Size size, tgfx::Size displacementSize, tgfx::Rect contentBounds,
                         std::shared_ptr<tgfx::Image> sourceImage)
       : RuntimeFilter(Type(), {std::move(sourceImage)}),
         useForHorizontalDisplacement(useForHorizontalDisplacement),
@@ -87,11 +89,11 @@ class DisplacementMapFilter : public RuntimeFilter {
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 
-  Enum useForHorizontalDisplacement = DisplacementMapSource::Red;
+  DisplacementMapSource useForHorizontalDisplacement = DisplacementMapSource::Red;
   float maxHorizontalDisplacement = 0.f;
-  Enum useForVerticalDisplacement = DisplacementMapSource::Red;
+  DisplacementMapSource useForVerticalDisplacement = DisplacementMapSource::Red;
   float maxVerticalDisplacement = 0.f;
-  Enum displacementMapBehavior = DisplacementMapBehavior::CenterMap;
+  DisplacementMapBehavior displacementMapBehavior = DisplacementMapBehavior::CenterMap;
   bool edgeBehavior = false;
   bool expandOutput = true;
   float effectOpacity = 1.f;

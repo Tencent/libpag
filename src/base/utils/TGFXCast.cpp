@@ -19,7 +19,7 @@
 #include "TGFXCast.h"
 
 namespace pag {
-static constexpr std::pair<Enum, tgfx::BlendMode> BlendModeMap[] = {
+static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Normal, tgfx::BlendMode::SrcOver},
     {BlendMode::Multiply, tgfx::BlendMode::Multiply},
     {BlendMode::Screen, tgfx::BlendMode::Screen},
@@ -38,7 +38,7 @@ static constexpr std::pair<Enum, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Luminosity, tgfx::BlendMode::Luminosity},
     {BlendMode::Add, tgfx::BlendMode::PlusLighter}};
 
-tgfx::BlendMode ToTGFXBlend(Enum blendMode) {
+tgfx::BlendMode ToTGFXBlend(BlendMode blendMode) {
   for (const auto& pair : BlendModeMap) {
     if (pair.first == blendMode) {
       return pair.second;
@@ -47,7 +47,7 @@ tgfx::BlendMode ToTGFXBlend(Enum blendMode) {
   return tgfx::BlendMode::SrcOver;
 }
 
-tgfx::LineCap ToTGFXCap(Enum cap) {
+tgfx::LineCap ToTGFXCap(LineCap cap) {
   switch (cap) {
     case LineCap::Round:
       return tgfx::LineCap::Round;
@@ -58,7 +58,7 @@ tgfx::LineCap ToTGFXCap(Enum cap) {
   }
 }
 
-tgfx::LineJoin ToTGFXJoin(Enum join) {
+tgfx::LineJoin ToTGFXJoin(LineJoin join) {
   switch (join) {
     case LineJoin::Round:
       return tgfx::LineJoin::Round;

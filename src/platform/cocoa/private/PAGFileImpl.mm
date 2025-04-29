@@ -187,12 +187,12 @@
 
 - (int)timeStretchMode {
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
-  return pagFile->timeStretchMode();
+  return static_cast<int>(pagFile->timeStretchMode());
 }
 
 - (void)seTimeStretchMode:(int)value {
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
-  return pagFile->setTimeStretchMode(value);
+  return pagFile->setTimeStretchMode(static_cast<pag::PAGTimeStretchMode>(value));
 }
 
 - (void)setDuration:(int64_t)duration {

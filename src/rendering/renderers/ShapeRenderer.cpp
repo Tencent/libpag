@@ -54,8 +54,8 @@ struct StrokePaint {
   }
 
   float strokeWidth = 0;
-  Enum lineCap = LineCap::Butt;
-  Enum lineJoin = LineJoin::Miter;
+  LineCap lineCap = LineCap::Butt;
+  LineJoin lineJoin = LineJoin::Miter;
   float miterLimit = 0;
   std::vector<float> dashes;
   float dashOffset = 0;
@@ -93,7 +93,7 @@ class PaintElement : public ElementData {
   PaintType paintType = PaintType::Fill;
   tgfx::BlendMode blendMode = tgfx::BlendMode::SrcOver;
   float alpha = 1.0f;
-  Enum compositeOrder = CompositeOrder::BelowPreviousInSameGroup;
+  CompositeOrder compositeOrder = CompositeOrder::BelowPreviousInSameGroup;
   tgfx::PathFillType pathFillType = tgfx::PathFillType::Winding;
   tgfx::Color color = tgfx::Color::White();
   GradientPaint gradient;
@@ -340,7 +340,7 @@ void ShapePathToPath(ShapePathElement* shapePath, tgfx::Path* path, Frame frame)
   path->addPath(ToPath(*pathData));
 }
 
-tgfx::PathFillType ToPathFillType(Enum rule) {
+tgfx::PathFillType ToPathFillType(FillRule rule) {
   return rule == FillRule::EvenOdd ? tgfx::PathFillType::EvenOdd : tgfx::PathFillType::Winding;
 }
 

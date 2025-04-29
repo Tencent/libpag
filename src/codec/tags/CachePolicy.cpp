@@ -20,11 +20,11 @@
 
 namespace pag {
 void ReadCachePolicy(DecodeStream* stream, Layer* layer) {
-  layer->cachePolicy = ReadEnum(stream);
+  layer->cachePolicy = static_cast<CachePolicy>(ReadEnum(stream));
 }
 
 TagCode WriteCachePolicy(EncodeStream* stream, Layer* layer) {
-  WriteEnum(stream, layer->cachePolicy);
+  WriteEnum(stream, static_cast<Enum>(layer->cachePolicy));
   return TagCode::CachePolicy;
 }
 };  // namespace pag

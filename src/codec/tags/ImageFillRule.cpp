@@ -23,7 +23,8 @@ namespace pag {
 
 static std::unique_ptr<BlockConfig> ImageFillRuleTag(ImageFillRule* imageFillRule, TagCode code) {
   auto tagConfig = new BlockConfig(code);
-  AddAttribute(tagConfig, &imageFillRule->scaleMode, AttributeType::Value, PAGScaleMode::LetterBox);
+  AddAttribute(tagConfig, &imageFillRule->scaleMode, AttributeType::Value,
+               static_cast<uint8_t>(PAGScaleMode::LetterBox));
   AddAttribute(tagConfig, &imageFillRule->timeRemap, AttributeType::SimpleProperty,
                static_cast<Frame>(0));
   return std::unique_ptr<BlockConfig>(tagConfig);

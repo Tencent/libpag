@@ -156,12 +156,12 @@ void PAGPlayer::setMaxFrameRate(float value) {
   _maxFrameRate = value;
 }
 
-int PAGPlayer::scaleMode() {
+PAGScaleMode PAGPlayer::scaleMode() {
   LockGuard autoLock(rootLocker);
   return _scaleMode;
 }
 
-void PAGPlayer::setScaleMode(int mode) {
+void PAGPlayer::setScaleMode(PAGScaleMode mode) {
   LockGuard autoLock(rootLocker);
   _scaleMode = mode;
   auto pagComposition = stage->getRootComposition();

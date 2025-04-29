@@ -22,7 +22,8 @@ namespace pag {
 std::unique_ptr<BlockConfig> PolyStarTag(PolyStarElement* shape) {
   auto tagConfig = new BlockConfig(TagCode::PolyStar);
   AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
-  AddAttribute(tagConfig, &shape->polyType, AttributeType::Value, PolyStarType::Star);
+  AddAttribute(tagConfig, &shape->polyType, AttributeType::Value,
+               static_cast<uint8_t>(PolyStarType::Star));
   AddAttribute(tagConfig, &shape->points, AttributeType::SimpleProperty, 5.0f);
   AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
   AddAttribute(tagConfig, &shape->rotation, AttributeType::SimpleProperty, 0.0f);

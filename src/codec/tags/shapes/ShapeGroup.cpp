@@ -45,7 +45,8 @@ std::unique_ptr<BlockConfig> ShapeGroupTag(ShapeGroupElement* shape) {
   }
   auto transform = shape->transform;
   auto tagConfig = new BlockConfig(TagCode::ShapeGroup);
-  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
+  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
   AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty, Point::Zero());
   AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,

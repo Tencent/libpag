@@ -27,7 +27,7 @@ namespace pag {
 enum class SolidStrokeMode { Normal, Thick };
 
 struct SolidStrokeOption {
-  Enum position = -1;
+  StrokePosition position = StrokePosition::Outside;
   tgfx::Color color = tgfx::Color::Black();
   float spreadSizeX = 0.0f;
   float spreadSizeY = 0.0f;

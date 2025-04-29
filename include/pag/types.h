@@ -1390,70 +1390,67 @@ enum class LayerType {
 /**
  * Defines the rules on how to scale the content to fit the specified area.
  */
-class PAG_API PAGScaleMode {
- public:
+enum class PAG_API PAGScaleMode : uint8_t {
   /**
    * The content is not scaled.
    */
-  static const Enum None = 0;
+  None = 0,
   /**
    * The content is stretched to fit.
    */
-  static const Enum Stretch = 1;
+  Stretch = 1,
   /**
    * The content is scaled with respect to the original unscaled image's aspect ratio.
    * This is the default value.
    */
-  static const Enum LetterBox = 2;
+  LetterBox = 2,
   /**
    * The content is scaled to fit with respect to the original unscaled image's aspect ratio.
    * This results in cropping on one axis.
    */
-  static const Enum Zoom = 3;
+  Zoom = 3
 };
 
 /**
  * Defines the rules on how to stretch the timeline of content to fit the specified duration.
  */
-class PAG_API PAGTimeStretchMode {
- public:
+enum class PAG_API PAGTimeStretchMode : uint8_t {
   /**
    * Keep the original playing speed, and display the last frame if the content's duration is less
    * than target duration.
    */
-  static const Enum None = 0;
-  /*
-   * Change the playing speed of the content to fit target duration.
+    None = 0,
+  /**
+   * Keep the original playing speed, and display the last frame if the content's duration is less
+   * than target duration.
    */
-  static const Enum Scale = 1;
+    Scale = 1,
   /**
    * Keep the original playing speed, but repeat the content if the content's duration is less than
    * target duration. This is the default mode.
    */
-  static const Enum Repeat = 2;
+    Repeat = 2,
   /**
    * Keep the original playing speed, but repeat the content in reversed if the content's duration
    * is less than target duration.
    */
-  static const Enum RepeatInverted = 3;
+    RepeatInverted = 3
 };
 
-class PAG_API ParagraphJustification {
- public:
-  static const Enum LeftJustify = 0;
-  static const Enum CenterJustify = 1;
-  static const Enum RightJustify = 2;
-  static const Enum FullJustifyLastLineLeft = 3;
-  static const Enum FullJustifyLastLineRight = 4;
-  static const Enum FullJustifyLastLineCenter = 5;
-  static const Enum FullJustifyLastLineFull = 6;
+enum class PAG_API ParagraphJustification : uint8_t {
+  LeftJustify = 0,
+  CenterJustify = 1,
+  RightJustify = 2,
+  FullJustifyLastLineLeft = 3,
+  FullJustifyLastLineRight = 4,
+  FullJustifyLastLineCenter = 5,
+  FullJustifyLastLineFull = 6
 };
 
-class PAG_API TextDirection {
- public:
-  static const Enum Default = 0;
-  static const Enum Horizontal = 1;
-  static const Enum Vertical = 2;
+enum class PAG_API TextDirection : uint8_t {
+  Default = 0,
+  Horizontal = 1,
+  Vertical = 2
 };
 
 /**
@@ -1545,7 +1542,7 @@ class PAG_API TextDocument {
   /**
    * The paragraph justification for the text layer.
    */
-  Enum justification = ParagraphJustification::LeftJustify;
+  ParagraphJustification justification = ParagraphJustification::LeftJustify;
 
   /**
    * The space between lines, 0 indicates 'auto', which is fontSize * 1.2
@@ -1566,7 +1563,7 @@ class PAG_API TextDocument {
    */
   uint8_t backgroundAlpha = 0;
 
-  Enum direction = TextDirection::Default;
+  TextDirection direction = TextDirection::Default;
 };
 
 typedef std::shared_ptr<TextDocument> TextDocumentHandle;
@@ -1720,25 +1717,24 @@ enum class ColorType {
   RGBA_1010102
 };
 
-class PAG_API BlendMode {
- public:
-  static const Enum Normal = 0;
-  static const Enum Multiply = 1;
-  static const Enum Screen = 2;
-  static const Enum Overlay = 3;
-  static const Enum Darken = 4;
-  static const Enum Lighten = 5;
-  static const Enum ColorDodge = 6;
-  static const Enum ColorBurn = 7;
-  static const Enum HardLight = 8;
-  static const Enum SoftLight = 9;
-  static const Enum Difference = 10;
-  static const Enum Exclusion = 11;
-  static const Enum Hue = 12;
-  static const Enum Saturation = 13;
-  static const Enum Color = 14;
-  static const Enum Luminosity = 15;
-  static const Enum Add = 16;
+enum class PAG_API BlendMode : uint8_t {
+  Normal = 0,
+  Multiply = 1,
+  Screen = 2,
+  Overlay = 3,
+  Darken = 4,
+  Lighten = 5,
+  ColorDodge = 6,
+  ColorBurn = 7,
+  HardLight = 8,
+  SoftLight = 9,
+  Difference = 10,
+  Exclusion = 11,
+  Hue = 12,
+  Saturation = 13,
+  Color = 14,
+  Luminosity = 15,
+  Add = 16
 };
 
 }  // namespace pag

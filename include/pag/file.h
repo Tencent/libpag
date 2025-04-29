@@ -201,12 +201,11 @@ class PAG_API PathData {
 
 typedef std::shared_ptr<PathData> PathHandle;
 
-class PAG_API KeyframeInterpolationType {
- public:
-  static const Enum None = 0;
-  static const Enum Linear = 1;
-  static const Enum Bezier = 2;
-  static const Enum Hold = 3;
+enum class PAG_API KeyframeInterpolationType : uint8_t {
+  None = 0,
+  Linear = 1,
+  Bezier = 2,
+  Hold = 3
 };
 
 template <typename T>
@@ -229,7 +228,7 @@ class Keyframe {
   T endValue;
   Frame startTime = ZeroFrame;
   Frame endTime = ZeroFrame;
-  Enum interpolationType = KeyframeInterpolationType::Hold;
+  KeyframeInterpolationType interpolationType = KeyframeInterpolationType::Hold;
   std::vector<Point> bezierOut;
   std::vector<Point> bezierIn;
   Point3D spatialOut = Point3D::Zero();
@@ -396,16 +395,15 @@ class PAG_API Transform3D {
   bool verify() const;
 };
 
-class PAG_API MaskMode {
- public:
-  static const Enum None = 0;  // mask shape does nothing
-  static const Enum Add = 1;   // shape is added into mask (normal behavior (really screen!))
-  static const Enum Subtract = 2;
-  static const Enum Intersect = 3;
-  static const Enum Lighten = 4;
-  static const Enum Darken = 5;
-  static const Enum Difference = 6;
-  static const Enum Accum = 7;  // real add, not screen (not exposed in UI!)
+enum class PAG_API MaskMode : uint8_t {
+  None = 0,  // mask shape does nothing
+  Add = 1,   // shape is added into mask (normal behavior (really screen!))
+  Subtract = 2,
+  Intersect = 3,
+  Lighten = 4,
+  Darken = 5,
+  Difference = 6,
+  Accum = 7   // real add, not screen (not exposed in UI!)
 };
 
 class PAG_API MaskData {
@@ -414,7 +412,7 @@ class PAG_API MaskData {
 
   ID id = ZeroID;
   bool inverted = false;
-  Enum maskMode = MaskMode::Add;
+  MaskMode maskMode = MaskMode::Add;
   Property<PathHandle>* maskPath = nullptr;
   Property<Point>* maskFeather = nullptr;
   Property<Opacity>* maskOpacity = nullptr;
@@ -625,11 +623,10 @@ class PAG_API BulgeEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-class PAG_API BlurDimensionsDirection {
- public:
-  static const Enum All = 0;
-  static const Enum Horizontal = 1;
-  static const Enum Vertical = 2;
+enum class PAG_API BlurDimensionsDirection : uint8_t {
+  All = 0,
+  Horizontal = 1,
+  Vertical = 2
 };
 
 class PAG_API FastBlurEffect : public Effect {
@@ -654,7 +651,7 @@ class PAG_API FastBlurEffect : public Effect {
   bool verify() const override;
 
   Property<float>* blurriness = nullptr;
-  Property<Enum>* blurDimensions = nullptr;
+  Property<BlurDimensionsDirection>* blurDimensions = nullptr;
   Property<bool>* repeatEdgePixels = nullptr;
 
   RTTR_ENABLE(Effect)
@@ -688,26 +685,24 @@ class PAG_API GlowEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-class PAG_API DisplacementMapSource {
- public:
-  static const Enum Red = 0;
-  static const Enum Green = 1;
-  static const Enum Blue = 2;
-  static const Enum Alpha = 3;
-  static const Enum Luminance = 4;
-  static const Enum Hue = 5;
-  static const Enum Lightness = 6;
-  static const Enum Saturation = 7;
-  static const Enum Full = 8;
-  static const Enum Half = 9;
-  static const Enum Off = 10;
+enum class PAG_API DisplacementMapSource : uint8_t {
+  Red = 0,
+  Green = 1,
+  Blue = 2,
+  Alpha = 3,
+  Luminance = 4,
+  Hue = 5,
+  Lightness = 6,
+  Saturation = 7,
+  Full = 8,
+  Half = 9,
+  Off = 10
 };
 
-class DisplacementMapBehavior {
- public:
-  static const Enum CenterMap = 0;
-  static const Enum StretchMapToFit = 1;
-  static const Enum TileMap = 2;
+enum class DisplacementMapBehavior : uint8_t {
+  CenterMap = 0,
+  StretchMapToFit = 1,
+  TileMap = 2
 };
 
 class Layer;
@@ -734,27 +729,25 @@ class PAG_API DisplacementMapEffect : public Effect {
   bool verify() const override;
 
   Layer* displacementMapLayer = nullptr;                   // ref layer
-  Property<Enum>* useForHorizontalDisplacement = nullptr;  // DisplacementMapSource
+  Property<DisplacementMapSource>* useForHorizontalDisplacement = nullptr;
   Property<float>* maxHorizontalDisplacement = nullptr;
-  Property<Enum>* useForVerticalDisplacement = nullptr;  // DisplacementMapSource
+  Property<DisplacementMapSource>* useForVerticalDisplacement = nullptr;
   Property<float>* maxVerticalDisplacement = nullptr;
-  Property<Enum>* displacementMapBehavior = nullptr;  // DisplacementMapBehavior
+  Property<DisplacementMapBehavior>* displacementMapBehavior = nullptr;
   Property<bool>* edgeBehavior = nullptr;
   Property<bool>* expandOutput = nullptr;
 
   RTTR_ENABLE(Effect)
 };
 
-class PAG_API RadialBlurMode {
- public:
-  static const Enum Spin = 0;
-  static const Enum Zoom = 1;
+enum class PAG_API RadialBlurMode : uint8_t {
+  Spin = 0,
+  Zoom = 1
 };
 
-class PAG_API RadialBlurAntialias {
- public:
-  static const Enum Low = 0;
-  static const Enum High = 1;
+enum class PAG_API RadialBlurAntialias : uint8_t {
+  Low = 0,
+  High = 1
 };
 
 class PAG_API RadialBlurEffect : public Effect {
@@ -780,8 +773,8 @@ class PAG_API RadialBlurEffect : public Effect {
 
   Property<float>* amount = nullptr;
   Property<Point>* center = nullptr;  // spatial
-  Property<Enum>* mode = nullptr;
-  Property<Enum>* antialias = nullptr;
+  Property<RadialBlurMode>* mode = nullptr;
+  Property<RadialBlurAntialias>* antialias = nullptr;
 
   RTTR_ENABLE(Effect)
 };
@@ -838,16 +831,15 @@ class PAG_API BrightnessContrastEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-class PAG_API ChannelControlType {
- public:
-  static const Enum Master = 0;
-  static const Enum Reds = 1;
-  static const Enum Yellows = 2;
-  static const Enum Greens = 3;
-  static const Enum Cyans = 4;
-  static const Enum Blues = 5;
-  static const Enum Magentas = 6;
-  static const int Count = 7;
+enum class PAG_API ChannelControlType : uint8_t {
+  Master = 0,
+  Reds = 1,
+  Yellows = 2,
+  Greens = 3,
+  Cyans = 4,
+  Blues = 5,
+  Magentas = 6,
+  Count = 7
 };
 
 class PAG_API HueSaturationEffect : public Effect {
@@ -871,10 +863,10 @@ class PAG_API HueSaturationEffect : public Effect {
 
   bool verify() const override;
 
-  Enum channelControl = ChannelControlType::Master;
-  float hue[ChannelControlType::Count] = {0.0f};
-  float saturation[ChannelControlType::Count] = {0.0f};
-  float lightness[ChannelControlType::Count] = {0.0f};
+  ChannelControlType channelControl = ChannelControlType::Master;
+  float hue[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
+  float saturation[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
+  float lightness[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
   bool colorize = false;
   Property<float>* colorizeHue = nullptr;
   Property<float>* colorizeSaturation = nullptr;
@@ -929,23 +921,45 @@ class PAG_API LayerStyle {
   RTTR_ENABLE()
 };
 
-class PAG_API StrokePosition {
- public:
-  static const Enum Outside = 0;
-  static const Enum Inside = 1;
-  static const Enum Center = 2;
+enum class PAG_API StrokePosition : uint8_t {
+  Outside = 0,
+  Inside = 1,
+  Center = 2
 };
 
-class PAG_API GlowColorType {
- public:
-  static const Enum SingleColor = 0;
-  static const Enum Gradient = 1;
+enum class PAG_API GlowColorType : uint8_t {
+  SingleColor = 0,
+  Gradient = 1
 };
 
-class PAG_API GlowTechniqueType {
- public:
-  static const Enum Softer = 0;
-  static const Enum Precise = 1;
+enum class PAG_API GlowTechniqueType : uint8_t {
+  Softer = 0,
+  Precise = 1
+};
+
+enum class PAG_API LineCap : uint8_t {
+  Butt = 0,
+  Round = 1,
+  Square = 2
+};
+
+enum class PAG_API LineJoin : uint8_t {
+  Miter = 0,
+  Round = 1,
+  Bevel = 2
+};
+
+enum class PAG_API FillRule : uint8_t {
+  NonZeroWinding = 0,
+  EvenOdd = 1
+};
+
+enum class PAG_API GradientFillType : uint8_t {
+  Linear = 0,
+  Radial = 1,
+  Angle = 2,
+  Reflected = 3,
+  Diamond = 4  // not supported yet
 };
 
 class PAG_API DropShadowStyle : public LayerStyle {
@@ -969,7 +983,7 @@ class PAG_API DropShadowStyle : public LayerStyle {
 
   bool verify() const override;
 
-  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<BlendMode>* blendMode = nullptr;
   Property<Color>* color = nullptr;
   Property<Opacity>* opacity = nullptr;
   Property<float>* angle = nullptr;
@@ -1001,11 +1015,11 @@ class PAG_API StrokeStyle : public LayerStyle {
 
   bool verify() const override;
 
-  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<BlendMode>* blendMode = nullptr;
   Property<Color>* color = nullptr;
   Property<float>* size = nullptr;
   Property<Opacity>* opacity = nullptr;
-  Property<Enum>* position = nullptr;  // StrokePosition
+  Property<StrokePosition>* position = nullptr;
 
   RTTR_ENABLE(LayerStyle)
 };
@@ -1053,12 +1067,12 @@ class PAG_API GradientOverlayStyle : public LayerStyle {
 
   bool verify() const override;
 
-  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<BlendMode>* blendMode = nullptr;
   Property<Opacity>* opacity = nullptr;
   Property<GradientColorHandle>* colors = nullptr;
   Property<float>* gradientSmoothness = nullptr;
   Property<float>* angle = nullptr;
-  Property<Enum>* style = nullptr;  // GradientFillType
+  Property<GradientFillType>* style = nullptr;
   Property<bool>* reverse = nullptr;
   Property<bool>* alignWithLayer = nullptr;
   Property<float>* scale = nullptr;
@@ -1088,14 +1102,14 @@ class PAG_API OuterGlowStyle : public LayerStyle {
 
   bool verify() const override;
 
-  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<BlendMode>* blendMode = nullptr;
   Property<Opacity>* opacity = nullptr;
   Property<Percent>* noise = nullptr;
-  Property<Enum>* colorType = nullptr;  // GlowColorType
+  Property<GlowColorType>* colorType = nullptr;
   Property<Color>* color = nullptr;
   Property<GradientColorHandle>* colors = nullptr;
   Property<Percent>* gradientSmoothness = nullptr;
-  Property<Enum>* technique = nullptr;  // GlowTechniqueType
+  Property<GlowTechniqueType>* technique = nullptr;
   Property<Percent>* spread = nullptr;
   Property<float>* size = nullptr;
   Property<Percent>* range = nullptr;
@@ -1120,19 +1134,18 @@ class PAG_API TextPathOptions {
   bool verify() const;
 };
 
-class PAG_API AnchorPointGrouping {
- public:
-  static const Enum Character = 0;
-  static const Enum Word = 1;
-  static const Enum Line = 2;
-  static const Enum All = 3;
+enum class PAG_API AnchorPointGrouping : uint8_t{
+  Character = 0,
+  Word = 1,
+  Line = 2,
+  All = 3
 };
 
 class PAG_API TextMoreOptions {
  public:
   ~TextMoreOptions();
 
-  Enum anchorPointGrouping = AnchorPointGrouping::Character;
+  AnchorPointGrouping anchorPointGrouping = AnchorPointGrouping::Character;
   Property<Point>* groupingAlignment = nullptr;  // multidimensional Percent
 
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const;
@@ -1140,53 +1153,47 @@ class PAG_API TextMoreOptions {
   bool verify() const;
 };
 
-class PAG_API TextRangeSelectorUnits {
- public:
-  static const Enum Percentage = 0;
-  static const Enum Index = 1;
+enum class PAG_API TextRangeSelectorUnits : uint8_t {
+  Percentage = 0,
+  Index = 1
 };
 
-class PAG_API TextSelectorBasedOn {
- public:
-  static const Enum Characters = 0;
-  static const Enum CharactersExcludingSpaces = 1;
-  static const Enum Words = 2;
-  static const Enum Lines = 3;
+enum class PAG_API TextSelectorBasedOn : uint8_t {
+  Characters = 0,
+  CharactersExcludingSpaces = 1,
+  Words = 2,
+  Lines = 3
 };
 
-class PAG_API TextSelectorMode {
- public:
-  static const Enum None = 0;
-  static const Enum Add = 1;
-  static const Enum Subtract = 2;
-  static const Enum Intersect = 3;
-  static const Enum Min = 4;
-  static const Enum Max = 5;
-  static const Enum Difference = 6;
+enum class PAG_API TextSelectorMode : uint8_t {
+  None = 0,
+  Add = 1,
+  Subtract = 2,
+  Intersect = 3,
+  Min = 4,
+  Max = 5,
+  Difference = 6
 };
 
-class PAG_API TextRangeSelectorShape {
- public:
-  static const Enum Square = 0;
-  static const Enum RampUp = 1;
-  static const Enum RampDown = 2;
-  static const Enum Triangle = 3;
-  static const Enum Round = 4;
-  static const Enum Smooth = 5;
+enum class PAG_API TextRangeSelectorShape : uint8_t {
+  Square = 0,
+  RampUp = 1,
+  RampDown = 2,
+  Triangle = 3,
+  Round = 4,
+  Smooth = 5
 };
 
-class PAG_API TextAnimatorTrackingType {
- public:
-  static const Enum BeforeAndAfter = 0;
-  static const Enum Before = 1;
-  static const Enum After = 2;
+enum class PAG_API TextAnimatorTrackingType : uint8_t {
+  BeforeAndAfter = 0,
+  Before = 1,
+  After = 2
 };
 
-class PAG_API TextSelectorType {
- public:
-  static const Enum Range = 0;
-  static const Enum Wiggly = 1;
-  static const Enum Expression = 2;
+enum class PAG_API TextSelectorType : uint8_t {
+  Range = 0,
+  Wiggly = 1,
+  Expression = 2
 };
 
 class PAG_API TextSelector {
@@ -1206,17 +1213,17 @@ class PAG_API TextRangeSelector : public TextSelector {
   ~TextRangeSelector();
 
   Enum type() const override {
-    return TextSelectorType::Range;
+    return static_cast<Enum>(TextSelectorType::Range);
   };
 
   Property<Percent>* start = nullptr;
   Property<Percent>* end = nullptr;
   Property<float>* offset = nullptr;
-  Enum units = TextRangeSelectorUnits::Percentage;
-  Enum basedOn = TextSelectorBasedOn::Characters;
-  Property<Enum>* mode = nullptr;
+  TextRangeSelectorUnits units = TextRangeSelectorUnits::Percentage;
+  TextSelectorBasedOn basedOn = TextSelectorBasedOn::Characters;
+  Property<TextSelectorMode>* mode = nullptr;
   Property<Percent>* amount = nullptr;
-  Enum shape = TextRangeSelectorShape::Square;
+  TextRangeSelectorShape shape = TextRangeSelectorShape::Square;
   Property<Percent>* smoothness = nullptr;
   Property<Percent>* easeHigh = nullptr;
   Property<Percent>* easeLow = nullptr;
@@ -1233,13 +1240,13 @@ class PAG_API TextWigglySelector : public TextSelector {
   ~TextWigglySelector();
 
   Enum type() const override {
-    return TextSelectorType::Wiggly;
+    return static_cast<Enum>(TextSelectorType::Wiggly);
   }
 
-  Property<Enum>* mode = nullptr;
+  Property<TextSelectorMode>* mode = nullptr;
   Property<Percent>* maxAmount = nullptr;
   Property<Percent>* minAmount = nullptr;
-  Enum basedOn = TextSelectorBasedOn::Characters;
+  TextSelectorBasedOn basedOn = TextSelectorBasedOn::Characters;
   Property<float>* wigglesPerSecond = nullptr;
   Property<Percent>* correlation = nullptr;
   Property<float>* temporalPhase = nullptr;
@@ -1268,7 +1275,7 @@ class PAG_API TextAnimatorTypographyProperties {
  public:
   ~TextAnimatorTypographyProperties();
 
-  Property<Enum>* trackingType = nullptr;  // TextAnimatorTrackingType
+  Property<TextAnimatorTrackingType>* trackingType = nullptr;
   Property<float>* trackingAmount = nullptr;
   Property<Point>* position = nullptr;  // spatial
   Property<Point>* scale = nullptr;     // multidimensional
@@ -1294,35 +1301,6 @@ class PAG_API TextAnimator {
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const;
 
   bool verify() const;
-};
-
-class PAG_API LineCap {
- public:
-  static const Enum Butt = 0;
-  static const Enum Round = 1;
-  static const Enum Square = 2;
-};
-
-class PAG_API LineJoin {
- public:
-  static const Enum Miter = 0;
-  static const Enum Round = 1;
-  static const Enum Bevel = 2;
-};
-
-class PAG_API FillRule {
- public:
-  static const Enum NonZeroWinding = 0;
-  static const Enum EvenOdd = 1;
-};
-
-class PAG_API GradientFillType {
- public:
-  static const Enum Linear = 0;
-  static const Enum Radial = 1;
-  static const Enum Angle = 2;
-  static const Enum Reflected = 3;
-  static const Enum Diamond = 4;  // not supported yet
 };
 
 class PAG_API ShapeTransform {
@@ -1385,7 +1363,7 @@ class PAG_API ShapeGroupElement : public ShapeElement {
     return ShapeType::ShapeGroup;
   }
 
-  Enum blendMode = BlendMode::Normal;
+  BlendMode blendMode = BlendMode::Normal;
   ShapeTransform* transform = nullptr;
   std::vector<ShapeElement*> elements;
 
@@ -1435,10 +1413,9 @@ class PAG_API EllipseElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
-class PAG_API PolyStarType {
- public:
-  static const Enum Star = 0;
-  static const Enum Polygon = 1;
+enum class PAG_API PolyStarType : uint8_t {
+  Star = 0,
+  Polygon = 1
 };
 
 class PAG_API PolyStarElement : public ShapeElement {
@@ -1450,7 +1427,7 @@ class PAG_API PolyStarElement : public ShapeElement {
   }
 
   bool reversed = false;
-  Enum polyType = PolyStarType::Star;
+  PolyStarType polyType = PolyStarType::Star;
   Property<float>* points = nullptr;
   Property<Point>* position = nullptr;  // spatial
   Property<float>* rotation = nullptr;
@@ -1483,10 +1460,9 @@ class PAG_API ShapePathElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
-class PAG_API CompositeOrder {
- public:
-  static const Enum BelowPreviousInSameGroup = 0;
-  static const Enum AbovePreviousInSameGroup = 1;
+enum class PAG_API CompositeOrder : uint8_t {
+  BelowPreviousInSameGroup = 0,
+  AbovePreviousInSameGroup = 1
 };
 
 class PAG_API FillElement : public ShapeElement {
@@ -1497,9 +1473,9 @@ class PAG_API FillElement : public ShapeElement {
     return ShapeType::Fill;
   }
 
-  Enum blendMode = BlendMode::Normal;
-  Enum composite = CompositeOrder::BelowPreviousInSameGroup;
-  Enum fillRule = FillRule::NonZeroWinding;
+  BlendMode blendMode = BlendMode::Normal;
+  CompositeOrder composite = CompositeOrder::BelowPreviousInSameGroup;
+  FillRule fillRule = FillRule::NonZeroWinding;
   Property<Color>* color = nullptr;
   Property<Opacity>* opacity = nullptr;
 
@@ -1518,13 +1494,13 @@ class PAG_API StrokeElement : public ShapeElement {
     return ShapeType::Stroke;
   }
 
-  Enum blendMode = BlendMode::Normal;
-  Enum composite = CompositeOrder::BelowPreviousInSameGroup;
+  BlendMode blendMode = BlendMode::Normal;
+  CompositeOrder composite = CompositeOrder::BelowPreviousInSameGroup;
   Property<Color>* color = nullptr;
   Property<Opacity>* opacity = nullptr;
   Property<float>* strokeWidth = nullptr;
-  Enum lineCap = LineCap::Butt;
-  Enum lineJoin = LineJoin::Miter;
+  LineCap lineCap = LineCap::Butt;
+  LineJoin lineJoin = LineJoin::Miter;
   Property<float>* miterLimit = nullptr;
   Property<float>* dashOffset = nullptr;
   std::vector<Property<float>*> dashes;
@@ -1544,10 +1520,10 @@ class PAG_API GradientFillElement : public ShapeElement {
     return ShapeType::GradientFill;
   }
 
-  Enum blendMode = BlendMode::Normal;
-  Enum composite = CompositeOrder::BelowPreviousInSameGroup;
-  Enum fillRule = FillRule::NonZeroWinding;
-  Enum fillType = GradientFillType::Linear;
+  BlendMode blendMode = BlendMode::Normal;
+  CompositeOrder composite = CompositeOrder::BelowPreviousInSameGroup;
+  FillRule fillRule = FillRule::NonZeroWinding;
+  GradientFillType fillType = GradientFillType::Linear;
   Property<Opacity>* opacity = nullptr;
   Property<Point>* startPoint = nullptr;  // spatial
   Property<Point>* endPoint = nullptr;    // spatial
@@ -1568,11 +1544,11 @@ class PAG_API GradientStrokeElement : public ShapeElement {
     return ShapeType::GradientStroke;
   }
 
-  Enum blendMode = BlendMode::Normal;
-  Enum composite = CompositeOrder::BelowPreviousInSameGroup;
-  Enum fillType = GradientFillType::Linear;
-  Enum lineCap = LineCap::Butt;
-  Enum lineJoin = LineJoin::Miter;
+  BlendMode blendMode = BlendMode::Normal;
+  CompositeOrder composite = CompositeOrder::BelowPreviousInSameGroup;
+  GradientFillType fillType = GradientFillType::Linear;
+  LineCap lineCap = LineCap::Butt;
+  LineJoin lineJoin = LineJoin::Miter;
   Property<float>* miterLimit = nullptr;
   Property<Point>* startPoint = nullptr;  // spatial
   Property<Point>* endPoint = nullptr;    // spatial
@@ -1589,13 +1565,12 @@ class PAG_API GradientStrokeElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
-class PAG_API MergePathsMode {
- public:
-  static const Enum Merge = 0;
-  static const Enum Add = 1;
-  static const Enum Subtract = 2;
-  static const Enum Intersect = 3;
-  static const Enum ExcludeIntersections = 4;
+enum class PAG_API MergePathsMode : uint8_t {
+  Merge = 0,
+  Add = 1,
+  Subtract = 2,
+  Intersect = 3,
+  ExcludeIntersections = 4
 };
 
 class PAG_API MergePathsElement : public ShapeElement {
@@ -1604,15 +1579,14 @@ class PAG_API MergePathsElement : public ShapeElement {
     return ShapeType::MergePaths;
   }
 
-  Enum mode = MergePathsMode::Add;
+  MergePathsMode mode = MergePathsMode::Add;
 
   RTTR_ENABLE(ShapeElement)
 };
 
-class PAG_API TrimPathsType {
- public:
-  static const Enum Simultaneously = 0;
-  static const Enum Individually = 1;
+enum class PAG_API TrimPathsType : uint8_t {
+  Simultaneously = 0,
+  Individually = 1
 };
 
 class PAG_API TrimPathsElement : public ShapeElement {
@@ -1626,7 +1600,7 @@ class PAG_API TrimPathsElement : public ShapeElement {
   Property<Percent>* start = nullptr;
   Property<Percent>* end = nullptr;
   Property<float>* offset = nullptr;
-  Enum trimType = TrimPathsType::Simultaneously;
+  TrimPathsType trimType = TrimPathsType::Simultaneously;
 
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
 
@@ -1651,10 +1625,9 @@ class PAG_API RepeaterTransform {
   bool verify() const;
 };
 
-class PAG_API RepeaterOrder {
- public:
-  static const Enum Below = 0;
-  static const Enum Above = 1;
+enum class PAG_API RepeaterOrder : uint8_t {
+  Below = 0,
+  Above = 1
 };
 
 class PAG_API RepeaterElement : public ShapeElement {
@@ -1667,7 +1640,7 @@ class PAG_API RepeaterElement : public ShapeElement {
 
   Property<float>* copies = nullptr;
   Property<float>* offset = nullptr;
-  Enum composite = RepeaterOrder::Below;
+  RepeaterOrder composite = RepeaterOrder::Below;
   RepeaterTransform* transform = nullptr;
 
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
@@ -1694,17 +1667,16 @@ class PAG_API RoundCornersElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
-class PAG_API IrisShapeType {
- public:
-  static const Enum FastRectangle = 0;
-  static const Enum Triangle = 1;
-  static const Enum Square = 2;
-  static const Enum Pentagon = 3;
-  static const Enum Hexagon = 4;
-  static const Enum Heptagon = 5;
-  static const Enum Octagon = 6;
-  static const Enum Nonagon = 7;
-  static const Enum Decagon = 8;
+enum class PAG_API IrisShapeType : uint8_t {
+  FastRectangle = 0,
+  Triangle = 1,
+  Square = 2,
+  Pentagon = 3,
+  Hexagon = 4,
+  Heptagon = 5,
+  Octagon = 6,
+  Nonagon = 7,
+  Decagon = 8
 };
 
 class PAG_API CameraOption {
@@ -1716,7 +1688,7 @@ class PAG_API CameraOption {
   Property<float>* focusDistance = nullptr;
   Property<float>* aperture = nullptr;
   Property<Percent>* blurLevel = nullptr;
-  Property<Enum>* irisShape = nullptr;
+  Property<IrisShapeType>* irisShape = nullptr;
   Property<float>* irisRotation = nullptr;
   Property<Percent>* irisRoundness = nullptr;
   Property<float>* irisAspectRatio = nullptr;
@@ -1743,20 +1715,18 @@ class PAG_API Cache {
   virtual ~Cache() = default;
 };
 
-class PAG_API TrackMatteType {
- public:
-  static const Enum None = 0;
-  static const Enum Alpha = 1;
-  static const Enum AlphaInverted = 2;
-  static const Enum Luma = 3;
-  static const Enum LumaInverted = 4;
+enum class PAG_API TrackMatteType : uint8_t {
+  None = 0,
+  Alpha = 1,
+  AlphaInverted = 2,
+  Luma = 3,
+  LumaInverted = 4
 };
 
-class PAG_API CachePolicy {
- public:
-  static const Enum Auto = 0;
-  static const Enum Enable = 1;
-  static const Enum Disable = 2;
+enum class PAG_API CachePolicy : uint8_t {
+  Auto = 0,
+  Enable = 1,
+  Disable = 2
 };
 
 /**
@@ -1831,18 +1801,18 @@ class PAG_API Layer {
   /**
    * The blending mode of the layer.
    */
-  Enum blendMode = BlendMode::Normal;
+  BlendMode blendMode = BlendMode::Normal;
   /**
    * If layer has a track matte, specifies the way it is applied.
    */
-  Enum trackMatteType = TrackMatteType::None;
+  TrackMatteType trackMatteType = TrackMatteType::None;
   Layer* trackMatteLayer = nullptr;
   Property<float>* timeRemap = nullptr;
   std::vector<MaskData*> masks;
   std::vector<Effect*> effects;
   std::vector<LayerStyle*> layerStyles;
   std::vector<Marker*> markers;
-  Enum cachePolicy = CachePolicy::Auto;
+  CachePolicy cachePolicy = CachePolicy::Auto;
 
   Cache* cache = nullptr;
   std::mutex locker = {};
@@ -1942,7 +1912,7 @@ class PAG_API ImageFillRule {
  public:
   ~ImageFillRule();
 
-  Enum scaleMode = PAGScaleMode::LetterBox;
+  PAGScaleMode scaleMode = PAGScaleMode::LetterBox;
 
   // timeRemap基于composition时间轴
   Property<Frame>* timeRemap = nullptr;
@@ -2500,7 +2470,7 @@ class PAG_API File {
   /**
    * Indicates how to stretch the duration of File when rendering.
    */
-  Enum timeStretchMode = PAGTimeStretchMode::Repeat;
+  PAGTimeStretchMode timeStretchMode = PAGTimeStretchMode::Repeat;
   TimeRange scaledTimeRange = {};
   FileAttributes fileAttributes = {};
   std::string path = "";
@@ -2509,7 +2479,7 @@ class PAG_API File {
 
   std::vector<int>* editableImages = nullptr;
   std::vector<int>* editableTexts = nullptr;
-  std::vector<Enum>* imageScaleModes = nullptr;  // PAGScaleMode
+  std::vector<PAGScaleMode>* imageScaleModes = nullptr;
 
  private:
   PreComposeLayer* rootLayer = nullptr;

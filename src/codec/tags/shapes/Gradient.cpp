@@ -33,7 +33,8 @@ static bool WriteStrokeDashes(EncodeStream* stream, void* target) {
 
 template <typename T>
 void AddGradientCommonTags(BlockConfig* tagConfig, T* shape) {
-  AddAttribute(tagConfig, &shape->fillType, AttributeType::Value, GradientFillType::Linear);
+  AddAttribute(tagConfig, &shape->fillType, AttributeType::Value,
+               static_cast<uint8_t>(GradientFillType::Linear));
   AddAttribute(tagConfig, &shape->startPoint, AttributeType::SpatialProperty, Point::Zero());
   AddAttribute(tagConfig, &shape->endPoint, AttributeType::SpatialProperty, Point::Make(100, 0));
   AddAttribute(tagConfig, &shape->colors, AttributeType::SimpleProperty,
@@ -43,13 +44,16 @@ void AddGradientCommonTags(BlockConfig* tagConfig, T* shape) {
 
 std::unique_ptr<BlockConfig> GradientStrokeTag(GradientStrokeElement* shape) {
   auto tagConfig = new BlockConfig(TagCode::GradientStroke);
-  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
+  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &shape->composite, AttributeType::Value,
-               CompositeOrder::BelowPreviousInSameGroup);
+               static_cast<uint8_t>(CompositeOrder::BelowPreviousInSameGroup));
   AddGradientCommonTags(tagConfig, shape);
   AddAttribute(tagConfig, &shape->strokeWidth, AttributeType::SimpleProperty, 2.0f);
-  AddAttribute(tagConfig, &shape->lineCap, AttributeType::Value, LineCap::Butt);
-  AddAttribute(tagConfig, &shape->lineJoin, AttributeType::Value, LineJoin::Miter);
+  AddAttribute(tagConfig, &shape->lineCap, AttributeType::Value,
+               static_cast<uint8_t>(LineCap::Butt));
+  AddAttribute(tagConfig, &shape->lineJoin, AttributeType::Value,
+               static_cast<uint8_t>(LineJoin::Miter));
   AddAttribute(tagConfig, &shape->miterLimit, AttributeType::SimpleProperty, 4.0f);
   AddCustomAttribute(tagConfig, shape, ReadStrokeDashes, WriteStrokeDashes);
   return std::unique_ptr<BlockConfig>(tagConfig);
@@ -57,10 +61,12 @@ std::unique_ptr<BlockConfig> GradientStrokeTag(GradientStrokeElement* shape) {
 
 std::unique_ptr<BlockConfig> GradientFillTag(GradientFillElement* shape) {
   auto tagConfig = new BlockConfig(TagCode::GradientFill);
-  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
+  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &shape->composite, AttributeType::Value,
-               CompositeOrder::BelowPreviousInSameGroup);
-  AddAttribute(tagConfig, &shape->fillRule, AttributeType::Value, FillRule::NonZeroWinding);
+               static_cast<uint8_t>(CompositeOrder::BelowPreviousInSameGroup));
+  AddAttribute(tagConfig, &shape->fillRule, AttributeType::Value,
+               static_cast<uint8_t>(FillRule::NonZeroWinding));
   AddGradientCommonTags(tagConfig, shape);
   return std::unique_ptr<BlockConfig>(tagConfig);
 }

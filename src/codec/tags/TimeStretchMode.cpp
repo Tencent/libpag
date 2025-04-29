@@ -20,7 +20,7 @@
 
 namespace pag {
 void ReadTimeStretchMode(DecodeStream* stream, CodecContext* context) {
-  context->timeStretchMode = ReadEnum(stream);
+  context->timeStretchMode = static_cast<PAGTimeStretchMode>(ReadEnum(stream));
   auto hasTimeRange = stream->readBoolean();
   if (hasTimeRange) {
     if (context->scaledTimeRange == nullptr) {
@@ -32,7 +32,7 @@ void ReadTimeStretchMode(DecodeStream* stream, CodecContext* context) {
 }
 
 TagCode WriteTimeStretchMode(EncodeStream* stream, const File* file) {
-  WriteEnum(stream, file->timeStretchMode);
+  WriteEnum(stream, static_cast<Enum>(file->timeStretchMode));
   auto timeRange = file->scaledTimeRange;
   stream->writeBoolean(file->hasScaledTimeRange());
   if (file->hasScaledTimeRange()) {

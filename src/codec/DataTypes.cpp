@@ -249,7 +249,7 @@ static std::unique_ptr<BlockConfig> TextDocumentBlockCore(TextDocument* textDocu
   AddAttribute(blockConfig, &textDocument->strokeWidth, AttributeType::Value, 1.0f);
   AddAttribute(blockConfig, &textDocument->text, AttributeType::Value, std::string());
   AddAttribute(blockConfig, &textDocument->justification, AttributeType::Value,
-               ParagraphJustification::LeftJustify);
+               static_cast<uint8_t>(ParagraphJustification::LeftJustify));
   AddAttribute(blockConfig, &textDocument->leading, AttributeType::Value, 0.0f);
   AddAttribute(blockConfig, &textDocument->tracking, AttributeType::Value, 0.0f);
   if (tagCode >= TagCode::TextSourceV2) {
@@ -258,7 +258,7 @@ static std::unique_ptr<BlockConfig> TextDocumentBlockCore(TextDocument* textDocu
   }
   if (tagCode >= TagCode::TextSourceV3) {
     AddAttribute(blockConfig, &textDocument->direction, AttributeType::Value,
-                 TextDirection::Vertical);
+                 static_cast<uint8_t>(TextDirection::Vertical));
   }
   AddCustomAttribute(blockConfig, textDocument, ReadFontData, WriteFontData);
   return std::unique_ptr<BlockConfig>(blockConfig);
@@ -304,9 +304,6 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
   auto alphaCount = stream->readEncodedUint32();
   auto colorCount = stream->readEncodedUint32();
   for (uint32_t i = 0; i < alphaCount; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
     AlphaStop stop = {};
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
@@ -314,9 +311,6 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
     alphaStops.push_back(stop);
   }
   for (uint32_t i = 0; i < colorCount; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
     ColorStop stop = {};
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;

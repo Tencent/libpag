@@ -32,14 +32,14 @@ class GradientPaint {
  public:
   GradientPaint() = default;
 
-  GradientPaint(Enum fillType, Point startPoint, Point endPoint,
+  GradientPaint(GradientFillType fillType, Point startPoint, Point endPoint,
                 const GradientColorHandle& gradientColor, const tgfx::Matrix& matrix,
                 bool reverse = false);
 
   std::shared_ptr<tgfx::Shader> getShader() const;
 
  private:
-  Enum gradientType = GradientFillType::Linear;
+  GradientFillType gradientType = GradientFillType::Linear;
   tgfx::Point startPoint = tgfx::Point::Zero();
   tgfx::Point endPoint = tgfx::Point::Zero();
   std::vector<tgfx::Color> colors;

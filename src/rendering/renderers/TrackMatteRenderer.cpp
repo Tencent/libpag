@@ -57,7 +57,7 @@ static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerF
 }
 
 static std::shared_ptr<Modifier> MakeMaskModifier(std::shared_ptr<Graphic> content,
-                                                  Enum trackMatteType) {
+                                                  TrackMatteType trackMatteType) {
   auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
                    trackMatteType == TrackMatteType::LumaInverted);
   auto useLuma =
