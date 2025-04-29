@@ -161,7 +161,7 @@ PAG_API jint Java_org_libpag_PAGImage_scaleMode(JNIEnv* env, jobject thiz) {
   if (image == nullptr) {
     return 0;
   }
-  return image->scaleMode();
+  return static_cast<jint>(image->scaleMode());
 }
 
 PAG_API void Java_org_libpag_PAGImage_setScaleMode(JNIEnv* env, jobject thiz, jint value) {
@@ -169,7 +169,7 @@ PAG_API void Java_org_libpag_PAGImage_setScaleMode(JNIEnv* env, jobject thiz, ji
   if (image == nullptr) {
     return;
   }
-  image->setScaleMode(value);
+  image->setScaleMode(static_cast<PAGScaleMode>(value));
 }
 
 PAG_API void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thiz,
