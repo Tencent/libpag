@@ -26,6 +26,9 @@ BitmapSequence* ReadBitmapSequence(DecodeStream* stream) {
   sequence->frameRate = stream->readFloat();
   auto count = stream->readEncodedUint32();
   for (uint32_t i = 0; i < count; i++) {
+    if (stream->context->hasException()) {
+      return sequence;
+    }
     auto bitmapFrame = new BitmapFrame();
     sequence->frames.push_back(bitmapFrame);
     bitmapFrame->isKeyframe = stream->readBitBoolean();
@@ -34,6 +37,9 @@ BitmapSequence* ReadBitmapSequence(DecodeStream* stream) {
     auto bitmapFrame = sequence->frames[i];
     uint32_t bitmapCount = stream->readEncodedUint32();
     for (uint32_t j = 0; j < bitmapCount; j++) {
+      if (stream->context->hasException()) {
+        break;
+      }
       auto bitmap = new BitmapRect();
       bitmapFrame->bitmaps.push_back(bitmap);
       bitmap->x = stream->readEncodedInt32();

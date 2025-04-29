@@ -131,6 +131,9 @@ static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum r
   auto& verbs = value->verbs;
   auto& points = value->points;
   for (uint32_t i = 0; i < numVerbs; i++) {
+    if (stream->context->hasException()) {
+      break;
+    }
     auto pathRecord = records[i];
     switch (pathRecord) {
       case PathRecord::Close:
@@ -301,6 +304,9 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
   auto alphaCount = stream->readEncodedUint32();
   auto colorCount = stream->readEncodedUint32();
   for (uint32_t i = 0; i < alphaCount; i++) {
+    if (stream->context->hasException()) {
+      break;
+    }
     AlphaStop stop = {};
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
@@ -308,6 +314,9 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
     alphaStops.push_back(stop);
   }
   for (uint32_t i = 0; i < colorCount; i++) {
+    if (stream->context->hasException()) {
+      break;
+    }
     ColorStop stop = {};
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
