@@ -67,8 +67,9 @@ std::vector<ShapedGlyph> NativeTextShaper::Shape(const std::string& text,
     CTRunGetStringIndices(run, CFRangeMake(0, count), indices.data());
     std::vector<CGPoint> positions(count);
     CTRunGetPositions(run, CFRangeMake(0, count), positions.data());
+    bool hasColor = face->hasColor();
     for (size_t j = 0; j < glyphIDs.size(); j++) {
-      if (j > 0 && positions[j].x == positions[j - 1].x) {
+      if (hasColor && j > 0 && positions[j].x == positions[j - 1].x) {
         glyphs.back().glyphIDs.emplace_back(static_cast<tgfx::GlyphID>(glyphIDs[j]));
         continue;
       }
