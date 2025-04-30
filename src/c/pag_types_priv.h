@@ -155,9 +155,11 @@ std::shared_ptr<pag::PAGFile> ToPAGFile(pag_file* file);
 
 std::shared_ptr<pag::PAGComposition> ToPAGComposition(pag_composition* composition);
 
-bool FromCTimeStretchMode(pag_time_stretch_mode cTimeStretchMode, pag::Enum* timeStretchMode);
+bool FromCTimeStretchMode(pag_time_stretch_mode cTimeStretchMode,
+                          pag::PAGTimeStretchMode* timeStretchMode);
 
-bool ToCTimeStretchMode(pag::Enum timeStretchMode, pag_time_stretch_mode* cTimeStretchMode);
+bool ToCTimeStretchMode(pag::PAGTimeStretchMode timeStretchMode,
+                        pag_time_stretch_mode* cTimeStretchMode);
 
 bool FromCColorType(pag_color_type cColorType, pag::ColorType* colorType);
 
@@ -167,14 +169,14 @@ bool FromCAlphaType(pag_alpha_type cAlphaType, pag::AlphaType* alphaType);
 
 bool ToCAlphaType(pag::AlphaType alphaType, pag_alpha_type* cAlphaType);
 
-bool FromCScaleMode(pag_scale_mode cScaleMode, pag::Enum* scaleMode);
+bool FromCScaleMode(pag_scale_mode cScaleMode, pag::PAGScaleMode* scaleMode);
 
-bool ToCScaleMode(pag::Enum scaleMode, pag_scale_mode* cScaleMode);
+bool ToCScaleMode(pag::PAGScaleMode scaleMode, pag_scale_mode* cScaleMode);
 
 bool FromCParagraphJustification(pag_paragraph_justification cParagraphJustification,
-                                 pag::Enum* paragraphJustification);
+                                 pag::ParagraphJustification* paragraphJustification);
 
-bool ToCParagraphJustification(pag::Enum paragraphJustification,
+bool ToCParagraphJustification(pag::ParagraphJustification paragraphJustification,
                                pag_paragraph_justification* cParagraphJustification);
 
 bool FromCLayerType(pag_layer_type cLayerType, pag::LayerType* layerType);

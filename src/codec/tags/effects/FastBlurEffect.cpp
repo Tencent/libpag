@@ -24,7 +24,7 @@ std::unique_ptr<BlockConfig> FastBlurEffectTag(FastBlurEffect* effect) {
   auto tagConfig = new BlockConfig(TagCode::FastBlurEffect);
   AddAttribute(tagConfig, &effect->blurriness, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &effect->blurDimensions, AttributeType::DiscreteProperty,
-               BlurDimensionsDirection::All);
+               static_cast<uint8_t>(BlurDimensionsDirection::All));
   AddAttribute(tagConfig, &effect->repeatEdgePixels, AttributeType::DiscreteProperty, false);
   EffectCompositingOptionTag(tagConfig, effect);
   return std::unique_ptr<BlockConfig>(tagConfig);

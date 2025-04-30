@@ -28,7 +28,7 @@ std::unique_ptr<BlockConfig> CameraOptionTag(CameraOption* cameraOption) {
   AddAttribute(tagConfig, &cameraOption->aperture, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &cameraOption->blurLevel, AttributeType::SimpleProperty, 1.0f);
   AddAttribute(tagConfig, &cameraOption->irisShape, AttributeType::DiscreteProperty,
-               IrisShapeType::FastRectangle);
+               static_cast<uint8_t>(IrisShapeType::FastRectangle));
   AddAttribute(tagConfig, &cameraOption->irisRotation, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &cameraOption->irisRoundness, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &cameraOption->irisAspectRatio, AttributeType::SimpleProperty, 1.0f);

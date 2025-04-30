@@ -49,7 +49,7 @@ tgfx::Path ToPath(const PathData& pathData) {
   return path;
 }
 
-tgfx::PathOp ToPathOp(Enum maskMode) {
+tgfx::PathOp ToPathOp(MaskMode maskMode) {
   switch (maskMode) {
     case MaskMode::Subtract:
       return tgfx::PathOp::Difference;

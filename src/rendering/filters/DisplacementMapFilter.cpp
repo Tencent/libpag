@@ -158,7 +158,7 @@ struct SelectorCoeffs {
   float cOffset;
 };
 
-static SelectorCoeffs Coeffs(Enum sel) {
+static SelectorCoeffs Coeffs(DisplacementMapSource sel) {
   // D = displacement input
   // C = displacement coverage
   static constexpr SelectorCoeffs gCoeffs[] = {
@@ -180,7 +180,7 @@ static SelectorCoeffs Coeffs(Enum sel) {
 
 // 0.0: REPEAT
 // 1.0: CLAMP_TO_BORDER
-static float DisplacementWrapMode(Enum pos) {
+static float DisplacementWrapMode(DisplacementMapBehavior pos) {
   return pos == DisplacementMapBehavior::TileMap ? 0.0 : 1.0;
 }
 
@@ -188,7 +188,7 @@ static float InputWrapMode(bool edgeBehavior) {
   return edgeBehavior ? 0.0 : 1.0;
 }
 
-static tgfx::Matrix DisplacementMatrix(Enum pos, const tgfx::Size& size,
+static tgfx::Matrix DisplacementMatrix(DisplacementMapBehavior pos, const tgfx::Size& size,
                                        const tgfx::Size& displacementSize) {
   switch (pos) {
     case DisplacementMapBehavior::CenterMap:
@@ -203,12 +203,12 @@ static tgfx::Matrix DisplacementMatrix(Enum pos, const tgfx::Size& size,
   }
 }
 
-static bool IsHSL(Enum sel) {
+static bool IsHSL(DisplacementMapSource sel) {
   return sel == DisplacementMapSource::Hue || sel == DisplacementMapSource::Saturation ||
          sel == DisplacementMapSource::Lightness;
 }
 
-static bool IsRGB(Enum sel) {
+static bool IsRGB(DisplacementMapSource sel) {
   return sel == DisplacementMapSource::Red || sel == DisplacementMapSource::Green ||
          sel == DisplacementMapSource::Blue;
 }

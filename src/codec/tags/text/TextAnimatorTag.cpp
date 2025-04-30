@@ -26,7 +26,7 @@ static std::unique_ptr<BlockConfig> TextAnimatorTrackingTypeTag(
     TextAnimatorTypographyProperties* properties) {
   auto tagConfig = new BlockConfig(TagCode::TextAnimatorPropertiesTrackingType);
   AddAttribute(tagConfig, &properties->trackingType, AttributeType::DiscreteProperty,
-               TextAnimatorTrackingType::BeforeAndAfter);
+               static_cast<uint8_t>(TextAnimatorTrackingType::BeforeAndAfter));
   return std::unique_ptr<BlockConfig>(tagConfig);
 }
 
@@ -184,9 +184,10 @@ void ReadTextAnimator(DecodeStream* stream, TextLayer* layer) {
 
 static void WriteTextSelectors(EncodeStream* stream, const TextAnimator* animator) {
   for (auto& selector : animator->selectors) {
-    if (selector->type() == TextSelectorType::Range) {
+    auto type = static_cast<TextSelectorType>(selector->type());
+    if (type == TextSelectorType::Range) {
       WriteTagBlock(stream, static_cast<TextRangeSelector*>(selector), TextRangeSelectorTag);
-    } else if (selector->type() == TextSelectorType::Wiggly) {
+    } else if (type == TextSelectorType::Wiggly) {
       WriteTagBlock(stream, static_cast<TextWigglySelector*>(selector), TextWigglySelectorTag);
     }
   }

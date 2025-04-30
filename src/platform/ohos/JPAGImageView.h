@@ -65,9 +65,9 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   void setComposition(std::shared_ptr<PAGComposition> composition, float frameRate);
 
-  void setScaleMode(int scaleMode);
+  void setScaleMode(PAGScaleMode scaleMode);
 
-  int scaleMode();
+  PAGScaleMode scaleMode();
 
   void setMatrix(const Matrix& matrix);
 
@@ -114,7 +114,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   int _height = 0;
   float _renderScale = 1.0f;
   float _frameRate = 30.0f;
-  int _scaleMode = PAGScaleMode::LetterBox;
+  PAGScaleMode _scaleMode = PAGScaleMode::LetterBox;
   tgfx::Matrix _matrix = tgfx::Matrix::I();
   bool _cacheAllFramesInMemory = false;
   std::shared_ptr<PAGComposition> _composition = nullptr;

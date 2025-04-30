@@ -138,7 +138,7 @@ std::vector<Keyframe<T>*> ReadKeyframes(DecodeStream* stream, const AttributeCon
       // There is no need to read any bits here.
       keyframe = new Keyframe<T>();
     } else {
-      auto interpolationType = static_cast<Enum>(stream->readUBits(2));
+      auto interpolationType = static_cast<KeyframeInterpolationType>(stream->readUBits(2));
       if (interpolationType == KeyframeInterpolationType::Hold) {
         keyframe = new Keyframe<T>();
       } else {
@@ -357,7 +357,7 @@ void WriteKeyframes(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyfr
     return;
   }
   for (auto& keyframe : keyframes) {
-    stream->writeUBits(keyframe->interpolationType, 2);
+    stream->writeUBits(static_cast<uint32_t>(keyframe->interpolationType), 2);
   }
 }
 

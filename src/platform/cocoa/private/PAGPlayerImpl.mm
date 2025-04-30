@@ -107,11 +107,11 @@
 }
 
 - (int)scaleMode {
-  return pagPlayer->scaleMode();
+  return static_cast<int>(pagPlayer->scaleMode());
 }
 
 - (void)setScaleMode:(int)value {
-  pagPlayer->setScaleMode(value);
+  pagPlayer->setScaleMode(static_cast<pag::PAGScaleMode>(value));
 }
 
 - (CGAffineTransform)matrix {

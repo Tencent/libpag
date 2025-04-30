@@ -32,7 +32,7 @@ static const uint8_t EncryptedVersion = 3;
 
 static const uint8_t KnownVersion = 3;
 
-static bool HasTrackMatte(Enum type) {
+static bool HasTrackMatte(TrackMatteType type) {
   switch (type) {
     case TrackMatteType::Alpha:
     case TrackMatteType::AlphaInverted:

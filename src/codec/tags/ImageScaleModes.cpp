@@ -23,9 +23,9 @@ void ReadImageScaleModes(DecodeStream* stream) {
   auto context = static_cast<CodecContext*>(stream->context);
   auto count = stream->readEncodedUint32();
   if (count > 0) {
-    context->imageScaleModes = new std::vector<Enum>(count);
+    context->imageScaleModes = new std::vector<PAGScaleMode>(count);
     for (uint32_t i = 0; i < count; i++) {
-      context->imageScaleModes->at(i) = stream->readEncodedUint32();
+      context->imageScaleModes->at(i) = static_cast<PAGScaleMode>(stream->readEncodedUint32());
     }
   }
 }
@@ -36,7 +36,7 @@ TagCode WriteImageScaleModes(EncodeStream* stream, const File* file) {
   } else {
     stream->writeEncodedUint32(static_cast<uint32_t>(file->imageScaleModes->size()));
     for (auto mode : *file->imageScaleModes) {
-      stream->writeEncodedUint32(mode);
+      stream->writeEncodedUint32(static_cast<uint32_t>(mode));
     }
   }
   return TagCode::ImageScaleModes;

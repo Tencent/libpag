@@ -28,12 +28,12 @@ PAGImage::PAGImage(int width, int height)
     : _uniqueID(UniqueID::Next()), _width(width), _height(height) {
 }
 
-int PAGImage::scaleMode() const {
+PAGScaleMode PAGImage::scaleMode() const {
   std::lock_guard<std::mutex> autoLock(locker);
   return _scaleMode;
 }
 
-void PAGImage::setScaleMode(int mode) {
+void PAGImage::setScaleMode(PAGScaleMode mode) {
   std::lock_guard<std::mutex> autoLock(locker);
   _scaleMode = mode;
   _matrix.setIdentity();
@@ -52,7 +52,8 @@ void PAGImage::setMatrix(const Matrix& matrix) {
   hasSetScaleMode = true;
 }
 
-Matrix PAGImage::getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight) {
+Matrix PAGImage::getContentMatrix(PAGScaleMode defaultScaleMode, int contentWidth,
+                                  int contentHeight) {
   auto scaleMode = hasSetScaleMode ? _scaleMode : defaultScaleMode;
   Matrix matrix = {};
   if (scaleMode != PAGScaleMode::None) {

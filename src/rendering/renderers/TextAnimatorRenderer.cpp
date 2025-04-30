@@ -39,7 +39,8 @@ static bool HasAnimator(const std::vector<TextAnimator*>* animators) {
 }
 
 // 根据对齐方式计算（字间距）偏移量
-static float CalculateOffsetByJustification(Enum justification, float trackingAnimatorLen) {
+static float CalculateOffsetByJustification(ParagraphJustification justification,
+                                            float trackingAnimatorLen) {
   float offset = 0.0f;
   switch (justification) {
     case ParagraphJustification::RightJustify:
@@ -70,7 +71,7 @@ static int CalculateCharactersCount(const std::vector<std::vector<GlyphHandle>>&
 
 bool TextAnimatorRenderer::ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& glyphList,
                                          const std::vector<TextAnimator*>* animators,
-                                         Enum justification, Frame layerFrame) {
+                                         ParagraphJustification justification, Frame layerFrame) {
   if (!HasAnimator(animators)) {
     return false;  // 提前判断如果没有文本动画，就不必要进行下面一堆操作了。
   }
@@ -106,8 +107,9 @@ tgfx::Point TextAnimatorRenderer::GetPositionFromAnimators(
   return ret;
 }
 
-TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator, Enum justification,
-                                           size_t textCount, Frame frame)
+TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator,
+                                           ParagraphJustification justification, size_t textCount,
+                                           Frame frame)
     : justification(justification) {
   // 读取动画属性信息
   auto typographyProperties = animator->typographyProperties;
@@ -130,11 +132,12 @@ TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator, Enum ju
 
   // 读取范围选择器信息
   for (auto selector : animator->selectors) {
-    if (selector->type() == TextSelectorType::Range) {
+    auto type = static_cast<TextSelectorType>(selector->type());
+    if (type == TextSelectorType::Range) {
       auto selectorRenderer =
           new RangeSelectorRenderer(static_cast<TextRangeSelector*>(selector), textCount, frame);
       selectorRenderers.push_back(selectorRenderer);
-    } else if (selector->type() == TextSelectorType::Wiggly) {
+    } else if (type == TextSelectorType::Wiggly) {
       auto selectorRenderer =
           new WigglySelectorRenderer(static_cast<TextWigglySelector*>(selector), textCount, frame);
       selectorRenderers.push_back(selectorRenderer);

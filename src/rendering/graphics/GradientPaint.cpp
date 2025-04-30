@@ -55,7 +55,7 @@ void ConvertAlphaStop(const GradientColorHandle& gradientColor, std::vector<Opac
   }
 }
 
-GradientPaint::GradientPaint(Enum fillType, Point startPoint, Point endPoint,
+GradientPaint::GradientPaint(GradientFillType fillType, Point startPoint, Point endPoint,
                              const GradientColorHandle& gradientColor, const tgfx::Matrix& matrix,
                              bool reverse)
     : gradientType(fillType), startPoint(ToTGFX(startPoint)), endPoint(ToTGFX(endPoint)),

@@ -22,7 +22,7 @@ namespace pag {
 std::unique_ptr<BlockConfig> TextMoreOptionTag(TextMoreOptions* moreOption) {
   auto tagConfig = new BlockConfig(TagCode::TextPathOption);
   AddAttribute(tagConfig, &moreOption->anchorPointGrouping, AttributeType::Value,
-               AnchorPointGrouping::Character);
+               static_cast<uint8_t>(AnchorPointGrouping::Character));
   AddAttribute(tagConfig, &moreOption->groupingAlignment, AttributeType::MultiDimensionProperty,
                Point::Zero());
   return std::unique_ptr<BlockConfig>(tagConfig);

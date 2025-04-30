@@ -89,11 +89,11 @@
 }
 
 - (int)scaleMode {
-  return _pagImage->scaleMode();
+  return static_cast<int>(_pagImage->scaleMode());
 }
 
 - (void)setScaleMode:(int)value {
-  _pagImage->setScaleMode(value);
+  _pagImage->setScaleMode(static_cast<pag::PAGScaleMode>(value));
 }
 
 - (CGAffineTransform)matrix {

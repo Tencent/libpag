@@ -252,7 +252,7 @@ static napi_value UniqueID(napi_env env, napi_callback_info info) {
 }
 
 static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
-  Enum state = *static_cast<Enum*>(data);
+  uint8_t state = *static_cast<uint8_t*>(data);
   size_t argc = 1;
   napi_value argv[1] = {0};
   napi_create_uint32(env, static_cast<uint32_t>(state), &argv[0]);
@@ -523,7 +523,7 @@ static napi_value SetScaleMode(napi_env env, napi_callback_info info) {
   if (view != nullptr) {
     auto player = view->getPlayer();
     if (player) {
-      player->setScaleMode(value);
+      player->setScaleMode(static_cast<PAGScaleMode>(value));
     }
   }
   return nullptr;
@@ -535,7 +535,7 @@ static napi_value ScaleMode(napi_env env, napi_callback_info info) {
   napi_value args[1] = {0};
   napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
 
-  int scaleMode = PAGScaleMode::LetterBox;
+  PAGScaleMode scaleMode = PAGScaleMode::LetterBox;
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   if (view != nullptr) {
@@ -545,7 +545,7 @@ static napi_value ScaleMode(napi_env env, napi_callback_info info) {
     }
   }
   napi_value result;
-  napi_create_int32(env, scaleMode, &result);
+  napi_create_int32(env, static_cast<int32_t>(scaleMode), &result);
   return result;
 }
 
@@ -823,7 +823,8 @@ JPAGView::~JPAGView() {
 void JPAGView::onAnimationStart(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, const_cast<Enum*>(&PAGAnimatorState::Start),
+    napi_call_threadsafe_function(playingStateCallback,
+                                  const_cast<uint8_t*>(&PAGAnimatorState::Start),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -832,7 +833,7 @@ void JPAGView::onAnimationCancel(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
     napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<Enum*>(&PAGAnimatorState::Cancel),
+                                  const_cast<uint8_t*>(&PAGAnimatorState::Cancel),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -840,7 +841,8 @@ void JPAGView::onAnimationCancel(PAGAnimator*) {
 void JPAGView::onAnimationEnd(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback, const_cast<Enum*>(&PAGAnimatorState::End),
+    napi_call_threadsafe_function(playingStateCallback,
+                                  const_cast<uint8_t*>(&PAGAnimatorState::End),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
@@ -849,7 +851,7 @@ void JPAGView::onAnimationRepeat(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
   if (playingStateCallback) {
     napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<Enum*>(&PAGAnimatorState::Repeat),
+                                  const_cast<uint8_t*>(&PAGAnimatorState::Repeat),
                                   napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
   }
 }
