@@ -924,7 +924,8 @@ class PAG_API LayerStyle {
 enum class PAG_API StrokePosition : uint8_t {
   Outside = 0,
   Inside = 1,
-  Center = 2
+  Center = 2,
+  Invalid = 255
 };
 
 enum class PAG_API GlowColorType : uint8_t {
