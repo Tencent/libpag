@@ -39,7 +39,7 @@ static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerF
   }
   auto layerTransform = layerCache->getTransform(contentFrame);
   Recorder recorder = {};
-  recorder.saveLayer(layerTransform->alpha, ToTGFXBlend(layer->blendMode));
+  recorder.saveLayer(layerTransform->alpha, ToTGFX(layer->blendMode));
   if (extraTransform) {
     recorder.concat(extraTransform->matrix);
   }

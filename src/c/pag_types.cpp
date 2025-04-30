@@ -108,7 +108,7 @@ std::shared_ptr<pag::PAGFile> ToPAGFile(pag_file* file) {
 }
 const struct {
   pag_time_stretch_mode C;
-  pag::Enum Pag;
+  pag::PAGTimeStretchMode Pag;
 } gTimeStretchPairs[] = {
     {pag_time_stretch_mode_none, pag::PAGTimeStretchMode::None},
     {pag_time_stretch_mode_scale, pag::PAGTimeStretchMode::Scale},
@@ -116,7 +116,8 @@ const struct {
     {pag_time_stretch_mode_repeat_inverted, pag::PAGTimeStretchMode::RepeatInverted},
 };
 
-bool FromCTimeStretchMode(pag_time_stretch_mode cTimeStretchMode, pag::Enum* timeStretchMode) {
+bool FromCTimeStretchMode(pag_time_stretch_mode cTimeStretchMode,
+                          pag::PAGTimeStretchMode* timeStretchMode) {
   for (auto& pair : gTimeStretchPairs) {
     if (pair.C == cTimeStretchMode) {
       *timeStretchMode = pair.Pag;
@@ -126,7 +127,8 @@ bool FromCTimeStretchMode(pag_time_stretch_mode cTimeStretchMode, pag::Enum* tim
   return false;
 }
 
-bool ToCTimeStretchMode(pag::Enum timeStretchMode, pag_time_stretch_mode* cTimeStretchMode) {
+bool ToCTimeStretchMode(pag::PAGTimeStretchMode timeStretchMode,
+                        pag_time_stretch_mode* cTimeStretchMode) {
   for (auto& pair : gTimeStretchPairs) {
     if (pair.Pag == timeStretchMode) {
       *cTimeStretchMode = pair.C;
@@ -202,7 +204,7 @@ bool ToCAlphaType(pag::AlphaType alphaType, pag_alpha_type* cAlphaType) {
 
 const struct {
   pag_scale_mode C;
-  pag::Enum Pag;
+  pag::PAGScaleMode Pag;
 } gScaleModePairs[] = {
     {pag_scale_mode_none, pag::PAGScaleMode::None},
     {pag_scale_mode_stretch, pag::PAGScaleMode::Stretch},
@@ -210,7 +212,7 @@ const struct {
     {pag_scale_mode_zoom, pag::PAGScaleMode::Zoom},
 };
 
-bool FromCScaleMode(pag_scale_mode cScaleMode, pag::Enum* scaleMode) {
+bool FromCScaleMode(pag_scale_mode cScaleMode, pag::PAGScaleMode* scaleMode) {
   for (auto& pair : gScaleModePairs) {
     if (pair.C == cScaleMode) {
       *scaleMode = pair.Pag;
@@ -220,7 +222,7 @@ bool FromCScaleMode(pag_scale_mode cScaleMode, pag::Enum* scaleMode) {
   return false;
 }
 
-bool ToCScaleMode(pag::Enum scaleMode, pag_scale_mode* cScaleMode) {
+bool ToCScaleMode(pag::PAGScaleMode scaleMode, pag_scale_mode* cScaleMode) {
   for (auto& pair : gScaleModePairs) {
     if (pair.Pag == scaleMode) {
       *cScaleMode = pair.C;
@@ -232,7 +234,7 @@ bool ToCScaleMode(pag::Enum scaleMode, pag_scale_mode* cScaleMode) {
 
 const struct {
   pag_paragraph_justification C;
-  pag::Enum Pag;
+  pag::ParagraphJustification Pag;
 } gParagraphJustificationPairs[] = {
     {pag_paragraph_justification_left_justify, pag::ParagraphJustification::LeftJustify},
     {pag_paragraph_justification_center_justify, pag::ParagraphJustification::CenterJustify},
@@ -248,7 +250,7 @@ const struct {
 };
 
 bool FromCParagraphJustification(pag_paragraph_justification cParagraphJustification,
-                                 pag::Enum* paragraphJustification) {
+                                 pag::ParagraphJustification* paragraphJustification) {
   for (auto& pair : gParagraphJustificationPairs) {
     if (pair.C == cParagraphJustification) {
       *paragraphJustification = pair.Pag;
@@ -258,7 +260,7 @@ bool FromCParagraphJustification(pag_paragraph_justification cParagraphJustifica
   return false;
 }
 
-bool ToCParagraphJustification(pag::Enum paragraphJustification,
+bool ToCParagraphJustification(pag::ParagraphJustification paragraphJustification,
                                pag_paragraph_justification* cParagraphJustification) {
   for (auto& pair : gParagraphJustificationPairs) {
     if (pair.Pag == paragraphJustification) {

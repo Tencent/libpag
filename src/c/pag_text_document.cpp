@@ -283,7 +283,7 @@ void pag_text_document_set_justification(pag_text_document* document,
   if (document == nullptr) {
     return;
   }
-  pag::Enum pagJustification;
+  pag::ParagraphJustification pagJustification;
   if (FromCParagraphJustification(justification, &pagJustification)) {
     document->p->justification = pagJustification;
   }

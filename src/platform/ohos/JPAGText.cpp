@@ -138,7 +138,7 @@ std::shared_ptr<TextDocument> JPAGText::FromJs(napi_env env, napi_value value) {
   napi_get_named_property(env, value, JPAGTEXT_JUSTIFICATION, &justification);
   int intTemp = 0;
   napi_get_value_int32(env, justification, &intTemp);
-  text->justification = static_cast<Enum>(intTemp);
+  text->justification = static_cast<ParagraphJustification>(intTemp);
 
   napi_value leading;
   napi_get_named_property(env, value, JPAGTEXT_LEADING, &leading);
@@ -244,7 +244,7 @@ napi_value JPAGText::ToJs(napi_env env, const std::shared_ptr<TextDocument>& tex
   napi_set_named_property(env, result, JPAGTEXT_TEXT, content);
 
   napi_value justification;
-  napi_create_int32(env, text->justification, &justification);
+  napi_create_int32(env, static_cast<int32_t>(text->justification), &justification);
   napi_set_named_property(env, result, JPAGTEXT_JUSTIFICATION, justification);
 
   napi_value leading;

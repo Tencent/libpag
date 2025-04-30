@@ -1202,7 +1202,7 @@ class PAG_API TextSelector {
   virtual ~TextSelector() {
   }
 
-  virtual Enum type() const = 0;
+  virtual uint8_t type() const = 0;
 
   virtual void excludeVaryingRanges(std::vector<TimeRange>*) const = 0;
 
@@ -1213,8 +1213,8 @@ class PAG_API TextRangeSelector : public TextSelector {
  public:
   ~TextRangeSelector();
 
-  Enum type() const override {
-    return static_cast<Enum>(TextSelectorType::Range);
+  uint8_t type() const override {
+    return static_cast<uint8_t>(TextSelectorType::Range);
   };
 
   Property<Percent>* start = nullptr;
@@ -1240,8 +1240,8 @@ class PAG_API TextWigglySelector : public TextSelector {
  public:
   ~TextWigglySelector();
 
-  Enum type() const override {
-    return static_cast<Enum>(TextSelectorType::Wiggly);
+  uint8_t type() const override {
+    return static_cast<uint8_t>(TextSelectorType::Wiggly);
   }
 
   Property<TextSelectorMode>* mode = nullptr;

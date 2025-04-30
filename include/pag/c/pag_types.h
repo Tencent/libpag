@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include "stddef.h"
+#include "stdint.h"
 #include "pag/defines.h"
 
 #ifdef __cplusplus

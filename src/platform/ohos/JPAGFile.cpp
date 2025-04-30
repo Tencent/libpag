@@ -275,7 +275,7 @@ static napi_value TimeStretchMode(napi_env env, napi_callback_info info) {
     return nullptr;
   }
   napi_value value;
-  napi_create_int32(env, file->timeStretchMode(), &value);
+  napi_create_int32(env, static_cast<int32_t>(file->timeStretchMode()), &value);
   return value;
 }
 
@@ -290,7 +290,7 @@ static napi_value SetTimeStretchMode(napi_env env, napi_callback_info info) {
   }
   int mode = 0;
   napi_get_value_int32(env, args[0], &mode);
-  file->setTimeStretchMode(mode);
+  file->setTimeStretchMode(static_cast<PAGTimeStretchMode>(mode));
   return nullptr;
 }
 static napi_value SetDuration(napi_env env, napi_callback_info info) {

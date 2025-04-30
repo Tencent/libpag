@@ -78,7 +78,7 @@ void pag_file_set_time_stretch_mode(pag_file* file, pag_time_stretch_mode mode) 
   if (pagFile == nullptr) {
     return;
   }
-  pag::Enum pagMode;
+  pag::PAGTimeStretchMode pagMode;
   if (FromCTimeStretchMode(mode, &pagMode)) {
     pagFile->setTimeStretchMode(pagMode);
   }

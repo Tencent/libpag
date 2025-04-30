@@ -38,7 +38,7 @@ static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Luminosity, tgfx::BlendMode::Luminosity},
     {BlendMode::Add, tgfx::BlendMode::PlusLighter}};
 
-tgfx::BlendMode ToTGFXBlend(BlendMode blendMode) {
+tgfx::BlendMode ToTGFX(BlendMode blendMode) {
   for (const auto& pair : BlendModeMap) {
     if (pair.first == blendMode) {
       return pair.second;
@@ -47,7 +47,7 @@ tgfx::BlendMode ToTGFXBlend(BlendMode blendMode) {
   return tgfx::BlendMode::SrcOver;
 }
 
-tgfx::LineCap ToTGFXCap(LineCap cap) {
+tgfx::LineCap ToTGFX(LineCap cap) {
   switch (cap) {
     case LineCap::Round:
       return tgfx::LineCap::Round;
@@ -58,7 +58,7 @@ tgfx::LineCap ToTGFXCap(LineCap cap) {
   }
 }
 
-tgfx::LineJoin ToTGFXJoin(LineJoin join) {
+tgfx::LineJoin ToTGFX(LineJoin join) {
   switch (join) {
     case LineJoin::Round:
       return tgfx::LineJoin::Round;

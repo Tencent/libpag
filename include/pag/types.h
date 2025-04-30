@@ -31,7 +31,6 @@
 
 namespace pag {
 
-typedef uint8_t Enum;
 typedef uint32_t ID;
 typedef float Percent;    // in the range [0 - 1]
 typedef uint8_t Opacity;  // in the range [0 - 255]

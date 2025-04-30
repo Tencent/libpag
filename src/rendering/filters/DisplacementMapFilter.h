@@ -65,7 +65,7 @@ class DisplacementMapFilter : public RuntimeFilter {
                         float maxHorizontalDisplacement,
                         DisplacementMapSource useForVerticalDisplacement,
                         float maxVerticalDisplacement,
-                        DisplacementMapBehavior displacementMapBehavior, Enum edgeBehavior,
+                        DisplacementMapBehavior displacementMapBehavior, bool edgeBehavior,
                         bool expandOutput, float effectOpacity, tgfx::Matrix layerMatrix,
                         tgfx::Size size, tgfx::Size displacementSize, tgfx::Rect contentBounds,
                         std::shared_ptr<tgfx::Image> sourceImage)

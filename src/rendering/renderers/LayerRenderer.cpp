@@ -53,7 +53,7 @@ void LayerRenderer::DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame
   if (extraTransform) {
     alpha *= extraTransform->alpha;
   }
-  recorder->saveLayer(alpha, ToTGFXBlend(layer->blendMode));
+  recorder->saveLayer(alpha, ToTGFX(layer->blendMode));
   if (trackMatte) {
     recorder->saveLayer(trackMatte->modifier);
   }
