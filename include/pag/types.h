@@ -1420,9 +1420,8 @@ enum class PAG_API PAGTimeStretchMode : uint8_t {
    * than target duration.
    */
     None = 0,
-  /**
-   * Keep the original playing speed, and display the last frame if the content's duration is less
-   * than target duration.
+  /*
+   * Change the playing speed of the content to fit target duration.
    */
     Scale = 1,
   /**
