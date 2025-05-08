@@ -21,18 +21,19 @@
 namespace pag {
 std::unique_ptr<BlockConfig> OuterGlowStyleTag(OuterGlowStyle* style) {
   auto tagConfig = new BlockConfig(TagCode::OuterGlowStyle);
-  AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty, BlendMode::Normal);
+  AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, (Opacity)191);
   AddAttribute(tagConfig, &style->noise, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &style->colorType, AttributeType::SimpleProperty,
-               GlowColorType::SingleColor);
+               static_cast<uint8_t>(GlowColorType::SingleColor));
   Color defaultColor = {0xFF, 0xFF, 0xBE};
   AddAttribute(tagConfig, &style->color, AttributeType::SimpleProperty, defaultColor);
   AddAttribute(tagConfig, &style->colors, AttributeType::SimpleProperty,
                GradientColorHandle(new GradientColor()));
   AddAttribute(tagConfig, &style->gradientSmoothness, AttributeType::SimpleProperty, 1.0f);
   AddAttribute(tagConfig, &style->technique, AttributeType::DiscreteProperty,
-               GlowTechniqueType::Softer);
+               static_cast<uint8_t>(GlowTechniqueType::Softer));
   AddAttribute(tagConfig, &style->spread, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &style->size, AttributeType::SimpleProperty, 5.0f);
   AddAttribute(tagConfig, &style->range, AttributeType::SimpleProperty, 0.5f);

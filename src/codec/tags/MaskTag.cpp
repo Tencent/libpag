@@ -23,7 +23,8 @@ static std::unique_ptr<BlockConfig> MaskTagInternal(MaskData* mask, TagCode tagC
   auto tagConfig = new BlockConfig(tagCode);
   AddAttribute(tagConfig, &mask->id, AttributeType::FixedValue, ZeroID);
   AddAttribute(tagConfig, &mask->inverted, AttributeType::BitFlag, false);
-  AddAttribute(tagConfig, &mask->maskMode, AttributeType::Value, MaskMode::Add);
+  AddAttribute(tagConfig, &mask->maskMode, AttributeType::Value,
+               static_cast<uint8_t>(MaskMode::Add));
   AddAttribute(tagConfig, &mask->maskPath, AttributeType::SimpleProperty,
                PathHandle(new PathData()));
   if (tagCode == TagCode::MaskBlockV2) {

@@ -32,11 +32,11 @@ class GradientOverlayFilter : public LayerStyleFilter {
 
  private:
   GradientOverlayStyle* layerStyle = nullptr;
-  Enum blendMode = 0;  // BlendMode
+  BlendMode blendMode = BlendMode::Normal;
   Opacity opacity = 255;
   GradientColorHandle colors = nullptr;
   float angle = 0;
-  Enum gradStyle = 0;  // GradientFillType
+  GradientFillType gradStyle = GradientFillType::Linear;
   bool reverse = false;
   float scale = 1.0;
   Point offset = Point::Zero();

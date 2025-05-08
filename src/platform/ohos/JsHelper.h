@@ -32,10 +32,10 @@ namespace pag {
 
 class PAGAnimatorState {
  public:
-  inline static const Enum Start = 0;
-  inline static const Enum Cancel = 1;
-  inline static const Enum End = 2;
-  inline static const Enum Repeat = 3;
+  inline static const uint8_t Start = 0;
+  inline static const uint8_t Cancel = 1;
+  inline static const uint8_t End = 2;
+  inline static const uint8_t Repeat = 3;
 };
 
 napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf8name,

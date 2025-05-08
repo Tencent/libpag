@@ -25,13 +25,13 @@ std::unique_ptr<BlockConfig> DisplacementMapEffectTag(DisplacementMapEffect* eff
   AddAttribute(tagConfig, &effect->displacementMapLayer, AttributeType::Value,
                static_cast<Layer*>(nullptr));
   AddAttribute(tagConfig, &effect->useForHorizontalDisplacement, AttributeType::DiscreteProperty,
-               DisplacementMapSource::Red);
+               static_cast<uint8_t>(DisplacementMapSource::Red));
   AddAttribute(tagConfig, &effect->maxHorizontalDisplacement, AttributeType::SimpleProperty, 5.0f);
   AddAttribute(tagConfig, &effect->useForVerticalDisplacement, AttributeType::DiscreteProperty,
-               DisplacementMapSource::Green);
+               static_cast<uint8_t>(DisplacementMapSource::Green));
   AddAttribute(tagConfig, &effect->maxVerticalDisplacement, AttributeType::SimpleProperty, 5.0f);
   AddAttribute(tagConfig, &effect->displacementMapBehavior, AttributeType::DiscreteProperty,
-               DisplacementMapBehavior::CenterMap);
+               static_cast<uint8_t>(DisplacementMapBehavior::CenterMap));
   AddAttribute(tagConfig, &effect->edgeBehavior, AttributeType::DiscreteProperty, false);
   AddAttribute(tagConfig, &effect->expandOutput, AttributeType::DiscreteProperty, true);
   EffectCompositingOptionTag(tagConfig, effect);

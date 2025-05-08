@@ -30,11 +30,11 @@
 
 namespace pag {
 
-tgfx::BlendMode ToTGFXBlend(Enum blendMode);
+tgfx::BlendMode ToTGFX(BlendMode blendMode);
 
-tgfx::LineCap ToTGFXCap(Enum cap);
+tgfx::LineCap ToTGFX(LineCap cap);
 
-tgfx::LineJoin ToTGFXJoin(Enum join);
+tgfx::LineJoin ToTGFX(LineJoin join);
 
 tgfx::Color ToTGFX(Color color, Opacity opacity = Opaque);
 

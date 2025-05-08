@@ -31,7 +31,7 @@ DisplacementMapEffect::~DisplacementMapEffect() {
   delete expandOutput;
 }
 
-static bool IsConst(Enum s) {
+static bool IsConst(DisplacementMapSource s) {
   return s == DisplacementMapSource::Full || s == DisplacementMapSource::Half ||
          s == DisplacementMapSource::Off;
 }

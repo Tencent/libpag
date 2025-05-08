@@ -131,13 +131,13 @@ class PAG_API PAGImage {
   /**
    * Returns the current scale mode. The default value is PAGScaleMode::LetterBox.
    */
-  int scaleMode() const;
+  PAGScaleMode scaleMode() const;
 
   /**
    * Specifies the rule of how to scale the content to fit the image layer's original size.
    * The matrix changes when this method is called.
    */
-  void setScaleMode(int mode);
+  void setScaleMode(PAGScaleMode mode);
 
   /**
    * Returns a copy of the current matrix.
@@ -164,11 +164,11 @@ class PAG_API PAGImage {
   ID _uniqueID = 0;
   int _width = 0;
   int _height = 0;
-  int _scaleMode = PAGScaleMode::LetterBox;
+  PAGScaleMode _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
 
-  Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
+  Matrix getContentMatrix(PAGScaleMode defaultScaleMode, int contentWidth, int contentHeight);
 
   friend class ImageReplacement;
 
@@ -810,7 +810,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
   Frame getFrameFromTimeRemap(Frame value);
   void measureBounds(tgfx::Rect* bounds) override;
   int64_t contentDurationInternal();
-  int getDefaultScaleMode();
+  PAGScaleMode getDefaultScaleMode();
 
   friend class RenderCache;
 
@@ -1109,12 +1109,12 @@ class PAG_API PAGFile : public PAGComposition {
    * Indicate how to stretch the original duration to fit target duration when file's duration is
    * changed. The default value is PAGTimeStretchMode::Repeat.
    */
-  Enum timeStretchMode() const;
+  PAGTimeStretchMode timeStretchMode() const;
 
   /**
    * Set the timeStretchMode of this file.
    */
-  void setTimeStretchMode(Enum value);
+  void setTimeStretchMode(PAGTimeStretchMode value);
 
   /**
    * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
@@ -1156,7 +1156,7 @@ class PAG_API PAGFile : public PAGComposition {
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;
-  Enum _timeStretchMode = PAGTimeStretchMode::Repeat;
+  PAGTimeStretchMode _timeStretchMode = PAGTimeStretchMode::Repeat;
 
   friend class PAGImageLayer;
 
@@ -1377,13 +1377,13 @@ class PAG_API PAGPlayer {
   /**
    * Returns the current scale mode.
    */
-  int scaleMode();
+  PAGScaleMode scaleMode();
 
   /**
    * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
    * changes when this method is called.
    */
-  void setScaleMode(int mode);
+  void setScaleMode(PAGScaleMode mode);
 
   /**
    * Returns a copy of the current matrix.
@@ -1544,7 +1544,7 @@ class PAG_API PAGPlayer {
  private:
   FileReporter* reporter = nullptr;
   float _maxFrameRate = 60;
-  int _scaleMode = PAGScaleMode::LetterBox;
+  PAGScaleMode _scaleMode = PAGScaleMode::LetterBox;
   bool _autoClear = true;
 
   bool updateStageSize();

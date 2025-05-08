@@ -26,7 +26,8 @@ std::unique_ptr<BlockConfig> TrimPathsTag(TrimPathsElement* shape) {
   // change it.
   AddAttribute(tagConfig, &shape->end, AttributeType::SimpleProperty, 100.0f);
   AddAttribute(tagConfig, &shape->offset, AttributeType::SimpleProperty, 0.0f);
-  AddAttribute(tagConfig, &shape->trimType, AttributeType::Value, TrimPathsType::Simultaneously);
+  AddAttribute(tagConfig, &shape->trimType, AttributeType::Value,
+               static_cast<uint8_t>(TrimPathsType::Simultaneously));
   return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

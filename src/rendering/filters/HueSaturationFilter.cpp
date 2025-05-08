@@ -97,7 +97,7 @@ std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Im
                                                         Effect* effect, Frame layerFrame,
                                                         tgfx::Point* offset) {
   auto* hueSaturationEffect = reinterpret_cast<const HueSaturationEffect*>(effect);
-  auto channelControl = hueSaturationEffect->channelControl;
+  auto channelControl = static_cast<int>(hueSaturationEffect->channelControl);
   auto hue = hueSaturationEffect->hue[channelControl];
   auto saturation = hueSaturationEffect->saturation[channelControl];
   auto lightness = hueSaturationEffect->lightness[channelControl];

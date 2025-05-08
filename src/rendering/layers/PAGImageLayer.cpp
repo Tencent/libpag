@@ -677,7 +677,7 @@ int64_t PAGImageLayer::contentDurationInternal() {
   return FrameToTime(maxFrame + 1, frameRate);
 }
 
-int PAGImageLayer::getDefaultScaleMode() {
+PAGScaleMode PAGImageLayer::getDefaultScaleMode() {
   auto imageLayer = static_cast<ImageLayer*>(layer);
   if (imageLayer && imageLayer->imageFillRule) {
     return imageLayer->imageFillRule->scaleMode;

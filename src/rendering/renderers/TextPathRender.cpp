@@ -24,7 +24,7 @@
 
 namespace pag {
 struct TextPathLayout {
-  Enum justification = ParagraphJustification::LeftJustify;
+  ParagraphJustification justification = ParagraphJustification::LeftJustify;
   bool forceAlignment = false;
   bool perpendicularToPath = true;
   float firstMargin = 0;

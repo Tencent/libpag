@@ -22,7 +22,8 @@
 namespace pag {
 class ImageReplacement : public Content {
  public:
-  ImageReplacement(std::shared_ptr<PAGImage> pagImage, int scaleMode, ImageBytes* imageBytes);
+  ImageReplacement(std::shared_ptr<PAGImage> pagImage, PAGScaleMode scaleMode,
+                   ImageBytes* imageBytes);
 
   void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;
@@ -33,7 +34,7 @@ class ImageReplacement : public Content {
 
  private:
   std::shared_ptr<PAGImage> pagImage;
-  int defaultScaleMode = PAGScaleMode::LetterBox;
+  PAGScaleMode defaultScaleMode = PAGScaleMode::LetterBox;
   int contentWidth = 0;
   int contentHeight = 0;
   Frame contentFrame = -1;

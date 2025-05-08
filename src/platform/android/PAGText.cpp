@@ -113,7 +113,7 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   env->SetFloatField(textData, PAGText_strokeWidth, textDocument->strokeWidth);
   auto text = SafeConvertToJString(env, textDocument->text);
   env->SetObjectField(textData, PAGText_text, text);
-  env->SetIntField(textData, PAGText_justification, textDocument->justification);
+  env->SetIntField(textData, PAGText_justification, static_cast<jint>(textDocument->justification));
   env->SetFloatField(textData, PAGText_leading, textDocument->leading);
   env->SetFloatField(textData, PAGText_tracking, textDocument->tracking);
   jint backgroundColor =
@@ -158,7 +158,7 @@ TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData) {
   auto textObject = (jstring)env->GetObjectField(textData, PAGText_text);
   textDocument->text = SafeConvertToStdString(env, textObject);
   textDocument->justification =
-      static_cast<Enum>(env->GetIntField(textData, PAGText_justification));
+      static_cast<ParagraphJustification>(env->GetIntField(textData, PAGText_justification));
   textDocument->leading = env->GetFloatField(textData, PAGText_leading);
   textDocument->tracking = env->GetFloatField(textData, PAGText_tracking);
   jint backgroundColorObject = env->GetIntField(textData, PAGText_backgroundColor);

@@ -176,7 +176,7 @@ PAG_API jint Java_org_libpag_PAGPlayer_scaleMode(JNIEnv* env, jobject thiz) {
   if (player == nullptr) {
     return 0;
   }
-  return player->scaleMode();
+  return static_cast<jint>(player->scaleMode());
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_setScaleMode(JNIEnv* env, jobject thiz, jint value) {
@@ -184,7 +184,7 @@ PAG_API void Java_org_libpag_PAGPlayer_setScaleMode(JNIEnv* env, jobject thiz, j
   if (player == nullptr) {
     return;
   }
-  player->setScaleMode(value);
+  player->setScaleMode(static_cast<PAGScaleMode>(value));
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeGetMatrix(JNIEnv* env, jobject thiz,

@@ -33,11 +33,14 @@ static bool WriteStrokeDashes(EncodeStream* stream, void* target) {
 
 std::unique_ptr<BlockConfig> StrokeTag(StrokeElement* shape) {
   auto tagConfig = new BlockConfig(TagCode::Stroke);
-  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
+  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &shape->composite, AttributeType::Value,
-               CompositeOrder::BelowPreviousInSameGroup);
-  AddAttribute(tagConfig, &shape->lineCap, AttributeType::Value, LineCap::Butt);
-  AddAttribute(tagConfig, &shape->lineJoin, AttributeType::Value, LineJoin::Miter);
+               static_cast<uint8_t>(CompositeOrder::BelowPreviousInSameGroup));
+  AddAttribute(tagConfig, &shape->lineCap, AttributeType::Value,
+               static_cast<uint8_t>(LineCap::Butt));
+  AddAttribute(tagConfig, &shape->lineJoin, AttributeType::Value,
+               static_cast<uint8_t>(LineJoin::Miter));
   AddAttribute(tagConfig, &shape->miterLimit, AttributeType::SimpleProperty, 4.0f);
   AddAttribute(tagConfig, &shape->color, AttributeType::SimpleProperty, White);
   AddAttribute(tagConfig, &shape->opacity, AttributeType::SimpleProperty, Opaque);

@@ -116,7 +116,7 @@ void pag_player_set_scale_mode(pag_player* player, pag_scale_mode scaleMode) {
   if (player == nullptr) {
     return;
   }
-  pag::Enum pagScaleMode;
+  pag::PAGScaleMode pagScaleMode;
   if (FromCScaleMode(scaleMode, &pagScaleMode)) {
     player->p->setScaleMode(pagScaleMode);
   }

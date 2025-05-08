@@ -21,7 +21,8 @@
 namespace pag {
 std::unique_ptr<BlockConfig> MergePathsTag(MergePathsElement* shape) {
   auto tagConfig = new BlockConfig(TagCode::MergePaths);
-  AddAttribute(tagConfig, &shape->mode, AttributeType::FixedValue, MergePathsMode::Add);
+  AddAttribute(tagConfig, &shape->mode, AttributeType::FixedValue,
+               static_cast<uint8_t>(MergePathsMode::Add));
   return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

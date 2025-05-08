@@ -18,21 +18,21 @@
 
 #include "DataTypes.h"
 #include <algorithm>
+#include <cstdint>
 #include "Attributes.h"
 #include "codec/tags/FontTables.h"
 
 namespace pag {
 
-class PathRecord {
- public:
-  static const Enum Close = 0;
-  static const Enum Move = 1;
-  static const Enum Line = 2;
-  static const Enum HLine = 3;
-  static const Enum VLine = 4;
-  static const Enum Curve01 = 5;  // has only control2 point
-  static const Enum Curve10 = 6;  // has only control1 point
-  static const Enum Curve11 = 7;  // has both control points
+enum class PathRecord : uint8_t {
+  Close = 0,
+  Move = 1,
+  Line = 2,
+  HLine = 3,
+  VLine = 4,
+  Curve01 = 5,  // has only control2 point
+  Curve10 = 6,  // has only control1 point
+  Curve11 = 7   // has both control points
 };
 
 Ratio ReadRatio(DecodeStream* stream) {
@@ -62,7 +62,7 @@ bool ReadBoolean(DecodeStream* stream) {
   return stream->readBoolean();
 }
 
-Enum ReadEnum(DecodeStream* stream) {
+uint8_t ReadUint8(DecodeStream* stream) {
   return stream->readUint8();
 }
 
@@ -123,7 +123,7 @@ Point3D ReadPoint3D(DecodeStream* stream) {
   return point;
 }
 
-static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum records[],
+static void ReadPathInternal(DecodeStream* stream, PathData* value, const uint8_t records[],
                              int64_t numVerbs) {
   auto numBits = stream->readNumBits();
   float lastX = 0;
@@ -135,7 +135,7 @@ static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum r
       break;
     }
     auto pathRecord = records[i];
-    switch (pathRecord) {
+    switch (static_cast<PathRecord>(pathRecord)) {
       case PathRecord::Close:
         verbs.push_back(PathDataVerb::Close);
         break;
@@ -205,9 +205,9 @@ PathHandle ReadPath(DecodeStream* stream) {
   if (numVerbs == 0) {
     return PathHandle(value);
   }
-  auto records = new Enum[static_cast<size_t>(numVerbs)];
+  auto records = new uint8_t[static_cast<size_t>(numVerbs)];
   for (uint32_t i = 0; i < numVerbs; i++) {
-    records[i] = static_cast<Enum>(stream->readUBits(3));
+    records[i] = static_cast<uint8_t>(stream->readUBits(3));
   }
   ReadPathInternal(stream, value, records, numVerbs);
   delete[] records;
@@ -249,7 +249,7 @@ static std::unique_ptr<BlockConfig> TextDocumentBlockCore(TextDocument* textDocu
   AddAttribute(blockConfig, &textDocument->strokeWidth, AttributeType::Value, 1.0f);
   AddAttribute(blockConfig, &textDocument->text, AttributeType::Value, std::string());
   AddAttribute(blockConfig, &textDocument->justification, AttributeType::Value,
-               ParagraphJustification::LeftJustify);
+               static_cast<uint8_t>(ParagraphJustification::LeftJustify));
   AddAttribute(blockConfig, &textDocument->leading, AttributeType::Value, 0.0f);
   AddAttribute(blockConfig, &textDocument->tracking, AttributeType::Value, 0.0f);
   if (tagCode >= TagCode::TextSourceV2) {
@@ -258,7 +258,7 @@ static std::unique_ptr<BlockConfig> TextDocumentBlockCore(TextDocument* textDocu
   }
   if (tagCode >= TagCode::TextSourceV3) {
     AddAttribute(blockConfig, &textDocument->direction, AttributeType::Value,
-                 TextDirection::Vertical);
+                 static_cast<uint8_t>(TextDirection::Vertical));
   }
   AddCustomAttribute(blockConfig, textDocument, ReadFontData, WriteFontData);
   return std::unique_ptr<BlockConfig>(blockConfig);
@@ -304,9 +304,6 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
   auto alphaCount = stream->readEncodedUint32();
   auto colorCount = stream->readEncodedUint32();
   for (uint32_t i = 0; i < alphaCount; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
     AlphaStop stop = {};
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
@@ -314,9 +311,6 @@ GradientColorHandle ReadGradientColor(DecodeStream* stream) {
     alphaStops.push_back(stop);
   }
   for (uint32_t i = 0; i < colorCount; i++) {
-    if (stream->context->hasException()) {
-      break;
-    }
     ColorStop stop = {};
     stop.position = stream->readUint16() * GRADIENT_PRECISION;
     stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
@@ -357,7 +351,7 @@ void WriteBoolean(EncodeStream* stream, bool value) {
   stream->writeBoolean(value);
 }
 
-void WriteEnum(EncodeStream* stream, Enum value) {
+void WriteUint8(EncodeStream* stream, uint8_t value) {
   stream->writeUint8(value);
 }
 
@@ -417,24 +411,24 @@ static void WritePathInternal(EncodeStream* stream, pag::PathHandle value) {
   for (auto& verb : value->verbs) {
     switch (verb) {
       case PathDataVerb::Close:
-        stream->writeUBits(PathRecord::Close, 3);
+        stream->writeUBits(static_cast<uint32_t>(PathRecord::Close), 3);
         break;
       case PathDataVerb::MoveTo:
         lastPoint = points[index++];
-        stream->writeUBits(PathRecord::Move, 3);
+        stream->writeUBits(static_cast<uint32_t>(PathRecord::Move), 3);
         pointList.push_back(lastPoint.x);
         pointList.push_back(lastPoint.y);
         break;
       case PathDataVerb::LineTo:
         point = points[index++];
         if (point.x == lastPoint.x) {
-          stream->writeUBits(PathRecord::VLine, 3);
+          stream->writeUBits(static_cast<uint32_t>(PathRecord::VLine), 3);
           pointList.push_back(point.y);
         } else if (point.y == lastPoint.y) {
-          stream->writeUBits(PathRecord::HLine, 3);
+          stream->writeUBits(static_cast<uint32_t>(PathRecord::HLine), 3);
           pointList.push_back(point.x);
         } else {
-          stream->writeUBits(PathRecord::Line, 3);
+          stream->writeUBits(static_cast<uint32_t>(PathRecord::Line), 3);
           pointList.push_back(point.x);
           pointList.push_back(point.y);
         }
@@ -445,21 +439,21 @@ static void WritePathInternal(EncodeStream* stream, pag::PathHandle value) {
         control2 = points[index++];
         point = points[index++];
         if (control1 == lastPoint) {
-          stream->writeUBits(PathRecord::Curve01, 3);
+          stream->writeUBits(static_cast<uint32_t>(PathRecord::Curve01), 3);
           pointList.push_back(control2.x);
           pointList.push_back(control2.y);
           pointList.push_back(point.x);
           pointList.push_back(point.y);
           lastPoint = point;
         } else if (control2 == point) {
-          stream->writeUBits(PathRecord::Curve10, 3);
+          stream->writeUBits(static_cast<uint32_t>(PathRecord::Curve10), 3);
           pointList.push_back(control1.x);
           pointList.push_back(control1.y);
           pointList.push_back(point.x);
           pointList.push_back(point.y);
           lastPoint = point;
         } else {
-          stream->writeUBits(PathRecord::Curve11, 3);
+          stream->writeUBits(static_cast<uint32_t>(PathRecord::Curve11), 3);
           pointList.push_back(control1.x);
           pointList.push_back(control1.y);
           pointList.push_back(control2.x);

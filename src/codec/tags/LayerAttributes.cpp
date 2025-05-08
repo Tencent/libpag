@@ -32,8 +32,10 @@ std::unique_ptr<BlockConfig> MakeFromLayerAttributesTag(TagCode tagCode, Layer* 
   AddAttribute(tagConfig, &layer->stretch, AttributeType::Value, DefaultRatio);
   AddAttribute(tagConfig, &layer->startTime, AttributeType::Value, ZeroFrame);
   if (layer->type() != LayerType::Camera) {
-    AddAttribute(tagConfig, &layer->blendMode, AttributeType::Value, BlendMode::Normal);
-    AddAttribute(tagConfig, &layer->trackMatteType, AttributeType::Value, TrackMatteType::None);
+    AddAttribute(tagConfig, &layer->blendMode, AttributeType::Value,
+                 static_cast<uint8_t>(BlendMode::Normal));
+    AddAttribute(tagConfig, &layer->trackMatteType, AttributeType::Value,
+                 static_cast<uint8_t>(TrackMatteType::None));
   }
   AddAttribute(tagConfig, &layer->timeRemap, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &layer->duration, AttributeType::FixedValue, ZeroFrame);

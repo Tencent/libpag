@@ -172,12 +172,12 @@ std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersByEditableIndexInternal
   return result;
 }
 
-Enum PAGFile::timeStretchMode() const {
+PAGTimeStretchMode PAGFile::timeStretchMode() const {
   LockGuard autoLock(rootLocker);
   return _timeStretchMode;
 }
 
-void PAGFile::setTimeStretchMode(Enum value) {
+void PAGFile::setTimeStretchMode(PAGTimeStretchMode value) {
   LockGuard autoLock(rootLocker);
   _timeStretchMode = value;
 }

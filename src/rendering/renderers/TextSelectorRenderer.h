@@ -38,7 +38,7 @@ class TextSelectorRenderer {
  protected:
   size_t textCount = 0;
   Frame frame = 0;
-  Enum mode = TextSelectorMode::Intersect;  // 模式
+  TextSelectorMode mode = TextSelectorMode::Intersect;  // 模式
   std::vector<int> randomIndexs;
 
   // 生成随机序号
@@ -83,10 +83,10 @@ class RangeSelectorRenderer : public TextSelectorRenderer {
   float easeLow = 0.0f;   // 缓和度低(0%-100%)
 
   // 范围选择器的高级选项：模式(在父类里)、数量、形状、随机排序
-  float amount = 1.0f;                          // 数量
-  Enum shape = TextRangeSelectorShape::Square;  // 形状
-  bool randomizeOrder = false;                  // 随机排序
-  uint16_t randomSeed = 0;                      // 随机植入
+  float amount = 1.0f;                                            // 数量
+  TextRangeSelectorShape shape = TextRangeSelectorShape::Square;  // 形状
+  bool randomizeOrder = false;                                    // 随机排序
+  uint16_t randomSeed = 0;                                        // 随机植入
 };
 
 }  // namespace pag

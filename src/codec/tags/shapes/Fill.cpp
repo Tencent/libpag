@@ -21,10 +21,12 @@
 namespace pag {
 std::unique_ptr<BlockConfig> FillTag(FillElement* shape) {
   auto tagConfig = new BlockConfig(TagCode::Fill);
-  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
+  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &shape->composite, AttributeType::Value,
-               CompositeOrder::BelowPreviousInSameGroup);
-  AddAttribute(tagConfig, &shape->fillRule, AttributeType::Value, FillRule::NonZeroWinding);
+               static_cast<uint8_t>(CompositeOrder::BelowPreviousInSameGroup));
+  AddAttribute(tagConfig, &shape->fillRule, AttributeType::Value,
+               static_cast<uint8_t>(FillRule::NonZeroWinding));
   AddAttribute(tagConfig, &shape->color, AttributeType::SimpleProperty, Red);
   AddAttribute(tagConfig, &shape->opacity, AttributeType::SimpleProperty, Opaque);
   return std::unique_ptr<BlockConfig>(tagConfig);

@@ -78,7 +78,7 @@ bool GradientOverlayFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> so
 
   auto imageShader = tgfx::Shader::MakeImageShader(source);
   shader = tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, shader, imageShader);
-  shader = tgfx::Shader::MakeBlend(ToTGFXBlend(blendMode), imageShader, shader);
+  shader = tgfx::Shader::MakeBlend(ToTGFX(blendMode), imageShader, shader);
   tgfx::Paint paint;
   paint.setShader(shader);
   auto rect = tgfx::Rect::MakeWH(width, height);

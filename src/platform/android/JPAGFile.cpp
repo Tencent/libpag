@@ -220,7 +220,7 @@ PAG_API jint Java_org_libpag_PAGFile_timeStretchMode(JNIEnv* env, jobject thiz) 
   if (pagFile == nullptr) {
     return 0;
   }
-  return pagFile->timeStretchMode();
+  return static_cast<jint>(pagFile->timeStretchMode());
 }
 
 PAG_API void Java_org_libpag_PAGFile_setTimeStretchMode(JNIEnv* env, jobject thiz, jint mode) {
@@ -228,7 +228,7 @@ PAG_API void Java_org_libpag_PAGFile_setTimeStretchMode(JNIEnv* env, jobject thi
   if (pagFile == nullptr) {
     return;
   }
-  pagFile->setTimeStretchMode(static_cast<Enum>(mode));
+  pagFile->setTimeStretchMode(static_cast<PAGTimeStretchMode>(mode));
 }
 
 PAG_API void Java_org_libpag_PAGFile_setDuration(JNIEnv* env, jobject thiz, jlong duration) {

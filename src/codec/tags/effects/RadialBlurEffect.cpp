@@ -25,9 +25,10 @@ std::unique_ptr<BlockConfig> RadialBlurEffectTag(RadialBlurEffect* effect) {
   AddAttribute(tagConfig, &effect->amount, AttributeType::SimpleProperty, 10.0f);
   AddAttribute(tagConfig, &effect->center, AttributeType::SpatialProperty,
                Point::Make(640.0f, 360.0f));
-  AddAttribute(tagConfig, &effect->mode, AttributeType::DiscreteProperty, RadialBlurMode::Spin);
+  AddAttribute(tagConfig, &effect->mode, AttributeType::DiscreteProperty,
+               static_cast<uint8_t>(RadialBlurMode::Spin));
   AddAttribute(tagConfig, &effect->antialias, AttributeType::DiscreteProperty,
-               RadialBlurAntialias::Low);
+               static_cast<uint8_t>(RadialBlurAntialias::Low));
   EffectCompositingOptionTag(tagConfig, effect);
   return std::unique_ptr<BlockConfig>(tagConfig);
 }

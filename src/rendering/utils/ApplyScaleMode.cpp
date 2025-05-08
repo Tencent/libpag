@@ -19,7 +19,7 @@
 #include "ApplyScaleMode.h"
 
 namespace pag {
-Matrix ApplyScaleMode(int scaleMode, int sourceWidth, int sourceHeight, int targetWidth,
+Matrix ApplyScaleMode(PAGScaleMode scaleMode, int sourceWidth, int sourceHeight, int targetWidth,
                       int targetHeight) {
   Matrix matrix = {};
   matrix.setIdentity();
