@@ -129,7 +129,7 @@ export class PAGView extends NativePAGView {
     this.pagSurface = pagSurface;
   }
 
-  public getCanvasCssSize(canvasId: string | undefined): Promise<CanvasSize> {
+  public getCanvasCssSize(canvasId: string): Promise<CanvasSize> {
     return new Promise((resolve) => {
       wx.createSelectorQuery()
         .select(`#${canvasId}`)
