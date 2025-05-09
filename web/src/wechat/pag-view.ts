@@ -20,11 +20,6 @@ export interface PAGViewOptions {
    * When target canvas is offscreen canvas, useScale is false.
    */
   useScale?: boolean;
-
-  /**
-   * Canvas ID.
-   */
-  canvasId?: string;
 }
 
 export type wxCanvas = (HTMLCanvasElement | OffscreenCanvas) & {
@@ -94,7 +89,7 @@ export class PAGView extends NativePAGView {
     const pagPlayer = PAGModule.PAGPlayer.create();
     const pagView = new PAGView(pagPlayer, canvasElement);
     if (typeof canvas === 'string') {
-      pagView.pagViewOptions.canvasId = canvas;
+      pagView.canvasId = canvas;
     }
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
     await pagView.resetSize(pagView.pagViewOptions.useScale);
@@ -116,8 +111,9 @@ export class PAGView extends NativePAGView {
   protected override pagViewOptions: PAGViewOptions = {
     firstFrame: true,
     useScale: true,
-    canvasId: '',
   };
+
+  private canvasId = '';
 
   /**
    * Update size when changed canvas size.
@@ -148,8 +144,8 @@ export class PAGView extends NativePAGView {
   }
 
   public async calculateDisplaySize(canvas: any) {
-    if (this.pagViewOptions.canvasId !== '') {
-      const canvasSize = await this.getCanvasCssSize(this.pagViewOptions.canvasId);
+    if (this.canvasId !== undefined && this.canvasId !== '') {
+      const canvasSize = await this.getCanvasCssSize(this.canvasId);
       if (canvasSize.width !== 0 && canvasSize.height !== 0) {
         return canvasSize;
       }
@@ -230,7 +226,7 @@ export class PAGView extends NativePAGView {
     if (!useScale || isOffscreenCanvas(this.canvasElement)) {
       return;
     }
-    const displaySize=await this.calculateDisplaySize(this.canvasElement);
+    const displaySize = await this.calculateDisplaySize(this.canvasElement);
     const dpr = wx.getSystemInfoSync().pixelRatio;
     this.canvasElement!.width = displaySize.width * dpr;
     this.canvasElement!.height = displaySize.height * dpr;
