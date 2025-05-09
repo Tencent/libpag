@@ -15,6 +15,16 @@ export interface PAGViewOptions {
    * Render first frame when pag view init. default true.
    */
   firstFrame?: boolean;
+  /**
+   * Use style to scale canvas. default false.
+   * When target canvas is offscreen canvas, useScale is false.
+   */
+  useScale?: boolean;
+
+  /**
+   * Canvas ID.
+   */
+  canvasId?: string;
 }
 
 export type wxCanvas = (HTMLCanvasElement | OffscreenCanvas) & {
@@ -22,9 +32,45 @@ export type wxCanvas = (HTMLCanvasElement | OffscreenCanvas) & {
   cancelAnimationFrame: (requestID: number) => void;
 };
 
+function isOffscreenCanvas(canvas: any): boolean {
+  if (canvas.isOffscreenCanvas !== undefined) {
+    return canvas.isOffscreenCanvas;
+  }
+  return false;
+}
+
+interface CanvasSize {
+  width: number;
+  height: number;
+}
+
 @destroyVerify
 @wasmAwaitRewind
 export class PAGView extends NativePAGView {
+  /**
+   * Get canvas element by canvas ID
+   *
+   * @param {string} canvasId - The ID of the canvas element to find
+   *
+   * @returns {Promise<HTMLCanvasElement | OffscreenCanvas | null>}
+   *          - Returns the found canvas element, or null if not found
+   */
+  public static getCanvasElementByCanvasId(canvasId: string): Promise<HTMLCanvasElement | OffscreenCanvas> {
+    return new Promise((resolve, reject) => {
+      const query = wx.createSelectorQuery();
+      query
+        .select(`#${canvasId}`)
+        .fields({ node: true, size: true })
+        .exec((res) => {
+          if (res[0] && res[0].node) {
+            resolve(res[0].node);
+          } else {
+            reject(new Error(`Cannot find Canvas element with ID ${canvasId}`));
+          }
+        });
+    });
+  }
+
   /**
    * Create pag view.
    * @param file pag file.
@@ -34,18 +80,29 @@ export class PAGView extends NativePAGView {
    */
   public static async init(
     file: PAGComposition,
-    canvas: HTMLCanvasElement | OffscreenCanvas,
+    canvas: HTMLCanvasElement | OffscreenCanvas | string,
     initOptions: PAGViewOptions = {},
   ): Promise<PAGView> {
+    let canvasElement: HTMLCanvasElement | OffscreenCanvas | null = null;
+    if (typeof canvas === 'string') {
+      canvasElement = await this.getCanvasElementByCanvasId(canvas);
+    } else {
+      canvasElement = canvas;
+    }
+    if (!canvasElement) throw new Error('Canvas is not found!');
+
     const pagPlayer = PAGModule.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer, canvas);
+    const pagView = new PAGView(pagPlayer, canvasElement);
+    if (typeof canvas === 'string') {
+      pagView.pagViewOptions.canvasId = canvas;
+    }
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
-    pagView.resetSize();
-    pagView.renderCanvas = RenderCanvas.from(canvas, { alpha: true });
+    await pagView.resetSize(pagView.pagViewOptions.useScale);
+    pagView.renderCanvas = RenderCanvas.from(canvasElement, { alpha: true });
     pagView.renderCanvas.retain();
     pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
     pagView.frameRate = file.frameRate();
-    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, canvas.width, canvas.height);
+    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, canvasElement.width, canvasElement.height);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     pagView.setProgress(0);
@@ -58,18 +115,53 @@ export class PAGView extends NativePAGView {
 
   protected override pagViewOptions: PAGViewOptions = {
     firstFrame: true,
+    useScale: true,
+    canvasId: '',
   };
 
   /**
    * Update size when changed canvas size.
    */
   public updateSize() {
+    if (!this.canvasElement) {
+      throw new Error('Canvas element is not found!');
+    }
     if (!this.pagGlContext) return;
-    this.resetSize();
     const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.canvasElement!.width, this.canvasElement!.height);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
     this.pagSurface = pagSurface;
+  }
+
+  public getCanvasCssSize(canvasId: string | undefined): Promise<CanvasSize> {
+    return new Promise((resolve) => {
+      wx.createSelectorQuery()
+        .select(`#${canvasId}`)
+        .fields({ node: true, size: true })
+        .exec((res) => {
+          resolve({
+            width: res[0]?.width || 0,
+            height: res[0]?.height || 0,
+          });
+        });
+    });
+  }
+
+  public async calculateDisplaySize(canvas: any) {
+    if (this.pagViewOptions.canvasId !== '') {
+      const canvasSize = await this.getCanvasCssSize(this.pagViewOptions.canvasId);
+      if (canvasSize.width !== 0 && canvasSize.height !== 0) {
+        return canvasSize;
+      }
+    }
+    if (canvas.displayWidth === undefined && canvas.displayHeight === undefined) {
+      canvas.displayWidth = canvas.width;
+      canvas.displayHeight = canvas.height;
+    }
+    return {
+      width: canvas.displayWidth,
+      height: canvas.displayHeight,
+    };
   }
 
   protected override async flushLoop(force = false) {
@@ -131,9 +223,16 @@ export class PAGView extends NativePAGView {
     }
   }
 
-  protected override resetSize() {
+  protected override async resetSize(useScale = true) {
+    if (!this.canvasElement) {
+      throw new Error('Canvas element is not found!');
+    }
+    if (!useScale || isOffscreenCanvas(this.canvasElement)) {
+      return;
+    }
+    const displaySize=await this.calculateDisplaySize(this.canvasElement);
     const dpr = wx.getSystemInfoSync().pixelRatio;
-    this.canvasElement!.width = this.canvasElement!.width * dpr;
-    this.canvasElement!.height = this.canvasElement!.height * dpr;
+    this.canvasElement!.width = displaySize.width * dpr;
+    this.canvasElement!.height = displaySize.height * dpr;
   }
 }
