@@ -13,6 +13,10 @@
         <file>images/update-red.png</file>
         <file>images/background-on.png</file>
         <file>images/background-off.png</file>
+        <file>images/right-arrow.png</file>
+        <file>images/icon-collapse.png</file>
+        <file>images/icon-edit.png</file>
+        <file>images/icon-save.png</file>
 
         <!-- svg -->
         <file>images/close-dark.svg</file>
