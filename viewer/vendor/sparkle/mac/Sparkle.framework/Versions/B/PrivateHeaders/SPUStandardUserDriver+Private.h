@@ -24,14 +24,15 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-SU_EXPORT @interface SPUStandardUserDriver (Private)
+SU_EXPORT @interface SPUStandardUserDriver(Private)
 
 /**
  Private API for accessing the active update alert's window controller.
  This is the window controller that shows the update's release notes and install choices.
- This can be accessed in -[SPUStandardUserDriverDelegate standardUserDriverWillHandleShowingUpdate:forUpdate:state:]
+ This can be accessed in -[SPUStandardUserDriverDelegate
+ standardUserDriverWillHandleShowingUpdate:forUpdate:state:]
  */
-@property (nonatomic, readonly, nullable) NSWindowController *activeUpdateAlert;
+@property(nonatomic, readonly, nullable) NSWindowController* activeUpdateAlert;
 
 @end
 

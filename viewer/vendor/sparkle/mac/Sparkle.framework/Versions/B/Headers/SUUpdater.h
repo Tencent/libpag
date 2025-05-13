@@ -16,15 +16,15 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wquoted-include-in-framework-header"
 #import "SUExport.h"
+#import "SUUpdaterDelegate.h"
 #import "SUVersionComparisonProtocol.h"
 #import "SUVersionDisplayProtocol.h"
-#import "SUUpdaterDelegate.h"
 #pragma clang diagnostic pop
 #else
 #import <Sparkle/SUExport.h>
+#import <Sparkle/SUUpdaterDelegate.h>
 #import <Sparkle/SUVersionComparisonProtocol.h>
 #import <Sparkle/SUVersionDisplayProtocol.h>
-#import <Sparkle/SUUpdaterDelegate.h>
 #endif
 
 @class SUAppcastItem, SUAppcast, NSMenuItem;
@@ -34,34 +34,38 @@
 /**
  The legacy API in Sparkle for controlling the update mechanism.
 
- This class is now deprecated and acts as a thin wrapper around `SPUUpdater` and `SPUStandardUserDriver`.
- 
- If you are migrating to Sparkle 2, use `SPUStandardUpdaterController` instead, or `SPUUpdater` if you need more control.
- */
-__deprecated_msg("Deprecated in Sparkle 2. Use SPUStandardUpdaterController instead, or SPUUpdater if you need more control.")
-SU_EXPORT @interface SUUpdater : NSObject
+ This class is now deprecated and acts as a thin wrapper around `SPUUpdater` and
+ `SPUStandardUserDriver`.
 
-@property (unsafe_unretained, nonatomic) IBOutlet id<SUUpdaterDelegate> delegate;
+ If you are migrating to Sparkle 2, use `SPUStandardUpdaterController` instead, or `SPUUpdater` if
+ you need more control.
+ */
+__deprecated_msg("Deprecated in Sparkle 2. Use SPUStandardUpdaterController instead, or SPUUpdater "
+                 "if you need more control.") SU_EXPORT @interface SUUpdater : NSObject
+
+@property(unsafe_unretained, nonatomic) IBOutlet id<SUUpdaterDelegate> delegate;
 
 /*!
  The shared updater for the main bundle.
- 
+
  This is equivalent to passing [NSBundle mainBundle] to SUUpdater::updaterForBundle:
  */
-+ (SUUpdater *)sharedUpdater;
++ (SUUpdater*)sharedUpdater;
 
 /*!
  The shared updater for a specified bundle.
- If an updater has already been initialized for the provided bundle, that shared instance will be returned.
+ If an updater has already been initialized for the provided bundle, that shared instance will be
+ returned.
  */
-+ (SUUpdater *)updaterForBundle:(NSBundle *)bundle;
++ (SUUpdater*)updaterForBundle:(NSBundle*)bundle;
 
 /*!
  Designated initializer for SUUpdater.
- 
- If an updater has already been initialized for the provided bundle, that shared instance will be returned.
+
+ If an updater has already been initialized for the provided bundle, that shared instance will be
+ returned.
  */
-- (instancetype)initForBundle:(NSBundle *)bundle;
+- (instancetype)initForBundle:(NSBundle*)bundle;
 
 /*!
  Explicitly checks for updates and displays a progress dialog while doing so.
@@ -78,7 +82,7 @@ SU_EXPORT @interface SUUpdater : NSObject
 /*!
  The menu item validation used for the -checkForUpdates: action
  */
-- (BOOL)validateMenuItem:(NSMenuItem *)menuItem;
+- (BOOL)validateMenuItem:(NSMenuItem*)menuItem;
 
 /*!
  Checks for updates, but does not display any UI unless an update is found.
@@ -102,7 +106,7 @@ SU_EXPORT @interface SUUpdater : NSObject
  The update schedule cycle will be reset in a short delay after the property's new value is set.
  This is to allow reverting this property without kicking off a schedule change immediately
  */
-@property (nonatomic) BOOL automaticallyChecksForUpdates;
+@property(nonatomic) BOOL automaticallyChecksForUpdates;
 
 /*!
  A property indicating whether or not updates can be automatically downloaded in the background.
@@ -112,7 +116,7 @@ SU_EXPORT @interface SUUpdater : NSObject
 
  Setting this property will persist in the host bundle's user defaults.
  */
-@property (nonatomic) BOOL automaticallyDownloadsUpdates;
+@property(nonatomic) BOOL automaticallyDownloadsUpdates;
 
 /*!
  A property indicating the current automatic update check interval.
@@ -121,7 +125,7 @@ SU_EXPORT @interface SUUpdater : NSObject
  The update schedule cycle will be reset in a short delay after the property's new value is set.
  This is to allow reverting this property without kicking off a schedule change immediately
  */
-@property (nonatomic) NSTimeInterval updateCheckInterval;
+@property(nonatomic) NSTimeInterval updateCheckInterval;
 
 /*!
  Begins a "probing" check for updates which will not actually offer to
@@ -141,54 +145,58 @@ SU_EXPORT @interface SUUpdater : NSObject
 
  Setting this property will persist in the host bundle's user defaults.
  If you don't want persistence, you may want to consider instead implementing
- SUUpdaterDelegate::feedURLStringForUpdater: or SUUpdaterDelegate::feedParametersForUpdater:sendingSystemProfile:
+ SUUpdaterDelegate::feedURLStringForUpdater: or
+ SUUpdaterDelegate::feedParametersForUpdater:sendingSystemProfile:
 
  This property must be called on the main thread.
  */
-@property (nonatomic, copy) NSURL *feedURL;
+@property(nonatomic, copy) NSURL* feedURL;
 
 /*!
  The host bundle that is being updated.
  */
-@property (readonly, nonatomic) NSBundle *hostBundle;
+@property(readonly, nonatomic) NSBundle* hostBundle;
 
 /*!
  The bundle this class (SUUpdater) is loaded into.
  */
-@property (nonatomic, readonly) NSBundle *sparkleBundle;
+@property(nonatomic, readonly) NSBundle* sparkleBundle;
 
 /*!
  The user agent used when checking for and downloading updates.
 
  The default implementation can be overridden.
  */
-@property (nonatomic, copy) NSString *userAgentString;
+@property(nonatomic, copy) NSString* userAgentString;
 
 /*!
  The HTTP headers used when checking for and downloading updates.
 
- The keys of this dictionary are HTTP header fields (NSString) and values are corresponding values (NSString)
+ The keys of this dictionary are HTTP header fields (NSString) and values are corresponding values
+ (NSString)
  */
-@property (copy, nonatomic) NSDictionary<NSString *, NSString *> *httpHeaders;
+@property(copy, nonatomic) NSDictionary<NSString*, NSString*>* httpHeaders;
 
 /*!
- A property indicating whether or not the user's system profile information is sent when checking for updates.
+ A property indicating whether or not the user's system profile information is sent when checking
+ for updates.
 
  Setting this property will persist in the host bundle's user defaults.
  */
-@property (nonatomic) BOOL sendsSystemProfile;
+@property(nonatomic) BOOL sendsSystemProfile;
 
 /*!
- A property indicating the decryption password used for extracting updates shipped as Apple Disk Images (dmg)
+ A property indicating the decryption password used for extracting updates shipped as Apple Disk
+ Images (dmg)
  */
-@property (nonatomic, copy) NSString *decryptionPassword;
+@property(nonatomic, copy) NSString* decryptionPassword;
 
 /*!
  Returns the date of last update check.
 
  \returns \c nil if no check has been performed.
  */
-@property (nonatomic, readonly, copy) NSDate *lastUpdateCheckDate;
+@property(nonatomic, readonly, copy) NSDate* lastUpdateCheckDate;
 
 /*!
  Appropriately schedules or cancels the update checking timer according to
@@ -205,7 +213,7 @@ SU_EXPORT @interface SUUpdater : NSObject
  Note this property is not indicative of whether or not user initiated updates can be performed.
  Use SUUpdater::validateMenuItem: for that instead.
  */
-@property (nonatomic, readonly) BOOL updateInProgress;
+@property(nonatomic, readonly) BOOL updateInProgress;
 
 @end
 

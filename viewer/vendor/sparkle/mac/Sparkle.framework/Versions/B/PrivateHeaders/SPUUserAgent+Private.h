@@ -22,8 +22,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class SUHost;
 
-SU_EXPORT NSString *SPUMakeUserAgentWithHost(SUHost *responsibleHost, NSString * _Nullable displayNameSuffix);
+SU_EXPORT NSString* SPUMakeUserAgentWithHost(SUHost* responsibleHost,
+                                             NSString* _Nullable displayNameSuffix);
 
-SU_EXPORT NSString *SPUMakeUserAgentWithBundle(NSBundle *responsibleBundle, NSString * _Nullable displayNameSuffix);
+SU_EXPORT NSString* SPUMakeUserAgentWithBundle(NSBundle* responsibleBundle,
+                                               NSString* _Nullable displayNameSuffix);
 
 NS_ASSUME_NONNULL_END

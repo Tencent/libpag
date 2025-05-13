@@ -28,7 +28,6 @@
 
 #include <stddef.h>
 #include <time.h>
-
 #include "winsparkle-version.h"
 
 #if !defined(BUILDING_WIN_SPARKLE) && defined(_MSC_VER)
@@ -40,16 +39,14 @@ extern "C" {
 #endif
 
 #ifdef BUILDING_WIN_SPARKLE
-    #define WIN_SPARKLE_API __declspec(dllexport)
+#define WIN_SPARKLE_API __declspec(dllexport)
 #else
-    #define WIN_SPARKLE_API __declspec(dllimport)
+#define WIN_SPARKLE_API __declspec(dllimport)
 #endif
-
 
 /// Return value for boolean functions to indicate unexpected error.
 /// Only used by functions or callbacks that are explicitly documented as using it.
 #define WINSPARKLE_RETURN_ERROR (-1)
-
 
 /*--------------------------------------------------------------------------*
                        Initialization and shutdown
@@ -85,7 +82,6 @@ WIN_SPARKLE_API void __cdecl win_sparkle_cleanup();
 
 //@}
 
-
 /*--------------------------------------------------------------------------*
                              Language settings
 *--------------------------------------------------------------------------*/
@@ -112,7 +108,7 @@ detects the UI language automatically.
 
     @see win_sparkle_set_langid()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_lang(const char *lang);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_lang(const char* lang);
 
 /**
     Sets UI language from its Win32 LANGID code.
@@ -164,7 +160,7 @@ WIN_SPARKLE_API void __cdecl win_sparkle_set_langid(unsigned short lang);
     @note See https://github.com/vslavik/winsparkle/wiki/Appcast-Feeds for
           more information about appcast feeds.
  */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_appcast_url(const char *url);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_appcast_url(const char* url);
 
 /**
     Sets DSA public key.
@@ -183,7 +179,7 @@ WIN_SPARKLE_API void __cdecl win_sparkle_set_appcast_url(const char *url);
 
     @since 0.6.0
  */
-WIN_SPARKLE_API int __cdecl win_sparkle_set_dsa_pub_pem(const char *dsa_pub_pem);
+WIN_SPARKLE_API int __cdecl win_sparkle_set_dsa_pub_pem(const char* dsa_pub_pem);
 
 /**
     Sets application metadata.
@@ -205,9 +201,9 @@ WIN_SPARKLE_API int __cdecl win_sparkle_set_dsa_pub_pem(const char *dsa_pub_pem)
 
     @see win_sparkle_set_app_build_version();
  */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_app_details(const wchar_t *company_name,
-                                                         const wchar_t *app_name,
-                                                         const wchar_t *app_version);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_app_details(const wchar_t* company_name,
+                                                         const wchar_t* app_name,
+                                                         const wchar_t* app_version);
 
 /**
     Sets application build version number.
@@ -227,7 +223,7 @@ WIN_SPARKLE_API void __cdecl win_sparkle_set_app_details(const wchar_t *company_
 
     @see win_sparkle_set_app_details()
  */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_app_build_version(const wchar_t *build);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_app_build_version(const wchar_t* build);
 
 /**
     Set custom HTTP header for appcast checks.
@@ -236,7 +232,7 @@ WIN_SPARKLE_API void __cdecl win_sparkle_set_app_build_version(const wchar_t *bu
 
     @see win_sparkle_clear_http_headers()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_http_header(const char *name, const char *value);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_http_header(const char* name, const char* value);
 
 /**
     Clears all custom HTTP headers previously added using
@@ -266,20 +262,19 @@ WIN_SPARKLE_API void __cdecl win_sparkle_clear_http_headers();
 
     @since 0.3
  */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_registry_path(const char *path);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_registry_path(const char* path);
 
 /// Type used to override WinSparkle configuration's read, write and delete functions
 typedef struct win_sparkle_config_methods_tag {
-    /// Copy config value named @a name to the buffer pointed by @a buf, returns TRUE on success, FALSE on failure
-    int(__cdecl *config_read)(const char *name, wchar_t *buf, size_t len, void *user_data);
-    /// Write @a value as config value @a name 's new value
-    void(__cdecl *config_write)(const char *name, const wchar_t *value, void *user_data);
-    /// Delete config value named @a name
-    void(__cdecl *config_delete)(const char *name, void *user_data);
-    /// Arbitrary data which will be passed to the above functions, WinSparkle will not read or alter it.
-    void *user_data;
+  /// Copy config value named @a name to the buffer pointed by @a buf, returns TRUE on success, FALSE on failure
+  int(__cdecl* config_read)(const char* name, wchar_t* buf, size_t len, void* user_data);
+  /// Write @a value as config value @a name 's new value
+  void(__cdecl* config_write)(const char* name, const wchar_t* value, void* user_data);
+  /// Delete config value named @a name
+  void(__cdecl* config_delete)(const char* name, void* user_data);
+  /// Arbitrary data which will be passed to the above functions, WinSparkle will not read or alter it.
+  void* user_data;
 } win_sparkle_config_methods_t;
-
 
 /**
     Override WinSparkle's configuration read, write and delete functions.
@@ -302,7 +297,8 @@ typedef struct win_sparkle_config_methods_tag {
 
     @since 0.7
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_config_methods(win_sparkle_config_methods_t *config_methods);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_config_methods(
+    win_sparkle_config_methods_t* config_methods);
 
 /**
     Sets whether updates are checked automatically or only through a manual call.
@@ -355,7 +351,7 @@ WIN_SPARKLE_API int __cdecl win_sparkle_get_update_check_interval();
 WIN_SPARKLE_API time_t __cdecl win_sparkle_get_last_check_time();
 
 /// Callback type for win_sparkle_error_callback()
-typedef void (__cdecl *win_sparkle_error_callback_t)();
+typedef void(__cdecl* win_sparkle_error_callback_t)();
 
 /**
     Set callback to be called when the updater encounters an error.
@@ -365,7 +361,7 @@ typedef void (__cdecl *win_sparkle_error_callback_t)();
 WIN_SPARKLE_API void __cdecl win_sparkle_set_error_callback(win_sparkle_error_callback_t callback);
 
 /// Callback type for win_sparkle_can_shutdown_callback()
-typedef int (__cdecl *win_sparkle_can_shutdown_callback_t)();
+typedef int(__cdecl* win_sparkle_can_shutdown_callback_t)();
 
 /**
     Set callback for querying the application if it can be closed.
@@ -383,11 +379,11 @@ typedef int (__cdecl *win_sparkle_can_shutdown_callback_t)();
 
     @see win_sparkle_set_shutdown_request_callback()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_can_shutdown_callback(win_sparkle_can_shutdown_callback_t callback);
-
+WIN_SPARKLE_API void __cdecl win_sparkle_set_can_shutdown_callback(
+    win_sparkle_can_shutdown_callback_t callback);
 
 /// Callback type for win_sparkle_shutdown_request_callback()
-typedef void (__cdecl *win_sparkle_shutdown_request_callback_t)();
+typedef void(__cdecl* win_sparkle_shutdown_request_callback_t)();
 
 /**
     Set callback for shutting down the application.
@@ -407,10 +403,11 @@ typedef void (__cdecl *win_sparkle_shutdown_request_callback_t)();
 
     @see win_sparkle_set_can_shutdown_callback()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_shutdown_request_callback(win_sparkle_shutdown_request_callback_t);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_shutdown_request_callback(
+    win_sparkle_shutdown_request_callback_t);
 
 /// Callback type for win_sparkle_did_find_update_callback()
-typedef void(__cdecl *win_sparkle_did_find_update_callback_t)();
+typedef void(__cdecl* win_sparkle_did_find_update_callback_t)();
 
 /**
     Set callback to be called when the updater did find an update.
@@ -424,10 +421,11 @@ typedef void(__cdecl *win_sparkle_did_find_update_callback_t)();
     @see win_sparkle_did_not_find_update_callback()
     @see win_sparkle_check_update_with_ui_and_install()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_did_find_update_callback(win_sparkle_did_find_update_callback_t callback);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_did_find_update_callback(
+    win_sparkle_did_find_update_callback_t callback);
 
 /// Callback type for win_sparkle_did_not_find_update_callback()
-typedef void (__cdecl *win_sparkle_did_not_find_update_callback_t)();
+typedef void(__cdecl* win_sparkle_did_not_find_update_callback_t)();
 
 /**
     Set callback to be called when the updater did not find an update.
@@ -441,10 +439,11 @@ typedef void (__cdecl *win_sparkle_did_not_find_update_callback_t)();
     @see win_sparkle_did_find_update_callback()
     @see win_sparkle_check_update_with_ui_and_install()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_did_not_find_update_callback(win_sparkle_did_not_find_update_callback_t callback);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_did_not_find_update_callback(
+    win_sparkle_did_not_find_update_callback_t callback);
 
 /// Callback type for win_sparkle_update_cancelled_callback()
-typedef void (__cdecl *win_sparkle_update_cancelled_callback_t)();
+typedef void(__cdecl* win_sparkle_update_cancelled_callback_t)();
 
 /**
     Set callback to be called when the user cancels an update, e.g.
@@ -459,7 +458,8 @@ typedef void (__cdecl *win_sparkle_update_cancelled_callback_t)();
 
     @see win_sparkle_check_update_with_ui_and_install(), win_sparkle_set_update_dismissed_callback()
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_update_cancelled_callback(win_sparkle_update_cancelled_callback_t callback);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_update_cancelled_callback(
+    win_sparkle_update_cancelled_callback_t callback);
 
 /// Callback type for win_sparkle_update_skipped_callback()
 typedef void(__cdecl* win_sparkle_update_skipped_callback_t)();
@@ -476,7 +476,8 @@ typedef void(__cdecl* win_sparkle_update_skipped_callback_t)();
 
     @since 0.8
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_update_skipped_callback(win_sparkle_update_skipped_callback_t callback);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_update_skipped_callback(
+    win_sparkle_update_skipped_callback_t callback);
 
 /// Callback type for win_sparkle_update_postponed_callback()
 typedef void(__cdecl* win_sparkle_update_postponed_callback_t)();
@@ -494,7 +495,8 @@ typedef void(__cdecl* win_sparkle_update_postponed_callback_t)();
 
     @since 0.8
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_update_postponed_callback(win_sparkle_update_postponed_callback_t callback);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_update_postponed_callback(
+    win_sparkle_update_postponed_callback_t callback);
 
 /// Callback type for win_sparkle_update_dismissed_callback()
 typedef void(__cdecl* win_sparkle_update_dismissed_callback_t)();
@@ -514,11 +516,11 @@ typedef void(__cdecl* win_sparkle_update_dismissed_callback_t)();
 
     @since 0.8
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_update_dismissed_callback(win_sparkle_update_dismissed_callback_t callback);
-
+WIN_SPARKLE_API void __cdecl win_sparkle_set_update_dismissed_callback(
+    win_sparkle_update_dismissed_callback_t callback);
 
 /// Callback type for win_sparkle_user_run_installer_callback()
-typedef int(__cdecl* win_sparkle_user_run_installer_callback_t)(const wchar_t *);
+typedef int(__cdecl* win_sparkle_user_run_installer_callback_t)(const wchar_t*);
 
 /**
     Set callback to be called when the update payload is
@@ -532,10 +534,10 @@ typedef int(__cdecl* win_sparkle_user_run_installer_callback_t)(const wchar_t *)
 
     @since 0.8
 */
-WIN_SPARKLE_API void __cdecl win_sparkle_set_user_run_installer_callback(win_sparkle_user_run_installer_callback_t callback);
+WIN_SPARKLE_API void __cdecl win_sparkle_set_user_run_installer_callback(
+    win_sparkle_user_run_installer_callback_t callback);
 
 //@}
-
 
 /*--------------------------------------------------------------------------*
                               Manual usage
@@ -614,4 +616,4 @@ WIN_SPARKLE_API void __cdecl win_sparkle_check_update_without_ui();
 }
 #endif
 
-#endif // _winsparkle_h_
+#endif  // _winsparkle_h_
