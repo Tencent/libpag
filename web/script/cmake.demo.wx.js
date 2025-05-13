@@ -11,6 +11,7 @@ process.argv.push("web");
 process.argv.push("-a");
 process.argv.push("wasm");
 process.argv.push("pag");
+require("./setup.emsdk.wx");
 require("../../build_pag");
 
 if (!fs.existsSync("../lib")) {
@@ -19,5 +20,5 @@ if (!fs.existsSync("../lib")) {
 if (!fs.existsSync("../wechat/lib")) {
     fs.mkdirSync("../wechat/lib", {recursive: true});
 }
-fs.copyFileSync("../src/wasm/libpag.wasm", "../lib/libpag.wasm")
+fs.copyFileSync("../src/wasm/libpag.wasm", "../wechat/lib/libpag.wasm")
 

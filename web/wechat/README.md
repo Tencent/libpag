@@ -46,16 +46,10 @@ Page({
 
 ``` javascript
 // index.js
-wx.createSelectorQuery()
-  .select('#pag')
-  .node()
-  .exec(async (res) => {
-    const canvas = res[0].node;
-    const buffer = await loadFileByRequest('https://pag.io/file/test.pag');
-    const pagFile = await this.PAG.PAGFile.load(buffer);
-    const pagView = await this.PAG.PAGView.init(pagFile, canvas);
-    pagView.play();
-  });
+const buffer = await loadFileByRequest('https://pag.io/file/test.pag');
+const pagFile = await this.PAG.PAGFile.load(buffer);
+const pagView = await this.PAG.PAGView.init(pagFile, 'pag'); // 建议传入wxml中定义的canvasId
+pagView.play();
 
 const loadFileByRequest = async (url) => {
   return new Promise((resolve) => {

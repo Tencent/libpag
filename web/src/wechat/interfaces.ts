@@ -13,6 +13,7 @@ export interface wx {
     compInst?: any,
   ) => OffscreenCanvas;
   getPerformance: () => Performance;
+  createSelectorQuery: () => SelectorQuery;
 }
 
 export interface FileSystemManager {
@@ -51,6 +52,7 @@ export interface VideoDecoder {
     callback: (...args: any[]) => any,
   ) => void;
 }
+
 /** 视频帧数据，若取不到则返回 null。当缓冲区为空的时候可能暂停取不到数据。 */
 export interface FrameDataOptions {
   /** 帧数据 */
@@ -73,8 +75,24 @@ export interface VideoDecoderStartOption {
 }
 
 export interface SystemInfo {
-  /** 客户端平台	 */
+  /** 客户端平台     */
   platform: 'ios' | 'android' | 'windows' | 'mac' | 'devtools';
   /** 设备像素比 */
   pixelRatio: number;
+}
+
+interface Fields {
+  node?: boolean;
+  size?: boolean;
+}
+
+interface NodesRef {
+  id: string;
+  fields: (fields: Fields) => SelectorQuery;
+}
+
+export interface SelectorQuery {
+  select: (selector: string) => NodesRef;
+  selectAll: (selector: string) => NodesRef;
+  exec: (callback?: (...args: any[]) => any) => NodesRef;
 }
