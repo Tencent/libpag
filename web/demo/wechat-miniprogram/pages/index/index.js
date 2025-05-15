@@ -53,7 +53,7 @@ Page({
     const time = wx.getPerformance().now();
     this.pagFile = await this.PAG.PAGFile.load(buffer);
     debugData = { ...debugData, decodeTime: wx.getPerformance().now() - time };
-    this.pagView = await this.PAG.PAGView.init(this.pagFile, canvas);
+    this.pagView = await this.PAG.PAGView.init(this.pagFile, canvas); // 自v4.4.29开始建议传入wxml中定义的canvasId
     this.updateDebugData(this.pagView);
     this.pagView.addListener('onAnimationUpdate', () => {
       this.updateDebugData(this.pagView);
