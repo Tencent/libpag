@@ -34,38 +34,9 @@ function isOffscreenCanvas(canvas: any): boolean {
   return false;
 }
 
-interface CanvasSize {
-  width: number;
-  height: number;
-}
-
 @destroyVerify
 @wasmAwaitRewind
 export class PAGView extends NativePAGView {
-  /**
-   * Get canvas element by canvas ID
-   *
-   * @param {string} canvasId - The ID of the canvas element to find
-   *
-   * @returns {Promise<HTMLCanvasElement | OffscreenCanvas | null>}
-   *          - Returns the found canvas element, or null if not found
-   */
-  public static getCanvasElementByCanvasId(canvasId: string): Promise<HTMLCanvasElement | OffscreenCanvas> {
-    return new Promise((resolve, reject) => {
-      const query = wx.createSelectorQuery();
-      query
-        .select(`#${canvasId}`)
-        .fields({ node: true, size: true })
-        .exec((res) => {
-          if (res[0] && res[0].node) {
-            resolve(res[0].node);
-          } else {
-            reject(new Error(`Cannot find Canvas element with ID ${canvasId}`));
-          }
-        });
-    });
-  }
-
   /**
    * Create pag view.
    * @param file pag file.
@@ -75,29 +46,18 @@ export class PAGView extends NativePAGView {
    */
   public static async init(
     file: PAGComposition,
-    canvas: HTMLCanvasElement | OffscreenCanvas | string,
+    canvas: HTMLCanvasElement | OffscreenCanvas,
     initOptions: PAGViewOptions = {},
   ): Promise<PAGView> {
-    let canvasElement: HTMLCanvasElement | OffscreenCanvas | null = null;
-    if (typeof canvas === 'string') {
-      canvasElement = await this.getCanvasElementByCanvasId(canvas);
-    } else {
-      canvasElement = canvas;
-    }
-    if (!canvasElement) throw new Error('Canvas is not found!');
-
     const pagPlayer = PAGModule.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer, canvasElement);
-    if (typeof canvas === 'string') {
-      pagView.canvasId = canvas;
-    }
+    const pagView = new PAGView(pagPlayer, canvas);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
-    await pagView.resetSize(pagView.pagViewOptions.useScale);
-    pagView.renderCanvas = RenderCanvas.from(canvasElement, { alpha: true });
+    pagView.resetSize(pagView.pagViewOptions.useScale);
+    pagView.renderCanvas = RenderCanvas.from(canvas, { alpha: true });
     pagView.renderCanvas.retain();
     pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
     pagView.frameRate = file.frameRate();
-    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, canvasElement.width, canvasElement.height);
+    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, canvas.width, canvas.height);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     pagView.setProgress(0);
@@ -113,8 +73,6 @@ export class PAGView extends NativePAGView {
     useScale: true,
   };
 
-  private canvasId = '';
-
   /**
    * Update size when changed canvas size.
    */
@@ -129,27 +87,7 @@ export class PAGView extends NativePAGView {
     this.pagSurface = pagSurface;
   }
 
-  public getCanvasCssSize(canvasId: string): Promise<CanvasSize> {
-    return new Promise((resolve) => {
-      wx.createSelectorQuery()
-        .select(`#${canvasId}`)
-        .fields({ node: true, size: true })
-        .exec((res) => {
-          resolve({
-            width: res[0]?.width || 0,
-            height: res[0]?.height || 0,
-          });
-        });
-    });
-  }
-
-  public async calculateDisplaySize(canvas: any) {
-    if (this.canvasId !== undefined && this.canvasId !== '') {
-      const canvasSize = await this.getCanvasCssSize(this.canvasId);
-      if (canvasSize.width !== 0 && canvasSize.height !== 0) {
-        return canvasSize;
-      }
-    }
+  public calculateDisplaySize(canvas: any) {
     if (canvas.displayWidth === undefined && canvas.displayHeight === undefined) {
       canvas.displayWidth = canvas.width;
       canvas.displayHeight = canvas.height;
@@ -219,14 +157,14 @@ export class PAGView extends NativePAGView {
     }
   }
 
-  protected override async resetSize(useScale = true) {
+  protected override resetSize(useScale = true) {
     if (!this.canvasElement) {
       throw new Error('Canvas element is not found!');
     }
     if (!useScale || isOffscreenCanvas(this.canvasElement)) {
       return;
     }
-    const displaySize = await this.calculateDisplaySize(this.canvasElement);
+    const displaySize = this.calculateDisplaySize(this.canvasElement);
     const dpr = wx.getSystemInfoSync().pixelRatio;
     this.canvasElement!.width = displaySize.width * dpr;
     this.canvasElement!.height = displaySize.height * dpr;
