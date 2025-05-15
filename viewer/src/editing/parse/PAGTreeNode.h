@@ -18,26 +18,35 @@
 
 #pragma once
 
-#if !defined(PAG_API)
-#if defined(PAG_DLL)
-#if defined(_MSC_VER)
-#define PAG_API __declspec(dllexport)
-#else
-#define PAG_API __attribute__((visibility("default")))
-#endif
-#else
-#define PAG_API
-#endif
-#endif
+#include <QVector>
 
-#if !defined(RTTR_AUTO_REGISTER_CLASS)
-#define RTTR_AUTO_REGISTER_CLASS
-#endif
+namespace pag {
 
-#if !defined(RTTR_SKIP_REGISTER_PROPERTY)
-#define RTTR_SKIP_REGISTER_PROPERTY
-#endif
+class PAGTreeNode {
+ public:
+  PAGTreeNode();
+  explicit PAGTreeNode(PAGTreeNode* parent);
+  ~PAGTreeNode();
 
-#if !defined(RTTR_REGISTER_FUNCTION_AS_PROPERTY)
-#define RTTR_REGISTER_FUNCTION_AS_PROPERTY(propertyName, function)
-#endif
+  PAGTreeNode* getChild(int row) const;
+  PAGTreeNode* getParent() const;
+  int getRow() const;
+  int getChildrenCount() const;
+  int getColumnCount() const;
+  QVariant getData(int column) const;
+  QString getName() const;
+  QString getValue() const;
+  void setName(QString name);
+  void setValue(QVariant value);
+  void setValue(QString value);
+  void setParent(PAGTreeNode* parent);
+  void appendChild(PAGTreeNode* child);
+
+ private:
+  QString name = "";
+  QString value = "";
+  PAGTreeNode* parent = nullptr;
+  QVector<PAGTreeNode*> children = {};
+};
+
+}  //  namespace pag

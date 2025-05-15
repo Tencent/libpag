@@ -16,28 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PAGTree.h"
+#include <QDebug>
+#include "editing/parse/PAGFileSerializer.h"
 
-#if !defined(PAG_API)
-#if defined(PAG_DLL)
-#if defined(_MSC_VER)
-#define PAG_API __declspec(dllexport)
-#else
-#define PAG_API __attribute__((visibility("default")))
-#endif
-#else
-#define PAG_API
-#endif
-#endif
+namespace pag {
 
-#if !defined(RTTR_AUTO_REGISTER_CLASS)
-#define RTTR_AUTO_REGISTER_CLASS
-#endif
+PAGTree::PAGTree() {
+  rootNode = std::make_unique<PAGTreeNode>(nullptr);
+  rootNode->setName("root");
+}
 
-#if !defined(RTTR_SKIP_REGISTER_PROPERTY)
-#define RTTR_SKIP_REGISTER_PROPERTY
-#endif
+PAGTree::~PAGTree() = default;
 
-#if !defined(RTTR_REGISTER_FUNCTION_AS_PROPERTY)
-#define RTTR_REGISTER_FUNCTION_AS_PROPERTY(propertyName, function)
-#endif
+void PAGTree::resetFile(const std::shared_ptr<File>& file) {
+  this->file = file;
+}
+
+PAGTreeNode* PAGTree::getRootNode() {
+  return rootNode.get();
+}
+
+void PAGTree::buildTree() {
+  if (file == nullptr) {
+    return;
+  }
+  rootNode = std::make_unique<PAGTreeNode>(nullptr);
+  rootNode->setName("root");
+  auto realRootNode = new PAGTreeNode(rootNode.get());
+  realRootNode->setName("file");
+  rootNode->appendChild(realRootNode);
+
+  PAGFileSerializer::serialize(file, realRootNode);
+}
+
+}  // namespace pag
