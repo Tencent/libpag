@@ -437,7 +437,7 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
                                               const std::vector<std::vector<GlyphHandle>>& lines,
                                               const TextDocument* textDocument) {
   float strokeWidth = textDocument->strokeWidth;
-  auto margin = textDocument->fontSize * 0.2f;
+  auto margin = textDocument->fontSize * 0.4f;
   if (margin < strokeWidth) {
     margin = strokeWidth;
   }
