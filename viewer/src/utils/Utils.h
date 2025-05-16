@@ -22,7 +22,7 @@
 
 namespace pag::Utils {
 
-int exportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
+int ExportAPNGFromPNGSequence(const std::string& outPath, const std::string& firstPNGPath,
                               int frameRate);
 
 }  // namespace pag::Utils

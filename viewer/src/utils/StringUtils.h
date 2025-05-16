@@ -22,11 +22,11 @@
 
 namespace pag::Utils {
 
-QString toQString(double num);
-QString toQString(int32_t num);
-QString toQString(int64_t num);
-QString getMemorySizeUnit(int64_t size);
-QString getMemorySizeNumString(int64_t size);
-std::string tagCodeToVersion(uint16_t tagCode);
+QString ToQString(double num);
+QString ToQString(int32_t num);
+QString ToQString(int64_t num);
+QString GetMemorySizeUnit(int64_t size);
+QString GetMemorySizeNumString(int64_t size);
+std::string TagCodeToVersion(uint16_t tagCode);
 
 }  // namespace pag::Utils

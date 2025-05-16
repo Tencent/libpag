@@ -119,7 +119,7 @@ void PAGPlayTask::startInternal() {
   releaseResource();
   Q_EMIT taskFinished(result, filePath);
   if (openAfterExport) {
-    Utils::openInFinder(filePath, true);
+    Utils::OpenInFinder(filePath, true);
   }
   workerThread.exit(0);
 }

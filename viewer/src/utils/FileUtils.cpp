@@ -24,7 +24,7 @@
 
 namespace pag::Utils {
 
-void openInFinder(const QString& path, bool select) {
+void OpenInFinder(const QString& path, bool select) {
   QFileInfo fileInfo(path);
   if (!fileInfo.exists()) {
     return;
@@ -37,7 +37,7 @@ void openInFinder(const QString& path, bool select) {
   }
 }
 
-bool deleteFile(const QString& path) {
+bool DeleteFile(const QString& path) {
   QFile file(path);
   if (!file.exists()) {
     return true;
@@ -45,7 +45,7 @@ bool deleteFile(const QString& path) {
   return file.remove();
 }
 
-bool deleteDir(const QString& path) {
+bool DeleteDir(const QString& path) {
   QDir dir(path);
   if (!dir.exists()) {
     return true;
@@ -59,7 +59,7 @@ bool deleteDir(const QString& path) {
         return false;
       }
     } else {
-      if (!deleteDir(fileInfo.absoluteFilePath())) {
+      if (!DeleteDir(fileInfo.absoluteFilePath())) {
         return false;
       }
     }
@@ -68,7 +68,7 @@ bool deleteDir(const QString& path) {
   return dir.rmdir(path);
 }
 
-bool makeDir(const QString& path, bool isDir) {
+bool MakeDir(const QString& path, bool isDir) {
   QString dirPath;
   QFileInfo fileInfo(path);
   if (isDir) {

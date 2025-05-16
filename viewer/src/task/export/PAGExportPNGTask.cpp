@@ -30,7 +30,7 @@ PAGExportPNGTask::PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QStr
     : PAGPlayTask(pagFile, filePath), exportFrame(exportFrame) {
   QString lowerFilePath = filePath.toLower();
   if (!lowerFilePath.endsWith(QString(".%1").arg(ExportPNGFileSuffix.c_str()))) {
-    Utils::makeDir(filePath);
+    Utils::MakeDir(filePath);
   }
 }
 

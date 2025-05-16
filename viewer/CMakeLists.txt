@@ -91,7 +91,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
 set(RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGRttr.hpp")
 execute_process(COMMAND bash -c "${CMAKE_CURRENT_SOURCE_DIR}/sync_deps.sh")
-execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
+execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
 
 # collects pag include directories.
 set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
