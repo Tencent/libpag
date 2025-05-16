@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include <QVector>
+#include <QString>
+#include <vector>
 
 namespace pag {
 
@@ -46,7 +47,7 @@ class PAGTreeNode {
   QString name = "";
   QString value = "";
   PAGTreeNode* parent = nullptr;
-  QVector<std::unique_ptr<PAGTreeNode>> children = {};
+  std::vector<std::unique_ptr<PAGTreeNode>> children = {};
 };
 
 }  //  namespace pag

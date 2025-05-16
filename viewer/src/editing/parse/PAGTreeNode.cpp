@@ -30,7 +30,7 @@ PAGTreeNode::~PAGTreeNode() {
 }
 
 PAGTreeNode* PAGTreeNode::getChild(int row) const {
-  if (row < 0 || row >= children.size()) {
+  if (row < 0 || static_cast<size_t>(row) >= children.size()) {
     return nullptr;
   }
   return children[row].get();
@@ -42,7 +42,7 @@ PAGTreeNode* PAGTreeNode::getParent() const {
 
 int PAGTreeNode::getRow() const {
   if (parent != nullptr) {
-    for (int i = 0; i < parent->children.size(); ++i) {
+    for (size_t i = 0; i < parent->children.size(); ++i) {
       if (parent->children[i].get() == this) {
         return i;
       }
@@ -144,7 +144,7 @@ void PAGTreeNode::setParent(PAGTreeNode* parent) {
 }
 
 void PAGTreeNode::appendChild(std::unique_ptr<PAGTreeNode> child) {
-  children.append(std::move(child));
+  children.push_back(std::move(child));
 }
 
 void PAGTreeNode::releaseChildren() {
