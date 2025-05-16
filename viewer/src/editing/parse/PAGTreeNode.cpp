@@ -21,7 +21,6 @@
 #include <QVariant>
 
 namespace pag {
-PAGTreeNode::PAGTreeNode() = default;
 
 PAGTreeNode::PAGTreeNode(PAGTreeNode* parent) : parent(parent) {
 }

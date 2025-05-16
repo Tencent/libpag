@@ -24,7 +24,6 @@ namespace pag {
 
 class PAGTreeNode {
  public:
-  PAGTreeNode();
   explicit PAGTreeNode(PAGTreeNode* parent);
   ~PAGTreeNode();
 

@@ -26,7 +26,6 @@ namespace pag {
 class PAGTree {
  public:
   PAGTree();
-  ~PAGTree();
 
   void resetFile(const std::shared_ptr<File>& file);
   PAGTreeNode* getRootNode();

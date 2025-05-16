@@ -22,19 +22,14 @@
 #include "pag/file.h"
 #include "rttr/type.h"
 
-namespace pag {
+namespace pag::FileSerializer {
 
-class PAGFileSerializer {
- public:
-  static void serialize(std::shared_ptr<File>& file, PAGTreeNode* node);
-  static void serializeInstance(const rttr::instance& item, PAGTreeNode* node);
-  static bool serializeVariant(const rttr::variant& value, PAGTreeNode* node);
-  static void serializeSequentialContainer(const rttr::variant_sequential_view& view,
-                                           PAGTreeNode* node);
-  static void serializeAssociativeContainer(const rttr::variant_associative_view& view,
-                                            PAGTreeNode* node);
-  static QString transformNumberToQString(const rttr::type& type, const rttr::variant& value);
-  static QString transformEnumToQString(const rttr::type& type, const rttr::variant& value);
-};
+void serialize(const std::shared_ptr<File>& file, PAGTreeNode* node);
+void serializeInstance(const rttr::instance& item, PAGTreeNode* node);
+void serializeVariant(const rttr::variant& value, PAGTreeNode* node);
+void serializeSequentialContainer(const rttr::variant_sequential_view& view, PAGTreeNode* node);
+void serializeAssociativeContainer(const rttr::variant_associative_view& view, PAGTreeNode* node);
+QString transformNumberToQString(const rttr::type& type, const rttr::variant& value);
+QString transformEnumToQString(const rttr::variant& value);
 
-}  //  namespace pag
+}  // namespace pag::FileSerializer

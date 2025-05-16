@@ -27,8 +27,6 @@ PAGTree::PAGTree() {
   rootNode->setName("root");
 }
 
-PAGTree::~PAGTree() = default;
-
 void PAGTree::resetFile(const std::shared_ptr<File>& file) {
   this->file = file;
 }
@@ -47,7 +45,7 @@ void PAGTree::buildTree() {
   realRootNode->setName("file");
   rootNode->appendChild(realRootNode);
 
-  PAGFileSerializer::serialize(file, realRootNode);
+  FileSerializer::serialize(file, realRootNode);
 }
 
 }  // namespace pag
