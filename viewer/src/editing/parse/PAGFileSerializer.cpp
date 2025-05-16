@@ -113,7 +113,8 @@ void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeN
   serializeInstance(value, node);
 }
 
-void serializeSequentialContainer(const rttr::variant_sequential_view& view, const std::shared_ptr<PAGTreeNode>& node) {
+void serializeSequentialContainer(const rttr::variant_sequential_view& view,
+                                  const std::shared_ptr<PAGTreeNode>& node) {
   int index = 0;
   auto wrappedType = getWrappedType(view.get_value_type().get_raw_type());
   node->setValue(QString(wrappedType.get_name().data()) + "[" + QString::number(view.get_size()) +
@@ -143,7 +144,8 @@ void serializeSequentialContainer(const rttr::variant_sequential_view& view, con
   }
 }
 
-void serializeAssociativeContainer(const rttr::variant_associative_view& view, const std::shared_ptr<PAGTreeNode>& node) {
+void serializeAssociativeContainer(const rttr::variant_associative_view& view,
+                                   const std::shared_ptr<PAGTreeNode>& node) {
   static const std::string_view key_name = "key";
   static const std::string_view value_name = "value";
 
