@@ -40,9 +40,9 @@ void PAGTree::buildTree() {
     return;
   }
   rootNode->releaseChildren();
-  auto realRootNode = std::make_shared<PAGTreeNode>(rootNode.get());
+  auto realRootNode = std::make_unique<PAGTreeNode>(rootNode.get());
   realRootNode->setName("file");
-  FileSerializer::serialize(file, realRootNode);
+  FileSerializer::Serialize(file, realRootNode);
   rootNode->appendChild(std::move(realRootNode));
 }
 

@@ -24,14 +24,14 @@
 
 namespace pag::FileSerializer {
 
-void serialize(const std::shared_ptr<File>& file, const std::shared_ptr<PAGTreeNode>& node);
-void serializeInstance(const rttr::instance& item, const std::shared_ptr<PAGTreeNode>& node);
-void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeNode>& node);
-void serializeSequentialContainer(const rttr::variant_sequential_view& view,
-                                  const std::shared_ptr<PAGTreeNode>& node);
-void serializeAssociativeContainer(const rttr::variant_associative_view& view,
-                                   const std::shared_ptr<PAGTreeNode>& node);
-QString transformNumberToQString(const rttr::type& type, const rttr::variant& value);
-QString transformEnumToQString(const rttr::variant& value);
+void Serialize(const std::shared_ptr<File>& file, const std::unique_ptr<PAGTreeNode>& node);
+void SerializeInstance(const rttr::instance& item, const std::unique_ptr<PAGTreeNode>& node);
+void SerializeVariant(const rttr::variant& value, const std::unique_ptr<PAGTreeNode>& node);
+void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
+                                  const std::unique_ptr<PAGTreeNode>& node);
+void SerializeAssociativeContainer(const rttr::variant_associative_view& view,
+                                   const std::unique_ptr<PAGTreeNode>& node);
+QString TransformNumberToQString(const rttr::type& type, const rttr::variant& value);
+QString TransformEnumToQString(const rttr::variant& value);
 
 }  // namespace pag::FileSerializer

@@ -35,12 +35,12 @@ auto getWrappedType(const rttr::type& type) {
   return type.is_wrapper() ? type.get_wrapped_type() : type;
 }
 
-void serialize(const std::shared_ptr<File>& file, const std::shared_ptr<PAGTreeNode>& node) {
+void Serialize(const std::shared_ptr<File>& file, const std::unique_ptr<PAGTreeNode>& node) {
   rttr::instance item = file;
-  serializeInstance(item, node);
+  SerializeInstance(item, node);
 }
 
-void serializeInstance(const rttr::instance& item, const std::shared_ptr<PAGTreeNode>& node) {
+void SerializeInstance(const rttr::instance& item, const std::unique_ptr<PAGTreeNode>& node) {
   rttr::instance object = getWrappedInstance(item);
   auto derivedType = object.get_derived_type();
   node->setValue(derivedType.get_name().data());
@@ -59,14 +59,14 @@ void serializeInstance(const rttr::instance& item, const std::shared_ptr<PAGTree
       continue;
     }
 
-    auto childNode = std::make_shared<PAGTreeNode>(node.get());
+    auto childNode = std::make_unique<PAGTreeNode>(node.get());
     childNode->setName(property.get_name().data());
-    serializeVariant(variant, childNode);
+    SerializeVariant(variant, childNode);
     node->appendChild(std::move(childNode));
   }
 }
 
-void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeNode>& node) {
+void SerializeVariant(const rttr::variant& value, const std::unique_ptr<PAGTreeNode>& node) {
   auto wrappedType = getWrappedType(value.get_type());
   bool isWrapped = wrappedType != value.get_type();
   auto realValue = isWrapped ? value.extract_wrapped_value() : value;
@@ -77,11 +77,11 @@ void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeN
   }
 
   if (wrappedType.is_arithmetic()) {
-    node->setValue(transformNumberToQString(wrappedType, realValue));
+    node->setValue(TransformNumberToQString(wrappedType, realValue));
     return;
   }
   if (wrappedType.is_enumeration()) {
-    node->setValue(transformEnumToQString(realValue));
+    node->setValue(TransformEnumToQString(realValue));
     return;
   }
   if (wrappedType == rttr::type::get<std::string>()) {
@@ -90,12 +90,12 @@ void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeN
   }
   if (value.is_sequential_container()) {
     node->setValue(wrappedType.get_name().to_string().c_str());
-    serializeSequentialContainer(value.create_sequential_view(), node);
+    SerializeSequentialContainer(value.create_sequential_view(), node);
     return;
   }
   if (value.is_associative_container()) {
     node->setValue(wrappedType.get_name().to_string().c_str());
-    serializeAssociativeContainer(value.create_associative_view(), node);
+    SerializeAssociativeContainer(value.create_associative_view(), node);
     return;
   }
 
@@ -110,33 +110,33 @@ void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeN
     return;
   }
   node->setValue(wrappedType.get_name().to_string().c_str());
-  serializeInstance(value, node);
+  SerializeInstance(value, node);
 }
 
-void serializeSequentialContainer(const rttr::variant_sequential_view& view,
-                                  const std::shared_ptr<PAGTreeNode>& node) {
+void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
+                                  const std::unique_ptr<PAGTreeNode>& node) {
   int index = 0;
   auto wrappedType = getWrappedType(view.get_value_type().get_raw_type());
   node->setValue(QString(wrappedType.get_name().data()) + "[" + QString::number(view.get_size()) +
                  "]");
   for (auto& item : view) {
-    auto childNode = std::make_shared<PAGTreeNode>(node.get());
+    auto childNode = std::make_unique<PAGTreeNode>(node.get());
     auto indexStr = QString::number(index);
     childNode->setName(indexStr);
     if (item.is_sequential_container()) {
       childNode->setValue("[]");
-      serializeSequentialContainer(item.create_sequential_view(), childNode);
+      SerializeSequentialContainer(item.create_sequential_view(), childNode);
     } else {
       auto wrappedValue = item.extract_wrapped_value();
       auto type = wrappedValue.get_type();
       if (type.is_arithmetic()) {
-        childNode->setValue(transformNumberToQString(type, wrappedValue));
+        childNode->setValue(TransformNumberToQString(type, wrappedValue));
       } else if (type.is_enumeration()) {
-        childNode->setValue(transformEnumToQString(wrappedValue));
+        childNode->setValue(TransformEnumToQString(wrappedValue));
       } else if (type == rttr::type::get<std::string>()) {
         childNode->setValue(wrappedValue.to_string().c_str());
       } else {
-        serializeInstance(wrappedValue, childNode);
+        SerializeInstance(wrappedValue, childNode);
       }
     }
     index++;
@@ -144,34 +144,34 @@ void serializeSequentialContainer(const rttr::variant_sequential_view& view,
   }
 }
 
-void serializeAssociativeContainer(const rttr::variant_associative_view& view,
-                                   const std::shared_ptr<PAGTreeNode>& node) {
+void SerializeAssociativeContainer(const rttr::variant_associative_view& view,
+                                   const std::unique_ptr<PAGTreeNode>& node) {
   static const std::string_view key_name = "key";
   static const std::string_view value_name = "value";
 
   if (view.is_key_only_type()) {
     for (auto& item : view) {
-      auto childNode = std::make_shared<PAGTreeNode>(node.get());
+      auto childNode = std::make_unique<PAGTreeNode>(node.get());
       childNode->setName(key_name.data());
-      serializeVariant(item, childNode);
+      SerializeVariant(item, childNode);
       node->appendChild(std::move(childNode));
     }
   } else {
     for (auto& item : view) {
-      auto keyNode = std::make_shared<PAGTreeNode>(node.get());
+      auto keyNode = std::make_unique<PAGTreeNode>(node.get());
       keyNode->setName(key_name.data());
-      serializeVariant(item.first, keyNode);
+      SerializeVariant(item.first, keyNode);
       node->appendChild(std::move(keyNode));
 
-      auto valueNode = std::make_shared<PAGTreeNode>(node.get());
+      auto valueNode = std::make_unique<PAGTreeNode>(node.get());
       valueNode->setName(value_name.data());
-      serializeVariant(item.second, valueNode);
+      SerializeVariant(item.second, valueNode);
       node->appendChild(std::move(valueNode));
     }
   }
 }
 
-QString transformNumberToQString(const rttr::type& type, const rttr::variant& value) {
+QString TransformNumberToQString(const rttr::type& type, const rttr::variant& value) {
   std::string result;
   if (type == rttr::type::get<bool>()) {
     return value.to_bool() ? "true" : "false";
@@ -210,10 +210,10 @@ QString transformNumberToQString(const rttr::type& type, const rttr::variant& va
     return QString::number(value.to_double());
   }
 
-  return "0";
+  return "";
 }
 
-QString transformEnumToQString(const rttr::variant& value) {
+QString TransformEnumToQString(const rttr::variant& value) {
   bool result = false;
   std::string str = value.to_string(&result);
   if (result) {

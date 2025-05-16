@@ -143,7 +143,7 @@ void PAGTreeNode::setParent(PAGTreeNode* parent) {
   this->parent = parent;
 }
 
-void PAGTreeNode::appendChild(std::shared_ptr<PAGTreeNode> child) {
+void PAGTreeNode::appendChild(std::unique_ptr<PAGTreeNode> child) {
   children.append(std::move(child));
 }
 

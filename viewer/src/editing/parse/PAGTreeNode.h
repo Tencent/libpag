@@ -39,7 +39,7 @@ class PAGTreeNode {
   void setValue(QVariant value);
   void setValue(QString value);
   void setParent(PAGTreeNode* parent);
-  void appendChild(std::shared_ptr<PAGTreeNode> child);
+  void appendChild(std::unique_ptr<PAGTreeNode> child);
   void releaseChildren();
 
  private:
