@@ -35,12 +35,12 @@ auto getWrappedType(const rttr::type& type) {
   return type.is_wrapper() ? type.get_wrapped_type() : type;
 }
 
-void serialize(const std::shared_ptr<File>& file, PAGTreeNode* node) {
+void serialize(const std::shared_ptr<File>& file, const std::shared_ptr<PAGTreeNode>& node) {
   rttr::instance item = file;
   serializeInstance(item, node);
 }
 
-void serializeInstance(const rttr::instance& item, PAGTreeNode* node) {
+void serializeInstance(const rttr::instance& item, const std::shared_ptr<PAGTreeNode>& node) {
   rttr::instance object = getWrappedInstance(item);
   auto derivedType = object.get_derived_type();
   node->setValue(derivedType.get_name().data());
@@ -59,14 +59,14 @@ void serializeInstance(const rttr::instance& item, PAGTreeNode* node) {
       continue;
     }
 
-    auto childNode = new PAGTreeNode(node);
+    auto childNode = std::make_shared<PAGTreeNode>(node.get());
     childNode->setName(property.get_name().data());
-    node->appendChild(childNode);
     serializeVariant(variant, childNode);
+    node->appendChild(std::move(childNode));
   }
 }
 
-void serializeVariant(const rttr::variant& value, PAGTreeNode* node) {
+void serializeVariant(const rttr::variant& value, const std::shared_ptr<PAGTreeNode>& node) {
   auto wrappedType = getWrappedType(value.get_type());
   bool isWrapped = wrappedType != value.get_type();
   auto realValue = isWrapped ? value.extract_wrapped_value() : value;
@@ -113,16 +113,15 @@ void serializeVariant(const rttr::variant& value, PAGTreeNode* node) {
   serializeInstance(value, node);
 }
 
-void serializeSequentialContainer(const rttr::variant_sequential_view& view, PAGTreeNode* node) {
+void serializeSequentialContainer(const rttr::variant_sequential_view& view, const std::shared_ptr<PAGTreeNode>& node) {
   int index = 0;
   auto wrappedType = getWrappedType(view.get_value_type().get_raw_type());
   node->setValue(QString(wrappedType.get_name().data()) + "[" + QString::number(view.get_size()) +
                  "]");
   for (auto& item : view) {
-    auto childNode = new PAGTreeNode(node);
+    auto childNode = std::make_shared<PAGTreeNode>(node.get());
     auto indexStr = QString::number(index);
     childNode->setName(indexStr);
-    node->appendChild(childNode);
     if (item.is_sequential_container()) {
       childNode->setValue("[]");
       serializeSequentialContainer(item.create_sequential_view(), childNode);
@@ -140,31 +139,32 @@ void serializeSequentialContainer(const rttr::variant_sequential_view& view, PAG
       }
     }
     index++;
+    node->appendChild(std::move(childNode));
   }
 }
 
-void serializeAssociativeContainer(const rttr::variant_associative_view& view, PAGTreeNode* node) {
+void serializeAssociativeContainer(const rttr::variant_associative_view& view, const std::shared_ptr<PAGTreeNode>& node) {
   static const std::string_view key_name = "key";
   static const std::string_view value_name = "value";
 
   if (view.is_key_only_type()) {
     for (auto& item : view) {
-      auto childNode = new PAGTreeNode(node);
+      auto childNode = std::make_shared<PAGTreeNode>(node.get());
       childNode->setName(key_name.data());
-      node->appendChild(childNode);
       serializeVariant(item, childNode);
+      node->appendChild(std::move(childNode));
     }
   } else {
     for (auto& item : view) {
-      auto keyNode = new PAGTreeNode(node);
+      auto keyNode = std::make_shared<PAGTreeNode>(node.get());
       keyNode->setName(key_name.data());
-      node->appendChild(keyNode);
       serializeVariant(item.first, keyNode);
+      node->appendChild(std::move(keyNode));
 
-      auto valueNode = new PAGTreeNode(node);
+      auto valueNode = std::make_shared<PAGTreeNode>(node.get());
       valueNode->setName(value_name.data());
-      node->appendChild(valueNode);
       serializeVariant(item.second, valueNode);
+      node->appendChild(std::move(valueNode));
     }
   }
 }

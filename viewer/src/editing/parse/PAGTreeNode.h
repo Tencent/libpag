@@ -39,13 +39,14 @@ class PAGTreeNode {
   void setValue(QVariant value);
   void setValue(QString value);
   void setParent(PAGTreeNode* parent);
-  void appendChild(PAGTreeNode* child);
+  void appendChild(std::shared_ptr<PAGTreeNode> child);
+  void releaseChildren();
 
  private:
   QString name = "";
   QString value = "";
   PAGTreeNode* parent = nullptr;
-  QVector<PAGTreeNode*> children = {};
+  QVector<std::shared_ptr<PAGTreeNode>> children = {};
 };
 
 }  //  namespace pag

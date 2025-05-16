@@ -26,14 +26,14 @@ PAGTreeNode::PAGTreeNode(PAGTreeNode* parent) : parent(parent) {
 }
 
 PAGTreeNode::~PAGTreeNode() {
-  qDeleteAll(children);
+  releaseChildren();
 }
 
 PAGTreeNode* PAGTreeNode::getChild(int row) const {
   if (row < 0 || row >= children.size()) {
     return nullptr;
   }
-  return children[row];
+  return children[row].get();
 }
 
 PAGTreeNode* PAGTreeNode::getParent() const {
@@ -42,7 +42,11 @@ PAGTreeNode* PAGTreeNode::getParent() const {
 
 int PAGTreeNode::getRow() const {
   if (parent != nullptr) {
-    return parent->children.indexOf(const_cast<PAGTreeNode*>(this));
+    for (int i = 0; i < parent->children.size(); ++i) {
+      if (parent->children[i].get() == this) {
+        return i;
+      }
+    }
   }
   return 0;
 }
@@ -139,8 +143,12 @@ void PAGTreeNode::setParent(PAGTreeNode* parent) {
   this->parent = parent;
 }
 
-void PAGTreeNode::appendChild(PAGTreeNode* child) {
-  children.append(child);
+void PAGTreeNode::appendChild(std::shared_ptr<PAGTreeNode> child) {
+  children.append(std::move(child));
+}
+
+void PAGTreeNode::releaseChildren() {
+  children.clear();
 }
 
 }  //  namespace pag

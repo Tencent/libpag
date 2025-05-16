@@ -39,13 +39,11 @@ void PAGTree::buildTree() {
   if (file == nullptr) {
     return;
   }
-  rootNode = std::make_unique<PAGTreeNode>(nullptr);
-  rootNode->setName("root");
-  auto realRootNode = new PAGTreeNode(rootNode.get());
+  rootNode->releaseChildren();
+  auto realRootNode = std::make_shared<PAGTreeNode>(rootNode.get());
   realRootNode->setName("file");
-  rootNode->appendChild(realRootNode);
-
   FileSerializer::serialize(file, realRootNode);
+  rootNode->appendChild(std::move(realRootNode));
 }
 
 }  // namespace pag
