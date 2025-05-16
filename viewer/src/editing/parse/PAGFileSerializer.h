@@ -24,13 +24,11 @@
 
 namespace pag::FileSerializer {
 
-void Serialize(const std::shared_ptr<File>& file, const std::unique_ptr<PAGTreeNode>& node);
-void SerializeInstance(const rttr::instance& item, const std::unique_ptr<PAGTreeNode>& node);
-void SerializeVariant(const rttr::variant& value, const std::unique_ptr<PAGTreeNode>& node);
-void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
-                                  const std::unique_ptr<PAGTreeNode>& node);
-void SerializeAssociativeContainer(const rttr::variant_associative_view& view,
-                                   const std::unique_ptr<PAGTreeNode>& node);
+void Serialize(const std::shared_ptr<File>& file, PAGTreeNode* node);
+void SerializeInstance(const rttr::instance& item, PAGTreeNode* node);
+void SerializeVariant(const rttr::variant& value, PAGTreeNode* node);
+void SerializeSequentialContainer(const rttr::variant_sequential_view& view, PAGTreeNode* node);
+void SerializeAssociativeContainer(const rttr::variant_associative_view& view, PAGTreeNode* node);
 QString TransformNumberToQString(const rttr::type& type, const rttr::variant& value);
 QString TransformEnumToQString(const rttr::variant& value);
 

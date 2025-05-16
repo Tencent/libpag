@@ -42,7 +42,7 @@ void PAGTree::buildTree() {
   rootNode->releaseChildren();
   auto realRootNode = std::make_unique<PAGTreeNode>(rootNode.get());
   realRootNode->setName("file");
-  FileSerializer::Serialize(file, realRootNode);
+  FileSerializer::Serialize(file, realRootNode.get());
   rootNode->appendChild(std::move(realRootNode));
 }
 

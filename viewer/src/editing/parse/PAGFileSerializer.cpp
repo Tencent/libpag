@@ -35,12 +35,12 @@ auto getWrappedType(const rttr::type& type) {
   return type.is_wrapper() ? type.get_wrapped_type() : type;
 }
 
-void Serialize(const std::shared_ptr<File>& file, const std::unique_ptr<PAGTreeNode>& node) {
+void Serialize(const std::shared_ptr<File>& file, PAGTreeNode* node) {
   rttr::instance item = file;
   SerializeInstance(item, node);
 }
 
-void SerializeInstance(const rttr::instance& item, const std::unique_ptr<PAGTreeNode>& node) {
+void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
   rttr::instance object = getWrappedInstance(item);
   auto derivedType = object.get_derived_type();
   node->setValue(derivedType.get_name().data());
@@ -59,14 +59,14 @@ void SerializeInstance(const rttr::instance& item, const std::unique_ptr<PAGTree
       continue;
     }
 
-    auto childNode = std::make_unique<PAGTreeNode>(node.get());
+    auto childNode = std::make_unique<PAGTreeNode>(node);
     childNode->setName(property.get_name().data());
-    SerializeVariant(variant, childNode);
+    SerializeVariant(variant, childNode.get());
     node->appendChild(std::move(childNode));
   }
 }
 
-void SerializeVariant(const rttr::variant& value, const std::unique_ptr<PAGTreeNode>& node) {
+void SerializeVariant(const rttr::variant& value, PAGTreeNode* node) {
   auto wrappedType = getWrappedType(value.get_type());
   bool isWrapped = wrappedType != value.get_type();
   auto realValue = isWrapped ? value.extract_wrapped_value() : value;
@@ -113,19 +113,18 @@ void SerializeVariant(const rttr::variant& value, const std::unique_ptr<PAGTreeN
   SerializeInstance(value, node);
 }
 
-void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
-                                  const std::unique_ptr<PAGTreeNode>& node) {
+void SerializeSequentialContainer(const rttr::variant_sequential_view& view, PAGTreeNode* node) {
   int index = 0;
   auto wrappedType = getWrappedType(view.get_value_type().get_raw_type());
   node->setValue(QString(wrappedType.get_name().data()) + "[" + QString::number(view.get_size()) +
                  "]");
   for (auto& item : view) {
-    auto childNode = std::make_unique<PAGTreeNode>(node.get());
+    auto childNode = std::make_unique<PAGTreeNode>(node);
     auto indexStr = QString::number(index);
     childNode->setName(indexStr);
     if (item.is_sequential_container()) {
       childNode->setValue("[]");
-      SerializeSequentialContainer(item.create_sequential_view(), childNode);
+      SerializeSequentialContainer(item.create_sequential_view(), childNode.get());
     } else {
       auto wrappedValue = item.extract_wrapped_value();
       auto type = wrappedValue.get_type();
@@ -136,7 +135,7 @@ void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
       } else if (type == rttr::type::get<std::string>()) {
         childNode->setValue(wrappedValue.to_string().c_str());
       } else {
-        SerializeInstance(wrappedValue, childNode);
+        SerializeInstance(wrappedValue, childNode.get());
       }
     }
     index++;
@@ -144,28 +143,27 @@ void SerializeSequentialContainer(const rttr::variant_sequential_view& view,
   }
 }
 
-void SerializeAssociativeContainer(const rttr::variant_associative_view& view,
-                                   const std::unique_ptr<PAGTreeNode>& node) {
+void SerializeAssociativeContainer(const rttr::variant_associative_view& view, PAGTreeNode* node) {
   static const std::string_view key_name = "key";
   static const std::string_view value_name = "value";
 
   if (view.is_key_only_type()) {
     for (auto& item : view) {
-      auto childNode = std::make_unique<PAGTreeNode>(node.get());
+      auto childNode = std::make_unique<PAGTreeNode>(node);
       childNode->setName(key_name.data());
-      SerializeVariant(item, childNode);
+      SerializeVariant(item, childNode.get());
       node->appendChild(std::move(childNode));
     }
   } else {
     for (auto& item : view) {
-      auto keyNode = std::make_unique<PAGTreeNode>(node.get());
+      auto keyNode = std::make_unique<PAGTreeNode>(node);
       keyNode->setName(key_name.data());
-      SerializeVariant(item.first, keyNode);
+      SerializeVariant(item.first, keyNode.get());
       node->appendChild(std::move(keyNode));
 
-      auto valueNode = std::make_unique<PAGTreeNode>(node.get());
+      auto valueNode = std::make_unique<PAGTreeNode>(node);
       valueNode->setName(value_name.data());
-      SerializeVariant(item.second, valueNode);
+      SerializeVariant(item.second, valueNode.get());
       node->appendChild(std::move(valueNode));
     }
   }
