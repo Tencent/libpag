@@ -46,7 +46,7 @@ class PAGTreeNode {
   QString name = "";
   QString value = "";
   PAGTreeNode* parent = nullptr;
-  QVector<std::shared_ptr<PAGTreeNode>> children = {};
+  QVector<std::unique_ptr<PAGTreeNode>> children = {};
 };
 
 }  //  namespace pag
