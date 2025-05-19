@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "editing/parse/PAGTreeNode.h"
+#include "editing/serialize/PAGTreeNode.h"
 #include "pag/file.h"
 #include "rttr/type.h"
 

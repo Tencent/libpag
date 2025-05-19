@@ -170,7 +170,6 @@ void SerializeAssociativeContainer(const rttr::variant_associative_view& view, P
 }
 
 QString TransformNumberToQString(const rttr::type& type, const rttr::variant& value) {
-  std::string result;
   if (type == rttr::type::get<bool>()) {
     return value.to_bool() ? "true" : "false";
   }

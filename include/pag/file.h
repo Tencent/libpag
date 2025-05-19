@@ -2172,7 +2172,7 @@ class PAG_API Sequence {
   /**
    * The Composition which owns this Sequence.
    */
-  Composition* composition = nullptr;
+  Composition* RTTR_SKIP_REGISTER_PROPERTY composition = nullptr;
   /**
    * The width of the sequence.
    */

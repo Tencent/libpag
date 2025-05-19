@@ -41,7 +41,7 @@ class PAGTreeNode {
   void setValue(QString value);
   void setParent(PAGTreeNode* parent);
   void appendChild(std::unique_ptr<PAGTreeNode> child);
-  void releaseChildren();
+  void clear();
 
  private:
   QString name = "";

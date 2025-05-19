@@ -26,7 +26,7 @@ PAGTreeNode::PAGTreeNode(PAGTreeNode* parent) : parent(parent) {
 }
 
 PAGTreeNode::~PAGTreeNode() {
-  releaseChildren();
+  clear();
 }
 
 PAGTreeNode* PAGTreeNode::getChild(int row) const {
@@ -60,10 +60,6 @@ int PAGTreeNode::getColumnCount() const {
 }
 
 QVariant PAGTreeNode::getData(int column) const {
-  if (parent == nullptr) {
-    return {""};
-    ;
-  }
   if (column == 0) {
     QJsonObject json;
     json["name"] = name;
@@ -71,6 +67,10 @@ QVariant PAGTreeNode::getData(int column) const {
     valueStr = valueStr.replace("pag::", "");
     valueStr = valueStr.replace("<", "&lt;").replace(">", "&gt;");
     json["value"] = valueStr;
+
+    if (parent == nullptr) {
+      return {json};
+    }
 
     for (int i = 0; i < parent->getChildrenCount(); i++) {
       auto child = parent->getChild(i);
@@ -147,7 +147,7 @@ void PAGTreeNode::appendChild(std::unique_ptr<PAGTreeNode> child) {
   children.push_back(std::move(child));
 }
 
-void PAGTreeNode::releaseChildren() {
+void PAGTreeNode::clear() {
   children.clear();
 }
 

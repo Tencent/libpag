@@ -16,34 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGTree.h"
-#include <QDebug>
-#include "editing/parse/PAGFileSerializer.h"
+#pragma once
+
+#include "editing/serialize/PAGTreeNode.h"
+#include "pag/file.h"
 
 namespace pag {
 
-PAGTree::PAGTree() {
-  rootNode = std::make_unique<PAGTreeNode>(nullptr);
-  rootNode->setName("root");
-}
+class PAGTree {
+ public:
+  void resetFile(const std::shared_ptr<File>& file);
+  PAGTreeNode* getRootNode();
+  void buildTree();
 
-void PAGTree::resetFile(const std::shared_ptr<File>& file) {
-  this->file = file;
-}
-
-PAGTreeNode* PAGTree::getRootNode() {
-  return rootNode.get();
-}
-
-void PAGTree::buildTree() {
-  if (file == nullptr) {
-    return;
-  }
-  rootNode->releaseChildren();
-  auto realRootNode = std::make_unique<PAGTreeNode>(rootNode.get());
-  realRootNode->setName("file");
-  FileSerializer::Serialize(file, realRootNode.get());
-  rootNode->appendChild(std::move(realRootNode));
-}
+ private:
+  std::shared_ptr<File> file = nullptr;
+  std::unique_ptr<PAGTreeNode> rootNode = nullptr;
+};
 
 }  // namespace pag
