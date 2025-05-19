@@ -18,26 +18,20 @@
 
 #pragma once
 
-#if !defined(PAG_API)
-#if defined(PAG_DLL)
-#if defined(_MSC_VER)
-#define PAG_API __declspec(dllexport)
-#else
-#define PAG_API __attribute__((visibility("default")))
-#endif
-#else
-#define PAG_API
-#endif
-#endif
+#include "editing/serialize/PAGTreeNode.h"
+#include "pag/file.h"
 
-#if !defined(RTTR_AUTO_REGISTER_CLASS)
-#define RTTR_AUTO_REGISTER_CLASS
-#endif
+namespace pag {
 
-#if !defined(RTTR_SKIP_REGISTER_PROPERTY)
-#define RTTR_SKIP_REGISTER_PROPERTY
-#endif
+class PAGTree {
+ public:
+  void resetFile(const std::shared_ptr<File>& file);
+  PAGTreeNode* getRootNode();
+  void buildTree();
 
-#if !defined(RTTR_REGISTER_FUNCTION_AS_PROPERTY)
-#define RTTR_REGISTER_FUNCTION_AS_PROPERTY(propertyName, function)
-#endif
+ private:
+  std::shared_ptr<File> file = nullptr;
+  std::unique_ptr<PAGTreeNode> rootNode = nullptr;
+};
+
+}  // namespace pag

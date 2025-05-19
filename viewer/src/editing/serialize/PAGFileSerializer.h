@@ -18,26 +18,18 @@
 
 #pragma once
 
-#if !defined(PAG_API)
-#if defined(PAG_DLL)
-#if defined(_MSC_VER)
-#define PAG_API __declspec(dllexport)
-#else
-#define PAG_API __attribute__((visibility("default")))
-#endif
-#else
-#define PAG_API
-#endif
-#endif
+#include "editing/serialize/PAGTreeNode.h"
+#include "pag/file.h"
+#include "rttr/type.h"
 
-#if !defined(RTTR_AUTO_REGISTER_CLASS)
-#define RTTR_AUTO_REGISTER_CLASS
-#endif
+namespace pag::FileSerializer {
 
-#if !defined(RTTR_SKIP_REGISTER_PROPERTY)
-#define RTTR_SKIP_REGISTER_PROPERTY
-#endif
+void Serialize(const std::shared_ptr<File>& file, PAGTreeNode* node);
+void SerializeInstance(const rttr::instance& item, PAGTreeNode* node);
+void SerializeVariant(const rttr::variant& value, PAGTreeNode* node);
+void SerializeSequentialContainer(const rttr::variant_sequential_view& view, PAGTreeNode* node);
+void SerializeAssociativeContainer(const rttr::variant_associative_view& view, PAGTreeNode* node);
+QString TransformNumberToQString(const rttr::type& type, const rttr::variant& value);
+QString TransformEnumToQString(const rttr::variant& value);
 
-#if !defined(RTTR_REGISTER_FUNCTION_AS_PROPERTY)
-#define RTTR_REGISTER_FUNCTION_AS_PROPERTY(propertyName, function)
-#endif
+}  // namespace pag::FileSerializer
