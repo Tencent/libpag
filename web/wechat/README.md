@@ -53,7 +53,7 @@ wx.createSelectorQuery()
     const canvas = res[0].node;
     const buffer = await loadFileByRequest('https://pag.io/file/test.pag');
     const pagFile = await this.PAG.PAGFile.load(buffer);
-    const pagView = await this.PAG.PAGView.init(pagFile, canvas); // 自v4.4.29开始建议传入wxml中定义的canvasId
+    const pagView = await this.PAG.PAGView.init(pagFile, canvas);
     pagView.play();
   });
 
