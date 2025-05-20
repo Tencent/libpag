@@ -18,36 +18,32 @@
 
 #pragma once
 
-#include <QAbstractListModel>
+#include <QObject>
 #include "pag/pag.h"
 
 namespace pag {
-class PAGFileInfo {
- public:
-  explicit PAGFileInfo(const QString& name, const QString& value = "", const QString& unit = "");
 
-  QString name = "";
-  QString value = "";
-  QString unit = "";
-};
-
-class PAGFileInfoModel : public QAbstractListModel {
+class PAGEditAttributeModel : public QObject {
   Q_OBJECT
  public:
-  enum class PAGFileInfoRoles { NameRole = Qt::UserRole + 1, ValueRole, UnitRole };
+  explicit PAGEditAttributeModel(QObject* parent = nullptr);
 
-  PAGFileInfoModel();
-  explicit PAGFileInfoModel(QObject* parent);
+  Q_INVOKABLE QString getPAGFilePath();
+  Q_INVOKABLE QStringList getAttributeOptions(const QString& attributeName);
+  Q_INVOKABLE bool saveAttribute(int layerId, int markerIndex, const QString& attributeName,
+                                 const QString& attributeValue, const QString& savePath = "");
 
-  QVariant data(const QModelIndex& index, int role) const override;
-  int rowCount(const QModelIndex& parent) const override;
-  void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
-
- protected:
-  QHash<int, QByteArray> roleNames() const override;
+  Q_SLOT void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
 
  private:
-  std::vector<PAGFileInfo> fileInfos = {};
+  Layer* getLayerFromFile(const std::shared_ptr<File>& file, int layerId);
+  Composition* getCompositionFromFile(const std::shared_ptr<File>& file, int layerId);
+  Layer* getLayerFromPreComposition(int layerId, PreComposeLayer* preComposeLayer);
+  Composition* getCompositionFromPreComposition(int layerId, PreComposeLayer* preComposeLayer);
+
+ private:
+  QString filePath = "";
+  std::shared_ptr<PAGFile> pagFile = nullptr;
 };
 
 }  // namespace pag

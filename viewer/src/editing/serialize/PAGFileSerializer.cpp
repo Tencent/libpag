@@ -55,10 +55,6 @@ void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
     }
 
     rttr::variant variant = property.get_value(object);
-    if (variant == nullptr) {
-      continue;
-    }
-
     auto childNode = std::make_unique<PAGTreeNode>(node);
     childNode->setName(property.get_name().data());
     SerializeVariant(variant, childNode.get());

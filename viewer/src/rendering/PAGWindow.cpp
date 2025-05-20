@@ -49,9 +49,15 @@ void PAGWindow::onPAGViewerDestroyed() {
 void PAGWindow::open() {
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
+  treeViewModel = std::make_unique<PAGTreeViewModel>();
+  editAttributeModel = std::make_unique<PAGEditAttributeModel>();
+  runTimeModelManager = std::make_unique<PAGRunTimeModelManager>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
+  context->setContextProperty("treeViewModel", treeViewModel.get());
+  context->setContextProperty("editAttributeModel", editAttributeModel.get());
+  context->setContextProperty("runTimeModelManager", runTimeModelManager.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
@@ -65,15 +71,18 @@ void PAGWindow::open() {
 
   pagView = window->findChild<pag::PAGView*>("pagView");
   auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
-  auto* runTimeModelManager = window->findChild<PAGRunTimeModelManager*>("runTimeModelManager");
   PAGRenderThread* renderThread = pagView->getRenderThread();
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
   connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
-  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
-  connect(pagView, &PAGView::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
-  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager,
+  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::setFile);
+  connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
+  connect(pagView, &PAGView::fileChanged, editAttributeModel.get(),
+          &PAGEditAttributeModel::setFile);
+  connect(pagView, &PAGView::fileChanged, runTimeModelManager.get(),
+          &PAGRunTimeModelManager::setFile);
+  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager.get(),
           &PAGRunTimeModelManager::updateData);
 }
 

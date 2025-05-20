@@ -22,7 +22,7 @@
 
 namespace pag {
 
-void PAGTree::resetFile(const std::shared_ptr<File>& file) {
+void PAGTree::setFile(const std::shared_ptr<File>& file) {
   this->file = file;
 }
 

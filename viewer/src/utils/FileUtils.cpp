@@ -83,4 +83,26 @@ bool MakeDir(const QString& path, bool isDir) {
   return dir.mkpath(dirPath);
 }
 
+bool WriteFileToDisk(std::shared_ptr<File> file, QString filePath) {
+  size_t result = 0;
+  auto encodeByteData = pag::Codec::Encode(file);
+
+  FILE* fp = fopen(filePath.toStdString().c_str(), "wb");
+  if (fp == nullptr) {
+    return false;
+  }
+
+  result = fwrite(encodeByteData->data(), 1, encodeByteData->length(), fp);
+  if (result != encodeByteData->length()) {
+    fclose(fp);
+    return false;
+  }
+
+  result = fclose(fp);
+  if (result != 0) {
+    return false;
+  }
+  return true;
+}
+
 }  // namespace pag::Utils

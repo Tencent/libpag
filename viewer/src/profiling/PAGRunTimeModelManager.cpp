@@ -69,14 +69,14 @@ void PAGRunTimeModelManager::updateData(int64_t currentFrame, int64_t renderTime
   Q_EMIT dataChanged();
 }
 
-void PAGRunTimeModelManager::resetFile(const std::shared_ptr<PAGFile>& pagFile,
-                                       const std::string& filePath) {
+void PAGRunTimeModelManager::setFile(const std::shared_ptr<PAGFile>& pagFile,
+                                     const std::string& filePath) {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
   frameTimeMetricsVector.resize(totalFrame, {0, 0, 0});
   frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.clear();
-  fileInfoModel.resetFile(pagFile, filePath);
+  fileInfoModel.setFile(pagFile, filePath);
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT dataChanged();
 }

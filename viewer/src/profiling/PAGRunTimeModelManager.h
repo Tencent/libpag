@@ -62,7 +62,7 @@ class PAGRunTimeModelManager : public QObject {
   Q_SLOT void updateData(int64_t currentFrame, int64_t renderTime, int64_t presentTime,
                          int64_t imageDecodeTime);
 
-  void resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+  void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
 
  private:
   void updateFrameDisplayInfo(int64_t renderTime, int64_t presentTime, int64_t imageDecodeTime);
