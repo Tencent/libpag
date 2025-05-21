@@ -83,7 +83,7 @@ bool MakeDir(const QString& path, bool isDir) {
   return dir.mkpath(dirPath);
 }
 
-bool WriteFileToDisk(std::shared_ptr<File> file, QString filePath) {
+bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath) {
   size_t result = 0;
   auto encodeByteData = pag::Codec::Encode(file);
 

@@ -78,7 +78,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
 
-            model: runTimeModelManager ? runTimeModelManager.fileInfoModel : null
+            model: runTimeDataModel ? runTimeDataModel.fileInfoModel : null
 
             delegate: Item {
                 width: fileInfoView.cellWidth
@@ -204,7 +204,7 @@ Item {
                 anchors.fill: parent
                 spacing: 1
 
-                model: runTimeModelManager ? runTimeModelManager.frameDisplayInfoModel : null
+                model: runTimeDataModel ? runTimeDataModel.frameDisplayInfoModel : null
 
                 delegate: Item {
                     height: 20

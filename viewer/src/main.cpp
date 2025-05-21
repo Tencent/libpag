@@ -21,7 +21,7 @@
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include "PAGViewer.h"
-#include "profiling/PAGRunTimeModelManager.h"
+#include "profiling/PAGRunTimeDataModel.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
 

@@ -33,10 +33,10 @@ class FrameTimeMetrics {
   int64_t imageDecodeTime = 0;
 };
 
-class PAGRunTimeModelManager : public QObject {
+class PAGRunTimeDataModel : public QObject {
   Q_OBJECT
  public:
-  explicit PAGRunTimeModelManager(QObject* parent = nullptr);
+  explicit PAGRunTimeDataModel(QObject* parent = nullptr);
 
   Q_PROPERTY(QString totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
   Q_PROPERTY(

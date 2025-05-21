@@ -44,7 +44,10 @@ QVariant PAGTreeViewModel::data(const QModelIndex& index, int role) const {
     }
     case PAGTreeViewModelRoles::IsEditableKeyRole: {
       jsonObject = node->getData(0).value<QJsonObject>();
-      return jsonObject.value("IsEditableKey").toVariant();
+      if (jsonObject.contains("IsEditableKey")) {
+        return jsonObject.value("IsEditableKey").toVariant();
+      }
+      return {false};
     }
     case PAGTreeViewModelRoles::LayerIdKeyRole: {
       jsonObject = node->getData(0).value<QJsonObject>();

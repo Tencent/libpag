@@ -31,6 +31,6 @@ bool DeleteDir(const QString& path);
 
 bool MakeDir(const QString& path, bool isDir = true);
 
-bool WriteFileToDisk(std::shared_ptr<File> file, QString filePath);
+bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath);
 
 }  // namespace pag::Utils

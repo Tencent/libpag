@@ -20,7 +20,7 @@
 #include <QQmlContext>
 #include "PAGRenderThread.h"
 #include "PAGWindowHelper.h"
-#include "profiling/PAGRunTimeModelManager.h"
+#include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
 
 namespace pag {
@@ -50,14 +50,14 @@ void PAGWindow::open() {
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
   treeViewModel = std::make_unique<PAGTreeViewModel>();
+  runTimeDataModel = std::make_unique<PAGRunTimeDataModel>();
   editAttributeModel = std::make_unique<PAGEditAttributeModel>();
-  runTimeModelManager = std::make_unique<PAGRunTimeModelManager>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
   context->setContextProperty("treeViewModel", treeViewModel.get());
+  context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
-  context->setContextProperty("runTimeModelManager", runTimeModelManager.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
@@ -80,10 +80,9 @@ void PAGWindow::open() {
   connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
   connect(pagView, &PAGView::fileChanged, editAttributeModel.get(),
           &PAGEditAttributeModel::setFile);
-  connect(pagView, &PAGView::fileChanged, runTimeModelManager.get(),
-          &PAGRunTimeModelManager::setFile);
-  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager.get(),
-          &PAGRunTimeModelManager::updateData);
+  connect(pagView, &PAGView::fileChanged, runTimeDataModel.get(), &PAGRunTimeDataModel::setFile);
+  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
+          &PAGRunTimeDataModel::updateData);
 }
 
 QString PAGWindow::getFilePath() {

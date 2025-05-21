@@ -24,7 +24,7 @@
 #include "PAGWindowHelper.h"
 #include "editing/PAGEditAttributeModel.h"
 #include "editing/PAGTreeViewModel.h"
-#include "profiling/PAGRunTimeModelManager.h"
+#include "profiling/PAGRunTimeDataModel.h"
 
 namespace pag {
 class PAGWindow : public QObject {
@@ -50,8 +50,8 @@ class PAGWindow : public QObject {
   std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
   std::unique_ptr<PAGTreeViewModel> treeViewModel = nullptr;
+  std::unique_ptr<PAGRunTimeDataModel> runTimeDataModel = nullptr;
   std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
-  std::unique_ptr<PAGRunTimeModelManager> runTimeModelManager = nullptr;
 };
 
 }  // namespace pag
