@@ -73,16 +73,16 @@ void PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile,
   Q_UNUSED(filePath);
   beginResetModel();
   fileInfos.clear();
-  fileInfos.emplace_back("Duration", Utils::toQString(pagFile->duration() / 1000000.0), "s");
-  fileInfos.emplace_back("FrameRate", Utils::toQString(pagFile->frameRate()), "FPS");
-  fileInfos.emplace_back("Width", Utils::toQString(pagFile->width()));
-  fileInfos.emplace_back("Height", Utils::toQString(pagFile->height()));
+  fileInfos.emplace_back("Duration", Utils::ToQString(pagFile->duration() / 1000000.0), "s");
+  fileInfos.emplace_back("FrameRate", Utils::ToQString(pagFile->frameRate()), "FPS");
+  fileInfos.emplace_back("Width", Utils::ToQString(pagFile->width()));
+  fileInfos.emplace_back("Height", Utils::ToQString(pagFile->height()));
   auto memorySize = CalculateGraphicsMemory(pagFile->getFile());
-  fileInfos.emplace_back("Graphics", Utils::getMemorySizeNumString(memorySize),
-                         Utils::getMemorySizeUnit(memorySize));
-  fileInfos.emplace_back("Videos", Utils::toQString(pagFile->numVideos()));
-  fileInfos.emplace_back("Layers", Utils::toQString(pagFile->getFile()->numLayers()));
-  auto version = Utils::tagCodeToVersion(pagFile->tagLevel());
+  fileInfos.emplace_back("Graphics", Utils::GetMemorySizeNumString(memorySize),
+                         Utils::GetMemorySizeUnit(memorySize));
+  fileInfos.emplace_back("Videos", Utils::ToQString(pagFile->numVideos()));
+  fileInfos.emplace_back("Layers", Utils::ToQString(pagFile->getFile()->numLayers()));
+  auto version = Utils::TagCodeToVersion(pagFile->tagLevel());
   fileInfos.emplace_back("SDK Version", version.c_str());
   endResetModel();
 }

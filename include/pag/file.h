@@ -48,7 +48,7 @@ namespace pag {
  * The maximum number of type is 1023. It only allows to add new tag to the end before
  * TagCode::Count.
  */
-enum class TagCode {
+enum class RTTR_AUTO_REGISTER_CLASS TagCode {
   End = 0,
   FontTables = 1,
   VectorCompositionBlock = 2,
@@ -151,7 +151,7 @@ enum class TagCode {
   Count
 };
 
-struct Ratio {
+struct RTTR_AUTO_REGISTER_CLASS Ratio {
   float value() const {
     return static_cast<float>(numerator) / denominator;
   }
@@ -171,7 +171,7 @@ inline bool operator!=(const Ratio& left, const Ratio& right) {
 
 static constexpr Ratio DefaultRatio = {1, 1};
 
-enum class PathDataVerb { MoveTo, LineTo, CurveTo, Close };
+enum class RTTR_AUTO_REGISTER_CLASS PathDataVerb { MoveTo, LineTo, CurveTo, Close };
 
 /**
  * The Path object encapsulates information describing a path in a shape layer, or the outline path
@@ -209,7 +209,7 @@ enum class PAG_API KeyframeInterpolationType : uint8_t {
 };
 
 template <typename T>
-class Keyframe {
+class RTTR_AUTO_REGISTER_CLASS Keyframe {
  public:
   virtual ~Keyframe() = default;
 
@@ -239,7 +239,7 @@ class Keyframe {
  * The Property object contains value information about a particular AE property of a layer.
  */
 template <typename T>
-class Property {
+class RTTR_AUTO_REGISTER_CLASS Property {
  public:
   T value;
   Property() = default;
@@ -276,7 +276,7 @@ bool PAG_API HasVaryingTimeRange(const std::vector<TimeRange>* staticTimeRanges,
 TimeRange PAG_API GetTimeRangeContains(const std::vector<TimeRange>& timeRanges, Frame frame);
 
 template <typename T>
-class AnimatableProperty : public Property<T> {
+class RTTR_AUTO_REGISTER_CLASS AnimatableProperty : public Property<T> {
  public:
   explicit AnimatableProperty(const std::vector<Keyframe<T>*>& keyframes)
       : keyframes(keyframes), lastKeyframeIndex(0) {
@@ -423,7 +423,7 @@ class PAG_API MaskData {
   bool verify() const;
 };
 
-enum class EffectType {
+enum class RTTR_AUTO_REGISTER_CLASS EffectType {
   Unknown,
   Fill,
   MotionTile,
@@ -699,7 +699,7 @@ enum class PAG_API DisplacementMapSource : uint8_t {
   Off = 10
 };
 
-enum class DisplacementMapBehavior : uint8_t {
+enum class RTTR_AUTO_REGISTER_CLASS DisplacementMapBehavior : uint8_t {
   CenterMap = 0,
   StretchMapToFit = 1,
   TileMap = 2
@@ -728,7 +728,7 @@ class PAG_API DisplacementMapEffect : public Effect {
 
   bool verify() const override;
 
-  Layer* displacementMapLayer = nullptr;                   // ref layer
+  Layer* RTTR_SKIP_REGISTER_PROPERTY displacementMapLayer = nullptr;                   // ref layer
   Property<DisplacementMapSource>* useForHorizontalDisplacement = nullptr;
   Property<float>* maxHorizontalDisplacement = nullptr;
   Property<DisplacementMapSource>* useForVerticalDisplacement = nullptr;
@@ -875,9 +875,9 @@ class PAG_API HueSaturationEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay, OuterGlow };
+enum class RTTR_AUTO_REGISTER_CLASS LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay, OuterGlow };
 
-enum class LayerStylePosition { Above, Blow };
+enum class RTTR_AUTO_REGISTER_CLASS LayerStylePosition { Above, Blow };
 
 class PAG_API LayerStyle {
  public:
@@ -1321,7 +1321,7 @@ class PAG_API ShapeTransform {
   bool verify() const;
 };
 
-enum class ShapeType {
+enum class RTTR_AUTO_REGISTER_CLASS ShapeType {
   Unknown,
   ShapeGroup,
   Rectangle,
@@ -1758,9 +1758,9 @@ class PAG_API Layer {
   /**
    * The parent of this layer.
    */
-  Layer* parent = nullptr;  // layer reference
+  Layer* RTTR_SKIP_REGISTER_PROPERTY parent = nullptr;  // layer reference
 
-  VectorComposition* containingComposition = nullptr;  // composition reference
+  VectorComposition* RTTR_SKIP_REGISTER_PROPERTY containingComposition = nullptr;  // composition reference
 
   /**
    * The name of the layer.
@@ -1815,7 +1815,7 @@ class PAG_API Layer {
   std::vector<Marker*> markers;
   CachePolicy cachePolicy = CachePolicy::Auto;
 
-  Cache* cache = nullptr;
+  Cache* RTTR_SKIP_REGISTER_PROPERTY cache = nullptr;
   std::mutex locker = {};
 
   virtual void excludeVaryingRanges(std::vector<TimeRange>* timeRanges);
@@ -1985,7 +1985,7 @@ class PAG_API CameraLayer : public Layer {
 /**
  * Compositions are always one of the following types.
  */
-enum class CompositionType { Unknown, Vector, Bitmap, Video };
+enum class RTTR_AUTO_REGISTER_CLASS CompositionType { Unknown, Vector, Bitmap, Video };
 
 class PAG_API Composition {
  public:
@@ -2036,7 +2036,7 @@ class PAG_API Composition {
    * [FrameStart, FrameEnd(included)], [FrameStar, FrameEnd]...
    */
   std::vector<TimeRange> staticTimeRanges;
-  Cache* cache = nullptr;
+  Cache* RTTR_SKIP_REGISTER_PROPERTY cache = nullptr;
   std::mutex locker = {};
 
   bool staticContent() const;
@@ -2132,7 +2132,7 @@ class PAG_API ImageBytes {
 
   bool verify() const;
 
-  Cache* cache = nullptr;
+  Cache* RTTR_SKIP_REGISTER_PROPERTY cache = nullptr;
   std::mutex locker = {};
 
  private:
@@ -2172,7 +2172,7 @@ class PAG_API Sequence {
   /**
    * The Composition which owns this Sequence.
    */
-  Composition* composition = nullptr;
+  Composition* RTTR_SKIP_REGISTER_PROPERTY composition = nullptr;
   /**
    * The width of the sequence.
    */
@@ -2481,6 +2481,19 @@ class PAG_API File {
   std::vector<int>* editableImages = nullptr;
   std::vector<int>* editableTexts = nullptr;
   std::vector<PAGScaleMode>* imageScaleModes = nullptr;
+
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("duration", duration)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("frameRate", frameRate)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("width", width)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("height", height)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("tagLevel", tagLevel)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("backgroundColor", backgroundColor)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("numTexts", numTexts)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("numImages", numImages)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("numVideos", numVideos)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("numLayers", numLayers)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("rootLayer", getRootLayer)
+  RTTR_REGISTER_FUNCTION_AS_PROPERTY("hasScaledTimeRange", hasScaledTimeRange)
 
  private:
   PreComposeLayer* rootLayer = nullptr;

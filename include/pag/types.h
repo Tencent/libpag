@@ -48,7 +48,7 @@ inline Opacity PAG_API OpacityConcat(Opacity a, Opacity b) {
   return static_cast<Opacity>(a * b / 255);
 }
 
-struct Color {
+struct RTTR_AUTO_REGISTER_CLASS Color {
   uint8_t red, green, blue;  // in the range [0 - 255]
 };
 
@@ -69,7 +69,7 @@ static constexpr Color Blue = {0, 0, 255};
 /**
  * TimeRange represents a range of frames.
  */
-struct TimeRange {
+struct RTTR_AUTO_REGISTER_CLASS TimeRange {
   /**
    * The start frame of the time range, which is included.
    */
@@ -1375,7 +1375,7 @@ class PAG_API Matrix {
 /**
  * Layers are always one of the following types.
  */
-enum class LayerType {
+enum class RTTR_AUTO_REGISTER_CLASS LayerType {
   Unknown,
   Null,
   Solid,
@@ -1569,7 +1569,7 @@ typedef std::shared_ptr<TextDocument> TextDocumentHandle;
 /**
  * Marker stores comments and other metadata and mark important times in a composition or layer.
  */
-struct Marker {
+struct RTTR_AUTO_REGISTER_CLASS Marker {
   Frame startTime = 0;
   Frame duration = 0;
   std::string comment;
