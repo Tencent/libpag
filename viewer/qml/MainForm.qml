@@ -1,5 +1,6 @@
 import PAG
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Controls
 import "components"
 
@@ -28,7 +29,7 @@ SplitView {
 
     property alias centerItem: centerItem
 
-    property alias rightItem: rightItem
+    property alias rightItemLoader: rightItemLoader
 
     property alias controlForm: controlForm
     anchors.fill: parent
@@ -117,37 +118,148 @@ SplitView {
         }
     }
 
-    PAGRectangle {
-        id: rightItem
+    Loader {
+        id: rightItemLoader
+        active: isEditPanelOpen
         visible: isEditPanelOpen
+        width: minPanelWidth
         SplitView.minimumWidth: minPanelWidth
         SplitView.preferredWidth: minPanelWidth
-        color: "#16161d"
-        radius: 5
-        leftTopRadius: false
-        rightTopRadius: false
-        rightBottomRadius: false
-
-        PAGRectangle {
-            id: performance
-            color: "#16161D"
-            clip: true
-            anchors.top: parent.top
-            anchors.topMargin: 0
-            anchors.right: parent.right
-            anchors.rightMargin: 0
-            anchors.left: parent.left
-            anchors.leftMargin: 0
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 0
+        sourceComponent: PAGRectangle {
+            id: rightItem
+            visible: true
+            width: parent.width
+            height: parent.height
+            color: "#16161d"
             radius: 5
             leftTopRadius: false
             rightTopRadius: false
-            leftBottomRadius: false
+            rightBottomRadius: false
 
-            Profiler {
-                id: profilerForm
+            Column {
+                spacing: 0
+                height: parent.height
+                width: parent.height
                 anchors.fill: parent
+
+                Item {
+                    width: parent.width
+                    height: 1
+                }
+
+                TabBar {
+                    id: tabBar
+
+                    height: 38
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+
+                    background: Rectangle {
+                        color: "#16161D"
+                    }
+
+                    PAGTabButton {
+                        id: editLayerButton
+                        text: qsTr("Edit Layer")
+                    }
+
+                    PAGTabButton {
+                        id: fileStructureButton
+                        text: qsTr("File Structure")
+                    }
+
+                    PAGTabButton {
+                        id: spaceButton
+                        text: ""
+                        enabled: false
+                    }
+                }
+
+                StackLayout {
+                    id: tabContents
+
+                    currentIndex: tabBar.currentIndex
+
+                    height: parent.height - tabBar.height - performance.height
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+
+                    Rectangle {
+                        color: "#20202A"
+                        anchors.fill: tabContents.alignment
+                    }
+
+                    /* File Structure Area */
+                    Rectangle {
+                        color: "#20202A"
+                        anchors.fill: tabContents.alignment
+
+                        ScrollView {
+                            anchors.fill: parent
+                            clip: true
+
+                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                            ScrollBar.vertical.background: Rectangle {
+                                color: "#00000000"
+                            }
+                            ScrollBar.vertical.contentItem: Rectangle {
+                                implicitWidth: 9
+                                implicitHeight: 100
+                                color: "#00000000"
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 4
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 2
+                                    color: "#AA4B4B5A"
+                                }
+                            }
+
+                            TreeView {
+                                id: fileTreeView
+
+                                property int myCurrentRow: -1
+
+                                anchors.fill: parent
+                                model: treeViewModel
+                                delegate: FileTreeViewDelegate {
+                                    treeView: fileTreeView
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: 1
+                }
+
+                PAGRectangle {
+                    id: performance
+                    color: "#16161D"
+                    height: profilerForm.defaultHeight
+                    clip: true
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    radius: 5
+                    leftTopRadius: false
+                    rightTopRadius: false
+                    leftBottomRadius: false
+
+                    Profiler {
+                        id: profilerForm
+                        anchors.fill: parent
+                    }
+                }
             }
         }
     }

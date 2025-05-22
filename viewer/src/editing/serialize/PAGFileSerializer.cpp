@@ -17,13 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGFileSerializer.h"
+#include <PAGRttr.hpp>
 #include <QDebug>
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wextra-semi"
-#pragma clang diagnostic ignored "-Wdtor-name"
-#include "editing/rttr/PAGRttr.hpp"
-#pragma clang diagnostic pop
 
 namespace pag::FileSerializer {
 
@@ -55,10 +50,6 @@ void SerializeInstance(const rttr::instance& item, PAGTreeNode* node) {
     }
 
     rttr::variant variant = property.get_value(object);
-    if (variant == nullptr) {
-      continue;
-    }
-
     auto childNode = std::make_unique<PAGTreeNode>(node);
     childNode->setName(property.get_name().data());
     SerializeVariant(variant, childNode.get());

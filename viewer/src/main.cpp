@@ -21,7 +21,7 @@
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include "PAGViewer.h"
-#include "profiling/PAGRunTimeModelManager.h"
+#include "profiling/PAGRunTimeDataModel.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
 
@@ -63,7 +63,6 @@ int main(int argc, char* argv[]) {
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
-  qmlRegisterType<pag::PAGRunTimeModelManager>("PAG", 1, 0, "PAGRunTimeModelManager");
   app.openFile(filePath.data());
 
   return QApplication::exec();

@@ -121,4 +121,5 @@ elseif (WIN32)
 endif ()
 
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
+target_include_directories(PAGViewer SYSTEM PRIVATE ./src/editing/rttr)
 target_link_libraries(PAGViewer pag ${PAG_VIEWER_PLATFORM_LIBS} ${VIEWER_VENDOR_LIBRARIES})

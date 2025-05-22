@@ -20,7 +20,7 @@
 #include <QQmlContext>
 #include "PAGRenderThread.h"
 #include "PAGWindowHelper.h"
-#include "profiling/PAGRunTimeModelManager.h"
+#include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
 
 namespace pag {
@@ -49,9 +49,15 @@ void PAGWindow::onPAGViewerDestroyed() {
 void PAGWindow::open() {
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
+  treeViewModel = std::make_unique<PAGTreeViewModel>();
+  runTimeDataModel = std::make_unique<PAGRunTimeDataModel>();
+  editAttributeModel = std::make_unique<PAGEditAttributeModel>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
+  context->setContextProperty("treeViewModel", treeViewModel.get());
+  context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
+  context->setContextProperty("editAttributeModel", editAttributeModel.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
@@ -65,16 +71,18 @@ void PAGWindow::open() {
 
   pagView = window->findChild<pag::PAGView*>("pagView");
   auto* taskFactory = window->findChild<PAGTaskFactory*>("taskFactory");
-  auto* runTimeModelManager = window->findChild<PAGRunTimeModelManager*>("runTimeModelManager");
   PAGRenderThread* renderThread = pagView->getRenderThread();
 
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
   connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
-  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::resetFile);
-  connect(pagView, &PAGView::fileChanged, runTimeModelManager, &PAGRunTimeModelManager::resetFile);
-  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeModelManager,
-          &PAGRunTimeModelManager::updateData);
+  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::setFile);
+  connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
+  connect(pagView, &PAGView::fileChanged, editAttributeModel.get(),
+          &PAGEditAttributeModel::setFile);
+  connect(pagView, &PAGView::fileChanged, runTimeDataModel.get(), &PAGRunTimeDataModel::setFile);
+  connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
+          &PAGRunTimeDataModel::updateData);
 }
 
 QString PAGWindow::getFilePath() {

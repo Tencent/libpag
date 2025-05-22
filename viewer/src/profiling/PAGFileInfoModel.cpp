@@ -68,8 +68,8 @@ int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
   return static_cast<int>(fileInfos.size());
 }
 
-void PAGFileInfoModel::resetFile(const std::shared_ptr<PAGFile>& pagFile,
-                                 const std::string& filePath) {
+void PAGFileInfoModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
+                               const std::string& filePath) {
   Q_UNUSED(filePath);
   beginResetModel();
   fileInfos.clear();
