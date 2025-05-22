@@ -98,6 +98,13 @@ export class PAGView extends NativePAGView {
     };
   }
 
+  /**
+   * WeChat Mini Programs do not support capturing screenshots of WebGL Canvas.
+   */
+  public override makeSnapshot(): never {
+    throw new Error('WeChat Mini Programs do not support capturing screenshots of WebGL Canvas');
+  }
+
   protected override async flushLoop(force = false) {
     if (!this.isPlaying) return;
     this.setTimer();

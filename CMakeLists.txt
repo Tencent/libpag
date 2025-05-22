@@ -508,7 +508,7 @@ endif ()
 
 if (WEB)
     add_executable(pag ${PAG_FILES})
-    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='Hello2D' -sWASM=1 -sASYNCIFY
+    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1 -sASYNCIFY
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
             -sMODULARIZE=1 -sENVIRONMENT='web,worker' -sEXPORT_ES6=1)
     if (${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.4")
