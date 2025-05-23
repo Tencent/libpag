@@ -52,12 +52,14 @@ void PAGWindow::open() {
   treeViewModel = std::make_unique<PAGTreeViewModel>();
   runTimeDataModel = std::make_unique<PAGRunTimeDataModel>();
   editAttributeModel = std::make_unique<PAGEditAttributeModel>();
+  textLayerModel = std::make_unique<PAGTextLayerModel>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
   context->setContextProperty("treeViewModel", treeViewModel.get());
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
+  context->setContextProperty("textLayerModel", textLayerModel.get());
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
@@ -81,6 +83,7 @@ void PAGWindow::open() {
   connect(pagView, &PAGView::fileChanged, editAttributeModel.get(),
           &PAGEditAttributeModel::setFile);
   connect(pagView, &PAGView::fileChanged, runTimeDataModel.get(), &PAGRunTimeDataModel::setFile);
+  connect(pagView, &PAGView::fileChanged, textLayerModel.get(), &PAGTextLayerModel::setFile);
   connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
           &PAGRunTimeDataModel::updateData);
 }

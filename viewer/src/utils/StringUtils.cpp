@@ -24,7 +24,6 @@ namespace pag::Utils {
 QString ToQString(double num) {
   QString result;
   return result.setNum(num, 'f', 2);
-  ;
 }
 
 QString ToQString(int32_t num) {
@@ -83,6 +82,54 @@ std::string TagCodeToVersion(uint16_t tagCode) {
     }
   }
   return "Unknown";
+}
+
+pag::Color QStringToPAGColor(const QString& color) {
+  Color pagColor{};
+  auto strColor = color.toStdString();
+  auto strColor12 = strColor.substr(1, 2);
+  auto r = strColor12.c_str();
+  auto strColor34 = strColor.substr(3, 2);
+  auto g = strColor34.c_str();
+  auto strColor56 = strColor.substr(5, 2);
+  auto b = strColor56.c_str();
+
+  char* str;
+  uint8_t red = strtol(r, &str, 16);
+  uint8_t green = strtol(g, &str, 16);
+  uint8_t blue = strtol(b, &str, 16);
+  pagColor.red = red;
+  pagColor.green = green;
+  pagColor.blue = blue;
+  return pagColor;
+}
+
+QString PAGColorToQString(const Color& color) {
+  char R[10] = {0};
+  char G[10] = {0};
+  char B[10] = {0};
+  snprintf(R, 10, "%X", color.red);
+  snprintf(G, 10, "%X", color.green);
+  snprintf(B, 10, "%X", color.blue);
+
+  auto placeHolder = [](char* color) -> void {
+    if (color[1] == 0) {
+      color[1] = color[0];
+      color[0] = 48;
+    }
+  };
+
+  placeHolder(R);
+  placeHolder(G);
+  placeHolder(B);
+
+  QString qColor;
+  qColor.append("#");
+  qColor.append(R);
+  qColor.append(G);
+  qColor.append(B);
+
+  return qColor;
 }
 
 }  // namespace pag::Utils

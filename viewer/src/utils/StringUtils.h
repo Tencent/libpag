@@ -19,6 +19,7 @@
 #pragma once
 
 #include <QString>
+#include "pag/types.h"
 
 namespace pag::Utils {
 
@@ -28,5 +29,7 @@ QString ToQString(int64_t num);
 QString GetMemorySizeUnit(int64_t size);
 QString GetMemorySizeNumString(int64_t size);
 std::string TagCodeToVersion(uint16_t tagCode);
+Color QStringToPAGColor(const QString& color);
+QString PAGColorToQString(const Color& color);
 
 }  // namespace pag::Utils
