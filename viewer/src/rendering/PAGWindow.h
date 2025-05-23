@@ -23,6 +23,7 @@
 #include "PAGView.h"
 #include "PAGWindowHelper.h"
 #include "editing/PAGEditAttributeModel.h"
+#include "editing/PAGTextLayerModel.h"
 #include "editing/PAGTreeViewModel.h"
 #include "profiling/PAGRunTimeDataModel.h"
 
@@ -52,6 +53,7 @@ class PAGWindow : public QObject {
   std::unique_ptr<PAGTreeViewModel> treeViewModel = nullptr;
   std::unique_ptr<PAGRunTimeDataModel> runTimeDataModel = nullptr;
   std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
+  std::unique_ptr<PAGTextLayerModel> textLayerModel = nullptr;
 };
 
 }  // namespace pag
