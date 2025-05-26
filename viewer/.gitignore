@@ -1,0 +1,4 @@
+tools/*RttrAutoRegister*
+src/editing/rttr/
+build_*/
+cmake-build-*/
