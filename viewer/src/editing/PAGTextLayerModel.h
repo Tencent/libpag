@@ -67,7 +67,6 @@ class PAGTextLayerModel : public QAbstractListModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
  private:
-  void copyTextDocument(TextDocument* oldTextDocument, TextDocument* newTextDocument);
   bool compareTextDocument(TextDocument* oldTextDocument, TextDocument* newTextDocument);
 
  private:

@@ -65,7 +65,7 @@ void PAGTextLayerModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
   }
 
   beginResetModel();
-  for (auto layerIndex : editableList) {
+  for (const auto& layerIndex : editableList) {
     textLayers.append(pagFile->getTextData(layerIndex));
   }
   endResetModel();
@@ -78,9 +78,8 @@ void PAGTextLayerModel::revertText(int index) {
   pagFile->replaceText(convertIndex(index), nullptr);
   beginResetModel();
   revertSet.remove(index);
-  textLayers.removeAt(index);
   auto newTextDocument = pagFile->getTextData(convertIndex(index));
-  textLayers.insert(index, newTextDocument);
+  textLayers[index] = newTextDocument;
   endResetModel();
 }
 
@@ -108,7 +107,9 @@ QStringList PAGTextLayerModel::fontStyles(const QString& fontFamily) {
     return {};
   }
 
-  return QFontDatabase::styles(fontFamily);
+  auto styles = QFontDatabase::styles(fontFamily);
+  styles.removeDuplicates();
+  return styles;
 }
 
 bool PAGTextLayerModel::fauxBold(int index) {
@@ -287,7 +288,7 @@ void PAGTextLayerModel::recordTextDocument(int index) {
     return;
   }
   auto textDocument = textLayers.at(index);
-  copyTextDocument(textDocument.get(), &oldTextDocument);
+  oldTextDocument = *textDocument;
 }
 
 void PAGTextLayerModel::updateTextDocument(int index) {
@@ -312,7 +313,7 @@ void PAGTextLayerModel::revertTextDocument(int index) {
   }
 
   auto textDocument = textLayers.at(index);
-  copyTextDocument(&oldTextDocument, textDocument.get());
+  *textDocument = oldTextDocument;
 
   auto defaultTextDocument = pagFile->getTextData(convertIndex(index));
   if (compareTextDocument(defaultTextDocument.get(), textDocument.get())) {
@@ -332,58 +333,32 @@ QHash<int, QByteArray> PAGTextLayerModel::roleNames() const {
   return roles;
 }
 
-void PAGTextLayerModel::copyTextDocument(TextDocument* oldTextDocument,
-                                         TextDocument* newTextDocument) {
-  newTextDocument->text = oldTextDocument->text;
-  newTextDocument->fauxBold = oldTextDocument->fauxBold;
-  newTextDocument->fauxItalic = oldTextDocument->fauxItalic;
-  newTextDocument->fontSize = oldTextDocument->fontSize;
-  newTextDocument->fontFamily = oldTextDocument->fontFamily;
-  newTextDocument->fontStyle = oldTextDocument->fontStyle;
-  newTextDocument->fillColor = oldTextDocument->fillColor;
-  newTextDocument->strokeColor = oldTextDocument->strokeColor;
-  if (oldTextDocument->applyStroke) {
-    newTextDocument->applyStroke = true;
-    newTextDocument->strokeWidth = oldTextDocument->strokeWidth;
-  } else {
-    newTextDocument->applyStroke = false;
-    newTextDocument->strokeWidth = 0;
-  }
-}
-
 bool PAGTextLayerModel::compareTextDocument(TextDocument* oldTextDocument,
                                             TextDocument* newTextDocument) {
   if ((oldTextDocument == nullptr) || (newTextDocument == nullptr)) {
     return false;
   }
 
-  if (oldTextDocument->applyStroke != newTextDocument->applyStroke) {
-    return false;
-  }
-  if (oldTextDocument->strokeWidth != newTextDocument->strokeWidth) {
-    return false;
-  }
-  if (oldTextDocument->strokeColor != newTextDocument->strokeColor) {
-    return false;
-  }
-  if (oldTextDocument->fauxBold != newTextDocument->fauxBold) {
-    return false;
-  }
-  if (oldTextDocument->fauxItalic != newTextDocument->fauxItalic) {
-    return false;
-  }
-  if (oldTextDocument->text != newTextDocument->text) {
-    return false;
-  }
-  if (oldTextDocument->fontSize != newTextDocument->fontSize) {
-    return false;
-  }
-  if (oldTextDocument->fontFamily != newTextDocument->fontFamily) {
-    return false;
-  }
-  if (oldTextDocument->fontStyle != newTextDocument->fontStyle) {
-    return false;
-  }
+  return std::tie(
+             oldTextDocument->applyFill, oldTextDocument->applyStroke,
+             oldTextDocument->baselineShift, oldTextDocument->boxText, oldTextDocument->boxTextPos,
+             oldTextDocument->boxTextSize, oldTextDocument->firstBaseLine,
+             oldTextDocument->fauxBold, oldTextDocument->fauxItalic, oldTextDocument->fillColor,
+             oldTextDocument->fontFamily, oldTextDocument->fontStyle, oldTextDocument->fontSize,
+             oldTextDocument->strokeColor, oldTextDocument->strokeOverFill,
+             oldTextDocument->strokeWidth, oldTextDocument->text, oldTextDocument->justification,
+             oldTextDocument->leading, oldTextDocument->tracking, oldTextDocument->backgroundColor,
+             oldTextDocument->backgroundAlpha, oldTextDocument->direction) ==
+         std::tie(
+             newTextDocument->applyFill, newTextDocument->applyStroke,
+             newTextDocument->baselineShift, newTextDocument->boxText, newTextDocument->boxTextPos,
+             newTextDocument->boxTextSize, newTextDocument->firstBaseLine,
+             newTextDocument->fauxBold, newTextDocument->fauxItalic, newTextDocument->fillColor,
+             newTextDocument->fontFamily, newTextDocument->fontStyle, newTextDocument->fontSize,
+             newTextDocument->strokeColor, newTextDocument->strokeOverFill,
+             newTextDocument->strokeWidth, newTextDocument->text, newTextDocument->justification,
+             newTextDocument->leading, newTextDocument->tracking, newTextDocument->backgroundColor,
+             newTextDocument->backgroundAlpha, newTextDocument->direction);
 
   return true;
 }
