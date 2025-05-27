@@ -134,8 +134,8 @@ Popup {
                     height: parent.height
                     topInset: 0
                     bottomInset: 0
-                    model: textModel ? textModel.getFontFamilies() : null
-                    currentIndex: textModel ? textModel.getFontFamilies().indexOf(currentValue) : -1
+                    model: textModel ? textModel.fontFamilies() : null
+                    currentIndex: textModel ? textModel.fontFamilies().indexOf(currentValue) : -1
 
                     background: Rectangle {
                         color: "#16161D"
@@ -185,12 +185,12 @@ Popup {
                             onClicked: {
                                 fontFamilyName.text = modelData;
                                 fontStyleComboBox.currentFontFamily = modelData;
-                                let index = textModel.getFontStyles(modelData).indexOf(fontStyleName.text);
+                                let index = textModel.fontStyles(modelData).indexOf(fontStyleName.text);
                                 if (index >= 0) {
-                                    cbFontStyle.currentIndex = index;
+                                    fontStyleComboBox.currentIndex = index;
                                 } else {
-                                    cbFontStyle.currentIndex = 0;
-                                    fontStyleName.text = textModel.getFontStyles(modelData)[0];
+                                    fontStyleComboBox.currentIndex = 0;
+                                    fontStyleName.text = textModel.fontStyles(modelData)[0];
                                 }
                                 fontFamilyComboBox.currentIndex = fontFamilyComboBox.model.indexOf(modelData);
                                 textModel.changeFontFamily(layerIndex, modelData);
@@ -257,8 +257,8 @@ Popup {
                     height: parent.height
                     topInset: 0
                     bottomInset: 0
-                    model: textModel ? textModel.getFontStyles(currentFontFamily) : null
-                    currentIndex: textModel ? textModel.getFontStyles(currentFontFamily).indexOf(currentValue) : -1
+                    model: textModel ? textModel.fontStyles(currentFontFamily) : null
+                    currentIndex: textModel ? textModel.fontStyles(currentFontFamily).indexOf(currentValue) : -1
 
                     background: Rectangle {
                         color: "#16161D"

@@ -119,15 +119,15 @@ ListView {
                     onClicked: {
                         textModel.recordTextDocument(index);
                         textEditDialog.layerIndex = index;
-                        textEditDialog.fauxBold = textModel.getFauxBold(index);
-                        textEditDialog.fauxItalic = textModel.getFauxItalic(index);
-                        textEditDialog.strokeWidth = textModel.getStrokeWidth(index);
-                        textEditDialog.fillColor = textModel.getFillColor(index);
-                        textEditDialog.strokeColor = textModel.getStrokeColor(index);
-                        textEditDialog.fontSize = textModel.getFontSize(index);
-                        textEditDialog.fontFamily = textModel.getFontFamily(index);
-                        textEditDialog.fontStyle = textModel.getFontStyle(index);
-                        textEditDialog.displatText = textModel.getText(index);
+                        textEditDialog.fauxBold = textModel.fauxBold(index);
+                        textEditDialog.fauxItalic = textModel.fauxItalic(index);
+                        textEditDialog.strokeWidth = textModel.strokeWidth(index);
+                        textEditDialog.fillColor = textModel.fillColor(index);
+                        textEditDialog.strokeColor = textModel.strokeColor(index);
+                        textEditDialog.fontSize = textModel.fontSize(index);
+                        textEditDialog.fontFamily = textModel.fontFamily(index);
+                        textEditDialog.fontStyle = textModel.fontStyle(index);
+                        textEditDialog.displatText = textModel.text(index);
                         textEditDialog.open();
                     }
                 }

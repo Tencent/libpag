@@ -84,7 +84,7 @@ std::string TagCodeToVersion(uint16_t tagCode) {
   return "Unknown";
 }
 
-pag::Color QStringToPAGColor(const QString& color) {
+pag::Color QStringToColor(const QString& color) {
   Color pagColor{};
   auto strColor = color.toStdString();
   auto strColor12 = strColor.substr(1, 2);
@@ -104,32 +104,10 @@ pag::Color QStringToPAGColor(const QString& color) {
   return pagColor;
 }
 
-QString PAGColorToQString(const Color& color) {
-  char R[10] = {0};
-  char G[10] = {0};
-  char B[10] = {0};
-  snprintf(R, 10, "%X", color.red);
-  snprintf(G, 10, "%X", color.green);
-  snprintf(B, 10, "%X", color.blue);
-
-  auto placeHolder = [](char* color) -> void {
-    if (color[1] == 0) {
-      color[1] = color[0];
-      color[0] = 48;
-    }
-  };
-
-  placeHolder(R);
-  placeHolder(G);
-  placeHolder(B);
-
-  QString qColor;
-  qColor.append("#");
-  qColor.append(R);
-  qColor.append(G);
-  qColor.append(B);
-
-  return qColor;
+QString ColorToQString(const Color& color) {
+  char hexColor[8] = {0};
+  snprintf(hexColor, 8, "#%02X%02X%02X", color.red, color.green, color.blue);
+  return {hexColor};
 }
 
 }  // namespace pag::Utils

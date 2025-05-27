@@ -38,17 +38,17 @@ class PAGTextLayerModel : public QAbstractListModel {
   Q_INVOKABLE void revertText(int index);
   Q_INVOKABLE int convertIndex(int index);
 
-  Q_INVOKABLE QStringList getFontFamilies();
-  Q_INVOKABLE QStringList getFontStyles(const QString& fontFamily);
-  Q_INVOKABLE bool getFauxBold(int index);
-  Q_INVOKABLE bool getFauxItalic(int index);
-  Q_INVOKABLE double getFontSize(int index);
-  Q_INVOKABLE double getStrokeWidth(int index);
-  Q_INVOKABLE QString getText(int index);
-  Q_INVOKABLE QString getFontStyle(int index);
-  Q_INVOKABLE QString getFontFamily(int index);
-  Q_INVOKABLE QString getFillColor(int index);
-  Q_INVOKABLE QString getStrokeColor(int index);
+  Q_INVOKABLE QStringList fontFamilies();
+  Q_INVOKABLE QStringList fontStyles(const QString& fontFamily);
+  Q_INVOKABLE bool fauxBold(int index);
+  Q_INVOKABLE bool fauxItalic(int index);
+  Q_INVOKABLE double fontSize(int index);
+  Q_INVOKABLE double strokeWidth(int index);
+  Q_INVOKABLE QString text(int index);
+  Q_INVOKABLE QString fontStyle(int index);
+  Q_INVOKABLE QString fontFamily(int index);
+  Q_INVOKABLE QString fillColor(int index);
+  Q_INVOKABLE QString strokeColor(int index);
 
   Q_INVOKABLE void changeText(int index, const QString& text);
   Q_INVOKABLE void changeFontSize(int index, double fontSize);
@@ -73,7 +73,7 @@ class PAGTextLayerModel : public QAbstractListModel {
  private:
   TextDocument oldTextDocument = {};
   QSet<int> revertSet = {};
-  QStringList fontFamilies = {};
+  QStringList fontFamilyList = {};
   QList<TextDocumentHandle> textLayers = {};
   std::shared_ptr<PAGFile> pagFile = nullptr;
 };

@@ -242,8 +242,8 @@ SplitView {
                                 Rectangle {
                                     id: textListContainer
                                     width: parent.width
-                                    height: isTextListOpen ? (pagView.textCount * 40 + 44) : 32
-                                    visible: pagView.textCount > 0
+                                    height: isTextListOpen ? (pagView.editableTextLayerCount * 40 + 44) : 32
+                                    visible: pagView.editableTextLayerCount > 0
                                     color: "#20202A"
                                     anchors.left: parent.left
                                     anchors.leftMargin: 0
@@ -309,7 +309,7 @@ SplitView {
 
                                     TextListView {
                                         id: textListView
-                                        height: pagView.textCount * 40
+                                        height: pagView.editableTextLayerCount * 40
                                         textHeight: 40
                                         textModel: textLayerModel
                                         visible: isTextListOpen && height > 0

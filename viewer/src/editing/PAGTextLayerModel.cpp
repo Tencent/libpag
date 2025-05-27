@@ -65,8 +65,8 @@ void PAGTextLayerModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
   }
 
   beginResetModel();
-  for (auto i : editableList) {
-    textLayers.append(pagFile->getTextData(i));
+  for (auto layerIndex : editableList) {
+    textLayers.append(pagFile->getTextData(layerIndex));
   }
   endResetModel();
 }
@@ -93,17 +93,17 @@ int PAGTextLayerModel::convertIndex(int index) {
   return editableIndices.at(index);
 }
 
-QStringList PAGTextLayerModel::getFontFamilies() {
-  if (fontFamilies.count() > 0) {
-    return fontFamilies;
+QStringList PAGTextLayerModel::fontFamilies() {
+  if (fontFamilyList.count() > 0) {
+    return fontFamilyList;
   }
 
-  fontFamilies = QFontDatabase::families();
-  fontFamilies.removeDuplicates();
-  return fontFamilies;
+  fontFamilyList = QFontDatabase::families();
+  fontFamilyList.removeDuplicates();
+  return fontFamilyList;
 }
 
-QStringList PAGTextLayerModel::getFontStyles(const QString& fontFamily) {
+QStringList PAGTextLayerModel::fontStyles(const QString& fontFamily) {
   if (fontFamily.isEmpty()) {
     return {};
   }
@@ -111,7 +111,7 @@ QStringList PAGTextLayerModel::getFontStyles(const QString& fontFamily) {
   return QFontDatabase::styles(fontFamily);
 }
 
-bool PAGTextLayerModel::getFauxBold(int index) {
+bool PAGTextLayerModel::fauxBold(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return false;
   }
@@ -119,7 +119,7 @@ bool PAGTextLayerModel::getFauxBold(int index) {
   return textLayers.at(index)->fauxBold;
 }
 
-bool PAGTextLayerModel::getFauxItalic(int index) {
+bool PAGTextLayerModel::fauxItalic(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return false;
   }
@@ -127,7 +127,7 @@ bool PAGTextLayerModel::getFauxItalic(int index) {
   return textLayers.at(index)->fauxItalic;
 }
 
-double PAGTextLayerModel::getFontSize(int index) {
+double PAGTextLayerModel::fontSize(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return 0.0;
   }
@@ -135,7 +135,7 @@ double PAGTextLayerModel::getFontSize(int index) {
   return textLayers.at(index)->fontSize;
 }
 
-double PAGTextLayerModel::getStrokeWidth(int index) {
+double PAGTextLayerModel::strokeWidth(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return 0.0;
   }
@@ -143,7 +143,7 @@ double PAGTextLayerModel::getStrokeWidth(int index) {
   return textLayers.at(index)->strokeWidth;
 }
 
-QString PAGTextLayerModel::getText(int index) {
+QString PAGTextLayerModel::text(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return "";
   }
@@ -151,7 +151,7 @@ QString PAGTextLayerModel::getText(int index) {
   return QString::fromStdString(textLayers.at(index)->text);
 }
 
-QString PAGTextLayerModel::getFontStyle(int index) {
+QString PAGTextLayerModel::fontStyle(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return "";
   }
@@ -159,7 +159,7 @@ QString PAGTextLayerModel::getFontStyle(int index) {
   return QString::fromStdString(textLayers.at(index)->fontStyle);
 }
 
-QString PAGTextLayerModel::getFontFamily(int index) {
+QString PAGTextLayerModel::fontFamily(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return "";
   }
@@ -167,20 +167,20 @@ QString PAGTextLayerModel::getFontFamily(int index) {
   return QString::fromStdString(textLayers.at(index)->fontFamily);
 }
 
-QString PAGTextLayerModel::getFillColor(int index) {
+QString PAGTextLayerModel::fillColor(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return "";
   }
 
-  return Utils::PAGColorToQString(textLayers.at(index)->fillColor);
+  return Utils::ColorToQString(textLayers.at(index)->fillColor);
 }
 
-QString PAGTextLayerModel::getStrokeColor(int index) {
+QString PAGTextLayerModel::strokeColor(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return "";
   }
 
-  return Utils::PAGColorToQString(textLayers.at(index)->strokeColor);
+  return Utils::ColorToQString(textLayers.at(index)->strokeColor);
 }
 
 void PAGTextLayerModel::changeText(int index, const QString& text) {
@@ -237,7 +237,7 @@ void PAGTextLayerModel::changeFillColor(int index, const QString& color) {
   }
 
   auto textDocument = textLayers.at(index);
-  textDocument->fillColor = Utils::QStringToPAGColor(color);
+  textDocument->fillColor = Utils::QStringToColor(color);
   pagFile->replaceText(convertIndex(index), textDocument);
 }
 
@@ -247,7 +247,7 @@ void PAGTextLayerModel::changeStrokeColor(int index, const QString& color) {
   }
 
   auto textDocument = textLayers.at(index);
-  textDocument->strokeColor = Utils::QStringToPAGColor(color);
+  textDocument->strokeColor = Utils::QStringToColor(color);
   pagFile->replaceText(convertIndex(index), textDocument);
 }
 
