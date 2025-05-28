@@ -142,7 +142,6 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
    imageReader = JVideoSurface::GetImageReader(env, videoSurface);
     if (imageReader == nullptr) {
         AMediaFormat_delete(mediaFormat);
-        AMediaFormat_delete(mediaFormat);
         AMediaCodec_stop(videoDecoder);
         AMediaCodec_delete(videoDecoder);
         ANativeWindow_release(nativeWindow);
