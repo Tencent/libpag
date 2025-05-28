@@ -27,7 +27,7 @@ endif ()
 
 add_definitions(-DQT_NO_KEYWORDS)
 
-list(APPEND PAGExporter_STATIC_VENDORS AE_SDK ffmpeg)
+list(APPEND PAGExporter_STATIC_VENDORS AE_SDK ffaudio)
 
 add_vendor_target(PAGExporter-vendor STATIC_VENDORS ${PAGExporter_STATIC_VENDORS})
 find_vendor_libraries(PAGExporter-vendor STATIC PAGExporter_VENDOR_STATIC_LIBRARIES)

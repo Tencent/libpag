@@ -16,18 +16,16 @@
       }
     },
     {
-      "name": "ffmpeg",
-      "dir": "third_party/ffmpeg",
-      "scripts": {
-        "mac": {
-          "executor": "bash",
-          "file": "scripts/mac/build_ffmpeg.sh",
-          "arguments": []
-        },
-        "win": {
-          "executor": "cmd.exe",
-          "file": "scripts/mac/build_ffmpeg.bat"
-        }
+      "name": "ffaudio",
+      "dir": "third_party/ffaudio",
+      "cmake": {
+        "targets": [
+          "ffaudio"
+        ],
+        "platforms": [
+          "mac",
+          "win"
+        ]
       }
     }
   ]

@@ -3,9 +3,9 @@
   "repos": {
     "common": [
       {
-        "url": "https://github.com/FFmpeg/FFmpeg.git",
-        "commit": "48c0f071d4b5dd3c06c9978a2edc0fdcbbc3717a",
-        "dir": "third_party/ffmpeg"
+        "url": "https://github.com/libpag/ffaudio.git",
+        "commit": "d6b49e99ce28879769689fceb7f48a2f5c21c12e",
+        "dir": "third_party/ffaudio"
       }
     ]
   },
