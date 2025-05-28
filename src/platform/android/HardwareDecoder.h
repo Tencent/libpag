@@ -22,6 +22,10 @@
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
 #include "tgfx/platform/android/SurfaceTextureReader.h"
+#include "media/NdkMediaCodec.h"
+#include "media/NdkMediaFormat.h"
+#include "android/native_window.h"
+#include "android/native_window_jni.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
@@ -42,13 +46,17 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
- private:
-  bool isValid = false;
-  std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
-  jobject videoDecoder = nullptr;
+private:
+    bool isValid = false;
+    bool disableFlush = true;
+    std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
+    AMediaCodec* videoDecoder = nullptr;
+    static const int TIMEOUT_US = 1000;
+    ssize_t lastOutputBufferIndex = -1;
+    AMediaCodecBufferInfo* bufferInfo = new AMediaCodecBufferInfo();
 
   explicit HardwareDecoder(const VideoFormat& format);
-  bool initDecoder(JNIEnv* env, const VideoFormat& format);
+  bool initDecoder(const VideoFormat& format);
 
   friend class HardwareDecoderFactory;
 };
