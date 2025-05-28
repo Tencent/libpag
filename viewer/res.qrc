@@ -18,6 +18,9 @@
         <file>images/icon-edit.png</file>
         <file>images/icon-save.png</file>
         <file>images/icon-close.png</file>
+        <file>images/revert.png</file>
+        <file>images/checked.png</file>
+        <file>images/unchecked.png</file>
 
         <!-- svg -->
         <file>images/close-dark.svg</file>
@@ -36,6 +39,8 @@
         <file>qml/FileTreeViewDelegate.qml</file>
         <file>qml/SaveFileDialog.qml</file>
         <file>qml/AttributeEditDialog.qml</file>
+        <file>qml/TextListView.qml</file>
+        <file>qml/TextEditDialog.qml</file>
         <file>qml/utils/qmldir</file>
         <file>qml/utils/Utils.qml</file>
         <file>qml/components/PAGMenu.qml</file>
