@@ -24,7 +24,7 @@
 namespace pag {
 
 tgfx::Path ToPath(const PathData& pathData);
-tgfx::PathOp ToPathOp(Enum maskMode);
+tgfx::PathOp ToPathOp(MaskMode maskMode);
 void ExpandPath(tgfx::Path* path, float expansion);
 
 }  // namespace pag

@@ -18,7 +18,7 @@
 
 #include <thread>
 #include "base/utils/Log.h"
-#include "nlohmann/json.hpp"
+#include "base/utils/TimeUtil.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -28,8 +28,9 @@ namespace pag {
 void mockPAGView() {
   PAG_SETUP(surface, player, file);
   int num = 20;
+  Frame totalFrames = TimeToFrame(file->duration(), file->frameRate());
   for (int i = 0; i < num; i++) {
-    long time = file->duration() * i / num;
+    long time = file->duration() * i / totalFrames;
     file->setCurrentTime(time);
     player->flush();
     MakeSnapshot(surface);
@@ -72,8 +73,9 @@ void TearDownPAG() {
 }
 
 void mockAsyncFlush(int num = 30) {
+  Frame totalFrames = TimeToFrame(TestPAGFile->duration(), TestPAGFile->frameRate());
   for (int i = 0; i < num; i++) {
-    TestPAGFile->setCurrentTime(TestPAGFile->duration() * i / num);
+    TestPAGFile->setCurrentTime(TestPAGFile->duration() * i / totalFrames);
     TestPAGPlayer->flush();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }

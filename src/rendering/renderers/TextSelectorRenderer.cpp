@@ -38,7 +38,7 @@ float TextSelectorRenderer::CalculateFactorFromSelectors(
   return totalFactor;
 }
 
-static float OverlayFactorByMode(float oldFactor, float factor, Enum mode) {
+static float OverlayFactorByMode(float oldFactor, float factor, TextSelectorMode mode) {
   float newFactor;
   switch (mode) {
     case TextSelectorMode::Subtract:

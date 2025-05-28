@@ -50,12 +50,12 @@ enum class PaintType { Fill, Stroke, GradientFill, GradientStroke };
  */
 struct StrokePaint {
   tgfx::Stroke getStroke() const {
-    return tgfx::Stroke(strokeWidth, ToTGFXCap(lineCap), ToTGFXJoin(lineJoin), miterLimit);
+    return tgfx::Stroke(strokeWidth, ToTGFX(lineCap), ToTGFX(lineJoin), miterLimit);
   }
 
   float strokeWidth = 0;
-  Enum lineCap = LineCap::Butt;
-  Enum lineJoin = LineJoin::Miter;
+  LineCap lineCap = LineCap::Butt;
+  LineJoin lineJoin = LineJoin::Miter;
   float miterLimit = 0;
   std::vector<float> dashes;
   float dashOffset = 0;
@@ -93,7 +93,7 @@ class PaintElement : public ElementData {
   PaintType paintType = PaintType::Fill;
   tgfx::BlendMode blendMode = tgfx::BlendMode::SrcOver;
   float alpha = 1.0f;
-  Enum compositeOrder = CompositeOrder::BelowPreviousInSameGroup;
+  CompositeOrder compositeOrder = CompositeOrder::BelowPreviousInSameGroup;
   tgfx::PathFillType pathFillType = tgfx::PathFillType::Winding;
   tgfx::Color color = tgfx::Color::White();
   GradientPaint gradient;
@@ -340,7 +340,7 @@ void ShapePathToPath(ShapePathElement* shapePath, tgfx::Path* path, Frame frame)
   path->addPath(ToPath(*pathData));
 }
 
-tgfx::PathFillType ToPathFillType(Enum rule) {
+tgfx::PathFillType ToPathFillType(FillRule rule) {
   return rule == FillRule::EvenOdd ? tgfx::PathFillType::EvenOdd : tgfx::PathFillType::Winding;
 }
 
@@ -349,7 +349,7 @@ PaintElement* FillToPaint(FillElement* fill, Frame frame) {
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::Fill);
-  paint->blendMode = ToTGFXBlend(fill->blendMode);
+  paint->blendMode = ToTGFX(fill->blendMode);
   paint->alpha = ToAlpha(fill->opacity->getValueAt(frame));
   paint->color = ToTGFX(fill->color->getValueAt(frame));
   paint->pathFillType = ToPathFillType(fill->fillRule);
@@ -362,7 +362,7 @@ PaintElement* StrokeToPaint(StrokeElement* stroke, const tgfx::Matrix& matrix, F
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::Stroke);
-  paint->blendMode = ToTGFXBlend(stroke->blendMode);
+  paint->blendMode = ToTGFX(stroke->blendMode);
   paint->alpha = ToAlpha(stroke->opacity->getValueAt(frame));
   paint->compositeOrder = stroke->composite;
   paint->color = ToTGFX(stroke->color->getValueAt(frame));
@@ -386,7 +386,7 @@ PaintElement* GradientFillToPaint(GradientFillElement* fill, const tgfx::Matrix&
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::GradientFill);
-  paint->blendMode = ToTGFXBlend(fill->blendMode);
+  paint->blendMode = ToTGFX(fill->blendMode);
   paint->alpha = ToAlpha(fill->opacity->getValueAt(frame));
   paint->compositeOrder = fill->composite;
   paint->gradient =
@@ -403,7 +403,7 @@ PaintElement* GradientStrokeToPaint(GradientStrokeElement* stroke, const tgfx::M
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::GradientStroke);
-  paint->blendMode = ToTGFXBlend(stroke->blendMode);
+  paint->blendMode = ToTGFX(stroke->blendMode);
   paint->alpha = ToAlpha(stroke->opacity->getValueAt(frame));
   paint->compositeOrder = stroke->composite;
   paint->stroke.strokeWidth = stroke->strokeWidth->getValueAt(frame);
@@ -684,7 +684,7 @@ void RenderElements_ShapeGroup(ShapeElement* element, const tgfx::Matrix& parent
   transform.matrix.postConcat(parentMatrix);
   auto group = new GroupElement();
   group->alpha = transform.alpha;
-  group->blendMode = ToTGFXBlend(shape->blendMode);
+  group->blendMode = ToTGFX(shape->blendMode);
   RenderElements(shape->elements, transform.matrix, group, frame);
   parentGroup->elements.push_back(group);
 }

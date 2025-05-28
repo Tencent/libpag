@@ -43,13 +43,13 @@ class CodecContext : public StreamContext {
   std::unordered_map<int, FontDescriptor*> fontIDMap;
   std::vector<Composition*> compositions;
   std::vector<ImageBytes*> images;
-  int timeStretchMode = PAGTimeStretchMode::Repeat;
+  PAGTimeStretchMode timeStretchMode = PAGTimeStretchMode::Repeat;
   TimeRange* scaledTimeRange = nullptr;
   FileAttributes fileAttributes = {};
 
   std::vector<int>* editableImages = nullptr;
   std::vector<int>* editableTexts = nullptr;
-  std::vector<Enum>* imageScaleModes = nullptr;
+  std::vector<PAGScaleMode>* imageScaleModes = nullptr;
   uint16_t tagLevel = 0;
 };
 }  // namespace pag

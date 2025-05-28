@@ -185,8 +185,8 @@ endif ()
 
 if (PAG_USE_QT)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
-    # set(CMAKE_PREFIX_PATH /Users/username/Qt5.13.0/5.13.0/clang_64/lib/cmake)
-    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+    # set(CMAKE_PREFIX_PATH /Users/username/Qt6.2.0/Qt6.2.0/clang_64/lib/cmake)
+    find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
     find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets OpenGL Quick)
     list(APPEND PAG_SHARED_LIBS Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::OpenGL
             Qt${QT_VERSION_MAJOR}::Quick)
@@ -508,7 +508,7 @@ endif ()
 
 if (WEB)
     add_executable(pag ${PAG_FILES})
-    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='Hello2D' -sWASM=1 -sASYNCIFY
+    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1 -sASYNCIFY
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
             -sMODULARIZE=1 -sENVIRONMENT='web,worker' -sEXPORT_ES6=1)
     if (${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.4")

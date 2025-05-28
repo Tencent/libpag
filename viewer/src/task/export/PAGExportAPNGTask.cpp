@@ -18,8 +18,8 @@
 
 #include "PAGExportAPNGTask.h"
 #include <QDebug>
-#include "utils/PAGFileUtils.h"
-#include "utils/PAGUtils.h"
+#include "utils/FileUtils.h"
+#include "utils/Utils.h"
 
 namespace pag {
 
@@ -29,18 +29,18 @@ PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QS
   openAfterExport = false;
 }
 
-auto PAGExportAPNGTask::onFrameFlush(double progress) -> void {
+void PAGExportAPNGTask::onFrameFlush(double progress) {
   PAGExportPNGTask::onFrameFlush(progress * 0.9);
 }
 
-auto PAGExportAPNGTask::onFinish() -> int {
+int PAGExportAPNGTask::onFinish() {
   std::string outPath = apngFilePath.toStdString();
   std::string firstPNGPath = QString("%1/1.png").arg(filePath).toStdString();
   int frameRate = static_cast<int>(pagFile->frameRate());
-  Utils::exportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
+  Utils::ExportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
   PAGExportPNGTask::onFrameFlush(1.0);
-  Utils::deleteDir(filePath);
-  Utils::openInFinder(apngFilePath, true);
+  Utils::DeleteDir(filePath);
+  Utils::OpenInFinder(apngFilePath, true);
   return PAGExportPNGTask::onFinish();
 }
 

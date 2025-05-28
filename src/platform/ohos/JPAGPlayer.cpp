@@ -249,7 +249,7 @@ static napi_value ScaleMode(napi_env env, napi_callback_info info) {
     return nullptr;
   }
   napi_value result;
-  napi_create_int32(env, player->scaleMode(), &result);
+  napi_create_int32(env, static_cast<int32_t>(player->scaleMode()), &result);
   return result;
 }
 
@@ -265,7 +265,7 @@ static napi_value SetScaleMode(napi_env env, napi_callback_info info) {
   int value = 0;
   auto status = napi_get_value_int32(env, args[0], &value);
   if (status == napi_status::napi_ok) {
-    player->setScaleMode(value);
+    player->setScaleMode(static_cast<PAGScaleMode>(value));
   }
   return nullptr;
 }

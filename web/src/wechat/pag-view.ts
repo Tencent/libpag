@@ -15,12 +15,24 @@ export interface PAGViewOptions {
    * Render first frame when pag view init. default true.
    */
   firstFrame?: boolean;
+  /**
+   * Use style to scale canvas. default false.
+   * When target canvas is offscreen canvas, useScale is false.
+   */
+  useScale?: boolean;
 }
 
 export type wxCanvas = (HTMLCanvasElement | OffscreenCanvas) & {
   requestAnimationFrame: (callback: () => void) => number;
   cancelAnimationFrame: (requestID: number) => void;
 };
+
+function isOffscreenCanvas(canvas: any): boolean {
+  if (canvas.isOffscreenCanvas !== undefined) {
+    return canvas.isOffscreenCanvas;
+  }
+  return false;
+}
 
 @destroyVerify
 @wasmAwaitRewind
@@ -40,7 +52,7 @@ export class PAGView extends NativePAGView {
     const pagPlayer = PAGModule.PAGPlayer.create();
     const pagView = new PAGView(pagPlayer, canvas);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
-    pagView.resetSize();
+    pagView.resetSize(pagView.pagViewOptions.useScale);
     pagView.renderCanvas = RenderCanvas.from(canvas, { alpha: true });
     pagView.renderCanvas.retain();
     pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
@@ -58,18 +70,39 @@ export class PAGView extends NativePAGView {
 
   protected override pagViewOptions: PAGViewOptions = {
     firstFrame: true,
+    useScale: true,
   };
 
   /**
    * Update size when changed canvas size.
    */
   public updateSize() {
+    if (!this.canvasElement) {
+      throw new Error('Canvas element is not found!');
+    }
     if (!this.pagGlContext) return;
-    this.resetSize();
     const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.canvasElement!.width, this.canvasElement!.height);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
     this.pagSurface = pagSurface;
+  }
+
+  public calculateDisplaySize(canvas: any) {
+    if (canvas.displayWidth === undefined && canvas.displayHeight === undefined) {
+      canvas.displayWidth = canvas.width;
+      canvas.displayHeight = canvas.height;
+    }
+    return {
+      width: canvas.displayWidth,
+      height: canvas.displayHeight,
+    };
+  }
+
+  /**
+   * WeChat Mini Programs do not support capturing screenshots of WebGL Canvas.
+   */
+  public override makeSnapshot(): never {
+    throw new Error('WeChat Mini Programs do not support capturing screenshots of WebGL Canvas');
   }
 
   protected override async flushLoop(force = false) {
@@ -131,9 +164,16 @@ export class PAGView extends NativePAGView {
     }
   }
 
-  protected override resetSize() {
+  protected override resetSize(useScale = true) {
+    if (!this.canvasElement) {
+      throw new Error('Canvas element is not found!');
+    }
+    if (!useScale || isOffscreenCanvas(this.canvasElement)) {
+      return;
+    }
+    const displaySize = this.calculateDisplaySize(this.canvasElement);
     const dpr = wx.getSystemInfoSync().pixelRatio;
-    this.canvasElement!.width = this.canvasElement!.width * dpr;
-    this.canvasElement!.height = this.canvasElement!.height * dpr;
+    this.canvasElement!.width = displaySize.width * dpr;
+    this.canvasElement!.height = displaySize.height * dpr;
   }
 }

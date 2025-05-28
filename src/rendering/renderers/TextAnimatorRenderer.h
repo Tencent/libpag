@@ -29,14 +29,14 @@ class TextAnimatorRenderer {
  public:
   // 应用动画到Glyphs, 如果含有动画内容返回 true
   static bool ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& glyphList,
-                            const std::vector<TextAnimator*>* animators, Enum justification,
-                            Frame layerFrame);
+                            const std::vector<TextAnimator*>* animators,
+                            ParagraphJustification justification, Frame layerFrame);
   // 根据序号获取文本动画位置（供AE导出插件在计算firstBaseLine时调用）
   static tgfx::Point GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
                                               const TextDocument* textDocument, Frame layerFrame,
                                               size_t index, bool* pBiasFlag);
-  TextAnimatorRenderer(const TextAnimator* animator, Enum justification, size_t textCount,
-                       Frame frame);
+  TextAnimatorRenderer(const TextAnimator* animator, ParagraphJustification justification,
+                       size_t textCount, Frame frame);
   ~TextAnimatorRenderer();
 
  private:
@@ -62,7 +62,7 @@ class TextAnimatorRenderer {
   float trackingBefore = 0.0f;  // 字间距-之前
   float trackingAfter = 0.0f;   // 字间距-之后
 
-  Enum justification = ParagraphJustification::LeftJustify;
+  ParagraphJustification justification = ParagraphJustification::LeftJustify;
 
   std::vector<TextSelectorRenderer*> selectorRenderers;
 };

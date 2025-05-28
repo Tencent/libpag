@@ -23,7 +23,7 @@
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
-ImageReplacement::ImageReplacement(std::shared_ptr<PAGImage> pagImage, int scaleMode,
+ImageReplacement::ImageReplacement(std::shared_ptr<PAGImage> pagImage, PAGScaleMode scaleMode,
                                    ImageBytes* imageBytes)
     : pagImage(std::move(pagImage)), defaultScaleMode(scaleMode), contentWidth(imageBytes->width),
       contentHeight(imageBytes->height) {

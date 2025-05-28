@@ -47,7 +47,7 @@ PAGText* ToPAGText(pag::TextDocumentHandle textDocument) {
   textData.strokeOverFill = textDocument->strokeOverFill;
   textData.strokeWidth = textDocument->strokeWidth;
   textData.text = [NSString stringWithUTF8String:textDocument->text.c_str()];
-  textData.justification = textDocument->justification;
+  textData.justification = static_cast<uint8_t>(textDocument->justification);
   textData.leading = textDocument->leading;
   textData.tracking = textDocument->tracking;
   textData.backgroundColor = PAGColorUtility::ToCocoaColor(textDocument->backgroundColor);
@@ -79,7 +79,7 @@ pag::TextDocumentHandle ToTextDocument(PAGText* value) {
   textDocument->strokeOverFill = value.strokeOverFill;
   textDocument->strokeWidth = value.strokeWidth;
   textDocument->text = IsUTF8StringEmpty(value.text) ? "" : value.text.UTF8String;
-  textDocument->justification = value.justification;
+  textDocument->justification = static_cast<ParagraphJustification>(value.justification);
   textDocument->leading = value.leading;
   textDocument->tracking = value.tracking;
   textDocument->backgroundColor = PAGColorUtility::ToColor(value.backgroundColor);

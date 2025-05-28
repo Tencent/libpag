@@ -29,3 +29,15 @@
 #define PAG_API
 #endif
 #endif
+
+#if !defined(RTTR_AUTO_REGISTER_CLASS)
+#define RTTR_AUTO_REGISTER_CLASS
+#endif
+
+#if !defined(RTTR_SKIP_REGISTER_PROPERTY)
+#define RTTR_SKIP_REGISTER_PROPERTY
+#endif
+
+#if !defined(RTTR_REGISTER_FUNCTION_AS_PROPERTY)
+#define RTTR_REGISTER_FUNCTION_AS_PROPERTY(propertyName, function)
+#endif

@@ -20,5 +20,4 @@ if (!fs.existsSync("../wechat/lib")) {
     fs.mkdirSync("../wechat/lib", {recursive: true});
 }
 fs.copyFileSync("../src/wasm/libpag.wasm", "../lib/libpag.wasm")
-fs.copyFileSync("../src/wasm/libpag.wasm", "../wechat/lib/libpag.wasm")
 

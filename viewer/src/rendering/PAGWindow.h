@@ -22,6 +22,10 @@
 #include <QString>
 #include "PAGView.h"
 #include "PAGWindowHelper.h"
+#include "editing/PAGEditAttributeModel.h"
+#include "editing/PAGTextLayerModel.h"
+#include "editing/PAGTreeViewModel.h"
+#include "profiling/PAGRunTimeDataModel.h"
 
 namespace pag {
 class PAGWindow : public QObject {
@@ -35,8 +39,8 @@ class PAGWindow : public QObject {
   Q_SLOT void openFile(QString path);
   Q_SLOT void onPAGViewerDestroyed();
 
-  auto open() -> void;
-  auto getFilePath() -> QString;
+  void open();
+  QString getFilePath();
 
   static QList<PAGWindow*> AllWindows;
 
@@ -46,6 +50,10 @@ class PAGWindow : public QObject {
   PAGView* pagView = nullptr;
   std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
+  std::unique_ptr<PAGTreeViewModel> treeViewModel = nullptr;
+  std::unique_ptr<PAGRunTimeDataModel> runTimeDataModel = nullptr;
+  std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
+  std::unique_ptr<PAGTextLayerModel> textLayerModel = nullptr;
 };
 
 }  // namespace pag

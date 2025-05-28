@@ -22,8 +22,8 @@ namespace pag {
 PAGWindowHelper::PAGWindowHelper(QObject* parent) : QObject(parent) {
 }
 
-auto PAGWindowHelper::setWindowStyle(QQuickWindow* quickWindow, double red, double green,
-                                     double blue) -> void {
+void PAGWindowHelper::setWindowStyle(QQuickWindow* quickWindow, double red, double green,
+                                     double blue) {
   return;
 }
 

@@ -25,7 +25,8 @@ std::unique_ptr<BlockConfig> RepeaterTag(RepeaterElement* shape) {
   }
   auto transform = shape->transform;
   auto tagConfig = new BlockConfig(TagCode::Repeater);
-  AddAttribute(tagConfig, &shape->composite, AttributeType::Value, RepeaterOrder::Below);
+  AddAttribute(tagConfig, &shape->composite, AttributeType::Value,
+               static_cast<uint8_t>(RepeaterOrder::Below));
   AddAttribute(tagConfig, &shape->copies, AttributeType::SimpleProperty, 3.0f);
   AddAttribute(tagConfig, &shape->offset, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());

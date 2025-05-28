@@ -60,7 +60,8 @@ class DefaultLZ4Decoder : public LZ4Decoder {
   size_t decode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
                 size_t srcSize) const override {
     return LZ4_decompress_safe(reinterpret_cast<const char*>(srcBuffer),
-                               reinterpret_cast<char*>(dstBuffer), srcSize, dstSize);
+                               reinterpret_cast<char*>(dstBuffer), static_cast<int>(srcSize),
+                               static_cast<int>(dstSize));
   }
 };
 

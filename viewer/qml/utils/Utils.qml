@@ -32,4 +32,16 @@ QtObject {
 
         return str.substring(0, lastIndex) + newPara + str.substring(lastIndex + oldPara.length);
     }
+
+    function removeFileSchema(fileUrl) {
+        let path = fileUrl.toString();
+        if (path.indexOf('file://') !== 0) {
+            return path;
+        }
+        path = path.substr(7);
+        if (Qt.platform.os === 'windows') {
+            path = path.substr(1);
+        }
+        return path;
+    }
 }

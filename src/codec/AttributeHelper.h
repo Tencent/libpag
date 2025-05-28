@@ -22,6 +22,8 @@
 #include "base/Keyframes.h"
 
 namespace pag {
+static constexpr int MAX_KEYFRAMES = 5184000;  // 60 frames per second, 24 hours
+
 enum class AttributeType {
   Value,
   FixedValue,  // always exists, no need to store a flag.
@@ -126,13 +128,17 @@ std::vector<Keyframe<T>*> ReadKeyframes(DecodeStream* stream, const AttributeCon
                                         const AttributeFlag& flag) {
   std::vector<Keyframe<T>*> keyframes;
   auto numFrames = stream->readEncodedUint32();
+  if (numFrames > MAX_KEYFRAMES) {
+    PAGThrowError(stream->context, "number of keyframes is too large");
+    return keyframes;
+  }
   for (uint32_t i = 0; i < numFrames; i++) {
     Keyframe<T>* keyframe;
     if (config.attributeType == AttributeType::DiscreteProperty) {
       // There is no need to read any bits here.
       keyframe = new Keyframe<T>();
     } else {
-      auto interpolationType = static_cast<Enum>(stream->readUBits(2));
+      auto interpolationType = static_cast<KeyframeInterpolationType>(stream->readUBits(2));
       if (interpolationType == KeyframeInterpolationType::Hold) {
         keyframe = new Keyframe<T>();
       } else {
@@ -351,7 +357,7 @@ void WriteKeyframes(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyfr
     return;
   }
   for (auto& keyframe : keyframes) {
-    stream->writeUBits(keyframe->interpolationType, 2);
+    stream->writeUBits(static_cast<uint32_t>(keyframe->interpolationType), 2);
   }
 }
 

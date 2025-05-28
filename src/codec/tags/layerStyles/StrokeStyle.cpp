@@ -21,12 +21,13 @@
 namespace pag {
 std::unique_ptr<BlockConfig> StrokeStyleTag(StrokeStyle* style) {
   auto tagConfig = new BlockConfig(TagCode::StrokeStyle);
-  AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty, BlendMode::Normal);
+  AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty,
+               static_cast<uint8_t>(BlendMode::Normal));
   AddAttribute(tagConfig, &style->color, AttributeType::SimpleProperty, Red);
   AddAttribute(tagConfig, &style->size, AttributeType::SimpleProperty, 3.0f);
   AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, Opaque);
   AddAttribute(tagConfig, &style->position, AttributeType::DiscreteProperty,
-               StrokePosition::Outside);
+               static_cast<uint8_t>(StrokePosition::Outside));
   return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

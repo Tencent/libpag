@@ -45,7 +45,7 @@ struct TextLayout {
   float tracking = 0;
   float firstBaseLine = 0;
   float baselineShift = 0;
-  Enum justification = 0;
+  ParagraphJustification justification = ParagraphJustification::LeftJustify;
   tgfx::Rect boxRect = tgfx::Rect::MakeEmpty();
   float glyphScale = 1.0f;
   tgfx::Matrix coordinateMatrix = tgfx::Matrix::I();
@@ -204,7 +204,7 @@ static void AdjustToFitBox(TextLayout* layout, std::vector<GlyphInfo>* glyphInfo
   }
 }
 
-static float CalculateDrawX(Enum justification, float lineWidth, bool isLastLine,
+static float CalculateDrawX(ParagraphJustification justification, float lineWidth, bool isLastLine,
                             const tgfx::Rect& boxRect) {
   float drawX;
 
@@ -251,8 +251,8 @@ static float CalculateDrawX(Enum justification, float lineWidth, bool isLastLine
   return drawX;
 }
 
-static float CalculateLetterSpacing(Enum justification, float tracking, float lineWidth,
-                                    size_t lineGlyphCount, bool isLastLine,
+static float CalculateLetterSpacing(ParagraphJustification justification, float tracking,
+                                    float lineWidth, size_t lineGlyphCount, bool isLastLine,
                                     const tgfx::Rect& boxRect) {
   if (boxRect.isEmpty()) {
     return tracking;
@@ -437,7 +437,7 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
                                               const std::vector<std::vector<GlyphHandle>>& lines,
                                               const TextDocument* textDocument) {
   float strokeWidth = textDocument->strokeWidth;
-  auto margin = textDocument->fontSize * 0.2f;
+  auto margin = textDocument->fontSize * 0.4f;
   if (margin < strokeWidth) {
     margin = strokeWidth;
   }
