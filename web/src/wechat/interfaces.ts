@@ -13,7 +13,6 @@ export interface wx {
     compInst?: any,
   ) => OffscreenCanvas;
   getPerformance: () => Performance;
-  createSelectorQuery: () => SelectorQuery;
 }
 
 export interface FileSystemManager {
@@ -79,20 +78,4 @@ export interface SystemInfo {
   platform: 'ios' | 'android' | 'windows' | 'mac' | 'devtools';
   /** 设备像素比 */
   pixelRatio: number;
-}
-
-interface Fields {
-  node?: boolean;
-  size?: boolean;
-}
-
-interface NodesRef {
-  id: string;
-  fields: (fields: Fields) => SelectorQuery;
-}
-
-export interface SelectorQuery {
-  select: (selector: string) => NodesRef;
-  selectAll: (selector: string) => NodesRef;
-  exec: (callback?: (...args: any[]) => any) => NodesRef;
 }

@@ -69,8 +69,8 @@ PAGWindow {
                 let preferredSize = pagView.preferredSize;
                 let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
                 let height = Math.max(viewWindow.minimumHeight, preferredSize.height);
-                if (settings.isEditPanelOpen) {
-                    width += mainForm.rightItem.width + mainForm.splitHandleWidth;
+                if (mainForm.rightItemLoader.status === Loader.Ready) {
+                    width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
                 }
                 let x = Math.max(0, oldX - ((width - oldWidth) / 2));
                 let y = Math.max(50, oldY - ((height - oldHeight) / 2));
@@ -316,30 +316,28 @@ PAGWindow {
             mainForm.controlForm.panelsButton.checked = willOpen;
         }
 
+        settings.isEditPanelOpen = willOpen;
+        mainForm.isEditPanelOpen = willOpen;
         if (willOpen) {
-            let widthChange = (mainForm.rightItem.width === 0) ? mainForm.minPanelWidth : mainForm.rightItem.width;
-            widthChange += mainForm.splitHandleWidth;
+            let widthChange = mainForm.rightItemLoader.width;
             if (viewWindow.visibility === Window.FullScreen) {
                 mainForm.centerItem.width = viewWindow.width - widthChange;
             } else {
-                viewWindow.width = viewWindow.width + widthChange;
+                viewWindow.width = viewWindow.width + widthChange + mainForm.splitHandleWidth;
             }
-            mainForm.rightItem.width = widthChange;
             if (viewWindow.height < minWindowHeightWithEditPanel) {
                 viewWindow.height = minWindowHeightWithEditPanel;
             }
         } else {
-            let widthChange = -1 * mainForm.rightItem.width;
-            if ((viewWindow.width + widthChange) < viewWindow.minimumWidth) {
+            let widthChange = -1 * mainForm.rightItemLoader.width;
+            if (viewWindow.visibility === Window.FullScreen) {
+                mainForm.centerItem.width = viewWindow.width;
+            } else if ((viewWindow.width + widthChange) < viewWindow.minimumWidth) {
                 viewWindow.width = viewWindow.minimumWidth;
             } else {
                 viewWindow.width = viewWindow.width + widthChange;
             }
-            mainForm.rightItem.width = 0;
         }
-
-        settings.isEditPanelOpen = willOpen;
-        mainForm.isEditPanelOpen = willOpen;
     }
 
     function onCommand(command) {

@@ -1,5 +1,6 @@
 import PAG
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Controls
 import "components"
 
@@ -11,6 +12,8 @@ SplitView {
     property bool isBackgroundOn: false
 
     property bool isEditPanelOpen: false
+
+    property bool isTextListOpen: true
 
     property int minPlayerWidth: 360
 
@@ -28,7 +31,7 @@ SplitView {
 
     property alias centerItem: centerItem
 
-    property alias rightItem: rightItem
+    property alias rightItemLoader: rightItemLoader
 
     property alias controlForm: controlForm
     anchors.fill: parent
@@ -117,37 +120,281 @@ SplitView {
         }
     }
 
-    PAGRectangle {
-        id: rightItem
+    Loader {
+        id: rightItemLoader
+        active: isEditPanelOpen
         visible: isEditPanelOpen
+        width: minPanelWidth
         SplitView.minimumWidth: minPanelWidth
         SplitView.preferredWidth: minPanelWidth
-        color: "#16161d"
-        radius: 5
-        leftTopRadius: false
-        rightTopRadius: false
-        rightBottomRadius: false
-
-        PAGRectangle {
-            id: performance
-            color: "#16161D"
-            clip: true
-            anchors.top: parent.top
-            anchors.topMargin: 0
-            anchors.right: parent.right
-            anchors.rightMargin: 0
-            anchors.left: parent.left
-            anchors.leftMargin: 0
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 0
+        sourceComponent: PAGRectangle {
+            id: rightItem
+            visible: true
+            width: parent.width
+            height: parent.height
+            color: "#16161d"
             radius: 5
             leftTopRadius: false
             rightTopRadius: false
-            leftBottomRadius: false
+            rightBottomRadius: false
 
-            Profiler {
-                id: profilerForm
+            Column {
+                spacing: 0
+                height: parent.height
+                width: parent.height
                 anchors.fill: parent
+
+                Item {
+                    width: parent.width
+                    height: 1
+                }
+
+                TabBar {
+                    id: tabBar
+
+                    height: 38
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+
+                    background: Rectangle {
+                        color: "#16161D"
+                    }
+
+                    PAGTabButton {
+                        id: editLayerButton
+                        text: qsTr("Edit Layer")
+                    }
+
+                    PAGTabButton {
+                        id: fileStructureButton
+                        text: qsTr("File Structure")
+                    }
+
+                    PAGTabButton {
+                        id: spaceButton
+                        text: ""
+                        enabled: false
+                    }
+                }
+
+                StackLayout {
+                    id: tabContents
+
+                    currentIndex: tabBar.currentIndex
+
+                    height: parent.height - tabBar.height - performance.height
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+
+                    /* Layer Editing Area */
+                    Rectangle {
+                        color: "#20202A"
+                        anchors.fill: tabContents.alignment
+
+                        ScrollView {
+                            id: editArea
+                            anchors.fill: parent
+                            clip: true
+
+                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                            ScrollBar.vertical.background: Rectangle {
+                                color: "#00000000"
+                            }
+                            ScrollBar.vertical.contentItem: Rectangle {
+                                implicitWidth: 9
+                                implicitHeight: 100
+                                color: "#00000000"
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 4
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 2
+                                    color: "#AA4B4B5A"
+                                    visible: editArea.ScrollBar.vertical.size < 1.0
+                                }
+                            }
+
+                            Column {
+                                spacing: 0
+                                width: parent.width
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: editArea.height
+                                    visible: !textListContainer.visible
+                                    color: "#20202A"
+                                    Text {
+                                        color: "#80ffffff"
+                                        text: qsTr("No layer was editable")
+                                        font.pixelSize: 12
+                                        verticalAlignment: Text.AlignVCenter
+                                        horizontalAlignment: Text.AlignHCenter
+                                        anchors.fill: parent
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: textListContainer
+                                    width: parent.width
+                                    height: isTextListOpen ? (pagView.editableTextLayerCount * 40 + 44) : 32
+                                    visible: pagView.editableTextLayerCount > 0
+                                    color: "#20202A"
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 0
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 0
+
+                                    Row {
+                                        id: textListTitle
+                                        spacing: 0
+                                        width: parent.width
+                                        height: 21
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 5
+
+                                        Item {
+                                            width: 5
+                                            height: 1
+                                        }
+
+                                        CheckBox {
+                                            id: textListCheckBox
+                                            width: 20
+                                            height: 21
+                                            anchors.top: parent.top
+                                            checked: isTextListOpen
+                                            rotation: isTextListOpen ? 0 : -90
+
+                                            indicator: Image {
+                                                width: parent.width
+                                                height: parent.height
+                                                source: "qrc:/images/icon-collapse.png"
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onPressed: function (mouse) {
+                                                        mouse.accepted = false;
+                                                    }
+                                                }
+                                            }
+
+                                            onClicked: {
+                                                splitView.isTextListOpen = !splitView.isTextListOpen;
+                                            }
+                                        }
+
+                                        Item {
+                                            width: 5
+                                            height: 1
+                                        }
+
+                                        Text {
+                                            id: textListTitleText
+                                            height: 20
+                                            anchors.top: parent.top
+                                            text: qsTr("Edit Text")
+                                            font.pixelSize: 12
+                                            renderType: Text.NativeRendering
+                                            color: "#9B9B9B"
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                    }
+
+                                    TextListView {
+                                        id: textListView
+                                        height: pagView.editableTextLayerCount * 40
+                                        textHeight: 40
+                                        textModel: textLayerModel
+                                        visible: isTextListOpen && height > 0
+                                        anchors.top: textListTitle.bottom
+                                        anchors.topMargin: 5
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 10
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 15
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 15
+                                        clip: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    /* File Structure Area */
+                    Rectangle {
+                        color: "#20202A"
+                        anchors.fill: tabContents.alignment
+
+                        ScrollView {
+                            anchors.fill: parent
+                            clip: true
+
+                            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                            ScrollBar.vertical.background: Rectangle {
+                                color: "#00000000"
+                            }
+                            ScrollBar.vertical.contentItem: Rectangle {
+                                implicitWidth: 9
+                                implicitHeight: 100
+                                color: "#00000000"
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 4
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 2
+                                    color: "#AA4B4B5A"
+                                }
+                            }
+
+                            TreeView {
+                                id: fileTreeView
+
+                                property int myCurrentRow: -1
+
+                                anchors.fill: parent
+                                model: treeViewModel
+                                delegate: FileTreeViewDelegate {
+                                    treeView: fileTreeView
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Item {
+                    width: parent.width
+                    height: 1
+                }
+
+                PAGRectangle {
+                    id: performance
+                    color: "#16161D"
+                    height: profilerForm.defaultHeight
+                    clip: true
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    radius: 5
+                    leftTopRadius: false
+                    rightTopRadius: false
+                    leftBottomRadius: false
+
+                    Profiler {
+                        id: profilerForm
+                        anchors.fill: parent
+                    }
+                }
             }
         }
     }

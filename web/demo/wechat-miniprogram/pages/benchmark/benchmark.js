@@ -20,7 +20,7 @@ Page({
             const canvas = res[0].node;
             const buffer = await loadFileByRequest(`${origin}${this.data.pagMap[index]}`);
             const pagFile = await this.PAG.PAGFile.load(buffer);
-            const pagView = await this.PAG.PAGView.init(pagFile, canvas, { firstFrame: true }); // 自v4.4.29开始建议传入wxml中定义的canvasId
+            const pagView = await this.PAG.PAGView.init(pagFile, canvas, { firstFrame: true });
             pagView.setRepeatCount(0);
             pagView.addListener('onAnimationUpdate', () => {
               wx.createSelectorQuery()

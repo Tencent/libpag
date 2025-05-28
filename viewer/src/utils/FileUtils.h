@@ -19,15 +19,18 @@
 #pragma once
 
 #include <QString>
+#include "pag/file.h"
 
 namespace pag::Utils {
 
-void openInFinder(const QString& path, bool select = true);
+void OpenInFinder(const QString& path, bool select = true);
 
-bool deleteFile(const QString& path);
+bool DeleteFile(const QString& path);
 
-bool deleteDir(const QString& path);
+bool DeleteDir(const QString& path);
 
-bool makeDir(const QString& path, bool isDir = true);
+bool MakeDir(const QString& path, bool isDir = true);
+
+bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath);
 
 }  // namespace pag::Utils

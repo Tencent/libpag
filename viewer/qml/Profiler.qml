@@ -15,11 +15,6 @@ Item {
     width: defaultWidth
     height: defaultHeight
 
-    PAGRunTimeModelManager {
-        id: runTimeModelManager
-        objectName: "runTimeModelManager"
-    }
-
     Column {
         spacing: 0
         anchors {
@@ -83,7 +78,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
 
-            model: runTimeModelManager.fileInfoModel
+            model: runTimeDataModel ? runTimeDataModel.fileInfoModel : null
 
             delegate: Item {
                 width: fileInfoView.cellWidth
@@ -209,7 +204,7 @@ Item {
                 anchors.fill: parent
                 spacing: 1
 
-                model: runTimeModelManager.frameDisplayInfoModel
+                model: runTimeDataModel ? runTimeDataModel.frameDisplayInfoModel : null
 
                 delegate: Item {
                     height: 20

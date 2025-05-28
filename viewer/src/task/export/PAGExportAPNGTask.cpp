@@ -37,10 +37,10 @@ int PAGExportAPNGTask::onFinish() {
   std::string outPath = apngFilePath.toStdString();
   std::string firstPNGPath = QString("%1/1.png").arg(filePath).toStdString();
   int frameRate = static_cast<int>(pagFile->frameRate());
-  Utils::exportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
+  Utils::ExportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
   PAGExportPNGTask::onFrameFlush(1.0);
-  Utils::deleteDir(filePath);
-  Utils::openInFinder(apngFilePath, true);
+  Utils::DeleteDir(filePath);
+  Utils::OpenInFinder(apngFilePath, true);
   return PAGExportPNGTask::onFinish();
 }
 

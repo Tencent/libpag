@@ -41,7 +41,7 @@ class PAGFileInfoModel : public QAbstractListModel {
 
   QVariant data(const QModelIndex& index, int role) const override;
   int rowCount(const QModelIndex& parent) const override;
-  void resetFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+  void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
 
  protected:
   QHash<int, QByteArray> roleNames() const override;

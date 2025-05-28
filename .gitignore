@@ -79,3 +79,4 @@ ios/PAG
 mac/PAG
 linux/vendor/
 /PAG
+.cache
