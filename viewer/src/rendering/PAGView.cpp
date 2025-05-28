@@ -63,6 +63,10 @@ int PAGView::getEditableTextLayerCount() const {
   return editableTextLayerCount;
 }
 
+int PAGView::getEditableImageLayerCount() const {
+  return editableImageLayerCount;
+}
+
 QString PAGView::getTotalFrame() const {
   if (pagFile == nullptr) {
     return "0";
@@ -206,7 +210,9 @@ bool PAGView::setFile(const QString& filePath) {
   setIsPlaying(true);
 
   editableTextLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Text).size());
+  editableImageLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Image).size());
   Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
+  Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
 
   return true;
 }

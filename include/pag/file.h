@@ -864,9 +864,9 @@ class PAG_API HueSaturationEffect : public Effect {
   bool verify() const override;
 
   ChannelControlType channelControl = ChannelControlType::Master;
-  float hue[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
-  float saturation[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
-  float lightness[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
+  float RTTR_SKIP_REGISTER_PROPERTY hue[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
+  float RTTR_SKIP_REGISTER_PROPERTY saturation[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
+  float RTTR_SKIP_REGISTER_PROPERTY lightness[static_cast<size_t>(ChannelControlType::Count)] = {0.0f};
   bool colorize = false;
   Property<float>* colorizeHue = nullptr;
   Property<float>* colorizeSaturation = nullptr;

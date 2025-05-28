@@ -36,6 +36,8 @@ class PAGView : public QQuickItem {
   Q_PROPERTY(int pagHeight READ getPAGHeight)
   Q_PROPERTY(int editableTextLayerCount READ getEditableTextLayerCount NOTIFY
                  editableTextLayerCountChanged)
+  Q_PROPERTY(int editableImageLayerCount READ getEditableImageLayerCount NOTIFY
+                 editableImageLayerCountChanged)
   Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
   Q_PROPERTY(bool showVideoFrames READ getShowVideoFrames WRITE setShowVideoFrames)
   Q_PROPERTY(double progress READ getProgress WRITE setProgress NOTIFY progressChanged)
@@ -50,6 +52,7 @@ class PAGView : public QQuickItem {
   int getPAGWidth() const;
   int getPAGHeight() const;
   int getEditableTextLayerCount() const;
+  int getEditableImageLayerCount() const;
 
   bool isPlaying() const;
   bool getShowVideoFrames() const;
@@ -67,6 +70,7 @@ class PAGView : public QQuickItem {
   void setProgress(double progress);
 
   Q_SIGNAL void editableTextLayerCountChanged(int editableTextLayerCount);
+  Q_SIGNAL void editableImageLayerCountChanged(int editableImageLayerCount);
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
   Q_SIGNAL void fileChanged(const std::shared_ptr<pag::PAGFile>& pagFile,
@@ -85,6 +89,7 @@ class PAGView : public QQuickItem {
 
  private:
   int editableTextLayerCount = 0;
+  int editableImageLayerCount = 0;
   int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
   qreal lastWidth = 0;

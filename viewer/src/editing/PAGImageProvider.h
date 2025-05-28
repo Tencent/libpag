@@ -18,43 +18,19 @@
 
 #pragma once
 
-#include <QQmlApplicationEngine>
-#include <QString>
-#include "PAGView.h"
-#include "PAGWindowHelper.h"
-#include "editing/PAGEditAttributeModel.h"
+#include <QQuickImageProvider>
 #include "editing/PAGImageLayerModel.h"
-#include "editing/PAGImageProvider.h"
-#include "editing/PAGTextLayerModel.h"
-#include "editing/PAGTreeViewModel.h"
-#include "profiling/PAGRunTimeDataModel.h"
 
 namespace pag {
-class PAGWindow : public QObject {
-  Q_OBJECT
+
+class PAGImageProvider : public QQuickImageProvider {
  public:
-  explicit PAGWindow(QObject* parent = nullptr);
+  explicit PAGImageProvider();
 
-  Q_SIGNAL void destroyWindow(PAGWindow* window);
-
-  Q_SLOT void openFile(QString path);
-  Q_SLOT void onPAGViewerDestroyed();
-
-  void open();
-  QString getFilePath();
-
-  static QList<PAGWindow*> AllWindows;
+  QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) Q_DECL_OVERRIDE;
+  void setImageLayerModel(const std::shared_ptr<PAGImageLayerModel>& model);
 
  private:
-  QString filePath = "";
-  QQuickWindow* window = nullptr;
-  PAGView* pagView = nullptr;
-  std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
-  std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
-  std::unique_ptr<PAGTreeViewModel> treeViewModel = nullptr;
-  std::unique_ptr<PAGRunTimeDataModel> runTimeDataModel = nullptr;
-  std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
-  std::unique_ptr<PAGTextLayerModel> textLayerModel = nullptr;
   std::shared_ptr<PAGImageLayerModel> imageLayerModel = nullptr;
 };
 
