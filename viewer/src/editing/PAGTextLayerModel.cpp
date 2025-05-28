@@ -359,8 +359,6 @@ bool PAGTextLayerModel::compareTextDocument(TextDocument* oldTextDocument,
              newTextDocument->strokeWidth, newTextDocument->text, newTextDocument->justification,
              newTextDocument->leading, newTextDocument->tracking, newTextDocument->backgroundColor,
              newTextDocument->backgroundAlpha, newTextDocument->direction);
-
-  return true;
 }
 
 }  // namespace pag
