@@ -47,11 +47,7 @@ QVariant PAGImageLayerModel::data(const QModelIndex& index, int role) const {
   return {};
 }
 
-QImage PAGImageLayerModel::requestImage(const QString& id, QSize* size,
-                                        const QSize& requestedSize) {
-  Q_UNUSED(size);
-  Q_UNUSED(requestedSize);
-  int index = id.toInt();
+QImage PAGImageLayerModel::requestImage(int index) {
   if (index < 0 || index >= imageLayers.count()) {
     return {};
   }

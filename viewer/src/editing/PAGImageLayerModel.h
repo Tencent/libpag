@@ -32,7 +32,7 @@ class PAGImageLayerModel : public QAbstractListModel {
 
   int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
   QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
-  QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize);
+  QImage requestImage(int index);
 
   Q_SLOT void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
 

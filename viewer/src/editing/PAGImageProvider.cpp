@@ -24,10 +24,12 @@ PAGImageProvider::PAGImageProvider() : QQuickImageProvider(QQuickImageProvider::
 }
 
 QImage PAGImageProvider::requestImage(const QString& id, QSize* size, const QSize& requestedSize) {
+  Q_UNUSED(size);
+  Q_UNUSED(requestedSize);
   if (imageLayerModel == nullptr) {
     return {};
   }
-  return imageLayerModel->requestImage(id, size, requestedSize);
+  return imageLayerModel->requestImage(id.toInt());
 }
 
 void PAGImageProvider::setImageLayerModel(const std::shared_ptr<PAGImageLayerModel>& model) {
