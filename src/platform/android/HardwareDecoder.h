@@ -19,13 +19,13 @@
 #pragma once
 
 #include "JNIHelper.h"
+#include "android/native_window.h"
+#include "android/native_window_jni.h"
+#include "media/NdkMediaCodec.h"
+#include "media/NdkMediaFormat.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
 #include "tgfx/platform/android/SurfaceTextureReader.h"
-#include "media/NdkMediaCodec.h"
-#include "media/NdkMediaFormat.h"
-#include "android/native_window.h"
-#include "android/native_window_jni.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
@@ -48,20 +48,20 @@ class HardwareDecoder : public VideoDecoder {
 
   bool releaseOutputBuffer(bool render);
 
-private:
-    bool isValid = false;
+ private:
+  bool isValid = false;
 
-    // AMediaCodec_start(原decoder.start)
-    // AMediaCodec_flush(原decoder.flush)
-    // HUAWEI Mate 40 Pro，在连续或者相近的时间执行上面代码会解码失败，
-    // 报 `VIDEO-[pps_sps_check_tmp_id]:[5994]pps is null ppsid = 0 havn't decode`
-    bool disableFlush = true;
+  // AMediaCodec_start(原decoder.start)
+  // AMediaCodec_flush(原decoder.flush)
+  // HUAWEI Mate 40 Pro，在连续或者相近的时间执行上面代码会解码失败，
+  // 报 `VIDEO-[pps_sps_check_tmp_id]:[5994]pps is null ppsid = 0 havn't decode`
+  bool disableFlush = true;
 
-    std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
-    AMediaCodec* videoDecoder = nullptr;
-    static const int TIMEOUT_US = 1000;
-    ssize_t lastOutputBufferIndex = -1;
-    AMediaCodecBufferInfo* bufferInfo = nullptr;
+  std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
+  AMediaCodec* videoDecoder = nullptr;
+  static const int TIMEOUT_US = 1000;
+  ssize_t lastOutputBufferIndex = -1;
+  AMediaCodecBufferInfo* bufferInfo = nullptr;
 
   explicit HardwareDecoder(const VideoFormat& format);
   bool initDecoder(const VideoFormat& format);

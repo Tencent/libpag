@@ -34,40 +34,38 @@ void HardwareDecoder::InitJNI(JNIEnv* env) {
     return;
   }
 
-  HardwareDecoder_getVideoSurface = env->GetStaticMethodID(HardwareDecoderClass.get(), "getVideoSurface",
-                                                     "(II)Lorg/libpag/VideoSurface;");
-  HardwareDecoder_getSurface = env->GetStaticMethodID(HardwareDecoderClass.get(), "getSurface",
-                                                             "(Lorg/libpag/VideoSurface;)Landroid/view/Surface;");
-
+  HardwareDecoder_getVideoSurface = env->GetStaticMethodID(
+      HardwareDecoderClass.get(), "getVideoSurface", "(II)Lorg/libpag/VideoSurface;");
+  HardwareDecoder_getSurface =
+      env->GetStaticMethodID(HardwareDecoderClass.get(), "getSurface",
+                             "(Lorg/libpag/VideoSurface;)Landroid/view/Surface;");
 }
 
-
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
-    isValid = initDecoder(format);
+  isValid = initDecoder(format);
 }
 
 HardwareDecoder::~HardwareDecoder() {
-    releaseOutputBuffer(false);
-    media_status_t status;
-    if(videoDecoder!= nullptr){
-        status = AMediaCodec_stop(videoDecoder);
-        if(status!=AMEDIA_OK){
-            LOGE("HardwareDecoder: Error on stopping videoDecoder.\n");
-        }
-
-        status = AMediaCodec_delete(videoDecoder);
-        if(status!=AMEDIA_OK){
-            LOGE("HardwareDecoder: Error on deleting videoDecoder.\n");
-        }
-        videoDecoder = nullptr;
+  releaseOutputBuffer(false);
+  media_status_t status;
+  if (videoDecoder != nullptr) {
+    status = AMediaCodec_stop(videoDecoder);
+    if (status != AMEDIA_OK) {
+      LOGE("HardwareDecoder: Error on stopping videoDecoder.\n");
     }
 
-    delete bufferInfo;
+    status = AMediaCodec_delete(videoDecoder);
+    if (status != AMEDIA_OK) {
+      LOGE("HardwareDecoder: Error on deleting videoDecoder.\n");
+    }
+    videoDecoder = nullptr;
+  }
 
+  delete bufferInfo;
 }
 
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
-    LOGE("HardwareDecoder: START Hardware Decoder.\n");
+  LOGE("HardwareDecoder: START Hardware Decoder.\n");
 
   if (HardwareDecoderClass.get() == nullptr) {
     LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
@@ -85,7 +83,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
 
   if (format.mimeType == "video/hevc") {
     if (!format.headers.empty()) {
-      const char *keyString = "csd-0";
+      const char* keyString = "csd-0";
       size_t dataLength = 0;
       for (auto& header : format.headers) {
         dataLength += header->size();
@@ -96,150 +94,157 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
         buffer.writeRange(pos, header->size(), header->data());
         pos += header->size();
       }
-        AMediaFormat_setBuffer(mediaFormat, keyString, buffer.data(), buffer.size());
+      AMediaFormat_setBuffer(mediaFormat, keyString, buffer.data(), buffer.size());
     }
   } else {
     int index = 0;
     for (auto& header : format.headers) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
-      AMediaFormat_setBuffer(mediaFormat, keyString, const_cast<uint8_t*>(header->bytes()), header->size());
+      AMediaFormat_setBuffer(mediaFormat, keyString, const_cast<uint8_t*>(header->bytes()),
+                             header->size());
       index++;
     }
   }
 
-    AMediaFormat_setFloat(mediaFormat, AMEDIAFORMAT_KEY_FRAME_RATE, format.frameRate);
+  AMediaFormat_setFloat(mediaFormat, AMEDIAFORMAT_KEY_FRAME_RATE, format.frameRate);
   videoDecoder = AMediaCodec_createDecoderByType(format.mimeType.c_str());
-    if (videoDecoder == nullptr) {
-        AMediaFormat_delete(mediaFormat);
-        return false;
-    }
-
-    auto videoSurface =  env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_getVideoSurface, format.width, format.height);
-    auto surface = env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_getSurface, videoSurface);
-    ANativeWindow* nativeWindow = ANativeWindow_fromSurface(env, surface);
-    media_status_t status;
-    status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
+  if (videoDecoder == nullptr) {
     AMediaFormat_delete(mediaFormat);
-    if(status!=AMEDIA_OK){
-        LOGE("HardwareDecoder: Error on configuring videoDecoder.\n");
-        ANativeWindow_release(nativeWindow);
-        AMediaCodec_delete(videoDecoder);
-        videoDecoder = nullptr;
-        return false;
-    }
-    status = AMediaCodec_start(videoDecoder);
-    if(status!=AMEDIA_OK){
-        LOGE("HardwareDecoder: Error on starting videoDecoder.\n");
-        ANativeWindow_release(nativeWindow);
-        AMediaCodec_delete(videoDecoder);
-        videoDecoder = nullptr;
-        return false;
-    }
-   imageReader = JVideoSurface::GetImageReader(env, videoSurface);
-    if (imageReader == nullptr) {
-        AMediaCodec_stop(videoDecoder);
-        ANativeWindow_release(nativeWindow);
-        AMediaCodec_delete(videoDecoder);
-        videoDecoder = nullptr;
-        return false;
-    }
+    return false;
+  }
 
-    bufferInfo = new AMediaCodecBufferInfo();
+  auto videoSurface = env->CallStaticObjectMethod(
+      HardwareDecoderClass.get(), HardwareDecoder_getVideoSurface, format.width, format.height);
+  auto surface = env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_getSurface,
+                                             videoSurface);
+  ANativeWindow* nativeWindow = ANativeWindow_fromSurface(env, surface);
+  media_status_t status;
+  status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
+  AMediaFormat_delete(mediaFormat);
+  if (status != AMEDIA_OK) {
+    LOGE("HardwareDecoder: Error on configuring videoDecoder.\n");
     ANativeWindow_release(nativeWindow);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
+    return false;
+  }
+  status = AMediaCodec_start(videoDecoder);
+  if (status != AMEDIA_OK) {
+    LOGE("HardwareDecoder: Error on starting videoDecoder.\n");
+    ANativeWindow_release(nativeWindow);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
+    return false;
+  }
+  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
+  if (imageReader == nullptr) {
+    AMediaCodec_stop(videoDecoder);
+    ANativeWindow_release(nativeWindow);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
+    return false;
+  }
 
-    return true;
+  bufferInfo = new AMediaCodecBufferInfo();
+  ANativeWindow_release(nativeWindow);
+
+  return true;
 }
 
 DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
-    ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
-    size_t outsize;
-    if (inputBufferIndex >= 0) {
-        uint8_t* inputBuffer = AMediaCodec_getInputBuffer(videoDecoder, inputBufferIndex, &outsize);
-        if (inputBuffer == nullptr || length > outsize) {
-            LOGE("HardwareDecoder: Error on getting input buffer index.\n");
-            return pag::DecodingResult::Error;
-        }
-        memcpy(inputBuffer, bytes, length);
-        media_status_t status = AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, length, time, 0);
-        if(status != AMEDIA_OK){
-            LOGE("HardwareDecoder: Error on queuing input buffer in onSendBytes.\n");
-            return pag::DecodingResult::Error;
-        }
-        disableFlush = false;
-        return pag::DecodingResult::Success;
+  ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
+  size_t outsize;
+  if (inputBufferIndex >= 0) {
+    uint8_t* inputBuffer = AMediaCodec_getInputBuffer(videoDecoder, inputBufferIndex, &outsize);
+    if (inputBuffer == nullptr || length > outsize) {
+      LOGE("HardwareDecoder: Error on getting input buffer index.\n");
+      return pag::DecodingResult::Error;
     }
-    return pag::DecodingResult::TryAgainLater;
+    memcpy(inputBuffer, bytes, length);
+    media_status_t status =
+        AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, length, time, 0);
+    if (status != AMEDIA_OK) {
+      LOGE("HardwareDecoder: Error on queuing input buffer in onSendBytes.\n");
+      return pag::DecodingResult::Error;
+    }
+    disableFlush = false;
+    return pag::DecodingResult::Success;
+  }
+  return pag::DecodingResult::TryAgainLater;
 }
 
 DecodingResult HardwareDecoder::onDecodeFrame() {
-    releaseOutputBuffer(false);
-    ssize_t outputBufferIndex = AMediaCodec_dequeueOutputBuffer(videoDecoder, bufferInfo, TIMEOUT_US);
-    if ((bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
-        if (outputBufferIndex >= 0) {
-            lastOutputBufferIndex = outputBufferIndex;
-        }
-        return pag::DecodingResult::EndOfStream;
-    }
+  releaseOutputBuffer(false);
+  ssize_t outputBufferIndex = AMediaCodec_dequeueOutputBuffer(videoDecoder, bufferInfo, TIMEOUT_US);
+  if ((bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
     if (outputBufferIndex >= 0) {
-        lastOutputBufferIndex = outputBufferIndex;
+      lastOutputBufferIndex = outputBufferIndex;
     }
+    return pag::DecodingResult::EndOfStream;
+  }
+  if (outputBufferIndex >= 0) {
+    lastOutputBufferIndex = outputBufferIndex;
+  }
 
-    return lastOutputBufferIndex != -1 ? pag::DecodingResult::Success : pag::DecodingResult::TryAgainLater;
+  return lastOutputBufferIndex != -1 ? pag::DecodingResult::Success
+                                     : pag::DecodingResult::TryAgainLater;
 }
 
 void HardwareDecoder::onFlush() {
-    if(disableFlush){
-        return;
-    }
-    media_status_t status;
-    status = AMediaCodec_flush(videoDecoder);
-    if(status!=AMEDIA_OK){
-        LOGE("HardwareDecoder: Error on Decoder Flush.");
-    }
+  if (disableFlush) {
+    return;
+  }
+  media_status_t status;
+  status = AMediaCodec_flush(videoDecoder);
+  if (status != AMEDIA_OK) {
+    LOGE("HardwareDecoder: Error on Decoder Flush.");
+  }
 
-    bufferInfo->flags = 0;
-    bufferInfo->presentationTimeUs = 0;
+  bufferInfo->flags = 0;
+  bufferInfo->presentationTimeUs = 0;
 
-    lastOutputBufferIndex = -1;
+  lastOutputBufferIndex = -1;
 }
 
 int64_t HardwareDecoder::presentationTime() {
-    return bufferInfo->presentationTimeUs;
+  return bufferInfo->presentationTimeUs;
 }
 
 DecodingResult HardwareDecoder::onEndOfStream() {
-    ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
-    if (inputBufferIndex >= 0) {
-        media_status_t status = AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, 0, 0, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
-        if(status != AMEDIA_OK){
-            LOGE("HardwareDecoder: Error on queuing input buffer in EndOfStream.\n");
-            return pag::DecodingResult::Error;
-        }
-        disableFlush = false;
-        return pag::DecodingResult::Success;
+  ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
+  if (inputBufferIndex >= 0) {
+    media_status_t status = AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, 0, 0,
+                                                         AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
+    if (status != AMEDIA_OK) {
+      LOGE("HardwareDecoder: Error on queuing input buffer in EndOfStream.\n");
+      return pag::DecodingResult::Error;
     }
-    return pag::DecodingResult::TryAgainLater;
+    disableFlush = false;
+    return pag::DecodingResult::Success;
+  }
+  return pag::DecodingResult::TryAgainLater;
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-    bool result = releaseOutputBuffer(true);
-    if (!result) {
-        return nullptr;
-    }
-    return imageReader->acquireNextBuffer();
+  bool result = releaseOutputBuffer(true);
+  if (!result) {
+    return nullptr;
+  }
+  return imageReader->acquireNextBuffer();
 }
 
-bool HardwareDecoder::releaseOutputBuffer(bool render){
-    if (lastOutputBufferIndex != -1) {
-        media_status_t status = AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, render);
-        lastOutputBufferIndex = -1;
-        if(status == AMEDIA_OK){
-            return true;
-        }
-        LOGE("HardwareDecoder: Error on releasing Output Buffer.");
+bool HardwareDecoder::releaseOutputBuffer(bool render) {
+  if (lastOutputBufferIndex != -1) {
+    media_status_t status =
+        AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, render);
+    lastOutputBufferIndex = -1;
+    if (status == AMEDIA_OK) {
+      return true;
     }
-    return false;
+    LOGE("HardwareDecoder: Error on releasing Output Buffer.");
+  }
+  return false;
 }
 
 }  // namespace pag
