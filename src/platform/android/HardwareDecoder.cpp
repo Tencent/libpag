@@ -22,25 +22,23 @@
 #include "tgfx/core/Task.h"
 
 namespace pag {
-static Global<jclass> HardwareDecoderClass;
+static Global<jclass> VideoSurfaceClass;
 
-static jmethodID HardwareDecoder_getVideoSurface;
-static jmethodID HardwareDecoder_getSurface;
+static jmethodID VideoSurface_Make;
 
 static const int TIMEOUT_US = 1000;
 
 void HardwareDecoder::InitJNI(JNIEnv* env) {
-  HardwareDecoderClass = env->FindClass("org/libpag/HardwareDecoder");
-  if (HardwareDecoderClass.get() == nullptr) {
-    LOGE("Could not run HardwareDecoder.InitJNI(), HardwareDecoderClass is not found!");
+  VideoSurfaceClass = env->FindClass("org/libpag/VideoSurface");
+  if (VideoSurfaceClass.get() == nullptr) {
+    LOGE(
+        "HardwareDecoder: Could not run HardwareDecoder.InitJNI(), VideoSurfaceClass is not "
+        "found!");
     return;
   }
 
-  HardwareDecoder_getVideoSurface = env->GetStaticMethodID(
-      HardwareDecoderClass.get(), "getVideoSurface", "(II)Lorg/libpag/VideoSurface;");
-  HardwareDecoder_getSurface =
-      env->GetStaticMethodID(HardwareDecoderClass.get(), "getSurface",
-                             "(Lorg/libpag/VideoSurface;)Landroid/view/Surface;");
+  VideoSurface_Make =
+      env->GetStaticMethodID(VideoSurfaceClass.get(), "Make", "(II)Lorg/libpag/VideoSurface;");
 }
 
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
@@ -76,8 +74,8 @@ HardwareDecoder::~HardwareDecoder() {
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   LOGE("HardwareDecoder: START Hardware Decoder.\n");
 
-  if (HardwareDecoderClass.get() == nullptr) {
-    LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
+  if (VideoSurfaceClass.get() == nullptr) {
+    LOGE("Could not run HardwareDecoder.initDecoder(), VideoSurfaceClass is not found!");
     return false;
   }
 
@@ -122,13 +120,39 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
+    AMediaFormat_delete(mediaFormat);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
     return false;
   }
-  auto videoSurface = env->CallStaticObjectMethod(
-      HardwareDecoderClass.get(), HardwareDecoder_getVideoSurface, format.width, format.height);
-  auto surface = env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_getSurface,
-                                             videoSurface);
+
+  auto videoSurface = env->CallStaticObjectMethod(VideoSurfaceClass.get(), VideoSurface_Make,
+                                                  format.width, format.height);
+  if (videoSurface == nullptr) {
+    AMediaFormat_delete(mediaFormat);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
+    return false;
+  }
+
+  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
+  if (imageReader == nullptr) {
+    AMediaFormat_delete(mediaFormat);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
+    return false;
+  }
+
+  auto surface = imageReader->getInputSurface();
+  if (surface == nullptr) {
+    AMediaFormat_delete(mediaFormat);
+    AMediaCodec_delete(videoDecoder);
+    videoDecoder = nullptr;
+    return false;
+  }
+
   nativeWindow = ANativeWindow_fromSurface(env, surface);
+
   media_status_t status;
   status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
   AMediaFormat_delete(mediaFormat);
@@ -139,17 +163,10 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     videoDecoder = nullptr;
     return false;
   }
+
   status = AMediaCodec_start(videoDecoder);
   if (status != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on starting videoDecoder.\n");
-    ANativeWindow_release(nativeWindow);
-    AMediaCodec_delete(videoDecoder);
-    videoDecoder = nullptr;
-    return false;
-  }
-  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
-  if (imageReader == nullptr) {
-    AMediaCodec_stop(videoDecoder);
     ANativeWindow_release(nativeWindow);
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
