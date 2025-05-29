@@ -45,7 +45,7 @@ class BlendModifier : public Modifier {
   void prepare(RenderCache*) const override {
   }
 
-  void applyToBounds(tgfx::Rect*) const override {};
+  void applyToBounds(tgfx::Rect*) const override{};
 
   bool applyToPath(tgfx::Path*) const override {
     return alpha == 1.0f;  // blendMode 只影响颜色，不改变形状或透明度，不影响 getPath 结果。

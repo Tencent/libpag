@@ -24,9 +24,9 @@
 #include "pag/types.h"
 
 #define PAG_DEFAULT_METHOD_ENTRY(name, func) \
-  {#name, nullptr, func, nullptr, nullptr, nullptr, napi_default, nullptr}
+  { #name, nullptr, func, nullptr, nullptr, nullptr, napi_default, nullptr }
 #define PAG_STATIC_METHOD_ENTRY(name, func) \
-  {#name, nullptr, func, nullptr, nullptr, nullptr, napi_static, nullptr}
+  { #name, nullptr, func, nullptr, nullptr, nullptr, napi_static, nullptr }
 
 namespace pag {
 

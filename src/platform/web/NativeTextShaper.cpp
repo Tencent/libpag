@@ -61,7 +61,8 @@ static void CheckContinuations(std::vector<Info>& infos) {
 
 static void MergeClusters(std::vector<Info>& infos) {
   auto groupEnd = [&](size_t start) -> size_t {
-    while (++start < infos.size() && infos[start].isContinuation);
+    while (++start < infos.size() && infos[start].isContinuation)
+      ;
     return start;
   };
 
