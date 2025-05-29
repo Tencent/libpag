@@ -80,11 +80,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
     return false;
   }
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return false;
-  }
+
   auto mediaFormat = AMediaFormat_new();
   AMediaFormat_setString(mediaFormat, AMEDIAFORMAT_KEY_MIME, format.mimeType.c_str());
   AMediaFormat_setInt32(mediaFormat, AMEDIAFORMAT_KEY_WIDTH, format.width);
@@ -123,6 +119,11 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
 
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return false;
+  }
   auto videoSurface = env->CallStaticObjectMethod(
       HardwareDecoderClass.get(), HardwareDecoder_getVideoSurface, format.width, format.height);
   auto surface = env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_getSurface,
