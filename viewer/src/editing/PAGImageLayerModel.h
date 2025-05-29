@@ -26,7 +26,7 @@ namespace pag {
 class PAGImageLayerModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  enum class PAGImageLayerRoles { IndexRole = Qt::UserRole + 1, CanReveryRole };
+  enum class PAGImageLayerRoles { IndexRole = Qt::UserRole + 1, ReveryRole };
 
   explicit PAGImageLayerModel(QObject* parent = nullptr);
 
@@ -45,7 +45,7 @@ class PAGImageLayerModel : public QAbstractListModel {
 
  private:
   QSet<int> revertSet = {};
-  QList<QImage> imageLayers = {};
+  QMap<int, QImage> imageLayers = {};
   std::shared_ptr<PAGFile> pagFile = nullptr;
 };
 

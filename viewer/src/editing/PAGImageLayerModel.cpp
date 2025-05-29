@@ -29,7 +29,7 @@ PAGImageLayerModel::PAGImageLayerModel(QObject* parent) : QAbstractListModel(par
 
 int PAGImageLayerModel::rowCount(const QModelIndex& parent) const {
   Q_UNUSED(parent);
-  return static_cast<int>(imageLayers.count());
+  return imageLayers.count();
 }
 
 QVariant PAGImageLayerModel::data(const QModelIndex& index, int role) const {
@@ -40,7 +40,7 @@ QVariant PAGImageLayerModel::data(const QModelIndex& index, int role) const {
   if (role == static_cast<int>(PAGImageLayerRoles::IndexRole)) {
     return index.row();
   }
-  if (role == static_cast<int>(PAGImageLayerRoles::CanReveryRole)) {
+  if (role == static_cast<int>(PAGImageLayerRoles::ReveryRole)) {
     return {revertSet.find(index.row()) != revertSet.end()};
   }
 
@@ -56,7 +56,7 @@ QImage PAGImageLayerModel::requestImage(const QString& id, QSize* size,
     return {};
   }
 
-  return imageLayers.at(index);
+  return imageLayers[index];
 }
 
 void PAGImageLayerModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
@@ -85,7 +85,7 @@ void PAGImageLayerModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
     auto imageData = layer->imageBytes->fileBytes;
 
     QImage image = QImage::fromData(imageData->data(), static_cast<int>(imageData->length()));
-    imageLayers.append(image);
+    imageLayers[imageLayers.count()] = image;
   }
   endResetModel();
 }
@@ -123,7 +123,7 @@ void PAGImageLayerModel::replaceImage(int index, const QString& filePath) {
 
   beginResetModel();
   revertSet.insert(index);
-  imageLayers.replace(index, newImage);
+  imageLayers[index] = newImage;
   endResetModel();
 }
 
@@ -143,7 +143,7 @@ void PAGImageLayerModel::revertImage(int index) {
   pagFile->replaceImage(convertIndex(index), nullptr);
   beginResetModel();
   revertSet.remove(index);
-  imageLayers.replace(index, image);
+  imageLayers[index] = image;
   endResetModel();
 }
 
@@ -155,7 +155,7 @@ int PAGImageLayerModel::convertIndex(int index) {
 QHash<int, QByteArray> PAGImageLayerModel::roleNames() const {
   static QHash<int, QByteArray> roles = {
       {static_cast<int>(PAGImageLayerRoles::IndexRole), "value"},
-      {static_cast<int>(PAGImageLayerRoles::CanReveryRole), "canRevert"},
+      {static_cast<int>(PAGImageLayerRoles::ReveryRole), "canRevert"},
   };
   return roles;
 }
