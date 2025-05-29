@@ -47,29 +47,27 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
 }
 
 HardwareDecoder::~HardwareDecoder() {
+    releaseOutputBuffer(false);
     media_status_t status;
-    if (lastOutputBufferIndex != -1) {
-        status = AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, false);
-        lastOutputBufferIndex = -1;
-        if(status != AMEDIA_OK){
-            LOGE("HardwareDecoder: Error on releasing OutputBuffer.\n");
-        }
-    }
     if(videoDecoder!= nullptr){
         status = AMediaCodec_stop(videoDecoder);
         if(status!=AMEDIA_OK){
             LOGE("HardwareDecoder: Error on stopping videoDecoder.\n");
         }
+
         status = AMediaCodec_delete(videoDecoder);
         if(status!=AMEDIA_OK){
             LOGE("HardwareDecoder: Error on deleting videoDecoder.\n");
         }
         videoDecoder = nullptr;
     }
+
+    delete bufferInfo;
+
 }
 
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
-    LOGE("START Hardware Decoder.\n");
+    LOGE("HardwareDecoder: START Hardware Decoder.\n");
 
   if (HardwareDecoderClass.get() == nullptr) {
     LOGE("Could not run HardwareDecoder.initDecoder(), HardwareDecoderClass is not found!");
@@ -122,32 +120,34 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     ANativeWindow* nativeWindow = ANativeWindow_fromSurface(env, surface);
     media_status_t status;
     status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
+    AMediaFormat_delete(mediaFormat);
     if(status!=AMEDIA_OK){
         LOGE("HardwareDecoder: Error on configuring videoDecoder.\n");
-        AMediaFormat_delete(mediaFormat);
-        AMediaCodec_delete(videoDecoder);
         ANativeWindow_release(nativeWindow);
+        AMediaCodec_delete(videoDecoder);
         videoDecoder = nullptr;
         return false;
     }
     status = AMediaCodec_start(videoDecoder);
     if(status!=AMEDIA_OK){
         LOGE("HardwareDecoder: Error on starting videoDecoder.\n");
-        AMediaFormat_delete(mediaFormat);
-        AMediaCodec_delete(videoDecoder);
         ANativeWindow_release(nativeWindow);
+        AMediaCodec_delete(videoDecoder);
         videoDecoder = nullptr;
         return false;
     }
    imageReader = JVideoSurface::GetImageReader(env, videoSurface);
     if (imageReader == nullptr) {
-        AMediaFormat_delete(mediaFormat);
         AMediaCodec_stop(videoDecoder);
-        AMediaCodec_delete(videoDecoder);
         ANativeWindow_release(nativeWindow);
+        AMediaCodec_delete(videoDecoder);
         videoDecoder = nullptr;
         return false;
     }
+
+    bufferInfo = new AMediaCodecBufferInfo();
+    ANativeWindow_release(nativeWindow);
+
     return true;
 }
 
@@ -173,10 +173,7 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
 }
 
 DecodingResult HardwareDecoder::onDecodeFrame() {
-    if (lastOutputBufferIndex != -1) {
-        AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, false);
-        lastOutputBufferIndex = -1;
-    }
+    releaseOutputBuffer(false);
     ssize_t outputBufferIndex = AMediaCodec_dequeueOutputBuffer(videoDecoder, bufferInfo, TIMEOUT_US);
     if ((bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
         if (outputBufferIndex >= 0) {
@@ -195,8 +192,15 @@ void HardwareDecoder::onFlush() {
     if(disableFlush){
         return;
     }
-    AMediaCodec_flush(videoDecoder);
-    bufferInfo = new AMediaCodecBufferInfo();
+    media_status_t status;
+    status = AMediaCodec_flush(videoDecoder);
+    if(status!=AMEDIA_OK){
+        LOGE("HardwareDecoder: Error on Decoder Flush.");
+    }
+
+    bufferInfo->flags = 0;
+    bufferInfo->presentationTimeUs = 0;
+
     lastOutputBufferIndex = -1;
 }
 
@@ -219,18 +223,23 @@ DecodingResult HardwareDecoder::onEndOfStream() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-    bool result = false;
-    if (lastOutputBufferIndex != -1) {
-        media_status_t status = AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, true);
-        lastOutputBufferIndex = -1;
-        if(status == AMEDIA_OK){
-            result = true;
-        }
-    }
+    bool result = releaseOutputBuffer(true);
     if (!result) {
         return nullptr;
     }
     return imageReader->acquireNextBuffer();
+}
+
+bool HardwareDecoder::releaseOutputBuffer(bool render){
+    if (lastOutputBufferIndex != -1) {
+        media_status_t status = AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, render);
+        lastOutputBufferIndex = -1;
+        if(status == AMEDIA_OK){
+            return true;
+        }
+        LOGE("HardwareDecoder: Error on releasing Output Buffer.");
+    }
+    return false;
 }
 
 }  // namespace pag

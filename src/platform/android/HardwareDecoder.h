@@ -46,14 +46,22 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
+  bool releaseOutputBuffer(bool render);
+
 private:
     bool isValid = false;
+
+    // AMediaCodec_start(原decoder.start)
+    // AMediaCodec_flush(原decoder.flush)
+    // HUAWEI Mate 40 Pro，在连续或者相近的时间执行上面代码会解码失败，
+    // 报 `VIDEO-[pps_sps_check_tmp_id]:[5994]pps is null ppsid = 0 havn't decode`
     bool disableFlush = true;
+
     std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
     AMediaCodec* videoDecoder = nullptr;
     static const int TIMEOUT_US = 1000;
     ssize_t lastOutputBufferIndex = -1;
-    AMediaCodecBufferInfo* bufferInfo = new AMediaCodecBufferInfo();
+    AMediaCodecBufferInfo* bufferInfo = nullptr;
 
   explicit HardwareDecoder(const VideoFormat& format);
   bool initDecoder(const VideoFormat& format);
