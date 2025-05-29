@@ -27,6 +27,8 @@ static Global<jclass> HardwareDecoderClass;
 static jmethodID HardwareDecoder_getVideoSurface;
 static jmethodID HardwareDecoder_getSurface;
 
+static const int TIMEOUT_US = 1000;
+
 void HardwareDecoder::InitJNI(JNIEnv* env) {
   HardwareDecoderClass = env->FindClass("org/libpag/HardwareDecoder");
   if (HardwareDecoderClass.get() == nullptr) {
@@ -47,8 +49,8 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
 
 HardwareDecoder::~HardwareDecoder() {
   releaseOutputBuffer(false);
-  media_status_t status;
   if (videoDecoder != nullptr) {
+    media_status_t status;
     status = AMediaCodec_stop(videoDecoder);
     if (status != AMEDIA_OK) {
       LOGE("HardwareDecoder: Error on stopping videoDecoder.\n");
@@ -60,8 +62,15 @@ HardwareDecoder::~HardwareDecoder() {
     }
     videoDecoder = nullptr;
   }
+  if (nativeWindow != nullptr) {
+    ANativeWindow_release(nativeWindow);
+    nativeWindow = nullptr;
+  }
 
-  delete bufferInfo;
+  if (bufferInfo != nullptr) {
+    delete bufferInfo;
+    bufferInfo = nullptr;
+  }
 }
 
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
@@ -118,7 +127,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
       HardwareDecoderClass.get(), HardwareDecoder_getVideoSurface, format.width, format.height);
   auto surface = env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_getSurface,
                                              videoSurface);
-  ANativeWindow* nativeWindow = ANativeWindow_fromSurface(env, surface);
+  nativeWindow = ANativeWindow_fromSurface(env, surface);
   media_status_t status;
   status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
   AMediaFormat_delete(mediaFormat);
@@ -147,8 +156,6 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   }
 
   bufferInfo = new AMediaCodecBufferInfo();
-  ANativeWindow_release(nativeWindow);
-
   return true;
 }
 
@@ -162,9 +169,8 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
       return pag::DecodingResult::Error;
     }
     memcpy(inputBuffer, bytes, length);
-    media_status_t status =
-        AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, length, time, 0);
-    if (status != AMEDIA_OK) {
+    if (AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, length, time, 0) !=
+        AMEDIA_OK) {
       LOGE("HardwareDecoder: Error on queuing input buffer in onSendBytes.\n");
       return pag::DecodingResult::Error;
     }
@@ -195,9 +201,7 @@ void HardwareDecoder::onFlush() {
   if (disableFlush) {
     return;
   }
-  media_status_t status;
-  status = AMediaCodec_flush(videoDecoder);
-  if (status != AMEDIA_OK) {
+  if (AMediaCodec_flush(videoDecoder) != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on Decoder Flush.");
   }
 
@@ -214,9 +218,8 @@ int64_t HardwareDecoder::presentationTime() {
 DecodingResult HardwareDecoder::onEndOfStream() {
   ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
   if (inputBufferIndex >= 0) {
-    media_status_t status = AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, 0, 0,
-                                                         AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM);
-    if (status != AMEDIA_OK) {
+    if (AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, 0, 0,
+                                     AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != AMEDIA_OK) {
       LOGE("HardwareDecoder: Error on queuing input buffer in EndOfStream.\n");
       return pag::DecodingResult::Error;
     }
@@ -236,12 +239,11 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
 
 bool HardwareDecoder::releaseOutputBuffer(bool render) {
   if (lastOutputBufferIndex != -1) {
-    media_status_t status =
-        AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, render);
-    lastOutputBufferIndex = -1;
-    if (status == AMEDIA_OK) {
+    if (AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, render) == AMEDIA_OK) {
+      lastOutputBufferIndex = -1;
       return true;
     }
+    lastOutputBufferIndex = -1;
     LOGE("HardwareDecoder: Error on releasing Output Buffer.");
   }
   return false;

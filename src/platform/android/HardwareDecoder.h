@@ -59,7 +59,7 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
   AMediaCodec* videoDecoder = nullptr;
-  static const int TIMEOUT_US = 1000;
+  ANativeWindow* nativeWindow = nullptr;
   ssize_t lastOutputBufferIndex = -1;
   AMediaCodecBufferInfo* bufferInfo = nullptr;
 
