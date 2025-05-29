@@ -3,8 +3,9 @@ English | [简体中文](./README.zh_CN.md)
 ## Introduction
 ***
 
-The exporter is a plugin for Adobe After Effects (AE), enabling designers to export motion effects created in AE into asset files with one click.  
+The PAGExporter is a plugin for Adobe After Effects (AE), enabling designers to export motion effects created in AE into asset files with one click.  
 While supporting more AE features in pure vector export mode, it also introduces hybrid export mode combining BMP pre-compositions with vectors, supporting all AE features while maintaining runtime editable.
+
 ## Development
 ***
 
@@ -28,7 +29,7 @@ Other environment dependencies are the same as [libpag](../README.md).
 
 ### Building the Project
 
-Ensure that libpag can be compiled successfully before attempting to compile the exporter. Open the project root directory directly in CLion to start the compilation.
+Ensure that libpag can be compiled successfully before attempting to compile the PAGExporter. Open the project root directory directly in CLion to start the compilation.
 
 **For macOS:**
 
