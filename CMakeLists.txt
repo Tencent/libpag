@@ -330,6 +330,9 @@ elseif (ANDROID)
     find_library(JNIGRAPHICS_LIB jnigraphics)
     list(APPEND PAG_SHARED_LIBS ${JNIGRAPHICS_LIB})
 
+    find_library(MEDIANDKLIB mediandk)
+    list(APPEND PAG_SHARED_LIBS ${MEDIANDKLIB})
+
     if (PAG_USE_FFAVC)
         list(APPEND PAG_DEFINES PAG_USE_FFAVC)
         file(GLOB FFAVC_LIB android/libpag/libs/${ANDROID_ABI}/libffavc.so)
