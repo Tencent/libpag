@@ -16,32 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGExportAPNGTask.h"
-#include <QDebug>
-#include "utils/FileUtils.h"
-#include "utils/Utils.h"
+#include "PAGImageProvider.h"
 
 namespace pag {
 
-PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
-                                     const QString& pngFilePath)
-    : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
-  openAfterExport = false;
+PAGImageProvider::PAGImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {
 }
 
-void PAGExportAPNGTask::onFrameFlush(double progress) {
-  PAGExportPNGTask::onFrameFlush(progress * 0.9);
+QImage PAGImageProvider::requestImage(const QString& id, QSize* size, const QSize& requestedSize) {
+  Q_UNUSED(size);
+  Q_UNUSED(requestedSize);
+  if (imageLayerModel == nullptr) {
+    return {};
+  }
+  return imageLayerModel->requestImage(id.toInt());
 }
 
-int PAGExportAPNGTask::onFinish() {
-  std::string outPath = apngFilePath.toStdString();
-  std::string firstPNGPath = QString("%1/1.png").arg(filePath).toStdString();
-  int frameRate = static_cast<int>(pagFile->frameRate());
-  Utils::ExportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
-  PAGExportPNGTask::onFrameFlush(1.0);
-  Utils::DeleteDir(filePath);
-  Utils::OpenInFinder(apngFilePath, true);
-  return PAGExportPNGTask::onFinish();
+void PAGImageProvider::setImageLayerModel(PAGImageLayerModel* model) {
+  imageLayerModel = model;
 }
 
-}  // namespace pag
+}  //  namespace pag

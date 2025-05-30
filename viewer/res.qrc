@@ -41,6 +41,7 @@
         <file>qml/AttributeEditDialog.qml</file>
         <file>qml/TextListView.qml</file>
         <file>qml/TextEditDialog.qml</file>
+        <file>qml/ImageListView.qml</file>
         <file>qml/utils/qmldir</file>
         <file>qml/utils/Utils.qml</file>
         <file>qml/components/PAGMenu.qml</file>

@@ -1,7 +1,7 @@
 #!/bin/bash
 cd $(dirname $0)
 
-./install_tools.sh
+../install_tools.sh
 
 if [[ `uname` == 'Darwin' ]]; then
   if [ ! $(which emcc) ]; then
