@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -55,7 +55,7 @@ class PAGWindow : public QObject {
   std::unique_ptr<PAGRunTimeDataModel> runTimeDataModel = nullptr;
   std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
   std::unique_ptr<PAGTextLayerModel> textLayerModel = nullptr;
-  std::shared_ptr<PAGImageLayerModel> imageLayerModel = nullptr;
+  std::unique_ptr<PAGImageLayerModel> imageLayerModel = nullptr;
 };
 
 }  // namespace pag

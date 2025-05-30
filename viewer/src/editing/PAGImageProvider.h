@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -28,10 +28,10 @@ class PAGImageProvider : public QQuickImageProvider {
   explicit PAGImageProvider();
 
   QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) Q_DECL_OVERRIDE;
-  void setImageLayerModel(const std::shared_ptr<PAGImageLayerModel>& model);
+  void setImageLayerModel(PAGImageLayerModel* model);
 
  private:
-  std::shared_ptr<PAGImageLayerModel> imageLayerModel = nullptr;
+  PAGImageLayerModel* imageLayerModel = nullptr;
 };
 
 }  // namespace pag

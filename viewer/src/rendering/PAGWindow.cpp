@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -51,7 +51,7 @@ void PAGWindow::open() {
   runTimeDataModel = std::make_unique<PAGRunTimeDataModel>();
   editAttributeModel = std::make_unique<PAGEditAttributeModel>();
   textLayerModel = std::make_unique<PAGTextLayerModel>();
-  imageLayerModel = std::make_shared<PAGImageLayerModel>();
+  imageLayerModel = std::make_unique<PAGImageLayerModel>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
@@ -63,7 +63,7 @@ void PAGWindow::open() {
 
   // Image Provider will be managed by QML
   auto imageProvider = new PAGImageProvider();
-  imageProvider->setImageLayerModel(imageLayerModel);
+  imageProvider->setImageLayerModel(imageLayerModel.get());
   engine->addImageProvider(QLatin1String("PAGImageProvider"), imageProvider);
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
