@@ -43,7 +43,7 @@ class JVideoSurface {
 
   static void InitJNI(JNIEnv* env);
 
-  static jobject getVideoSurface(JNIEnv* env, int width, int height);
+  static jobject Make(JNIEnv* env, int width, int height);
 
  private:
   std::mutex locker;

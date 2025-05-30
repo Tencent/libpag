@@ -105,7 +105,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
 
-  auto videoSurface = JVideoSurface::getVideoSurface(env, format.width, format.height);
+  auto videoSurface = JVideoSurface::Make(env, format.width, format.height);
   if (videoSurface == nullptr) {
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);

@@ -52,7 +52,7 @@ void JVideoSurface::InitJNI(JNIEnv* env) {
       env->GetStaticMethodID(VideoSurfaceClass.get(), "Make", "(II)Lorg/libpag/VideoSurface;");
 }
 
-jobject JVideoSurface::getVideoSurface(JNIEnv* env, int width, int height) {
+jobject JVideoSurface::Make(JNIEnv* env, int width, int height) {
   auto res = env->CallStaticObjectMethod(VideoSurfaceClass.get(), VideoSurface_Make, width, height);
   if (res == nullptr) {
     LOGE("JVideoSurface: Error on getting Video Surface.");
