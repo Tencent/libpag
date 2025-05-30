@@ -30,8 +30,6 @@
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
  public:
-  static void InitJNI(JNIEnv* env);
-
   ~HardwareDecoder() override;
 
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;

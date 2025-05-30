@@ -34,6 +34,33 @@ std::shared_ptr<tgfx::SurfaceTextureReader> JVideoSurface::GetImageReader(JNIEnv
   }
   return reader->get();
 }
+
+static Global<jclass> VideoSurfaceClass;
+
+static jmethodID VideoSurface_Make;
+
+void JVideoSurface::InitJNI(JNIEnv* env) {
+  VideoSurfaceClass = env->FindClass("org/libpag/VideoSurface");
+  if (VideoSurfaceClass.get() == nullptr) {
+    LOGE(
+        "JVideoSurface: Could not run JVideoSurface.InitJNI(), VideoSurfaceClass is not "
+        "found!");
+    return;
+  }
+
+  VideoSurface_Make =
+      env->GetStaticMethodID(VideoSurfaceClass.get(), "Make", "(II)Lorg/libpag/VideoSurface;");
+}
+
+jobject JVideoSurface::getVideoSurface(JNIEnv* env, int width, int height) {
+  auto res = env->CallStaticObjectMethod(VideoSurfaceClass.get(), VideoSurface_Make, width, height);
+  if (res == nullptr) {
+    LOGE("JVideoSurface: Error on getting Video Surface.");
+    return nullptr;
+  }
+  return res;
+}
+
 }  // namespace pag
 
 using namespace pag;

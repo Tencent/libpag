@@ -22,24 +22,8 @@
 #include "tgfx/core/Task.h"
 
 namespace pag {
-static Global<jclass> VideoSurfaceClass;
-
-static jmethodID VideoSurface_Make;
 
 static const int TIMEOUT_US = 1000;
-
-void HardwareDecoder::InitJNI(JNIEnv* env) {
-  VideoSurfaceClass = env->FindClass("org/libpag/VideoSurface");
-  if (VideoSurfaceClass.get() == nullptr) {
-    LOGE(
-        "HardwareDecoder: Could not run HardwareDecoder.InitJNI(), VideoSurfaceClass is not "
-        "found!");
-    return;
-  }
-
-  VideoSurface_Make =
-      env->GetStaticMethodID(VideoSurfaceClass.get(), "Make", "(II)Lorg/libpag/VideoSurface;");
-}
 
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   isValid = initDecoder(format);
@@ -73,11 +57,6 @@ HardwareDecoder::~HardwareDecoder() {
 
 bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   LOGE("HardwareDecoder: START Hardware Decoder.\n");
-
-  if (VideoSurfaceClass.get() == nullptr) {
-    LOGE("Could not run HardwareDecoder.initDecoder(), VideoSurfaceClass is not found!");
-    return false;
-  }
 
   auto mediaFormat = AMediaFormat_new();
   AMediaFormat_setString(mediaFormat, AMEDIAFORMAT_KEY_MIME, format.mimeType.c_str());
@@ -126,8 +105,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
 
-  auto videoSurface = env->CallStaticObjectMethod(VideoSurfaceClass.get(), VideoSurface_Make,
-                                                  format.width, format.height);
+  auto videoSurface = JVideoSurface::getVideoSurface(env, format.width, format.height);
   if (videoSurface == nullptr) {
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);
