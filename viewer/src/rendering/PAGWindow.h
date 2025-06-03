@@ -23,6 +23,9 @@
 #include "PAGView.h"
 #include "PAGWindowHelper.h"
 #include "editing/PAGEditAttributeModel.h"
+#include "editing/PAGImageLayerModel.h"
+#include "editing/PAGImageProvider.h"
+#include "editing/PAGTextLayerModel.h"
 #include "editing/PAGTreeViewModel.h"
 #include "profiling/PAGRunTimeDataModel.h"
 
@@ -31,7 +34,6 @@ class PAGWindow : public QObject {
   Q_OBJECT
  public:
   explicit PAGWindow(QObject* parent = nullptr);
-  ~PAGWindow() override;
 
   Q_SIGNAL void destroyWindow(PAGWindow* window);
 
@@ -52,6 +54,8 @@ class PAGWindow : public QObject {
   std::unique_ptr<PAGTreeViewModel> treeViewModel = nullptr;
   std::unique_ptr<PAGRunTimeDataModel> runTimeDataModel = nullptr;
   std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
+  std::unique_ptr<PAGTextLayerModel> textLayerModel = nullptr;
+  std::unique_ptr<PAGImageLayerModel> imageLayerModel = nullptr;
 };
 
 }  // namespace pag

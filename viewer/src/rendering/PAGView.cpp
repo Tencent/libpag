@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -57,6 +57,14 @@ int PAGView::getPAGHeight() const {
     return 0;
   }
   return pagFile->height();
+}
+
+int PAGView::getEditableTextLayerCount() const {
+  return editableTextLayerCount;
+}
+
+int PAGView::getEditableImageLayerCount() const {
+  return editableImageLayerCount;
 }
 
 QString PAGView::getTotalFrame() const {
@@ -200,6 +208,11 @@ bool PAGView::setFile(const QString& filePath) {
   Q_EMIT fileChanged(pagFile, strPath);
   setProgress(0);
   setIsPlaying(true);
+
+  editableTextLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Text).size());
+  editableImageLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Image).size());
+  Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
+  Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
 
   return true;
 }
