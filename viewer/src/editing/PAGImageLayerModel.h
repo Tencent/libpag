@@ -16,32 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGExportAPNGTask.h"
-#include <QDebug>
-#include "utils/FileUtils.h"
-#include "utils/Utils.h"
+#pragma once
+
+#include <QAbstractListModel>
+#include "pag/pag.h"
 
 namespace pag {
 
-PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
-                                     const QString& pngFilePath)
-    : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
-  openAfterExport = false;
-}
+class PAGImageLayerModel : public QAbstractListModel {
+  Q_OBJECT
+ public:
+  enum class PAGImageLayerRoles { IndexRole = Qt::UserRole + 1, ReveryRole };
 
-void PAGExportAPNGTask::onFrameFlush(double progress) {
-  PAGExportPNGTask::onFrameFlush(progress * 0.9);
-}
+  explicit PAGImageLayerModel(QObject* parent = nullptr);
 
-int PAGExportAPNGTask::onFinish() {
-  std::string outPath = apngFilePath.toStdString();
-  std::string firstPNGPath = QString("%1/1.png").arg(filePath).toStdString();
-  int frameRate = static_cast<int>(pagFile->frameRate());
-  Utils::ExportAPNGFromPNGSequence(outPath, firstPNGPath, frameRate);
-  PAGExportPNGTask::onFrameFlush(1.0);
-  Utils::DeleteDir(filePath);
-  Utils::OpenInFinder(apngFilePath, true);
-  return PAGExportPNGTask::onFinish();
-}
+  int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
+  QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
+  QImage requestImage(int index);
+
+  Q_SLOT void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+
+  Q_INVOKABLE void replaceImage(int index, const QString& filePath);
+  Q_INVOKABLE void revertImage(int index);
+  Q_INVOKABLE int convertIndex(int index);
+
+ protected:
+  QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
+
+ private:
+  QSet<int> revertSet = {};
+  QMap<int, QImage> imageLayers = {};
+  std::shared_ptr<PAGFile> pagFile = nullptr;
+};
 
 }  // namespace pag
