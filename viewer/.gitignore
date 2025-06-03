@@ -1,0 +1,3 @@
+src/version.h
+src/editing/rttr
+tools/*RttrAutoRegister*

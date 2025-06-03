@@ -38,6 +38,10 @@ PAGWindow {
 
         property bool isUseEnglish: true
 
+        property bool isUseBeta: false
+
+        property bool isAutoCheckUpdate: true
+
         property double lastX: 0
 
         property double lastY: 0
@@ -340,6 +344,14 @@ PAGWindow {
         }
     }
 
+    function updateAvailable(hasNewVersion) {
+        mainForm.controlForm.updateAvailable = hasNewVersion;
+    }
+
+    function checkForUpdates(keepSilent) {
+        checkUpdateModel.checkForUpdates(keepSilent, settings.isUseBeta);
+    }
+
     function onCommand(command) {
         console.log(`Get command: [${command}]`);
         switch (command) {
@@ -485,6 +497,9 @@ PAGWindow {
             };
             openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
             openFileDialog.open();
+            break;
+        case "check-for-updates":
+            checkForUpdates(false);
             break;
         default:
             console.log(`Undefined command: [${command}]`);

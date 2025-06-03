@@ -48,6 +48,12 @@ Item {
                         root.command("open-preferences");
                     }
                 }
+                Action {
+                    text: qsTr("Check for Updates")
+                    onTriggered: {
+                        root.command("check-for-updates");
+                    }
+                }
                 PAGMenu {
                     menuWidth: windowsMenuBar.menuWidth
                     title: qsTr("Export")
@@ -186,6 +192,14 @@ Item {
                     role: "ApplicationSpecificRole"
                     onTriggered: {
                         root.command("open-commerce-page");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("Check for Updates")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("check-for-updates");
                     }
                 }
                 Platform.MenuItem {

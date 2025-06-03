@@ -22,6 +22,7 @@
 #include "PAGWindowHelper.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
+#include "PAGViewer.h"
 
 namespace pag {
 
@@ -61,6 +62,9 @@ void PAGWindow::open() {
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
   context->setContextProperty("textLayerModel", textLayerModel.get());
 
+  auto viewer = static_cast<PAGViewer *>(qApp);
+  context->setContextProperty("checkUpdateModel", viewer->getCheckUpdateModel());
+
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
   window = static_cast<QQuickWindow*>(engine->rootObjects().at(0));
@@ -90,6 +94,10 @@ void PAGWindow::open() {
 
 QString PAGWindow::getFilePath() {
   return filePath;
+}
+
+QQmlApplicationEngine* PAGWindow::getEngine() {
+  return engine.get();
 }
 
 }  // namespace pag

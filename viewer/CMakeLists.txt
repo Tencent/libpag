@@ -54,6 +54,23 @@ list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_
         Qt${QT_VERSION_MAJOR}::QuickControls2)
 qt_add_resources(QT_RESOURCES res.qrc)
 
+message(STATUS "Generate Version File")
+set(MajorVersion $ENV{BK_CI_MAJOR_VERSION} 1)
+set(MinorVersion $ENV{BK_CI_MINOR_VERSION} 0)
+set(BuildNumber $ENV{BK_CI_BUILD_NO} 0)
+if ($ENV{isBetaVersion} MATCHES "false")
+    set(UpdateChannel "stable")
+else ()
+    set(UpdateChannel "beta")
+endif ()
+configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
+    ${CMAKE_SOURCE_DIR}/src/version.h
+    @ONLY
+)
+
+message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
+message(STATUS "Update Channel: ${UpdateChannel}")
+
 if (APPLE)
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${APPLICATION_SERVICES_FRAMEWORK})

@@ -18,25 +18,12 @@
 
 #pragma once
 
-#include <QApplication>
-#include "maintenance/PAGCheckUpdateModel.h"
-#include "rendering/PAGWindow.h"
+#include <string>
 
 namespace pag {
 
-class PAGViewer : public QApplication {
-  Q_OBJECT
- public:
-  PAGViewer(int& argc, char** argv);
+const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
+const std::string UpdateChannel = "@UpdateChannel@";
+const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
 
-  bool event(QEvent* event) override;
-  void openFile(QString path);
-  PAGCheckUpdateModel *getCheckUpdateModel();
-
-  Q_SLOT void onWindowDestroyed(PAGWindow* window);
-
-private:
-  std::unique_ptr<PAGCheckUpdateModel> checkUpdateModel = nullptr;
-};
-
-}  // namespace pag
+} // namespace pag

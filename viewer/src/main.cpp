@@ -24,6 +24,8 @@
 #include "profiling/PAGRunTimeDataModel.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
+#include "version.h"
+#include "PAGUpdater.h"
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;
@@ -44,8 +46,8 @@ int main(int argc, char* argv[]) {
     QApplication::setAttribute(Qt::AA_UseSoftwareOpenGL);
   }
 
-  QApplication::setApplicationName("PAGViewer");
-  QApplication::setOrganizationName("Tencent");
+  QApplication::setApplicationName("PAGPlayer");
+  QApplication::setOrganizationName("PAGTeam");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
   defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
   defaultFormat.setVersion(3, 2);
@@ -64,6 +66,8 @@ int main(int argc, char* argv[]) {
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
   app.openFile(filePath.data());
+
+  pag::PAGUpdater::initUpdater();
 
   return QApplication::exec();
 }
