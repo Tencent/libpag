@@ -68,7 +68,7 @@ int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
   return static_cast<int>(fileInfos.size());
 }
 
-void PAGFileInfoModel::setFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGFileInfoModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   beginResetModel();
   fileInfos.clear();
   fileInfos.emplace_back("Duration", Utils::ToQString(pagFile->duration() / 1000000.0), "s");

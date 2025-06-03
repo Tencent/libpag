@@ -61,7 +61,7 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
   return task;
 }
 
-void PAGTaskFactory::setFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGTaskFactory::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   this->pagFile = PAGFile::Load(pagFile->path());
 }
 

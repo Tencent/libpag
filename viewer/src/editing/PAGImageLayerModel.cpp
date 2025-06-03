@@ -55,7 +55,7 @@ QImage PAGImageLayerModel::requestImage(int index) {
   return imageLayers[index];
 }
 
-void PAGImageLayerModel::setFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGImageLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   beginResetModel();
   imageLayers.clear();
   revertSet.clear();

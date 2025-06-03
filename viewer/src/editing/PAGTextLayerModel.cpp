@@ -46,7 +46,7 @@ QVariant PAGTextLayerModel::data(const QModelIndex& index, int role) const {
   return {};
 }
 
-void PAGTextLayerModel::setFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGTextLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   beginResetModel();
   textLayers.clear();
   revertSet.clear();
