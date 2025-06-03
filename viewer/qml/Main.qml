@@ -144,7 +144,21 @@ PAGWindow {
         width: 500
         height: 160 + windowTitleBarHeight
         title: qsTr("Settings")
+        autoCheckForUpdates: settings.isAutoCheckUpdate
+        useBeta: settings.isUseBeta
         useEnglish: settings.isUseEnglish
+        onAutoCheckForUpdatesChanged: {
+            if (!settingsWindow.visible || settingsWindow.autoCheckForUpdates === settings.isAutoCheckUpdate) {
+                return;
+            }
+            settings.isAutoCheckUpdate = settingsWindow.autoCheckForUpdates;
+        }
+        onUseBetaChanged: {
+            if (!settingsWindow.visible || settingsWindow.useBeta === settings.isUseBeta) {
+                return;
+            }
+            settings.isUseBeta = settingsWindow.useBeta;
+        }
         onUseEnglishChanged: {
             if (!settingsWindow.visible || settingsWindow.useEnglish === settings.isUseEnglish) {
                 return;
@@ -185,6 +199,26 @@ PAGWindow {
 
         visible: false
         title: qsTr("Select Save Path")
+    }
+
+    Timer {
+        id: startupTimer
+        repeat: false
+        interval: 1000
+        onTriggered: {
+            if (settings.isAutoCheckUpdate) {
+                checkForUpdates(true);
+            }
+        }
+    }
+
+    Timer {
+        id: updateTimer
+        repeat: true
+        interval: 1000 * 60 * 60 * 24
+        onTriggered: {
+            checkForUpdates(true);
+        }
     }
 
     PAGWindow {
@@ -295,6 +329,9 @@ PAGWindow {
             })
         });
         menuBar.command.connect(onCommand);
+
+        startupTimer.start();
+        updateTimer.start();
     }
 
     function updateProgress() {
