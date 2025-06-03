@@ -108,7 +108,11 @@ double PAGView::getProgress() const {
 }
 
 QString PAGView::getFilePath() const {
-  return filePath;
+  if (pagFile == nullptr) {
+    return "";
+  }
+
+  return QString::fromStdString(pagFile->path());
 }
 
 QString PAGView::getDisplayedTime() const {
@@ -201,11 +205,11 @@ bool PAGView::setFile(const QString& filePath) {
   }
   setIsPlaying(false);
   pagFile = newPagFile;
-  this->filePath = strPath.c_str();
+  pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
-  Q_EMIT fileChanged(pagFile, strPath);
+  Q_EMIT fileChanged(pagFile);
   setProgress(0);
   setIsPlaying(true);
 

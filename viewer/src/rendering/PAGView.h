@@ -73,8 +73,7 @@ class PAGView : public QQuickItem {
   Q_SIGNAL void editableImageLayerCountChanged(int editableImageLayerCount);
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
-  Q_SIGNAL void fileChanged(const std::shared_ptr<pag::PAGFile>& pagFile,
-                            const std::string& filePath);
+  Q_SIGNAL void fileChanged(const std::shared_ptr<pag::PAGFile>& pagFile);
 
   Q_SLOT void flush() const;
 
@@ -97,7 +96,6 @@ class PAGView : public QQuickItem {
   qreal lastPixelRatio = 1;
   double progress = 0.0;
   double progressPerFrame = 0.0;
-  QString filePath = "";
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
   std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
