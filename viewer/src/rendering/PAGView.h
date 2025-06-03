@@ -73,7 +73,9 @@ class PAGView : public QQuickItem {
   Q_SIGNAL void editableImageLayerCountChanged(int editableImageLayerCount);
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
-  Q_SIGNAL void fileChanged(const std::shared_ptr<pag::PAGFile>& pagFile);
+  Q_SIGNAL void fileChanged(const std::shared_ptr<pag::File>& file);
+  Q_SIGNAL void filePathChanged(const std::string& filePath);
+  Q_SIGNAL void pagFileChanged(const std::shared_ptr<pag::PAGFile>& pagFile);
 
   Q_SLOT void flush() const;
 

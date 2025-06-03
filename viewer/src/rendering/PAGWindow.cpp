@@ -82,13 +82,15 @@ void PAGWindow::open() {
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
   connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
-  connect(pagView, &PAGView::fileChanged, taskFactory, &PAGTaskFactory::setPAGFile);
-  connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setPAGFile);
-  connect(pagView, &PAGView::fileChanged, editAttributeModel.get(),
+  connect(pagView, &PAGView::filePathChanged, taskFactory, &PAGTaskFactory::setFilePath);
+  connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
+  connect(pagView, &PAGView::pagFileChanged, editAttributeModel.get(),
           &PAGEditAttributeModel::setPAGFile);
-  connect(pagView, &PAGView::fileChanged, runTimeDataModel.get(), &PAGRunTimeDataModel::setPAGFile);
-  connect(pagView, &PAGView::fileChanged, textLayerModel.get(), &PAGTextLayerModel::setPAGFile);
-  connect(pagView, &PAGView::fileChanged, imageLayerModel.get(), &PAGImageLayerModel::setPAGFile);
+  connect(pagView, &PAGView::pagFileChanged, runTimeDataModel.get(),
+          &PAGRunTimeDataModel::setPAGFile);
+  connect(pagView, &PAGView::pagFileChanged, textLayerModel.get(), &PAGTextLayerModel::setPAGFile);
+  connect(pagView, &PAGView::pagFileChanged, imageLayerModel.get(),
+          &PAGImageLayerModel::setPAGFile);
   connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
           &PAGRunTimeDataModel::updateData);
 }

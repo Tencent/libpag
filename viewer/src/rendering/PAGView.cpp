@@ -209,7 +209,9 @@ bool PAGView::setFile(const QString& filePath) {
   pagPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
-  Q_EMIT fileChanged(pagFile);
+  Q_EMIT fileChanged(pagFile->getFile());
+  Q_EMIT filePathChanged(strPath);
+  Q_EMIT pagFileChanged(pagFile);
   setProgress(0);
   setIsPlaying(true);
 
