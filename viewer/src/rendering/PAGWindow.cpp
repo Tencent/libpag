@@ -31,8 +31,6 @@ QList<PAGWindow*> PAGWindow::AllWindows;
 PAGWindow::PAGWindow(QObject* parent) : QObject(parent) {
 }
 
-PAGWindow::~PAGWindow() = default;
-
 void PAGWindow::openFile(QString path) {
   bool result = pagView->setFile(path);
   if (!result) {
@@ -54,6 +52,7 @@ void PAGWindow::open() {
   runTimeDataModel = std::make_unique<PAGRunTimeDataModel>();
   editAttributeModel = std::make_unique<PAGEditAttributeModel>();
   textLayerModel = std::make_unique<PAGTextLayerModel>();
+  imageLayerModel = std::make_unique<PAGImageLayerModel>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
@@ -61,10 +60,15 @@ void PAGWindow::open() {
   context->setContextProperty("runTimeDataModel", runTimeDataModel.get());
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
   context->setContextProperty("textLayerModel", textLayerModel.get());
+  context->setContextProperty("imageLayerModel", imageLayerModel.get());
 
   auto viewer = static_cast<PAGViewer *>(qApp);
   context->setContextProperty("checkUpdateModel", viewer->getCheckUpdateModel());
 
+  // Image Provider will be managed by QML
+  auto imageProvider = new PAGImageProvider();
+  imageProvider->setImageLayerModel(imageLayerModel.get());
+  engine->addImageProvider(QLatin1String("PAGImageProvider"), imageProvider);
   engine->load(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
   window = static_cast<QQuickWindow*>(engine->rootObjects().at(0));
@@ -88,6 +92,7 @@ void PAGWindow::open() {
           &PAGEditAttributeModel::setFile);
   connect(pagView, &PAGView::fileChanged, runTimeDataModel.get(), &PAGRunTimeDataModel::setFile);
   connect(pagView, &PAGView::fileChanged, textLayerModel.get(), &PAGTextLayerModel::setFile);
+  connect(pagView, &PAGView::fileChanged, imageLayerModel.get(), &PAGImageLayerModel::setFile);
   connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
           &PAGRunTimeDataModel::updateData);
 }

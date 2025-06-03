@@ -41,6 +41,10 @@ class JVideoSurface {
     imageReader = nullptr;
   }
 
+  static void InitJNI(JNIEnv* env);
+
+  static jobject Make(JNIEnv* env, int width, int height);
+
  private:
   std::mutex locker;
   std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;

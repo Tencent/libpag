@@ -67,7 +67,7 @@ void NativePlatform::InitJNI() {
   initialized = true;
   JTraceImage::InitJNI(env);
   FontConfigAndroid::InitJNI(env);
-  HardwareDecoder::InitJNI(env);
+  JVideoSurface::InitJNI(env);
   InitPAGTextJNI(env);
   JPAGDiskCache::InitJNI(env);
   NativeDisplayLink::InitJNI(env);
