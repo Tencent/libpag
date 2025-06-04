@@ -15,8 +15,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif ()
 
 if (MSVC)
-    add_compile_options("/utf-8")
-    add_compile_options(/GR-)
+    add_compile_options("/utf-8" /GR /bigobj)
 endif (MSVC)
 
 # Sets flags

@@ -1,3 +1,4 @@
 src/version.h
 src/editing/rttr
 tools/*RttrAutoRegister*
+tools/libclang.dll
