@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGUpdater.h"
-#include "version.h"
-#include "rendering/PAGWindow.h"
-#include <codecvt>
 #include <winsparkle/winsparkle.h>
+#include <codecvt>
+#include "rendering/PAGWindow.h"
+#include "version.h"
 
 namespace pag {
 
@@ -53,4 +53,4 @@ void PAGUpdater::checkForUpdates(bool keepSilent, const std::string& url) {
   }
 }
 
-}
+}  // namespace pag

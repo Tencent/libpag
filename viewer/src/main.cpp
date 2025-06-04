@@ -20,12 +20,12 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
+#include "PAGUpdater.h"
 #include "PAGViewer.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
 #include "version.h"
-#include "PAGUpdater.h"
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;

@@ -23,9 +23,9 @@
 namespace pag {
 
 class PAGUpdater {
-public:
+ public:
   static void initUpdater();
   static void checkForUpdates(bool keepSilent, const std::string& url);
 };
 
-} // namespace pag
+}  // namespace pag

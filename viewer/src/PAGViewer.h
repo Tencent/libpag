@@ -31,11 +31,11 @@ class PAGViewer : public QApplication {
 
   bool event(QEvent* event) override;
   void openFile(QString path);
-  PAGCheckUpdateModel *getCheckUpdateModel();
+  PAGCheckUpdateModel* getCheckUpdateModel();
 
   Q_SLOT void onWindowDestroyed(PAGWindow* window);
 
-private:
+ private:
   std::unique_ptr<PAGCheckUpdateModel> checkUpdateModel = nullptr;
 };
 

@@ -27,14 +27,15 @@
 
 namespace pag {
 
-static const QString serverUrl = "https://pag.io/server.html";
+static const QString serverUrl = "https://pag.qq.com/test/server.html";
 
-PAGNetworkFetcher::PAGNetworkFetcher(const QString& url, QObject* parent) : QObject(parent), url(url) {
+PAGNetworkFetcher::PAGNetworkFetcher(const QString& url, QObject* parent)
+    : QObject(parent), url(url) {
 }
 
 void PAGNetworkFetcher::fetch() {
   QNetworkAccessManager manager;
-  QNetworkReply *reply = manager.get(QNetworkRequest(QUrl(url)));
+  QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(url)));
 
   QEventLoop eventLoop;
   connect(reply, &QNetworkReply::finished, &eventLoop, &QEventLoop::quit);
@@ -50,7 +51,8 @@ void PAGNetworkFetcher::fetch() {
   Q_EMIT finished();
 }
 
-PAGUpdateVersionFetcher::PAGUpdateVersionFetcher(const QString& url, QObject* parent) : PAGNetworkFetcher(url, parent) {
+PAGUpdateVersionFetcher::PAGUpdateVersionFetcher(const QString& url, QObject* parent)
+    : PAGNetworkFetcher(url, parent) {
   connect(this, &PAGUpdateVersionFetcher::fetched, this, &PAGUpdateVersionFetcher::parseAppcast);
 };
 
@@ -124,8 +126,10 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
     connect(thread, &QThread::started, fetcher, &PAGUpdateVersionFetcher::fetch);
     connect(thread, &QThread::finished, thread, &QThread::deleteLater);
     connect(fetcher, &PAGUpdateVersionFetcher::finished, thread, &QThread::quit);
-    connect(fetcher, &PAGUpdateVersionFetcher::finished, fetcher, &PAGUpdateVersionFetcher::deleteLater);
-    connect(fetcher, &PAGUpdateVersionFetcher::versionFound, this, &PAGCheckUpdateModel::getUpdateVersion);
+    connect(fetcher, &PAGUpdateVersionFetcher::finished, fetcher,
+            &PAGUpdateVersionFetcher::deleteLater);
+    connect(fetcher, &PAGUpdateVersionFetcher::versionFound, this,
+            &PAGCheckUpdateModel::getUpdateVersion);
     thread->start();
   }
 }
@@ -151,7 +155,7 @@ void PAGCheckUpdateModel::getUpdateVersion(const QString& url, const QString& ve
     }
   }
 
-  QMetaObject::invokeMethod(qApp, [this, selectedUrl] () -> void {
+  QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
     availableUpdates.clear();
     availableUpdateUrls.clear();
     PAGUpdater::checkForUpdates(keepSilent, selectedUrl.toStdString());

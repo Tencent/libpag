@@ -60,7 +60,7 @@ void PAGViewer::openFile(QString path) {
   window->openFile(path);
 }
 
-PAGCheckUpdateModel *PAGViewer::getCheckUpdateModel() {
+PAGCheckUpdateModel* PAGViewer::getCheckUpdateModel() {
   return checkUpdateModel.get();
 }
 

@@ -28,4 +28,4 @@ class PAGUpdater {
   static void checkForUpdates(bool keepSilent, const std::string& url);
 };
 
-} // namespace pag
+}  // namespace pag

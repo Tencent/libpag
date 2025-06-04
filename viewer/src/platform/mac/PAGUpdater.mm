@@ -18,30 +18,30 @@
 
 #include "PAGUpdater.h"
 #include <Cocoa/Cocoa.h>
+#import <Sparkle/Sparkle.h>
 #include "rendering/PAGWindow.h"
 #include "utils/Utils.h"
-#import <Sparkle/Sparkle.h>
 
-@interface PAGUpdaterDelegate : NSObject<SPUUpdaterDelegate>
+@interface PAGUpdaterDelegate : NSObject <SPUUpdaterDelegate>
 @property BOOL showUI;
 @property(nonatomic, copy) NSString* feedUrl;
 @end
 
 @implementation PAGUpdaterDelegate
 
--(NSString *)feedURLStringForUpdater:(SPUUpdater *)updater {
-    return self.feedUrl;
+- (NSString*)feedURLStringForUpdater:(SPUUpdater*)updater {
+  return self.feedUrl;
 }
 
-- (bool)updaterDidFindValidUpdate:(SPUUpdater *)updater {
-    for (int i = 0; i < pag::PAGWindow::AllWindows.count(); i++) {
-        auto window = pag::PAGWindow::AllWindows[i];
-        auto root = window->getEngine()->rootObjects().first();
-        if (root) {
-            QMetaObject::invokeMethod(root, "updateAvailable", Q_ARG(QVariant, true));
-        }
+- (bool)updaterDidFindValidUpdate:(SPUUpdater*)updater {
+  for (int i = 0; i < pag::PAGWindow::AllWindows.count(); i++) {
+    auto window = pag::PAGWindow::AllWindows[i];
+    auto root = window->getEngine()->rootObjects().first();
+    if (root) {
+      QMetaObject::invokeMethod(root, "updateAvailable", Q_ARG(QVariant, true));
     }
-    return self.showUI;
+  }
+  return self.showUI;
 }
 
 @end
@@ -52,51 +52,51 @@ static SPUStandardUpdaterController* updaterController = nil;
 namespace pag {
 
 void PAGUpdater::initUpdater() {
-    if (updaterDelegate == nil) {
-        updaterDelegate = [[PAGUpdaterDelegate alloc] init];
-    }
+  if (updaterDelegate == nil) {
+    updaterDelegate = [[PAGUpdaterDelegate alloc] init];
+  }
 
-    if (updaterController == nil) {
-        updaterController = [[SPUStandardUpdaterController alloc]
-            initWithStartingUpdater:NO
-            updaterDelegate:updaterDelegate
-            userDriverDelegate:nil];
+  if (updaterController == nil) {
+    updaterController =
+        [[SPUStandardUpdaterController alloc] initWithStartingUpdater:NO
+                                                      updaterDelegate:updaterDelegate
+                                                   userDriverDelegate:nil];
 
-        SPUUpdater *updater = updaterController.updater;
-        updater.automaticallyChecksForUpdates = NO;
-        updater.automaticallyDownloadsUpdates = NO;
-    }
+    SPUUpdater* updater = updaterController.updater;
+    updater.automaticallyChecksForUpdates = NO;
+    updater.automaticallyDownloadsUpdates = NO;
+  }
 }
 
 void PAGUpdater::checkForUpdates(bool keepSilent, const std::string& url) {
-    if (updaterController == nil) {
-        qDebug() << "Updater is not initialized";
-        return;
+  if (updaterController == nil) {
+    qDebug() << "Updater is not initialized";
+    return;
+  }
+
+  @autoreleasepool {
+    if (updaterDelegate) {
+      updaterDelegate.showUI = !keepSilent;
+      updaterDelegate.feedUrl = [NSString stringWithUTF8String:url.c_str()];
     }
 
-    @autoreleasepool {
-        if (updaterDelegate) {
-            updaterDelegate.showUI = !keepSilent;
-            updaterDelegate.feedUrl = [NSString stringWithUTF8String:url.c_str()];
-        }
+    SPUUpdater* updater = updaterController.updater;
+    if (updater) {
+      if (![updater canCheckForUpdates]) {
+        [updaterController startUpdater];
+      }
 
-        SPUUpdater *updater = updaterController.updater;
-        if (updater) {
-            if (![updater canCheckForUpdates]) {
-                [updaterController startUpdater];
-            }
-
-            if ([updater canCheckForUpdates]) {
-                if (keepSilent) {
-                    [updater checkForUpdatesInBackground];
-                } else {
-                    [updaterController checkForUpdates:nil];
-                }
-            } else {
-                qDebug() << "Error: Updater is not ready to check for updates";
-            }
+      if ([updater canCheckForUpdates]) {
+        if (keepSilent) {
+          [updater checkForUpdatesInBackground];
+        } else {
+          [updaterController checkForUpdates:nil];
         }
+      } else {
+        qDebug() << "Error: Updater is not ready to check for updates";
+      }
     }
+  }
 }
 
-} // namespace pag
+}  // namespace pag
