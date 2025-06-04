@@ -48,10 +48,6 @@ print "[ 编译 ]"
 # 2.1 编译PAGViewer x86
 print "[ 编译x86 ]"
 x86BuildDir="${BuildDir}/build_x86"
-if [ -d "${x86BuildDir}" ];
-then
-    rm -rf "${x86BuildDir}"
-fi
 
 cmake -S ${SourceDir} -B ${x86BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
 if [ $? -ne 0 ];
@@ -70,10 +66,6 @@ fi
 # 2.2 编译PAGViewer arm
 print "[ 编译arm64 ]"
 armBuildDir="${BuildDir}/build_arm"
-if [ -d "${armBuildDir}" ];
-then
-    rm -rf "${armBuildDir}"
-fi
 
 cmake -S ${SourceDir} -B ${armBuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
 if [ $? -ne 0 ];
@@ -98,10 +90,6 @@ ExeDir="${AppDir}/Contents/MacOS"
 ExePath="${ExeDir}/PAGViewer"
 x86ExePath="${x86BuildDir}/PAGViewer"
 armExePath="${armBuildDir}/PAGViewer"
-if [ -d "${AppDir}" ];
-then
-    rm -rf "${AppDir}"
-fi
 
 mkdir -p ${ExeDir}
 lipo -create ${x86ExePath} ${armExePath} -output ${ExePath}
