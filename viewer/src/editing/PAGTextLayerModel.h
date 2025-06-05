@@ -33,7 +33,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
   QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
 
-  Q_SLOT void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
 
   Q_INVOKABLE void revertText(int index);
   Q_INVOKABLE int convertIndex(int index);
