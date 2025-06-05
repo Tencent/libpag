@@ -22,6 +22,7 @@
 #include <QVariantMap>
 #include "task/export/PAGExportAPNGTask.h"
 #include "task/export/PAGExportPNGTask.h"
+#include "task/profiling/PAGProfilingTask.h"
 
 namespace pag {
 
@@ -49,6 +50,10 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
       QFileInfo fileInfo(path);
       QString pngFilePath = fileInfo.absolutePath() + "/" + fileInfo.baseName() + "_PNG";
       task = new PAGExportAPNGTask(pagFile, path, pngFilePath);
+      break;
+    }
+    case PAGTaskType_Profiling: {
+      task = new PAGProfilingTask(pagFile, path);
       break;
     }
     default: {

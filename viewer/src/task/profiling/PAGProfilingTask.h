@@ -18,21 +18,22 @@
 
 #pragma once
 
-#include <QString>
-#include "pag/file.h"
+#include "codec/DataTypes.h"
+#include "task/PAGTask.h"
 
-namespace pag::Utils {
+namespace pag {
 
-void OpenInFinder(const QString& path, bool select = true);
+class PAGProfilingTask : public PAGPlayTask {
+ public:
+  PAGProfilingTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
 
-bool DeleteFile(const QString& path);
+ protected:
+  auto onBegin() -> void override;
+  auto onFinish() -> int override;
+  auto onFrameFlush(double progress) -> void override;
 
-bool DeleteDir(const QString& path);
+ private:
+  std::shared_ptr<PerformanceData> performanceData = nullptr;
+};
 
-bool MakeDir(const QString& path, bool isDir = true);
-
-bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath);
-
-bool WriteDataToDisk(const QString& filePath, const void* data, size_t length);
-
-}  // namespace pag::Utils
+}  // namespace pag

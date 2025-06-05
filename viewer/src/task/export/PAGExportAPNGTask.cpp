@@ -23,8 +23,8 @@
 
 namespace pag {
 
-PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
-                                     const QString& pngFilePath)
+PAGExportAPNGTask::PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                     const QString& apngFilePath, const QString& pngFilePath)
     : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
   openAfterExport = false;
 }

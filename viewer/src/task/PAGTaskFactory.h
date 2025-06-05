@@ -29,10 +29,15 @@ class PAGTaskFactory : public QObject {
  public:
   Q_ENUMS(PAGTaskType)
 
-  enum PAGTaskType { PAGTaskType_None, PAGTaskType_ExportPNG, PAGTaskType_ExportAPNG };
+  enum PAGTaskType {
+    PAGTaskType_None,
+    PAGTaskType_ExportPNG,
+    PAGTaskType_ExportAPNG,
+    PAGTaskType_Profiling
+  };
 
   Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
-                                  const QVariantMap& extraParams);
+                                  const QVariantMap& extraParams = {});
 
   void setFilePath(const std::string& filePath);
 
