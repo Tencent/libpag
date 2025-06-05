@@ -25,7 +25,7 @@ namespace pag {
 class PAGExportPNGTask : public PAGPlayTask {
   Q_OBJECT
  public:
-  explicit PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
+  explicit PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
                             int exportFrame = -1);
 
  protected:

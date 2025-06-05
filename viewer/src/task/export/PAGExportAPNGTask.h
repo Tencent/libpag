@@ -25,7 +25,7 @@ namespace pag {
 class PAGExportAPNGTask : public PAGExportPNGTask {
   Q_OBJECT
  public:
-  explicit PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
+  explicit PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
                              const QString& pngFilePath);
 
  protected:

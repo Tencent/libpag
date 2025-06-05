@@ -84,16 +84,22 @@ bool MakeDir(const QString& path, bool isDir) {
 }
 
 bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath) {
-  size_t result = 0;
   auto encodeByteData = pag::Codec::Encode(file);
+  if (encodeByteData == nullptr) {
+    return false;
+  }
 
+  return WriteDataToDisk(filePath, encodeByteData->data(), encodeByteData->length());
+}
+
+bool WriteDataToDisk(const QString& filePath, const void* data, size_t length) {
   FILE* fp = fopen(filePath.toStdString().c_str(), "wb");
   if (fp == nullptr) {
     return false;
   }
 
-  result = fwrite(encodeByteData->data(), 1, encodeByteData->length(), fp);
-  if (result != encodeByteData->length()) {
+  size_t result = fwrite(data, 1, length, fp);
+  if (result != length) {
     fclose(fp);
     return false;
   }

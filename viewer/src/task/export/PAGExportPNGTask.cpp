@@ -25,7 +25,7 @@ namespace pag {
 
 const std::string ExportPNGFileSuffix = "png";
 
-PAGExportPNGTask::PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
+PAGExportPNGTask::PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
                                    int exportFrame)
     : PAGPlayTask(pagFile, filePath), exportFrame(exportFrame) {
   QString lowerFilePath = filePath.toLower();
