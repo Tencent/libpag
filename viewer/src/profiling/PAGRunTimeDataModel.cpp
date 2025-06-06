@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -69,14 +69,13 @@ void PAGRunTimeDataModel::updateData(int64_t currentFrame, int64_t renderTime, i
   Q_EMIT dataChanged();
 }
 
-void PAGRunTimeDataModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
-                                  const std::string& filePath) {
+void PAGRunTimeDataModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
   frameTimeMetricsVector.resize(totalFrame, {0, 0, 0});
   frameTimeMetricsVector.squeeze();
   frameTimeMetricsVector.clear();
-  fileInfoModel.setFile(pagFile, filePath);
+  fileInfoModel.setPAGFile(pagFile);
   updateFrameDisplayInfo(0, 0, 0);
   Q_EMIT dataChanged();
 }

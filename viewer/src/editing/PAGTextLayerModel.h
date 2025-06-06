@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -33,7 +33,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
   QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
 
-  Q_SLOT void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
 
   Q_INVOKABLE void revertText(int index);
   Q_INVOKABLE int convertIndex(int index);

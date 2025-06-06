@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -68,9 +68,7 @@ int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
   return static_cast<int>(fileInfos.size());
 }
 
-void PAGFileInfoModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
-                               const std::string& filePath) {
-  Q_UNUSED(filePath);
+void PAGFileInfoModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   beginResetModel();
   fileInfos.clear();
   fileInfos.emplace_back("Duration", Utils::ToQString(pagFile->duration() / 1000000.0), "s");

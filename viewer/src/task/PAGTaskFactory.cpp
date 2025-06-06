@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -61,10 +61,8 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
   return task;
 }
 
-void PAGTaskFactory::setFile([[maybe_unused]] const std::shared_ptr<PAGFile>& pagFile,
-                             const std::string& filePath) {
+void PAGTaskFactory::setFilePath(const std::string& filePath) {
   this->pagFile = PAGFile::Load(filePath);
-  this->filePath = filePath;
 }
 
 }  // namespace pag

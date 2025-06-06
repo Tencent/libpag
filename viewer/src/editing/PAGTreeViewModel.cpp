@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -164,10 +164,9 @@ QHash<int, QByteArray> PAGTreeViewModel::roleNames() const {
   return roles;
 }
 
-void PAGTreeViewModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
-                               [[maybe_unused]] const std::string& filePath) {
+void PAGTreeViewModel::setFile(const std::shared_ptr<File>& file) {
   beginResetModel();
-  fileTree->setFile(pagFile->getFile());
+  fileTree->setFile(file);
   fileTree->buildTree();
   endResetModel();
 }

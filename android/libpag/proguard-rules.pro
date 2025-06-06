@@ -64,7 +64,7 @@
     private static java.lang.String GetCacheDir();
 }
 
--keepclasseswithmembers class org.libpag.HardwareDecoder {
+-keepclasseswithmembers class org.libpag.VideoSurface {
     <methods>;
 }
 
