@@ -48,7 +48,8 @@ set(PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/inclu
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
 file(GLOB_RECURSE AE_SDK_SOURCE_FILES ${AE_SDK_PATH}/Util/*.cpp)
 if(MSVC)
-    set_source_files_properties(${AE_SDK_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "/wd4100")
+    set_source_files_properties(${AE_SDK_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "/wd4100 /wd4189")
+    set_source_files_properties(src/aecommand/AECommand.cpp PROPERTIES COMPILE_FLAGS "/wd4100 /wd4189")
 else()
     set_source_files_properties(${AE_SDK_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable")
     set_source_files_properties(src/aecommand/AECommand.cpp PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable")
@@ -155,7 +156,7 @@ elseif (WIN32)
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rc
             COMMAND cl /I ${AE_SDK_PATH}/Headers /EP ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r > ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr
-            COMMAND ${AE_SDK_PATH}/PiPLTool ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc
+            COMMAND ${AE_SDK_PATH}/Resources/PiPLTool ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc
             COMMAND cl /D "MSWindows" /EP ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc > ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rc
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
             COMMENT "Compiling the PiPL"
@@ -174,7 +175,7 @@ elseif (WIN32)
         message(STATUS "Found windeployqt.exe at: ${windeployqt_executable}")
         add_custom_command(
                 TARGET PAGExporter POST_BUILD
-                COMMAND ${CMAKE_CURRENT_BINARY_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>"
+                COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/win/deployqt.bat" "${windeployqt_executable}" "$<TARGET_FILE:PAGExporter>"
                 COMMENT "Running deploy script..."
                 VERBATIM
         )
