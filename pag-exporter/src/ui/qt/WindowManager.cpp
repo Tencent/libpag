@@ -29,35 +29,16 @@ WindowManager& WindowManager::getInstance() {
   return instance;
 }
 
-WindowManager::~WindowManager() {
-  if (panelExporterDialog) {
-    delete panelExporterDialog;
-    panelExporterDialog = nullptr;
-  }
-}
-
 void WindowManager::showPanelExporterDialog() {
-  if (isConfigDialogDestroy && panelExporterDialog != nullptr) {
-    delete panelExporterDialog;
-    panelExporterDialog = nullptr;
-    isConfigDialogDestroy = false;
-  }
-  if (!panelExporterDialog) {
-    panelExporterDialog = new PAGPanelExporterDialog();
-    panelExporterDialog->showMainPage();
-  } else {
-    panelExporterDialog->resetData();
-    panelExporterDialog->refreshErrorListView();
-    panelExporterDialog->show();
-  }
+  panelExporterDialog = std::make_unique<PAGPanelExporterDialog>();
+  panelExporterDialog->showMainPage();
 }
 
-void WindowManager::exitPAGPanelExporterDialog() {
+void WindowManager::exitPAGPanelExporterDialog() const {
   panelExporterDialog->hide();
-  isConfigDialogDestroy = true;
 }
 
-bool WindowManager::PanelExporterDialogIsActive() {
+bool WindowManager::PanelExporterDialogIsActive() const {
   if (panelExporterDialog) {
     return panelExporterDialog->isActive();
   }
@@ -65,7 +46,7 @@ bool WindowManager::PanelExporterDialogIsActive() {
 }
 
 void WindowManager::showPAGConfigDialog() {
-  configDialog = new PAGConfigDialog();
+  configDialog = std::make_unique<PAGConfigDialog>();
   configDialog->exec();
 }
 

@@ -34,7 +34,8 @@ void ExportSettingDialog::initTabWidget() {
 ExportSettingDialog::ExportSettingDialog(AEGP_ItemH& currentAEItem, QObject* parent)
     : currentAEItem(currentAEItem), QObject(parent) {
   initTabWidget();
-  connect(compositionModel, &CompositionModel::bmpDataChange, this, &ExportSettingDialog::onBmpDataChange);
+  connect(compositionModel, &CompositionModel::bmpDataChange, this,
+          &ExportSettingDialog::onBmpDataChange);
 }
 
 ExportSettingDialog::~ExportSettingDialog() {
@@ -117,6 +118,8 @@ void ExportSettingDialog::exit() {
   }
   engine->removeImageProvider(PLACEHOLDER_IMAGE);
   engine->removeImageProvider(COMPOSITION_IMAGE);
+  placeHolderImageProvider = nullptr;
+  snapshotCenter->compositionImageProvider = nullptr;
   Q_EMIT showExportConfigDialogSignal();
 }
 

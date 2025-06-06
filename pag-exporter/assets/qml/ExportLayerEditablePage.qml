@@ -29,7 +29,7 @@ Item{
                 id: leftTitle
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.top: boundLine1.bottom
+                anchors.top: parent.top
                 width: parent.width
                 height:36
                 color: "transparent"

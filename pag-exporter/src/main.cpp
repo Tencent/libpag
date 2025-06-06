@@ -74,7 +74,6 @@ extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long maj
 
   ERR(suites.RegisterSuite5()->AEGP_RegisterUpdateMenuHook(pluginID, AECommand::OnUpdateMenu,
                                                            nullptr));
-
   if (err) {
     ERR2(suites.UtilitySuite3()->AEGP_ReportInfo(pluginID,
                                                  "PAGExporter : Could not register command hook."));

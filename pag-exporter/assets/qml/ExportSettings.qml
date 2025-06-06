@@ -71,16 +71,6 @@ PApplicationWindow {
                 anchors.bottom: parent.bottom
             }
 
-            /*
-            CustomTabButton{
-                id: placeHolderTabBtn
-                text: placeholderTips
-                width: virtualText2.width
-                height: parent.height
-                underLineVisible: tabBar.currentIndex == 1 ? true : false
-                anchors.bottom: parent.bottom
-            }*/
-
             CustomTabButton {
                 id: layerEditableTabBtn
                 text: qsTr("文本图层")
@@ -113,13 +103,6 @@ PApplicationWindow {
                 visible: false
                 text: qsTr("预合成")
             }
-
-            /*
-            Text {
-                id: virtualText1
-                visible: false
-                text: placeholderTips
-            }*/
 
             Text {
                 id: virtualText1
@@ -156,10 +139,6 @@ PApplicationWindow {
             ExportCompositionPage {
                 id: compositionPage
             }
-            /*
-                        ExportPlaceHolderPage{
-                            id: placeHolderPage
-                        }*/
 
             ExportLayerEditablePage {
                 id: layerEditablePage
@@ -210,15 +189,12 @@ PApplicationWindow {
             onBmpStatusChange: {
                 console.log("onBmpStatusChange")
                 rootContainer.resetPlaceHolderTabTitle()
-                placeHolderTabBtn.resetTitleWidth()
-                placeHolderPage.showOrHideRightPart()
             }
         }
 
         function resetPlaceHolderTabTitle(argument) {
             var placeHolderSize = exportSettingDialog.getPlaceHolderSize()
             var tip = placeholderTips.arg(placeHolderSize);
-            placeHolderTabBtn.text = tip;
             console.log("qml placeholder size:" + placeHolderSize)
         }
     }

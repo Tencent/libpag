@@ -16,8 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "AudioSequence.h"
-#include "src/VideoEncoder/AudioMuxer.h"
+// #include "src/VideoEncoder/AudioMuxer.h"
 #include "src/utils/AEUtils.h"
+#include "ffaudio.h"
 
 #define CHECK_RET(statements)                                             \
   do {                                                                    \
@@ -53,6 +54,10 @@ static int RemoveSilence(int16_t* data, int channel, int numSamples, int& startS
   auto endSamples = endIndex / channel;
 
   return endSamples - startSamples + 1;
+}
+
+std::unique_ptr<pag::ByteData> getByteData(const std::string& filename) {
+  return pag::ByteData::FromPath(filename);
 }
 
 void ExportAudioSequence(pagexporter::Context* context, const AEGP_ItemH& itemHandle,
@@ -102,7 +107,7 @@ void ExportAudioSequence(pagexporter::Context* context, const AEGP_ItemH& itemHa
           int offset = startSamples * static_cast<int>(soundFormat2.num_channelsL);
           muxer->putData(static_cast<int16_t*>(samples) + offset, numSamples);
           muxer->close();
-          composition->audioBytes = muxer->getByteData().release();
+          composition->audioBytes = getByteData(muxer->getFilename()).release();
           composition->audioStartTime = static_cast<pag::Frame>(
               (startSamples / soundFormat2.sample_rateF) * composition->frameRate);
         } else {

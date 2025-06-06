@@ -15,6 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#if 0
 #ifndef VIDEOENCODERFFMPEG_H
 #define VIDEOENCODERFFMPEG_H
 #include "VideoEncoder.h"
@@ -62,3 +63,4 @@ private:
   int outStreamBufSize = 0;
 };
 #endif //VIDEOENCODERFFMPEG_H
+#endif

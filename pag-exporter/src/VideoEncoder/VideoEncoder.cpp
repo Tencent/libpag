@@ -31,14 +31,14 @@
 #include "src/utils/color_space/color_space.h"
 
 std::unique_ptr<VideoEncoder> VideoEncoder::MakeVideoEncoder(bool bHW) {
-  if (bHW && VideoEncoderFfmpeg::TestBeEnable()) {
-    auto videoEncoder = new VideoEncoderFfmpeg();
-    return std::unique_ptr<VideoEncoder>(videoEncoder);
-  } else {
+  // if (bHW && VideoEncoderFfmpeg::TestBeEnable()) {
+  //   auto videoEncoder = new VideoEncoderFfmpeg();
+  //   return std::unique_ptr<VideoEncoder>(videoEncoder);
+  // } else {
     //auto videoEncoder = new VideoEncoderX264();
     auto videoEncoder = new VideoEncoderOffline();
     return std::unique_ptr<VideoEncoder>(videoEncoder);
-  }
+  // }
 }
 
 static void FillYUVPadding(uint8_t* data[4], int stride[4], int width, int height,

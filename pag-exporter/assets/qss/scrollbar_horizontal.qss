@@ -1,0 +1,33 @@
+QScrollBar:horizontal {
+     background: transparent;
+     height: 8px;
+     margin: 0px 0 0px 0;
+}
+
+QScrollBar::handle:horizontal {
+     background: rgba(255, 255, 255, 51);
+     min-width: 99px;
+     margin: 2px 0px 1px 0px;
+     border-radius: 5px;
+     border: none;
+}
+
+QScrollBar::add-line:horizontal {
+     border: 0px solid grey;
+     background: #32CC99;
+     width: 0px;
+     subcontrol-position: right;
+     subcontrol-origin: margin;
+}
+
+QScrollBar::sub-line:horizontal {
+     border: 0px solid grey;
+     background: #32CC99;
+     width: 0px;
+     subcontrol-position: left;
+     subcontrol-origin: margin;
+}
+
+ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+     background: none;
+}

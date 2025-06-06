@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(LIBPAG_PATH ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(BUILD_ARCH "arm64")
 # Compile different architectures based on parameters
 if (APPLE)
     if (DEFINED BUILD_ARCH)
@@ -80,7 +81,8 @@ list(APPEND THIRDPARTY_INCLUDES
         ${ROOT}/third_party/json/include
         ${ROOT}/vendor/webp/include
         ${ROOT}/vendor/x264/include
-        ${ROOT}/vendor/ffmpeg/include)
+#        ${ROOT}/vendor/ffmpeg/include
+        ${ROOT}/vendor/ffaudio/include)
 
 if (APPLE)
     set(CMAKE_CXX_FLAGS "-stdlib=libc++")
@@ -113,11 +115,14 @@ if (APPLE)
 
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND libs ${ICONV_LIBRARIES})
-    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/libpag.a)
+#    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/libpag.a)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/webp/mac/libwebp.a)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/x264/mac/libx264.a)
-    file(GLOB ffmpeglibs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffmpeg/mac/*.a)
-    list(APPEND libs ${ffmpeglibs})
+#    file(GLOB ffmpeglibs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffmpeg/mac/arm64/*.a)
+#    list(APPEND libs ${ffmpeglibs})
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffaudio/mac/${ARCH}/libffaudio.dylib)
+#    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffaudio/mac/arm64/libffaudio.a)
+
 elseif (WIN32)
     find_library(Bcrypt_LIB Bcrypt)
     list(APPEND libs ${Bcrypt_LIB})
@@ -130,6 +135,14 @@ elseif (WIN32)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/win/libpag.lib)
 endif ()
 
+set(PAG_USE_QT ON)
+set(PAG_USE_RTTR OFF)
+set(PAG_USE_LIBAVC ON)
+set(PAG_BUILD_SHARED OFF)
+set(PAG_BUILD_TESTS OFF)
+
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
 add_library(PAGExporter MODULE ${SOURCE_FILES} ${UI_FILES} ${QT_RESOURCES})
 #target_compile_options(PAGExporter PUBLIC -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
@@ -138,8 +151,8 @@ target_include_directories(PAGExporter SYSTEM PRIVATE ${THIRDPARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/include)
 target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/src)
 target_include_directories(PAGExporter PUBLIC ${LIBPAG_PATH}/third_party/tgfx/include)
-
-target_link_libraries(PAGExporter ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Multimedia Qt6::Network)
+message("libs:${libs}")
+target_link_libraries(PAGExporter pag ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Multimedia Qt6::Network)
 if (APPLE)
     set_target_properties(PAGExporter PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugin/${BUILD_ARCH}/)
     target_link_libraries(PAGExporter "-framework AppKit" compression)

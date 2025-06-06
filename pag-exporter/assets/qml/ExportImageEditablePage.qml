@@ -10,6 +10,7 @@ Item {
     property var dividerWidth: 1
     property var snapshotImgMargin: 50
     property var sliderContainerHeight: 47
+    property var fontFamily: "PingFang SC"
 
     id: imageEditableTab
     Rectangle {

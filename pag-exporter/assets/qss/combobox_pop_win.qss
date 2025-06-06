@@ -1,0 +1,48 @@
+/* 未下拉时，QComboBox的样式 */
+QComboBox {
+    border: 0px solid gray;   /* 边框 */
+	font-size:14px;
+    border-radius: 2px;   /* 圆角 */
+    padding: 3px 0px 0px 10px;   /* 上，右，下，左 */
+    color: #FFF;
+    font: "PingFang SC";
+    background: rgba(255, 255, 255,25);
+	selection-background-color: rgba(255, 255, 255,50);
+	combobox-popup: 0
+}
+
+QComboBox QAbstractItemView{
+	background:#373740;
+    border-radius:0px 0px 5px 5px;
+	color: #FFFFFF;
+	font-size:14px;
+	width: 182px;
+	min-width:182px;
+	margin-top:1px;
+  }
+
+QComboBox QAbstractItemView::item {
+    color: #FFFFFF;
+    background-color: #383841; 
+	height:28px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    color: #FFFFFF;
+    background-color: #0063E1;  
+}
+
+/* 下拉框样式 */
+QComboBox::drop-down {
+    subcontrol-origin: padding;   
+    subcontrol-position: top right;  
+    width: 16px;   
+	border:none;
+}
+
+/* 下拉箭头样式 */
+ QComboBox::down-arrow {
+	image: url(':/images/down_arrow.png');
+	width: 16px;
+ 	height: 27px;
+ } 

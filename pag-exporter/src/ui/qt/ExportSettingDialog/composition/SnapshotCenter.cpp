@@ -29,6 +29,8 @@ void SnapshotCenter::initTimer() {
 }
 
 SnapshotCenter::~SnapshotCenter() noexcept {
+  delete timer;
+  timer = nullptr;
   delete compositionImageProvider;
   compositionImageProvider = nullptr;
 }
@@ -50,7 +52,7 @@ void SnapshotCenter::getImageInProgress(int progress) {
 }
 
 void SnapshotCenter::setCompositionPanel(std::shared_ptr<AECompositionPanel> compositionPanel) {
-  this->compositionPanel = compositionPanel;
+  this->compositionPanel = std::move(compositionPanel);
 }
 
 void SnapshotCenter::update() {
@@ -71,7 +73,7 @@ void SnapshotCenter::update() {
   frameWaitQueue = std::queue<int>();
   QString frameId = QString::number(progress);
   frameId.append("_").append(compositionPanel->compositionName.c_str());
-  if (progress != 1 && compositionImageProvider->isCacheFrame(frameId)) { //第一帧缓存不展示，可能是QT的BUG，先不缓存第一帧
+  if (progress != 1 && compositionImageProvider->isCacheFrame(frameId)) {
     qDebug() << "get cache image for frameId:" << frameId;
     Q_EMIT imageChange(frameId);
     return;

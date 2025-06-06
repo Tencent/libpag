@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "VideoEncoderOffline.h"
-#include "VideoEncoderX264.h"
+// #include "VideoEncoderX264.h"
 #include "src/cJSON/cJSON.h"
 #include "src/configparam/ConfigParam.h"
 #ifdef _WIN32

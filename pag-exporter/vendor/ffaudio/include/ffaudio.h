@@ -15,36 +15,33 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef WINDOWMANAGER_H
-#define WINDOWMANAGER_H
+#ifndef FFAUDIO_H
+#define FFAUDIO_H
+#include <string>
 #include <memory>
-#include "AE_GeneralPlug.h"
 
-class PAGPanelExporterDialog;
-class PAGConfigDialog;
+#ifdef _WIN32
+#define FFAUDIO_EXPORT __declspec(dllexport)
+#else
+#define FFAUDIO_EXPORT __attribute__((visibility("default")))
+#endif
 
-class WindowManager {
- public:
-  static WindowManager& getInstance();
+class AudioMuxerImpl;
 
-  WindowManager(const WindowManager&) = delete;
-  WindowManager& operator=(const WindowManager&) = delete;
+class FFAUDIO_EXPORT AudioMuxer {
+public:
+    AudioMuxer();
+    ~AudioMuxer();
 
-  void showPanelExporterDialog();
-  void showPAGConfigDialog();
-  void showExportPreviewDialog(AEGP_ItemH itemH, bool isExportAudio, bool needShowExport,
-                               bool isQWidget = false);
-  void exitPAGPanelExporterDialog() const;
+    bool init(std::string& outputPath, int channel, int sampleRate);
 
-  bool PanelExporterDialogIsActive() const;
+    void close();
 
-  bool PAGConfigDialogIsActive();
+    int putData(int16_t* data, int numSamples);
 
- private:
-  WindowManager() = default;
-  ~WindowManager() = default;
+    std::string getFilename();
 
-  std::shared_ptr<PAGPanelExporterDialog> panelExporterDialog;
-  std::shared_ptr<PAGConfigDialog> configDialog;
+private:
+    std::unique_ptr<AudioMuxerImpl> impl;
 };
-#endif  //WINDOWMANAGER_H
+#endif  //FFAUDIO_H

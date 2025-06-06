@@ -15,6 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#if 0
 #include "VideoEncoderFfmpeg.h"
 
 void VideoEncoderFfmpeg::checkAndResizeOutBuf(int newSize) {
@@ -262,3 +263,4 @@ int main_gpu2() {
   delete data[0];
   return 0;
 }
+#endif

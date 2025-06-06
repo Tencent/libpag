@@ -26,12 +26,12 @@
 class SnapshotCenter : public QObject {
   Q_OBJECT
  public:
-  SnapshotCenter(std::shared_ptr<AECompositionPanel> compositionPanel, QObject* parent = nullptr);
-  ~SnapshotCenter();
+  explicit SnapshotCenter(std::shared_ptr<AECompositionPanel> compositionPanel, QObject* parent = nullptr);
+  ~SnapshotCenter() override;
   Q_INVOKABLE void setSize(int width, int height);
   Q_INVOKABLE void getImageInProgress(int progress);
   Q_SIGNAL void imageChange(QString frameId);
-  CompositionImageProvider* compositionImageProvider;
+  CompositionImageProvider* compositionImageProvider=nullptr;
 
   void setCompositionPanel(std::shared_ptr<AECompositionPanel> compositionPanel);
 

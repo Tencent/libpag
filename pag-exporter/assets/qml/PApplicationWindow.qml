@@ -134,7 +134,6 @@ Window {
                 width: 16
                 height: 16
                 fillMode: Image.PreserveAspectFit
-                source: "qrc:/images/window-icon-32x.png"
             }
 
             RectangleWithRadius {
