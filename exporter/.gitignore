@@ -2,3 +2,4 @@
 /cmake-build-*
 /vendor/AfterEffectsSDK
 *.cfg
+*.rsrc
