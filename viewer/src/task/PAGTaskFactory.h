@@ -29,7 +29,7 @@ class PAGTaskFactory : public QObject {
  public:
   Q_ENUMS(PAGTaskType)
 
-  enum PAGTaskType {
+  enum class PAGTaskType {
     PAGTaskType_None,
     PAGTaskType_ExportPNG,
     PAGTaskType_ExportAPNG,

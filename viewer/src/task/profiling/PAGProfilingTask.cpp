@@ -33,11 +33,10 @@ auto PAGProfilingTask::onBegin() -> void {
 
 auto PAGProfilingTask::onFinish() -> int {
   PAGPlayTask::onFinish();
-  auto frames = currentFrame - 1;
-  if (frames > 0) {
-    performanceData->presentingTime /= frames;
-    performanceData->renderingTime /= frames;
-    performanceData->imageDecodingTime /= frames;
+  if (currentFrame > 0) {
+    performanceData->presentingTime /= currentFrame;
+    performanceData->renderingTime /= currentFrame;
+    performanceData->imageDecodingTime /= currentFrame;
   }
   performanceData->graphicsMemory = CalculateGraphicsMemory(pagFile->getFile());
   auto byteData = pag::Codec::Encode(pagFile->getFile(), performanceData);
