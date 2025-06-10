@@ -25,8 +25,7 @@ namespace pag {
 class PAGExportAPNGTask : public PAGExportPNGTask {
   Q_OBJECT
  public:
-  explicit PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
-                             const QString& pngFilePath);
+  explicit PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath);
 
  protected:
   void onFrameFlush(double progress) override;

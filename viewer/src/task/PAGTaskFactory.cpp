@@ -47,9 +47,7 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
       break;
     }
     case PAGTaskType::PAGTaskType_ExportAPNG: {
-      QFileInfo fileInfo(path);
-      QString pngFilePath = fileInfo.absolutePath() + "/" + fileInfo.baseName() + "_PNG";
-      task = new PAGExportAPNGTask(pagFile, path, pngFilePath);
+      task = new PAGExportAPNGTask(pagFile, path);
       break;
     }
     case PAGTaskType::PAGTaskType_Profiling: {
