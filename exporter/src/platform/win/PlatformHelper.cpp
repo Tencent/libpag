@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "platform/PlatformHelper.h"
 #include <filesystem>
-#include <fstream>
-#include <iostream>
+#include <cstdlib>
 #include <string>
 
 namespace fs = std::filesystem;

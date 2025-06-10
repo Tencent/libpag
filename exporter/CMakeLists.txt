@@ -159,7 +159,7 @@ elseif (WIN32)
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rc
             COMMAND cl /I ${AE_SDK_PATH}/Headers /EP ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r > ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr
-            COMMAND ${AE_SDK_PATH}/PiPLTool ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc
+            COMMAND ${AE_SDK_PATH}/Resources/PiPLTool ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc
             COMMAND cl /D "MSWindows" /EP ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc > ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rc
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
             COMMENT "Compiling the PiPL"
@@ -179,7 +179,7 @@ elseif (WIN32)
             message(STATUS "Found windeployqt.exe at: ${windeployqt_executable}")
             add_custom_command(
                     TARGET PAGExporter POST_BUILD
-                    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>"
+                    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>"
                     COMMENT "Running deploy script..."
                     VERBATIM
             )
