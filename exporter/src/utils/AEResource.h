@@ -22,8 +22,6 @@ namespace exporter {
 
 enum class AEResourceType { Unknown, Folder, Composition, Image };
 
-class AEResourceManager {
- public:
-  static bool HasCompositionResource();
-};
+bool HasCompositionResource();
+
 }  // namespace exporter

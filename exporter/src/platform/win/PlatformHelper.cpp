@@ -37,10 +37,15 @@ std::string GetRoamingPath() {
   return path + "\\";
 }
 
-void CreateFolder(const std::string& path) {
+bool CreateFolder(const std::string& path) {
   if (!fs::exists(path)) {
-    fs::create_directories(path);
+    std::error_code errorCode;
+    if (!fs::create_directories(path, errorCode)) {
+      printf("Create %s failed: %s\n", path.c_str(), errorCode.message().c_str());
+      return false;
+    }
   }
+  return true;
 }
 
 std::string GetConfigPath() {
@@ -50,7 +55,9 @@ std::string GetConfigPath() {
   }
 
   path += "PAGExporter\\";
-  CreateFolder(path);
+  if (!CreateFolder(path)) {
+    return "";
+  }
   return path;
 }
 

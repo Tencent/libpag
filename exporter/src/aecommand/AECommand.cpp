@@ -18,7 +18,7 @@
 
 #include "AECommand.h"
 #include "utils/AEHelper.h"
-#include "utils/AEResourceManager.h"
+#include "utils/AEResource.h"
 
 namespace exporter {
 
@@ -30,7 +30,8 @@ AEGP_Command AECommand::PAGPreviewCMD = 0L;
 A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon /*globalRefcon*/,
                               AEGP_UpdateMenuRefcon /*menuRefcon*/,
                               AEGP_WindowType /*windowType*/) {
-  A_Err err = A_Err_NONE, err2 = A_Err_NONE;
+  A_Err err = A_Err_NONE;
+  A_Err err2 = A_Err_NONE;
   const auto& suites = AEHelper::GetSuites();
   AEGP_ItemH active_itemH = AEHelper::GetActiveCompositionItem();
   if (active_itemH) {
@@ -42,7 +43,7 @@ A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon /*globalRefcon*/,
   }
 
   ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGConfigCMD));
-  if (AEResourceManager::HasCompositionResource()) {
+  if (exporter::HasCompositionResource()) {
     ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGPanelCMD));
   } else {
     ERR2(suites->CommandSuite1()->AEGP_DisableCommand(PAGPanelCMD));

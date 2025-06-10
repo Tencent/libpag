@@ -26,10 +26,10 @@
 extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long /*majorVersion*/,
                                           A_long /*minorVersion*/, AEGP_PluginID pluginID,
                                           AEGP_GlobalRefcon* /*globalRefcon*/) {
-  exporter::AEHelper::SetSuitesAndPluginID(suite, pluginID);
+  AEHelper::SetSuitesAndPluginID(suite, pluginID);
   A_Err err = A_Err_NONE;
   A_Err err2 = A_Err_NONE;
-  const auto& suites = exporter::AEHelper::GetSuites();
+  const auto& suites = AEHelper::GetSuites();
 
   // PAG Config...
   ERR(suites->CommandSuite1()->AEGP_GetUniqueCommand(&exporter::AECommand::PAGConfigCMD));

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AEResourceManager.h"
+#include "AEResource.h"
 #include "AEHelper.h"
 
 namespace exporter {
@@ -48,7 +48,7 @@ static AEResourceType GetResourceType(const std::shared_ptr<AEGP_SuiteHandler>& 
   return AEResourceType::Unknown;
 }
 
-bool AEResourceManager::HasCompositionResource() {
+bool HasCompositionResource() {
   const auto& suites = AEHelper::GetSuites();
   A_long numProjects = 0;
   suites->ProjSuite6()->AEGP_GetNumProjects(&numProjects);

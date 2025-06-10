@@ -18,17 +18,17 @@
 
 #include "AEHelper.h"
 
-namespace exporter {
+namespace AEHelper {
 
-AEGP_PluginID AEHelper::PluginID = 0L;
-std::shared_ptr<AEGP_SuiteHandler> AEHelper::Suites = nullptr;
+AEGP_PluginID PluginID = 0L;
+std::shared_ptr<AEGP_SuiteHandler> Suites = nullptr;
 
-void AEHelper::SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
-  Suites = std::make_unique<AEGP_SuiteHandler>(basicSuite);
+void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
+  Suites = std::make_shared<AEGP_SuiteHandler>(basicSuite);
   PluginID = id;
 }
 
-AEGP_ItemH AEHelper::GetActiveCompositionItem() {
+AEGP_ItemH GetActiveCompositionItem() {
   const auto& suites = GetSuites();
   AEGP_ItemH activeItemH = nullptr;
   suites->ItemSuite6()->AEGP_GetActiveItem(&activeItemH);
@@ -48,4 +48,12 @@ AEGP_ItemH AEHelper::GetActiveCompositionItem() {
   return activeItemH;
 }
 
-}  // namespace exporter
+AEGP_PluginID GetPluginID() {
+  return PluginID;
+}
+
+std::shared_ptr<AEGP_SuiteHandler> GetSuites() {
+  return Suites;
+}
+
+}  // namespace AEHelper

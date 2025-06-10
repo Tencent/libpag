@@ -22,21 +22,14 @@
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
 
-namespace exporter {
+namespace AEHelper {
 
-class AEHelper {
- public:
-  static AEGP_ItemH GetActiveCompositionItem();
-  static void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id);
-  static std::shared_ptr<AEGP_SuiteHandler> GetSuites() {
-    return Suites;
-  }
-  static AEGP_PluginID GetPluginID() {
-    return PluginID;
-  }
+AEGP_ItemH GetActiveCompositionItem();
 
- private:
-  static AEGP_PluginID PluginID;
-  static std::shared_ptr<AEGP_SuiteHandler> Suites;
-};
-}  // namespace exporter
+void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id);
+
+std::shared_ptr<AEGP_SuiteHandler> GetSuites();
+
+AEGP_PluginID GetPluginID();
+
+}  // namespace AEHelper

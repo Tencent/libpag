@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "platform/PlatformHelper.h"
 #import <Foundation/Foundation.h>
+namespace exporter {
 std::string GetRoamingPath() {
   NSArray* arr =
       NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
@@ -31,10 +32,15 @@ std::string GetConfigPath() {
   NSFileManager* fileManager = [NSFileManager defaultManager];
   NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
   if (![fileManager fileExistsAtPath:nsPath]) {
-    [fileManager createDirectoryAtPath:nsPath
-           withIntermediateDirectories:YES
-                            attributes:nil
-                                 error:nil];
+    NSError* error = nil;
+    if (![fileManager createDirectoryAtPath:nsPath
+                withIntermediateDirectories:YES
+                                 attributes:nil
+                                      error:&error]) {
+      NSLog(@"Failed to create directory: %@", error);
+      return "";
+    }
   }
   return path;
 }
+}  // namespace exporter
