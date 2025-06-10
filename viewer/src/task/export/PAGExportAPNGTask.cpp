@@ -24,7 +24,7 @@
 
 namespace pag {
 
-static QString getPNGTempDir(const QString& apngFilePath) {
+static QString GetPNGTempDir(const QString& apngFilePath) {
   QFileInfo fileInfo(apngFilePath);
   QString pngFilePath = fileInfo.absolutePath() + "/" + fileInfo.baseName() + "_PNG";
   return pngFilePath;
@@ -32,7 +32,7 @@ static QString getPNGTempDir(const QString& apngFilePath) {
 
 PAGExportAPNGTask::PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile,
                                      const QString& apngFilePath)
-    : PAGExportPNGTask(pagFile, getPNGTempDir(apngFilePath)), apngFilePath(apngFilePath) {
+    : PAGExportPNGTask(pagFile, GetPNGTempDir(apngFilePath)), apngFilePath(apngFilePath) {
   openAfterExport = false;
 }
 
