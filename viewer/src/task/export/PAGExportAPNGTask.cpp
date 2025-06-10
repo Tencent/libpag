@@ -18,14 +18,21 @@
 
 #include "PAGExportAPNGTask.h"
 #include <QDebug>
+#include <QFileInfo>
 #include "utils/FileUtils.h"
 #include "utils/Utils.h"
 
 namespace pag {
 
-PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
-                                     const QString& pngFilePath)
-    : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
+static QString GetPNGTempDir(const QString& apngFilePath) {
+  QFileInfo fileInfo(apngFilePath);
+  QString pngFilePath = fileInfo.absolutePath() + "/" + fileInfo.baseName() + "_PNG";
+  return pngFilePath;
+}
+
+PAGExportAPNGTask::PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                     const QString& apngFilePath)
+    : PAGExportPNGTask(pagFile, GetPNGTempDir(apngFilePath)), apngFilePath(apngFilePath) {
   openAfterExport = false;
 }
 
