@@ -25,13 +25,15 @@ namespace pag {
 
 const std::string ExportPNGFileSuffix = "png";
 
-PAGExportPNGTask::PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
-                                   int exportFrame)
-    : PAGPlayTask(pagFile, filePath), exportFrame(exportFrame) {
-  QString lowerFilePath = filePath.toLower();
-  if (!lowerFilePath.endsWith(QString(".%1").arg(ExportPNGFileSuffix.c_str()))) {
-    Utils::MakeDir(filePath);
-  }
+PAGExportPNGTask::PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                   const QString& pngfilePath, int exportFrame)
+    : PAGPlayTask(pagFile, pngfilePath), exportFrame(exportFrame) {
+}
+
+PAGExportPNGTask::PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                   const QString& pngSequenceDirPath)
+    : PAGPlayTask(pagFile, pngSequenceDirPath) {
+  Utils::MakeDir(pngSequenceDirPath);
 }
 
 void PAGExportPNGTask::onFrameFlush(double progress) {

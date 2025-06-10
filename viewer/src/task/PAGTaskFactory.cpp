@@ -39,11 +39,12 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
 
   switch (taskType) {
     case PAGTaskType::PAGTaskType_ExportPNG: {
-      int exportFrame = -1;
       if (extraParams.contains("exportFrame")) {
-        exportFrame = extraParams.value("exportFrame").toInt();
+        int exportFrame = extraParams.value("exportFrame").toInt();
+        task = new PAGExportPNGTask(pagFile, path, exportFrame);
+      } else {
+        task = new PAGExportPNGTask(pagFile, path);
       }
-      task = new PAGExportPNGTask(pagFile, path, exportFrame);
       break;
     }
     case PAGTaskType::PAGTaskType_ExportAPNG: {
