@@ -32,6 +32,14 @@ if (NOT CMAKE_PREFIX_PATH)
     include("./QTCMAKE.cfg")
 endif ()
 
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick Multimedia Network REQUIRED)
+add_definitions(${Qt6Widgets_DEFINITIONS} ${QtQml_DEFINITIONS} ${${Qt6Quick_DEFINITIONS}})
+qt6_add_resources(QT_RESOURCES assets/res.qrc)
+
 if (MSVC)
     add_compile_options("/utf-8")
     add_compile_options(/GR-)

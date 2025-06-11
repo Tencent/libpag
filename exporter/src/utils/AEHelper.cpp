@@ -17,11 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AEHelper.h"
+#include "platform/PlatformHelper.h"
 
 namespace AEHelper {
 
 AEGP_PluginID PluginID = 0L;
 std::shared_ptr<AEGP_SuiteHandler> Suites = nullptr;
+std::string DocumentsFolderPath;
+std::string AeVersion;
 
 void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
   Suites = std::make_shared<AEGP_SuiteHandler>(basicSuite);
@@ -54,6 +57,61 @@ AEGP_PluginID GetPluginID() {
 
 std::shared_ptr<AEGP_SuiteHandler> GetSuites() {
   return Suites;
+}
+
+std::string RunScript(std::shared_ptr<AEGP_SuiteHandler> suites, AEGP_PluginID pluginID,
+                      const std::string& scriptText) {
+  AEGP_MemHandle scriptResult;
+  AEGP_MemHandle errorResult;
+  suites->UtilitySuite6()->AEGP_ExecuteScript(pluginID, scriptText.c_str(), FALSE, &scriptResult,
+                                              &errorResult);
+  A_char* result = nullptr;
+  suites->MemorySuite1()->AEGP_LockMemHandle(scriptResult, reinterpret_cast<void**>(&result));
+  std::string resultText = result;
+  suites->MemorySuite1()->AEGP_FreeMemHandle(scriptResult);
+  A_char* error = nullptr;
+  suites->MemorySuite1()->AEGP_LockMemHandle(errorResult, reinterpret_cast<void**>(&error));
+  std::string errorText = error;
+  suites->MemorySuite1()->AEGP_FreeMemHandle(errorResult);
+  return resultText;
+}
+
+void RegisterTextDocumentScript() {
+  static bool hasInit = false;
+  if (!hasInit) {
+    const auto& suites = GetSuites();
+    auto pluginID = GetPluginID();
+    RunScript(suites, pluginID, TextDocumentScript);
+    hasInit = true;
+  }
+}
+
+std::string GetDocumentsFolderPath() {
+  if (DocumentsFolderPath.empty()) {
+    const auto& suites = GetSuites();
+    auto pluginID = GetPluginID();
+    DocumentsFolderPath = RunScript(suites, pluginID, "Folder.myDocuments.fsName;");
+  }
+  return DocumentsFolderPath;
+}
+
+std::string GetAeVersion() {
+  if (AeVersion.empty()) {
+    const auto& suites = GetSuites();
+    auto pluginID = GetPluginID();
+    AeVersion = RunScript(suites, pluginID, "app.version");
+  }
+  return AeVersion;
+}
+
+void RunScriptPreWarm() {
+  static bool hasInit = false;
+  if (!hasInit) {
+    RegisterTextDocumentScript();
+    GetDocumentsFolderPath();
+    GetAeVersion();
+    hasInit = true;
+  }
 }
 
 }  // namespace AEHelper
