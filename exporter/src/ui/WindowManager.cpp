@@ -17,11 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WindowManager.h"
-#include <QDesktopServices>
 #include <QFile>
-#include <QUrl>
 #include <QtGui/QFont>
-#include <QtGui/QSurfaceFormat>
 #include <QtQuick/QQuickWindow>
 #include <QtWidgets/QApplication>
 #include "utils/AEHelper.h"

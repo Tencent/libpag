@@ -36,7 +36,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick Multimedia Network REQUIRED)
+find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick  REQUIRED)
 add_definitions(${Qt6Widgets_DEFINITIONS} ${QtQml_DEFINITIONS} ${${Qt6Quick_DEFINITIONS}})
 qt6_add_resources(QT_RESOURCES assets/res.qrc)
 
@@ -113,7 +113,7 @@ add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${AE_SDK_SOURCE_FILE
 
 target_include_directories(PAGExporter SYSTEM PRIVATE ${PAG_EXPORTER_THIRD_PARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${PAG_EXPORTER_INCLUDES})
-target_link_libraries(PAGExporter  pag ${libs})
+target_link_libraries(PAGExporter  pag ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
 
 if (APPLE)
     target_link_libraries(PAGExporter "-framework AppKit" compression)
@@ -175,22 +175,26 @@ elseif (WIN32)
     target_sources(${PROJECT_NAME} PRIVATE PAGExporterPiPL.rc)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        get_target_property(qmake_executable Qt6::qmake IMPORTED_LOCATION)
-        if (NOT qmake_executable)
-            message(FATAL_ERROR "qmake executable not found")
-        endif ()
-        get_filename_component(qt_bin_dir "${qmake_executable}" DIRECTORY)
-        find_program(windeployqt_executable windeployqt HINTS "${qt_bin_dir}")
-        if (NOT windeployqt_executable)
-            message(FATAL_ERROR "windeployqt.exe not found in ${qt_bin_dir}")
-        elseif (windeployqt_executable)
-            message(STATUS "Found windeployqt.exe at: ${windeployqt_executable}")
-            add_custom_command(
-                    TARGET PAGExporter POST_BUILD
-                    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>"
-                    COMMENT "Running deploy script..."
-                    VERBATIM
-            )
-        endif ()
+        set(deploy_build_type "debug")
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        set(deploy_build_type "release")
+    endif ()
+
+    get_target_property(qmake_executable Qt6::qmake IMPORTED_LOCATION)
+    if (NOT qmake_executable)
+        message(FATAL_ERROR "qmake executable not found")
+    endif ()
+    get_filename_component(qt_bin_dir "${qmake_executable}" DIRECTORY)
+    find_program(windeployqt_executable windeployqt HINTS "${qt_bin_dir}")
+    if (NOT windeployqt_executable)
+        message(FATAL_ERROR "windeployqt.exe not found in ${qt_bin_dir}")
+    elseif (windeployqt_executable)
+        message(STATUS "Found windeployqt.exe at: ${windeployqt_executable}")
+        add_custom_command(
+                TARGET PAGExporter POST_BUILD
+                COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>" ${deploy_build_type}
+                COMMENT "Running deploy script..."
+                VERBATIM
+        )
     endif ()
 endif ()
