@@ -47,6 +47,15 @@ add_definitions(-DQT_NO_KEYWORDS)
 list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
 file(GLOB_RECURSE AE_SDK_SOURCE_FILES ${AE_SDK_PATH}/Util/*.cpp)
+
+list(FILTER PAG_EXPORTER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
+if (APPLE)
+    file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/mac/*.*)
+elseif (WIN32)
+    file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/win/*.*)
+endif ()
+list(APPEND PAG_EXPORTER_SOURCE_FILES ${PLATFORM_SOURCE_FILES})
+
 if(MSVC)
     set_source_files_properties(${AE_SDK_SOURCE_FILES} PROPERTIES COMPILE_FLAGS "/wd4100")
 else()
@@ -150,7 +159,7 @@ elseif (WIN32)
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rc
             COMMAND cl /I ${AE_SDK_PATH}/Headers /EP ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r > ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr
-            COMMAND ${AE_SDK_PATH}/PiPLTool ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc
+            COMMAND ${AE_SDK_PATH}/Resources/PiPLTool ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rr ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc
             COMMAND cl /D "MSWindows" /EP ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rrc > ${CMAKE_CURRENT_BINARY_DIR}/PAGExporterPiPL.rc
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
             COMMENT "Compiling the PiPL"
@@ -170,7 +179,7 @@ elseif (WIN32)
             message(STATUS "Found windeployqt.exe at: ${windeployqt_executable}")
             add_custom_command(
                     TARGET PAGExporter POST_BUILD
-                    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>"
+                    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/win/deployqt.bat ${windeployqt_executable} "$<TARGET_FILE:PAGExporter>"
                     COMMENT "Running deploy script..."
                     VERBATIM
             )
