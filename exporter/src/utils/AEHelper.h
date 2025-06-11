@@ -17,22 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
+#include <string>
+#include "AEGP_SuiteHandler.h"
+#include "AE_GeneralPlug.h"
 
-#include <QString>
-#include "pag/file.h"
+namespace AEHelper {
 
-namespace pag::Utils {
+AEGP_ItemH GetActiveCompositionItem();
 
-void OpenInFinder(const QString& path, bool select = true);
+void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id);
 
-bool DeleteFile(const QString& path);
+std::shared_ptr<AEGP_SuiteHandler> GetSuites();
 
-bool DeleteDir(const QString& path);
+AEGP_PluginID GetPluginID();
 
-bool MakeDir(const QString& path, bool isDir = true);
-
-bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath);
-
-bool WriteDataToDisk(const QString& filePath, const void* data, size_t length);
-
-}  // namespace pag::Utils
+}  // namespace AEHelper
