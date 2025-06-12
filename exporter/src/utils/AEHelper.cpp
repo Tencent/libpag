@@ -23,8 +23,8 @@ namespace AEHelper {
 
 AEGP_PluginID PluginID = 0L;
 std::shared_ptr<AEGP_SuiteHandler> Suites = nullptr;
-std::string DocumentsFolderPath;
-std::string AeVersion;
+std::string DocumentsFolderPath = "";
+std::string AeVersion = "";
 
 void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
   Suites = std::make_shared<AEGP_SuiteHandler>(basicSuite);

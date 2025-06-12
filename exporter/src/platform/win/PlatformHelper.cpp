@@ -22,7 +22,7 @@
 #include "utils/AEHelper.h"
 
 namespace fs = std::filesystem;
-std::string TempFolderPath;
+std::string TempFolderPath = "";
 
 namespace exporter {
 std::string GetRoamingPath() {
@@ -67,7 +67,7 @@ std::string GetTempFolderPath() {
   if (TempFolderPath.empty()) {
     const auto& suites = AEHelper::GetSuites();
     auto pluginID = AEHelper::GetPluginID();
-    TempFolderPath = AEHelper::RunScript(suites, pluginID, "Folder.myDocuments.fsName;");
+    TempFolderPath = AEHelper::RunScript(suites, pluginID, "Folder.temp.fsName;");
   }
   return TempFolderPath;
 }

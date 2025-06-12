@@ -32,8 +32,10 @@ class WindowManager {
   void showExportPreviewWindow();
 
   WindowManager(const WindowManager&) = delete;
-
   WindowManager& operator=(const WindowManager&) = delete;
+
+  WindowManager(WindowManager&&) = delete;
+  WindowManager& operator=(WindowManager&&) = delete;
 
  private:
   WindowManager();

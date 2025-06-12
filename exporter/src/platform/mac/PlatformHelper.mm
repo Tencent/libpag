@@ -18,7 +18,7 @@
 #include "platform/PlatformHelper.h"
 #import <Foundation/Foundation.h>
 
-std::string TempFolderPath;
+std::string TempFolderPath = "";
 namespace exporter {
 std::string GetRoamingPath() {
   NSArray* arr =
