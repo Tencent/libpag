@@ -16,9 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <unistd.h>
 #include "HardwareDecoder.h"
-#include "android/api-level.h"
+#include <unistd.h>
 #include "base/utils/Log.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
@@ -50,7 +49,7 @@ HardwareDecoder::~HardwareDecoder() {
     delete bufferInfo;
     bufferInfo = nullptr;
   }
-  if(imageReader != nullptr) {
+  if (imageReader != nullptr) {
     delete imageReader;
     imageReader = nullptr;
   }
@@ -95,7 +94,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
   imageReader = new HardwareImageReader();
-  if(!imageReader->makeFrom(format)){
+  if (!imageReader->makeFrom(format)) {
     LOGE("HardwareDecoder: Error on creating imageReader.\n");
     delete imageReader;
     AMediaFormat_delete(mediaFormat);
@@ -105,7 +104,8 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   }
 
   media_status_t status;
-  status = AMediaCodec_configure(videoDecoder, mediaFormat, imageReader->getANativeWindow(), nullptr, 0);
+  status =
+      AMediaCodec_configure(videoDecoder, mediaFormat, imageReader->getANativeWindow(), nullptr, 0);
   AMediaFormat_delete(mediaFormat);
   if (status != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on configuring videoDecoder.\n");
@@ -199,10 +199,10 @@ DecodingResult HardwareDecoder::onEndOfStream() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-    if (!releaseOutputBuffer(true)) {
-        return nullptr;
-    }
-    return imageReader->acquireNextBuffer();
+  if (!releaseOutputBuffer(true)) {
+    return nullptr;
+  }
+  return imageReader->acquireNextBuffer();
 }
 
 bool HardwareDecoder::releaseOutputBuffer(bool render) {

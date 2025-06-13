@@ -16,43 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/android/SurfaceTextureReader.h"
-#include "rendering/video/VideoFormat.h"
 #include "android/native_window.h"
 #include "android/native_window_jni.h"
-#include "media/NdkMediaCodec.h"
-#include "media/NdkMediaFormat.h"
 #include "media/NdkImage.h"
 #include "media/NdkImageReader.h"
+#include "media/NdkMediaFormat.h"
+#include "rendering/video/VideoFormat.h"
 #include "tgfx/core/ImageReader.h"
+#include "tgfx/platform/android/SurfaceTextureReader.h"
 
 namespace pag {
-    class HardwareImageReader {
-    public:
-        ~HardwareImageReader();
+class HardwareImageReader {
+ public:
+  ~HardwareImageReader();
 
-//        HardwareImageReader(const VideoFormat& format);
+  void notifyFrameAvailable();
 
-        void notifyFrameAvailable();
+  std::shared_ptr<tgfx::ImageBuffer> acquireNextBuffer();
 
-        std::shared_ptr<tgfx::ImageBuffer> acquireNextBuffer();
+  bool makeFrom(const VideoFormat& format);
 
-        bool makeFrom(const VideoFormat& format);
+  ANativeWindow* getANativeWindow() const {
+    return aNativeWindow;
+  }
 
-        ANativeWindow* getANativeWindow() const{
-            return aNativeWindow;
-        }
+  static void OnImageAvailableStatic(void* context, AImageReader*);
 
-        static void onImageAvailableStatic(void* context, AImageReader*);
-
-    private:
-        std::mutex locker = {};
-        std::condition_variable condition = {};
-        VideoFormat videoFormat{};
-        ANativeWindow* aNativeWindow = nullptr;
-        AImageReader* aImageReader = nullptr;
-        AImage* aImage = nullptr;
-        std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
-        bool frameAvailable = false;
-    };
+ private:
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+  VideoFormat videoFormat{};
+  ANativeWindow* aNativeWindow = nullptr;
+  std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
+  bool frameAvailable = false;
+#if __ANDROID_API__ >= 26
+  AImageReader* aImageReader = nullptr;
+  AImage* aImage = nullptr;
+#endif
+};
 }  // namespace pag

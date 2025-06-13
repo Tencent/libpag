@@ -18,17 +18,17 @@
 
 #pragma once
 
+#include "HardwareImageReader.h"
 #include "JNIHelper.h"
 #include "android/native_window.h"
 #include "android/native_window_jni.h"
-#include "media/NdkMediaCodec.h"
-#include "media/NdkMediaFormat.h"
 #include "media/NdkImage.h"
 #include "media/NdkImageReader.h"
+#include "media/NdkMediaCodec.h"
+#include "media/NdkMediaFormat.h"
+#include "pag/decoder.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
-#include "pag/decoder.h"
-#include "HardwareImageReader.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
