@@ -81,7 +81,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             pagView.addListener(this);
             pagView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-            PAGFile pagFile = PAGFile.Load(getAssets(), "castle.pag");
+            PAGFile pagFile = PAGFile.Load(getAssets(), "particle_video.pag");
             if (pagFile.numTexts() > 0) {
                 PAGText pagText = pagFile.getTextData(0);
                 pagText.text = "hahhha哈哈哈😆哈哈哈";
