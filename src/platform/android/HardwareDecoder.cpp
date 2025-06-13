@@ -16,10 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <unistd.h>
 #include "HardwareDecoder.h"
+#include "android/api-level.h"
 #include "base/utils/Log.h"
 #include "tgfx/core/Buffer.h"
-#include "tgfx/core/Task.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 
@@ -44,14 +46,13 @@ HardwareDecoder::~HardwareDecoder() {
     }
     videoDecoder = nullptr;
   }
-  if (nativeWindow != nullptr) {
-    ANativeWindow_release(nativeWindow);
-    nativeWindow = nullptr;
-  }
-
   if (bufferInfo != nullptr) {
     delete bufferInfo;
     bufferInfo = nullptr;
+  }
+  if(imageReader != nullptr) {
+    delete imageReader;
+    imageReader = nullptr;
   }
 }
 
@@ -62,7 +63,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   AMediaFormat_setString(mediaFormat, AMEDIAFORMAT_KEY_MIME, format.mimeType.c_str());
   AMediaFormat_setInt32(mediaFormat, AMEDIAFORMAT_KEY_WIDTH, format.width);
   AMediaFormat_setInt32(mediaFormat, AMEDIAFORMAT_KEY_HEIGHT, format.height);
-
+  AMediaFormat_setFloat(mediaFormat, AMEDIAFORMAT_KEY_FRAME_RATE, format.frameRate);
   if (format.mimeType == "video/hevc") {
     if (!format.headers.empty()) {
       const char* keyString = "csd-0";
@@ -88,55 +89,27 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
       index++;
     }
   }
-
-  AMediaFormat_setFloat(mediaFormat, AMEDIAFORMAT_KEY_FRAME_RATE, format.frameRate);
   videoDecoder = AMediaCodec_createDecoderByType(format.mimeType.c_str());
   if (videoDecoder == nullptr) {
     AMediaFormat_delete(mediaFormat);
     return false;
   }
-
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
+  imageReader = new HardwareImageReader();
+  if(!imageReader->makeFrom(format)){
+    LOGE("HardwareDecoder: Error on creating imageReader.\n");
+    delete imageReader;
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
     return false;
   }
-
-  auto videoSurface = JVideoSurface::Make(env, format.width, format.height);
-  if (videoSurface == nullptr) {
-    AMediaFormat_delete(mediaFormat);
-    AMediaCodec_delete(videoDecoder);
-    videoDecoder = nullptr;
-    return false;
-  }
-
-  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
-  if (imageReader == nullptr) {
-    AMediaFormat_delete(mediaFormat);
-    AMediaCodec_delete(videoDecoder);
-    videoDecoder = nullptr;
-    return false;
-  }
-
-  auto surface = imageReader->getInputSurface();
-  if (surface == nullptr) {
-    AMediaFormat_delete(mediaFormat);
-    AMediaCodec_delete(videoDecoder);
-    videoDecoder = nullptr;
-    return false;
-  }
-
-  nativeWindow = ANativeWindow_fromSurface(env, surface);
 
   media_status_t status;
-  status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
+  status = AMediaCodec_configure(videoDecoder, mediaFormat, imageReader->getANativeWindow(), nullptr, 0);
   AMediaFormat_delete(mediaFormat);
   if (status != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on configuring videoDecoder.\n");
-    ANativeWindow_release(nativeWindow);
+    delete imageReader;
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
     return false;
@@ -145,7 +118,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   status = AMediaCodec_start(videoDecoder);
   if (status != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on starting videoDecoder.\n");
-    ANativeWindow_release(nativeWindow);
+    delete imageReader;
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
     return false;
@@ -226,11 +199,10 @@ DecodingResult HardwareDecoder::onEndOfStream() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-  bool result = releaseOutputBuffer(true);
-  if (!result) {
-    return nullptr;
-  }
-  return imageReader->acquireNextBuffer();
+    if (!releaseOutputBuffer(true)) {
+        return nullptr;
+    }
+    return imageReader->acquireNextBuffer();
 }
 
 bool HardwareDecoder::releaseOutputBuffer(bool render) {

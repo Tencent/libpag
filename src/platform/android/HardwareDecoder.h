@@ -23,9 +23,12 @@
 #include "android/native_window_jni.h"
 #include "media/NdkMediaCodec.h"
 #include "media/NdkMediaFormat.h"
+#include "media/NdkImage.h"
+#include "media/NdkImageReader.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
-#include "tgfx/platform/android/SurfaceTextureReader.h"
+#include "pag/decoder.h"
+#include "HardwareImageReader.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
@@ -55,11 +58,10 @@ class HardwareDecoder : public VideoDecoder {
   // 报 `VIDEO-[pps_sps_check_tmp_id]:[5994]pps is null ppsid = 0 havn't decode`
   bool disableFlush = true;
 
-  std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
   AMediaCodec* videoDecoder = nullptr;
-  ANativeWindow* nativeWindow = nullptr;
   ssize_t lastOutputBufferIndex = -1;
   AMediaCodecBufferInfo* bufferInfo = nullptr;
+  HardwareImageReader* imageReader = nullptr;
 
   explicit HardwareDecoder(const VideoFormat& format);
   bool initDecoder(const VideoFormat& format);
