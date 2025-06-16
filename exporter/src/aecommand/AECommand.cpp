@@ -19,7 +19,6 @@
 #include "AECommand.h"
 #include "utils/AEHelper.h"
 #include "utils/AEResource.h"
-
 namespace exporter {
 
 AEGP_Command AECommand::PAGExporterCMD = 0L;

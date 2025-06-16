@@ -17,14 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AEHelper.h"
+#include <iostream>
 #include "platform/PlatformHelper.h"
-
 namespace AEHelper {
 
 AEGP_PluginID PluginID = 0L;
 std::shared_ptr<AEGP_SuiteHandler> Suites = nullptr;
 std::string DocumentsFolderPath = "";
 std::string AeVersion = "";
+
+int32_t MAJORVERSION = 23;
 
 void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
   Suites = std::make_shared<AEGP_SuiteHandler>(basicSuite);
@@ -112,6 +114,32 @@ void RunScriptPreWarm() {
     GetAeVersion();
     hasInit = true;
   }
+}
+
+bool CheckAeVersion() {
+  int32_t majorVersion = 0;
+  if (AeVersion.empty()) {
+    return false;
+  }
+  try {
+    size_t dotPos = AeVersion.find('.');
+    if (dotPos == std::string::npos) {
+      std::cerr << "Invalid version format" << std::endl;
+      return false;
+    }
+    std::string versionStr = AeVersion.substr(0, dotPos);
+    majorVersion = std::stoi(versionStr);
+  } catch (const std::invalid_argument& e) {
+    std::cerr << "Invalid argument: " << e.what() << std::endl;
+    return false;
+  } catch (const std::out_of_range& e) {
+    std::cerr << "Out of range: " << e.what() << std::endl;
+    return false;
+  }
+  if (majorVersion >= MAJORVERSION) {
+    return true;
+  }
+  return false;
 }
 
 }  // namespace AEHelper

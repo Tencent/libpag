@@ -37,6 +37,8 @@ std::string RunScript(std::shared_ptr<AEGP_SuiteHandler> suites, AEGP_PluginID p
 
 void RunScriptPreWarm();
 
+bool CheckAeVersion();
+
 const std::string TextDocumentScript = R"(
 if (typeof PAG !== 'object') {
     PAG = {};
