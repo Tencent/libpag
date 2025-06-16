@@ -43,7 +43,7 @@ A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon /*globalRefcon*/,
   }
 
   ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGConfigCMD));
-  if (exporter::HasCompositionResource()) {
+  if (HasCompositionResource()) {
     ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGPanelCMD));
   } else {
     ERR2(suites->CommandSuite1()->AEGP_DisableCommand(PAGPanelCMD));

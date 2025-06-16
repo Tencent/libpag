@@ -17,14 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <string>
 
 namespace exporter {
+class WindowManager {
+ public:
+  static WindowManager& getInstance();
 
-std::string GetRoamingPath();
+  void initializeQtEnvironment();
 
-std::string GetConfigPath();
+  void showPanelExporterWindow();
 
-std::string GetTempFolderPath();
+  void showPAGConfigWindow();
 
+  void showExportPreviewWindow();
+
+  WindowManager(const WindowManager&) = delete;
+  WindowManager& operator=(const WindowManager&) = delete;
+
+  WindowManager(WindowManager&&) = delete;
+  WindowManager& operator=(WindowManager&&) = delete;
+
+ private:
+  WindowManager();
+  ~WindowManager() = default;
+};
 }  // namespace exporter
