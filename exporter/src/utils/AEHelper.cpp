@@ -18,6 +18,7 @@
 
 #include "AEHelper.h"
 #include <iostream>
+#include "StringHelper.h"
 #include "platform/PlatformHelper.h"
 namespace AEHelper {
 
@@ -140,6 +141,117 @@ bool CheckAeVersion() {
     return true;
   }
   return false;
+}
+
+std::string GetItemName(const AEGP_ItemH& itemH) {
+  std::string itemName;
+  if (itemH == nullptr) {
+    return itemName;
+  }
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  AEGP_MemHandle nameMemory = nullptr;
+  suites->ItemSuite8()->AEGP_GetItemName(pluginID, itemH, &nameMemory);
+  if (!nameMemory) {
+    return itemName;
+  }
+  itemName = StringHelper::AeMemoryHandleToString(nameMemory);
+  suites->MemorySuite1()->AEGP_FreeMemHandle(nameMemory);
+
+  itemName = StringHelper::DeleteLastSpace(itemName);
+  return itemName;
+}
+
+std::string GetLayerName(const AEGP_LayerH& layerH) {
+  std::string layerName;
+  if (layerH == nullptr) {
+    return layerName;
+  }
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  AEGP_MemHandle layerNameHandle = nullptr;
+  AEGP_MemHandle sourceNameHandle = nullptr;
+  suites->LayerSuite6()->AEGP_GetLayerName(pluginID, layerH, &layerNameHandle, &sourceNameHandle);
+  if (!layerNameHandle || !sourceNameHandle) {
+    return layerName;
+  }
+  layerName = StringHelper::AeMemoryHandleToString(layerNameHandle);
+  if (layerName.empty()) {
+    layerName = StringHelper::AeMemoryHandleToString(sourceNameHandle);
+  }
+  suites->MemorySuite1()->AEGP_FreeMemHandle(layerNameHandle);
+  suites->MemorySuite1()->AEGP_FreeMemHandle(sourceNameHandle);
+
+  layerName = StringHelper::DeleteLastSpace(layerName);
+  return layerName;
+}
+
+AEGP_ItemH GetItemFromComp(const AEGP_CompH& compH) {
+  const auto& suites = GetSuites();
+  AEGP_ItemH itemH = nullptr;
+  if (compH != nullptr) {
+    suites->CompSuite6()->AEGP_GetItemFromComp(compH, &itemH);
+  }
+  return itemH;
+}
+
+std::string GetCompName(const AEGP_CompH& compH) {
+  if (compH == nullptr) {
+    return "";
+  }
+  auto itemH = GetItemFromComp(compH);
+  return GetItemName(itemH);
+}
+
+void SelectItem(const AEGP_ItemH& itemH) {
+  const auto& suites = GetSuites();
+  if (itemH != nullptr) {
+    suites->ItemSuite6()->AEGP_SelectItem(itemH, true, true);
+    suites->CommandSuite1()->AEGP_DoCommand(
+        3061);  // 3061: Open selection, ignoring any modifier keys.
+  }
+}
+
+void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  if (itemH == nullptr) {
+    return;
+  }
+  bool hasLayer = (layerH != nullptr);
+  AEGP_CollectionItemV2 collectionItem;
+  AEGP_StreamRefH streamH;
+  if (hasLayer) {
+    suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(pluginID, layerH, &streamH);
+    collectionItem.type = AEGP_CollectionItemType_LAYER;
+    collectionItem.u.layer.layerH = layerH;
+    collectionItem.stream_refH = streamH;
+  }
+
+  suites->ItemSuite6()->AEGP_SelectItem(itemH, true, true);
+  if (!hasLayer) {
+    suites->CommandSuite1()->AEGP_DoCommand(
+        3061);  // 3061: Open selection, ignoring any modifier keys.
+    return;
+  }
+
+  auto compH = GetCompFromItem(itemH);
+  AEGP_Collection2H collectionH = nullptr;
+  suites->CollectionSuite2()->AEGP_NewCollection(pluginID, &collectionH);
+  suites->CollectionSuite2()->AEGP_CollectionPushBack(collectionH, &collectionItem);
+  suites->CompSuite6()->AEGP_SetSelection(compH, collectionH);
+  suites->CommandSuite1()->AEGP_DoCommand(
+      3061);  // 3061: Open selection, ignoring any modifier keys.
+  suites->CollectionSuite2()->AEGP_DisposeCollection(collectionH);
+}
+
+AEGP_CompH GetCompFromItem(const AEGP_ItemH& itemH) {
+  const auto& suites = GetSuites();
+  AEGP_CompH compH = nullptr;
+  if (itemH != nullptr) {
+    suites->CompSuite6()->AEGP_GetCompFromItem(itemH, &compH);
+  }
+  return compH;
 }
 
 }  // namespace AEHelper

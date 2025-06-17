@@ -39,6 +39,18 @@ void RunScriptPreWarm();
 
 bool CheckAeVersion();
 
+std::string GetItemName(const AEGP_ItemH& itemH);
+
+std::string GetCompName(const AEGP_CompH& compH);
+
+std::string GetLayerName(const AEGP_LayerH& layerH);
+
+AEGP_CompH GetCompFromItem(const AEGP_ItemH& itemH);
+
+void SelectItem(const AEGP_ItemH& itemH);
+
+void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH);
+
 const std::string TextDocumentScript = R"(
 if (typeof PAG !== 'object') {
     PAG = {};
