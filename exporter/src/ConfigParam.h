@@ -31,29 +31,29 @@ enum class PresetTagLevel {
 };
 
 enum class TagMode {
-  TagModeStable = 0,
-  TagModeBeta = 1,
-  TagModeCustom = 2,
+  Stable = 0,
+  Beta = 1,
+  Custom = 2,
 };
 
-enum class ExportLanguage {
+enum class Language {
   Auto = 0,
   Chinese = 1,
   English = 2,
 };
 
 enum class ExportScenes {
-  GeneralScenes = 0,
-  UIScenes = 1,
-  VideoEditScenes = 2,
+  General = 0,
+  UI = 1,
+  VideoEdit = 2,
 };
 
 struct ConfigParam {
   int bitmapKeyFrameInterval = 60;
   int bitmapMaxResolution = 720;
   float frameRate = 24.0;
-  TagMode tagMode = TagMode::TagModeStable;
-  ExportScenes scenes = ExportScenes::GeneralScenes;
+  TagMode tagMode = TagMode::Stable;
+  ExportScenes scenes = ExportScenes::General;
   uint16_t exportTagLevel = 1023;
   int imageQuality = 80;
   float imagePixelRatio = 2.0;
@@ -64,7 +64,7 @@ struct ConfigParam {
   bool enableCompressionPanel = false;
   pag::CompositionType sequenceType = CompositionType::Video;
   bool enableFontAudio = true;
-  ExportLanguage language = ExportLanguage::Auto;
+  Language language = Language::Auto;
 };
 }  // namespace exporter
 }  // namespace pag
