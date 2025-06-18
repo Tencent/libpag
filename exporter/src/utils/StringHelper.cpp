@@ -65,17 +65,15 @@ bool LastIsSpace(const std::string& text) {
   if (text.empty()) {
     return false;
   }
-  auto last = text.substr(text.length() - 1, 1);
-  if (last == " " || last == "\n") {
-    return true;
-  }
-  return false;
+  char last = text.back();
+  return last == ' ' || last == '\n' || last == '\t' || last == '\r' || last == '\v' ||
+         last == '\f';
 }
 
 std::string DeleteLastSpace(const std::string& text) {
   std::string result = text;
-  while (LastIsSpace(result)) {
-    result = result.substr(0, result.length() - 1);
+  while (!result.empty() && LastIsSpace(result)) {
+    result.pop_back();
   }
   return result;
 }

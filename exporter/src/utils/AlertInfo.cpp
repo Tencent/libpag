@@ -28,7 +28,7 @@ namespace exporter {
 #define FUNC_GETINFO(errorType) GetInfo##errorType
 #define DEFINE_GETINFO(errorType)                                                          \
   static void GetInfo##errorType(std::string& info, [[maybe_unused]] std::string& suggest, \
-                                 [[maybe_unused]] std::string addInfo)
+                                 [[maybe_unused]] const std::string& addInfo)
 
 DEFINE_GETINFO(UnknownWarning) {
   info = addInfo;
@@ -540,7 +540,7 @@ static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pa
 #undef FUNC_GETINFO
 #undef DEFINE_GETINFO
 
-AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH, std::string addInfo)
+AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH,  AEGP_LayerH layerH, const std::string& addInfo)
     : itemH(itemH), layerH(layerH), type(type) {
   auto pair = GetInfoByTypeMap.find(type);
   if (pair != GetInfoByTypeMap.end()) {
@@ -606,7 +606,8 @@ bool AlertInfoManager::showAlertInfo(bool showWarning, bool showError) {
 }
 
 template <typename T>
-T GetHandleById(std::unordered_map<pag::ID, T> list, pag::ID id) {
+T GetHandleById(const std::unordered_map<pag::ID, T>& list, pag::ID id) {
+  static_assert(std::is_pointer<T>::value, "T must be a pointer type.");
   auto pair = list.find(id);
   if (pair != list.end()) {
     return pair->second;
@@ -615,38 +616,42 @@ T GetHandleById(std::unordered_map<pag::ID, T> list, pag::ID id) {
   }
 }
 
-void AlertInfoManager::pushWarning(std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
-                                   std::unordered_map<pag::ID, AEGP_LayerH>& layerHList,
+AlertInfoManager& AlertInfoManager::GetInstance() {
+  static AlertInfoManager instance;
+  return instance;
+}
+
+void AlertInfoManager::pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
+                                   const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList,
                                    AlertInfoType type, pag::ID compId, pag::ID layerId,
-                                   std::string addInfo) {
+                                   const std::string& addInfo) {
   auto itemH = GetHandleById(compItemHList, compId);
   auto layerH = GetHandleById(layerHList, layerId);
   warningList.push_back(AlertInfo(type, itemH, layerH, addInfo));
 }
 
 void AlertInfoManager::eraseUnusedInfo() {
-  for (int i = static_cast<int>(warningList.size()) - 1; i >= 0; i--) {
-    auto& alert = warningList[i];
-    if (alert.type != AlertInfoType::UnknownWarning) {
-      if ((alert.itemH != nullptr && itemHList.count(alert.itemH) == 0) ||
-          (alert.layerH != nullptr && layerHList.count(alert.layerH) == 0)) {
-        warningList.erase(warningList.begin() + i);
-      }
-    }
-  }
+  warningList.erase(
+      std::remove_if(warningList.begin(), warningList.end(),
+                     [this](const AlertInfo& alert) {
+                       return alert.type != AlertInfoType::UnknownWarning &&
+                              ((alert.itemH != nullptr && itemHList.count(alert.itemH) == 0) ||
+                               (alert.layerH != nullptr && layerHList.count(alert.layerH) == 0));
+                     }),
+      warningList.end());
 }
 
 std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {
   std::vector<AlertInfo> alertList;
 
-  return alertList;
+  return {};
 }
 
 void PrintAlertList(std::vector<AlertInfo>& list) {
   for (auto alert : list) {
-    std::cout << std::endl;
-    std::cout << (alert.isError ? "Error" : "Warning") << ": " << alert.info << std::endl;
-    std::cout << "Suggest: " << alert.suggest << std::endl;
+    std::cerr << std::endl;
+    std::cerr << (alert.isError ? "Error" : "Warning") << ": " << alert.info << std::endl;
+    std::cerr << "Suggest: " << alert.suggest << std::endl;
   }
 }
 

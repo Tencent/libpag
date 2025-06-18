@@ -95,7 +95,7 @@ enum class AlertInfoType {
 
 class AlertInfo {
  public:
-  AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH, std::string info = "");
+  AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH, const std::string& info = "");
   void select();  // Navigate to the problematic composition/layer
 
   AEGP_ItemH itemH = nullptr;
@@ -113,27 +113,33 @@ class AlertInfo {
   std::string getMessage();
 };
 
-class PAGExportSession;
-
 class AlertInfoManager {
  public:
-  static std::vector<AlertInfo> GetAlertList(AEGP_ItemH itemH);
-
-  AlertInfoManager() = default;
-  ~AlertInfoManager() = default;
+  static AlertInfoManager& GetInstance();
+  std::vector<AlertInfo> GetAlertList(AEGP_ItemH itemH);
 
   bool showAlertInfo(bool showWarning = true, bool showError = true);
 
-  std::vector<AlertInfo> warningList;
-  std::vector<AlertInfo> saveWarnings;
-  std::unordered_set<AEGP_ItemH> itemHList;
-  std::unordered_set<AEGP_LayerH> layerHList;
+  std::vector<AlertInfo> warningList={};
+  std::vector<AlertInfo> saveWarnings={};
+  std::unordered_set<AEGP_ItemH> itemHList={};
+  std::unordered_set<AEGP_LayerH> layerHList={};
 
-  void pushWarning(std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
-                   std::unordered_map<pag::ID, AEGP_LayerH>& layerHList, AlertInfoType type,
-                   pag::ID compId, pag::ID layerId, std::string addInfo = "");
+  void pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
+                   const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList, AlertInfoType type,
+                   pag::ID compId, pag::ID layerId, const std::string& addInfo = "");
 
   void eraseUnusedInfo();
+
+  AlertInfoManager(const AlertInfoManager&) = delete;
+  AlertInfoManager& operator=(const AlertInfoManager&) = delete;
+
+  AlertInfoManager(AlertInfoManager&&) = delete;
+  AlertInfoManager& operator=(AlertInfoManager&&) = delete;
+
+private:
+  AlertInfoManager() = default;
+  ~AlertInfoManager() = default;
 };
 
 }  // namespace exporter
