@@ -95,8 +95,7 @@ enum class ExportScenes {
 /* enable font audio */
 #define DEFAULT_ENABLE_AUDIO true
 
-/* enable compression panel */
-#define DEFAULT_ENABLE_COMPRESS_PANEL false
+// (Lines 98-99 removed)
 
 struct ScaleAndFps {
   int32_t width;
