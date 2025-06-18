@@ -596,11 +596,11 @@ bool AlertInfoManager::showAlertInfo(bool showWarning, bool showError) {
   auto ret = (errors.size() > 0);
   if (ret && showError) {
     auto infos = AlertInfosToStrings(errors);
-    ret = WindowManager::GetInstance().showExportErrorInfo(infos);
+    ret = WindowManager::GetInstance().showErrors(infos);
   }
   if (!ret && showWarning) {
     auto infos = AlertInfosToStrings(warnings);
-    ret = WindowManager::GetInstance().showExportWarningInfo(infos);
+    ret = WindowManager::GetInstance().showWarnings(infos);
   }
   warningList.clear();
   return ret;
@@ -643,16 +643,19 @@ void AlertInfoManager::eraseUnusedInfo() {
 }
 
 std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {
-  std::vector<AlertInfo> alertList;
 
   return {};
 }
 
 void PrintAlertList(std::vector<AlertInfo>& list) {
   for (auto alert : list) {
-    std::cerr << std::endl;
-    std::cerr << (alert.isError ? "Error" : "Warning") << ": " << alert.info << std::endl;
-    std::cerr << "Suggest: " << alert.suggest << std::endl;
+    std::cout << std::endl;
+    if (alert.isError) {
+      std::cerr << "Error: " << alert.info << std::endl;
+    } else {
+      std::cout << "Warning: " << alert.info << std::endl;
+    }
+    std::cout << "Suggest: " << alert.suggest << std::endl;
   }
 }
 

@@ -65,12 +65,12 @@ void WindowManager::initializeQtEnvironment() {
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 }
 
-bool WindowManager::showExportWarningInfo(std::vector<std::string>& /*infos*/) {
+bool WindowManager::showWarnings(std::vector<std::string>& /*infos*/) {
 
   return true;
 }
 
-bool WindowManager::showExportErrorInfo(std::vector<std::string>& /*infos*/) {
+bool WindowManager::showErrors(std::vector<std::string>& /*infos*/) {
 
   return true;
 }

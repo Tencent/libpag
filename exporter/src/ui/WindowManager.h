@@ -34,9 +34,9 @@ class WindowManager {
 
   void showExportPreviewWindow();
 
-  bool showExportWarningInfo(std::vector<std::string>& infos);
+  bool showWarnings(std::vector<std::string>& infos);
 
-  bool showExportErrorInfo(std::vector<std::string>& infos);
+  bool showErrors(std::vector<std::string>& infos);
 
   WindowManager(const WindowManager&) = delete;
   WindowManager& operator=(const WindowManager&) = delete;
