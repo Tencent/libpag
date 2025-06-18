@@ -540,7 +540,8 @@ static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pa
 #undef FUNC_GETINFO
 #undef DEFINE_GETINFO
 
-AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH,  AEGP_LayerH layerH, const std::string& addInfo)
+AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH,
+                     const std::string& addInfo)
     : itemH(itemH), layerH(layerH), type(type) {
   auto pair = GetInfoByTypeMap.find(type);
   if (pair != GetInfoByTypeMap.end()) {

@@ -120,10 +120,10 @@ class AlertInfoManager {
 
   bool showAlertInfo(bool showWarning = true, bool showError = true);
 
-  std::vector<AlertInfo> warningList={};
-  std::vector<AlertInfo> saveWarnings={};
-  std::unordered_set<AEGP_ItemH> itemHList={};
-  std::unordered_set<AEGP_LayerH> layerHList={};
+  std::vector<AlertInfo> warningList = {};
+  std::vector<AlertInfo> saveWarnings = {};
+  std::unordered_set<AEGP_ItemH> itemHList = {};
+  std::unordered_set<AEGP_LayerH> layerHList = {};
 
   void pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
                    const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList, AlertInfoType type,
@@ -137,7 +137,7 @@ class AlertInfoManager {
   AlertInfoManager(AlertInfoManager&&) = delete;
   AlertInfoManager& operator=(AlertInfoManager&&) = delete;
 
-private:
+ private:
   AlertInfoManager() = default;
   ~AlertInfoManager() = default;
 };
