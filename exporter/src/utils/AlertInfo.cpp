@@ -647,16 +647,4 @@ std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {
   return {};
 }
 
-void PrintAlertList(std::vector<AlertInfo>& list) {
-  for (auto alert : list) {
-    std::cout << std::endl;
-    if (alert.isError) {
-      std::cerr << "Error: " << alert.info << std::endl;
-    } else {
-      std::cout << "Warning: " << alert.info << std::endl;
-    }
-    std::cout << "Suggest: " << alert.suggest << std::endl;
-  }
-}
-
 }  // namespace exporter
