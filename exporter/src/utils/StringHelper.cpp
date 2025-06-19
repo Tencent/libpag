@@ -27,34 +27,9 @@ std::string AeMemoryHandleToString(const AEGP_MemHandle& handle) {
   char16_t* str = nullptr;
   suites->MemorySuite1()->AEGP_LockMemHandle(handle, reinterpret_cast<void**>(&str));
 
-  std::string u8str;
-  try {
-    const char16_t* p = str;
-    while (*p) {
-      char32_t codePoint = *p++;
-      if (codePoint >= 0xD800 && codePoint <= 0xDBFF && *p) {
-        char32_t lowSurrogate = *p++;
-        codePoint = 0x10000 + ((codePoint - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-      }
-
-      if (codePoint <= 0x7F) {
-        u8str.push_back(static_cast<char>(codePoint));
-      } else if (codePoint <= 0x7FF) {
-        u8str.push_back(static_cast<char>(0xC0 | (codePoint >> 6)));
-        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
-      } else if (codePoint <= 0xFFFF) {
-        u8str.push_back(static_cast<char>(0xE0 | (codePoint >> 12)));
-        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
-        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
-      } else {
-        u8str.push_back(static_cast<char>(0xF0 | (codePoint >> 18)));
-        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F)));
-        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
-        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
-      }
-    }
-  } catch (const std::exception& e) {
-    std::cerr << "AeMemoryHandleToString failed: " << e.what() << std::endl;
+  std::string u8str = Utf16ToUtf8(str);
+  if (u8str.empty()) {
+    std::cerr << "AeMemoryHandleToString failed: " << std::endl;
   }
 
   suites->MemorySuite1()->AEGP_UnlockMemHandle(handle);
@@ -76,6 +51,295 @@ std::string DeleteLastSpace(const std::string& text) {
     result.pop_back();
   }
   return result;
+}
+
+std::vector<std::string> Split(const std::string& text, const std::string& separator) {
+  std::vector<std::string> result;
+  if (text.empty() || separator.empty()) {
+    result.push_back(text);
+    return result;
+  }
+
+  size_t pos1 = 0;
+  size_t pos2 = text.find(separator);
+  while (pos2 != std::string::npos) {
+    result.push_back(text.substr(pos1, pos2 - pos1));
+    pos1 = pos2 + separator.size();
+    pos2 = text.find(separator, pos1);
+  }
+  if (pos1 < text.length()) {
+    result.push_back(text.substr(pos1));
+  }
+
+  return result;
+}
+
+std::string ToLowerCase(const std::string& text) {
+  std::string result(text);
+  std::transform(result.begin(), result.end(), result.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return result;
+}
+
+std::string ToUpperCase(const std::string& text) {
+  std::string result(text);
+  std::transform(result.begin(), result.end(), result.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  return result;
+}
+
+std::string ReplaceAll(const std::string& text, const std::string& from, const std::string& to) {
+  if (from.empty()) {
+    return text;
+  }
+  std::string str = text;
+  size_t start_pos = 0;
+  const size_t from_length = from.length();
+  const size_t to_length = to.length();
+
+  while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+    str.replace(start_pos, from_length, to);
+    start_pos += to_length;
+  }
+  return str;
+}
+
+std::string GetMapValue(const std::unordered_map<std::string, std::string>& map,
+                        const std::string& key) {
+  const auto& result = map.find(key);
+  return result != map.end() ? result->second : "";
+}
+
+bool StringToBoolean(const std::string& value, const bool defaultValue) {
+  if (value.empty()) {
+    return defaultValue;
+  }
+  auto lowerValue = StringHelper::ToLowerCase(value);
+  return lowerValue == "true";
+}
+
+float StringToFloat(const std::string& value, const float defaultValue) {
+  if (value.empty()) {
+    return defaultValue;
+  }
+  try {
+    return std::stof(value);
+  } catch (const std::invalid_argument&) {
+    return defaultValue;
+  } catch (const std::out_of_range&) {
+    return defaultValue;
+  }
+}
+
+pag::ParagraphJustification StringToEnum(const std::string& value,
+                                         const pag::ParagraphJustification defaultValue) {
+  if (value.empty()) {
+    return defaultValue;
+  }
+  try {
+    return static_cast<pag::ParagraphJustification>(std::stoi(value));
+  } catch (const std::invalid_argument&) {
+    return defaultValue;
+  } catch (const std::out_of_range&) {
+    return defaultValue;
+  }
+}
+
+pag::Point StringToPoint(const std::string& value, const pag::Point& defaultValue) {
+  if (value.empty()) {
+    return defaultValue;
+  }
+  auto lines = StringHelper::Split(value, ",");
+  if (lines.size() < 2) {
+    return defaultValue;
+  }
+  pag::Point point = {};
+  try {
+    point.x = static_cast<float>(std::stod(lines[0]));
+    point.y = static_cast<float>(std::stod(lines[1]));
+  } catch (const std::invalid_argument&) {
+    return defaultValue;
+  } catch (const std::out_of_range&) {
+    return defaultValue;
+  }
+  return point;
+}
+
+pag::Color StringToColor(const std::string& value, const pag::Color& defaultValue) {
+  if (value.empty()) {
+    return defaultValue;
+  }
+  auto lines = StringHelper::Split(value, ",");
+  if (lines.size() < 3) {
+    return defaultValue;
+  }
+  pag::Color color = {};
+  try {
+    color.red = static_cast<uint8_t>(std::stod(lines[0]) * 255);
+    color.green = static_cast<uint8_t>(std::stod(lines[1]) * 255);
+    color.blue = static_cast<uint8_t>(std::stod(lines[2]) * 255);
+  } catch (const std::invalid_argument&) {
+    return defaultValue;
+  } catch (const std::out_of_range&) {
+    return defaultValue;
+  }
+  return color;
+}
+
+std::string FormatString(const std::string& value, const std::string& defaultValue) {
+  if (value.empty()) {
+    return defaultValue;
+  }
+  return ReplaceAll(value, "\\n", "\n");
+}
+
+float CalculateLineSpacing(const std::string& value, float fontSize) {
+  if (value.empty()) {
+    return 0;
+  }
+  auto lines = Split(value, ",");
+  if (lines.size() < 6) {
+    return 0;
+  }
+  try {
+    auto firstY = static_cast<float>(std::stod(lines[1]));
+    auto secondY = static_cast<float>(std::stod(lines[5]));
+    auto leading = roundf(secondY - firstY);
+    if (leading == roundf(fontSize * 1.2f)) {
+      return 0;
+    }
+    if (leading > 100000000) {
+      return 0;
+    }
+    return leading;
+  } catch (const std::exception&) {
+    return 0;
+  }
+}
+
+float CalculateFirstBaseline(const std::string& value, float lineHeight, float baselineShift,
+                             bool isVertical) {
+  if (value.empty()) {
+    return 0;
+  }
+  auto lines = Split(value, ",");
+  if (lines.size() < 4) {
+    return 0;
+  }
+
+  const auto lineCount = static_cast<int>(floorf(static_cast<float>(lines.size()) / 4.0f));
+  if (lineCount < 1) {
+    return 0;
+  }
+  const auto index = (lineCount - 1) * 4;
+  float firstBaseLine;
+  try {
+    if (isVertical) {
+      firstBaseLine = static_cast<float>(std::stod(lines[0]));
+      if (fabsf(firstBaseLine) > 100000000) {
+        auto lastBaseLine = static_cast<float>(std::stod(lines[index + 0]));
+        firstBaseLine = lastBaseLine + lineHeight * (lineCount - 1);
+      }
+    } else {
+      firstBaseLine = static_cast<float>(std::stod(lines[1]));
+      if (fabsf(firstBaseLine) > 100000000) {
+        auto lastBaseLine = static_cast<float>(std::stod(lines[index + 1]));
+        firstBaseLine = lastBaseLine - lineHeight * (lineCount - 1);
+      }
+    }
+  } catch (const std::exception&) {
+    firstBaseLine = 0;
+  }
+
+  if (fabsf(firstBaseLine) > 100000000) {
+    firstBaseLine = 0;
+  }
+  return isVertical ? (firstBaseLine - baselineShift) : (firstBaseLine + baselineShift);
+}
+
+std::string ConvertStringEncoding(const std::string& str) {
+  return QString::fromStdString(str).toLocal8Bit().toStdString();
+}
+
+std::string Utf16ToUtf8(const char16_t* u16str) {
+  if (u16str == nullptr) {
+    return "";
+  }
+  std::string u8str;
+  u8str.reserve(wcslen(reinterpret_cast<const wchar_t*>(u16str)) * 3);
+
+  try {
+    while (*u16str) {
+      char32_t codePoint = *u16str++;
+      if (codePoint >= 0xD800 && codePoint <= 0xDBFF && *u16str) {
+        char32_t lowSurrogate = *u16str++;
+        if (lowSurrogate >= 0xDC00 && lowSurrogate <= 0xDFFF) {
+          codePoint = 0x10000 + ((codePoint - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+        } else {
+          continue;
+        }
+      }
+
+      if (codePoint <= 0x7F) {
+        u8str.push_back(static_cast<char>(codePoint));
+      } else if (codePoint <= 0x7FF) {
+        u8str.push_back(static_cast<char>(0xC0 | (codePoint >> 6)));
+        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
+      } else if (codePoint <= 0xFFFF) {
+        u8str.push_back(static_cast<char>(0xE0 | (codePoint >> 12)));
+        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
+        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
+      } else if (codePoint <= 0x10FFFF) {
+        u8str.push_back(static_cast<char>(0xF0 | (codePoint >> 18)));
+        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F)));
+        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
+        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
+      }
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "Utf16ToUtf8 failed: " << e.what() << std::endl;
+    return "";
+  }
+
+  return u8str;
+}
+
+std::u16string Utf8ToUtf16(const std::string& u8str) {
+  std::u16string u16str;
+  size_t i = 0;
+  while (i < u8str.size()) {
+    char32_t codePoint = 0;
+    unsigned char c = u8str[i++];
+
+    if (c <= 0x7F) {
+      codePoint = c;
+    } else if ((c & 0xE0) == 0xC0) {
+      if (i >= u8str.size()) throw std::runtime_error("Invalid UTF-8 sequence");
+      codePoint = ((c & 0x1F) << 6) | (u8str[i++] & 0x3F);
+    } else if ((c & 0xF0) == 0xE0) {
+      if (i + 1 >= u8str.size()) throw std::runtime_error("Invalid UTF-8 sequence");
+      codePoint = ((c & 0x0F) << 12) | ((u8str[i] & 0x3F) << 6) | (u8str[i + 1] & 0x3F);
+      i += 2;
+    } else if ((c & 0xF8) == 0xF0) {
+      if (i + 2 >= u8str.size()) throw std::runtime_error("Invalid UTF-8 sequence");
+      codePoint = ((c & 0x07) << 18) | ((u8str[i] & 0x3F) << 12) | ((u8str[i + 1] & 0x3F) << 6) |
+                  (u8str[i + 2] & 0x3F);
+      i += 3;
+    } else {
+      throw std::runtime_error("Invalid UTF-8 sequence");
+    }
+
+    if (codePoint <= 0xFFFF) {
+      u16str.push_back(static_cast<char16_t>(codePoint));
+    } else if (codePoint <= 0x10FFFF) {
+      codePoint -= 0x10000;
+      u16str.push_back(static_cast<char16_t>(0xD800 | (codePoint >> 10)));
+      u16str.push_back(static_cast<char16_t>(0xDC00 | (codePoint & 0x3FF)));
+    } else {
+      throw std::runtime_error("Invalid Unicode code point");
+    }
+  }
+  return u16str;
 }
 
 }  // namespace StringHelper

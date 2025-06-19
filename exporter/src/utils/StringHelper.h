@@ -18,12 +18,50 @@
 
 #pragma once
 #include <AEGP_SuiteHandler.h>
+#include <QString>
 #include <string>
+#include "pag/file.h"
+#include "pag/types.h"
 
 namespace StringHelper {
 
 std::string AeMemoryHandleToString(const AEGP_MemHandle& handle);
 
 std::string DeleteLastSpace(const std::string& text);
+
+std::vector<std::string> Split(const std::string& text, const std::string& separator);
+
+std::string ToLowerCase(const std::string& text);
+
+std::string ToUpperCase(const std::string& text);
+
+std::string ReplaceAll(const std::string& text, const std::string& from, const std::string& to);
+
+std::string GetMapValue(const std::unordered_map<std::string, std::string>& map,
+                        const std::string& key);
+
+bool StringToBoolean(const std::string& value, bool defaultValue);
+
+float StringToFloat(const std::string& value, float defaultValue);
+
+pag::Point StringToPoint(const std::string& value, const pag::Point& defaultValue);
+
+pag::Color StringToColor(const std::string& value, const pag::Color& defaultValue);
+
+std::string FormatString(const std::string& value, const std::string& defaultValue);
+
+pag::ParagraphJustification StringToEnum(const std::string& value,
+                                         const pag::ParagraphJustification defaultValue);
+
+float CalculateLineSpacing(const std::string& value, float fontSize);
+
+float CalculateFirstBaseline(const std::string& value, float lineHeight, float baselineShift,
+                             bool isVertical);
+
+std::string ConvertStringEncoding(const std::string& str);
+
+std::string Utf16ToUtf8(const char16_t* u16str);
+
+std::u16string Utf8ToUtf16(const std::string& u8str);
 
 }  // namespace StringHelper

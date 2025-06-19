@@ -51,6 +51,18 @@ void SelectItem(const AEGP_ItemH& itemH);
 
 void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH);
 
+AEGP_ItemH GetItemFromComp(const AEGP_CompH& compH);
+
+AEGP_ItemH GetItemFromLayer(const AEGP_LayerH& layerH);
+
+uint32_t GetItemId(const AEGP_ItemH& itemH);
+
+uint32_t GetItemIdFromLayer(const AEGP_LayerH& layerH);
+
+uint32_t GetLayerId(const AEGP_LayerH& layerH);
+
+void RegisterTextDocumentScript();
+
 const std::string TextDocumentScript = R"(
 if (typeof PAG !== 'object') {
     PAG = {};
