@@ -17,35 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
+#include <AEGP_SuiteHandler.h>
 #include <string>
-#include <vector>
 
-namespace exporter {
-class WindowManager {
- public:
-  static WindowManager& GetInstance();
+namespace StringHelper {
 
-  void initializeQtEnvironment();
+std::string AeMemoryHandleToString(const AEGP_MemHandle& handle);
 
-  void showPanelExporterWindow();
+std::string DeleteLastSpace(const std::string& text);
 
-  void showPAGConfigWindow();
-
-  void showExportPreviewWindow();
-
-  bool showWarnings(std::vector<std::string>& infos);
-
-  bool showErrors(std::vector<std::string>& infos);
-
-  WindowManager(const WindowManager&) = delete;
-  WindowManager& operator=(const WindowManager&) = delete;
-
-  WindowManager(WindowManager&&) = delete;
-  WindowManager& operator=(WindowManager&&) = delete;
-
- private:
-  WindowManager();
-  ~WindowManager() = default;
-};
-}  // namespace exporter
+}  // namespace StringHelper
