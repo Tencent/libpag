@@ -5,11 +5,11 @@
 ## 介绍
 
 libpag 是 PAG (Portable Animated Graphics) 动效文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, macOS,
-Windows, Linux, 以及 Web 端。
+Windows, Linux, OpenHarmony 以及 Web 端。
 
 ## 特性
 
-- Web 平台能力适配，支持 libpag 全能力
+- Web 平台能力适配，支持 libpag 全功能
 - 基于 WebAssembly + WebGL
 
 ## 快速开始
@@ -97,8 +97,6 @@ Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接�
 | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ----------------- |
 | Chrome >= 69                                                 | Safari >= 11.3                                               | Android >= 7.0                                               | iOS >= 11.3                                                  | last 2 versions   |
 
-更多版本的兼容工作正在进行中
-
 **以上的兼容表仅代表可以运行的兼容性。对于有移动端接入需要的用户，需要阅读一下这篇[兼容性情况](./doc/compatibility.md)的文章**
 
 ## 使用指南
@@ -157,10 +155,6 @@ PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行�
 ## 关于 BMP 预合成
 
 可以下载 [PAGViewer](https://pag.io/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量大于 0 时，即为 PAG 动画文件中存在 BMP 预合成。
-
-## Roadmap
-
-Web SDK 未来能力支持规划可以点击 [这里](https://github.com/Tencent/libpag/wiki/PAG-Web-roadmap) 查看
 
 ## 参与开发
 

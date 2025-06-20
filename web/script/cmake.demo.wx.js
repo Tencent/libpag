@@ -11,6 +11,7 @@ process.argv.push("web");
 process.argv.push("-a");
 process.argv.push("wasm");
 process.argv.push("pag");
+require("./delete_code");
 require("./setup.emsdk.wx");
 require("../../build_pag");
 

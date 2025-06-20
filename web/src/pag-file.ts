@@ -6,7 +6,6 @@ import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-uti
 
 import type { PAGImage } from './pag-image';
 import { LayerType, PAGTimeStretchMode, TextDocument } from './types';
-import { writeBufferToWasm } from '@tgfx/utils/buffer';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -28,9 +27,8 @@ export class PAGFile extends PAGComposition {
    */
   public static loadFromBuffer(buffer: ArrayBuffer) {
     if (!buffer || !(buffer.byteLength > 0)) throw new Error('Initialize PAGFile data not be empty!');
-    const { byteOffset, length, free } = writeBufferToWasm(PAGModule, buffer);
-    const wasmIns = PAGModule._PAGFile._Load(byteOffset, length);
-    free();
+    const uint8Buffer = new Uint8Array(buffer);
+    const wasmIns = PAGModule._PAGFile._Load(uint8Buffer);
     if (!wasmIns) throw new Error('Load PAGFile fail!');
     const pagFile = new PAGFile(wasmIns);
     return pagFile;

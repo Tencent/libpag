@@ -1,6 +1,5 @@
 import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
-import { readBufferFromWasm } from '@tgfx/utils/buffer';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
 @destroyVerify
@@ -74,14 +73,8 @@ export class PAGSurface {
    */
   public readPixels(colorType: ColorType, alphaType: AlphaType): Uint8Array | null {
     if (colorType === ColorType.Unknown) return null;
-    const rowBytes = this.width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
-    const length = rowBytes * this.height();
-    const dataUint8Array = new Uint8Array(length);
-    const { data, free } = readBufferFromWasm(PAGModule, dataUint8Array, (dataPtr) => {
-      return this.wasmIns._readPixels(colorType, alphaType, dataPtr, rowBytes) as boolean;
-    });
-    free();
-    return data;
+    const rowBytes = this.wasmIns._width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
+    return this.wasmIns._readPixels(colorType, alphaType, rowBytes);
   }
 
   public destroy(): void {
