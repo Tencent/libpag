@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AECommand.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/AEResource.h"
 
@@ -60,6 +61,7 @@ A_Err AECommand::OnClickConfig(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::getInstance().showPAGConfigWindow();
   return err;
 }
 

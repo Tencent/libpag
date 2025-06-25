@@ -32,14 +32,6 @@ if (NOT CMAKE_PREFIX_PATH)
     include("./QTCMAKE.cfg")
 endif ()
 
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTORCC ON)
-
-find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick  REQUIRED)
-add_definitions(${Qt6Widgets_DEFINITIONS} ${QtQml_DEFINITIONS} ${${Qt6Quick_DEFINITIONS}})
-qt6_add_resources(QT_RESOURCES assets/res.qrc)
-
 if (MSVC)
     add_compile_options("/utf-8")
     add_compile_options(/GR-)
@@ -51,6 +43,15 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
 endif ()
 
 add_definitions(-DQT_NO_KEYWORDS)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick OpenGL QuickControls2)
+list(APPEND libs Qt6::Core Qt6::Qml Qt6::Quick Qt6::OpenGL Qt6::QuickControls2)
+qt_add_resources(QT_RESOURCES assets/res.qrc)
 
 list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
@@ -109,11 +110,18 @@ set(PAG_BUILD_TESTS OFF)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
-add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${AE_SDK_SOURCE_FILES})
+set(TINYXML_SOURCES
+        vendor/tinyxml/tinyxml.cpp
+        vendor/tinyxml/tinyxmlerror.cpp
+        vendor/tinyxml/tinyxmlparser.cpp
+        vendor/tinyxml/tinystr.cpp
+)
+
+add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${AE_SDK_SOURCE_FILES} ${QT_RESOURCES} ${TINYXML_SOURCES})
 
 target_include_directories(PAGExporter SYSTEM PRIVATE ${PAG_EXPORTER_THIRD_PARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${PAG_EXPORTER_INCLUDES})
-target_link_libraries(PAGExporter  pag ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+target_link_libraries(PAGExporter pag ${libs})
 
 if (APPLE)
     target_link_libraries(PAGExporter "-framework AppKit" compression)

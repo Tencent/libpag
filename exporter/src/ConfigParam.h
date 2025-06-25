@@ -21,13 +21,12 @@
 #include <pag/file.h>
 #include "AEGP_SuiteHandler.h"
 
-namespace pag {
 namespace exporter {
 
 enum class PresetTagLevel {
-  TagLevelStable = static_cast<uint16_t>(TagCode::TextAnimatorPropertiesStrokeColor),
-  TagLevelMin = static_cast<uint16_t>(TagCode::DropShadowStyle),
-  TagLevelMax = static_cast<uint16_t>(TagCode::Count) - 1,
+  TagLevelStable = static_cast<uint16_t>(pag::TagCode::TextAnimatorPropertiesStrokeColor),
+  TagLevelMin = static_cast<uint16_t>(pag::TagCode::DropShadowStyle),
+  TagLevelMax = static_cast<uint16_t>(pag::TagCode::Count) - 1,
 };
 
 enum class TagMode {
@@ -51,20 +50,20 @@ enum class ExportScenes {
 struct ConfigParam {
   int bitmapKeyFrameInterval = 60;
   int bitmapMaxResolution = 720;
-  float frameRate = 24.0;
+  float frameRate = 24.0f;
+  float scale = 1.0f;
   TagMode tagMode = TagMode::Stable;
   ExportScenes scenes = ExportScenes::General;
   uint16_t exportTagLevel = 1023;
   int imageQuality = 80;
-  float imagePixelRatio = 2.0;
+  float imagePixelRatio = 2.0f;
   std::string sequenceSuffix = "_bmp";
   bool enableLayerName = true;
   bool enableFontFile = false;
   int sequenceQuality = 80;
   bool enableCompressionPanel = false;
-  pag::CompositionType sequenceType = CompositionType::Video;
+  pag::CompositionType sequenceType = pag::CompositionType::Video;
   bool enableFontAudio = true;
   Language language = Language::Auto;
 };
 }  // namespace exporter
-}  // namespace pag

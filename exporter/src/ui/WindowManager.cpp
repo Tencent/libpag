@@ -19,8 +19,9 @@
 #include "WindowManager.h"
 #include <QFile>
 #include <QtGui/QFont>
-#include <QtQuick/QQuickWindow>
 #include <QtWidgets/QApplication>
+#include <memory>
+#include "ConfigModel.h"
 #include "utils/AEHelper.h"
 
 namespace exporter {
@@ -39,6 +40,10 @@ void WindowManager::showPanelExporterWindow() {
 }
 
 void WindowManager::showPAGConfigWindow() {
+  auto configModel = std::make_unique<ConfigModel>();
+  configModel->setupQtEnvironment();
+  configModel->initConfigWindow();
+  configModel->show();
 }
 
 void WindowManager::showExportPreviewWindow() {
