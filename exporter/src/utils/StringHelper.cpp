@@ -93,13 +93,13 @@ std::string ReplaceAll(const std::string& text, const std::string& from, const s
     return text;
   }
   std::string str = text;
-  size_t start_pos = 0;
-  const size_t from_length = from.length();
-  const size_t to_length = to.length();
+  size_t startPos = 0;
+  const size_t fromLength = from.length();
+  const size_t toLength = to.length();
 
-  while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-    str.replace(start_pos, from_length, to);
-    start_pos += to_length;
+  while ((startPos = str.find(from, startPos)) != std::string::npos) {
+    str.replace(startPos, fromLength, to);
+    startPos += toLength;
   }
   return str;
 }
@@ -131,32 +131,38 @@ float StringToFloat(const std::string& value, const float defaultValue) {
   }
 }
 
-pag::ParagraphJustification StringToEnum(const std::string& value,
-                                         const pag::ParagraphJustification defaultValue) {
-  if (value.empty()) {
+pag::ParagraphJustification IntToParagraphJustification(
+    int value, const pag::ParagraphJustification defaultValue) {
+  if (value < 0) {
     return defaultValue;
   }
-  try {
-    return static_cast<pag::ParagraphJustification>(std::stoi(value));
-  } catch (const std::invalid_argument&) {
-    return defaultValue;
-  } catch (const std::out_of_range&) {
-    return defaultValue;
+
+  switch (value) {
+    case 7414:
+      return pag::ParagraphJustification::RightJustify;
+    case 7415:
+      return pag::ParagraphJustification::CenterJustify;
+    case 7416:
+      return pag::ParagraphJustification::FullJustifyLastLineLeft;
+    case 7417:
+      return pag::ParagraphJustification::FullJustifyLastLineRight;
+    case 7418:
+      return pag::ParagraphJustification::FullJustifyLastLineCenter;
+    case 7419:
+      return pag::ParagraphJustification::FullJustifyLastLineFull;
+    default:
+      return pag::ParagraphJustification::LeftJustify;
   }
 }
 
-pag::Point StringToPoint(const std::string& value, const pag::Point& defaultValue) {
-  if (value.empty()) {
-    return defaultValue;
-  }
-  auto lines = StringHelper::Split(value, ",");
-  if (lines.size() < 2) {
+pag::Point StringToPoint(const std::vector<std::string>& pointArr, const pag::Point& defaultValue) {
+  if (pointArr.size() < 2) {
     return defaultValue;
   }
   pag::Point point = {};
   try {
-    point.x = static_cast<float>(std::stod(lines[0]));
-    point.y = static_cast<float>(std::stod(lines[1]));
+    point.x = static_cast<float>(std::stod(pointArr[0]));
+    point.y = static_cast<float>(std::stod(pointArr[1]));
   } catch (const std::invalid_argument&) {
     return defaultValue;
   } catch (const std::out_of_range&) {
@@ -165,19 +171,15 @@ pag::Point StringToPoint(const std::string& value, const pag::Point& defaultValu
   return point;
 }
 
-pag::Color StringToColor(const std::string& value, const pag::Color& defaultValue) {
-  if (value.empty()) {
-    return defaultValue;
-  }
-  auto lines = StringHelper::Split(value, ",");
-  if (lines.size() < 3) {
+pag::Color StringToColor(const std::vector<std::string>& colorArr, const pag::Color& defaultValue) {
+  if (colorArr.size() < 3) {
     return defaultValue;
   }
   pag::Color color = {};
   try {
-    color.red = static_cast<uint8_t>(std::stod(lines[0]) * 255);
-    color.green = static_cast<uint8_t>(std::stod(lines[1]) * 255);
-    color.blue = static_cast<uint8_t>(std::stod(lines[2]) * 255);
+    color.red = static_cast<uint8_t>(std::stod(colorArr[0]) * 255);
+    color.green = static_cast<uint8_t>(std::stod(colorArr[1]) * 255);
+    color.blue = static_cast<uint8_t>(std::stod(colorArr[2]) * 255);
   } catch (const std::invalid_argument&) {
     return defaultValue;
   } catch (const std::out_of_range&) {
@@ -193,17 +195,13 @@ std::string FormatString(const std::string& value, const std::string& defaultVal
   return ReplaceAll(value, "\\n", "\n");
 }
 
-float CalculateLineSpacing(const std::string& value, float fontSize) {
-  if (value.empty()) {
-    return 0;
-  }
-  auto lines = Split(value, ",");
-  if (lines.size() < 6) {
+float CalculateLineSpacing(const std::vector<std::string>& locArr, float fontSize) {
+  if (locArr.size() < 6) {
     return 0;
   }
   try {
-    auto firstY = static_cast<float>(std::stod(lines[1]));
-    auto secondY = static_cast<float>(std::stod(lines[5]));
+    auto firstY = static_cast<float>(std::stod(locArr[1]));
+    auto secondY = static_cast<float>(std::stod(locArr[5]));
     auto leading = roundf(secondY - firstY);
     if (leading == roundf(fontSize * 1.2f)) {
       return 0;
@@ -217,17 +215,13 @@ float CalculateLineSpacing(const std::string& value, float fontSize) {
   }
 }
 
-float CalculateFirstBaseline(const std::string& value, float lineHeight, float baselineShift,
-                             bool isVertical) {
-  if (value.empty()) {
-    return 0;
-  }
-  auto lines = Split(value, ",");
-  if (lines.size() < 4) {
+float CalculateFirstBaseline(const std::vector<std::string>& locArr, float lineHeight,
+                             float baselineShift, bool isVertical) {
+  if (locArr.size() < 4) {
     return 0;
   }
 
-  const auto lineCount = static_cast<int>(floorf(static_cast<float>(lines.size()) / 4.0f));
+  const auto lineCount = static_cast<int>(floorf(static_cast<float>(locArr.size()) / 4.0f));
   if (lineCount < 1) {
     return 0;
   }
@@ -235,15 +229,15 @@ float CalculateFirstBaseline(const std::string& value, float lineHeight, float b
   float firstBaseLine;
   try {
     if (isVertical) {
-      firstBaseLine = static_cast<float>(std::stod(lines[0]));
+      firstBaseLine = static_cast<float>(std::stod(locArr[0]));
       if (fabsf(firstBaseLine) > 100000000) {
-        auto lastBaseLine = static_cast<float>(std::stod(lines[index + 0]));
+        auto lastBaseLine = static_cast<float>(std::stod(locArr[index + 0]));
         firstBaseLine = lastBaseLine + lineHeight * (lineCount - 1);
       }
     } else {
-      firstBaseLine = static_cast<float>(std::stod(lines[1]));
+      firstBaseLine = static_cast<float>(std::stod(locArr[1]));
       if (fabsf(firstBaseLine) > 100000000) {
-        auto lastBaseLine = static_cast<float>(std::stod(lines[index + 1]));
+        auto lastBaseLine = static_cast<float>(std::stod(locArr[index + 1]));
         firstBaseLine = lastBaseLine - lineHeight * (lineCount - 1);
       }
     }

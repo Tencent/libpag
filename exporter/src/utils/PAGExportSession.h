@@ -49,9 +49,9 @@ class PAGExportSession {
   void pushWarning(AlertInfoType type, pag::ID compId, pag::ID layerId,
                    const std::string& addInfo = "");
 
-  std::shared_ptr<char> fileBytes = nullptr;
+  std::vector<char> fileBytes = {};
   size_t fileLength = 0;
-  std::shared_ptr<char> getFileBytes();
+  std::vector<char> getFileBytes();
 
   AEGP_PluginID pluginID = 0L;
   std::shared_ptr<AEGP_SuiteHandler> suites = nullptr;
@@ -85,7 +85,8 @@ class PAGExportSession {
   std::vector<pag::TextDirection> textDirectList = {};
 
  private:
-  std::vector<float> ParseFloats(const std::string& text);
+  std::vector<std::vector<float>> extractFloatArraysByKey(const std::string& xmlContent,
+                                                          const std::string& keyName);
   std::vector<pag::AlphaStop> ParseAlphaStops(const std::string& text);
   std::vector<pag::ColorStop> ParseColorStops(const std::string& text);
   static pag::GradientColorHandle DefaultGradientColors();

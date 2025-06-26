@@ -113,9 +113,17 @@ int PsdTextAttribute::StringFormatTransform(char* dst, const uint8_t* src, const
 }
 
 PsdTextAttribute::PsdTextAttribute(int size, const uint8_t* data) {
-  mem = std::shared_ptr<char>(new char[size + 1024], std::default_delete<char[]>());
-  len = StringFormatTransform(mem.get(), data, size);
-  src = mem.get();
+  mem = new char[size + 1024];
+  len = StringFormatTransform(mem, data, size);
+  src = mem;
+}
+
+PsdTextAttribute::~PsdTextAttribute() {
+  if (mem != nullptr) {
+    delete[] mem;
+    mem = nullptr;
+    src = nullptr;
+  }
 }
 
 bool PsdTextAttribute::getIntegerByKeys(int& result, std::vector<int> keys, const int keyCount) {
@@ -330,7 +338,7 @@ void PsdTextAttribute::buildAttributeArray(int startPos, int endPos) {
       break;
     }
     attribute->key = index++;
-    attributeList.push_back(std::move(attribute));
+    attributeList.emplace_back(std::move(attribute));
   }
 }
 

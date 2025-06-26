@@ -17,122 +17,166 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ByteArray.h"
-#include <fstream>
 #include <iostream>
-
 namespace exporter {
 
-bool CheckBigEndian() {
+tgfx::ByteOrder CheckByteOrder() {
   const int i = 1;
   const auto p = reinterpret_cast<const char*>(&i);
-  return *p == 0;
+  return *p == 0 ? tgfx::ByteOrder::BigEndian : tgfx::ByteOrder::LittleEndian;
 }
 
-void ByteArray::skip(uint32_t size) {
-  if (size <= bytesAvailable()) {
-    _position += size;
-  } else {
-    std::cout << "End of file was encountered.";
-    _position = _length;
+void ByteArray::setPosition(uint32_t value) {
+  if (!checkEndOfFile(value)) {
+    positionChanged(static_cast<size_t>(value) - _position);
   }
+}
+
+void ByteArray::skip(uint32_t numBytes) {
+  if (!checkEndOfFile(numBytes)) {
+    positionChanged(numBytes);
+  }
+}
+
+bool ByteArray::readBoolean() {
+  if (!checkEndOfFile(1)) {
+    auto value = dataView.getBoolean(_position);
+    positionChanged(1);
+    return value;
+  }
+  return false;
+}
+
+int8_t ByteArray::readInt8() {
+  if (!checkEndOfFile(1)) {
+    auto value = dataView.getInt8(_position);
+    positionChanged(1);
+    return value;
+  }
+  return 0;
+}
+
+uint8_t ByteArray::readUint8() {
+  if (!checkEndOfFile(1)) {
+    auto value = dataView.getUint8(_position);
+    positionChanged(1);
+    return value;
+  }
+  return 0;
+}
+
+int16_t ByteArray::readInt16() {
+  if (!checkEndOfFile(2)) {
+    auto value = dataView.getInt16(_position);
+    positionChanged(2);
+    return value;
+  }
+  return 0;
+}
+
+uint16_t ByteArray::readUint16() {
+  if (!checkEndOfFile(2)) {
+    auto value = dataView.getUint16(_position);
+    positionChanged(2);
+    return value;
+  }
+  return 0;
+}
+
+int32_t ByteArray::readInt32() {
+  if (!checkEndOfFile(4)) {
+    auto value = dataView.getInt32(_position);
+    positionChanged(4);
+    return value;
+  }
+  return 0;
+}
+
+uint32_t ByteArray::readUint32() {
+  if (!checkEndOfFile(4)) {
+    auto value = dataView.getUint32(_position);
+    positionChanged(4);
+    return value;
+  }
+  return 0;
+}
+
+int64_t ByteArray::readInt64() {
+  if (!checkEndOfFile(8)) {
+    auto value = dataView.getInt64(_position);
+    positionChanged(8);
+    return value;
+  }
+  return 0;
+}
+
+uint64_t ByteArray::readUint64() {
+  if (!checkEndOfFile(8)) {
+    auto value = dataView.getUint64(_position);
+    positionChanged(8);
+    return value;
+  }
+  return 0;
+}
+
+float ByteArray::readFloat() {
+  if (!checkEndOfFile(4)) {
+    auto value = dataView.getFloat(_position);
+    positionChanged(4);
+    return value;
+  }
+  return 0;
+}
+
+double ByteArray::readDouble() {
+  if (!checkEndOfFile(8)) {
+    auto value = dataView.getDouble(_position);
+    positionChanged(8);
+    return value;
+  }
+  return 0;
 }
 
 ByteArray ByteArray::readBytes(uint32_t length) {
-  if (length == UINT32_MAX) {
-    length = _length - _position;
-  }
-  if (_position + length <= _length) {
-    ByteArray byteBuffer(bytes + _position, length);
-    _position += length;
+  if (!checkEndOfFile(length)) {
+    ByteArray byteBuffer(dataView.bytes() + _position, length);
+    positionChanged(length);
     return byteBuffer;
   }
-  std::cout << "End of file was encountered.";
-  _position = _length;
   return {};
 }
 
 std::string ByteArray::readUTF8String() {
-  if (_position == _length) {
-    return "";
-  }
-  if (_position < _length) {
-    auto text = reinterpret_cast<const char*>(bytes + _position);
-    auto textLength = strlen(text);
-    if (textLength > _length - _position) {
-      textLength = _length - _position;
+  if (_position < dataView.size()) {
+    auto text = reinterpret_cast<const char*>(dataView.bytes() + _position);
+    auto maxLength = dataView.size() - _position;
+    auto textLength = strnlen(text, maxLength);
+    if (textLength < maxLength) {
+      positionChanged(textLength + 1);
+      return {text, textLength};
     }
-    _position += textLength + 1;
-    return {text, textLength};
   }
-  std::cout << "End of file was encountered.";
-  _position = _length;
+  std::cout << "End of file was encountered." << std::endl;
   return "";
 }
 
-Bit8 ByteArray::readBit8() {
-  Bit8 data = {};
-  if (_position < _length) {
-    data.uintValue = bytes[_position++];
-  } else {
-    std::cout << "End of file was encountered.";
-    _position = _length;
-  }
-  return data;
+void ByteArray::bitPositionChanged(size_t offset) {
+  _bitPosition += offset;
+  _position = BitsToBytes(_bitPosition);
 }
 
-Bit16 ByteArray::readBit16() {
-  Bit16 data = {};
-  if (_position < _length - 1) {
-    if (IS_BIG_ENDIAN) {
-      data.bytes[0] = bytes[_position++];
-      data.bytes[1] = bytes[_position++];
-    } else {
-      data.bytes[1] = bytes[_position++];
-      data.bytes[0] = bytes[_position++];
-    }
-  } else {
-    std::cout << "End of file was encountered.";
-    _position = _length;
-  }
-  return data;
+void ByteArray::positionChanged(size_t offset) {
+  _position += offset;
+  _bitPosition = _position * 8;
 }
 
-Bit32 ByteArray::readBit32() {
-  Bit32 data = {};
-  if (_position < _length - 3) {
-    if (IS_BIG_ENDIAN) {
-      for (int i = 0; i < 4; i++) {
-        data.bytes[i] = bytes[_position++];
-      }
-    } else {
-      for (int i = 3; i >= 0; i--) {
-        data.bytes[i] = bytes[_position++];
-      }
-    }
-  } else {
-    std::cout << "End of file was encountered.";
-    _position = _length;
+bool ByteArray::checkEndOfFile(uint32_t bytesToRead) {
+  // The _position must not use the uint32_t type, otherwise it will overflow.
+  if (_position + bytesToRead > dataView.size()) {
+    std::cout << "End of file was encountered." << std::endl;
+    return true;
   }
-  return data;
-}
-
-Bit64 ByteArray::readBit64() {
-  Bit64 data = {};
-  if (_position < _length - 7) {
-    if (IS_BIG_ENDIAN) {
-      for (int i = 0; i < 8; i++) {
-        data.bytes[i] = bytes[_position++];
-      }
-    } else {
-      for (int i = 7; i >= 0; i--) {
-        data.bytes[i] = bytes[_position++];
-      }
-    }
-  } else {
-    std::cout << "End of file was encountered.";
-    _position = _length;
-  }
-  return data;
+  return false;
 }
 
 }  // namespace exporter

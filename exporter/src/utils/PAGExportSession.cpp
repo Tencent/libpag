@@ -20,16 +20,20 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include "AEHelper.h"
 #include "AEPReader.h"
 #include "ByteArray.h"
 #include "FileHelper.h"
 #include "PsdTextAttribute.h"
 #include "StringHelper.h"
+#include "nlohmann/json.hpp"
 #include "platform/PlatformHelper.h"
+#include "tinyxml.h"
 
 namespace fs = std::filesystem;
 using namespace StringHelper;
+using json = nlohmann::json;
 
 namespace exporter {
 
@@ -45,11 +49,7 @@ PAGExportSession::~PAGExportSession() {
 void PAGExportSession::checkParamValid() {
   const ConfigParam tempParam;
 
-  if (configParam.frameRate > 120) {
-    configParam.frameRate = 120;
-  } else if (configParam.frameRate < 0.01) {
-    configParam.frameRate = 0.01;
-  }
+  configParam.frameRate = std::clamp(configParam.frameRate, 0.01f, 120.0f);
 
   switch (configParam.tagMode) {
     case TagMode::Beta:
@@ -59,6 +59,7 @@ void PAGExportSession::checkParamValid() {
       configParam.exportTagLevel = static_cast<uint16_t>(PresetTagLevel::TagLevelStable);
       break;
     case TagMode::Custom:
+      // Custom mode doesn't modify exportTagLevel
       break;
     default:
       std::cerr << "Error! unsupported tagMode:" << static_cast<int>(configParam.tagMode)
@@ -68,26 +69,13 @@ void PAGExportSession::checkParamValid() {
       break;
   }
 
-  if (configParam.exportTagLevel < static_cast<uint16_t>(PresetTagLevel::TagLevelMin)) {
-    configParam.exportTagLevel = static_cast<uint16_t>(PresetTagLevel::TagLevelMin);
-  } else if (configParam.exportTagLevel > static_cast<uint16_t>(PresetTagLevel::TagLevelMax)) {
-    configParam.exportTagLevel = static_cast<uint16_t>(PresetTagLevel::TagLevelMax);
-  }
+  configParam.exportTagLevel =
+      std::clamp(configParam.exportTagLevel, static_cast<uint16_t>(PresetTagLevel::TagLevelMin),
+                 static_cast<uint16_t>(PresetTagLevel::TagLevelMax));
+  configParam.imageQuality = std::clamp(configParam.imageQuality, 0, 100);
+  configParam.imagePixelRatio = std::clamp(configParam.imagePixelRatio, 1.0f, 3.0f);
 
-  if (configParam.imageQuality < 0) {
-    configParam.imageQuality = 0;
-  } else if (configParam.imageQuality > 100) {
-    configParam.imageQuality = 100;
-  }
-
-  if (configParam.imagePixelRatio < 1.0) {
-    configParam.imagePixelRatio = 1.0;
-  } else if (configParam.imagePixelRatio > 3.0) {
-    configParam.imagePixelRatio = 3.0;
-  }
-
-  transform(configParam.sequenceSuffix.begin(), configParam.sequenceSuffix.end(),
-            configParam.sequenceSuffix.begin(), ::tolower);
+  configParam.sequenceSuffix = ToLowerCase(configParam.sequenceSuffix);
   if (configParam.sequenceSuffix.empty()) {
     configParam.sequenceSuffix = tempParam.sequenceSuffix;
   }
@@ -96,11 +84,7 @@ void PAGExportSession::checkParamValid() {
     configParam.sequenceType = tempParam.sequenceType;
   }
 
-  if (configParam.sequenceQuality < 0) {
-    configParam.sequenceQuality = 0;
-  } else if (configParam.sequenceQuality > 100) {
-    configParam.sequenceQuality = 100;
-  }
+  configParam.sequenceQuality = std::clamp(configParam.sequenceQuality, 0, 100);
 }
 
 pag::TextDocumentHandle PAGExportSession::currentTextDocument() {
@@ -110,160 +94,154 @@ pag::TextDocumentHandle PAGExportSession::currentTextDocument() {
   std::string result = "";
   if (enableRunScript) {
     AEHelper::RegisterTextDocumentScript();
-    auto code = "PAG.printTextDocuments(" + id + ", " + layer + ", " + keyframe + ");";
+    std::stringstream ss;
+    ss << "PAG.printTextDocuments(" << id << ", " << layer << ", " << keyframe << ");";
+    auto code = ss.str();
     result = AEHelper::RunScript(suites, pluginID, code);
   }
   if (result.empty()) {
     return std::make_shared<pag::TextDocument>();
   }
-  std::unordered_map<std::string, std::string> valueMap;
-  auto lines = StringHelper::Split(result, "\n");
-  for (auto& line : lines) {
-    auto index = line.find(" : ");
-    if (index == std::string::npos) {
-      continue;
-    }
-    auto key = line.substr(0, index);
-    auto value = line.substr(index + 3);
-    valueMap.insert(std::make_pair(key, value));
-  }
+
+  json jsonData = json::parse(result);
+
   auto textDocument = std::make_shared<pag::TextDocument>();
   textDocument->direction = currentTextDocumentDirection();
-  textDocument->applyFill =
-      StringToBoolean(GetMapValue(valueMap, "applyFill"), textDocument->applyFill);
-  textDocument->applyStroke =
-      StringToBoolean(GetMapValue(valueMap, "applyStroke"), textDocument->applyStroke);
-  textDocument->baselineShift =
-      StringToFloat(GetMapValue(valueMap, "baselineShift"), textDocument->baselineShift);
-  textDocument->boxText = StringToBoolean(GetMapValue(valueMap, "boxText"), textDocument->boxText);
-  textDocument->boxTextPos =
-      StringToPoint(GetMapValue(valueMap, "boxTextPos"), textDocument->boxTextPos);
-  textDocument->boxTextSize =
-      StringToPoint(GetMapValue(valueMap, "boxTextSize"), textDocument->boxTextSize);
-  textDocument->fauxBold =
-      StringToBoolean(GetMapValue(valueMap, "fauxBold"), textDocument->fauxBold);
-  textDocument->fauxItalic =
-      StringToBoolean(GetMapValue(valueMap, "fauxItalic"), textDocument->fauxItalic);
-  textDocument->fillColor =
-      StringToColor(GetMapValue(valueMap, "fillColor"), textDocument->fillColor);
-  textDocument->fontFamily = FormatString(GetMapValue(valueMap, "fontFamily"), "");
-  textDocument->fontStyle = FormatString(GetMapValue(valueMap, "fontStyle"), "");
-  textDocument->fontSize = StringToFloat(GetMapValue(valueMap, "fontSize"), textDocument->fontSize);
-  textDocument->strokeColor =
-      StringToColor(GetMapValue(valueMap, "strokeColor"), textDocument->strokeColor);
-  textDocument->strokeOverFill =
-      StringToBoolean(GetMapValue(valueMap, "strokeOverFill"), textDocument->strokeOverFill);
-  textDocument->strokeWidth =
-      StringToFloat(GetMapValue(valueMap, "strokeWidth"), textDocument->strokeWidth);
-  textDocument->text = FormatString(GetMapValue(valueMap, "text"), textDocument->text);
+  textDocument->applyFill = jsonData.value("applyFill", textDocument->applyFill);
+  textDocument->applyStroke = jsonData.value("applyStroke", textDocument->applyStroke);
+  textDocument->baselineShift = jsonData.value("applyStroke", textDocument->applyStroke);
+  textDocument->boxText = jsonData.value("boxText", textDocument->boxText);
+  textDocument->boxTextPos = StringToPoint(jsonData.value("boxTextPos", std::vector<std::string>()),
+                                           textDocument->boxTextPos);
+  textDocument->boxTextSize = StringToPoint(
+      jsonData.value("boxTextSize", std::vector<std::string>()), textDocument->boxTextSize);
+  textDocument->fauxBold = jsonData.value("fauxBold", textDocument->fauxBold);
+  textDocument->fauxItalic = jsonData.value("fauxItalic", textDocument->fauxItalic);
+  textDocument->fillColor = StringToColor(jsonData.value("fillColor", std::vector<std::string>()),
+                                          textDocument->fillColor);
+  textDocument->fontFamily = jsonData.value("fontFamily", textDocument->fontFamily);
+  textDocument->fontStyle = jsonData.value("fontStyle", textDocument->fontStyle);
+  textDocument->fontSize = jsonData.value("fontSize", textDocument->fontSize);
+  textDocument->strokeColor = StringToColor(
+      jsonData.value("strokeColor", std::vector<std::string>()), textDocument->strokeColor);
+  textDocument->strokeOverFill = jsonData.value("strokeOverFill", textDocument->strokeOverFill);
+  textDocument->strokeWidth = jsonData.value("strokeWidth", textDocument->strokeWidth);
+  textDocument->text = jsonData.value("text", textDocument->text);
   textDocument->justification =
-      StringToEnum(GetMapValue(valueMap, "justification"), textDocument->justification);
-  textDocument->leading = StringToFloat(GetMapValue(valueMap, "leading"), textDocument->leading);
+      IntToParagraphJustification(jsonData.value("justification", -1), textDocument->justification);
+  textDocument->leading = jsonData.value("leading", textDocument->leading);
   if (textDocument->leading == 0) {
-    textDocument->leading =
-        CalculateLineSpacing(GetMapValue(valueMap, "baselineLocs"), textDocument->fontSize);
+    textDocument->leading = CalculateLineSpacing(
+        jsonData.value("baselineLocs", std::vector<std::string>()), textDocument->fontSize);
   }
-  textDocument->tracking = StringToFloat(GetMapValue(valueMap, "tracking"), textDocument->tracking);
+  textDocument->tracking = jsonData.value("tracking", textDocument->tracking);
   auto lineHeight =
       textDocument->leading == 0 ? roundf(textDocument->fontSize * 1.2f) : textDocument->leading;
   textDocument->firstBaseLine = CalculateFirstBaseline(
-      GetMapValue(valueMap, "baselineLocs"), lineHeight, textDocument->baselineShift,
-      textDocument->direction == pag::TextDirection::Vertical);
+      jsonData.value("baselineLocs", std::vector<std::string>()), lineHeight,
+      textDocument->baselineShift, textDocument->direction == pag::TextDirection::Vertical);
 
+  std::stringstream ss;
   auto pathIndex = this->outputPath.find_last_of('/');
-  auto path = this->outputPath.substr(0, pathIndex);
-  path += "/" + textDocument->fontFamily + "-" + textDocument->fontStyle + ".ttc";
-  fontFilePathList.push_back(path);
-  auto fontLocation = FormatString(GetMapValue(valueMap, "fontLocation"), "");
+  ss << this->outputPath.substr(0, pathIndex) << "/" << textDocument->fontFamily << "-"
+     << textDocument->fontStyle << ".ttc";
+  auto path = ss.str();
+  fontFilePathList.emplace_back(path);
+  auto fontLocation = jsonData.value("fontLocation", "");
 
   FileHelper::CopyFile(fontLocation, path);
-  int size = FileHelper::GetFileSize(path);
-  if (size > 30 * 1000 * 1000) {  // 30MB
+  size_t size = FileHelper::GetFileSize(path);
+  if (size > 30 * 1024 * 1024) {  // 30MB
     pushWarning(AlertInfoType::FontFileTooBig,
-                textDocument->fontFamily + ", " + std::to_string(size / 1000 / 1000) + "MB");
+                textDocument->fontFamily + ", " + std::to_string(size / 1024 / 1024) + "MB");
   }
 
   return textDocument;
 }
 
-std::vector<float> PAGExportSession::ParseFloats(const std::string& text) {
-  std::vector<float> list;
-  auto remaining = text;
-  while (!remaining.empty()) {
-    auto index = remaining.find("<float>");
-    if (index == std::string::npos) {
-      break;
-    }
-    remaining = remaining.substr(index + 7, remaining.size() - index - 7);
-    index = remaining.find("</float>");
-    if (index == std::string::npos || index == 0) {
-      break;
-    }
-    auto floatText = remaining.substr(0, index);
-    remaining = remaining.substr(index + 7, remaining.size() - index - 7);
-    auto value = std::stof(floatText);
-    list.push_back(value);
+std::vector<std::vector<float>> PAGExportSession::extractFloatArraysByKey(
+    const std::string& xmlContent, const std::string& keyName) {
+  std::vector<std::vector<float>> result = {};
+  TiXmlDocument doc;
+  if (doc.Parse(xmlContent.c_str()) == nullptr) {
+    std::cerr << "XML parsing failed: " << doc.ErrorDesc() << std::endl;
+    return result;
   }
-  return list;
+
+  auto traverse = [&](TiXmlElement* element, const auto& traverseRef) {
+    if (!element) return;
+
+    for (TiXmlElement* child = element->FirstChildElement(); child != nullptr;
+         child = child->NextSiblingElement()) {
+      if (std::string(child->Value()) == "prop.pair") {
+        TiXmlElement* key = child->FirstChildElement("key");
+        if (key && key->GetText()) {
+          if (std::string(key->GetText()) == keyName) {
+            TiXmlElement* array = child->FirstChildElement("array");
+            if (array) {
+              TiXmlElement* arrayType = array->FirstChildElement("array.type");
+              if (arrayType && arrayType->FirstChildElement("float")) {
+                std::vector<float> floatList = {};
+                for (TiXmlElement* floatVal = array->FirstChildElement("float");
+                     floatVal != nullptr; floatVal = floatVal->NextSiblingElement("float")) {
+                  if (floatVal->GetText()) {
+                    try {
+                      floatList.emplace_back(std::stof(floatVal->GetText()));
+                    } catch (const std::exception& e) {
+                      std::cerr << "Error converting float value: " << e.what() << std::endl;
+                    }
+                  }
+                }
+                result.emplace_back(floatList);
+              }
+            }
+          }
+        }
+      }
+      traverseRef(child, traverseRef);
+    }
+  };
+
+  traverse(doc.RootElement(), traverse);
+
+  return result;
 }
 
 std::vector<pag::AlphaStop> PAGExportSession::ParseAlphaStops(const std::string& text) {
-  std::vector<pag::AlphaStop> list;
-  auto remaining = text;
-  while (!remaining.empty()) {
-    auto index = remaining.find("<key>Stops Alpha</key>");
-    if (index == std::string::npos) {
-      break;
-    }
-    remaining = remaining.substr(index, remaining.size() - index);
-    index = remaining.find("</array>");
-    if (index == std::string::npos) {
-      break;
-    }
-    auto alphaText = remaining.substr(0, index);
-    remaining = remaining.substr(index, remaining.size() - index);
-    auto floats = ParseFloats(alphaText);
-    if (floats.size() < 3) {
-      break;
+  std::vector<pag::AlphaStop> list = {};
+
+  auto alphaStopList = extractFloatArraysByKey(text, "Stops Alpha");
+  for (const auto& alphaStop : alphaStopList) {
+    if (alphaStop.size() < 3) {
+      return {};
     }
     pag::AlphaStop stop = {};
-    stop.position = floats[0];
-    stop.midpoint = floats[1];
-    stop.opacity = static_cast<uint8_t>(floats[2] * 255);
-    list.push_back(stop);
+    stop.position = alphaStop[0];
+    stop.midpoint = alphaStop[1];
+    stop.opacity = static_cast<uint8_t>(alphaStop[2] * 255);
+    list.emplace_back(stop);
   }
   return list;
 }
 
 std::vector<pag::ColorStop> PAGExportSession::ParseColorStops(const std::string& text) {
-  std::vector<pag::ColorStop> list;
-  auto remaining = text;
-  while (!remaining.empty()) {
-    auto index = remaining.find("<key>Stops Color</key>");
-    if (index == std::string::npos) {
-      break;
-    }
-    remaining = remaining.substr(index, remaining.size() - index);
-    index = remaining.find("</array>");
-    if (index == std::string::npos) {
-      break;
-    }
-    auto colorText = remaining.substr(0, index);
-    remaining = remaining.substr(index, remaining.size() - index);
-    auto floats = ParseFloats(colorText);
-    if (floats.size() < 6) {
-      break;
+  std::vector<pag::ColorStop> list = {};
+  auto colorStopList = extractFloatArraysByKey(text, "Stops Color");
+  for (const auto& colorStop : colorStopList) {
+    if (colorStop.size() < 6) {
+      return {};
     }
     pag::Color color = {};
-    color.red = static_cast<uint8_t>(255 * floats[2]);
-    color.green = static_cast<uint8_t>(255 * floats[3]);
-    color.blue = static_cast<uint8_t>(255 * floats[4]);
+    color.red = static_cast<uint8_t>(255 * colorStop[2]);
+    color.green = static_cast<uint8_t>(255 * colorStop[3]);
+    color.blue = static_cast<uint8_t>(255 * colorStop[4]);
     pag::ColorStop stop = {};
-    stop.position = floats[0];
-    stop.midpoint = floats[1];
+    stop.position = colorStop[0];
+    stop.midpoint = colorStop[1];
     stop.color = color;
     list.push_back(stop);
   }
+
   return list;
 }
 
@@ -277,18 +255,18 @@ pag::GradientColorHandle PAGExportSession::DefaultGradientColors() {
   auto gradientColor = std::make_shared<pag::GradientColor>();
   pag::AlphaStop stop = {};
   stop.position = 0.0f;
-  gradientColor->alphaStops.push_back(stop);
+  gradientColor->alphaStops.emplace_back(stop);
   stop = {};
   stop.position = 1.0f;
-  gradientColor->alphaStops.push_back(stop);
+  gradientColor->alphaStops.emplace_back(stop);
   pag::ColorStop colorStop = {};
   colorStop.position = 0.0f;
   colorStop.color = pag::White;
-  gradientColor->colorStops.push_back(colorStop);
+  gradientColor->colorStops.emplace_back(colorStop);
   colorStop = {};
   colorStop.position = 1.0f;
   colorStop.color = pag::Black;
-  gradientColor->colorStops.push_back(colorStop);
+  gradientColor->colorStops.emplace_back(colorStop);
   return gradientColor;
 }
 
@@ -310,11 +288,11 @@ pag::GradientColorHandle PAGExportSession::ParseGradientColor(const std::string&
 pag::GradientColorHandle PAGExportSession::currentGradientColors(
     const std::vector<std::string>& matchNames, int index) {
   auto fileBytes = getFileBytes();
-  if (!fileBytes) {
+  if (fileBytes.empty()) {
     return DefaultGradientColors();
   }
 
-  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.get()), static_cast<uint32_t>(fileLength));
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), static_cast<uint32_t>(fileLength));
   bytes = AEPReader::ReadBody(&bytes);
   auto compositions = AEPReader::ReadCompositions(&bytes);
 
@@ -373,7 +351,7 @@ pag::TextDirection PAGExportSession::currentTextDocumentDirection() {
   textDirectList.clear();
 
   auto fileBytes = getFileBytes();
-  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.get()), static_cast<uint32_t>(fileLength));
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), static_cast<uint32_t>(fileLength));
   bytes = AEPReader::ReadBody(&bytes);
   auto compositions = AEPReader::ReadCompositions(&bytes);
   ByteArray layerBytes = {};
@@ -407,9 +385,9 @@ pag::TextDirection PAGExportSession::currentTextDocumentDirection() {
     std::vector<int> keys = {0, 0, 8, 0, index, 0, 2, 1};
     auto flag = attribute.getIntegerByKeys(textDirect, keys, keys.size());
     if (flag && textDirect == 2) {
-      textDirectList.push_back(pag::TextDirection::Vertical);
+      textDirectList.emplace_back(pag::TextDirection::Vertical);
     } else {
-      textDirectList.push_back(pag::TextDirection::Horizontal);
+      textDirectList.emplace_back(pag::TextDirection::Horizontal);
     }
   }
   recordCompId = curCompId;
@@ -418,8 +396,8 @@ pag::TextDirection PAGExportSession::currentTextDocumentDirection() {
   return textDirectList[keyframeIndex];
 }
 
-std::shared_ptr<char> PAGExportSession::getFileBytes() {
-  if (fileBytes != nullptr) {
+std::vector<char> PAGExportSession::getFileBytes() {
+  if (!fileBytes.empty()) {
     return fileBytes;
   }
 
@@ -443,10 +421,10 @@ std::shared_ptr<char> PAGExportSession::getFileBytes() {
     isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
-  FileHelper::TemporaryFileManager tempFileMgr;
+  FileHelper::ScopedTempFile tempFile;
   if (isDirty || isAEPX) {
     filePath = GetTempFolderPath() + u8"/.PAGAutoSave.aep";
-    tempFileMgr.setFilePath(filePath);
+    tempFile.setFilePath(filePath);
     auto path = Utf8ToUtf16(filePath);
     suites->ProjSuite6()->AEGP_SaveProjectToPath(
         projectHandle, reinterpret_cast<const A_UTF16Char*>(path.c_str()));
@@ -456,15 +434,15 @@ std::shared_ptr<char> PAGExportSession::getFileBytes() {
 
   std::ifstream t(filePath, std::ios::binary);
   if (!t.is_open()) {
-    return nullptr;
+    return {};
   }
 
   t.seekg(0, std::ios::end);
   fileLength = t.tellg();
   t.seekg(0, std::ios::beg);
 
-  fileBytes = std::shared_ptr<char>(new char[fileLength], std::default_delete<char[]>());
-  t.read(fileBytes.get(), static_cast<std::streamsize>(fileLength));
+  fileBytes.resize(fileLength);
+  t.read(fileBytes.data(), static_cast<std::streamsize>(fileLength));
   t.close();
 
   return fileBytes;
@@ -488,7 +466,7 @@ AEGP_ItemH PAGExportSession::getCompItemHById(pag::ID id) {
 
 bool PAGExportSession::isVideoReplaceLayer(AEGP_LayerH layerH) {
   auto id = AEHelper::GetItemIdFromLayer(layerH);
-  for (auto pair : imageLayerHList) {
+  for (const auto& pair : imageLayerHList) {
     if (id == AEHelper::GetItemIdFromLayer(pair.first)) {
       return pair.second;
     }

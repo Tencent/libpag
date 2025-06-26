@@ -27,14 +27,16 @@ int WriteTextFile(const std::string& fileName, const char* text);
 
 int WriteTextFile(const std::string& fileName, const std::string& text);
 
-int GetFileSize(const std::string& fileName);
+size_t GetFileSize(const std::string& fileName);
 
 bool CopyFile(const std::string& src, const std::string& dst);
 
-class TemporaryFileManager {
+bool FileIsExist(const std::string& fileName);
+
+class ScopedTempFile {
  public:
-  TemporaryFileManager() = default;
-  ~TemporaryFileManager();
+  ScopedTempFile() = default;
+  ~ScopedTempFile();
 
   void setFilePath(const std::string& path);
 

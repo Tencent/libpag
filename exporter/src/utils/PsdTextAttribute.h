@@ -39,7 +39,7 @@ class PsdTextAttribute {
   PsdTextAttribute(int size, const uint8_t* data);
   PsdTextAttribute(char* src, int len) : src(src), len(len) {
   }
-  ~PsdTextAttribute() = default;
+  ~PsdTextAttribute();
 
   bool getIntegerByKeys(int& result, std::vector<int> keys, int keyCount);
   void skipSpaces();
@@ -53,7 +53,7 @@ class PsdTextAttribute {
   void buildAttributeArray(int startPos, int endPos);
 
  private:
-  std::shared_ptr<char> mem = nullptr;
+  char* mem = nullptr;
   char* src = nullptr;
   int len = 0;
   int pos = 0;

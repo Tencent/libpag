@@ -26,8 +26,12 @@ namespace FileHelper {
 
 std::string ReadTextFile(const std::string& filename) {
   std::ifstream inputStream(filename);
+  if (!inputStream.is_open()) {
+    return "";
+  }
   std::string text((std::istreambuf_iterator<char>(inputStream)),
                    (std::istreambuf_iterator<char>()));
+  inputStream.close();
   return text;
 }
 
@@ -37,6 +41,7 @@ int WriteTextFile(const std::string& fileName, const char* text) {
     return 0;
   }
   file << text;
+  file.close();
   return file.tellp();
 }
 
@@ -44,21 +49,32 @@ int WriteTextFile(const std::string& fileName, const std::string& text) {
   return WriteTextFile(fileName, text.c_str());
 }
 
-int GetFileSize(const std::string& fileName) {
+size_t GetFileSize(const std::string& fileName) {
   try {
-    return static_cast<int>(fs::file_size(fileName));
+    return fs::file_size(fileName);
   } catch (...) {
     return 0;
   }
 }
 
+bool FileIsExist(const std::string& fileName) {
+  try {
+    if (fileName.empty()) {
+      return false;
+    }
+    return fs::exists(fileName);
+  } catch (...) {
+    return false;
+  }
+}
+
 bool CopyFile(const std::string& src, const std::string& dst) {
   try {
-    if (!fs::exists(src)) {
+    if (!FileIsExist(src)) {
       return false;
     }
     auto parentPath = fs::path(dst).parent_path();
-    if (!parentPath.empty() && !fs::exists(parentPath)) {
+    if (!FileIsExist(parentPath)) {
       fs::create_directories(parentPath);
     }
     fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
@@ -68,13 +84,13 @@ bool CopyFile(const std::string& src, const std::string& dst) {
   }
 }
 
-TemporaryFileManager::~TemporaryFileManager() {
+ScopedTempFile::~ScopedTempFile() {
   if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
     std::remove(tempFilePath.c_str());
   }
 }
 
-void TemporaryFileManager::setFilePath(const std::string& path) {
+void ScopedTempFile::setFilePath(const std::string& path) {
   tempFilePath = path;
 }
 

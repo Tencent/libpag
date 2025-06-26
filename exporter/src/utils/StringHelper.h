@@ -44,19 +44,19 @@ bool StringToBoolean(const std::string& value, bool defaultValue);
 
 float StringToFloat(const std::string& value, float defaultValue);
 
-pag::Point StringToPoint(const std::string& value, const pag::Point& defaultValue);
+pag::Point StringToPoint(const std::vector<std::string>& pointArr, const pag::Point& defaultValue);
 
-pag::Color StringToColor(const std::string& value, const pag::Color& defaultValue);
+pag::Color StringToColor(const std::vector<std::string>& colorArr, const pag::Color& defaultValue);
 
 std::string FormatString(const std::string& value, const std::string& defaultValue);
 
-pag::ParagraphJustification StringToEnum(const std::string& value,
-                                         const pag::ParagraphJustification defaultValue);
+pag::ParagraphJustification IntToParagraphJustification(int value,
+                                                        pag::ParagraphJustification defaultValue);
 
-float CalculateLineSpacing(const std::string& value, float fontSize);
+float CalculateLineSpacing(const std::vector<std::string>& locArr, float fontSize);
 
-float CalculateFirstBaseline(const std::string& value, float lineHeight, float baselineShift,
-                             bool isVertical);
+float CalculateFirstBaseline(const std::vector<std::string>& locArr, float lineHeight,
+                             float baselineShift, bool isVertical);
 
 std::string ConvertStringEncoding(const std::string& str);
 
