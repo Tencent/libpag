@@ -31,15 +31,15 @@ class ByteArray final {
  public:
   ByteArray() = default;
 
-  ByteArray(const uint8_t* data, uint32_t length) : dataView(data, length, CheckByteOrder()) {
+  ByteArray(const uint8_t* data, size_t length) : dataView(data, length, CheckByteOrder()) {
   }
 
   /**
    * The number of bytes of data available for reading from the current position in the byte array to the end of
    * the array.
    */
-  uint32_t bytesAvailable() const {
-    return static_cast<uint32_t>(dataView.size() - _position);
+  size_t bytesAvailable() const {
+    return dataView.size() - _position;
   }
 
   bool empty() const {
@@ -56,21 +56,21 @@ class ByteArray final {
   /**
    * The length of the ByteArray object.
    */
-  uint32_t length() const {
-    return static_cast<uint32_t>(dataView.size());
+  size_t length() const {
+    return dataView.size();
   }
 
   /**
    * Moves, or returns the current position, of the file pointer into the ByteArray object. This is the point at
    * which the next call to a read method starts reading.
    */
-  uint32_t position() const {
-    return static_cast<uint32_t>(_position);
+  size_t position() const {
+    return _position;
   };
 
-  void setPosition(uint32_t value);
+  void setPosition(size_t value);
 
-  void skip(uint32_t size);
+  void skip(size_t size);
 
   /**
    * Reads a Boolean value from the byte stream. A signed 8-bit integer is read, and true is returned if the
@@ -149,7 +149,7 @@ class ByteArray final {
 
   void positionChanged(size_t offset);
 
-  bool checkEndOfFile(uint32_t bytesToRead);
+  bool checkEndOfFile(size_t bytesToRead);
 };
 
 }  // namespace exporter

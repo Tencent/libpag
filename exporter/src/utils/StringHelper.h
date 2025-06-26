@@ -50,7 +50,7 @@ pag::Color StringToColor(const std::vector<std::string>& colorArr, const pag::Co
 
 std::string FormatString(const std::string& value, const std::string& defaultValue);
 
-pag::ParagraphJustification IntToParagraphJustification(int value,
+pag::ParagraphJustification IntToParagraphJustification(int justification,
                                                         pag::ParagraphJustification defaultValue);
 
 float CalculateLineSpacing(const std::vector<std::string>& locArr, float fontSize);

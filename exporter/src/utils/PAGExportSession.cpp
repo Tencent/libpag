@@ -292,7 +292,7 @@ pag::GradientColorHandle PAGExportSession::currentGradientColors(
     return DefaultGradientColors();
   }
 
-  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), static_cast<uint32_t>(fileLength));
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileLength);
   bytes = AEPReader::ReadBody(&bytes);
   auto compositions = AEPReader::ReadCompositions(&bytes);
 
@@ -351,7 +351,7 @@ pag::TextDirection PAGExportSession::currentTextDocumentDirection() {
   textDirectList.clear();
 
   auto fileBytes = getFileBytes();
-  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), static_cast<uint32_t>(fileLength));
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileLength);
   bytes = AEPReader::ReadBody(&bytes);
   auto compositions = AEPReader::ReadCompositions(&bytes);
   ByteArray layerBytes = {};

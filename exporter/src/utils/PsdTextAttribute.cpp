@@ -34,48 +34,48 @@ inline int HexCharToInt(const char c) {
   return result;
 }
 
-int PsdTextAttribute::StringFormatTransform(char* dst, const uint8_t* src, const int len) {
-  int k = 0;
-  dst[k++] = '/';
-  dst[k++] = '0';
-  dst[k++] = ' ';
-  dst[k++] = '<';
-  dst[k++] = ' ';
+int PsdTextAttribute::stringFormatTransform(std::vector<char>& dst, const uint8_t* src,
+                                            const int len) {
+  dst.push_back('/');
+  dst.push_back('0');
+  dst.push_back(' ');
+  dst.push_back('<');
+  dst.push_back(' ');
 
   for (int i = 0; i < len; i++) {
     char c = src[i];
 
     if (c & 0x80) {
-      dst[k++] = 'W';
+      dst.push_back('W');
       i++;
     } else if (c == '\\') {
-      dst[k++] = 'Z';
+      dst.push_back('Z');
       i++;
     } else if (c == '<') {
       if (i + 1 < len && src[i + 1] == '<') {
-        dst[k++] = '<';
-        dst[k++] = ' ';
+        dst.push_back('<');
+        dst.push_back(' ');
         i++;
       } else {
-        dst[k++] = 'J';
+        dst.push_back('J');
       }
     } else if (c == '>') {
       if (i + 1 < len && src[i + 1] == '>') {
-        dst[k++] = '>';
-        dst[k++] = ' ';
+        dst.push_back('>');
+        dst.push_back(' ');
         i++;
       } else {
-        dst[k++] = 'J';
+        dst.push_back('J');
       }
     } else {
-      dst[k++] = c;
+      dst.push_back(c);
       if (c == '(') {
         if (i + 2 < len && ((src[i + 1] == 0xFE && src[i + 2] == 0xFF) ||
                             (src[i + 1] == 0xFF && src[i + 2] == 0xFE))) {
           i++;
           bool isBE = (src[i] == 0xFE);
-          dst[k++] = 'T';
-          dst[k++] = 'M';
+          dst.push_back('T');
+          dst.push_back('M');
           i += 2;
 
           while (i < len && src[i] != ')') {
@@ -83,47 +83,39 @@ int PsdTextAttribute::StringFormatTransform(char* dst, const uint8_t* src, const
 
             if ((w1 & 0xFF) == 0x5C && i + 3 < len) {
               i += 3;
-              dst[k++] = '.';
-              dst[k++] = '.';
-              dst[k++] = '.';
+              dst.push_back('.');
+              dst.push_back('.');
+              dst.push_back('.');
             } else if (w1 >= 0xD800 && w1 <= 0xDFFF && i + 4 < len) {
               i += 4;
-              dst[k++] = '.';
-              dst[k++] = '.';
-              dst[k++] = '.';
-              dst[k++] = '.';
+              dst.push_back('.');
+              dst.push_back('.');
+              dst.push_back('.');
+              dst.push_back('.');
             } else {
               i += 2;
-              dst[k++] = '.';
-              dst[k++] = '.';
+              dst.push_back('.');
+              dst.push_back('.');
             }
           }
           if (i < len) {
-            dst[k++] = src[i];
+            dst.push_back(src[i]);
           }
         }
       }
     }
   }
 
-  dst[k++] = ' ';
-  dst[k++] = '>';
-  dst[k++] = '\0';
-  return k;
+  dst.push_back(' ');
+  dst.push_back('>');
+  dst.push_back('\0');
+
+  return dst.size();
 }
 
 PsdTextAttribute::PsdTextAttribute(int size, const uint8_t* data) {
-  mem = new char[size + 1024];
-  len = StringFormatTransform(mem, data, size);
-  src = mem;
-}
-
-PsdTextAttribute::~PsdTextAttribute() {
-  if (mem != nullptr) {
-    delete[] mem;
-    mem = nullptr;
-    src = nullptr;
-  }
+  len = stringFormatTransform(mem, data, size);
+  src = mem.data();
 }
 
 bool PsdTextAttribute::getIntegerByKeys(int& result, std::vector<int> keys, const int keyCount) {

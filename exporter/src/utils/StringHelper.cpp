@@ -132,25 +132,25 @@ float StringToFloat(const std::string& value, const float defaultValue) {
 }
 
 pag::ParagraphJustification IntToParagraphJustification(
-    int value, const pag::ParagraphJustification defaultValue) {
-  if (value < 0) {
+    int justification, const pag::ParagraphJustification defaultValue) {
+  if (justification < 0) {
     return defaultValue;
   }
 
-  switch (value) {
-    case 7414:
+  switch (justification) {  // justification represents the text alignment method in After Effects.
+    case 7414:              // RightJustify
       return pag::ParagraphJustification::RightJustify;
-    case 7415:
+    case 7415:  // CenterJustify
       return pag::ParagraphJustification::CenterJustify;
-    case 7416:
+    case 7416:  // FullJustifyLastLineLeft
       return pag::ParagraphJustification::FullJustifyLastLineLeft;
-    case 7417:
+    case 7417:  // FullJustifyLastLineRight
       return pag::ParagraphJustification::FullJustifyLastLineRight;
-    case 7418:
+    case 7418:  // FullJustifyLastLineCenter
       return pag::ParagraphJustification::FullJustifyLastLineCenter;
-    case 7419:
+    case 7419:  // FullJustifyLastLineFull
       return pag::ParagraphJustification::FullJustifyLastLineFull;
-    default:
+    default:  // Default text justification is LeftJustify.
       return pag::ParagraphJustification::LeftJustify;
   }
 }

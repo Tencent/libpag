@@ -50,22 +50,22 @@ int WriteTextFile(const std::string& fileName, const std::string& text) {
 }
 
 size_t GetFileSize(const std::string& fileName) {
-  try {
-    return fs::file_size(fileName);
-  } catch (...) {
+  if (!FileIsExist(fileName)) {
     return 0;
   }
+  std::error_code ec;
+  size_t ret = fs::file_size(fileName, ec);
+
+  return ret;
 }
 
 bool FileIsExist(const std::string& fileName) {
-  try {
-    if (fileName.empty()) {
-      return false;
-    }
-    return fs::exists(fileName);
-  } catch (...) {
+  if (fileName.empty()) {
     return false;
   }
+  std::error_code ec;
+  bool ret = fs::exists(fileName, ec);
+  return ret;
 }
 
 bool CopyFile(const std::string& src, const std::string& dst) {

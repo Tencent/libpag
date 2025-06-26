@@ -34,12 +34,10 @@ enum class PsdValueType {
 
 class PsdTextAttribute {
  public:
-  static int StringFormatTransform(char* dst, const uint8_t* src, int len);
-
   PsdTextAttribute(int size, const uint8_t* data);
   PsdTextAttribute(char* src, int len) : src(src), len(len) {
   }
-  ~PsdTextAttribute();
+  ~PsdTextAttribute() = default;
 
   bool getIntegerByKeys(int& result, std::vector<int> keys, int keyCount);
   void skipSpaces();
@@ -53,7 +51,9 @@ class PsdTextAttribute {
   void buildAttributeArray(int startPos, int endPos);
 
  private:
-  char* mem = nullptr;
+  int stringFormatTransform(std::vector<char>& dst, const uint8_t* src, int len);
+
+  std::vector<char> mem = {};
   char* src = nullptr;
   int len = 0;
   int pos = 0;

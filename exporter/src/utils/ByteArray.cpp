@@ -26,13 +26,13 @@ tgfx::ByteOrder CheckByteOrder() {
   return *p == 0 ? tgfx::ByteOrder::BigEndian : tgfx::ByteOrder::LittleEndian;
 }
 
-void ByteArray::setPosition(uint32_t value) {
+void ByteArray::setPosition(size_t value) {
   if (!checkEndOfFile(value)) {
-    positionChanged(static_cast<size_t>(value) - _position);
+    positionChanged(value - _position);
   }
 }
 
-void ByteArray::skip(uint32_t numBytes) {
+void ByteArray::skip(size_t numBytes) {
   if (!checkEndOfFile(numBytes)) {
     positionChanged(numBytes);
   }
@@ -170,7 +170,7 @@ void ByteArray::positionChanged(size_t offset) {
   _bitPosition = _position * 8;
 }
 
-bool ByteArray::checkEndOfFile(uint32_t bytesToRead) {
+bool ByteArray::checkEndOfFile(size_t bytesToRead) {
   // The _position must not use the uint32_t type, otherwise it will overflow.
   if (_position + bytesToRead > dataView.size()) {
     std::cout << "End of file was encountered." << std::endl;
