@@ -41,9 +41,7 @@ void WindowManager::showPanelExporterWindow() {
 
 void WindowManager::showPAGConfigWindow() {
   auto configModel = std::make_unique<ConfigModel>();
-  configModel->setupQtEnvironment();
-  configModel->initConfigWindow();
-  configModel->show();
+  configModel->showConfig();
 }
 
 void WindowManager::showExportPreviewWindow() {

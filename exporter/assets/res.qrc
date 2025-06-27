@@ -24,7 +24,7 @@
         <file>qml/PAGTabButton.qml</file>
         <file>qml/PAGTextInput.qml</file>
         <file>qml/PAGWindow.qml</file>
-        <file>qml/Config.qml</file>
+        <file>qml/ConfigWindow.qml</file>
 
     </qresource>
 </RCC>

@@ -30,24 +30,20 @@ class ConfigModel : public QObject {
   ConfigModel(QObject* parent = nullptr);
   ~ConfigModel();
 
-  void setupQtEnvironment();
-
   void initConfigWindow();
-
-  void show();
-
-  ConfigParam& getConfig() {
-    return currentConfig;
-  }
+  void showConfig() const;
 
   Q_INVOKABLE void saveConfig();
   Q_INVOKABLE void loadConfig();
+  Q_INVOKABLE void resetToDefault();
   Q_INVOKABLE void setLanguage(int value);
-  Q_INVOKABLE QVariantMap getDefaultConfig() const;
-  Q_INVOKABLE QVariantMap getCurrentConfig() const;
   Q_INVOKABLE void updateConfigFromQML(const QVariantMap& configData);
 
-  Q_INVOKABLE void resetToDefault();
+  Q_INVOKABLE QVariantMap getDefaultConfig() const;
+  Q_INVOKABLE QVariantMap getCurrentConfig() const;
+
+ protected:
+  static ConfigParam createDefaultConfig();
 
  private:
   std::unique_ptr<QApplication> app;
@@ -55,9 +51,5 @@ class ConfigModel : public QObject {
   QQuickWindow* configWindow = nullptr;
   ConfigParam currentConfig;
   static const ConfigParam defaultConfig;
-
-  void readConfigFile();
-  void writeConfigFile();
-  static ConfigParam createDefaultConfig();
 };
 }  // namespace exporter

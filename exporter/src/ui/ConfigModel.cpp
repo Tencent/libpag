@@ -21,7 +21,6 @@
 #include <QFont>
 #include <QQmlContext>
 #include <QThread>
-#include <QVariantMap>
 #include "../Config/ConfigFile.h"
 
 namespace exporter {
@@ -36,47 +35,39 @@ ConfigParam ConfigModel::createDefaultConfig() {
 ConfigModel::ConfigModel(QObject* parent) : QObject(parent) {
   currentConfig = defaultConfig;
   loadConfig();
+
+  int argc = 0;
+  app = std::make_unique<QApplication>(argc, nullptr);
+  app->setObjectName("PAG-Config");
+  configEngine = std::make_unique<QQmlApplicationEngine>(app.get());
+  initConfigWindow();
 }
 
 ConfigModel::~ConfigModel() {
 }
 
-void ConfigModel::setupQtEnvironment() {
-  int argc = 0;
-  app = std::make_unique<QApplication>(argc, nullptr);
-  QString appName("PAG-Exporter-");
-  app->setObjectName(appName);
-}
-
 void ConfigModel::initConfigWindow() {
-  configEngine = std::make_unique<QQmlApplicationEngine>(app.get());
+  if (QThread::currentThread() != app->thread()) {
+    qCritical() << "Must call initConfigWindow() in main thread";
+    return;
+  }
 
   QQmlContext* context = configEngine->rootContext();
   context->setContextProperty("configModel", this);
 
-  configEngine->load(QUrl(QStringLiteral("qrc:/qml/Config.qml")));
-
-  if (configEngine->rootObjects().isEmpty()) {
-    return;
-  }
+  configEngine->load(QUrl(QStringLiteral("qrc:/qml/ConfigWindow.qml")));
 
   configWindow = qobject_cast<QQuickWindow*>(configEngine->rootObjects().first());
-  if (configWindow) {
-    configWindow->setPersistentGraphics(true);
-    configWindow->setPersistentSceneGraph(true);
-    configWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  }
+  configWindow->setPersistentGraphics(true);
+  configWindow->setPersistentSceneGraph(true);
+  configWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
 }
 
-void ConfigModel::show() {
+void ConfigModel::showConfig() const {
   if (configWindow == nullptr) {
     return;
   }
-
   configWindow->show();
-  configWindow->raise();
-  configWindow->requestActivate();
-
   app->exec();
 }
 
@@ -100,11 +91,11 @@ QVariantMap ConfigModel::getDefaultConfig() const {
 }
 
 void ConfigModel::saveConfig() {
-  writeConfigFile();
+  WriteConfigFile(&currentConfig);
 }
 
 void ConfigModel::loadConfig() {
-  readConfigFile();
+  ReadConfigFile(&currentConfig);
 }
 
 void ConfigModel::setLanguage(int value) {
@@ -170,15 +161,7 @@ void ConfigModel::resetToDefault() {
   currentConfig = defaultConfig;
 }
 
-void ConfigModel::readConfigFile() {
-  ReadConfigFile(&currentConfig);
-}
-
-void ConfigModel::writeConfigFile() {
-  WriteConfigFile(&currentConfig);
-}
-
-Q_INVOKABLE QVariantMap ConfigModel::getCurrentConfig() const {
+QVariantMap ConfigModel::getCurrentConfig() const {
   QVariantMap map;
   map["language"] = static_cast<int>(currentConfig.language);
   map["exportUseCase"] = static_cast<int>(currentConfig.scenes);

@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ConfigFile.h"
+#include <charconv>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include "ConfigParam.h"
 #include "platform/PlatformHelper.h"
 #include "vendor/TinyXML/tinyxml.h"
@@ -30,20 +32,21 @@ namespace exporter {
 
 template <typename T>
 T safeStringToInt(const char* str, T defaultValue) {
-  if (!str || strlen(str) == 0) {
+  if (str == nullptr) {
     return defaultValue;
   }
-  try {
-    return static_cast<T>(std::stoi(str));
-  } catch (const std::invalid_argument&) {
-    printf("Warning: Invalid integer format '%s', using default value %d\n", str,
-           static_cast<int>(defaultValue));
-    return defaultValue;
-  } catch (const std::out_of_range&) {
-    printf("Warning: Integer out of range '%s', using default value %d\n", str,
-           static_cast<int>(defaultValue));
+  std::string_view sv(str);
+  if (sv.empty()) {
     return defaultValue;
   }
+
+  T value{};
+  auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
+
+  if (ec == std::errc()) {
+    return value;
+  }
+  return defaultValue;
 }
 
 float safeStringToFloat(const char* str, float defaultValue) {
@@ -53,10 +56,8 @@ float safeStringToFloat(const char* str, float defaultValue) {
   try {
     return std::stof(str);
   } catch (const std::invalid_argument&) {
-    printf("Warning: Invalid float format '%s', using default value %.2f\n", str, defaultValue);
     return defaultValue;
   } catch (const std::out_of_range&) {
-    printf("Warning: Float out of range '%s', using default value %.2f\n", str, defaultValue);
     return defaultValue;
   }
 }
@@ -69,7 +70,7 @@ bool safeStringEqual(const char* str, const char* target) {
 }
 
 static void AddElement(TiXmlElement* parent, const char* name, const std::string& value) {
-  auto* element = new TiXmlElement(name);
+  auto element = new TiXmlElement(name);
   element->LinkEndChild(new TiXmlText(value.c_str()));
   parent->LinkEndChild(element);
 }
@@ -184,13 +185,13 @@ static void ReadBitmapConfig(TiXmlElement* bitmapElement, ConfigParam* configPar
 }
 
 static void WriteCommonConfig(TiXmlElement* root, ConfigParam* configParam) {
-  auto* common = new TiXmlElement("common");
+  auto common = new TiXmlElement("common");
   root->LinkEndChild(common);
 
-  auto* tagLevel = new TiXmlElement("tag-level");
+  auto tagLevel = new TiXmlElement("tag-level");
   common->LinkEndChild(tagLevel);
 
-  auto* mode = new TiXmlElement("mode");
+  auto mode = new TiXmlElement("mode");
   switch (configParam->tagMode) {
     case TagMode::Beta:
       mode->LinkEndChild(new TiXmlText("beta"));
@@ -204,12 +205,12 @@ static void WriteCommonConfig(TiXmlElement* root, ConfigParam* configParam) {
   }
   tagLevel->LinkEndChild(mode);
 
-  auto* customLevel = new TiXmlElement("custom-level");
+  auto customLevel = new TiXmlElement("custom-level");
   customLevel->LinkEndChild(new TiXmlText(std::to_string(configParam->exportTagLevel).c_str()));
   tagLevel->LinkEndChild(customLevel);
 
   AddElement(common, "image-quality", std::to_string(configParam->imageQuality));
-  AddElement(common, "image-pixel-ratio", formatFloat(configParam->imagePixelRatio, 0));
+  AddElement(common, "image-pixel-ratio", formatFloat(configParam->imagePixelRatio, 1));
   AddElement(common, "enable-compression-panel",
              std::to_string(configParam->enableCompressionPanel ? 1 : 0));
   AddElement(common, "enable-layer-name", std::to_string(configParam->enableLayerName ? 1 : 0));
@@ -219,7 +220,7 @@ static void WriteCommonConfig(TiXmlElement* root, ConfigParam* configParam) {
 }
 
 static void WriteBitmapConfig(TiXmlElement* root, ConfigParam* configParam) {
-  auto* bitmap = new TiXmlElement("bitmap");
+  auto bitmap = new TiXmlElement("bitmap");
   root->LinkEndChild(bitmap);
 
   AddElement(bitmap, "sequence-suffix", configParam->sequenceSuffix);
@@ -228,21 +229,21 @@ static void WriteBitmapConfig(TiXmlElement* root, ConfigParam* configParam) {
   AddElement(bitmap, "keyframe-interval", std::to_string(configParam->bitmapKeyFrameInterval));
   AddElement(bitmap, "max-resolution", std::to_string(configParam->bitmapMaxResolution));
 
-  auto* sequences = new TiXmlElement("sequences");
+  auto sequences = new TiXmlElement("sequences");
   bitmap->LinkEndChild(sequences);
 
-  auto* sequence = new TiXmlElement("sequence");
+  auto sequence = new TiXmlElement("sequence");
   sequence->SetAttribute("scale", "1");
   sequence->SetAttribute("framerate", formatFloat(configParam->frameRate, 1).c_str());
   sequences->LinkEndChild(sequence);
 
-  auto* vector = new TiXmlElement("vector");
-  const auto vectorText = new TiXmlText("");
+  auto vector = new TiXmlElement("vector");
+  auto vectorText = new TiXmlText("");
   vector->LinkEndChild(vectorText);
   root->LinkEndChild(vector);
 
-  auto* video = new TiXmlElement("video");
-  const auto videoText = new TiXmlText("");
+  auto video = new TiXmlElement("video");
+  auto videoText = new TiXmlText("");
   video->LinkEndChild(videoText);
   root->LinkEndChild(video);
 }
@@ -253,10 +254,10 @@ int WriteDefaultConfigFile(const char* fileName) {
   }
 
   TiXmlDocument doc;
-  auto* decl = new TiXmlDeclaration("1.0", "utf-8", "");
+  auto decl = new TiXmlDeclaration("1.0", "utf-8", "");
   doc.LinkEndChild(decl);
 
-  auto* root = new TiXmlElement("pag-exporter");
+  auto root = new TiXmlElement("pag-exporter");
   doc.LinkEndChild(root);
 
   ConfigParam defaultConfig;
@@ -264,11 +265,8 @@ int WriteDefaultConfigFile(const char* fileName) {
   WriteBitmapConfig(root, &defaultConfig);
 
   if (!doc.SaveFile(fileName)) {
-    printf("Failed to save default config file: %s\n", fileName);
     return -1;
   }
-
-  printf("Default config file created: %s\n", fileName);
   return 0;
 }
 
@@ -277,13 +275,11 @@ bool ReadConfigFile(ConfigParam* configParam) {
 
   const std::string configPath = GetConfigPath();
   if (configPath.empty()) {
-    printf("Failed to get config path.\n");
     return false;
   }
 
   std::string filename = configPath + "PAGConfig.xml";
   if (!std::filesystem::exists(filename)) {
-    printf("Config file not found: %s, creating default config.\n", filename.c_str());
     WriteDefaultConfigFile(filename.c_str());
     return false;
   }
@@ -292,19 +288,16 @@ bool ReadConfigFile(ConfigParam* configParam) {
   bool loadOkay = doc.LoadFile();
 
   if (!loadOkay) {
-    printf("Error='%s'. Could not load config file: %s'.\n", doc.ErrorDesc(), filename.c_str());
     return false;
   }
 
   TiXmlNode* rootNode = doc.FirstChild("pag-exporter");
   if (!rootNode) {
-    printf("Invalid config file format: missing root node.\n");
     return false;
   }
 
   TiXmlElement* rootElement = rootNode->ToElement();
   if (!rootElement) {
-    printf("Invalid config file format: invalid root element.\n");
     return false;
   }
 
@@ -312,7 +305,6 @@ bool ReadConfigFile(ConfigParam* configParam) {
   TiXmlElement* bitmapElement = rootElement->FirstChildElement("bitmap");
 
   if (!commonElement || !bitmapElement) {
-    printf("Invalid config file format: missing common or bitmap section.\n");
     return false;
   }
 
@@ -327,26 +319,19 @@ void WriteConfigFile(ConfigParam* configParam) {
 
   std::string configPath = GetConfigPath();
   if (configPath.empty()) {
-    printf("Failed to get config path.\n");
     return;
   }
 
   std::string filename = configPath + "PAGConfig.xml";
 
   TiXmlDocument doc;
-  auto* decl = new TiXmlDeclaration("1.0", "utf-8", "");
+  auto decl = new TiXmlDeclaration("1.0", "utf-8", "");
   doc.LinkEndChild(decl);
 
-  auto* root = new TiXmlElement("pag-exporter");
+  auto root = new TiXmlElement("pag-exporter");
   doc.LinkEndChild(root);
 
   WriteCommonConfig(root, configParam);
   WriteBitmapConfig(root, configParam);
-
-  if (!doc.SaveFile(filename.c_str())) {
-    printf("Failed to save config file: %s\n", filename.c_str());
-  } else {
-    printf("Config saved to: %s\n", filename.c_str());
-  }
 }
 }  // namespace exporter

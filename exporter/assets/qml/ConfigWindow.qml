@@ -286,7 +286,7 @@ PAGWindow {
                                             id: languageComboBox
                                             Layout.preferredWidth: 200
                                             Layout.preferredHeight: 30
-                                            model: ["Auto", "English", "中文"]
+                                            model: ["Auto", "中文（简体）", "English（US）"]
                                         }
 
                                         Text {
@@ -300,7 +300,7 @@ PAGWindow {
                                             id: useCaseComboBox
                                             Layout.preferredWidth: 200
                                             Layout.preferredHeight: 30
-                                            model: ["UI Animation", "Video Animation", "Game Animation"]
+                                            model: ["General", "UI Animation", "Video Editing"]
                                         }
 
                                         Text {
@@ -323,7 +323,6 @@ PAGWindow {
                                                     tagLevelInput.displayText = "1023";
                                                 }
                                                 var modeNames = ["Stable", "Beta", "Custom"];
-                                                console.log("Export Version Control changed to:", modeNames[currentIndex], "(index:", currentIndex + ")");
                                             }
                                         }
 
@@ -395,7 +394,6 @@ PAGWindow {
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 1.0, 3.0, false);
-                                                console.log("bitMapPixel changed:", displayText);
                                             }
                                         }
 
@@ -454,7 +452,6 @@ PAGWindow {
                                                 cursorShape: Qt.PointingHandCursor
 
                                                 onClicked: {
-                                                    // 强制提交所有正在编辑的内容
                                                     forceCommitAllEditing();
 
                                                     if (typeof configModel !== 'undefined') {
@@ -514,12 +511,11 @@ PAGWindow {
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 0, 100, true);
-                                                console.log("Quality changed:", displayText);
                                             }
                                         }
 
                                         Text {
-                                            text: "Export Size Limit:"
+                                            text: "Export Size Limit（Short Size）:"
                                             color: "#cccccc"
                                             font.pixelSize: 14
                                             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
@@ -537,7 +533,6 @@ PAGWindow {
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 0, 10000, true);
-                                                console.log("Size limit changed:", displayText);
                                             }
                                         }
 
@@ -560,7 +555,6 @@ PAGWindow {
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 1.0, 120.0, false);
-                                                console.log("Frame rate changed:", displayText);
                                             }
                                         }
 
@@ -583,7 +577,6 @@ PAGWindow {
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 0, 10000, true);
-                                                console.log("Keyframe interval changed:", displayText);
                                             }
                                         }
                                     }
