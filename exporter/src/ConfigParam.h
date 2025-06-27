@@ -21,13 +21,12 @@
 #include <pag/file.h>
 #include "AEGP_SuiteHandler.h"
 
-namespace pag {
 namespace exporter {
 
 enum class PresetTagLevel {
-  TagLevelStable = static_cast<uint16_t>(TagCode::TextAnimatorPropertiesStrokeColor),
-  TagLevelMin = static_cast<uint16_t>(TagCode::DropShadowStyle),
-  TagLevelMax = static_cast<uint16_t>(TagCode::Count) - 1,
+  TagLevelStable = static_cast<uint16_t>(pag::TagCode::TextAnimatorPropertiesStrokeColor),
+  TagLevelMin = static_cast<uint16_t>(pag::TagCode::DropShadowStyle),
+  TagLevelMax = static_cast<uint16_t>(pag::TagCode::Count) - 1,
 };
 
 enum class TagMode {
@@ -62,9 +61,9 @@ struct ConfigParam {
   bool enableFontFile = false;
   int sequenceQuality = 80;
   bool enableCompressionPanel = false;
-  pag::CompositionType sequenceType = CompositionType::Video;
+  pag::CompositionType sequenceType = pag::CompositionType::Video;
   bool enableFontAudio = true;
   Language language = Language::Auto;
+  float scale = 1.0;
 };
 }  // namespace exporter
-}  // namespace pag

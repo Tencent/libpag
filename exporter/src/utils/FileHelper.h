@@ -17,15 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <filesystem>
 #include <string>
-#include "utils/FileHelper.h"
+namespace FileHelper {
 
-namespace exporter {
+std::string ReadTextFile(const std::string& filename);
 
-std::string GetRoamingPath();
+int WriteTextFile(const std::string& fileName, const char* text);
 
-std::string GetConfigPath();
+int WriteTextFile(const std::string& fileName, const std::string& text);
 
-std::string GetTempFolderPath();
+size_t GetFileSize(const std::string& fileName);
 
-}  // namespace exporter
+bool CopyFile(const std::string& src, const std::string& dst);
+
+bool FileIsExist(const std::string& fileName);
+
+class ScopedTempFile {
+ public:
+  ScopedTempFile() = default;
+  ~ScopedTempFile();
+
+  void setFilePath(const std::string& path);
+
+ private:
+  std::string tempFilePath = "";
+};
+
+}  // namespace FileHelper
