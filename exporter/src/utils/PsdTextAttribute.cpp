@@ -114,6 +114,7 @@ int PsdTextAttribute::stringFormatTransform(std::vector<char>& dst, const uint8_
 }
 
 PsdTextAttribute::PsdTextAttribute(int size, const uint8_t* data) {
+  mem.reserve(size);
   len = stringFormatTransform(mem, data, size);
   src = mem.data();
 }

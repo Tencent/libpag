@@ -292,7 +292,7 @@ pag::GradientColorHandle PAGExportSession::currentGradientColors(
     return DefaultGradientColors();
   }
 
-  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileLength);
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileBytes.size());
   bytes = AEPReader::ReadBody(&bytes);
   auto compositions = AEPReader::ReadCompositions(&bytes);
 
@@ -351,7 +351,7 @@ pag::TextDirection PAGExportSession::currentTextDocumentDirection() {
   textDirectList.clear();
 
   auto fileBytes = getFileBytes();
-  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileLength);
+  ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileBytes.size());
   bytes = AEPReader::ReadBody(&bytes);
   auto compositions = AEPReader::ReadCompositions(&bytes);
   ByteArray layerBytes = {};
@@ -396,7 +396,7 @@ pag::TextDirection PAGExportSession::currentTextDocumentDirection() {
   return textDirectList[keyframeIndex];
 }
 
-std::vector<char> PAGExportSession::getFileBytes() {
+const std::vector<char>& PAGExportSession::getFileBytes() {
   if (!fileBytes.empty()) {
     return fileBytes;
   }
@@ -434,15 +434,15 @@ std::vector<char> PAGExportSession::getFileBytes() {
 
   std::ifstream t(filePath, std::ios::binary);
   if (!t.is_open()) {
-    return {};
+    return fileBytes;
   }
 
   t.seekg(0, std::ios::end);
-  fileLength = t.tellg();
+  auto fileLength = t.tellg();
   t.seekg(0, std::ios::beg);
 
   fileBytes.resize(fileLength);
-  t.read(fileBytes.data(), static_cast<std::streamsize>(fileLength));
+  t.read(fileBytes.data(), fileLength);
   t.close();
 
   return fileBytes;

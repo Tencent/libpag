@@ -138,19 +138,19 @@ pag::ParagraphJustification IntToParagraphJustification(
   }
 
   switch (justification) {  // justification represents the text alignment method in After Effects.
-    case 7414:              // RightJustify
+    case 7414:
       return pag::ParagraphJustification::RightJustify;
-    case 7415:  // CenterJustify
+    case 7415:
       return pag::ParagraphJustification::CenterJustify;
-    case 7416:  // FullJustifyLastLineLeft
+    case 7416:
       return pag::ParagraphJustification::FullJustifyLastLineLeft;
-    case 7417:  // FullJustifyLastLineRight
+    case 7417:
       return pag::ParagraphJustification::FullJustifyLastLineRight;
-    case 7418:  // FullJustifyLastLineCenter
+    case 7418:
       return pag::ParagraphJustification::FullJustifyLastLineCenter;
-    case 7419:  // FullJustifyLastLineFull
+    case 7419:
       return pag::ParagraphJustification::FullJustifyLastLineFull;
-    default:  // Default text justification is LeftJustify.
+    default:
       return pag::ParagraphJustification::LeftJustify;
   }
 }

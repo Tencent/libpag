@@ -50,14 +50,13 @@ class PAGExportSession {
                    const std::string& addInfo = "");
 
   std::vector<char> fileBytes = {};
-  size_t fileLength = 0;
-  std::vector<char> getFileBytes();
+  const std::vector<char>& getFileBytes();
 
   AEGP_PluginID pluginID = 0L;
   std::shared_ptr<AEGP_SuiteHandler> suites = nullptr;
   std::string outputPath = "";
   AlertInfoManager& alertInfoManager = AlertInfoManager::GetInstance();
-  std::atomic_bool bEarlyExit;
+  std::atomic_bool bEarlyExit = false;
   ConfigParam configParam = {};
 
   std::vector<std::pair<AEGP_LayerH, bool>> imageLayerHList = {};
@@ -71,9 +70,10 @@ class PAGExportSession {
   int gradientIndex = 0;
   int keyframeNum = 0;  // for text
   int keyframeIndex = 0;
-  bool alphaDetected =
-      false;              // Whether the alpha channel has been detected in the video sequence frame
-  bool hasAlpha = false;  // Whether the video sequence frame contains an alpha channel
+  // Whether the alpha channel has been detected in the video sequence frame
+  bool alphaDetected = false;
+  // Whether the video sequence frame contains an alpha channel
+  bool hasAlpha = false;
 
   bool enableRunScript = true;
 
