@@ -275,11 +275,13 @@ bool ReadConfigFile(ConfigParam* configParam) {
 
   const std::string configPath = GetConfigPath();
   if (configPath.empty()) {
+    printf("Failed to get config path.\n");
     return false;
   }
 
   std::string filename = configPath + "PAGConfig.xml";
   if (!std::filesystem::exists(filename)) {
+    printf("Config file not found: %s, creating default config.\n", filename.c_str());
     WriteDefaultConfigFile(filename.c_str());
     return false;
   }
@@ -333,5 +335,11 @@ void WriteConfigFile(ConfigParam* configParam) {
 
   WriteCommonConfig(root, configParam);
   WriteBitmapConfig(root, configParam);
+
+  if (!doc.SaveFile(filename.c_str())) {
+    printf("Failed to save config file: %s\n", filename.c_str());
+  } else {
+    printf("Config saved to: %s\n", filename.c_str());
+  }
 }
 }  // namespace exporter

@@ -20,7 +20,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QVariantMap>
-#include "../ConfigParam.h"
+#include "../Config/ConfigParam.h"
 
 namespace exporter {
 class ConfigModel : public QObject {
