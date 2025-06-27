@@ -26,7 +26,7 @@
 
 namespace exporter {
 
-WindowManager& WindowManager::getInstance() {
+WindowManager& WindowManager::GetInstance() {
   static WindowManager instance;
   return instance;
 }
@@ -66,6 +66,16 @@ void WindowManager::initializeQtEnvironment() {
   QApplication::setFont(defaultFonts);
 #endif
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+}
+
+bool WindowManager::showWarnings(std::vector<std::string>& /*infos*/) {
+
+  return true;
+}
+
+bool WindowManager::showErrors(std::vector<std::string>& /*infos*/) {
+
+  return true;
 }
 
 }  // namespace exporter
