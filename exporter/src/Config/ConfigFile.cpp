@@ -173,7 +173,7 @@ static void ReadBitmapConfig(TiXmlElement* bitmapElement, ConfigParam* configPar
   if (TiXmlElement* sequencesElement = bitmapElement->FirstChildElement("sequences")) {
     if (const TiXmlElement* sequenceElement = sequencesElement->FirstChildElement("sequence")) {
       double frameRate = 24.0;
-      if (sequenceElement->Attribute("frameRate", &frameRate)) {
+      if (sequenceElement->Attribute("framerate", &frameRate)) {
         configParam->frameRate = static_cast<float>(frameRate);
       }
     }

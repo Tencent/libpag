@@ -52,7 +52,7 @@ PAGWindow {
         if (config.bitmapCompressionQuality !== undefined)
             bitMapInput.displayText = config.bitmapCompressionQuality.toString();
         if (config.bitmapPixelDensity !== undefined)
-            bitMapPixelInput.displayText = config.bitmapPixelDensity.toString();
+            bitMapPixelInput.displayText = parseFloat(config.bitmapPixelDensity).toFixed(1);
         if (config.exportLayerName !== undefined)
             layerNameComboBox.currentIndex = config.exportLayerName ? 0 : 1;
         if (config.exportFonts !== undefined)
@@ -73,7 +73,7 @@ PAGWindow {
         if (config.exportSizeLimit !== undefined)
             sizeLimitInput.displayText = config.exportSizeLimit.toString();
         if (config.maximumFrameRate !== undefined)
-            frameRateInput.displayText = config.maximumFrameRate.toString();
+            frameRateInput.displayText = parseFloat(config.maximumFrameRate).toFixed(1);
         if (config.keyframeInterval !== undefined)
             keyFrameInput.displayText = config.keyframeInterval.toString();
     }
