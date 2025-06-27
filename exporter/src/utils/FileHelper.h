@@ -23,9 +23,9 @@ namespace FileHelper {
 
 std::string ReadTextFile(const std::string& filename);
 
-int WriteTextFile(const std::string& fileName, const char* text);
+size_t WriteTextFile(const std::string& fileName, const char* text);
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+size_t WriteTextFile(const std::string& fileName, const std::string& text);
 
 size_t GetFileSize(const std::string& fileName);
 
