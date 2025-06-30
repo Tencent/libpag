@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -52,11 +51,11 @@ class PsdTextAttribute {
   void buildAttributeArray(int startPos, int endPos);
 
  private:
-  size_t stringFormatTransform(std::vector<char>& dst, const uint8_t* src, int len);
+  int stringFormatTransform(std::vector<char>& dst, const uint8_t* src, int len);
 
   std::vector<char> mem = {};
   char* src = nullptr;
-  size_t len = 0;
+  int len = 0;
   int pos = 0;
   int key = -1;
   PsdValueType valueType = PsdValueType::None;
