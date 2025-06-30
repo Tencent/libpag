@@ -75,6 +75,7 @@ bool CopyFile(const std::string& src, const std::string& dst) {
     }
     auto parentPath = fs::path(dst).parent_path();
     if (!FileIsExist(parentPath.string())) {
+
       fs::create_directories(parentPath);
     }
     fs::copy_file(src, dst, fs::copy_options::overwrite_existing);

@@ -35,6 +35,7 @@ inline int HexCharToInt(const char c) {
   return result;
 }
 
+
 size_t PsdTextAttribute::stringFormatTransform(std::vector<char>& dst, const uint8_t* src,
                                             const int len) {
   dst.push_back('/');

@@ -53,7 +53,6 @@ class PsdTextAttribute {
 
  private:
   size_t stringFormatTransform(std::vector<char>& dst, const uint8_t* src, int len);
-
   std::vector<char> mem = {};
   char* src = nullptr;
   int len = 0;
