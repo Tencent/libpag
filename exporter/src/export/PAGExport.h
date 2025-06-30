@@ -17,20 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <filesystem>
-#include <string>
-namespace FileHelper {
+#include <memory>
+#include "utils/AEHelper.h"
+#include "utils/AlertInfo.h"
+#include "utils/PAGExportSession.h"
+#include "utils/ScopedHelper.h"
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
+class PAGExport {
+ public:
+  static bool ExportFile(const AEGP_ItemH& activeItemH, std::string& outputPath,
+                         bool enableAudio = true);
+  static bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size);
 
-int WriteTextFile(const std::string& fileName, const char* text);
+  PAGExport(const AEGP_ItemH& activeItemH, std::string& outputPath);
+  ~PAGExport() = default;
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+ private:
+  std::shared_ptr<pag::File> exportPAG(const AEGP_ItemH& activeItemH);
 
-size_t GetFileSize(const std::string& fileName);
-
-bool CopyFile(const std::string& src, const std::string& dst);
-
-bool FileIsExist(const std::string& fileName);
-
-}  // namespace FileHelper
+  std::shared_ptr<PAGExportSession> session = nullptr;
+  ScopedTimeSetter timeSetter;
+};
+}  // namespace exporter

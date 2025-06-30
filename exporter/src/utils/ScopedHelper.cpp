@@ -15,22 +15,37 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#pragma once
+#include "ScopedHelper.h"
 #include <filesystem>
-#include <string>
-namespace FileHelper {
+#include <fstream>
+#include <iostream>
+#include "AEHelper.h"
+namespace fs = std::filesystem;
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
 
-int WriteTextFile(const std::string& fileName, const char* text);
+ScopedTempFile::~ScopedTempFile() {
+  if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
+    std::remove(tempFilePath.c_str());
+  }
+}
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+void ScopedTempFile::setFilePath(const std::string& path) {
+  tempFilePath = path;
+}
 
-size_t GetFileSize(const std::string& fileName);
+ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
+    : itemHandle(itemHandle) {
+  const auto& suites = AEHelper::GetSuites();
+  suites->ItemSuite8()->AEGP_GetItemCurrentTime(itemHandle, &orgTime);
 
-bool CopyFile(const std::string& src, const std::string& dst);
+  A_Time newTime = {static_cast<A_long>(time * 100), 100};
+  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &newTime);
+}
 
-bool FileIsExist(const std::string& fileName);
+ScopedTimeSetter::~ScopedTimeSetter() {
+  const auto& suites = AEHelper::GetSuites();
+  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &orgTime);
+}
 
-}  // namespace FileHelper
+}  // namespace exporter

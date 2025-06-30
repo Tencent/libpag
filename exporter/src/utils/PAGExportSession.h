@@ -28,6 +28,13 @@
 
 namespace exporter {
 
+#define RECORD_ERROR(statements)                          \
+  do {                                                    \
+    if ((statements) != A_Err_NONE) {                     \
+      session->pushWarning(AlertInfoType::ExportAEError); \
+    }                                                     \
+  } while (0)
+
 class AlertInfoManager;
 
 class PAGExportSession {
@@ -77,12 +84,16 @@ class PAGExportSession {
 
   bool enableRunScript = true;
 
-  bool enableFontFile = false /*DEFAULT_ENABLE_FONTFILE*/;
+  bool enableFontFile = false /*DEFAULT_ENABLE_FONT_FILE*/;
   std::vector<std::string> fontFilePathList = {};
 
   pag::ID recordCompId = 0;
   pag::ID recordLayerId = 0;
   std::vector<pag::TextDirection> textDirectList = {};
+  bool enableAudio = true;
+  bool enableForceStaticBMP = true;
+
+  std::vector<std::shared_ptr<pag::Composition>> compositions = {};
 
  private:
   std::vector<std::vector<float>> extractFloatArraysByKey(const std::string& xmlContent,

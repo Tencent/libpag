@@ -84,14 +84,4 @@ bool CopyFile(const std::string& src, const std::string& dst) {
   }
 }
 
-ScopedTempFile::~ScopedTempFile() {
-  if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
-    std::remove(tempFilePath.c_str());
-  }
-}
-
-void ScopedTempFile::setFilePath(const std::string& path) {
-  tempFilePath = path;
-}
-
 }  // namespace FileHelper

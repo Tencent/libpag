@@ -30,6 +30,7 @@
 #include "nlohmann/json.hpp"
 #include "platform/PlatformHelper.h"
 #include "tinyxml.h"
+#include "utils/ScopedHelper.h"
 
 namespace fs = std::filesystem;
 using namespace StringHelper;
@@ -421,7 +422,7 @@ const std::vector<char>& PAGExportSession::getFileBytes() {
     isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
-  FileHelper::ScopedTempFile tempFile;
+  ScopedTempFile tempFile;
   if (isDirty || isAEPX) {
     filePath = GetTempFolderPath() + u8"/.PAGAutoSave.aep";
     tempFile.setFilePath(filePath);
