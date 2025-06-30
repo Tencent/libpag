@@ -342,6 +342,9 @@ PAGWindow {
                                             border.color: "#555555"
                                             border.width: 1
                                             radius: 4
+                                            showUpDownButtons: true
+                                            isFloat: false
+                                            step: 1
 
                                             enabled: exportVersionComboBox.currentIndex === 2
                                             opacity: enabled ? 1.0 : 0.6
@@ -369,6 +372,9 @@ PAGWindow {
                                             border.color: "#555555"
                                             border.width: 1
                                             radius: 4
+                                            showUpDownButtons: true
+                                            isFloat: false
+                                            step: 1
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 0, 100, true);
@@ -391,6 +397,10 @@ PAGWindow {
                                             border.color: "#555555"
                                             border.width: 1
                                             radius: 4
+                                            showUpDownButtons: true
+                                            isFloat: true
+                                            step: 0.1
+                                            decimals: 1
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 1.0, 3.0, false);
@@ -508,6 +518,9 @@ PAGWindow {
                                             border.color: "#555555"
                                             border.width: 1
                                             radius: 4
+                                            showUpDownButtons: true
+                                            isFloat: false
+                                            step: 1
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 0, 100, true);
@@ -552,6 +565,10 @@ PAGWindow {
                                             border.color: "#555555"
                                             border.width: 1
                                             radius: 4
+                                            showUpDownButtons: true
+                                            isFloat: true
+                                            step: 0.1
+                                            decimals: 1
 
                                             onEditingFinish: function (text) {
                                                 displayText = validateValue(text, 1.0, 120.0, false);
