@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <string>
 #include "utils/AEHelper.h"
+#include "utils/FileHelper.h"
 
 namespace fs = std::filesystem;
 std::string TempFolderPath = "";
@@ -40,7 +41,7 @@ std::string GetRoamingPath() {
 }
 
 bool CreateFolder(const std::string& path) {
-  if (!fs::exists(path)) {
+  if (!FileHelper::FileIsExist(path)) {
     std::error_code errorCode;
     if (!fs::create_directories(path, errorCode)) {
       printf("Create %s failed: %s\n", path.c_str(), errorCode.message().c_str());

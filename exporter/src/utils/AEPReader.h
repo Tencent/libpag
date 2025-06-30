@@ -17,12 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "ConfigParam.h"
+#include "ByteArray.h"
+using namespace exporter;
 
-namespace exporter {
+namespace AEPReader {
 
-bool ReadConfigFile(ConfigParam* configParam);
+struct Tag {
+  std::string name;
+  ByteArray bytes;
+};
 
-void WriteConfigFile(ConfigParam* configParam);
+struct Composition {
+  std::string name;
+  int32_t id;
+  ByteArray bytes;
+};
 
-}  // namespace exporter
+struct Layer {
+  int32_t id;
+  uint16_t flags;
+  std::string name;
+  int32_t type;
+  ByteArray bytes;
+};
+
+std::string ReadKeyName(ByteArray* bytes);
+
+Tag ReadTag(ByteArray* bytes);
+
+ByteArray ReadBody(ByteArray* bytes);
+
+Tag ReadFirstTagByName(ByteArray* bytes, const std::string& tagName);
+
+Tag ReadFirstTagByNames(ByteArray* bytes, const std::vector<std::string>& tagNames);
+
+Tag ReadFirstGroupByMatchName(ByteArray* bytes, const std::string& matchName);
+
+Tag ReadFirstGroupByMatchNames(ByteArray* bytes, const std::vector<std::string>& matchNames);
+
+std::vector<Composition> ReadCompositions(ByteArray* bytes);
+
+std::vector<Layer> ReadLayers(ByteArray* bytes);
+
+}  // namespace AEPReader

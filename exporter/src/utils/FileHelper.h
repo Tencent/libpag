@@ -17,12 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "ConfigParam.h"
+#include <filesystem>
+#include <string>
+namespace FileHelper {
 
-namespace exporter {
+std::string ReadTextFile(const std::string& filename);
 
-bool ReadConfigFile(ConfigParam* configParam);
+int WriteTextFile(const std::string& fileName, const char* text);
 
-void WriteConfigFile(ConfigParam* configParam);
+int WriteTextFile(const std::string& fileName, const std::string& text);
 
-}  // namespace exporter
+size_t GetFileSize(const std::string& fileName);
+
+bool CopyFile(const std::string& src, const std::string& dst);
+
+bool FileIsExist(const std::string& fileName);
+
+class ScopedTempFile {
+ public:
+  ScopedTempFile() = default;
+  ~ScopedTempFile();
+
+  void setFilePath(const std::string& path);
+
+ private:
+  std::string tempFilePath = "";
+};
+
+}  // namespace FileHelper
