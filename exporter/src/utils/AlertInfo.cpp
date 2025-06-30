@@ -470,7 +470,8 @@ DEFINE_GETINFO(OtherError) {
 
 using GetInfoHandler = void(std::string& info, std::string& suggest, std::string addInfo);
 
-#define LINE_GETINFO(errorType) {AlertInfoType::errorType, FUNC_GETINFO(errorType)}
+#define LINE_GETINFO(errorType) \
+  { AlertInfoType::errorType, FUNC_GETINFO(errorType) }
 
 static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pag::EnumClassHash>
     GetInfoByTypeMap = {LINE_GETINFO(UnknownWarning),
@@ -569,7 +570,7 @@ static std::vector<AlertInfo> GetInfoList(std::vector<AlertInfo>& warningList, b
   std::vector<AlertInfo> messages;
   for (auto alert : warningList) {
     if ((bWarning && !alert.isError) || (bError && alert.isError) || (bWarning && bError)) {
-      messages.emplace_back(alert);
+      messages.push_back(alert);
     }
   }
   return messages;
@@ -578,7 +579,7 @@ static std::vector<AlertInfo> GetInfoList(std::vector<AlertInfo>& warningList, b
 static std::vector<std::string> AlertInfosToStrings(std::vector<AlertInfo>& alertList) {
   std::vector<std::string> list;
   for (auto alert : alertList) {
-    list.emplace_back(alert.getMessage());
+    list.push_back(alert.getMessage());
   }
   return list;
 }
@@ -587,10 +588,10 @@ bool AlertInfoManager::showAlertInfo(bool showWarning, bool showError) {
   auto errors = GetInfoList(warningList, false, true);
   auto warnings = GetInfoList(warningList, true, false);
   for (auto info : errors) {
-    saveWarnings.emplace_back(info);
+    saveWarnings.push_back(info);
   }
   for (auto info : warnings) {
-    saveWarnings.emplace_back(info);
+    saveWarnings.push_back(info);
   }
   auto ret = (errors.size() > 0);
   if (ret && showError) {
@@ -627,7 +628,18 @@ void AlertInfoManager::pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>
                                    const std::string& addInfo) {
   auto itemH = GetHandleById(compItemHList, compId);
   auto layerH = GetHandleById(layerHList, layerId);
-  warningList.emplace_back(AlertInfo(type, itemH, layerH, addInfo));
+  warningList.push_back(AlertInfo(type, itemH, layerH, addInfo));
+}
+
+void AlertInfoManager::eraseUnusedInfo() {
+  warningList.erase(
+      std::remove_if(warningList.begin(), warningList.end(),
+                     [this](const AlertInfo& alert) {
+                       return alert.type != AlertInfoType::UnknownWarning &&
+                              ((alert.itemH != nullptr && itemHList.count(alert.itemH) == 0) ||
+                               (alert.layerH != nullptr && layerHList.count(alert.layerH) == 0));
+                     }),
+      warningList.end());
 }
 
 std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {

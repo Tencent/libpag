@@ -51,18 +51,6 @@ void SelectItem(const AEGP_ItemH& itemH);
 
 void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH);
 
-AEGP_ItemH GetItemFromComp(const AEGP_CompH& compH);
-
-AEGP_ItemH GetItemFromLayer(const AEGP_LayerH& layerH);
-
-uint32_t GetItemId(const AEGP_ItemH& itemH);
-
-uint32_t GetItemIdFromLayer(const AEGP_LayerH& layerH);
-
-uint32_t GetLayerId(const AEGP_LayerH& layerH);
-
-void RegisterTextDocumentScript();
-
 const std::string TextDocumentScript = R"(
 if (typeof PAG !== 'object') {
     PAG = {};
@@ -79,15 +67,15 @@ if (typeof PAG !== 'object') {
             }
         }
         if (composition == null) {
-            return "{}";
+            return "";
         }
         if (layerIndex >= composition.layers.length) {
-            return "{}";
+            return "";
         }
         var textLayer = composition.layers[layerIndex + 1];
         var sourceText = textLayer.property("Source Text");
         if (!sourceText) {
-            return "{}";
+            return "";
         }
         var textDocument;
         if (keyframeIndex === 0 && sourceText.numKeys === 0) {
@@ -96,9 +84,9 @@ if (typeof PAG !== 'object') {
             textDocument = sourceText.keyValue(keyframeIndex + 1);
         }
         if (!textDocument) {
-            return "{}";
+            return "";
         }
-        var resultObject = {};
+        var result = [];
         for (var key in textDocument) {
             if (!Object.prototype.hasOwnProperty.call(textDocument, key)) {
                 continue;
@@ -108,17 +96,18 @@ if (typeof PAG !== 'object') {
             } catch (e) {
                 continue;
             }
+            var text = key + " : ";
             switch (typeof value) {
                 case 'string':
                     value = value.split("\x03").join("\n");
                     value = value.split("\r\n").join("\n");
                     value = value.split("\r").join("\n");
                     value = value.split("\n").join("\\n");
-                    resultObject[key] = value;
+                    text += value;
                     break;
                 case 'number':
                 case 'boolean':
-                    resultObject[key] = value;
+                    text += String(value);
                     break;
                 case 'object':
                     if (value && Object.prototype.toString.apply(value) === '[object Array]') {
@@ -127,12 +116,15 @@ if (typeof PAG !== 'object') {
                         for (var i = 0; i < length; i += 1) {
                             partial[i] = String(value[i]);
                         }
-                        resultObject[key] = partial;
+                        text += partial.join(',');
                     }
                     break;
             }
+            if (text !== key + " : ") {
+                result.push(text);
+            }
         }
-        return JSON.stringify(resultObject);
+        return result.join("\n");
     }
 }());
 )";

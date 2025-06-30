@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <pag/file.h>
-#include "AEGP_SuiteHandler.h"
+#include <../../../include/pag/file.h>
+#include "../../vendor/AfterEffectsSDK/Examples/Util/AEGP_SuiteHandler.h"
 
 namespace exporter {
 

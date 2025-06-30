@@ -254,37 +254,4 @@ AEGP_CompH GetCompFromItem(const AEGP_ItemH& itemH) {
   return compH;
 }
 
-uint32_t GetItemId(const AEGP_ItemH& itemH) {
-  const auto& suites = GetSuites();
-  A_long id = 0;
-  if (itemH != nullptr) {
-    suites->ItemSuite6()->AEGP_GetItemID(itemH, &id);
-  }
-  return static_cast<uint32_t>(id);
-}
-
-uint32_t GetItemIdFromLayer(const AEGP_LayerH& layerH) {
-  auto itemH = GetItemFromLayer(layerH);
-  auto id = GetItemId(itemH);
-  return id;
-}
-
-uint32_t GetLayerId(const AEGP_LayerH& layerH) {
-  const auto& suites = GetSuites();
-  A_long id = 0;
-  if (layerH != nullptr) {
-    suites->LayerSuite6()->AEGP_GetLayerID(layerH, &id);
-  }
-  return static_cast<uint32_t>(id);
-}
-
-AEGP_ItemH GetItemFromLayer(const AEGP_LayerH& layerH) {
-  const auto& suites = GetSuites();
-  AEGP_ItemH itemH = nullptr;
-  if (layerH != nullptr) {
-    suites->LayerSuite6()->AEGP_GetLayerSourceItem(layerH, &itemH);
-  }
-  return itemH;
-}
-
 }  // namespace AEHelper
