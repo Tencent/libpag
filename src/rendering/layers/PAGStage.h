@@ -103,9 +103,9 @@ class PAGStage : public PAGComposition {
     PAGComposition::invalidateCacheScale();
   };
 
-  void onAddToStage(PAGStage*) override{};
+  void onAddToStage(PAGStage*) override {};
 
-  void onRemoveFromStage() override{};
+  void onRemoveFromStage() override {};
 
  private:
   float _cacheScale = 1.0f;
