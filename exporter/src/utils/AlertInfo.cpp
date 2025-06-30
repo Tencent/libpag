@@ -470,8 +470,7 @@ DEFINE_GETINFO(OtherError) {
 
 using GetInfoHandler = void(std::string& info, std::string& suggest, std::string addInfo);
 
-#define LINE_GETINFO(errorType) \
-  { AlertInfoType::errorType, FUNC_GETINFO(errorType) }
+#define LINE_GETINFO(errorType) {AlertInfoType::errorType, FUNC_GETINFO(errorType)}
 
 static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pag::EnumClassHash>
     GetInfoByTypeMap = {LINE_GETINFO(UnknownWarning),
