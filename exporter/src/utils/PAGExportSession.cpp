@@ -30,7 +30,7 @@
 #include "nlohmann/json.hpp"
 #include "platform/PlatformHelper.h"
 #include "tinyxml.h"
-#include "utils/ScopedHelper.h"
+#include "utils/TempFileDelete.h"
 
 namespace fs = std::filesystem;
 using namespace StringHelper;
@@ -38,7 +38,7 @@ using json = nlohmann::json;
 
 namespace exporter {
 
-PAGExportSession::PAGExportSession(std::string& path)
+PAGExportSession::PAGExportSession(const std::string& path)
     : pluginID(AEHelper::GetPluginID()), suites(AEHelper::GetSuites()), outputPath(path),
       bEarlyExit(false) {
   checkParamValid();
@@ -422,7 +422,7 @@ const std::vector<char>& PAGExportSession::getFileBytes() {
     isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
-  ScopedTempFile tempFile;
+  TempFileDelete tempFile;
   if (isDirty || isAEPX) {
     filePath = GetTempFolderPath() + u8"/.PAGAutoSave.aep";
     tempFile.setFilePath(filePath);

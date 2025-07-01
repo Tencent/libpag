@@ -26,17 +26,18 @@
 namespace exporter {
 class PAGExport {
  public:
-  static bool ExportFile(const AEGP_ItemH& activeItemH, std::string& outputPath,
+  static bool ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
                          bool enableAudio = true);
-  static bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size);
 
-  PAGExport(const AEGP_ItemH& activeItemH, std::string& outputPath);
+  static bool ValidatePAGFile(uint8_t* data, size_t size);
+
+  PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath);
   ~PAGExport() = default;
 
  private:
   std::shared_ptr<pag::File> exportPAG(const AEGP_ItemH& activeItemH);
 
   std::shared_ptr<PAGExportSession> session = nullptr;
-  ScopedTimeSetter timeSetter;
+  ScopedTimeSetter timeSetter = {nullptr, 0};
 };
 }  // namespace exporter

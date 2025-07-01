@@ -46,7 +46,6 @@ std::shared_ptr<pag::Composition> ExportComposition(std::shared_ptr<PAGExportSes
       return ExportVideoComposition(session, compHandle);
     case pag::CompositionType::Bitmap:
       return ExportBitmapComposition(session, compHandle);
-    case pag::CompositionType::Vector:
     default:
       return ExportVectorComposition(session, compHandle);
   }

@@ -21,13 +21,14 @@
 #include <iostream>
 #include "ExportComposition.h"
 #include "utils/AEHelper.h"
+#include "utils/FileHelper.h"
 namespace exporter {
 
-PAGExport::PAGExport(const AEGP_ItemH& activeItemH, std::string& outputPath)
+PAGExport::PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath)
     : session(std::make_shared<PAGExportSession>(outputPath)), timeSetter(activeItemH, -100.0f) {
 }
 
-bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, std::string& outputPath,
+bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
                            bool enableAudio) {
   bool res = false;
   do {
@@ -46,20 +47,15 @@ bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, std::string& outputPat
     if (bytes->length() == 0) {
       break;
     }
-    if (!WriteToFile(outputPath, reinterpret_cast<char*>(bytes->data()),
-                     static_cast<std::streamsize>(bytes->length()))) {
+    if (!FileHelper::WriteToFile(outputPath, reinterpret_cast<char*>(bytes->data()),
+                                 static_cast<std::streamsize>(bytes->length()))) {
       break;
     }
 
-    const auto pagFileDecoded = pag::File::Load(bytes->data(), bytes->length());
-    if (pagFileDecoded == nullptr) {
+    if (!ValidatePAGFile(bytes->data(), bytes->length())) {
       break;
     }
-    const auto bytes2 = pag::Codec::Encode(pagFileDecoded);
-    if (bytes2->length() != bytes->length()) {
-      printf("warning: bytes2->length(%zu) != bytes->length(%zu)\n", bytes2->length(),
-             bytes->length());
-    }
+
     res = true;
   } while (false);
 
@@ -75,26 +71,22 @@ std::shared_ptr<pag::File> PAGExport::exportPAG(const AEGP_ItemH& activeItemH) {
   return nullptr;
 }
 
-bool PAGExport::WriteToFile(const std::string& filePath, const char* data, std::streamsize size) {
-  std::ofstream file(filePath, std::ios::binary);
-  if (!file) {
-    std::cerr << "Failed to open file: " << filePath << std::endl;
-    return false;
-  }
-
-  file.write(data, size);
-
-  if (file.fail()) {
-    std::cerr << "Failed to write to file: " << filePath << std::endl;
-    if (file.eof()) {
-      std::cerr << "eof is set: End-of-File reached on input operation." << std::endl;
+bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
+  int res = false;
+  do {
+    const auto pagFileDecoded = pag::File::Load(data, size);
+    if (pagFileDecoded == nullptr) {
+      break;
     }
-    file.close();
-    return false;
-  }
+    const auto bytes = pag::Codec::Encode(pagFileDecoded);
+    if (bytes->length() != size) {
+      printf("warning: bytes->length(%zu) != data.size(%zu)\n", bytes->length(), size);
+    }
 
-  file.close();
-  return true;
+    res = true;
+  } while (false);
+
+  return res;
 }
 
 }  // namespace exporter

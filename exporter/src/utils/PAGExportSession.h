@@ -39,7 +39,7 @@ class AlertInfoManager;
 
 class PAGExportSession {
  public:
-  PAGExportSession(std::string& path);
+  PAGExportSession(const std::string& path);
   ~PAGExportSession();
 
   void checkParamValid();

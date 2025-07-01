@@ -23,17 +23,6 @@
 #include "AE_GeneralPlug.h"
 namespace exporter {
 
-class ScopedTempFile {
- public:
-  ScopedTempFile() = default;
-  ~ScopedTempFile();
-
-  void setFilePath(const std::string& path);
-
- private:
-  std::string tempFilePath = "";
-};
-
 class ScopedTimeSetter {
  public:
   ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time);

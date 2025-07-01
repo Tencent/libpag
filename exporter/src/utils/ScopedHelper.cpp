@@ -24,16 +24,6 @@ namespace fs = std::filesystem;
 
 namespace exporter {
 
-ScopedTempFile::~ScopedTempFile() {
-  if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
-    std::remove(tempFilePath.c_str());
-  }
-}
-
-void ScopedTempFile::setFilePath(const std::string& path) {
-  tempFilePath = path;
-}
-
 ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
     : itemHandle(itemHandle) {
   const auto& suites = AEHelper::GetSuites();

@@ -84,4 +84,27 @@ bool CopyFile(const std::string& src, const std::string& dst) {
   }
 }
 
+bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
+                 std::ios::openmode mode) {
+  std::ofstream file(filePath, mode);
+  if (!file) {
+    std::cerr << "Failed to open file: " << filePath << std::endl;
+    return false;
+  }
+
+  file.write(data, size);
+
+  if (file.fail()) {
+    std::cerr << "Failed to write to file: " << filePath << std::endl;
+    if (file.eof()) {
+      std::cerr << "eof is set: End-of-File reached on input operation." << std::endl;
+    }
+    file.close();
+    return false;
+  }
+
+  file.close();
+  return true;
+}
+
 }  // namespace FileHelper
