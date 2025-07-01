@@ -21,13 +21,12 @@
 #include <fstream>
 #include <memory>
 #include <string>
-#include "utils/ConfigUtils.h"
 #include "ConfigParam.h"
 #include "platform/PlatformHelper.h"
 #include "tinyxml.h"
+#include "utils/ConfigUtils.h"
 
 namespace exporter {
-
 static void ReadCommonConfig(TiXmlElement* commonElement, ConfigParam* configParam) {
   if (!commonElement) {
     return;
