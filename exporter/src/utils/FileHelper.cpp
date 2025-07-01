@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "src/base/utils/Log.h"
 namespace fs = std::filesystem;
 
 namespace FileHelper {
@@ -88,16 +89,16 @@ bool WriteToFile(const std::string& filePath, const char* data, std::streamsize 
                  std::ios::openmode mode) {
   std::ofstream file(filePath, mode);
   if (!file) {
-    std::cerr << "Failed to open file: " << filePath << std::endl;
+    LOGE("Failed to open file: %s", filePath.c_str());
     return false;
   }
 
   file.write(data, size);
 
   if (file.fail()) {
-    std::cerr << "Failed to write to file: " << filePath << std::endl;
+    LOGE("Failed to write to file: %s", filePath.c_str());
     if (file.eof()) {
-      std::cerr << "eof is set: End-of-File reached on input operation." << std::endl;
+      LOGE("eof is set: End-of-File reached on input operation.");
     }
     file.close();
     return false;

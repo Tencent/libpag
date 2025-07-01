@@ -19,6 +19,7 @@
 #include "StringHelper.h"
 #include <iostream>
 #include "AEHelper.h"
+#include "src/base/utils/Log.h"
 
 namespace StringHelper {
 
@@ -29,7 +30,7 @@ std::string AeMemoryHandleToString(const AEGP_MemHandle& handle) {
 
   std::string u8str = Utf16ToUtf8(str);
   if (u8str.empty()) {
-    std::cerr << "AeMemoryHandleToString failed: " << std::endl;
+    LOGE("AeMemoryHandleToString failed!");
   }
 
   suites->MemorySuite1()->AEGP_UnlockMemHandle(handle);
@@ -291,7 +292,7 @@ std::string Utf16ToUtf8(const char16_t* u16str) {
       }
     }
   } catch (const std::exception& e) {
-    std::cerr << "Utf16ToUtf8 failed: " << e.what() << std::endl;
+    LOGE("Utf16ToUtf8 failed: %s", e.what());
     return "";
   }
 

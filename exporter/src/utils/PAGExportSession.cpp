@@ -29,6 +29,7 @@
 #include "StringHelper.h"
 #include "nlohmann/json.hpp"
 #include "platform/PlatformHelper.h"
+#include "src/base/utils/Log.h"
 #include "tinyxml.h"
 #include "utils/TempFileDelete.h"
 
@@ -63,8 +64,7 @@ void PAGExportSession::checkParamValid() {
       // Custom mode doesn't modify exportTagLevel
       break;
     default:
-      std::cerr << "Error! unsupported tagMode:" << static_cast<int>(configParam.tagMode)
-                << std::endl;
+      LOGI("Warning! unsupported tagMode: %d", static_cast<int>(configParam.tagMode));
       configParam.tagMode = TagMode::Stable;
       configParam.exportTagLevel = static_cast<uint16_t>(PresetTagLevel::TagLevelStable);
       break;
@@ -165,7 +165,7 @@ std::vector<std::vector<float>> PAGExportSession::extractFloatArraysByKey(
   std::vector<std::vector<float>> result = {};
   TiXmlDocument doc;
   if (doc.Parse(xmlContent.c_str()) == nullptr) {
-    std::cerr << "XML parsing failed: " << doc.ErrorDesc() << std::endl;
+    LOGE("XML parsing failed: %s", doc.ErrorDesc());
     return result;
   }
 
@@ -189,7 +189,7 @@ std::vector<std::vector<float>> PAGExportSession::extractFloatArraysByKey(
                     try {
                       floatList.emplace_back(std::stof(floatVal->GetText()));
                     } catch (const std::exception& e) {
-                      std::cerr << "Error converting float value: " << e.what() << std::endl;
+                      LOGE("Error converting float value: %s", e.what());
                     }
                   }
                 }

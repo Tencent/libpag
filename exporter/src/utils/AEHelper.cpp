@@ -20,6 +20,7 @@
 #include <iostream>
 #include "StringHelper.h"
 #include "platform/PlatformHelper.h"
+#include "src/base/utils/Log.h"
 namespace AEHelper {
 
 AEGP_PluginID PluginID = 0L;
@@ -125,16 +126,16 @@ bool CheckAeVersion() {
   try {
     size_t dotPos = AeVersion.find('.');
     if (dotPos == std::string::npos) {
-      std::cerr << "Invalid version format" << std::endl;
+      LOGE("Invalid version format!");
       return false;
     }
     std::string versionStr = AeVersion.substr(0, dotPos);
     majorVersion = std::stoi(versionStr);
   } catch (const std::invalid_argument& e) {
-    std::cerr << "Invalid argument: " << e.what() << std::endl;
+    LOGE("Invalid argument: %s", e.what());
     return false;
   } catch (const std::out_of_range& e) {
-    std::cerr << "Out of range: " << e.what() << std::endl;
+    LOGE("Out of range: %s", e.what());
     return false;
   }
   if (majorVersion >= MAJORVERSION) {

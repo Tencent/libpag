@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include "ExportComposition.h"
+#include "src/base/utils/Log.h"
 #include "utils/AEHelper.h"
 #include "utils/FileHelper.h"
 namespace exporter {
@@ -80,7 +81,7 @@ bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
     }
     const auto bytes = pag::Codec::Encode(pagFileDecoded);
     if (bytes->length() != size) {
-      printf("warning: bytes->length(%zu) != data.size(%zu)\n", bytes->length(), size);
+      LOGI("warning: bytes->length(%zu) != data.size(%zu)", bytes->length(), size);
     }
 
     res = true;
