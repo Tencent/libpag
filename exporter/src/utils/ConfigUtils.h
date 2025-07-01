@@ -17,36 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <QQmlApplicationEngine>
-#include <QQuickWindow>
-#include <QVariantMap>
-#include "Config/ConfigParam.h"
+
+#include <charconv>
+#include <string>
+#include <string_view>
+
+class TiXmlElement;
 
 namespace exporter {
-class ConfigModel : public QObject {
-  Q_OBJECT
+template <typename T>
+T safeStringToInt(const char* str, T defaultValue) {
+  if (str == nullptr) {
+    return defaultValue;
+  }
+  std::string_view sv(str);
+  if (sv.empty()) {
+    return defaultValue;
+  }
 
- public:
-  ConfigModel(QObject* parent = nullptr);
-  ~ConfigModel();
+  T value{};
+  auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
 
-  void initConfigWindow();
-  void showConfig() const;
+  if (ec == std::errc()) {
+    return value;
+  }
+  return defaultValue;
+}
 
-  Q_INVOKABLE void saveConfig();
-  Q_INVOKABLE void loadConfig();
-  Q_INVOKABLE void resetToDefault();
-  Q_INVOKABLE void setLanguage(int value);
-  Q_INVOKABLE void updateConfigFromQML(const QVariantMap& configData);
+float safeStringToFloat(std::string_view str, float defaultValue);
 
-  Q_INVOKABLE QVariantMap getDefaultConfig() const;
-  Q_INVOKABLE QVariantMap getCurrentConfig() const;
+bool safeStringEqual(const char* str, const char* target);
 
- private:
-  std::unique_ptr<QApplication> app = nullptr;
-  std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
-  QQuickWindow* configWindow = nullptr;
-  ConfigParam currentConfig;
-  static const ConfigParam DefaultConfig;
-};
+std::string FormatFloat(float value, int precision);
+
+void AddElement(TiXmlElement* parent, const std::string& name, const std::string& value);
+
+const char* GetChildElementText(TiXmlElement* fatherElement, const char* childName);
+
 }  // namespace exporter

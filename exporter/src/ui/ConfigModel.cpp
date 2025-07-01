@@ -21,19 +21,14 @@
 #include <QFont>
 #include <QQmlContext>
 #include <QThread>
-#include "../Config/ConfigFile.h"
+#include "Config/ConfigFile.h"
 
 namespace exporter {
 
-const ConfigParam ConfigModel::defaultConfig = ConfigModel::createDefaultConfig();
-
-ConfigParam ConfigModel::createDefaultConfig() {
-  ConfigParam config;
-  return config;
-}
+const ConfigParam ConfigModel::DefaultConfig{};
 
 ConfigModel::ConfigModel(QObject* parent) : QObject(parent) {
-  currentConfig = defaultConfig;
+  currentConfig = DefaultConfig;
   loadConfig();
 
   int argc = 0;
@@ -73,20 +68,20 @@ void ConfigModel::showConfig() const {
 
 QVariantMap ConfigModel::getDefaultConfig() const {
   QVariantMap map;
-  map["language"] = static_cast<int>(defaultConfig.language);
-  map["exportUseCase"] = static_cast<int>(defaultConfig.scenes);
-  map["exportVersionControl"] = static_cast<int>(defaultConfig.tagMode);
-  map["tagLevel"] = defaultConfig.exportTagLevel;
-  map["bitmapCompressionQuality"] = defaultConfig.sequenceQuality;
-  map["bitmapPixelDensity"] = defaultConfig.imagePixelRatio;
-  map["exportLayerName"] = defaultConfig.enableLayerName;
-  map["exportFonts"] = defaultConfig.enableFontFile;
+  map["language"] = static_cast<int>(DefaultConfig.language);
+  map["exportUseCase"] = static_cast<int>(DefaultConfig.scenes);
+  map["exportVersionControl"] = static_cast<int>(DefaultConfig.tagMode);
+  map["tagLevel"] = DefaultConfig.exportTagLevel;
+  map["bitmapCompressionQuality"] = DefaultConfig.sequenceQuality;
+  map["bitmapPixelDensity"] = DefaultConfig.imagePixelRatio;
+  map["exportLayerName"] = DefaultConfig.enableLayerName;
+  map["exportFonts"] = DefaultConfig.enableFontFile;
 
-  map["bitmapQuality"] = static_cast<int>(defaultConfig.sequenceType);
-  map["imageQuality"] = defaultConfig.imageQuality;
-  map["exportSizeLimit"] = defaultConfig.bitmapMaxResolution;
-  map["maximumFrameRate"] = defaultConfig.frameRate;
-  map["keyframeInterval"] = defaultConfig.bitmapKeyFrameInterval;
+  map["bitmapQuality"] = static_cast<int>(DefaultConfig.sequenceType);
+  map["imageQuality"] = DefaultConfig.imageQuality;
+  map["exportSizeLimit"] = DefaultConfig.bitmapMaxResolution;
+  map["maximumFrameRate"] = DefaultConfig.frameRate;
+  map["keyframeInterval"] = DefaultConfig.bitmapKeyFrameInterval;
   return map;
 }
 
@@ -158,7 +153,7 @@ void ConfigModel::updateConfigFromQML(const QVariantMap& configData) {
 }
 
 void ConfigModel::resetToDefault() {
-  currentConfig = defaultConfig;
+  currentConfig = DefaultConfig;
 }
 
 QVariantMap ConfigModel::getCurrentConfig() const {
