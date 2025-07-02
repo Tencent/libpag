@@ -18,6 +18,7 @@
 
 #include "ByteArray.h"
 #include <iostream>
+#include "src/base/utils/Log.h"
 namespace exporter {
 
 tgfx::ByteOrder CheckByteOrder() {
@@ -156,7 +157,7 @@ std::string ByteArray::readUTF8String() {
       return {text, textLength};
     }
   }
-  std::cout << "End of file was encountered." << std::endl;
+  LOGI("End of file was encountered.");
   return "";
 }
 
@@ -173,7 +174,7 @@ void ByteArray::positionChanged(size_t offset) {
 bool ByteArray::checkEndOfFile(size_t bytesToRead) {
   // The _position must not use the uint32_t type, otherwise it will overflow.
   if (_position + bytesToRead > dataView.size()) {
-    std::cout << "End of file was encountered." << std::endl;
+    LOGI("End of file was encountered.");
     return true;
   }
   return false;

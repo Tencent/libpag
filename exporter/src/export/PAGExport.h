@@ -17,23 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <filesystem>
-#include <string>
-namespace FileHelper {
+#include <memory>
+#include "utils/AEHelper.h"
+#include "utils/AlertInfo.h"
+#include "utils/PAGExportSession.h"
+#include "utils/ScopedHelper.h"
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
+class PAGExport {
+ public:
+  static bool ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
+                         bool enableAudio = true);
 
-int WriteTextFile(const std::string& fileName, const char* text);
+  static bool ValidatePAGFile(uint8_t* data, size_t size);
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+  PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath);
+  ~PAGExport() = default;
 
-size_t GetFileSize(const std::string& fileName);
+ private:
+  std::shared_ptr<pag::File> exportPAG(const AEGP_ItemH& activeItemH);
 
-bool CopyFile(const std::string& src, const std::string& dst);
-
-bool FileIsExist(const std::string& fileName);
-
-bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
-                 std::ios::openmode mode = std::ios::out | std::ios::binary);
-
-}  // namespace FileHelper
+  std::shared_ptr<PAGExportSession> session = nullptr;
+  ScopedTimeSetter timeSetter = {nullptr, 0};
+};
+}  // namespace exporter

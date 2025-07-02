@@ -15,25 +15,27 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#pragma once
+#include "ScopedHelper.h"
 #include <filesystem>
-#include <string>
-namespace FileHelper {
+#include <fstream>
+#include <iostream>
+#include "AEHelper.h"
+namespace fs = std::filesystem;
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
 
-int WriteTextFile(const std::string& fileName, const char* text);
+ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
+    : itemHandle(itemHandle) {
+  const auto& suites = AEHelper::GetSuites();
+  suites->ItemSuite8()->AEGP_GetItemCurrentTime(itemHandle, &orgTime);
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+  A_Time newTime = {static_cast<A_long>(time * 100), 100};
+  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &newTime);
+}
 
-size_t GetFileSize(const std::string& fileName);
+ScopedTimeSetter::~ScopedTimeSetter() {
+  const auto& suites = AEHelper::GetSuites();
+  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &orgTime);
+}
 
-bool CopyFile(const std::string& src, const std::string& dst);
-
-bool FileIsExist(const std::string& fileName);
-
-bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
-                 std::ios::openmode mode = std::ios::out | std::ios::binary);
-
-}  // namespace FileHelper
+}  // namespace exporter

@@ -19,21 +19,22 @@
 #pragma once
 #include <filesystem>
 #include <string>
-namespace FileHelper {
+namespace exporter {
 
-std::string ReadTextFile(const std::string& filename);
+class TempFileDelete {
+ public:
+  ~TempFileDelete() {
+    if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
+      std::remove(tempFilePath.c_str());
+    }
+  }
 
-int WriteTextFile(const std::string& fileName, const char* text);
+  void setFilePath(const std::string& path) {
+    tempFilePath = path;
+  }
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+ private:
+  std::string tempFilePath = "";
+};
 
-size_t GetFileSize(const std::string& fileName);
-
-bool CopyFile(const std::string& src, const std::string& dst);
-
-bool FileIsExist(const std::string& fileName);
-
-bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
-                 std::ios::openmode mode = std::ios::out | std::ios::binary);
-
-}  // namespace FileHelper
+}  // namespace exporter
