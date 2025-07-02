@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include "src/base/utils/Log.h"
 #include "utils/AEHelper.h"
 #include "utils/FileHelper.h"
 
@@ -44,7 +45,7 @@ bool CreateFolder(const std::string& path) {
   if (!FileHelper::FileIsExist(path)) {
     std::error_code errorCode;
     if (!fs::create_directories(path, errorCode)) {
-      printf("Create %s failed: %s\n", path.c_str(), errorCode.message().c_str());
+      LOGE("Create %s failed: %s", path.c_str(), errorCode.message().c_str());
       return false;
     }
   }

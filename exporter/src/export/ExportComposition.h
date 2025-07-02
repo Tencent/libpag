@@ -17,42 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <charconv>
-#include <string>
-#include <string_view>
-#include "tinyxml2.h"
-
-using namespace tinyxml2;
-
+#include "pag/file.h"
+#include "pag/pag.h"
+#include "utils/PAGExportSession.h"
 namespace exporter {
-template <typename T>
-T SafeStringToInt(const char* str, T defaultValue) {
-  if (str == nullptr) {
-    return defaultValue;
-  }
-  std::string_view sv(str);
-  if (sv.empty()) {
-    return defaultValue;
-  }
 
-  T value{};
-  auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
+pag::CompositionType GetCompositionType(const std::shared_ptr<PAGExportSession>& session,
+                                        AEGP_CompH const& compHandle);
 
-  if (ec == std::errc()) {
-    return value;
-  }
-  return defaultValue;
-}
+bool IsStaticComposition(std::shared_ptr<PAGExportSession> session, AEGP_CompH const& compHandle);
 
-float SafeStringToFloat(std::string_view str, float defaultValue);
+std::shared_ptr<pag::Composition> ExportComposition(std::shared_ptr<PAGExportSession> session,
+                                                    const AEGP_ItemH& itemH);
 
-bool SafeStringEqual(const char* str, const char* target);
+std::shared_ptr<pag::VideoComposition> ExportVideoComposition(
+    std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compHandle);
 
-std::string FormatFloat(float value, int precision);
+std::shared_ptr<pag::BitmapComposition> ExportBitmapComposition(
+    std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compHandle);
 
-void AddElement(XMLElement* parent, const std::string& name, const std::string& value);
-
-const char* GetChildElementText(XMLElement* fatherElement, const char* childName);
+std::shared_ptr<pag::VectorComposition> ExportVectorComposition(
+    std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compHandle);
 
 }  // namespace exporter

@@ -29,15 +29,18 @@
 #include "StringHelper.h"
 #include "nlohmann/json.hpp"
 #include "platform/PlatformHelper.h"
-#include "tinyxml.h"
+#include "src/base/utils/Log.h"
+#include "tinyxml2.h"
+#include "utils/TempFileDelete.h"
 
 namespace fs = std::filesystem;
 using namespace StringHelper;
+using namespace tinyxml2;
 using json = nlohmann::json;
 
 namespace exporter {
 
-PAGExportSession::PAGExportSession(std::string& path)
+PAGExportSession::PAGExportSession(const std::string& path)
     : pluginID(AEHelper::GetPluginID()), suites(AEHelper::GetSuites()), outputPath(path),
       bEarlyExit(false) {
   checkParamValid();
@@ -62,8 +65,7 @@ void PAGExportSession::checkParamValid() {
       // Custom mode doesn't modify exportTagLevel
       break;
     default:
-      std::cerr << "Error! unsupported tagMode:" << static_cast<int>(configParam.tagMode)
-                << std::endl;
+      LOGI("Warning! unsupported tagMode: %d", static_cast<int>(configParam.tagMode));
       configParam.tagMode = TagMode::Stable;
       configParam.exportTagLevel = static_cast<uint16_t>(PresetTagLevel::TagLevelStable);
       break;
@@ -162,33 +164,33 @@ pag::TextDocumentHandle PAGExportSession::currentTextDocument() {
 std::vector<std::vector<float>> PAGExportSession::extractFloatArraysByKey(
     const std::string& xmlContent, const std::string& keyName) {
   std::vector<std::vector<float>> result = {};
-  TiXmlDocument doc;
-  if (doc.Parse(xmlContent.c_str()) == nullptr) {
-    std::cerr << "XML parsing failed: " << doc.ErrorDesc() << std::endl;
+  XMLDocument doc;
+  if (doc.Parse(xmlContent.c_str()) != XML_SUCCESS) {
+    LOGE("XML parsing failed: %s", doc.ErrorStr());
     return result;
   }
 
-  auto traverse = [&](TiXmlElement* element, const auto& traverseRef) {
+  auto traverse = [&](XMLElement* element, const auto& traverseRef) {
     if (!element) return;
 
-    for (TiXmlElement* child = element->FirstChildElement(); child != nullptr;
+    for (XMLElement* child = element->FirstChildElement(); child != nullptr;
          child = child->NextSiblingElement()) {
       if (std::string(child->Value()) == "prop.pair") {
-        TiXmlElement* key = child->FirstChildElement("key");
+        XMLElement* key = child->FirstChildElement("key");
         if (key && key->GetText()) {
           if (std::string(key->GetText()) == keyName) {
-            TiXmlElement* array = child->FirstChildElement("array");
+            XMLElement* array = child->FirstChildElement("array");
             if (array) {
-              TiXmlElement* arrayType = array->FirstChildElement("array.type");
+              XMLElement* arrayType = array->FirstChildElement("array.type");
               if (arrayType && arrayType->FirstChildElement("float")) {
                 std::vector<float> floatList = {};
-                for (TiXmlElement* floatVal = array->FirstChildElement("float");
-                     floatVal != nullptr; floatVal = floatVal->NextSiblingElement("float")) {
+                for (XMLElement* floatVal = array->FirstChildElement("float"); floatVal != nullptr;
+                     floatVal = floatVal->NextSiblingElement("float")) {
                   if (floatVal->GetText()) {
                     try {
                       floatList.emplace_back(std::stof(floatVal->GetText()));
                     } catch (const std::exception& e) {
-                      std::cerr << "Error converting float value: " << e.what() << std::endl;
+                      LOGE("Error converting float value: %s", e.what());
                     }
                   }
                 }
@@ -421,7 +423,7 @@ const std::vector<char>& PAGExportSession::getFileBytes() {
     isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
-  FileHelper::ScopedTempFile tempFile;
+  TempFileDelete tempFile;
   if (isDirty || isAEPX) {
     filePath = GetTempFolderPath() + u8"/.PAGAutoSave.aep";
     tempFile.setFilePath(filePath);

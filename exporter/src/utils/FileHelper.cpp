@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "src/base/utils/Log.h"
 namespace fs = std::filesystem;
 
 namespace FileHelper {
@@ -85,14 +86,27 @@ bool CopyFile(const std::string& src, const std::string& dst) {
   }
 }
 
-ScopedTempFile::~ScopedTempFile() {
-  if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
-    std::remove(tempFilePath.c_str());
+bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
+                 std::ios::openmode mode) {
+  std::ofstream file(filePath, mode);
+  if (!file) {
+    LOGE("Failed to open file: %s", filePath.c_str());
+    return false;
   }
-}
 
-void ScopedTempFile::setFilePath(const std::string& path) {
-  tempFilePath = path;
+  file.write(data, size);
+
+  if (file.fail()) {
+    LOGE("Failed to write to file: %s", filePath.c_str());
+    if (file.eof()) {
+      LOGE("eof is set: End-of-File reached on input operation.");
+    }
+    file.close();
+    return false;
+  }
+
+  file.close();
+  return true;
 }
 
 }  // namespace FileHelper

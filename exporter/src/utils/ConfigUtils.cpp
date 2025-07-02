@@ -21,7 +21,7 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept>
-#include "tinyxml.h"
+#include "tinyxml2.h"
 
 namespace exporter {
 
@@ -55,16 +55,15 @@ std::string FormatFloat(float value, int precision) {
   return oss.str();
 }
 
-void AddElement(TiXmlElement* parent, const std::string& name, const std::string& value) {
-  auto element = std::make_unique<TiXmlElement>(name.c_str());
-  auto text = std::make_unique<TiXmlText>(value.c_str());
-
-  element->LinkEndChild(text.release());
-  parent->LinkEndChild(element.release());
+void AddElement(XMLElement* parent, const std::string& name, const std::string& value) {
+  XMLDocument* doc = parent->GetDocument();
+  XMLElement* element = doc->NewElement(name.c_str());
+  element->SetText(value.c_str());
+  parent->InsertEndChild(element);
 }
 
-const char* GetChildElementText(TiXmlElement* fatherElement, const char* childName) {
-  TiXmlElement* childElement = fatherElement->FirstChildElement(childName);
+const char* GetChildElementText(XMLElement* fatherElement, const char* childName) {
+  XMLElement* childElement = fatherElement->FirstChildElement(childName);
   if (childElement == nullptr) {
     return nullptr;
   }
