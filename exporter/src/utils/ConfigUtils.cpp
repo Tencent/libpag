@@ -25,7 +25,7 @@
 
 namespace exporter {
 
-float safeStringToFloat(std::string_view str, float defaultValue) {
+float SafeStringToFloat(std::string_view str, float defaultValue) {
   if (str.empty()) {
     return defaultValue;
   }
@@ -38,7 +38,7 @@ float safeStringToFloat(std::string_view str, float defaultValue) {
   }
 }
 
-bool safeStringEqual(const char* str, const char* target) {
+bool SafeStringEqual(const char* str, const char* target) {
   if (!str || !target) {
     return false;
   }
