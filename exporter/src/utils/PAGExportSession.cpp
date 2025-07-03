@@ -167,6 +167,7 @@ std::vector<std::vector<float>> PAGExportSession::extractFloatArraysByKey(
   XMLDocument doc;
   if (doc.Parse(xmlContent.c_str()) != XML_SUCCESS) {
     LOGE("XML parsing failed: %s", doc.ErrorStr());
+
     return result;
   }
 
