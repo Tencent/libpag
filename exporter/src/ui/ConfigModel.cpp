@@ -66,22 +66,7 @@ void ConfigModel::showConfig() const {
 
 QVariantMap ConfigModel::getDefaultConfig() const {
   ConfigParam defaultConfig{};
-  QVariantMap map;
-  map["language"] = static_cast<int>(defaultConfig.language);
-  map["exportUseCase"] = static_cast<int>(defaultConfig.scenes);
-  map["exportVersionControl"] = static_cast<int>(defaultConfig.tagMode);
-  map["tagLevel"] = defaultConfig.exportTagLevel;
-  map["bitmapCompressionQuality"] = defaultConfig.sequenceQuality;
-  map["bitmapPixelDensity"] = defaultConfig.imagePixelRatio;
-  map["exportLayerName"] = defaultConfig.enableLayerName;
-  map["exportFonts"] = defaultConfig.enableFontFile;
-
-  map["bitmapQuality"] = static_cast<int>(defaultConfig.sequenceType);
-  map["imageQuality"] = defaultConfig.imageQuality;
-  map["exportSizeLimit"] = defaultConfig.bitmapMaxResolution;
-  map["maximumFrameRate"] = defaultConfig.frameRate;
-  map["keyframeInterval"] = defaultConfig.bitmapKeyFrameInterval;
-  return map;
+  return configParamToVariantMap(defaultConfig);
 }
 
 void ConfigModel::saveConfig() {
@@ -155,22 +140,26 @@ void ConfigModel::resetToDefault() {
   currentConfig = ConfigParam{};
 }
 
-QVariantMap ConfigModel::getCurrentConfig() const {
+QVariantMap ConfigModel::configParamToVariantMap(const ConfigParam& config) {
   QVariantMap map;
-  map["language"] = static_cast<int>(currentConfig.language);
-  map["exportUseCase"] = static_cast<int>(currentConfig.scenes);
-  map["exportVersionControl"] = static_cast<int>(currentConfig.tagMode);
-  map["tagLevel"] = currentConfig.exportTagLevel;
-  map["bitmapCompressionQuality"] = currentConfig.sequenceQuality;
-  map["bitmapPixelDensity"] = currentConfig.imagePixelRatio;
-  map["exportLayerName"] = currentConfig.enableLayerName;
-  map["exportFonts"] = currentConfig.enableFontFile;
+  map["language"] = static_cast<int>(config.language);
+  map["exportUseCase"] = static_cast<int>(config.scenes);
+  map["exportVersionControl"] = static_cast<int>(config.tagMode);
+  map["tagLevel"] = config.exportTagLevel;
+  map["bitmapCompressionQuality"] = config.sequenceQuality;
+  map["bitmapPixelDensity"] = config.imagePixelRatio;
+  map["exportLayerName"] = config.enableLayerName;
+  map["exportFonts"] = config.enableFontFile;
 
-  map["bitmapQuality"] = static_cast<int>(currentConfig.sequenceType);
-  map["imageQuality"] = currentConfig.imageQuality;
-  map["exportSizeLimit"] = currentConfig.bitmapMaxResolution;
-  map["maximumFrameRate"] = currentConfig.frameRate;
-  map["keyframeInterval"] = currentConfig.bitmapKeyFrameInterval;
+  map["bitmapQuality"] = static_cast<int>(config.sequenceType);
+  map["imageQuality"] = config.imageQuality;
+  map["exportSizeLimit"] = config.bitmapMaxResolution;
+  map["maximumFrameRate"] = config.frameRate;
+  map["keyframeInterval"] = config.bitmapKeyFrameInterval;
   return map;
+}
+
+QVariantMap ConfigModel::getCurrentConfig() const {
+  return configParamToVariantMap(currentConfig);
 }
 }  // namespace exporter

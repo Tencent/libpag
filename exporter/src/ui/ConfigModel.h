@@ -43,6 +43,8 @@ class ConfigModel : public QObject {
   Q_INVOKABLE QVariantMap getCurrentConfig() const;
 
  private:
+  static QVariantMap configParamToVariantMap(const ConfigParam& config);
+
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
   QQuickWindow* configWindow = nullptr;
