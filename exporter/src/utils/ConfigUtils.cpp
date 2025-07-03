@@ -22,7 +22,6 @@
 #include <stdexcept>
 #include "tinyxml2.h"
 
-
 namespace exporter {
 
 float SafeStringToFloat(std::string_view str, float defaultValue) {

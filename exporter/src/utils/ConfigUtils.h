@@ -23,8 +23,6 @@
 #include <string_view>
 #include "tinyxml2.h"
 
-
-
 namespace exporter {
 template <typename T>
 T SafeStringToInt(const char* str, T defaultValue) {
