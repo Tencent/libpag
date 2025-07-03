@@ -47,6 +47,5 @@ class ConfigModel : public QObject {
   std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
   QQuickWindow* configWindow = nullptr;
   ConfigParam currentConfig;
-  static const ConfigParam DefaultConfig;
 };
 }  // namespace exporter

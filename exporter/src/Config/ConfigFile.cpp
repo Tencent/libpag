@@ -24,6 +24,7 @@
 #include "platform/PlatformHelper.h"
 #include "tinyxml2.h"
 #include "utils/ConfigUtils.h"
+#include "utils/FileHelper.h"
 
 using namespace tinyxml2;
 namespace exporter {
@@ -182,7 +183,7 @@ static void WriteBitmapConfig(XMLElement* root, ConfigParam* configParam) {
   root->InsertEndChild(video);
 }
 
-int WriteDefaultConfigFile(std::string_view fileName) {
+int WriteDefaultConfigFile(const std::string& fileName) {
   if (fileName.empty()) {
     return -1;
   }
@@ -209,13 +210,13 @@ bool ReadConfigFile(ConfigParam* configParam) {
     return false;
   }
 
-  const std::string configPath = GetConfigPath();
+  const auto& configPath = GetConfigPath();
   if (configPath.empty()) {
     return false;
   }
 
   std::string filename = configPath + "PAGConfig.xml";
-  if (!std::filesystem::exists(filename)) {
+  if (!FileHelper::FileIsExist(filename)) {
     WriteDefaultConfigFile(filename.c_str());
     return false;
   }
@@ -248,7 +249,7 @@ void WriteConfigFile(ConfigParam* configParam) {
     return;
   }
 
-  std::string configPath = GetConfigPath();
+  const auto& configPath = GetConfigPath();
   if (configPath.empty()) {
     return;
   }

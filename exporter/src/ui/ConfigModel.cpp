@@ -25,10 +25,8 @@
 
 namespace exporter {
 
-const ConfigParam ConfigModel::DefaultConfig{};
-
 ConfigModel::ConfigModel(QObject* parent) : QObject(parent) {
-  currentConfig = DefaultConfig;
+  currentConfig = ConfigParam{};
   loadConfig();
 
   int argc = 0;
@@ -67,21 +65,22 @@ void ConfigModel::showConfig() const {
 }
 
 QVariantMap ConfigModel::getDefaultConfig() const {
+  ConfigParam defaultConfig{};
   QVariantMap map;
-  map["language"] = static_cast<int>(DefaultConfig.language);
-  map["exportUseCase"] = static_cast<int>(DefaultConfig.scenes);
-  map["exportVersionControl"] = static_cast<int>(DefaultConfig.tagMode);
-  map["tagLevel"] = DefaultConfig.exportTagLevel;
-  map["bitmapCompressionQuality"] = DefaultConfig.sequenceQuality;
-  map["bitmapPixelDensity"] = DefaultConfig.imagePixelRatio;
-  map["exportLayerName"] = DefaultConfig.enableLayerName;
-  map["exportFonts"] = DefaultConfig.enableFontFile;
+  map["language"] = static_cast<int>(defaultConfig.language);
+  map["exportUseCase"] = static_cast<int>(defaultConfig.scenes);
+  map["exportVersionControl"] = static_cast<int>(defaultConfig.tagMode);
+  map["tagLevel"] = defaultConfig.exportTagLevel;
+  map["bitmapCompressionQuality"] = defaultConfig.sequenceQuality;
+  map["bitmapPixelDensity"] = defaultConfig.imagePixelRatio;
+  map["exportLayerName"] = defaultConfig.enableLayerName;
+  map["exportFonts"] = defaultConfig.enableFontFile;
 
-  map["bitmapQuality"] = static_cast<int>(DefaultConfig.sequenceType);
-  map["imageQuality"] = DefaultConfig.imageQuality;
-  map["exportSizeLimit"] = DefaultConfig.bitmapMaxResolution;
-  map["maximumFrameRate"] = DefaultConfig.frameRate;
-  map["keyframeInterval"] = DefaultConfig.bitmapKeyFrameInterval;
+  map["bitmapQuality"] = static_cast<int>(defaultConfig.sequenceType);
+  map["imageQuality"] = defaultConfig.imageQuality;
+  map["exportSizeLimit"] = defaultConfig.bitmapMaxResolution;
+  map["maximumFrameRate"] = defaultConfig.frameRate;
+  map["keyframeInterval"] = defaultConfig.bitmapKeyFrameInterval;
   return map;
 }
 
@@ -153,7 +152,7 @@ void ConfigModel::updateConfigFromQML(const QVariantMap& configData) {
 }
 
 void ConfigModel::resetToDefault() {
-  currentConfig = DefaultConfig;
+  currentConfig = ConfigParam{};
 }
 
 QVariantMap ConfigModel::getCurrentConfig() const {
