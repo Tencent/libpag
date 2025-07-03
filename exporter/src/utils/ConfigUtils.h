@@ -23,7 +23,7 @@
 #include <string_view>
 #include "tinyxml2.h"
 
-using namespace tinyxml2;
+
 
 namespace exporter {
 template <typename T>
@@ -51,8 +51,8 @@ bool SafeStringEqual(const char* str, const char* target);
 
 std::string FormatFloat(float value, int precision);
 
-void AddElement(XMLElement* parent, const std::string& name, const std::string& value);
+void AddElement(tinyxml2::XMLElement* parent, const std::string& name, const std::string& value);
 
-const char* GetChildElementText(XMLElement* fatherElement, const char* childName);
+const char* GetChildElementText(tinyxml2::XMLElement* fatherElement, const char* childName);
 
 }  // namespace exporter

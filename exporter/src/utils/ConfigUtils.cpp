@@ -18,10 +18,10 @@
 
 #include "ConfigUtils.h"
 #include <iomanip>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include "tinyxml2.h"
+
 
 namespace exporter {
 
@@ -55,15 +55,15 @@ std::string FormatFloat(float value, int precision) {
   return oss.str();
 }
 
-void AddElement(XMLElement* parent, const std::string& name, const std::string& value) {
-  XMLDocument* doc = parent->GetDocument();
-  XMLElement* element = doc->NewElement(name.c_str());
+void AddElement(tinyxml2::XMLElement* parent, const std::string& name, const std::string& value) {
+  tinyxml2::XMLDocument* doc = parent->GetDocument();
+  tinyxml2::XMLElement* element = doc->NewElement(name.c_str());
   element->SetText(value.c_str());
   parent->InsertEndChild(element);
 }
 
-const char* GetChildElementText(XMLElement* fatherElement, const char* childName) {
-  XMLElement* childElement = fatherElement->FirstChildElement(childName);
+const char* GetChildElementText(tinyxml2::XMLElement* fatherElement, const char* childName) {
+  tinyxml2::XMLElement* childElement = fatherElement->FirstChildElement(childName);
   if (childElement == nullptr) {
     return nullptr;
   }
