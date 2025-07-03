@@ -26,7 +26,7 @@
 namespace exporter {
 
 ConfigModel::ConfigModel(QObject* parent) : QObject(parent) {
-  currentConfig = ConfigParam{};
+  currentConfig = ConfigParam();
   loadConfig();
 
   int argc = 0;
@@ -66,7 +66,7 @@ void ConfigModel::showConfig() const {
 
 QVariantMap ConfigModel::getDefaultConfig() const {
   ConfigParam defaultConfig{};
-  return configParamToVariantMap(defaultConfig);
+  return ConfigParamToVariantMap(defaultConfig);
 }
 
 void ConfigModel::saveConfig() {
@@ -137,10 +137,10 @@ void ConfigModel::updateConfigFromQML(const QVariantMap& configData) {
 }
 
 void ConfigModel::resetToDefault() {
-  currentConfig = ConfigParam{};
+  currentConfig = ConfigParam();
 }
 
-QVariantMap ConfigModel::configParamToVariantMap(const ConfigParam& config) {
+QVariantMap ConfigModel::ConfigParamToVariantMap(const ConfigParam& config) {
   QVariantMap map;
   map["language"] = static_cast<int>(config.language);
   map["exportUseCase"] = static_cast<int>(config.scenes);
@@ -160,6 +160,6 @@ QVariantMap ConfigModel::configParamToVariantMap(const ConfigParam& config) {
 }
 
 QVariantMap ConfigModel::getCurrentConfig() const {
-  return configParamToVariantMap(currentConfig);
+  return ConfigParamToVariantMap(currentConfig);
 }
 }  // namespace exporter
