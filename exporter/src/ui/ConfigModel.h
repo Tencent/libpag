@@ -17,23 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <filesystem>
-#include <string>
-namespace FileHelper {
+#include <QQmlApplicationEngine>
+#include <QQuickWindow>
+#include <QVariantMap>
+#include "Config/ConfigParam.h"
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
+class ConfigModel : public QObject {
+  Q_OBJECT
 
-size_t WriteTextFile(const std::string& fileName, const char* text);
+ public:
+  ConfigModel(QObject* parent = nullptr);
+  ~ConfigModel();
 
-size_t WriteTextFile(const std::string& fileName, const std::string& text);
+  void initConfigWindow();
+  void showConfig() const;
 
-size_t GetFileSize(const std::string& fileName);
+  Q_INVOKABLE void saveConfig();
+  Q_INVOKABLE void resetToDefault();
+  Q_INVOKABLE void setLanguage(int value);
+  Q_INVOKABLE void updateConfigFromQML(const QVariantMap& configData);
 
-bool CopyFile(const std::string& src, const std::string& dst);
+  Q_INVOKABLE QVariantMap getDefaultConfig() const;
+  Q_INVOKABLE QVariantMap getCurrentConfig() const;
 
-bool FileIsExist(const std::string& fileName);
-
-bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
-                 std::ios::openmode mode = std::ios::out | std::ios::binary);
-
-}  // namespace FileHelper
+ private:
+  static QVariantMap ConfigParamToVariantMap(const ConfigParam& config);
+  std::unique_ptr<QApplication> app = nullptr;
+  std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
+  QQuickWindow* configWindow = nullptr;
+  ConfigParam currentConfig;
+};
+}  // namespace exporter

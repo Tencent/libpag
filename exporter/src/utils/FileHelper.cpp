@@ -36,7 +36,7 @@ std::string ReadTextFile(const std::string& filename) {
   return text;
 }
 
-int WriteTextFile(const std::string& fileName, const char* text) {
+size_t WriteTextFile(const std::string& fileName, const char* text) {
   std::ofstream file(fileName, std::ios::out);
   if (!file.is_open()) {
     return 0;
@@ -46,7 +46,7 @@ int WriteTextFile(const std::string& fileName, const char* text) {
   return file.tellp();
 }
 
-int WriteTextFile(const std::string& fileName, const std::string& text) {
+size_t WriteTextFile(const std::string& fileName, const std::string& text) {
   return WriteTextFile(fileName, text.c_str());
 }
 
@@ -75,7 +75,8 @@ bool CopyFile(const std::string& src, const std::string& dst) {
       return false;
     }
     auto parentPath = fs::path(dst).parent_path();
-    if (!FileIsExist(parentPath)) {
+    if (!FileIsExist(parentPath.string())) {
+
       fs::create_directories(parentPath);
     }
     fs::copy_file(src, dst, fs::copy_options::overwrite_existing);

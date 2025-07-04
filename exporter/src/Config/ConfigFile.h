@@ -17,23 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <filesystem>
-#include <string>
-namespace FileHelper {
+#include "ConfigParam.h"
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
 
-size_t WriteTextFile(const std::string& fileName, const char* text);
+bool ReadConfigFile(ConfigParam* configParam);
 
-size_t WriteTextFile(const std::string& fileName, const std::string& text);
+void WriteConfigFile(ConfigParam* configParam);
 
-size_t GetFileSize(const std::string& fileName);
-
-bool CopyFile(const std::string& src, const std::string& dst);
-
-bool FileIsExist(const std::string& fileName);
-
-bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
-                 std::ios::openmode mode = std::ios::out | std::ios::binary);
-
-}  // namespace FileHelper
+}  // namespace exporter

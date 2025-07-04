@@ -56,7 +56,7 @@ list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src)
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
 file(GLOB_RECURSE PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES
         ${AE_SDK_PATH}/Util/*.cpp
-        vendor/TinyXML/*.cpp)
+        vendor/TinyXML2/*.cpp)
 
 list(FILTER PAG_EXPORTER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
 if (APPLE)
@@ -79,7 +79,7 @@ list(APPEND PAG_EXPORTER_THIRD_PARTY_INCLUDES
         ${AE_SDK_PATH}/Resources
         ../third_party/tgfx/include
         ../third_party/tgfx/third_party/json/include
-        vendor/TinyXML)
+        vendor/TinyXML2)
 
 if (APPLE)
     find_library(COCOA Cocoa REQUIRED)
@@ -114,7 +114,8 @@ set(PAG_BUILD_TESTS OFF)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
-add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES})
+
+add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES} ${QT_RESOURCES})
 
 target_include_directories(PAGExporter SYSTEM PRIVATE ${PAG_EXPORTER_THIRD_PARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${PAG_EXPORTER_INCLUDES})

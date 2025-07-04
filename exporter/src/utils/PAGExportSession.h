@@ -19,10 +19,10 @@
 #pragma once
 #include <memory>
 #include <string>
+#include "../Config/ConfigParam.h"
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
 #include "AlertInfo.h"
-#include "ConfigParam.h"
 #include "pag/file.h"
 #include "pag/types.h"
 

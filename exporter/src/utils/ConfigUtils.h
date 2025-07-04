@@ -17,23 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <filesystem>
+
+#include <charconv>
 #include <string>
-namespace FileHelper {
+#include <string_view>
+#include "tinyxml2.h"
 
-std::string ReadTextFile(const std::string& filename);
+namespace exporter {
+template <typename T>
+T SafeStringToInt(const char* str, T defaultValue) {
+  if (str == nullptr) {
+    return defaultValue;
+  }
+  std::string_view sv(str);
+  if (sv.empty()) {
+    return defaultValue;
+  }
 
-size_t WriteTextFile(const std::string& fileName, const char* text);
+  T value{};
+  auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), value);
 
-size_t WriteTextFile(const std::string& fileName, const std::string& text);
+  if (ec == std::errc()) {
+    return value;
+  }
+  return defaultValue;
+}
 
-size_t GetFileSize(const std::string& fileName);
+float SafeStringToFloat(std::string_view str, float defaultValue);
 
-bool CopyFile(const std::string& src, const std::string& dst);
+bool SafeStringEqual(const char* str, const char* target);
 
-bool FileIsExist(const std::string& fileName);
+std::string FormatFloat(float value, int precision);
 
-bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
-                 std::ios::openmode mode = std::ios::out | std::ios::binary);
+void AddElement(tinyxml2::XMLElement* parent, const std::string& name, const std::string& value);
 
-}  // namespace FileHelper
+const char* GetChildElementText(tinyxml2::XMLElement* fatherElement, const char* childName);
+
+}  // namespace exporter

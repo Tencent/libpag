@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AECommand.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/AEResource.h"
 namespace exporter {
@@ -59,6 +60,7 @@ A_Err AECommand::OnClickConfig(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showPAGConfigWindow();
   return err;
 }
 
