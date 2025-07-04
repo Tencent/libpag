@@ -34,7 +34,6 @@ class ConfigModel : public QObject {
   void showConfig() const;
 
   Q_INVOKABLE void saveConfig();
-  Q_INVOKABLE void loadConfig();
   Q_INVOKABLE void resetToDefault();
   Q_INVOKABLE void setLanguage(int value);
   Q_INVOKABLE void updateConfigFromQML(const QVariantMap& configData);
@@ -44,7 +43,6 @@ class ConfigModel : public QObject {
 
  private:
   static QVariantMap ConfigParamToVariantMap(const ConfigParam& config);
-
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
   QQuickWindow* configWindow = nullptr;

@@ -26,9 +26,7 @@
 namespace exporter {
 
 ConfigModel::ConfigModel(QObject* parent) : QObject(parent) {
-  currentConfig = ConfigParam();
-  loadConfig();
-
+  ReadConfigFile(&currentConfig);
   int argc = 0;
   app = std::make_unique<QApplication>(argc, nullptr);
   app->setObjectName("PAG-Config");
@@ -71,10 +69,6 @@ QVariantMap ConfigModel::getDefaultConfig() const {
 
 void ConfigModel::saveConfig() {
   WriteConfigFile(&currentConfig);
-}
-
-void ConfigModel::loadConfig() {
-  ReadConfigFile(&currentConfig);
 }
 
 void ConfigModel::setLanguage(int value) {
