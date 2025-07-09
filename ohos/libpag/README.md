@@ -169,6 +169,10 @@ If you find libpag is helpful, please give us a **Star**. We sincerely appreciat
 
 libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
 
+The copyright notice pertaining to the Tencent code in this repo was previously in the name of "THL
+A29 Limited". That entity has now been de-registered. You should treat all previously distributed
+copies of the code as if the copyright notice was in the name of "Tencent".
+
 ## Privacy Policy
 
 Please comply with [the personal information processing rules of PAG SDK](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd) while using libpag SDK
