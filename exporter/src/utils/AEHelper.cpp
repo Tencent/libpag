@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AEHelper.h"
+#include <QDir>
+#include <QFileInfo>
 #include <iostream>
 #include "StringHelper.h"
 #include "platform/PlatformHelper.h"
@@ -88,6 +90,22 @@ void RegisterTextDocumentScript() {
     RunScript(suites, pluginID, TextDocumentScript);
     hasInit = true;
   }
+}
+
+QString GetProjectPath() {
+  AEGP_ProjectH projectHandle;
+  Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
+  AEGP_MemHandle pathMemory;
+  Suites->ProjSuite6()->AEGP_GetProjectPath(projectHandle, &pathMemory);
+  std::string filePath = StringHelper::AeMemoryHandleToString(pathMemory);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
+  if (!filePath.empty()) {
+    std::replace(filePath.begin(), filePath.end(), '\\', '/');
+  }
+  QString projectPath =
+      QDir::cleanPath(QDir::fromNativeSeparators(QString::fromStdString(filePath)));
+  QFileInfo fileInfo(projectPath);
+  return fileInfo.absolutePath();
 }
 
 std::string GetDocumentsFolderPath() {

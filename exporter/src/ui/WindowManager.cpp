@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WindowManager.h"
+#include <QDebug>
 #include <QFile>
 #include <QtGui/QFont>
 #include <QtWidgets/QApplication>
 #include <memory>
+#include "AlertInfoModel.h"
 #include "ConfigModel.h"
 #include "utils/AEHelper.h"
 
@@ -68,14 +70,30 @@ void WindowManager::initializeQtEnvironment() {
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 }
 
-bool WindowManager::showWarnings(std::vector<std::string>& /*infos*/) {
-
+bool WindowManager::showWarnings(std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return false;
+  }
+  auto alertModel = std::make_unique<AlertInfoModel>();
+  alertModel->WarningsAlert(infos);
   return true;
 }
 
-bool WindowManager::showErrors(std::vector<std::string>& /*infos*/) {
-
+bool WindowManager::showErrors(std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return false;
+  }
+  auto alertModel = std::make_unique<AlertInfoModel>();
+  alertModel->ErrorsAlert(infos);
   return true;
+}
+
+bool WindowManager::showSimpleError(const QString& message) {
+  auto alertModel = std::make_unique<AlertInfoModel>();
+  alertModel->setErrorMessage(message);
+  std::vector<AlertInfo> emptyInfos;
+  bool result = alertModel->ErrorsAlert(emptyInfos);
+  return result;
 }
 
 }  // namespace exporter

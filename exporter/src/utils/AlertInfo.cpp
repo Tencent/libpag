@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AlertInfo.h"
+#include <QString>
 #include <QtCore/QObject>
 #include <iostream>
 #include "AEHelper.h"
@@ -576,14 +577,6 @@ static std::vector<AlertInfo> GetInfoList(std::vector<AlertInfo>& warningList, b
   return messages;
 }
 
-static std::vector<std::string> AlertInfosToStrings(std::vector<AlertInfo>& alertList) {
-  std::vector<std::string> list;
-  for (auto alert : alertList) {
-    list.emplace_back(alert.getMessage());
-  }
-  return list;
-}
-
 bool AlertInfoManager::showAlertInfo(bool showWarning, bool showError) {
   auto errors = GetInfoList(warningList, false, true);
   auto warnings = GetInfoList(warningList, true, false);
@@ -595,12 +588,10 @@ bool AlertInfoManager::showAlertInfo(bool showWarning, bool showError) {
   }
   auto ret = (errors.size() > 0);
   if (ret && showError) {
-    auto infos = AlertInfosToStrings(errors);
-    ret = WindowManager::GetInstance().showErrors(infos);
+    ret = WindowManager::GetInstance().showErrors(errors);
   }
   if (!ret && showWarning) {
-    auto infos = AlertInfosToStrings(warnings);
-    ret = WindowManager::GetInstance().showWarnings(infos);
+    ret = WindowManager::GetInstance().showWarnings(warnings);
   }
   warningList.clear();
   return ret;
@@ -629,6 +620,12 @@ void AlertInfoManager::pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>
   auto itemH = GetHandleById(compItemHList, compId);
   auto layerH = GetHandleById(layerHList, layerId);
   warningList.emplace_back(AlertInfo(type, itemH, layerH, addInfo));
+}
+
+void AlertInfoManager::addTestWarnings(const std::vector<AlertInfo>& testWarnings) {
+  for (const auto& warning : testWarnings) {
+    warningList.emplace_back(warning);
+  }
 }
 
 std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {

@@ -64,4 +64,6 @@ std::string Utf16ToUtf8(const char16_t* u16str);
 
 std::u16string Utf8ToUtf16(const std::string& u8str);
 
+void InsureStringSuffix(std::string& filePath, std::string suffix);
+
 }  // namespace StringHelper
