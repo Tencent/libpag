@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGVideoDecoderImpl.h"
+#import "PAGVideoDecoder.h"
 #import <HardwareDecoder.h>
 #import "pag/pag.h"
 
-@implementation PAGVideoDecoderImpl
+@implementation PAGVideoDecoder
 
 + (void)RegisterSoftwareDecoderFactory:(void*)decoderFactory {
   pag::PAGVideoDecoder::RegisterSoftwareDecoderFactory(
