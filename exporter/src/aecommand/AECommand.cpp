@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AECommand.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/AEResource.h"
 namespace exporter {
@@ -59,6 +60,7 @@ A_Err AECommand::OnClickConfig(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showPAGConfigWindow();
   return err;
 }
 

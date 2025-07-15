@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -50,12 +50,13 @@ enum class ExportScenes {
 struct ConfigParam {
   int bitmapKeyFrameInterval = 60;
   int bitmapMaxResolution = 720;
-  float frameRate = 24.0;
+  float frameRate = 24.0f;
+  float scale = 1.0f;
   TagMode tagMode = TagMode::Stable;
   ExportScenes scenes = ExportScenes::General;
   uint16_t exportTagLevel = 1023;
   int imageQuality = 80;
-  float imagePixelRatio = 2.0;
+  float imagePixelRatio = 2.0f;
   std::string sequenceSuffix = "_bmp";
   bool enableLayerName = true;
   bool enableFontFile = false;
@@ -64,6 +65,5 @@ struct ConfigParam {
   pag::CompositionType sequenceType = pag::CompositionType::Video;
   bool enableFontAudio = true;
   Language language = Language::Auto;
-  float scale = 1.0;
 };
 }  // namespace exporter

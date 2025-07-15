@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "src/base/utils/Log.h"
 namespace fs = std::filesystem;
 
 namespace FileHelper {
@@ -35,7 +36,7 @@ std::string ReadTextFile(const std::string& filename) {
   return text;
 }
 
-int WriteTextFile(const std::string& fileName, const char* text) {
+size_t WriteTextFile(const std::string& fileName, const char* text) {
   std::ofstream file(fileName, std::ios::out);
   if (!file.is_open()) {
     return 0;
@@ -45,7 +46,7 @@ int WriteTextFile(const std::string& fileName, const char* text) {
   return file.tellp();
 }
 
-int WriteTextFile(const std::string& fileName, const std::string& text) {
+size_t WriteTextFile(const std::string& fileName, const std::string& text) {
   return WriteTextFile(fileName, text.c_str());
 }
 
@@ -74,7 +75,8 @@ bool CopyFile(const std::string& src, const std::string& dst) {
       return false;
     }
     auto parentPath = fs::path(dst).parent_path();
-    if (!FileIsExist(parentPath)) {
+    if (!FileIsExist(parentPath.string())) {
+
       fs::create_directories(parentPath);
     }
     fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
@@ -84,14 +86,27 @@ bool CopyFile(const std::string& src, const std::string& dst) {
   }
 }
 
-ScopedTempFile::~ScopedTempFile() {
-  if (!tempFilePath.empty() && std::filesystem::exists(tempFilePath)) {
-    std::remove(tempFilePath.c_str());
+bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
+                 std::ios::openmode mode) {
+  std::ofstream file(filePath, mode);
+  if (!file) {
+    LOGE("Failed to open file: %s", filePath.c_str());
+    return false;
   }
-}
 
-void ScopedTempFile::setFilePath(const std::string& path) {
-  tempFilePath = path;
+  file.write(data, size);
+
+  if (file.fail()) {
+    LOGE("Failed to write to file: %s", filePath.c_str());
+    if (file.eof()) {
+      LOGE("eof is set: End-of-File reached on input operation.");
+    }
+    file.close();
+    return false;
+  }
+
+  file.close();
+  return true;
 }
 
 }  // namespace FileHelper

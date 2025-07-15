@@ -267,6 +267,9 @@ depsync
 
 libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
 
+本代码库中与腾讯代码相关的版权声明之前归 “THL A29 Limited” 所有。该实体现已注销，您应将所有之前分发的代码副本视为
+版权声明归 “腾讯” 所有。
+
 ## 隐私政策
 
 使用 libpag SDK 时请参考 [PAG SDK个人信息保护规则](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd).

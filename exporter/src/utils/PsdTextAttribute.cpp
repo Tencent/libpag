@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,25 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PsdTextAttribute.h"
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <iostream>
 #include <string_view>
+#include "src/base/utils/Log.h"
 namespace exporter {
 
 inline int HexCharToInt(const char c) {
   int result;
   auto [ptr, ec] = std::from_chars(&c, &c + 1, result, 16);
   if (ec != std::errc() || ptr != &c + 1) {
-    std::cerr << "HexCharToInt error: " << static_cast<int>(ec) << " ("
-              << std::make_error_code(ec).message() << ")" << std::endl;
+    LOGE("HexCharToInt error: %d (%s)", static_cast<int>(ec),
+         std::make_error_code(ec).message().c_str());
     return -1;
   }
   return result;
 }
 
-int PsdTextAttribute::stringFormatTransform(std::vector<char>& dst, const uint8_t* src,
-                                            const int len) {
+size_t PsdTextAttribute::stringFormatTransform(std::vector<char>& dst, const uint8_t* src,
+                                               const int len) {
   dst.push_back('/');
   dst.push_back('0');
   dst.push_back(' ');
@@ -160,7 +162,7 @@ bool PsdTextAttribute::getKey() {
     return false;
   }
   if (src[pos] != '/') {
-    std::cerr << "Error: Expected '/' at position " << pos << std::endl;
+    LOGE("Error: Expected '/' at position %d", pos);
     return false;
   }
 
@@ -172,16 +174,15 @@ bool PsdTextAttribute::getKey() {
       hasDigit = true;
     } else if (src[pos] == ' ') {
       if (!hasDigit) {
-        std::cerr << "Error: No digits found in key at position " << pos << std::endl;
+        LOGE("Error: No digits found in key at position %d", pos);
       }
       return hasDigit;
     } else {
-      std::cerr << "Error: Invalid character '" << src[pos] << "' in key at position " << pos
-                << std::endl;
+      LOGE("Error: Invalid character '%c' in key at position %d", src[pos], pos);
       return false;
     }
   }
-  std::cerr << "Error: Unexpected end of input while parsing key" << std::endl;
+  LOGE("Error: Unexpected end of input while parsing key");
   return false;
 }
 
@@ -234,7 +235,7 @@ bool PsdTextAttribute::getValue() {
       }
     }
     if (num != 0) {
-      std::cerr << "Error: Unmatched '<' in dictionary at position " << startPos << std::endl;
+      LOGE("Error: Unmatched '<' in dictionary at position %d", startPos);
       return false;
     }
 
@@ -257,7 +258,7 @@ bool PsdTextAttribute::getValue() {
       }
     }
     if (num != 0) {
-      std::cerr << "Error: Unmatched '[' in array at position " << startPos << std::endl;
+      LOGE("Error: Unmatched '[' in array at position %d", startPos);
       return false;
     }
 
@@ -303,7 +304,7 @@ bool PsdTextAttribute::getValue() {
 int PsdTextAttribute::getAttribute() {
   if (getKey()) {
     if (!getValue()) {
-      std::cerr << "getAttribute error!" << std::endl;
+      LOGE("Error: getAttribute error!");
     }
   }
   return pos;

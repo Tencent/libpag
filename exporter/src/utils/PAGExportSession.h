@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,20 +19,27 @@
 #pragma once
 #include <memory>
 #include <string>
+#include "../Config/ConfigParam.h"
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
 #include "AlertInfo.h"
-#include "ConfigParam.h"
 #include "pag/file.h"
 #include "pag/types.h"
 
 namespace exporter {
 
+#define RECORD_ERROR(statements)                          \
+  do {                                                    \
+    if ((statements) != A_Err_NONE) {                     \
+      session->pushWarning(AlertInfoType::ExportAEError); \
+    }                                                     \
+  } while (0)
+
 class AlertInfoManager;
 
 class PAGExportSession {
  public:
-  PAGExportSession(std::string& path);
+  PAGExportSession(const std::string& path);
   ~PAGExportSession();
 
   void checkParamValid();
@@ -77,12 +84,16 @@ class PAGExportSession {
 
   bool enableRunScript = true;
 
-  bool enableFontFile = false /*DEFAULT_ENABLE_FONTFILE*/;
+  bool enableFontFile = false /*DEFAULT_ENABLE_FONT_FILE*/;
   std::vector<std::string> fontFilePathList = {};
 
   pag::ID recordCompId = 0;
   pag::ID recordLayerId = 0;
   std::vector<pag::TextDirection> textDirectList = {};
+  bool enableAudio = true;
+  bool enableForceStaticBMP = true;
+
+  std::vector<std::shared_ptr<pag::Composition>> compositions = {};
 
  private:
   std::vector<std::vector<float>> extractFloatArraysByKey(const std::string& xmlContent,

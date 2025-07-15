@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include "src/base/utils/Log.h"
 #include "utils/AEHelper.h"
 #include "utils/FileHelper.h"
 
@@ -44,7 +45,7 @@ bool CreateFolder(const std::string& path) {
   if (!FileHelper::FileIsExist(path)) {
     std::error_code errorCode;
     if (!fs::create_directories(path, errorCode)) {
-      printf("Create %s failed: %s\n", path.c_str(), errorCode.message().c_str());
+      LOGE("Create %s failed: %s", path.c_str(), errorCode.message().c_str());
       return false;
     }
   }

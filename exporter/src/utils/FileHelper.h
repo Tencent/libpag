@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -23,9 +23,9 @@ namespace FileHelper {
 
 std::string ReadTextFile(const std::string& filename);
 
-int WriteTextFile(const std::string& fileName, const char* text);
+size_t WriteTextFile(const std::string& fileName, const char* text);
 
-int WriteTextFile(const std::string& fileName, const std::string& text);
+size_t WriteTextFile(const std::string& fileName, const std::string& text);
 
 size_t GetFileSize(const std::string& fileName);
 
@@ -33,15 +33,7 @@ bool CopyFile(const std::string& src, const std::string& dst);
 
 bool FileIsExist(const std::string& fileName);
 
-class ScopedTempFile {
- public:
-  ScopedTempFile() = default;
-  ~ScopedTempFile();
-
-  void setFilePath(const std::string& path);
-
- private:
-  std::string tempFilePath = "";
-};
+bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
+                 std::ios::openmode mode = std::ios::out | std::ios::binary);
 
 }  // namespace FileHelper

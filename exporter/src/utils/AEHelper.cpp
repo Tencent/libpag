@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 #include <iostream>
 #include "StringHelper.h"
 #include "platform/PlatformHelper.h"
+#include "src/base/utils/Log.h"
 namespace AEHelper {
 
 AEGP_PluginID PluginID = 0L;
@@ -125,16 +126,16 @@ bool CheckAeVersion() {
   try {
     size_t dotPos = AeVersion.find('.');
     if (dotPos == std::string::npos) {
-      std::cerr << "Invalid version format" << std::endl;
+      LOGE("Invalid version format!");
       return false;
     }
     std::string versionStr = AeVersion.substr(0, dotPos);
     majorVersion = std::stoi(versionStr);
   } catch (const std::invalid_argument& e) {
-    std::cerr << "Invalid argument: " << e.what() << std::endl;
+    LOGE("Invalid argument: %s", e.what());
     return false;
   } catch (const std::out_of_range& e) {
-    std::cerr << "Out of range: " << e.what() << std::endl;
+    LOGE("Out of range: %s", e.what());
     return false;
   }
   if (majorVersion >= MAJORVERSION) {
