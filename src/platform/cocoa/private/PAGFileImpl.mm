@@ -25,11 +25,6 @@
 #import "PAGLayerImpl+Internal.h"
 #import "PAGTextImpl.h"
 
-@interface PAGImageImpl ()
-
-@property(nonatomic) std::shared_ptr<pag::PAGImage> pagImage;
-
-@end
 
 @implementation PAGFileImpl {
 }
@@ -147,7 +142,7 @@
   return pagFile->replaceText(editableTextIndex, textDocument);
 }
 
-- (void)replaceImage:(int)editableImageIndex data:(PAGImageImpl*)value {
+- (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value {
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   if (value != nil) {
     pagFile->replaceImage(editableImageIndex, value.pagImage);
@@ -156,7 +151,7 @@
   }
 }
 
-- (void)replaceImageByName:(NSString*)layerName data:(PAGImageImpl*)value {
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value {
   if (layerName == nil || layerName.length == 0) {
     return;
   }

@@ -19,7 +19,7 @@
 #import <Foundation/Foundation.h>
 #import "PAGCompositionImpl.h"
 #import "PAGFile.h"
-#import "PAGImageImpl.h"
+#import "platform/cocoa/PAGImage.h"
 #import "PAGText.h"
 #import "platform/cocoa/PAGFont.h"
 #import "platform/cocoa/PAGText.h"
@@ -50,9 +50,9 @@
 
 - (void)replaceText:(int)editableTextIndex data:(PAGText*)value;
 
-- (void)replaceImage:(int)editableImageIndex data:(PAGImageImpl*)value;
+- (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value;
 
-- (void)replaceImageByName:(NSString*)layerName data:(PAGImageImpl*)value;
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value;
 
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type;
 

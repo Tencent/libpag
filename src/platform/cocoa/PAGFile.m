@@ -17,15 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGFile.h"
-#import "PAGImageImpl.h"
+#import "PAGImage.h"
 #import "platform/cocoa/private/PAGFileImpl.h"
 #import "platform/cocoa/private/PAGLayer+Internal.h"
-
-@interface PAGImage ()
-
-@property(nonatomic, strong) PAGImageImpl* image;
-
-@end
 
 @implementation PAGFile {
 }
@@ -75,19 +69,11 @@
 }
 
 - (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value {
-  if (value != nil) {
-    [(PAGFileImpl*)self.impl replaceImage:editableImageIndex data:[value image]];
-  } else {
-    [(PAGFileImpl*)self.impl replaceImage:editableImageIndex data:nil];
-  }
+  [(PAGFileImpl*)self.impl replaceImage:editableImageIndex data:value];
 }
 
 - (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value {
-  if (value != nil) {
-    [(PAGFileImpl*)self.impl replaceImageByName:layerName data:[value image]];
-  } else {
-    [(PAGFileImpl*)self.impl replaceImageByName:layerName data:nil];
-  }
+  [(PAGFileImpl*)self.impl replaceImageByName:layerName data:value];
 }
 
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type {

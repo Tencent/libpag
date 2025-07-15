@@ -18,22 +18,9 @@
 
 #import "PAGImageLayerImpl.h"
 #import "PAGImage.h"
-#import "PAGImageImpl.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGVideoRange.h"
 #import "pag/pag.h"
-
-@interface PAGImage ()
-
-@property(nonatomic, strong) PAGImageImpl* image;
-
-@end
-
-@interface PAGImageImpl ()
-
-@property(nonatomic) std::shared_ptr<pag::PAGImage> pagImage;
-
-@end
 
 @implementation PAGImageLayerImpl
 + (instancetype)Make:(CGSize)size duration:(int64_t)duration {
@@ -64,14 +51,12 @@
 
 - (void)replaceImage:(PAGImage*)image {
   auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
-  PAGImageImpl* imageImpl = [image image];
-  pagImageLayer->replaceImage(imageImpl.pagImage);
+  pagImageLayer->replaceImage(image.pagImage);
 }
 
 - (void)setImage:(PAGImage*)image {
   auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
-  PAGImageImpl* imageImpl = [image image];
-  pagImageLayer->setImage(imageImpl.pagImage);
+  pagImageLayer->setImage(image.pagImage);
 }
 
 - (int64_t)contentDuration {

@@ -16,51 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGImageImpl.h"
+#import "PAGImage.h"
 #include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "rendering/editing/StillImage.h"
 
-@interface PAGImageImpl ()
+@interface PAGImage ()
 
 @property(nonatomic) std::shared_ptr<pag::PAGImage> pagImage;
+@property(nonatomic) CFDataRef imageData;
 
 @end
 
-@implementation PAGImageImpl {
+@implementation PAGImage {
 }
 
-+ (PAGImageImpl*)FromPath:(NSString*)path {
-  if (path == nil) {
-    return nil;
-  }
-  auto data = pag::PAGImage::FromPath(path.UTF8String);
-  if (data == nullptr) {
-    return nil;
-  }
-  PAGImageImpl* image = [[[PAGImageImpl alloc] initWidthPAGImage:data] autorelease];
-  return image;
-}
-
-+ (PAGImageImpl*)FromBytes:(const void*)bytes size:(size_t)length {
-  auto data = pag::PAGImage::FromBytes(bytes, length);
-  if (data == nullptr) {
-    return nil;
-  }
-  PAGImageImpl* image = [[[PAGImageImpl alloc] initWidthPAGImage:data] autorelease];
-  return image;
-}
-
-+ (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  auto image = tgfx::Image::MakeFrom(pixelBuffer);
-  auto pagImage = pag::StillImage::MakeFrom(std::move(image));
-  if (pagImage == nullptr) {
-    return nil;
-  }
-  return [[[PAGImageImpl alloc] initWidthPAGImage:pagImage] autorelease];
-}
-
-+ (PAGImageImpl*)FromCGImage:(CGImageRef)cgImage {
++ (PAGImage*)FromCGImage:(CGImageRef)cgImage {
   if (cgImage == nil) {
     return nil;
   }
@@ -69,8 +40,38 @@
   if (data == nullptr) {
     return nil;
   }
-  PAGImageImpl* pagImage = [[[PAGImageImpl alloc] initWidthPAGImage:data] autorelease];
+  PAGImage* pagImage = [[[PAGImage alloc] initWidthPAGImage:data] autorelease];
   return pagImage;
+}
+
++ (PAGImage*)FromPath:(NSString*)path {
+  if (path == nil) {
+    return nil;
+  }
+  auto data = pag::PAGImage::FromPath(path.UTF8String);
+  if (data == nullptr) {
+    return nil;
+  }
+  PAGImage* image = [[[PAGImage alloc] initWidthPAGImage:data] autorelease];
+  return image;
+}
+
++ (PAGImage*)FromBytes:(const void*)bytes size:(size_t)length {
+  auto data = pag::PAGImage::FromBytes(bytes, length);
+  if (data == nullptr) {
+    return nil;
+  }
+  PAGImage* image = [[[PAGImage alloc] initWidthPAGImage:data] autorelease];
+  return image;
+}
+
++ (PAGImage*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+  auto image = tgfx::Image::MakeFrom(pixelBuffer);
+  auto pagImage = pag::StillImage::MakeFrom(std::move(image));
+  if (pagImage == nullptr) {
+    return nil;
+  }
+  return [[[PAGImage alloc] initWidthPAGImage:pagImage] autorelease];
 }
 
 - (instancetype)initWidthPAGImage:(std::shared_ptr<pag::PAGImage>)value {
@@ -78,6 +79,13 @@
     _pagImage = value;
   }
   return self;
+}
+
+- (void)dealloc {
+  if (_imageData) {
+    CFRelease(_imageData);
+  }
+  [super dealloc];
 }
 
 - (NSInteger)width {
@@ -88,11 +96,11 @@
   return _pagImage->height();
 }
 
-- (int)scaleMode {
-  return static_cast<int>(_pagImage->scaleMode());
+- (PAGScaleMode)scaleMode {
+  return (PAGScaleMode)_pagImage->scaleMode();
 }
 
-- (void)setScaleMode:(int)value {
+- (void)setScaleMode:(PAGScaleMode)value {
   _pagImage->setScaleMode(static_cast<pag::PAGScaleMode>(value));
 }
 

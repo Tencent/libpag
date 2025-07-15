@@ -22,6 +22,13 @@
 #import "PAG.h"
 #import "PAGScaleMode.h"
 
+#ifdef __cplusplus
+#include <memory>
+namespace pag {
+class PAGImage;
+}
+#endif
+
 PAG_API @interface PAGImage : NSObject
 /**
  * Creates a PAGImage object from a CGImage object, return null if it's not valid CGImage object.
@@ -77,5 +84,11 @@ PAG_API @interface PAGImage : NSObject
  * will be set to PAGScaleMode::None when this method is called.
  */
 - (void)setMatrix:(CGAffineTransform)value;
+
+#ifdef __cplusplus
+// Internal method for accessing the underlying C++ object
+- (instancetype)initWidthPAGImage:(std::shared_ptr<pag::PAGImage>)value;
+@property(nonatomic, readonly) std::shared_ptr<pag::PAGImage> pagImage;
+#endif
 
 @end
