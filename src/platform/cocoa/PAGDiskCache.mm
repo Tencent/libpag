@@ -17,20 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGDiskCache.h"
-#import "platform/cocoa/private/PAGDiskCacheImpl.h"
+#import "pag/pag.h"
+#include "rendering/caches/DiskCache.h"
 
 @implementation PAGDiskCache
 
 + (size_t)MaxDiskSize {
-  return [PAGDiskCacheImpl MaxDiskSize];
+  return pag::PAGDiskCache::MaxDiskSize();
 }
 
 + (void)SetMaxDiskSize:(size_t)size {
-  [PAGDiskCacheImpl SetMaxDiskSize:size];
+  pag::PAGDiskCache::SetMaxDiskSize(size);
 }
 
 + (void)RemoveAll {
-  [PAGDiskCacheImpl RemoveAll];
+  pag::PAGDiskCache::RemoveAll();
+}
+
++ (NSData*)ReadFile:(NSString*)key {
+  if (key == nil) {
+    return nil;
+  }
+  auto cacheDatas = pag::DiskCache::ReadFile([key UTF8String]);
+  if (!cacheDatas || cacheDatas->empty()) {
+    return nil;
+  }
+  return [NSData dataWithBytes:const_cast<void*>(cacheDatas->data()) length:cacheDatas->size()];
+}
+
++ (BOOL)WritFile:(NSString*)key data:(NSData*)data {
+  if (key == nil || data == nil) {
+    return false;
+  }
+  std::string cacheKey = [key UTF8String];
+  auto cacheDatas = tgfx::Data::MakeWithoutCopy(data.bytes, data.length);
+  return pag::DiskCache::WriteFile(cacheKey, cacheDatas);
 }
 
 @end

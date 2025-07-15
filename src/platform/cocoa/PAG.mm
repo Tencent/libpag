@@ -16,18 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#import "PAG.h"
+#import "pag/pag.h"
 
-@interface PAGDiskCacheImpl : NSObject
+@implementation PAG
 
-+ (size_t)MaxDiskSize;
-
-+ (void)SetMaxDiskSize:(size_t)size;
-
-+ (void)RemoveAll;
-
-+ (NSData*)ReadFile:(NSString*)key;
-
-+ (BOOL)WritFile:(NSString*)key data:(NSData*)data;
++ (NSString*)SDKVersion {
+  return [NSString stringWithUTF8String:pag::PAG::SDKVersion().c_str()];
+}
 
 @end

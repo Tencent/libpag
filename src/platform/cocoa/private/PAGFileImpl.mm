@@ -21,7 +21,7 @@
 #include "pag/pag.h"
 #include "tgfx/core/Task.h"
 
-#import "PAGDiskCacheImpl.h"
+#import "platform/cocoa/PAGDiskCache.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGTextImpl.h"
 
@@ -63,14 +63,14 @@
     return nil;
   }
   if ([PAGFileImpl IsNetWorkPath:path]) {
-    NSData* cacheData = [PAGDiskCacheImpl ReadFile:path];
+    NSData* cacheData = [PAGDiskCache ReadFile:path];
     if (cacheData == nil) {
       NSError* error = nil;
       cacheData = [NSData dataWithContentsOfURL:[NSURL URLWithString:path]
                                         options:NSDataReadingUncached
                                           error:&error];
       if (error == nil && cacheData != nil) {
-        [PAGDiskCacheImpl WritFile:path data:cacheData];
+        [PAGDiskCache WritFile:path data:cacheData];
       }
     }
     return [PAGFileImpl Load:cacheData.bytes size:cacheData.length path:path];

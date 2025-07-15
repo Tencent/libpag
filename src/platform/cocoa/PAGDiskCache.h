@@ -42,4 +42,14 @@ PAG_API @interface PAGDiskCache : NSObject
  */
 + (void)RemoveAll;
 
+/**
+ * Reads cached file data for the given key.
+ */
++ (NSData*)ReadFile:(NSString*)key;
+
+/**
+ * Writes data to cache file with the given key.
+ */
++ (BOOL)WritFile:(NSString*)key data:(NSData*)data;
+
 @end
