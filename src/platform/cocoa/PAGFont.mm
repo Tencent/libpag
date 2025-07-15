@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGFont.h"
-#import "platform/cocoa/private/PAGFontImpl.h"
+#import "pag/pag.h"
 
 @implementation PAGFont
 
@@ -31,7 +31,19 @@
 + (PAGFont*)RegisterFont:(NSString*)fontPath
                   family:(NSString*)fontFamily
                    style:(NSString*)fontStyle {
-  return [PAGFontImpl RegisterFont:fontPath family:fontFamily style:fontStyle];
+  if (fontPath == nil) {
+    return nullptr;
+  }
+  auto font = pag::PAGFont::RegisterFont(std::string(fontPath.UTF8String), 0,
+                                         std::string(fontFamily.UTF8String),
+                                         std::string(fontStyle.UTF8String));
+  if (font.fontFamily.empty()) {
+    return nullptr;
+  }
+  PAGFont* pagFont = [[[PAGFont alloc] init] autorelease];
+  pagFont.fontFamily = [NSString stringWithUTF8String:font.fontFamily.c_str()];
+  pagFont.fontStyle = [NSString stringWithUTF8String:font.fontStyle.c_str()];
+  return pagFont;
 }
 
 + (PAGFont*)RegisterFont:(void*)data size:(size_t)length {
@@ -42,11 +54,23 @@
                     size:(size_t)length
                   family:(NSString*)fontFamily
                    style:(NSString*)fontStyle {
-  return [PAGFontImpl RegisterFont:data size:length family:fontFamily style:fontStyle];
+  auto font = pag::PAGFont::RegisterFont(data, length, 0, std::string(fontFamily.UTF8String),
+                                         std::string(fontStyle.UTF8String));
+  if (font.fontFamily.empty()) {
+    return nullptr;
+  }
+  PAGFont* pagFont = [[[PAGFont alloc] init] autorelease];
+  pagFont.fontFamily = [NSString stringWithUTF8String:font.fontFamily.c_str()];
+  pagFont.fontStyle = [NSString stringWithUTF8String:font.fontStyle.c_str()];
+  return pagFont;
 }
 
 + (void)UnregisterFont:(PAGFont*)font {
-  [PAGFontImpl UnregisterFont:font];
+  if (font.fontFamily.length == 0) {
+    return;
+  }
+  pag::PAGFont::UnregisterFont(
+      {std::string(font.fontFamily.UTF8String), std::string(font.fontStyle.UTF8String)});
 }
 
 - (void)dealloc {
