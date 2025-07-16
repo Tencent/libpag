@@ -94,7 +94,11 @@ class ImageProxyPicture : public Picture {
     if (!(renderFlags & tgfx::RenderFlags::DisableCache)) {
       auto snapshot = cache->getSnapshot(this);
       if (snapshot) {
-        canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
+        auto canvasMatrix = canvas->getMatrix();
+        canvas->concat(snapshot->getMatrix());
+        auto currentMatrix = canvas->getMatrix();
+        canvas->drawImage(snapshot->getImage(), GetSamplingOptions(currentMatrix, snapshot->getImage().get()));
+        canvas->setMatrix(canvasMatrix);
         return;
       }
     }
@@ -178,7 +182,11 @@ class SnapshotPicture : public Picture {
       graphic->draw(canvas);
       return;
     }
-    canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
+    auto canvasMatrix = canvas->getMatrix();
+    canvas->concat(snapshot->getMatrix());
+    auto currentMatrix = canvas->getMatrix();
+    canvas->drawImage(snapshot->getImage(), GetSamplingOptions(currentMatrix, snapshot->getImage().get()));
+    canvas->setMatrix(canvasMatrix);
   }
 
  protected:
