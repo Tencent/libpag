@@ -20,7 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/RenderFlags.h"
-#include "tgfx//core/SamplingOptions.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace pag {
 class RenderCache;
