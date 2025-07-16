@@ -416,9 +416,7 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
     parentCanvas->drawPicture(sourcePicture);
   } else {
     auto canvasMatrix = parentCanvas->getMatrix();
-    parentCanvas->translate(totalOffset.x, totalOffset.y);
-    auto samplingOptions = GetSamplingOptions(parentCanvas->getMatrix(), output.get());
-    parentCanvas->drawImage(output, samplingOptions);
+    parentCanvas->drawImage(output);
     parentCanvas->setMatrix(canvasMatrix);
   }
   parentCanvas->restore();

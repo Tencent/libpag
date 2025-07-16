@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include "rendering/utils/SamplingOptions.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx//core/SamplingOptions.h"
 
 namespace pag {
 class RenderCache;
 struct CanvasState;
+
+tgfx::SamplingOptions GetSamplingOptions(const tgfx::Matrix& matrix, tgfx::Image* image);
 
 class Canvas {
  public:
