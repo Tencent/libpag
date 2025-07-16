@@ -21,6 +21,23 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
+tgfx::SamplingOptions GetSamplingOptions(const tgfx::Matrix& matrix, tgfx::Image* image) {
+  if (image == nullptr) {
+    return {};
+  }
+  auto mipmapMode = image->hasMipmaps() ? tgfx::MipmapMode::Linear : tgfx::MipmapMode::None;
+  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipmapMode);
+  if (matrix.getScaleX() == 1.0f && matrix.getScaleY() == 1.0f &&
+      matrix.getSkewX() == 0.0f && matrix.getSkewY() == 0.0f) {
+    float tx = matrix.getTranslateX();
+    float ty = matrix.getTranslateY();
+    if (std::floor(tx) == tx && std::floor(ty) == ty) {
+      samplingOptions.filterMode = tgfx::FilterMode::Nearest;
+    }
+  }
+  return samplingOptions;
+}
+
 struct CanvasState {
   float alpha = 1.0f;
   tgfx::BlendMode blendMode = tgfx::BlendMode::SrcOver;

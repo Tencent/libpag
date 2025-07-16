@@ -481,7 +481,10 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
     if (!targetCanvas->getMatrix().invert(&drawingMatrix)) {
       drawingMatrix.setIdentity();
     }
-    parentCanvas->drawImage(targetSurface->makeImageSnapshot(), drawingMatrix);
+    auto canvasMatrix = parentCanvas->getMatrix();
+    parentCanvas->concat(drawingMatrix);
+    parentCanvas->drawImage(targetSurface->makeImageSnapshot());
+    parentCanvas->setMatrix(canvasMatrix);
   }
 }
 }  // namespace pag
