@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace pag {
 class RenderCache;
@@ -147,19 +148,27 @@ class Canvas {
 
   void drawImage(std::shared_ptr<tgfx::Image> image, float left, float top,
                  const tgfx::Paint* paint = nullptr) {
-    auto realPaint = createPaint(paint);
-    canvas->drawImage(std::move(image), left, top, &realPaint);
+    drawImage(std::move(image), tgfx::Matrix::MakeTrans(left, top), paint);
   }
 
   void drawImage(std::shared_ptr<tgfx::Image> image, const tgfx::Matrix& matrix,
                  const tgfx::Paint* paint = nullptr) {
+    if (image == nullptr) {
+      return;
+    }
+    auto mipmapMode = image->hasMipmaps() ? tgfx::MipmapMode::Linear : tgfx::MipmapMode::None;
+    tgfx::SamplingOptions sampling{tgfx::FilterMode::Linear, mipmapMode};
+    canvas->concat(matrix);
+    auto totalMatrix = canvas->getMatrix();
+    if (totalMatrix.getScaleX() == 1.0f && totalMatrix.getScaleY() == 1.0f) {
+      sampling.filterMode = tgfx::FilterMode::Nearest;
+    }
     auto realPaint = createPaint(paint);
-    canvas->drawImage(std::move(image), matrix, &realPaint);
+    canvas->drawImage(std::move(image), sampling, &realPaint);
   }
 
   void drawImage(std::shared_ptr<tgfx::Image> image, const tgfx::Paint* paint = nullptr) {
-    auto realPaint = createPaint(paint);
-    canvas->drawImage(std::move(image), &realPaint);
+    drawImage(std::move(image), tgfx::Matrix::I(), paint);
   }
 
   void drawImage(std::shared_ptr<tgfx::Image> image, tgfx::SamplingOptions sampling,
