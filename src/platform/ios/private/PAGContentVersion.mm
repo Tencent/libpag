@@ -19,7 +19,6 @@
 #import "PAGContentVersion.h"
 
 #import "platform/cocoa/private/PAGLayer+Internal.h"
-#import "platform/cocoa/private/PAGLayerImpl+Internal.h"
 #include "rendering/layers/ContentVersion.h"
 
 @implementation PAGContentVersion
@@ -27,7 +26,7 @@
   if (pagComposition == nil) {
     return 0;
   }
-  auto composition = [[pagComposition impl] pagLayer];
+  auto composition = [pagComposition pagLayer];
   return pag::ContentVersion::Get(composition);
 }
 @end

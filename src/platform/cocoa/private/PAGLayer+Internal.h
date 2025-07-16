@@ -16,15 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#pragma once
+
 #import "platform/cocoa/PAGLayer.h"
+#import "pag/pag.h"
 
-@interface PAGLayer () {
-  id _impl;
-}
+@interface PAGLayer (Internal)
 
-- (instancetype)initWithImpl:(id)impl;
+- (instancetype)initWithPagLayer:(std::shared_ptr<pag::PAGLayer>)pagLayer;
 
-- (id)impl;
+- (std::shared_ptr<pag::PAGLayer>)pagLayer;
+
+- (void)setPagLayer:(std::shared_ptr<pag::PAGLayer>)pagLayer;
+
++ (PAGLayer*)ToPAGLayer:(std::shared_ptr<pag::PAGLayer>)layer;
+
++ (NSArray<PAGLayer*>*)BatchConvertToPAGLayers:
+    (const std::vector<std::shared_ptr<pag::PAGLayer>>&)layerVector;
+
++ (NSArray<PAGMarker*>*)BatchConvertToPAGMarkers:(std::vector<const pag::Marker*>&)markers;
 
 @end

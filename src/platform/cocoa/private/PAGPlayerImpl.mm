@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGPlayerImpl.h"
-#import "PAGLayer+Internal.h"
-#import "PAGLayerImpl+Internal.h"
-#import "pag/pag.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -46,12 +44,12 @@
 - (PAGComposition*)getComposition {
   // 必须从pagPlayer里返回，不能额外存储一个引用，因为同一个PAGComposition添加到别的PAGPlayer后会从当前的移除。
   auto composition = pagPlayer->getComposition();
-  return (PAGComposition*)[PAGLayerImpl ToPAGLayer:composition];
+  return (PAGComposition*)[PAGLayer ToPAGLayer:composition];
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
   if (newComposition != nil) {
-    auto layer = [[newComposition impl] pagLayer];
+    auto layer = [newComposition pagLayer];
     pagPlayer->setComposition(std::static_pointer_cast<pag::PAGComposition>(layer));
   } else {
     pagPlayer->setComposition(nullptr);
@@ -152,7 +150,7 @@
 }
 
 - (CGRect)getBounds:(PAGLayer*)pagLayer {
-  auto layer = [[pagLayer impl] pagLayer];
+  auto layer = [pagLayer pagLayer];
   auto bounds = pagPlayer->getBounds(layer);
   return CGRectMake(bounds.x(), bounds.y(), bounds.width(), bounds.height());
 }
@@ -160,14 +158,14 @@
 - (NSArray<PAGLayer*>*)getLayersUnderPoint:(CGPoint)point {
   auto pagLayerVector =
       pagPlayer->getLayersUnderPoint(static_cast<float>(point.x), static_cast<float>(point.y));
-  return [PAGLayerImpl BatchConvertToPAGLayers:pagLayerVector];
+  return [PAGLayer BatchConvertToPAGLayers:pagLayerVector];
 }
 
 - (BOOL)hitTestPoint:(PAGLayer*)layer point:(CGPoint)point pixelHitTest:(BOOL)pixelHitTest {
   if (layer == nil) {
     return false;
   }
-  auto pagLayer = [[layer impl] pagLayer];
+  auto pagLayer = [layer pagLayer];
   return pagPlayer->hitTestPoint(pagLayer, point.x, point.y, pixelHitTest);
 }
 @end

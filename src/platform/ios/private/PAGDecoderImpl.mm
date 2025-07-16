@@ -18,8 +18,7 @@
 
 #import "PAGDecoderImpl.h"
 #import <VideoToolbox/VideoToolbox.h>
-#import "PAGLayer+Internal.h"
-#import "PAGLayerImpl+Internal.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
@@ -33,7 +32,7 @@
                         scale:(float)scale {
   std::shared_ptr<pag::PAGComposition> pagComposition = nullptr;
   if (composition != nil) {
-    auto layer = [[composition impl] pagLayer];
+    auto layer = [composition pagLayer];
     pagComposition = std::static_pointer_cast<pag::PAGComposition>(layer);
   }
   auto decoder = pag::PAGDecoder::MakeFrom(pagComposition, maxFrameRate, scale);

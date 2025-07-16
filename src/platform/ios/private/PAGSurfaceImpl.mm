@@ -19,7 +19,7 @@
 #import "PAGSurfaceImpl.h"
 #include "GPUDrawable.h"
 #import "PAGLayer+Internal.h"
-#import "PAGLayerImpl+Internal.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 #import "PAGSurface+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"

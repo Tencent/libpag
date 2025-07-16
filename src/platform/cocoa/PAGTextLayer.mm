@@ -16,26 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGTextLayerImpl.h"
+#import "PAGTextLayer.h"
 #import "PAGColorUtility.h"
 #import "PAGFont.h"
-#import "PAGLayerImpl+Internal.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 
-@implementation PAGTextLayerImpl
+@implementation PAGTextLayer
 
 - (CocoaColor*)fillColor {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   auto color = pagTextLayer->fillColor();
   return PAGColorUtility::ToCocoaColor(color);
 }
 
 - (void)setFillColor:(CocoaColor*)color {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   pagTextLayer->setFillColor(PAGColorUtility::ToColor(color));
 }
 
 - (PAGFont*)font {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   auto font = pagTextLayer->font();
   PAGFont* pagFont = [PAGFont new];
   pagFont.fontFamily = [NSString stringWithUTF8String:font.fontFamily.c_str()];
@@ -45,7 +45,7 @@
 }
 
 - (void)setFont:(PAGFont*)font {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   if (font.fontFamily) {
     std::string familyName =
         std::string([font.fontFamily cStringUsingEncoding:NSUTF8StringEncoding]);
@@ -58,40 +58,40 @@
 }
 
 - (CGFloat)fontSize {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   return pagTextLayer->fontSize();
 }
 
 - (void)setFontSize:(CGFloat)size {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   return pagTextLayer->setFontSize(size);
 }
 
 - (CocoaColor*)strokeColor {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   auto color = pagTextLayer->strokeColor();
   return PAGColorUtility::ToCocoaColor(color);
 }
 
 - (void)setStrokeColor:(CocoaColor*)color {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   pagTextLayer->setStrokeColor(PAGColorUtility::ToColor(color));
 }
 
 - (NSString*)text {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   auto text = pagTextLayer->text();
   return [NSString stringWithUTF8String:text.c_str()];
 }
 
 - (void)setText:(NSString*)text {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   auto newText = std::string([text cStringUsingEncoding:NSUTF8StringEncoding]);
   pagTextLayer->setText(newText);
 }
 
 - (void)reset {
-  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([self pagLayer]);
   pagTextLayer->reset();
 }
 

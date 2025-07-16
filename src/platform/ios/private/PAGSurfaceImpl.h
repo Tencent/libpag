@@ -20,8 +20,8 @@
 #import <Foundation/Foundation.h>
 #import <QuartzCore/QuartzCore.h>
 #import <UIKit/UIKit.h>
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
+#import "platform/cocoa/PAGImageLayer.h"
+#import "platform/cocoa/PAGLayer.h"
 
 @interface PAGSurfaceImpl : NSObject
 

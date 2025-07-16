@@ -16,21 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGCompositionImpl.h"
-#import "PAGFileImpl.h"
-#import "PAGImageLayerImpl.h"
-#import "PAGLayer+Internal.h"
-#import "PAGLayerImpl+Internal.h"
-#import "PAGShapeLayerImpl.h"
-#import "PAGSolidLayerImpl.h"
-#import "PAGTextLayerImpl.h"
+#import "PAGLayer.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
+#import "platform/cocoa/PAGComposition.h"
 #import "platform/cocoa/PAGFile.h"
 #import "platform/cocoa/PAGImageLayer.h"
 #import "platform/cocoa/PAGShapeLayer.h"
 #import "platform/cocoa/PAGSolidLayer.h"
 #import "platform/cocoa/PAGTextLayer.h"
 
-@interface PAGLayerImpl () {
+@interface PAGLayer () {
   std::shared_ptr<pag::PAGLayer> _pagLayer;
 }
 
@@ -38,7 +33,7 @@
 
 @end
 
-@implementation PAGLayerImpl
+@implementation PAGLayer
 
 - (instancetype)initWithPagLayer:(std::shared_ptr<pag::PAGLayer>)pagLayer {
   if (self = [super init]) {
@@ -102,12 +97,12 @@
 
 - (PAGComposition*)parent {
   auto pagComposition = _pagLayer->parent();
-  return (PAGComposition*)[PAGLayerImpl ToPAGLayer:pagComposition];
+  return (PAGComposition*)[PAGLayer ToPAGLayer:pagComposition];
 }
 
 - (NSArray<PAGMarker*>*)markers {
   auto temp = _pagLayer->markers();
-  return [PAGLayerImpl BatchConvertToPAGMarkers:temp];
+  return [PAGLayer BatchConvertToPAGMarkers:temp];
 }
 
 - (int64_t)localTimeToGlobal:(int64_t)localTime {
@@ -152,7 +147,7 @@
 
 - (PAGLayer*)trackMatteLayer {
   auto pagLayer = _pagLayer->trackMatteLayer();
-  return [PAGLayerImpl ToPAGLayer:pagLayer];
+  return [PAGLayer ToPAGLayer:pagLayer];
 }
 
 - (CGRect)getBounds {
@@ -170,35 +165,27 @@
   id result = nil;
   switch (layer->layerType()) {
     case pag::LayerType::Solid: {
-      PAGSolidLayerImpl* impl = [[[PAGSolidLayerImpl alloc] initWithPagLayer:layer] autorelease];
-      result = [[PAGSolidLayer alloc] initWithImpl:impl];
+      result = [[PAGSolidLayer alloc] initWithPagLayer:layer];
     } break;
     case pag::LayerType::Text: {
-      PAGTextLayerImpl* impl = [[[PAGTextLayerImpl alloc] initWithPagLayer:layer] autorelease];
-      result = [[PAGTextLayer alloc] initWithImpl:impl];
+      result = [[PAGTextLayer alloc] initWithPagLayer:layer];
     } break;
     case pag::LayerType::Shape: {
-      PAGShapeLayerImpl* impl = [[[PAGShapeLayerImpl alloc] initWithPagLayer:layer] autorelease];
-      result = [[PAGShapeLayer alloc] initWithImpl:impl];
+      result = [[PAGShapeLayer alloc] initWithPagLayer:layer];
     } break;
     case pag::LayerType::Image: {
-      PAGImageLayerImpl* impl = [[[PAGImageLayerImpl alloc] initWithPagLayer:layer] autorelease];
-      result = [[PAGImageLayer alloc] initWithImpl:impl];
+      result = [[PAGImageLayer alloc] initWithPagLayer:layer];
     } break;
     case pag::LayerType::PreCompose: {
       auto composition = std::static_pointer_cast<pag::PAGComposition>(layer);
       if (composition->isPAGFile()) {
-        PAGFileImpl* impl = [[[PAGFileImpl alloc] initWithPagLayer:composition] autorelease];
-        result = [[PAGFile alloc] initWithImpl:impl];
+        result = [[PAGFile alloc] initWithPagLayer:composition];
       } else {
-        PAGCompositionImpl* impl =
-            [[[PAGCompositionImpl alloc] initWithPagLayer:composition] autorelease];
-        result = [[PAGComposition alloc] initWithImpl:impl];
+        result = [[PAGComposition alloc] initWithPagLayer:composition];
       }
     } break;
     default: {
-      PAGLayerImpl* impl = [[[PAGLayerImpl alloc] initWithPagLayer:layer] autorelease];
-      result = [[PAGLayer alloc] initWithImpl:impl];
+      result = [[PAGLayer alloc] initWithPagLayer:layer];
     } break;
   }
   layer->externalHandle = result;
@@ -213,7 +200,7 @@
   }
   NSMutableArray* mArray = [NSMutableArray new];
   for (auto pagLayer : layerVector) {
-    PAGLayer* obj = [PAGLayerImpl ToPAGLayer:pagLayer];
+    PAGLayer* obj = [PAGLayer ToPAGLayer:pagLayer];
     if (obj) {
       [mArray addObject:obj];
     }
@@ -221,11 +208,6 @@
   NSArray* result = [mArray copy];
   [mArray release];
   return [result autorelease];
-}
-
-- (void)dealloc {
-  _pagLayer->externalHandle = nullptr;
-  [super dealloc];
 }
 
 + (NSArray<PAGMarker*>*)BatchConvertToPAGMarkers:(std::vector<const pag::Marker*>&)markers {
@@ -260,6 +242,13 @@
 
 - (void)setAlpha:(float)value {
   _pagLayer->setAlpha(value);
+}
+
+- (void)dealloc {
+  if (_pagLayer) {
+    _pagLayer->externalHandle = nullptr;
+  }
+  [super dealloc];
 }
 
 @end

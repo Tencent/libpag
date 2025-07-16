@@ -16,18 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGFileImpl.h"
-
-#include "pag/pag.h"
+#import "PAGFile.h"
+#import "PAGImage.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
+#import "platform/cocoa/PAGDiskCache.h"
+#import "PAGTextImpl.h"
 #include "tgfx/core/Task.h"
 
-#import "platform/cocoa/PAGDiskCache.h"
-#import "PAGLayerImpl+Internal.h"
-#import "PAGTextImpl.h"
-
-
-@implementation PAGFileImpl {
-}
+@implementation PAGFile
 
 + (uint16_t)MaxSupportedTagLevel {
   return pag::PAGFile::MaxSupportedTagLevel();
@@ -57,7 +53,7 @@
   if (path == nil) {
     return nil;
   }
-  if ([PAGFileImpl IsNetWorkPath:path]) {
+  if ([PAGFile IsNetWorkPath:path]) {
     NSData* cacheData = [PAGDiskCache ReadFile:path];
     if (cacheData == nil) {
       NSError* error = nil;
@@ -68,17 +64,17 @@
         [PAGDiskCache WritFile:path data:cacheData];
       }
     }
-    return [PAGFileImpl Load:cacheData.bytes size:cacheData.length path:path];
+    return [PAGFile Load:cacheData.bytes size:cacheData.length path:path];
   }
   auto pagFile = pag::PAGFile::Load([path UTF8String]);
   if (pagFile == nullptr) {
     return nil;
   }
-  return (PAGFile*)[PAGLayerImpl ToPAGLayer:pagFile];
+  return (PAGFile*)[PAGLayer ToPAGLayer:pagFile];
 }
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length {
-  return [PAGFileImpl Load:bytes size:length path:@""];
+  return [PAGFile Load:bytes size:length path:@""];
 }
 
 + (PAGFile*)Load:(const void*)bytes size:(size_t)length path:(NSString*)filePath {
@@ -89,7 +85,7 @@
   if (pagFile == nullptr) {
     return nil;
   }
-  return (PAGFile*)[PAGLayerImpl ToPAGLayer:pagFile];
+  return (PAGFile*)[PAGLayer ToPAGLayer:pagFile];
 }
 
 + (void)LoadAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
@@ -100,7 +96,7 @@
   void (^copyCallback)(PAGFile*) = Block_copy(callback);
   [path retain];
   tgfx::Task::Run([callBack = copyCallback, path]() {
-    PAGFile* file = [PAGFileImpl Load:path];
+    PAGFile* file = [PAGFile Load:path];
     [path release];
     callBack(file);
     Block_release(callBack);
@@ -108,23 +104,23 @@
 }
 
 - (uint16_t)tagLevel {
-  return std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->tagLevel();
+  return std::static_pointer_cast<pag::PAGFile>([self pagLayer])->tagLevel();
 }
 
 - (int)numTexts {
-  return std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->numTexts();
+  return std::static_pointer_cast<pag::PAGFile>([self pagLayer])->numTexts();
 }
 
 - (int)numImages {
-  return std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->numImages();
+  return std::static_pointer_cast<pag::PAGFile>([self pagLayer])->numImages();
 }
 
 - (int)numVideos {
-  return std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->numVideos();
+  return std::static_pointer_cast<pag::PAGFile>([self pagLayer])->numVideos();
 }
 
 - (NSString*)path {
-  auto path = std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->path();
+  auto path = std::static_pointer_cast<pag::PAGFile>([self pagLayer])->path();
   if (path.empty()) {
     return nil;
   }
@@ -132,18 +128,18 @@
 }
 
 - (PAGText*)getTextData:(int)index {
-  auto textDocument = std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->getTextData(index);
+  auto textDocument = std::static_pointer_cast<pag::PAGFile>([self pagLayer])->getTextData(index);
   return ToPAGText(textDocument);
 }
 
 - (void)replaceText:(int)editableTextIndex data:(PAGText*)value {
   auto textDocument = ToTextDocument(value);
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   return pagFile->replaceText(editableTextIndex, textDocument);
 }
 
 - (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   if (value != nil) {
     pagFile->replaceImage(editableImageIndex, value.pagImage);
   } else {
@@ -156,7 +152,7 @@
     return;
   }
   std::string name = layerName.UTF8String;
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   if (value != nil) {
     pagFile->replaceImageByName(name, value.pagImage);
   } else {
@@ -165,13 +161,13 @@
 }
 
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   auto layerVector = pagFile->getLayersByEditableIndex(index, static_cast<pag::LayerType>(type));
-  return [PAGLayerImpl BatchConvertToPAGLayers:layerVector];
+  return [PAGLayer BatchConvertToPAGLayers:layerVector];
 }
 
 - (NSArray<NSNumber*>*)getEditableIndices:(PAGLayerType)type {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   auto indices = pagFile->getEditableIndices(static_cast<pag::LayerType>(type));
   NSMutableArray<NSNumber*>* result = [[NSMutableArray new] autorelease];
   for (size_t i = 0; i < indices.size(); ++i) {
@@ -180,27 +176,28 @@
   return result;
 }
 
-- (int)timeStretchMode {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
-  return static_cast<int>(pagFile->timeStretchMode());
+- (PAGTimeStretchMode)timeStretchMode {
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
+  return static_cast<PAGTimeStretchMode>(pagFile->timeStretchMode());
 }
 
-- (void)seTimeStretchMode:(int)value {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+- (void)seTimeStretchMode:(PAGTimeStretchMode)value {
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   return pagFile->setTimeStretchMode(static_cast<pag::PAGTimeStretchMode>(value));
 }
 
 - (void)setDuration:(int64_t)duration {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   return pagFile->setDuration(duration);
 }
 
 - (PAGFile*)copyOriginal {
-  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>([self pagLayer]);
   auto newFile = pagFile->copyOriginal();
   if (newFile == nullptr) {
     return nil;
   }
-  return [(PAGFile*)[PAGLayerImpl ToPAGLayer:newFile] retain];
+  return [(PAGFile*)[PAGLayer ToPAGLayer:newFile] retain];
 }
+
 @end

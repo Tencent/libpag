@@ -18,7 +18,7 @@
 
 #import "PAGSurfaceImpl.h"
 #include "GPUDrawable.h"
-#import "PAGLayerImpl+Internal.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 

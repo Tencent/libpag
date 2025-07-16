@@ -16,23 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGImageLayerImpl.h"
+#import "PAGImageLayer.h"
 #import "PAGImage.h"
-#import "PAGLayerImpl+Internal.h"
 #import "PAGVideoRange.h"
-#import "pag/pag.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 
-@implementation PAGImageLayerImpl
+@implementation PAGImageLayer
+
 + (instancetype)Make:(CGSize)size duration:(int64_t)duration {
   auto pagImageLayer = pag::PAGImageLayer::Make(size.width, size.height, duration);
-  if (pagImageLayer == nullptr) {
-    return nil;
-  }
-  return [[[PAGImageLayerImpl alloc] initWithPagLayer:pagImageLayer] autorelease];
+  return [[[PAGImageLayer alloc] initWithPagLayer:pagImageLayer] autorelease];
 }
 
 - (NSArray<PAGVideoRange*>*)getVideoRanges {
-  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
+  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([self pagLayer]);
   auto temp = pagImageLayer->getVideoRanges();
   NSMutableArray* mArray = [NSMutableArray new];
   for (auto range : temp) {
@@ -50,22 +47,22 @@
 }
 
 - (void)replaceImage:(PAGImage*)image {
-  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
+  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([self pagLayer]);
   pagImageLayer->replaceImage(image.pagImage);
 }
 
 - (void)setImage:(PAGImage*)image {
-  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
+  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([self pagLayer]);
   pagImageLayer->setImage(image.pagImage);
 }
 
 - (int64_t)contentDuration {
-  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
+  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([self pagLayer]);
   return pagImageLayer->contentDuration();
 }
 
 - (NSData*)imageBytes {
-  auto temp = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer])->imageBytes();
+  auto temp = std::static_pointer_cast<pag::PAGImageLayer>([self pagLayer])->imageBytes();
   if (temp == nullptr) {
     return nil;
   }

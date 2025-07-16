@@ -16,32 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
-#import "PAGLayerImpl.h"
-#import "pag/file.h"
-#import "pag/pag.h"
+#import "PAGSolidLayer.h"
+#import "PAGColorUtility.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
 
-@interface PAGLayerImpl (Internal)
+@implementation PAGSolidLayer
 
-- (instancetype)initWithPagLayer:(std::shared_ptr<pag::PAGLayer>)pagLayer;
+- (CocoaColor*)solidColor {
+  auto pagSolidLayer = std::static_pointer_cast<pag::PAGSolidLayer>([self pagLayer]);
+  auto color = pagSolidLayer->solidColor();
+  return PAGColorUtility::ToCocoaColor(color);
+}
 
-- (std::shared_ptr<pag::PAGLayer>)pagLayer;
+- (void)setSolidColor:(CocoaColor*)color {
+  auto pagSolidLayer = std::static_pointer_cast<pag::PAGSolidLayer>([self pagLayer]);
+  pagSolidLayer->setSolidColor(PAGColorUtility::ToColor(color));
+}
 
-- (void)setPagLayer:(std::shared_ptr<pag::PAGLayer>)pagLayer;
-
-/*
- * Convert pag::PAGLayer to a PAGLayer wrapper
- */
-+ (PAGLayer*)ToPAGLayer:(std::shared_ptr<pag::PAGLayer>)layer;
-
-/*
- * Batch Convert pag::PAGLayer to a PAGLayer wrapper
- */
-+ (NSArray<PAGLayer*>*)BatchConvertToPAGLayers:
-    (const std::vector<std::shared_ptr<pag::PAGLayer>>&)layerVector;
-
-/*
- * Batch Convert pag::Marker to a PAGMarker wrapper
- */
-+ (NSArray<PAGMarker*>*)BatchConvertToPAGMarkers:(std::vector<const pag::Marker*>&)markers;
 @end
