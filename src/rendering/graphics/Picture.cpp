@@ -96,8 +96,7 @@ class ImageProxyPicture : public Picture {
       if (snapshot) {
         auto canvasMatrix = canvas->getMatrix();
         canvas->concat(snapshot->getMatrix());
-        auto currentMatrix = canvas->getMatrix();
-        auto samplingOptions = GetSamplingOptions(currentMatrix, snapshot->getImage().get());
+        auto samplingOptions = GetSamplingOptions(canvas->getMatrix(), snapshot->getImage().get());
         canvas->drawImage(snapshot->getImage(), samplingOptions);
         canvas->setMatrix(canvasMatrix);
         return;
@@ -185,8 +184,7 @@ class SnapshotPicture : public Picture {
     }
     auto canvasMatrix = canvas->getMatrix();
     canvas->concat(snapshot->getMatrix());
-    auto currentMatrix = canvas->getMatrix();
-    auto samplingOptions = GetSamplingOptions(currentMatrix, snapshot->getImage().get());
+    auto samplingOptions = GetSamplingOptions(canvas->getMatrix(), snapshot->getImage().get());
     canvas->drawImage(snapshot->getImage(), samplingOptions);
     canvas->setMatrix(canvasMatrix);
   }

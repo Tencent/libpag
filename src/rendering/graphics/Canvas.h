@@ -148,8 +148,7 @@ class Canvas {
 
   void drawImage(std::shared_ptr<tgfx::Image> image, const tgfx::Paint* paint = nullptr) {
     auto realPaint = createPaint(paint);
-    auto matrix = canvas->getMatrix();
-    auto samplingOptions = GetSamplingOptions(matrix, image.get());
+    auto samplingOptions = GetSamplingOptions(canvas->getMatrix(), image.get());
     canvas->drawImage(std::move(image), samplingOptions, &realPaint);
   }
 
