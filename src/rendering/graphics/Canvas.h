@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "rendering/utils/SamplingOptions.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/RenderFlags.h"
-#include "rendering/utils/SamplingOptions.h"
 
 namespace pag {
 class RenderCache;
