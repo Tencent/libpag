@@ -29,7 +29,7 @@ buildscript {
         // in the individual module build.gradle files
     }
     
-    // Force commons-compress version for all configurations
+    // Force commons-compress version for all configurations to resolve compatibility issues
     configurations.classpath {
         resolutionStrategy {
             force 'org.apache.commons:commons-compress:1.26.0'
