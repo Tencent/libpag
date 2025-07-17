@@ -6,7 +6,7 @@ plugins {
 }
 
 
-version = '0.10001.0'
+version = '4.1.0'
 project.ext.artifactId = 'libpag'
 project.group = 'com.tencent.tav'
 
@@ -78,11 +78,9 @@ publishing {
         maven(MavenPublication) {
             groupId = 'com.tencent.tav'
             artifactId = 'libpag'
-            version = '0.10001.0'
-            
+
             artifact("$buildDir/outputs/aar/libpag-release.aar")
             artifact androidSourcesJar
-            
             pom {
                 name = 'libpag'
                 description = 'A real-time rendering library for PAG (Portable Animated Graphics) files that renders After Effects animations natively across multiple platforms.'
