@@ -1,6 +1,10 @@
-apply plugin: 'com.android.library'
-apply plugin: 'maven-publish'
-apply plugin: 'signing'
+plugins {
+    id 'com.android.library'
+    id 'maven-publish'
+    id 'signing'
+    id 'org.jreleaser' version '1.19.0'
+}
+
 
 version = '4.1.0'
 project.ext.artifactId = 'libpag'
@@ -71,37 +75,29 @@ task androidSourcesJar(type: Jar) {
 
 publishing {
     publications {
-        mavenAar(MavenPublication) {
-            // group id，发布后引用的依赖的 group id
-            groupId 'com.tencent.tav'
-            // 发布后引用的依赖的 artifact id
-            artifactId 'libpag'
-            println version
-            // 发布的 arr 的文件和源码文件
+        maven(MavenPublication) {
+            groupId = 'com.tencent.tav'
+            artifactId = 'libpag'
+
             artifact("$buildDir/outputs/aar/libpag-release.aar")
             artifact androidSourcesJar
             pom {
-                // 构件名称，可以自定义
                 name = 'libpag'
-                // 构件描述
                 description = 'A real-time rendering library for PAG (Portable Animated Graphics) files that renders After Effects animations natively across multiple platforms.'
-                // 构件主页
                 url = 'https://github.com/Tencent/libpag'
-                // 许可证名称和地址
                 licenses {
                     license {
                         name = 'The Apache License, Version 2.0'
                         url = 'https://github.com/Tencent/libpag/blob/main/LICENSE.txt'
                     }
                 }
-                // 开发者信息
                 developers {
                     developer {
+                        id = 'libpag'
                         name = 'libpag'
                         email = 'libpag@tencent.com'
                     }
                 }
-                // 版本控制仓库地址
                 scm {
                     url = 'https://github.com/Tencent/libpag'
                     connection = 'scm:git:github.com/Tencent/libpag.git'
@@ -110,18 +106,59 @@ publishing {
             }
         }
     }
+    
     repositories {
         maven {
-            // 发布的位置，这里根据发布的版本区分了 SNAPSHOT 和最终版本两种情况
-            def releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-            def snapshotsRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
-            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            name = 'staging'
+            url = layout.buildDirectory.dir('staging-deploy')
         }
     }
 }
 
 signing {
-    sign publishing.publications
+    // Completely disable Gradle signing - JReleaser will handle all signing
+    required { false }
+}
+
+jreleaser {
+    gitRootSearch = true
+
+    project{
+        description = "A real-time rendering library for PAG (Portable Animated Graphics) files that renders After Effects animations natively across multiple platforms."
+        copyright = "Copyright © 2025 Tencent. All rights reserved."
+    }
+    
+    release {
+        github {
+            enabled = true
+            skipTag = true
+            skipRelease = true
+        }
+    }
+    
+    signing {
+        active = 'ALWAYS'
+        armored = true
+    }
+    
+    deploy {
+        maven {
+            mavenCentral {
+                    sonatype {
+                    active = "ALWAYS"
+                    url = "https://central.sonatype.com/api/v1/publisher"
+                    stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
+                    setAuthorization("Basic")
+                    applyMavenCentralRules = false // Wait for fix: https://github.com/kordamp/pomchecker/issues/21
+                    sign = true
+                    checksums = true
+                    sourceJar = true
+                    javadocJar = true
+                    retryDelay = 60
+                }
+            }
+        }
+    }
 }
 
 project.afterEvaluate {
@@ -164,41 +201,6 @@ project.afterEvaluate {
             from project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/armeabi-v7a'
             into project.getBuildDir().path + '/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/armeabi'
             include '*.so'
-        }
-    }
-    publishing {
-        repositories {
-        }
-        publications {
-            aar(MavenPublication) {
-                groupId project.group
-                artifactId project.artifactId
-                version project.version
-
-                artifact bundleReleaseAar
-
-                //The publication doesn't know about our dependencies, so we have to manually add them to the pom
-                pom.withXml {
-                    // for dependencies and exclusions
-                    def dependenciesNode = asNode().appendNode('dependencies')
-                    configurations.api.allDependencies.withType(ModuleDependency) { ModuleDependency dp ->
-                        def dependencyNode = dependenciesNode.appendNode('dependency')
-                        dependencyNode.appendNode('groupId', dp.group)
-                        dependencyNode.appendNode('artifactId', dp.name)
-                        dependencyNode.appendNode('version', dp.version)
-
-                        // for exclusions
-                        if (dp.excludeRules.size() > 0) {
-                            def exclusions = dependencyNode.appendNode('exclusions')
-                            dp.excludeRules.each { ExcludeRule ex ->
-                                def exclusion = exclusions.appendNode('exclusion')
-                                exclusion.appendNode('groupId', ex.group)
-                                exclusion.appendNode('artifactId', ex.module)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }
