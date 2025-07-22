@@ -73,5 +73,68 @@ std::string GetTempFolderPath() {
   }
   return TempFolderPath;
 }
+std::string GetDownloadsPath() {
+  wchar_t* path = nullptr;
+  HRESUlT hr = SHGetknownFolderPath(FOLDERID_Dowloads, 0, nullptr, &path);
+
+  if (SUCCEEDED(hr) && path) {
+    int size = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, nullptr, nullptr);
+    std::string result(size - 1, 0);
+    WideCharToMultiByte(CP_UTF8, 0, path, -1, &result[0], size, nullptr, nullptr);
+    CoTaskMemFree(path);
+    return result;
+  }
+
+  wchar_t userProfile[MAX_PATH];
+  if (GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH)) {
+    std::filesystem::path downloadsPath = std::filesystem::path(userProfile) / "Downloads";
+    return downloadsPath.string();
+  }
+
+  return "C:\\Users\\Downloads";
+}
+
+std::string GetPAGViewerPath() {
+  auto configPath = GetRoamingPath() + "PAGViewerPath.txt";
+  auto pagViewerPath = FileHelper::ReadTextFile(configPath.c_str());
+  if (!pagViewerPath.empty() && FileHelper::FileIsExist(pagViewerPath)) {
+    return pagViewerPath;
+  }
+
+  auto config = std::make_shared<CheckConfig>();
+  config->SetTargetAppName("PAGViewer");
+  auto installer = std::make_unique<QtPAGViewerInstaller>(config);
+  auto info = installer->GetPAGViewerInfo();
+
+  if (!info.installLocation.empty()) {
+    std::filesystem::path viewerPath =
+        std::filesystem::path(info.installLocation) / "PAGViewer.exe";
+    if (FileHelper::FileIsExist(viewerPath)) {
+      return viewerPath.string();
+    }
+  }
+
+  return "";
+}
+
+void PreviewPAGFile(std::string pagFilePath) {
+  auto pagViewerPath = AEHelper::GetConfigParam().GetPlatformSpecificConfig("PAGViewerPath");
+
+  auto winCmd = "\"" + pagViewerPath + "\" \"" + pagFilePath + "\"";
+
+  STARTUPINFOA si = {0};
+  PROCESS_INFORMATION pi = {0};
+
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  if (CreateProcessA(NULL, (LPSTR)winCmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  } else {
+    LOGE("Failed to launch PAGViewer: %s", std::to_string(GetLastError()).c_str());
+  }
+}
 
 }  // namespace exporter

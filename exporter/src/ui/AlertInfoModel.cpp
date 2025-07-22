@@ -98,13 +98,13 @@ bool AlertInfoModel::setData(const QModelIndex& index, const QVariant& value, in
   }
 }
 
-bool AlertInfoModel::locateAlert(int row) const {
+bool AlertInfoModel::locateAlert(int row) {
   if (row < 0 || row >= static_cast<int>(alertInfos.size())) {
     return false;
   }
 
-  const AlertInfo& alertInfo = alertInfos[row];
-  const_cast<AlertInfo*>(&alertInfo)->select();
+  AlertInfo& alertInfo = alertInfos[row];
+  alertInfo.select();
   return true;
 }
 
@@ -126,8 +126,7 @@ void AlertInfoModel::jumpToUrl() {
 
 void AlertInfoModel::setAlertInfos(std::vector<AlertInfo>& infos) {
   beginResetModel();
-  alertInfos.clear();
-  alertInfos.insert(alertInfos.begin(), infos.begin(), infos.end());
+  alertInfos = std::move(infos);
   endResetModel();
 
   Q_EMIT alertInfoChanged();
@@ -209,30 +208,32 @@ std::string AlertInfoModel::browseForSave(bool useScript) {
     return "";
   }
   std::string itemName = AEHelper::GetItemName(activeItemH);
-
   QString projectPath = AEHelper::GetProjectPath();
-  QString fullPath = projectPath + "/" + QString::fromStdString(itemName) + ".pag";
+
+  QString fullPath = QDir(projectPath).filePath(QString::fromStdString(itemName));
   std::string filePath = fullPath.toStdString();
-  auto defaultPath = filePath;
+
   static std::string LastOutputPath;
   static std::string LastFilePath;
 
+  QString defaultPath = QString::fromStdString(filePath);
   if (!LastOutputPath.empty() && LastFilePath == filePath) {
-    defaultPath = LastOutputPath;
+    defaultPath = QString::fromStdString(LastOutputPath);
   }
 
   std::string outputPath = "";
   if (useScript) {
-    auto scriptText = "var file  = new File(\"" + defaultPath + "\");\n" +
+    QString scriptPath = defaultPath;
+    scriptPath.replace('\\', '/');
+    auto scriptText = "var file = new File(\"" + scriptPath.toStdString() + "\");\n" +
                       "var result = file.saveDlg();\n" + "result ? result.fsName : '';";
     outputPath = AEHelper::RunScript(suites, pluginID, scriptText);
   } else {
     QString saveFilePath = QFileDialog::getSaveFileName(QApplication::topLevelWidgets().value(0),
-                                                        QObject::tr("选择存储路径"),
-                                                        QString::fromStdString(defaultPath));
+                                                        QObject::tr("选择存储路径"), defaultPath);
     outputPath = saveFilePath.toStdString();
-    printf("outputPath is:%s\n", outputPath.c_str());
   }
+
   if (!outputPath.empty()) {
     LastFilePath = filePath;
     LastOutputPath = outputPath;

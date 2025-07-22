@@ -33,6 +33,7 @@
         <file>qml/ConfigWindow.qml</file>
         <file>qml/AlertWarning.qml</file>
         <file>qml/AlertError.qml</file>
+        <file>qml/PAGViewerInstall.qml</file>
 
     </qresource>
 </RCC>

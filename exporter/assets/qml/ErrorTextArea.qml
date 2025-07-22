@@ -1,5 +1,5 @@
-import QtQuick 2.5
-import QtQuick.Controls 2.1
+import QtQuick
+import QtQuick.Controls
 
 TextArea {
     id: suggestText
@@ -32,7 +32,7 @@ TextArea {
         acceptedButtons: Qt.LeftButton
         hoverEnabled: false
 
-        onPressed: pressed => {
+        onPressed: function(pressed) {
             hasMoved = false;
             targetListView.interactive = false;
             clearSelect();
@@ -48,7 +48,7 @@ TextArea {
             }
         }
 
-        onPositionChanged: mouse => {
+        onPositionChanged: function(mouse) {
             var position = targetTextArea.positionAt(mouse.x, mouse.y);
             if (!isInit) {
                 headPosition = position;
@@ -73,7 +73,7 @@ TextArea {
         }
     }
 
-    onFocusChanged: focus => {
+    onFocusChanged: function(focus) {
         if (!focus) {
             suggestMouseArea.clearSelect();
         }

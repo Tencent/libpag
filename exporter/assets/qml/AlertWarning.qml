@@ -44,8 +44,6 @@ PAGWindow {
         }
 
         function cancelAndModify() {
-            console.log("Cancel and Modify clicked");
-            console.log("Cancelling export");
             mainWindow.close();
         }
 
@@ -138,8 +136,8 @@ PAGWindow {
                 isPreview: true
                 normalColor: "#22222c"
                 secondRowColor: "#272730"
-                fontSize: 14
-                fontFamily: "PingFang SC"
+                // fontSize: 18
+                // fontFamily: "PingFang SC"
                 showLocationBtn: false
 
                 model: alertDataModel

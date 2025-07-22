@@ -13,7 +13,7 @@ Rectangle {
     property var itemRightMargin: 13
     property var secondLineMarginTop: 7
     property var normalMargin: 10
-    property var fontSize: 18
+    property var fontSize: 16
     property var titleMarginTop: 4
     property var titleIconMarginTop: -2
     property var fontFamily: "PingFang SC"

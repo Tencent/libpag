@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WindowManager.h"
-#include <QDebug>
 #include <QFile>
 #include <QtGui/QFont>
-#include <QtWidgets/QApplication>
 #include <memory>
 #include "AlertInfoModel.h"
 #include "ConfigModel.h"
+#include "PAGViewerInstallModel.h"
 #include "utils/AEHelper.h"
 
 namespace exporter {
@@ -94,6 +93,11 @@ bool WindowManager::showSimpleError(const QString& message) {
   std::vector<AlertInfo> emptyInfos;
   bool result = alertModel->ErrorsAlert(emptyInfos);
   return result;
+}
+
+bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
+  auto installModel = std::make_unique<PAGViewerInstallModel>();
+  return installModel->showInstallDialog(pagFilePath);
 }
 
 }  // namespace exporter

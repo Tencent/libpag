@@ -28,24 +28,10 @@ namespace exporter {
 
 class AlertInfoModel : public QAbstractListModel {
   Q_OBJECT
-
- public:
-  explicit AlertInfoModel(QObject* parent = nullptr);
-  ~AlertInfoModel() override;
-
-  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
-  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
-  QHash<int, QByteArray> roleNames() const override;
-  bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
-
-  Q_INVOKABLE bool locateAlert(int row) const;
-  Q_INVOKABLE QVariantList getAlertInfos() const;
-  Q_INVOKABLE int getAlertCount() const;
-  Q_INVOKABLE void jumpToUrl();
-
   Q_PROPERTY(
       QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
 
+ public:
   enum AlertRoles {
     IsErrorRole = Qt::UserRole + 1,
     InfoRole,
@@ -58,18 +44,34 @@ class AlertInfoModel : public QAbstractListModel {
   };
   Q_ENUM(AlertRoles)
 
-  void setAlertInfos(std::vector<AlertInfo>& infos);
+  explicit AlertInfoModel(QObject* parent = nullptr);
+  ~AlertInfoModel() override;
 
-  Q_SIGNAL void alertInfoChanged();
+  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+  QHash<int, QByteArray> roleNames() const override;
+  bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
 
+  Q_INVOKABLE bool locateAlert(int row);
+  Q_INVOKABLE QVariantList getAlertInfos() const;
+  Q_INVOKABLE int getAlertCount() const;
+  Q_INVOKABLE void jumpToUrl();
   QString getErrorMessage() const;
-  void setErrorMessage(const QString& message);
 
-  Q_SIGNAL void errorMessageChanged();
+  void setAlertInfos(std::vector<AlertInfo>& infos);
+  void setErrorMessage(const QString& message);
 
   bool WarningsAlert(std::vector<AlertInfo>& infos);
   bool ErrorsAlert(std::vector<AlertInfo>& info);
   std::string browseForSave(bool useScript);
+
+ Q_SIGNALS:
+  void errorMessageChanged();
+  void alertInfoChanged();
+
+ protected:
+  QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
+  const AlertInfo* getAlertInfo(const QModelIndex& index) const;
 
  private:
   std::vector<AlertInfo> alertInfos;
@@ -77,9 +79,6 @@ class AlertInfoModel : public QAbstractListModel {
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> alertEngine = nullptr;
   QQuickWindow* alertWindow = nullptr;
-
-  QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
-  const AlertInfo* getAlertInfo(const QModelIndex& index) const;
 };
 
 }  // namespace exporter

@@ -18,6 +18,7 @@
 
 #include "AECommand.h"
 #include "export/PAGExport.h"
+#include "platform/PlatformHelper.h"
 #include "ui/AlertInfoModel.h"
 #include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
@@ -168,8 +169,10 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
   if (outputPath.empty()) {
     return err;
   }
+
   std::vector<AlertInfo> testWarnings = createTestWarnings();
   WindowManager::GetInstance().showWarnings(testWarnings);
+  PreviewPAGFile(outputPath);
 
   return err;
 }

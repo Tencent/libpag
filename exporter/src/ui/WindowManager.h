@@ -42,6 +42,8 @@ class WindowManager {
 
   bool showSimpleError(const QString& message);
 
+  bool showPAGViewerInstallDialog(const std::string& pagFilePath);
+
   WindowManager(const WindowManager&) = delete;
   WindowManager& operator=(const WindowManager&) = delete;
 
