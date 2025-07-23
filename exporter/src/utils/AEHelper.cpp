@@ -108,6 +108,19 @@ QString GetProjectPath() {
   return fileInfo.absolutePath();
 }
 
+AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH) {
+  if (layerH == nullptr) {
+    return nullptr;
+  }
+
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  AEGP_StreamRefH streamH = nullptr;
+  suites->StreamSuite4()->AEGP_GetNewLayerStream(pluginID, layerH, AEGP_LayerStream_MARKER,
+                                                 &streamH);
+  return streamH;
+}
+
 std::string GetDocumentsFolderPath() {
   if (DocumentsFolderPath.empty()) {
     const auto& suites = GetSuites();

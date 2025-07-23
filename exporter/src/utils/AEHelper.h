@@ -66,6 +66,8 @@ void RegisterTextDocumentScript();
 
 QString GetProjectPath();
 
+AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH);
+
 const std::string TextDocumentScript = R"(
 if (typeof PAG !== 'object') {
     PAG = {};
