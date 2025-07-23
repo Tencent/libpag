@@ -20,10 +20,13 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace pag {
 class RenderCache;
 struct CanvasState;
+
+tgfx::SamplingOptions GetSamplingOptions(const tgfx::Matrix& matrix, tgfx::Image* image);
 
 class Canvas {
  public:
@@ -145,21 +148,10 @@ class Canvas {
     canvas->drawPath(path, createPaint(paint));
   }
 
-  void drawImage(std::shared_ptr<tgfx::Image> image, float left, float top,
-                 const tgfx::Paint* paint = nullptr) {
-    auto realPaint = createPaint(paint);
-    canvas->drawImage(std::move(image), left, top, &realPaint);
-  }
-
-  void drawImage(std::shared_ptr<tgfx::Image> image, const tgfx::Matrix& matrix,
-                 const tgfx::Paint* paint = nullptr) {
-    auto realPaint = createPaint(paint);
-    canvas->drawImage(std::move(image), matrix, &realPaint);
-  }
-
   void drawImage(std::shared_ptr<tgfx::Image> image, const tgfx::Paint* paint = nullptr) {
     auto realPaint = createPaint(paint);
-    canvas->drawImage(std::move(image), &realPaint);
+    auto samplingOptions = GetSamplingOptions(canvas->getMatrix(), image.get());
+    canvas->drawImage(std::move(image), samplingOptions, &realPaint);
   }
 
   void drawImage(std::shared_ptr<tgfx::Image> image, tgfx::SamplingOptions sampling,
