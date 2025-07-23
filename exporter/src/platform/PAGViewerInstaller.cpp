@@ -32,7 +32,11 @@ namespace exporter {
 PAGViewerInstaller::PAGViewerInstaller(std::shared_ptr<CheckConfig> config, QObject* parent)
     : QObject(parent), config(std::move(config)) {
   networkManager = new QNetworkAccessManager(this);
+#ifdef Q_OS_WIN
+  downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer_Installer.exe";
+#else
   downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer.zip";
+#endif
 
   tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/PAGInstaller";
 
@@ -81,8 +85,12 @@ InstallStatus PAGViewerInstaller::InstallPAGViewer() {
     progressCallback(0);
   }
 
-  QString zipPath = tempDir + "/PAGViewer.zip";
-  QFile::remove(zipPath);
+#ifdef Q_OS_WIN
+  QString filePath = tempDir + "/PAGViewer_Installer.exe";
+#else
+  QString filePath = tempDir + "/PAGViewer.zip";
+#endif
+  QFile::remove(filePath);
 
   QNetworkRequest request{QUrl(downloadUrl)};
   request.setRawHeader("User-Agent", "PAGExporter/1.0");
@@ -106,7 +114,7 @@ InstallStatus PAGViewerInstaller::InstallPAGViewer() {
     return InstallStatus::Error(InstallResult::ExecutionFailed, errorMsg.toStdString());
   }
 
-  QFile file(zipPath);
+  QFile file(filePath);
   if (!file.open(QIODevice::WriteOnly)) {
     downloadReply->deleteLater();
     downloadReply = nullptr;
@@ -127,7 +135,12 @@ InstallStatus PAGViewerInstaller::InstallPAGViewer() {
   downloadReply = nullptr;
 
   if (progressCallback) progressCallback(50);
-  return extractAndInstall(zipPath);
+
+#ifdef Q_OS_WIN
+  return executeInstaller(filePath);
+#else
+  return extractAndInstall(filePath);
+#endif
 }
 
 void PAGViewerInstaller::setProgressCallback(std::function<void(int)> callback) {
@@ -182,5 +195,31 @@ InstallStatus PAGViewerInstaller::extractAndInstall(const QString& zipPath) {
   }
   return InstallStatus::Success();
 }
+
+#ifdef Q_OS_WIN
+InstallStatus PAGViewerInstaller::executeInstaller(const QString& installerPath) {
+  QProcess installerProcess;
+  installerProcess.setProgram(installerPath);
+  
+  QStringList arguments;
+  arguments << "/S";  // Silent installation
+  installerProcess.setArguments(arguments);
+  
+  installerProcess.start();
+  installerProcess.waitForFinished(300000);  // 5 minutes timeout
+  
+  if (installerProcess.exitCode() != 0) {
+    QString error = installerProcess.readAllStandardError();
+    return InstallStatus::Error(InstallResult::ExecutionFailed,
+                                "installer execution failed: " + error.toStdString());
+  }
+  
+  if (progressCallback) {
+    progressCallback(90);
+  }
+  
+  return InstallStatus::Success();
+}
+#endif
 
 }  // namespace exporter

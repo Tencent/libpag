@@ -54,17 +54,8 @@ bool PAGViewerInstaller::IsPAGViewerInstallWin() {
 }
 
 bool PAGViewerInstaller::copyToApplicationsWindows(const QString& sourcePath) {
-  QString programFiles = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation);
-  QString targetDir = programFiles + "/PAGViewer";
-
-  QDir().mkpath(targetDir);
-  QString targetPath = targetDir + "/PAGViewer.exe";
-
-  if (QFile::exists(targetPath)) {
-    QFile::remove(targetPath);
-  }
-
-  return QFile::copy(sourcePath, targetPath);
+  Q_UNUSED(sourcePath)
+  return true;
 }
 
 }  // namespace exporter

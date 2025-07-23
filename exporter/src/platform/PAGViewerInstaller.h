@@ -39,6 +39,10 @@ class PAGViewerInstaller : public QObject {
  private:
   InstallStatus extractAndInstall(const QString& zipPath);
 
+#ifdef Q_OS_WIN
+  InstallStatus executeInstaller(const QString& installerPath);
+#endif
+
 #ifdef Q_OS_MAC
   bool IsPAGViewerInstalledMac();
   bool copyToApplicationsMac(const QString& sourcePath);

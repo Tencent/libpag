@@ -1,14 +1,15 @@
-#include "platform/PAGViewerCheck.h"
+#include <windows.h>
+#include <winerror.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <stringapiset.h>
-#include <windows.h>
 #include <winreg.h>
 #include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
 #include "platform/PlatformHelper.h"
+#include "platform/PAGViewerCheck.h"
 
 namespace exporter {
 
@@ -279,9 +280,9 @@ InstallStatus PAGViewerCheck::InstallPAGViewer() {
 
   if (!ShellExecuteExW(&sei)) {
     DWORD error = GetLastError();
-    if (error == ERROR_CANCELLED_BY_USER) {
-      return InstallStatus::Error(InstallResult::PermissionDenied, "User denied permission.");
-    }
+    // if (error ==  ERROR_CANCELLED_BY_USER) {
+    //   return InstallStatus::Error(InstallResult::PermissionDenied, "User denied permission.");
+    // }
     return InstallStatus::Error(InstallResult::ExecutionFailed,
                                 "Failed to execute installer. Error: " + std::to_string(error));
   }

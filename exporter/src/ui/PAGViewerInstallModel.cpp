@@ -24,7 +24,7 @@
 #include <QtConcurrent/QtConcurrent>
 #include <memory>
 #include <string>
-#include "platform/PAGViewerCheck.h"
+#include "platform/PAGViewerInstaller.h"
 #include "platform/PlatformHelper.h"
 
 namespace exporter {
@@ -141,8 +141,18 @@ void PAGViewerInstallModel::executeInstallation() {
     try {
       auto config = std::make_shared<CheckConfig>();
       config->SetTargetAppName("PAGViewer");
-      auto pagViewerCheck = std::make_unique<PAGViewerCheck>(config);
-      InstallStatus result = pagViewerCheck->InstallPAGViewer();
+      auto installer = std::make_unique<PAGViewerInstaller>(config);
+      installer->setProgressCallback([this](int progress) {
+        QMetaObject::invokeMethod(
+            this, [this, progress]() {
+              QString progressMessage = tr("正在安装PAGViewer... ") + QString("(%1%)").arg(progress);
+              message = progressMessage;
+              Q_EMIT messageChanged();
+            },
+            Qt::QueuedConnection);
+      });
+
+      InstallStatus result = installer->InstallPAGViewer();
 
       QMetaObject::invokeMethod(
           this,
