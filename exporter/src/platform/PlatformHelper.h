@@ -27,4 +27,10 @@ std::string GetConfigPath();
 
 std::string GetTempFolderPath();
 
+std::string GetDownloadsPath();
+
+std::string GetPAGViewerPath();
+
+void PreviewPAGFile(std::string pagFilePath);
+
 }  // namespace exporter
