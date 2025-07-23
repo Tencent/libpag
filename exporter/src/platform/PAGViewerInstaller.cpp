@@ -200,24 +200,24 @@ InstallStatus PAGViewerInstaller::extractAndInstall(const QString& zipPath) {
 InstallStatus PAGViewerInstaller::executeInstaller(const QString& installerPath) {
   QProcess installerProcess;
   installerProcess.setProgram(installerPath);
-  
+
   QStringList arguments;
   arguments << "/S";
   installerProcess.setArguments(arguments);
-  
+
   installerProcess.start();
   installerProcess.waitForFinished(300000);
-  
+
   if (installerProcess.exitCode() != 0) {
     QString error = installerProcess.readAllStandardError();
     return InstallStatus::Error(InstallResult::ExecutionFailed,
                                 "installer execution failed: " + error.toStdString());
   }
-  
+
   if (progressCallback) {
     progressCallback(90);
   }
-  
+
   return InstallStatus::Success();
 }
 #endif

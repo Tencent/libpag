@@ -144,8 +144,10 @@ void PAGViewerInstallModel::executeInstallation() {
       auto installer = std::make_unique<PAGViewerInstaller>(config);
       installer->setProgressCallback([this](int progress) {
         QMetaObject::invokeMethod(
-            this, [this, progress]() {
-              QString progressMessage = tr("正在安装PAGViewer... ") + QString("(%1%)").arg(progress);
+            this,
+            [this, progress]() {
+              QString progressMessage =
+                  tr("正在安装PAGViewer... ") + QString("(%1%)").arg(progress);
               message = progressMessage;
               Q_EMIT messageChanged();
             },

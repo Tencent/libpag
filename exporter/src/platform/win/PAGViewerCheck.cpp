@@ -1,15 +1,15 @@
-#include <windows.h>
-#include <winerror.h>
+#include "platform/PAGViewerCheck.h"
 #include <shellapi.h>
 #include <shlobj.h>
 #include <stringapiset.h>
+#include <windows.h>
+#include <winerror.h>
 #include <winreg.h>
 #include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
 #include "platform/PlatformHelper.h"
-#include "platform/PAGViewerCheck.h"
 
 namespace exporter {
 
