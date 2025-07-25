@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "platform/PAGViewerInstaller.h"
 #include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QSettings>
 #include <QStandardPaths>
-#include "platform/PAGViewerInstaller.h"
 
 #ifdef Q_OS_WIN
 #include <shlobj.h>
@@ -29,7 +29,7 @@
 
 namespace exporter {
 
-bool PAGViewerInstaller::IsPAGViewerInstallWin() {
+bool PAGViewerInstaller::isPAGViewerInstalled() {
 
   QString programFiles = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation);
   QString pagViewerPath = programFiles + "/PAGViewer/PAGViewer.exe";
@@ -53,7 +53,7 @@ bool PAGViewerInstaller::IsPAGViewerInstallWin() {
   return false;
 }
 
-bool PAGViewerInstaller::copyToApplicationsWindows(const QString& sourcePath) {
+bool PAGViewerInstaller::copyToApplications(const QString& sourcePath) {
   Q_UNUSED(sourcePath)
   return true;
 }

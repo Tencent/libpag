@@ -37,18 +37,19 @@ enum class InstallResult {
 struct InstallStatus {
   InstallResult result;
   std::string errorMessage;
+
+  InstallStatus() = default;
+
+  explicit InstallStatus(InstallResult result, std::string message = "")
+      : result(result), errorMessage(std::move(message)) {
+  }
+
   bool isSuccess() const {
-    return result == InstallResult::Success;
-  }
-  static InstallStatus Success() {
-    return {InstallResult::Success, ""};
-  }
-  static InstallStatus Error(InstallResult result, const std::string& message) {
-    return {result, message};
+    return result == InstallResult::UnknownError;
   }
 };
 
-struct SoftWareInfo {
+struct PackageInfo {
   std::string displayName;
   std::string version;
   std::string installLocation;
@@ -56,38 +57,38 @@ struct SoftWareInfo {
   std::string bundleID;
 };
 
-class CheckConfig {
+class AppConfig {
  public:
-  void SetTargetAppName(const std::string& name);
-  std::string GetTargetAppName();
-  void SetInstallerPath(const std::string& path);
-  std::string GetInstallerPath();
+  void setAppName(const std::string& name);
+  std::string getAppName();
+  void setInstallerPath(const std::string& path);
+  std::string getInstallerPath();
 
-  void SetPlatformSpecificConfig(const std::string& key, const std::string& value);
-  std::string GetPlatformSpecificConfig(const std::string& key);
+  void addConfig(const std::string& key, const std::string& value);
+  std::string getPlatformSpecificConfig(const std::string& key);
 
  private:
-  std::string targetAppName = "PAGViewer";
-  std::string installerPath;
+  std::string AppName = "PAGViewer";
+  std::string installerPath = "";
   std::unordered_map<std::string, std::string> platformConfig;
 };
 
 class PAGViewerCheck {
  public:
-  explicit PAGViewerCheck(std::shared_ptr<CheckConfig> config);
+  explicit PAGViewerCheck(std::shared_ptr<AppConfig> config);
 
-  bool IsPAGViewerInstalled();
+  bool isPAGViewerInstalled();
 
-  InstallStatus InstallPAGViewer();
+  InstallStatus installPAGViewer();
 
   void setProgressCallback(std::function<void(int)> callback);
 
-  std::vector<SoftWareInfo> FindSoftwareByName(const std::string& namePattern);
+  std::vector<PackageInfo> findSoftwareByName(const std::string& namePattern);
 
-  SoftWareInfo GetPAGViewerInfo();
+  PackageInfo getPackageInfo();
 
  private:
-  std::shared_ptr<CheckConfig> config;
+  std::shared_ptr<AppConfig> config = nullptr;
   std::function<void(int)> progressCallback;
 };
 

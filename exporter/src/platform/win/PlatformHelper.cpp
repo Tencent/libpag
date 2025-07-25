@@ -15,17 +15,17 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include <windows.h>
-#include <shlobj.h>
 #include "platform/PlatformHelper.h"
+#include <shlobj.h>
+#include <windows.h>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include "platform/PAGViewerCheck.h"
 #include "src/base/utils/Log.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/FileHelper.h"
-#include "platform/PAGViewerCheck.h"
-#include "ui/WindowManager.h"
 
 namespace fs = std::filesystem;
 std::string TempFolderPath = "";
@@ -82,20 +82,25 @@ std::string GetDownloadsPath() {
   HRESULT hr = SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &path);
 
   if (SUCCEEDED(hr) && path) {
-    int size = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr,0,  nullptr, nullptr);
+    int size = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
     std::string result(size - 1, 0);
     WideCharToMultiByte(CP_UTF8, 0, path, -1, &result[0], size, nullptr, nullptr);
     CoTaskMemFree(path);
     return result;
   }
 
-  wchar_t userProfile[MAX_PATH];
+  wchar_t userProfile[MAX_PATH] = {0};
   if (GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH)) {
     std::filesystem::path downloadsPath = std::filesystem::path(userProfile) / "Downloads";
     return downloadsPath.string();
   }
 
-  return "C:\\Users\\Downloads";
+  wchar_t tempPath[MAX_PATH];
+  if (GetTempPathW(MAX_PATH, tempPath)) {
+    std::filesystem::path fallbackPath = std::filesystem::path(tempPath) / "Downloads";
+    return fallbackPath.string();
+  }
+  return "";
 }
 
 std::string GetPAGViewerPath() {
@@ -105,10 +110,10 @@ std::string GetPAGViewerPath() {
     return pagViewerPath;
   }
 
-  auto config = std::make_shared<CheckConfig>();
-  config->SetTargetAppName("PAGViewer");
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
   auto check = std::make_unique<PAGViewerCheck>(config);
-  auto info = check->GetPAGViewerInfo();
+  auto info = check->getPackageInfo();
 
   if (!info.installLocation.empty()) {
     std::filesystem::path viewerPath =
@@ -121,16 +126,18 @@ std::string GetPAGViewerPath() {
   return "";
 }
 
-static void ExecutePreviewLogic(const std::string& pagFilePath) {
-  if(!FileHelper::FileIsExist(pagFilePath)) {
-    QString errorMsg = QString::fromUtf8("文件不存在，无法预览：") + QString::fromStdString(pagFilePath);
+static void ExecutePreview(const std::string& pagFilePath) {
+  if (!FileHelper::FileIsExist(pagFilePath)) {
+    QString errorMsg =
+        QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
     WindowManager::GetInstance().showSimpleError(errorMsg);
     return;
   }
 
   auto pagViewerPath = GetPAGViewerPath();
-  if(pagViewerPath.empty()) {
-    QString errorMsg = QString::fromUtf8("PAGViewer未安装或路径错误，无法预览：") + QString::fromStdString(pagFilePath);
+  if (pagViewerPath.empty()) {
+    QString errorMsg =
+        QString::fromUtf8(Messages::PAGVIEWER_NOT_FOUND) + QString::fromStdString(pagFilePath);
     WindowManager::GetInstance().showSimpleError(errorMsg);
     return;
   }
@@ -148,28 +155,24 @@ static void ExecutePreviewLogic(const std::string& pagFilePath) {
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
   } else {
-    QString errorMsg = QString::fromUtf8("无法启动PAGViewer预览：") + QString::number(GetLastError());
+    QString errorMsg =
+        QString::fromUtf8(Messages::PREVIEW_LAUNCH_FAILED) + QString::number(GetLastError());
     WindowManager::GetInstance().showSimpleError(errorMsg);
   }
-
-
-
 }
 
 void PreviewPAGFile(std::string pagFilePath) {
-  auto config = std::make_shared<CheckConfig>();
-  config->SetTargetAppName("PAGViewer");
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
   auto checker = std::make_unique<PAGViewerCheck>(config);
 
-  if(!checker->IsPAGViewerInstalled()) {
+  if (!checker->isPAGViewerInstalled()) {
     bool installSuccess = WindowManager::GetInstance().showPAGViewerInstallDialog(pagFilePath);
-    if(!installSuccess) {
+    if (!installSuccess) {
       return;
     }
   }
-  ExecutePreviewLogic(pagFilePath);
-
-
+  ExecutePreview(pagFilePath);
 }
 
 }  // namespace exporter

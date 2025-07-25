@@ -6,9 +6,9 @@
 
 namespace exporter {
 
-bool PAGViewerInstaller::IsPAGViewerInstalledMac() {
+bool PAGViewerInstaller::isPAGViewerInstalled() {
   @autoreleasepool {
-    std::string bundleIDString = config->GetPlatformSpecificConfig("bundleID");
+    std::string bundleIDString = config->getPlatformSpecificConfig("bundleID");
     if (bundleIDString.empty()) {
       bundleIDString = "com.tencent.libpag.viewer";
     }
@@ -27,7 +27,7 @@ bool PAGViewerInstaller::IsPAGViewerInstalledMac() {
   }
 }
 
-bool PAGViewerInstaller::copyToApplicationsMac(const QString& sourcePath) {
+bool PAGViewerInstaller::copyToApplications(const QString& sourcePath) {
   @autoreleasepool {
     NSString* source = [NSString stringWithUTF8String:sourcePath.toUtf8().constData()];
     NSString* destination = @"/Applications/PAGViewer.app";

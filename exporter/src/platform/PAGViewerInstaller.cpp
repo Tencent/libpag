@@ -29,7 +29,10 @@
 
 namespace exporter {
 
-PAGViewerInstaller::PAGViewerInstaller(std::shared_ptr<CheckConfig> config, QObject* parent)
+static constexpr int kDownloadProgressWeight = 50;      // 下载进度权重为50%
+static constexpr int UNZIP_PROCESS_TIMEOUT_MS = 30000;  // 解压超时30秒
+
+PAGViewerInstaller::PAGViewerInstaller(std::shared_ptr<AppConfig> config, QObject* parent)
     : QObject(parent), config(std::move(config)) {
   networkManager = new QNetworkAccessManager(this);
 #ifdef Q_OS_WIN
@@ -54,33 +57,14 @@ PAGViewerInstaller::~PAGViewerInstaller() {
   QDir(tempDir).removeRecursively();
 }
 
-bool PAGViewerInstaller::IsPAGViewerInstalled() {
-#ifdef Q_OS_WIN
-  return IsPAGViewerInstallWin();
-#elif defined(Q_OS_MAC)
-  return IsPAGViewerInstalledMac();
-#endif
-  return false;
-}
-
-bool PAGViewerInstaller::copyToApplicationsPlatform(const QString& sourcePath) {
-#ifdef Q_OS_WIN
-  return copyToApplicationsWindows(sourcePath);
-#elif defined(Q_OS_MAC)
-  return copyToApplicationsMac(sourcePath);
-#else
-  return false;
-#endif
-}
-
 void PAGViewerInstaller::onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal) {
   if (bytesTotal > 0 && progressCallback) {
-    int progress = static_cast<int>((bytesReceived * 50) / bytesTotal);
+    int progress = static_cast<int>((bytesReceived * kDownloadProgressWeight) / bytesTotal);
     progressCallback(progress);
   }
 }
 
-InstallStatus PAGViewerInstaller::InstallPAGViewer() {
+InstallStatus PAGViewerInstaller::installPAGViewer() {
   if (progressCallback) {
     progressCallback(0);
   }
@@ -97,7 +81,7 @@ InstallStatus PAGViewerInstaller::InstallPAGViewer() {
 
   downloadReply = networkManager->get(request);
   if (!downloadReply) {
-    return InstallStatus::Error(InstallResult::ExecutionFailed, "failed to create network request");
+    return InstallStatus(InstallResult::ExecutionFailed, "failed to create network request");
   }
 
   connect(downloadReply, &QNetworkReply::downloadProgress, this,
@@ -111,14 +95,14 @@ InstallStatus PAGViewerInstaller::InstallPAGViewer() {
     QString errorMsg = "下载失败: " + downloadReply->errorString();
     downloadReply->deleteLater();
     downloadReply = nullptr;
-    return InstallStatus::Error(InstallResult::ExecutionFailed, errorMsg.toStdString());
+    return InstallStatus(InstallResult::ExecutionFailed, errorMsg.toStdString());
   }
 
   QFile file(filePath);
   if (!file.open(QIODevice::WriteOnly)) {
     downloadReply->deleteLater();
     downloadReply = nullptr;
-    return InstallStatus::Error(InstallResult::AccessDenied, "can not create temp folder");
+    return InstallStatus(InstallResult::AccessDenied, "can not create temp folder");
   }
 
   QByteArray downloadedData = downloadReply->readAll();
@@ -128,13 +112,15 @@ InstallStatus PAGViewerInstaller::InstallPAGViewer() {
   if (written != downloadedData.size()) {
     downloadReply->deleteLater();
     downloadReply = nullptr;
-    return InstallStatus::Error(InstallResult::AccessDenied, "failed to write bytes");
+    return InstallStatus(InstallResult::AccessDenied, "failed to write bytes");
   }
 
   downloadReply->deleteLater();
   downloadReply = nullptr;
 
-  if (progressCallback) progressCallback(50);
+  if (progressCallback) {
+    progressCallback(50);
+  }
 
 #ifdef Q_OS_WIN
   return executeInstaller(filePath);
@@ -163,13 +149,12 @@ InstallStatus PAGViewerInstaller::extractAndInstall(const QString& zipPath) {
 #endif
   unzipProcess.setArguments(arguments);
   unzipProcess.start();
-  unzipProcess.waitForFinished(30000);
+  unzipProcess.waitForFinished(UNZIP_PROCESS_TIMEOUT_MS);
 
   if (unzipProcess.exitCode() != 0) {
     QString error = unzipProcess.readAllStandardError();
     QString output = unzipProcess.readAllStandardOutput();
-    return InstallStatus::Error(InstallResult::ExecutionFailed,
-                                "unzip failed: " + error.toStdString());
+    return InstallStatus(InstallResult::ExecutionFailed, "unzip failed: " + error.toStdString());
   }
 
   if (progressCallback) {
@@ -183,41 +168,41 @@ InstallStatus PAGViewerInstaller::extractAndInstall(const QString& zipPath) {
 #endif
   QFile appFile(appPath);
   if (!appFile.exists()) {
-    return InstallStatus::Error(InstallResult::ExecutionFailed, "can not find file after unzip");
+    return InstallStatus(InstallResult::ExecutionFailed, "can not find file after unzip");
   }
 
-  if (!copyToApplicationsPlatform(appPath)) {
-    return InstallStatus::Error(InstallResult::AccessDenied, "install PAGViewer failed");
+  if (!copyToApplications(appPath)) {
+    return InstallStatus(InstallResult::AccessDenied, "install PAGViewer failed");
   }
 
   if (progressCallback) {
     progressCallback(90);
   }
-  return InstallStatus::Success();
+  return InstallStatus(InstallResult::Success);
 }
 
 #ifdef Q_OS_WIN
 InstallStatus PAGViewerInstaller::executeInstaller(const QString& installerPath) {
   QProcess installerProcess;
   installerProcess.setProgram(installerPath);
-  
+
   QStringList arguments;
-  arguments << "/S";  // Silent installation
+  arguments << "/S";
   installerProcess.setArguments(arguments);
-  
+
   installerProcess.start();
-  installerProcess.waitForFinished(300000);  // 5 minutes timeout
-  
+  installerProcess.waitForFinished(INSTALLER_PROCESS_TIMEOUT_MS);
+
   if (installerProcess.exitCode() != 0) {
     QString error = installerProcess.readAllStandardError();
     return InstallStatus::Error(InstallResult::ExecutionFailed,
                                 "installer execution failed: " + error.toStdString());
   }
-  
+
   if (progressCallback) {
     progressCallback(90);
   }
-  
+
   return InstallStatus::Success();
 }
 #endif
