@@ -31,73 +31,6 @@ AEGP_Command AECommand::PAGConfigCMD = 0L;
 AEGP_Command AECommand::PAGPanelCMD = 0L;
 AEGP_Command AECommand::PAGPreviewCMD = 0L;
 
-// 创建测试警告信息的函数
-std::vector<AlertInfo> createTestWarnings() {
-  std::vector<AlertInfo> testWarnings;
-
-  // 1. 不支持的效果
-  AlertInfo warning1(AlertInfoType::UnsupportedEffects, nullptr, nullptr, "Glow");
-  warning1.compName = "Main Composition";
-  warning1.layerName = "Effect Layer";
-  testWarnings.push_back(warning1);
-
-  // 2. 不支持的图层样式
-  AlertInfo warning2(AlertInfoType::UnsupportedLayerStyle, nullptr, nullptr, "Drop Shadow");
-  warning2.compName = "Main Composition";
-  warning2.layerName = "Style Layer";
-  testWarnings.push_back(warning2);
-
-  // 3. 表达式不支持
-  AlertInfo warning3(AlertInfoType::Expression, nullptr, nullptr);
-  warning3.compName = "Animation Comp";
-  warning3.layerName = "Animated Layer";
-  testWarnings.push_back(warning3);
-
-  // 4. 连续的BMP合成
-  AlertInfo warning4(AlertInfoType::ContinuousSequence, nullptr, nullptr);
-  warning4.compName = "Sequence Comp";
-  warning4.layerName = "BMP Layer 1";
-  testWarnings.push_back(warning4);
-
-  // 5. 音频编码失败
-  AlertInfo warning5(AlertInfoType::AudioEncodeFail, nullptr, nullptr);
-  warning5.compName = "Audio Comp";
-  warning5.layerName = "Audio Layer";
-  testWarnings.push_back(warning5);
-
-  // 6. 图形内存使用过高
-  AlertInfo warning6(AlertInfoType::GraphicsMemory, nullptr, nullptr, "120MB");
-  warning6.compName = "Heavy Comp";
-  warning6.layerName = "Large Image Layer";
-  testWarnings.push_back(warning6);
-
-  // 7. 图片数量过多
-  AlertInfo warning7(AlertInfoType::ImageNum, nullptr, nullptr, "45");
-  warning7.compName = "Image Gallery";
-  warning7.layerName = "Image Sequence";
-  testWarnings.push_back(warning7);
-
-  // 8. 字体文件过大
-  AlertInfo warning8(AlertInfoType::FontFileTooBig, nullptr, nullptr, "15MB");
-  warning8.compName = "Text Comp";
-  warning8.layerName = "Title Text";
-  testWarnings.push_back(warning8);
-
-  // 9. 文本路径与文本动画不兼容
-  AlertInfo warning9(AlertInfoType::TextPathAnimator, nullptr, nullptr);
-  warning9.compName = "Text Animation";
-  warning9.layerName = "Path Text";
-  testWarnings.push_back(warning9);
-
-  // 10. 文本动画范围选择器基于设置不支持
-  AlertInfo warning10(AlertInfoType::RangeSelectorBasedOn, nullptr, nullptr, "Words");
-  warning10.compName = "Text Animation";
-  warning10.layerName = "Animated Text";
-  testWarnings.push_back(warning10);
-
-  return testWarnings;
-}
-
 A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon /*globalRefcon*/,
                               AEGP_UpdateMenuRefcon /*menuRefcon*/,
                               AEGP_WindowType /*windowType*/) {
@@ -170,8 +103,6 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
 
-  std::vector<AlertInfo> testWarnings = createTestWarnings();
-  WindowManager::GetInstance().showWarnings(testWarnings);
   PreviewPAGFile(outputPath);
 
   return err;
