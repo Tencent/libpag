@@ -89,13 +89,18 @@ std::string GetDownloadsPath() {
     return result;
   }
 
-  wchar_t userProfile[MAX_PATH];
+  wchar_t userProfile[MAX_PATH] = {0};
   if (GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH)) {
     std::filesystem::path downloadsPath = std::filesystem::path(userProfile) / "Downloads";
     return downloadsPath.string();
   }
 
-  return "C:\\Users\\Downloads";
+  wchar_t tempPath[MAX_PATH];
+  if (GetTempPathW(MAX_PATH, tempPath)) {
+    std::filesystem::path fallbackPath = std::filesystem::path(tempPath) / "Downloads";
+    return fallbackPath.string();
+  }
+  return "";
 }
 
 std::string GetPAGViewerPath() {
@@ -105,10 +110,10 @@ std::string GetPAGViewerPath() {
     return pagViewerPath;
   }
 
-  auto config = std::make_shared<CheckConfig>();
-  config->SetTargetAppName("PAGViewer");
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
   auto check = std::make_unique<PAGViewerCheck>(config);
-  auto info = check->GetPAGViewerInfo();
+  auto info = check->getPackageInfo();
 
   if (!info.installLocation.empty()) {
     std::filesystem::path viewerPath =
@@ -121,18 +126,18 @@ std::string GetPAGViewerPath() {
   return "";
 }
 
-static void ExecutePreviewLogic(const std::string& pagFilePath) {
+static void ExecutePreview(const std::string& pagFilePath) {
   if (!FileHelper::FileIsExist(pagFilePath)) {
     QString errorMsg =
-        QString::fromUtf8("文件不存在，无法预览：") + QString::fromStdString(pagFilePath);
+        QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
     WindowManager::GetInstance().showSimpleError(errorMsg);
     return;
   }
 
   auto pagViewerPath = GetPAGViewerPath();
   if (pagViewerPath.empty()) {
-    QString errorMsg = QString::fromUtf8("PAGViewer未安装或路径错误，无法预览：") +
-                       QString::fromStdString(pagFilePath);
+    QString errorMsg =
+        QString::fromUtf8(Messages::PAGVIEWER_NOT_FOUND) + QString::fromStdString(pagFilePath);
     WindowManager::GetInstance().showSimpleError(errorMsg);
     return;
   }
@@ -151,23 +156,23 @@ static void ExecutePreviewLogic(const std::string& pagFilePath) {
     CloseHandle(pi.hThread);
   } else {
     QString errorMsg =
-        QString::fromUtf8("无法启动PAGViewer预览：") + QString::number(GetLastError());
+        QString::fromUtf8(Messages::PREVIEW_LAUNCH_FAILED) + QString::number(GetLastError());
     WindowManager::GetInstance().showSimpleError(errorMsg);
   }
 }
 
 void PreviewPAGFile(std::string pagFilePath) {
-  auto config = std::make_shared<CheckConfig>();
-  config->SetTargetAppName("PAGViewer");
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
   auto checker = std::make_unique<PAGViewerCheck>(config);
 
-  if (!checker->IsPAGViewerInstalled()) {
+  if (!checker->isPAGViewerInstalled()) {
     bool installSuccess = WindowManager::GetInstance().showPAGViewerInstallDialog(pagFilePath);
     if (!installSuccess) {
       return;
     }
   }
-  ExecutePreviewLogic(pagFilePath);
+  ExecutePreview(pagFilePath);
 }
 
 }  // namespace exporter

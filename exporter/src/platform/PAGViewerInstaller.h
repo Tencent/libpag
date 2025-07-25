@@ -20,7 +20,6 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QObject>
-#include <QProcess>
 #include <QTimer>
 #include <functional>
 #include "platform/PAGViewerCheck.h"
@@ -29,11 +28,11 @@ namespace exporter {
 class PAGViewerInstaller : public QObject {
   Q_OBJECT
  public:
-  explicit PAGViewerInstaller(std::shared_ptr<CheckConfig> config, QObject* parent = nullptr);
+  explicit PAGViewerInstaller(std::shared_ptr<AppConfig> config, QObject* parent = nullptr);
   ~PAGViewerInstaller();
 
-  bool IsPAGViewerInstalled();
-  InstallStatus InstallPAGViewer();
+  bool isPAGViewerInstalled();
+  InstallStatus installPAGViewer();
   void setProgressCallback(std::function<void(int)> callback);
 
  private:
@@ -43,25 +42,15 @@ class PAGViewerInstaller : public QObject {
   InstallStatus executeInstaller(const QString& installerPath);
 #endif
 
-#ifdef Q_OS_MAC
-  bool IsPAGViewerInstalledMac();
-  bool copyToApplicationsMac(const QString& sourcePath);
-#endif
-
-#ifdef Q_OS_WIN
-  bool IsPAGViewerInstallWin();
-  bool copyToApplicationsWindows(const QString& sourcePath);
-#endif
-
-  bool copyToApplicationsPlatform(const QString& sourcePath);
+  bool copyToApplications(const QString& sourcePath);
 
   Q_SLOT void onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
 
-  std::shared_ptr<CheckConfig> config = nullptr;
+  std::shared_ptr<AppConfig> config = nullptr;
   std::function<void(int)> progressCallback = nullptr;
   QNetworkAccessManager* networkManager = nullptr;
   QNetworkReply* downloadReply = nullptr;
-  QString tempDir;
+  QString tempDir = "";
   QString downloadUrl;
 };
 }  // namespace exporter

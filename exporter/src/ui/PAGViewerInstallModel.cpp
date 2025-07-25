@@ -139,8 +139,8 @@ void PAGViewerInstallModel::updateStage(InstallStage stage) {
 void PAGViewerInstallModel::executeInstallation() {
   QThreadPool::globalInstance()->start([this]() {
     try {
-      auto config = std::make_shared<CheckConfig>();
-      config->SetTargetAppName("PAGViewer");
+      auto config = std::make_shared<AppConfig>();
+      config->setAppName("PAGViewer");
       auto installer = std::make_unique<PAGViewerInstaller>(config);
       installer->setProgressCallback([this](int progress) {
         QMetaObject::invokeMethod(
@@ -154,7 +154,7 @@ void PAGViewerInstallModel::executeInstallation() {
             Qt::QueuedConnection);
       });
 
-      InstallStatus result = installer->InstallPAGViewer();
+      InstallStatus result = installer->installPAGViewer();
 
       QMetaObject::invokeMethod(
           this,

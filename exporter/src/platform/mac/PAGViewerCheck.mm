@@ -9,9 +9,9 @@
 
 namespace exporter {
 
-static NSBundle* findPAGViewerBundle(const std::shared_ptr<CheckConfig>& config) {
+static NSBundle* findPAGViewerBundle(const std::shared_ptr<AppConfig>& config) {
   @autoreleasepool {
-    std::string bundleIDString = config->GetPlatformSpecificConfig("bundleID");
+    std::string bundleIDString = config->getPlatformSpecificConfig("bundleID");
     NSString* bundleID = [NSString stringWithUTF8String:bundleIDString.c_str()];
     if (!bundleID || [bundleID length] == 0) {
       return nil;
@@ -26,19 +26,19 @@ static NSBundle* findPAGViewerBundle(const std::shared_ptr<CheckConfig>& config)
   }
 }
 
-void CheckConfig::SetTargetAppName(const std::string& name) {
-  this->targetAppName = name;
+void AppConfig::setAppName(const std::string& name) {
+  this->AppName = std::move(name);
 }
 
-std::string CheckConfig::GetTargetAppName() {
-  return this->targetAppName;
+std::string AppConfig::getAppName() {
+  return this->AppName;
 }
 
-void CheckConfig::SetInstallerPath(const std::string& path) {
+void AppConfig::setInstallerPath(const std::string& path) {
   this->installerPath = path;
 }
 
-std::string CheckConfig::GetInstallerPath() {
+std::string AppConfig::getInstallerPath() {
   if (!this->installerPath.empty()) {
     return this->installerPath;
   }
@@ -50,11 +50,11 @@ std::string CheckConfig::GetInstallerPath() {
   }
 }
 
-void CheckConfig::SetPlatformSpecificConfig(const std::string& key, const std::string& value) {
+void AppConfig::addConfig(const std::string& key, const std::string& value) {
   this->platformConfig[key] = value;
 }
 
-std::string CheckConfig::GetPlatformSpecificConfig(const std::string& key) {
+std::string AppConfig::getPlatformSpecificConfig(const std::string& key) {
   if (key == "bundleID") {
     auto it = this->platformConfig.find(key);
     return (it != this->platformConfig.end()) ? it->second : "com.tencent.libpag.viewer";
@@ -63,15 +63,15 @@ std::string CheckConfig::GetPlatformSpecificConfig(const std::string& key) {
   return (it != this->platformConfig.end()) ? it->second : "";
 }
 
-PAGViewerCheck::PAGViewerCheck(std::shared_ptr<CheckConfig> config) : config(config) {
+PAGViewerCheck::PAGViewerCheck(std::shared_ptr<AppConfig> config) : config(config) {
 }
 
-bool PAGViewerCheck::IsPAGViewerInstalled() {
+bool PAGViewerCheck::isPAGViewerInstalled() {
   return findPAGViewerBundle(config) != nil;
 }
 
-SoftWareInfo PAGViewerCheck::GetPAGViewerInfo() {
-  SoftWareInfo info = {};
+PackageInfo PAGViewerCheck::getPackageInfo() {
+  PackageInfo info = {};
   @autoreleasepool {
     NSBundle* bundle = findPAGViewerBundle(config);
     if (bundle) {
@@ -101,11 +101,11 @@ SoftWareInfo PAGViewerCheck::GetPAGViewerInfo() {
   return info;
 }
 
-std::vector<SoftWareInfo> PAGViewerCheck::FindSoftwareByName(const std::string& namePattern) {
-  std::vector<SoftWareInfo> results;
+std::vector<PackageInfo> PAGViewerCheck::findSoftwareByName(const std::string& namePattern) {
+  std::vector<PackageInfo> results;
 
-  if (IsPAGViewerInstalled()) {
-    SoftWareInfo info = GetPAGViewerInfo();
+  if (isPAGViewerInstalled()) {
+    PackageInfo info = getPackageInfo();
     if (!info.displayName.empty() && info.displayName.find(namePattern) != std::string::npos) {
       results.push_back(info);
     }
@@ -114,14 +114,14 @@ std::vector<SoftWareInfo> PAGViewerCheck::FindSoftwareByName(const std::string& 
   return results;
 }
 
-InstallStatus PAGViewerCheck::InstallPAGViewer() {
+InstallStatus PAGViewerCheck::installPAGViewer() {
   auto installer = std::make_unique<PAGViewerInstaller>(config);
 
   if (progressCallback) {
     installer->setProgressCallback(progressCallback);
   }
 
-  return installer->InstallPAGViewer();
+  return installer->installPAGViewer();
 }
 
 void PAGViewerCheck::setProgressCallback(std::function<void(int)> callback) {

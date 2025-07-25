@@ -29,11 +29,15 @@ namespace exporter {
 std::string GetRoamingPath() {
   NSArray* arr =
       NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
-  if (arr.count == 0) {
+  if ([arr count] == 0) {
     return "";
   }
-  NSString* path = [arr[0] stringByAppendingPathComponent:@""];
-  return std::string([path UTF8String]);
+  NSString* basePath = [arr objectAtIndex:0];
+  NSString* path = [basePath stringByAppendingPathComponent:@""];
+  NSString* retainedPath = [path retain];
+  std::string result = std::string([retainedPath UTF8String]);
+  [retainedPath release];
+  return result;
 }
 
 std::string GetConfigPath() {
@@ -90,7 +94,7 @@ static void executePreviewLogic(const std::string& pagFilePath) {
     NSString* nsFilePath = [NSString stringWithCString:pagFilePath.c_str()
                                               encoding:NSUTF8StringEncoding];
     if (!nsFilePath) {
-      QString errorMsg = QString::fromUtf8("文件路径编码错误，无法预览文件。");
+      QString errorMsg = QString::fromUtf8(Messages::FILE_PATH_ENCODING_ERROR);
       WindowManager::GetInstance().showSimpleError(errorMsg);
       return;
     }
@@ -98,7 +102,7 @@ static void executePreviewLogic(const std::string& pagFilePath) {
     NSFileManager* fileManager = [NSFileManager defaultManager];
     if (![fileManager fileExistsAtPath:nsFilePath]) {
       QString errorMsg =
-          QString::fromUtf8("文件不存在，无法预览：") + QString::fromStdString(pagFilePath);
+          QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
       WindowManager::GetInstance().showSimpleError(errorMsg);
       return;
     }
@@ -114,14 +118,15 @@ static void executePreviewLogic(const std::string& pagFilePath) {
     }
 
     if (!appURL) {
-      QString errorMsg = QString::fromUtf8("PAGViewer.app not found.");
+      QString errorMsg = QString::fromUtf8(Messages::PAGVIEWER_NOT_FOUND_MAC);
       WindowManager::GetInstance().showSimpleError(errorMsg);
       return;
     }
 
     NSURL* fileURL = [NSURL fileURLWithPath:nsFilePath];
     if (!fileURL) {
-      QString errorMsg = QString::fromUtf8("无效的文件路径，无法创建预览。");
+      QString errorMsg = QString::fromUtf8(Messages::INVALID_FILE_PATH);
+      ;
       WindowManager::GetInstance().showSimpleError(errorMsg);
       return;
     }
@@ -136,7 +141,7 @@ static void executePreviewLogic(const std::string& pagFilePath) {
                               if (error) {
                                 dispatch_async(dispatch_get_main_queue(), ^{
                                   QString errorMsg =
-                                      QString::fromUtf8("使用PAGViewer打开文件失败：") +
+                                      QString::fromUtf8(Messages::PAGVIEWER_OPEN_FAILED) +
                                       QString::fromUtf8([error.localizedDescription UTF8String]);
                                   WindowManager::GetInstance().showSimpleError(errorMsg);
                                 });
@@ -146,11 +151,11 @@ static void executePreviewLogic(const std::string& pagFilePath) {
   }
 }
 void PreviewPAGFile(std::string pagFilePath) {
-  auto config = std::make_shared<CheckConfig>();
-  config->SetTargetAppName("PAGViewer.app");
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer.app");
   auto installer = std::make_unique<PAGViewerInstaller>(config);
 
-  if (!installer->IsPAGViewerInstalled()) {
+  if (!installer->isPAGViewerInstalled()) {
     bool installSuccess = WindowManager::GetInstance().showPAGViewerInstallDialog(pagFilePath);
 
     if (!installSuccess) {

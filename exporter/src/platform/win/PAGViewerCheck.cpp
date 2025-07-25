@@ -10,6 +10,8 @@
 #include <memory>
 #include <unordered_map>
 #include "platform/PlatformHelper.h"
+#include "utils/FileHelper.h"
+#include "utils/StringHelper.h"
 
 namespace exporter {
 
@@ -150,9 +152,9 @@ static std::vector<std::wstring> enumerateRegistrySubKeys(const RegistryKey& key
   return subKeys;
 }
 
-static SoftWareInfo readSoftwareInfoFromRegistry(const RegistryKey& parentKey,
-                                                 const std::wstring& subKeyName) {
-  SoftWareInfo info = {};
+static PackageInfo readPackageInfoFromRegistry(const RegistryKey& parentKey,
+                                               const std::wstring& subKeyName) {
+  PackageInfo info = {};
 
   auto subKey = RegistryKey::open(parentKey.get(), subKeyName);
   if (!subKey.isValid()) {
@@ -171,7 +173,7 @@ static SoftWareInfo readSoftwareInfoFromRegistry(const RegistryKey& parentKey,
   return info;
 }
 
-static void scanRegistryView(std::vector<SoftWareInfo>& softwareList, HKEY rootKey, REGSAM access) {
+static void scanRegistryView(std::vector<PackageInfo>& softwareList, HKEY rootKey, REGSAM access) {
   const std::wstring uninstallKeyPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
   auto uninstallKey = RegistryKey::open(rootKey, uninstallKeyPath, KEY_READ | access);
   if (!uninstallKey.isValid()) {
@@ -180,15 +182,15 @@ static void scanRegistryView(std::vector<SoftWareInfo>& softwareList, HKEY rootK
 
   auto subKeys = enumerateRegistrySubKeys(uninstallKey);
   for (const auto& subKeyName : subKeys) {
-    SoftWareInfo info = readSoftwareInfoFromRegistry(uninstallKey, subKeyName);
+    PackageInfo info = readPackageInfoFromRegistry(uninstallKey, subKeyName);
     if (!info.displayName.empty()) {
       softwareList.push_back(std::move(info));
     }
   }
 }
 
-static std::vector<SoftWareInfo> scanUninstallRegistry() {
-  std::vector<SoftWareInfo> softwareList = {};
+static std::vector<PackageInfo> scanUninstallRegistry() {
+  std::vector<PackageInfo> softwareList = {};
   scanRegistryView(softwareList, HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY);
   scanRegistryView(softwareList, HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY);
   scanRegistryView(softwareList, HKEY_CURRENT_USER, KEY_WOW64_64KEY);
@@ -196,19 +198,19 @@ static std::vector<SoftWareInfo> scanUninstallRegistry() {
   return softwareList;
 }
 
-void CheckConfig::SetTargetAppName(const std::string& name) {
-  this->targetAppName = name;
+void AppConfig::setAppName(const std::string& name) {
+  this->AppName = name;
 }
 
-std::string CheckConfig::GetTargetAppName() {
-  return this->targetAppName;
+std::string AppConfig::getAppName() {
+  return this->AppName;
 }
 
-void CheckConfig::SetInstallerPath(const std::string& path) {
+void AppConfig::setInstallerPath(const std::string& path) {
   this->installerPath = path;
 }
 
-std::string CheckConfig::GetInstallerPath() {
+std::string AppConfig::getInstallerPath() {
   if (!this->installerPath.empty()) {
     return this->installerPath;
   }
@@ -217,39 +219,35 @@ std::string CheckConfig::GetInstallerPath() {
   return downloadsPath + "\\PAGViewer_Installer.exe";
 }
 
-void CheckConfig::SetPlatformSpecificConfig(const std::string& key, const std::string& value) {
+void AppConfig::addConfig(const std::string& key, const std::string& value) {
   this->platformConfig[key] = value;
 }
 
-std::string CheckConfig::GetPlatformSpecificConfig(const std::string& key) {
+std::string AppConfig::getPlatformSpecificConfig(const std::string& key) {
   auto it = this->platformConfig.find(key);
   return (it != this->platformConfig.end()) ? it->second : "";
 }
 
-PAGViewerCheck::PAGViewerCheck(std::shared_ptr<CheckConfig> config) : config(config) {
+PAGViewerCheck::PAGViewerCheck(std::shared_ptr<AppConfig> config) : config(config) {
 }
 
-bool PAGViewerCheck::IsPAGViewerInstalled() {
-  auto results = FindSoftwareByName(config->GetTargetAppName());
+bool PAGViewerCheck::isPAGViewerInstalled() {
+  auto results = findSoftwareByName(config->getAppName());
   return !results.empty();
 }
 
-SoftWareInfo PAGViewerCheck::GetPAGViewerInfo() {
-  auto results = FindSoftwareByName(config->GetTargetAppName());
-  return results.empty() ? SoftWareInfo() : results[0];
+PackageInfo PAGViewerCheck::getPackageInfo() {
+  auto results = findSoftwareByName(config->getAppName());
+  return results.empty() ? PackageInfo() : results[0];
 }
 
-std::vector<SoftWareInfo> PAGViewerCheck::FindSoftwareByName(const std::string& namePattern) {
-  std::vector<SoftWareInfo> results = {};
+std::vector<PackageInfo> PAGViewerCheck::findSoftwareByName(const std::string& namePattern) {
+  std::vector<PackageInfo> results = {};
   auto allSoftware = scanUninstallRegistry();
-  std::string lowerPattern = namePattern;
-  std::transform(lowerPattern.begin(), lowerPattern.end(), lowerPattern.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
+  std::string lowerPattern = StringHelper::ToLowerCase(namePattern);
 
   for (const auto& software : allSoftware) {
-    std::string lowerName = software.displayName;
-    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::string lowerName = StringHelper::ToLowerCase(software.displayName);
 
     if (lowerName.find(lowerPattern) != std::string::npos) {
       results.push_back(software);
@@ -259,17 +257,16 @@ std::vector<SoftWareInfo> PAGViewerCheck::FindSoftwareByName(const std::string& 
   return results;
 }
 
-InstallStatus PAGViewerCheck::InstallPAGViewer() {
-  std::string installerPathStr = config->GetInstallerPath();
-  if (installerPathStr.empty() || installerPathStr.length() > 1024) {
-    return InstallStatus::Error(InstallResult::InvalidPath,
-                                "Invalid installer path: " + installerPathStr);
+InstallStatus PAGViewerCheck::installPAGViewer() {
+  std::string installerPathStr = config->getInstallerPath();
+  if (installerPathStr.empty() || installerPathStr.length() > MAX_PATH) {
+    return InstallStatus(InstallResult::InvalidPath, "Invalid installer path: " + installerPathStr);
   }
 
   std::wstring installerPathW = stringToWstring(installerPathStr);
-  if (!std::filesystem::exists(installerPathW)) {
-    return InstallStatus::Error(InstallResult::FileNotFound,
-                                "Installer file not found: " + installerPathStr);
+  if (!FileHelper::FileIsExist(installerPathStr)) {
+    return InstallStatus(InstallResult::FileNotFound,
+                         "Installer file not found: " + installerPathStr);
   }
 
   SHELLEXECUTEINFOW sei = {sizeof(sei)};
@@ -280,11 +277,11 @@ InstallStatus PAGViewerCheck::InstallPAGViewer() {
 
   if (!ShellExecuteExW(&sei)) {
     DWORD error = GetLastError();
-    // if (error ==  ERROR_CANCELLED_BY_USER) {
-    //   return InstallStatus::Error(InstallResult::PermissionDenied, "User denied permission.");
-    // }
-    return InstallStatus::Error(InstallResult::ExecutionFailed,
-                                "Failed to execute installer. Error: " + std::to_string(error));
+    if (error == ERROR_CANCELLED) {
+      return InstallStatus(InstallResult::PermissionDenied, "User denied permission.");
+    }
+    return InstallStatus(InstallResult::ExecutionFailed,
+                         "Failed to execute installer. Error: " + std::to_string(error));
   }
 
   if (sei.hProcess) {
@@ -295,14 +292,14 @@ InstallStatus PAGViewerCheck::InstallPAGViewer() {
     CloseHandle(sei.hProcess);
 
     if (exitCode == 0) {
-      return InstallStatus::Success();
+      return InstallStatus(InstallResult::Success);
     } else {
-      return InstallStatus::Error(InstallResult::ExecutionFailed,
-                                  "Installer exited with code: " + std::to_string(exitCode));
+      return InstallStatus(InstallResult::ExecutionFailed,
+                           "Installer exited with code: " + std::to_string(exitCode));
     }
   }
 
-  return InstallStatus::Success();
+  return InstallStatus(InstallResult::Success);
 }
 
 }  // namespace exporter
