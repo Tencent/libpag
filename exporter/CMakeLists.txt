@@ -36,7 +36,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick  REQUIRED)
+find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick Network REQUIRED)
 add_definitions(${Qt6Widgets_DEFINITIONS} ${QtQml_DEFINITIONS} ${${Qt6Quick_DEFINITIONS}})
 qt6_add_resources(QT_RESOURCES assets/res.qrc)
 
@@ -59,6 +59,7 @@ file(GLOB_RECURSE PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES
         vendor/TinyXML2/*.cpp)
 
 list(FILTER PAG_EXPORTER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
+list(APPEND PAG_EXPORTER_SOURCE_FILES src/platform/PAGViewerInstaller.cpp)
 if (APPLE)
     file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/mac/*.*)
 elseif (WIN32)
@@ -119,7 +120,7 @@ add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${PAG_EXPORTER_THIRD
 
 target_include_directories(PAGExporter SYSTEM PRIVATE ${PAG_EXPORTER_THIRD_PARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${PAG_EXPORTER_INCLUDES})
-target_link_libraries(PAGExporter  pag ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+target_link_libraries(PAGExporter  pag ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Network)
 
 if (APPLE)
     target_link_libraries(PAGExporter "-framework AppKit" compression)
