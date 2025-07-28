@@ -38,7 +38,7 @@ struct InstallStatus {
   InstallResult result;
   std::string errorMessage;
 
-  InstallStatus() = default;
+  InstallStatus();
 
   explicit InstallStatus(InstallResult result, std::string message = "")
       : result(result), errorMessage(std::move(message)) {
@@ -83,7 +83,7 @@ class PAGViewerCheck {
 
   void setProgressCallback(std::function<void(int)> callback);
 
-  std::vector<PackageInfo> findSoftwareByName(const std::string& namePattern);
+  std::vector<PackageInfo> findPackageinfoByName(const std::string& namePattern);
 
   PackageInfo getPackageInfo();
 

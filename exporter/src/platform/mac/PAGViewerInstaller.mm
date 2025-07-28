@@ -1,4 +1,7 @@
 #include "platform/PAGViewerInstaller.h"
+#include <QFile>
+#include <QProcess>
+#include "platform/PAGViewerCheck.h"
 
 #ifdef Q_OS_MAC
 #import <CoreServices/CoreServices.h>
@@ -44,6 +47,43 @@ bool PAGViewerInstaller::copyToApplications(const QString& sourcePath) {
     NSError* error = nil;
     return [fileManager copyItemAtPath:source toPath:destination error:&error];
   }
+}
+
+InstallStatus PAGViewerInstaller::executeInstall(const QString& zipPath) {
+  QProcess unzipProcess;
+  QStringList arguments;
+
+  unzipProcess.setProgram("unzip");
+  arguments << "-o"
+            << "-q" << zipPath << "-d" << tempDir;
+  unzipProcess.setArguments(arguments);
+  unzipProcess.start();
+  unzipProcess.waitForFinished(UNZIP_PROCESS_TIMEOUT_MS);
+
+  if (unzipProcess.exitCode() != 0) {
+    QString error = unzipProcess.readAllStandardError();
+    QString output = unzipProcess.readAllStandardOutput();
+    return InstallStatus(InstallResult::ExecutionFailed, "unzip failed: " + error.toStdString());
+  }
+
+  if (progressCallback) {
+    progressCallback(80);
+  }
+
+  QString appPath = tempDir + "/PAGViewer.app";
+  QFile appFile(appPath);
+  if (!appFile.exists()) {
+    return InstallStatus(InstallResult::ExecutionFailed, "can not find file after unzip");
+  }
+
+  if (!copyToApplications(appPath)) {
+    return InstallStatus(InstallResult::AccessDenied, "install PAGViewer failed");
+  }
+
+  if (progressCallback) {
+    progressCallback(90);
+  }
+  return InstallStatus(InstallResult::Success);
 }
 
 }

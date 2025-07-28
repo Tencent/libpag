@@ -159,7 +159,7 @@ void PAGViewerInstallModel::executeInstallation() {
       QMetaObject::invokeMethod(
           this,
           [this, result]() {
-            if (result.isSuccess()) {
+            if (!result.isSuccess()) {
               updateStage(Success);
             } else {
               QString errorMsg = tr("PAGViewer安装失败");

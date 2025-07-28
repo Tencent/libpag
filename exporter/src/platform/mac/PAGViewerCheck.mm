@@ -42,12 +42,8 @@ std::string AppConfig::getInstallerPath() {
   if (!this->installerPath.empty()) {
     return this->installerPath;
   }
-  @autoreleasepool {
-    std::string downloadsPathStr = GetDownloadsPath();
-    NSString* downloadsPath = [NSString stringWithUTF8String:downloadsPathStr.c_str()];
-    NSString* fullPath = [downloadsPath stringByAppendingPathComponent:@"PAGViewer.dmg"];
-    return [fullPath UTF8String];
-  }
+  std::string downloadsPathStr = GetDownloadsPath();
+  return downloadsPathStr + "/PAGViewer.dmg";
 }
 
 void AppConfig::addConfig(const std::string& key, const std::string& value) {
@@ -55,12 +51,14 @@ void AppConfig::addConfig(const std::string& key, const std::string& value) {
 }
 
 std::string AppConfig::getPlatformSpecificConfig(const std::string& key) {
-  if (key == "bundleID") {
-    auto it = this->platformConfig.find(key);
-    return (it != this->platformConfig.end()) ? it->second : "com.tencent.libpag.viewer";
+  auto it = platformConfig.find(key);
+  if (it != platformConfig.end()) {
+    return it->second;
   }
-  auto it = this->platformConfig.find(key);
-  return (it != this->platformConfig.end()) ? it->second : "";
+  if (key == "bundleID") {
+    return "com.tencent.libpag.viewer";
+  }
+  return "";
 }
 
 PAGViewerCheck::PAGViewerCheck(std::shared_ptr<AppConfig> config) : config(config) {
@@ -101,7 +99,7 @@ PackageInfo PAGViewerCheck::getPackageInfo() {
   return info;
 }
 
-std::vector<PackageInfo> PAGViewerCheck::findSoftwareByName(const std::string& namePattern) {
+std::vector<PackageInfo> PAGViewerCheck::findPackageinfoByName(const std::string& namePattern) {
   std::vector<PackageInfo> results;
 
   if (isPAGViewerInstalled()) {

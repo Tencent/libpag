@@ -83,7 +83,7 @@ std::wstring stringToWstring(const std::string& str) {
 
 static std::string wstringToString(const std::wstring& wstr) {
   if (wstr.empty()) {
-    return std::string();
+    return "";
   }
 
   auto size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), static_cast<int>(wstr.length()),
@@ -182,7 +182,7 @@ static void scanRegistryView(std::vector<PackageInfo>& softwareList, HKEY rootKe
 
   auto subKeys = enumerateRegistrySubKeys(uninstallKey);
   for (const auto& subKeyName : subKeys) {
-    PackageInfo info = readPackageInfoFromRegistry(uninstallKey, subKeyName);
+    PackageInfo info = readSoftwareInfoFromRegistry(uninstallKey, subKeyName);
     if (!info.displayName.empty()) {
       softwareList.push_back(std::move(info));
     }
@@ -202,7 +202,7 @@ void AppConfig::setAppName(const std::string& name) {
   this->AppName = name;
 }
 
-std::string AppConfig::getAppName() {
+std::string AppConfig::getTargetAppName() {
   return this->AppName;
 }
 
@@ -232,16 +232,16 @@ PAGViewerCheck::PAGViewerCheck(std::shared_ptr<AppConfig> config) : config(confi
 }
 
 bool PAGViewerCheck::isPAGViewerInstalled() {
-  auto results = findSoftwareByName(config->getAppName());
+  auto results = findPackageinfoByName(config->getAppName());
   return !results.empty();
 }
 
 PackageInfo PAGViewerCheck::getPackageInfo() {
-  auto results = findSoftwareByName(config->getAppName());
+  auto results = findPackageinfoByName(config->getAppName());
   return results.empty() ? PackageInfo() : results[0];
 }
 
-std::vector<PackageInfo> PAGViewerCheck::findSoftwareByName(const std::string& namePattern) {
+std::vector<PackageInfo> PAGViewerCheck::findPackageinfoByName(const std::string& namePattern) {
   std::vector<PackageInfo> results = {};
   auto allSoftware = scanUninstallRegistry();
   std::string lowerPattern = StringHelper::ToLowerCase(namePattern);
@@ -260,13 +260,14 @@ std::vector<PackageInfo> PAGViewerCheck::findSoftwareByName(const std::string& n
 InstallStatus PAGViewerCheck::installPAGViewer() {
   std::string installerPathStr = config->getInstallerPath();
   if (installerPathStr.empty() || installerPathStr.length() > MAX_PATH) {
-    return InstallStatus(InstallResult::InvalidPath, "Invalid installer path: " + installerPathStr);
+    return InstallStatus::Error(InstallResult::InvalidPath,
+                                "Invalid installer path: " + installerPathStr);
   }
 
   std::wstring installerPathW = stringToWstring(installerPathStr);
-  if (!FileHelper::FileIsExist(installerPathStr)) {
-    return InstallStatus(InstallResult::FileNotFound,
-                         "Installer file not found: " + installerPathStr);
+  if (!FileHelper::FileIsExist(installerPathW)) {
+    return InstallStatus::Error(InstallResult::FileNotFound,
+                                "Installer file not found: " + installerPathStr);
   }
 
   SHELLEXECUTEINFOW sei = {sizeof(sei)};
@@ -278,10 +279,10 @@ InstallStatus PAGViewerCheck::installPAGViewer() {
   if (!ShellExecuteExW(&sei)) {
     DWORD error = GetLastError();
     if (error == ERROR_CANCELLED) {
-      return InstallStatus(InstallResult::PermissionDenied, "User denied permission.");
+      return InstallStatus::Error(InstallResult::PermissionDenied, "User denied permission.");
     }
-    return InstallStatus(InstallResult::ExecutionFailed,
-                         "Failed to execute installer. Error: " + std::to_string(error));
+    return InstallStatus::Error(InstallResult::ExecutionFailed,
+                                "Failed to execute installer. Error: " + std::to_string(error));
   }
 
   if (sei.hProcess) {
@@ -292,14 +293,14 @@ InstallStatus PAGViewerCheck::installPAGViewer() {
     CloseHandle(sei.hProcess);
 
     if (exitCode == 0) {
-      return InstallStatus(InstallResult::Success);
+      return InstallStatus::Success();
     } else {
-      return InstallStatus(InstallResult::ExecutionFailed,
-                           "Installer exited with code: " + std::to_string(exitCode));
+      return InstallStatus::Error(InstallResult::ExecutionFailed,
+                                  "Installer exited with code: " + std::to_string(exitCode));
     }
   }
 
-  return InstallStatus(InstallResult::Success);
+  return InstallStatus::Success();
 }
 
 }  // namespace exporter

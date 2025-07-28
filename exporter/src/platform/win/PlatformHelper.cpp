@@ -126,7 +126,7 @@ std::string GetPAGViewerPath() {
   return "";
 }
 
-static void ExecutePreview(const std::string& pagFilePath) {
+static void StartPreview(const std::string& pagFilePath) {
   if (!FileHelper::FileIsExist(pagFilePath)) {
     QString errorMsg =
         QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
@@ -172,7 +172,7 @@ void PreviewPAGFile(std::string pagFilePath) {
       return;
     }
   }
-  ExecutePreview(pagFilePath);
+  StartPreview(pagFilePath);
 }
 
 }  // namespace exporter
