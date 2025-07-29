@@ -82,6 +82,9 @@ class StreamValueWrapper {
   }
   ~StreamValueWrapper() {
     if (streamValue && suitesH) {
+      if (streamValue && suitesH && *suitesH) {
+        (*suitesH)->StreamSuite3()->AEGP_DisposeStreamValue(streamValue);
+      }
     }
   }
 

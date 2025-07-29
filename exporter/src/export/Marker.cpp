@@ -131,7 +131,7 @@ std::vector<std::unique_ptr<pag::Marker>> Marker::ExportMarkers(PAGExportSession
 
     markers.push_back(std::move(marker));
   }
-  AEHelper::DeleteStream(streamH);
+  return markers;
 }
 
 void Marker::ParseMarkers(pag::Layer* layer) {
@@ -249,6 +249,9 @@ void Marker::DeleteAllTimeStretchInfo(const AEGP_StreamRefH& markerStreamH) {
     }
 
     else {
+      if (comment.empty()) {
+        continue;
+      }
       auto lowerComment = comment;
       StringHelper::ToLowerCase(lowerComment);
       if (lowerComment.find("#timestretchmode") != std::string::npos) {
