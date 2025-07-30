@@ -99,8 +99,8 @@ class Marker {
     return key + "-" + std::to_string(id);
   }
 
-  std::vector<std::unique_ptr<pag::Marker>> ExportMarkers(PAGExportSession* session,
-                                                          const AEGP_LayerH& layerH);
+  static std::vector<std::unique_ptr<pag::Marker>> ExportMarkers(PAGExportSession* session,
+                                                                 const AEGP_LayerH& layerH);
   static void ParseMarkers(pag::Layer* layer);
 
   static std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH);

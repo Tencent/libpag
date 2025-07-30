@@ -33,8 +33,7 @@ struct TimeStretchModeConvert {
         {"scale", pag::PAGTimeStretchMode::Scale},
         {"repeat", pag::PAGTimeStretchMode::Repeat},
         {"repeatinverted", pag::PAGTimeStretchMode::RepeatInverted}};
-    auto lowerStr = str;
-    StringHelper::ToLowerCase(lowerStr);
+    const auto& lowerStr = StringHelper::ToLowerCase(str);
     auto it = stringToModeMap.find(lowerStr);
     if (it != stringToModeMap.end()) {
       return it->second;
@@ -142,38 +141,37 @@ void Marker::ParseMarkers(pag::Layer* layer) {
   static constexpr const char* CachePolicyKey = "CachePolicy";
 
   for (const auto& marker : layer->markers) {
-    const std::string comment = marker->comment;
+    const std::string& comment = marker->comment;
     if (comment.empty()) {
       continue;
     }
 
-    try {
-      const json j = json::parse(comment);
+    const json j = json::parse(comment, nullptr, false);
+    if (j.is_discarded() || !j.is_object()) {
+      continue;
+    }
 
-      if (j.is_object() && j.contains(CachePolicyKey)) {
-        const auto& item = j.at(CachePolicyKey);
-
-        if (item.is_number_integer()) {
-          const auto value = item.get<int>();
-          if (value == 1) {
-            layer->cachePolicy = pag::CachePolicy::Enable;
-          } else if (value == 2) {
-            layer->cachePolicy = pag::CachePolicy::Disable;
-          }
-          break;
+    if (j.contains(CachePolicyKey)) {
+      const auto& item = j.at(CachePolicyKey);
+      if (item.is_number_integer()) {
+        const auto value = item.get<int>();
+        if (value == 1) {
+          layer->cachePolicy = pag::CachePolicy::Enable
+        } else if (value == 2) {
+          layer->cachePolicy = pag::CachePolicy::Disable;
         }
-
-        if (item.is_string()) {
-          const auto value = item.get<std::string>();
-          if (value == "enable") {
-            layer->cachePolicy = pag::CachePolicy::Enable;
-          } else if (value == "disable") {
-            layer->cachePolicy = pag::CachePolicy::Disable;
-          }
-          break;
-        }
+        break;
       }
-    } catch (const json::parse_error& e) {
+
+      if (item.is_string()) {
+        const auto& value = item.get<std::string>();
+        if (value == "enable") {
+          layer->cachePolicy = pag::CachePolicy::Enable;
+        } else if (value == "disable") {
+          layer->cachePolicy = pag::CachePolicy::Disable;
+        }
+        break;
+      }
     }
   }
 }
@@ -246,14 +244,11 @@ void Marker::DeleteAllTimeStretchInfo(const AEGP_StreamRefH& markerStreamH) {
       } else {
         SetMarkerComment(markerStreamH, index, json.dump(), {});
       }
-    }
-
-    else {
+    } else {
       if (comment.empty()) {
         continue;
       }
-      auto lowerComment = comment;
-      StringHelper::ToLowerCase(lowerComment);
+      const auto& lowerComment = StringHelper::ToLowerCase(comment);
       if (lowerComment.find("#timestretchmode") != std::string::npos) {
         suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStreamH, index);
       }
@@ -287,9 +282,9 @@ bool Marker::SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index,
   }
 
   auto fmtComment = StringHelper::Utf8ToUtf16(comment);
-  err = suites->MarkerSuite1()->AEGP_SetMarkerString(markerP, AEGP_MarkerString_COMMENT,
-                                                     (A_u_short*)fmtComment.c_str(),
-                                                     (A_long)fmtComment.length());
+  err = suites->MarkerSuite1()->AEGP_SetMarkerString(
+      markerP, AEGP_MarkerString_COMMENT, reinterpret_cast<const A_u_short*>(fmtComment.c_str()),
+      static_cast<A_long>(fmtComment.length()));
   if (err != A_Err_NONE) {
     suites->MarkerSuite1()->AEGP_DisposeMarker(markerP);
     suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
@@ -410,6 +405,7 @@ void Marker::ExportImageLayerEditable(std::shared_ptr<pag::File>& file, PAGExpor
   bool hasNonEditableImage = false;
 
   std::unordered_map<pag::ID, int> imageToIndex;
+  imageToIndex.reserve(imageCount);
   for (int i = 0; i < imageCount; ++i) {
     if (file->images[i]) {
       imageToIndex[file->images[i]->id] = i;
