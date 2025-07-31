@@ -812,8 +812,7 @@ std::optional<TimeStretchInfo> Marker::GetTimeStretchInfo(const AEGP_ItemH& item
     }
 
     if (!foundMode) {
-      auto lowerComment = comment;
-      StringHelper::ToLowerCase(lowerComment);
+      const auto& lowerComment = StringHelper::ToLowerCase(comment);
       if (lowerComment.find("#timestretchmode") != std::string::npos) {
         static const struct {
           std::string name;
