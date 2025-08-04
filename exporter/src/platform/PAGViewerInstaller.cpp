@@ -31,12 +31,6 @@ namespace exporter {
 PAGViewerInstaller::PAGViewerInstaller(std::shared_ptr<AppConfig> config, QObject* parent)
     : QObject(parent), config(std::move(config)) {
   networkManager = new QNetworkAccessManager(this);
-#ifdef Q_OS_WIN
-  downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer_Installer.exe";
-#else
-  downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer.zip";
-#endif
-
   tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/PAGInstaller";
 
   if (!QDir().mkpath(tempDir)) {

@@ -86,7 +86,7 @@ void PAGViewerInstallModel::onCancel() {
 void PAGViewerInstallModel::onComplete() {
   if (currentStage == Success) {
     dialogResult = true;
-    QThreadPool::globalInstance()->start([this]() { executePreview(pendingFilePath); });
+    QThreadPool::globalInstance()->start([this]() { startPreview(pendingFilePath); });
   } else {
     dialogResult = false;
   }
@@ -184,7 +184,7 @@ void PAGViewerInstallModel::executeInstallation() {
   });
 }
 
-void PAGViewerInstallModel::executePreview(const std::string& filePath) {
+void PAGViewerInstallModel::startPreview(const std::string& filePath) {
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     QMetaObject::invokeMethod(
         QApplication::instance(), [filePath]() { PreviewPAGFile(filePath); }, Qt::QueuedConnection);
