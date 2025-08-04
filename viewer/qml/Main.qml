@@ -496,7 +496,7 @@ PAGWindow {
             openFolderDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
             openFolderDialog.currentAcceptHandler = function () {
                 let filePath = openFolderDialog.folder;
-                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath, {});
+                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportPNG, filePath);
                 if (task) {
                     taskConnections.target = task;
                     progressWindow.title = qsTr("Exporting");
@@ -521,7 +521,7 @@ PAGWindow {
             openFileDialog.currentFolder = Utils.getFileDir(mainForm.pagView.filePath);
             openFileDialog.currentAcceptHandler = function () {
                 let filePath = openFileDialog.selectedFile;
-                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportAPNG, filePath, {});
+                let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_ExportAPNG, filePath);
                 if (task) {
                     taskConnections.target = task;
                     progressWindow.title = qsTr("Exporting");
@@ -537,6 +537,18 @@ PAGWindow {
             break;
         case "check-for-updates":
             checkForUpdates(false);
+            break;
+        case "performance-profile":
+            let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_Profiling, mainForm.pagView.filePath);
+            if (task) {
+                taskConnections.target = task;
+                progressWindow.title = qsTr("Profiling");
+                progressWindow.progressBar.value = 0;
+                progressWindow.task = task;
+                progressWindow.visible = true;
+                progressWindow.raise();
+                task.start();
+            }
             break;
         default:
             console.log(`Undefined command: [${command}]`);

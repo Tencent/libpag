@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -29,10 +29,15 @@ class PAGTaskFactory : public QObject {
  public:
   Q_ENUMS(PAGTaskType)
 
-  enum PAGTaskType { PAGTaskType_None, PAGTaskType_ExportPNG, PAGTaskType_ExportAPNG };
+  enum class PAGTaskType {
+    PAGTaskType_None,
+    PAGTaskType_ExportPNG,
+    PAGTaskType_ExportAPNG,
+    PAGTaskType_Profiling
+  };
 
   Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
-                                  const QVariantMap& extraParams);
+                                  const QVariantMap& extraParams = {});
 
   void setFilePath(const std::string& filePath);
 

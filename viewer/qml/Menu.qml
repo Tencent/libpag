@@ -54,6 +54,13 @@ Item {
                         root.command("check-for-updates");
                     }
                 }
+                Action {
+                    text: qsTr("Performance Test")
+                    enabled: root.hasPAGFile
+                    onTriggered: {
+                        root.command("performance-profile");
+                    }
+                }
                 PAGMenu {
                     menuWidth: windowsMenuBar.menuWidth
                     title: qsTr("Export")
@@ -234,6 +241,13 @@ Item {
                     shortcut: StandardKey.Open
                     onTriggered: {
                         root.command("open-pag-file");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Performance Test")
+                    enabled: root.hasPAGFile
+                    onTriggered: {
+                        root.command("performance-profile");
                     }
                 }
                 Platform.Menu {

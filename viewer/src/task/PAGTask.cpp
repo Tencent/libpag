@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -33,7 +33,7 @@ double PAGTask::getProgress() const {
   return progress;
 }
 
-PAGPlayTask::PAGPlayTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
+PAGPlayTask::PAGPlayTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
     : filePath(filePath), pagFile(pagFile) {
   QObject::connect(&workerThread, &QThread::started, this, &PAGPlayTask::startInternal,
                    Qt::DirectConnection);

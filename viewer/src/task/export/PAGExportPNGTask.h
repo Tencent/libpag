@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -25,8 +25,12 @@ namespace pag {
 class PAGExportPNGTask : public PAGPlayTask {
   Q_OBJECT
  public:
-  explicit PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
-                            int exportFrame = -1);
+  // use to export a single frame of a pag file as png file.
+  explicit PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& pngfilePath,
+                            int exportFrame);
+  // use to export a pag file as png sequcence.
+  explicit PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                            const QString& pngSequenceDirPath);
 
  protected:
   void onFrameFlush(double progress) override;

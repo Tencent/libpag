@@ -2,3 +2,6 @@
 /cmake-build-*
 /vendor/AfterEffectsSDK
 *.cfg
+*.rsrc
+*_bak*
+*_bak*

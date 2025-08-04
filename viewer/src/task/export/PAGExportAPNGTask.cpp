@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,21 @@
 
 #include "PAGExportAPNGTask.h"
 #include <QDebug>
+#include <QFileInfo>
 #include "utils/FileUtils.h"
 #include "utils/Utils.h"
 
 namespace pag {
 
-PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& apngFilePath,
-                                     const QString& pngFilePath)
-    : PAGExportPNGTask(pagFile, pngFilePath), apngFilePath(apngFilePath) {
+static QString GetPNGTempDir(const QString& apngFilePath) {
+  QFileInfo fileInfo(apngFilePath);
+  QString pngFilePath = fileInfo.absolutePath() + "/" + fileInfo.baseName() + "_PNG";
+  return pngFilePath;
+}
+
+PAGExportAPNGTask::PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                     const QString& apngFilePath)
+    : PAGExportPNGTask(pagFile, GetPNGTempDir(apngFilePath)), apngFilePath(apngFilePath) {
   openAfterExport = false;
 }
 

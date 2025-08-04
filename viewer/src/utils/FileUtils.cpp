@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -84,16 +84,22 @@ bool MakeDir(const QString& path, bool isDir) {
 }
 
 bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath) {
-  size_t result = 0;
   auto encodeByteData = pag::Codec::Encode(file);
+  if (encodeByteData == nullptr) {
+    return false;
+  }
 
+  return WriteDataToDisk(filePath, encodeByteData->data(), encodeByteData->length());
+}
+
+bool WriteDataToDisk(const QString& filePath, const void* data, size_t length) {
   FILE* fp = fopen(filePath.toStdString().c_str(), "wb");
   if (fp == nullptr) {
     return false;
   }
 
-  result = fwrite(encodeByteData->data(), 1, encodeByteData->length(), fp);
-  if (result != encodeByteData->length()) {
+  size_t result = fwrite(data, 1, length, fp);
+  if (result != length) {
     fclose(fp);
     return false;
   }

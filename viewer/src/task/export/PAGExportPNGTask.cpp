@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -25,13 +25,15 @@ namespace pag {
 
 const std::string ExportPNGFileSuffix = "png";
 
-PAGExportPNGTask::PAGExportPNGTask(std::shared_ptr<PAGFile>& pagFile, const QString& filePath,
-                                   int exportFrame)
-    : PAGPlayTask(pagFile, filePath), exportFrame(exportFrame) {
-  QString lowerFilePath = filePath.toLower();
-  if (!lowerFilePath.endsWith(QString(".%1").arg(ExportPNGFileSuffix.c_str()))) {
-    Utils::MakeDir(filePath);
-  }
+PAGExportPNGTask::PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                   const QString& pngfilePath, int exportFrame)
+    : PAGPlayTask(pagFile, pngfilePath), exportFrame(exportFrame) {
+}
+
+PAGExportPNGTask::PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile,
+                                   const QString& pngSequenceDirPath)
+    : PAGPlayTask(pagFile, pngSequenceDirPath) {
+  Utils::MakeDir(pngSequenceDirPath);
 }
 
 void PAGExportPNGTask::onFrameFlush(double progress) {

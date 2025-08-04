@@ -1,0 +1,8 @@
+#!/usr/bin/osascript
+do shell script "/bin/bash -s <<'EOF'
+AE_PLUGIN_PATH='/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/'
+if ! [ -d \"${AE_PLUGIN_PATH}\" ]; then
+	mkdir -p \"${AE_PLUGIN_PATH}\"
+fi
+chmod -R a+w \"${AE_PLUGIN_PATH}\"
+EOF" with administrator privileges
