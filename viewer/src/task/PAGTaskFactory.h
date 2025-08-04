@@ -34,11 +34,10 @@ class PAGTaskFactory : public QObject {
   Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
                                   const QVariantMap& extraParams);
 
-  void setFile(const std::shared_ptr<PAGFile>& pagFile, const std::string& filePath);
+  void setFilePath(const std::string& filePath);
 
  private:
   PAGTask* task = nullptr;
-  std::string filePath = "";
   std::shared_ptr<PAGFile> pagFile = nullptr;
 };
 

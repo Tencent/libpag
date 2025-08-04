@@ -111,10 +111,9 @@ bool PAGEditAttributeModel::saveAttribute(int layerId, int markerIndex,
   return false;
 }
 
-void PAGEditAttributeModel::setFile(const std::shared_ptr<PAGFile>& pagFile,
-                                    const std::string& filePath) {
+void PAGEditAttributeModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   this->pagFile = pagFile;
-  this->filePath = QString::fromStdString(filePath);
+  this->filePath = QString::fromStdString(pagFile->path());
 }
 
 Layer* PAGEditAttributeModel::getLayerFromFile(const std::shared_ptr<File>& file, int layerId) {
