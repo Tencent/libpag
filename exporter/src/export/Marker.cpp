@@ -27,33 +27,50 @@ using json = nlohmann::json;
 namespace exporter {
 
 struct TimeStretchModeConvert {
-  static pag::PAGTimeStretchMode FromString(const std::string& str) {
-    static const std::unordered_map<std::string, pag::PAGTimeStretchMode> stringToModeMap = {
+  static pag::PAGTimeStretchMode FromString(const std::string& str);
+  static std::string ToString(pag::PAGTimeStretchMode mode);
+  static const std::unordered_map<std::string, pag::PAGTimeStretchMode> stringToModeMap;
+  static const std::unordered_map<pag::PAGTimeStretchMode, std::string> modeToStringMap;
+  static const std::vector<std::pair<std::string, pag::PAGTimeStretchMode>> oldLookupVector;
+};
+
+const std::unordered_map<std::string, pag::PAGTimeStretchMode>
+    TimeStretchModeConvert::stringToModeMap = {
         {"none", pag::PAGTimeStretchMode::None},
         {"scale", pag::PAGTimeStretchMode::Scale},
         {"repeat", pag::PAGTimeStretchMode::Repeat},
         {"repeatinverted", pag::PAGTimeStretchMode::RepeatInverted}};
-    const auto& lowerStr = StringHelper::ToLowerCase(str);
-    auto it = stringToModeMap.find(lowerStr);
-    if (it != stringToModeMap.end()) {
-      return it->second;
-    }
-    return pag::PAGTimeStretchMode::Repeat;
-  }
 
-  static std::string ToString(pag::PAGTimeStretchMode mode) {
-    static const std::unordered_map<pag::PAGTimeStretchMode, std::string> modeToStringMap = {
+const std::unordered_map<pag::PAGTimeStretchMode, std::string>
+    TimeStretchModeConvert::modeToStringMap = {
         {pag::PAGTimeStretchMode::None, "none"},
         {pag::PAGTimeStretchMode::Scale, "scale"},
         {pag::PAGTimeStretchMode::Repeat, "repeat"},
         {pag::PAGTimeStretchMode::RepeatInverted, "repeatinverted"}};
-    auto it = modeToStringMap.find(mode);
-    if (it != modeToStringMap.end()) {
-      return it->second;
-    }
-    return "repeat";
+
+const std::vector<std::pair<std::string, pag::PAGTimeStretchMode>>
+    TimeStretchModeConvert::oldLookupVector = {
+        {"repeatinverted", pag::PAGTimeStretchMode::RepeatInverted},
+        {"repeat", pag::PAGTimeStretchMode::Repeat},
+        {"scale", pag::PAGTimeStretchMode::Scale},
+        {"none", pag::PAGTimeStretchMode::None}};
+
+pag::PAGTimeStretchMode TimeStretchModeConvert::FromString(const std::string& str) {
+  const auto& lowerStr = StringHelper::ToLowerCase(str);
+  auto it = stringToModeMap.find(lowerStr);
+  if (it != stringToModeMap.end()) {
+    return it->second;
   }
-};
+  return pag::PAGTimeStretchMode::Repeat;
+}
+
+std::string TimeStretchModeConvert::ToString(pag::PAGTimeStretchMode mode) {
+  auto it = modeToStringMap.find(mode);
+  if (it != modeToStringMap.end()) {
+    return it->second;
+  }
+  return "repeat";
+}
 
 static std::string TimeStretchModeToString(pag::PAGTimeStretchMode mode) {
   return TimeStretchModeConvert::ToString(mode);
@@ -156,7 +173,7 @@ void Marker::ParseMarkers(pag::Layer* layer) {
       if (item.is_number_integer()) {
         const auto value = item.get<int>();
         if (value == 1) {
-          layer->cachePolicy = pag::CachePolicy::Enable
+          layer->cachePolicy = pag::CachePolicy::Enable;
         } else if (value == 2) {
           layer->cachePolicy = pag::CachePolicy::Disable;
         }
@@ -814,19 +831,9 @@ std::optional<TimeStretchInfo> Marker::GetTimeStretchInfo(const AEGP_ItemH& item
     if (!foundMode) {
       const auto& lowerComment = StringHelper::ToLowerCase(comment);
       if (lowerComment.find("#timestretchmode") != std::string::npos) {
-        static const struct {
-          std::string name;
-          pag::PAGTimeStretchMode mode;
-        } oldLookup[] = {
-            {"repeatinverted", pag::PAGTimeStretchMode::RepeatInverted},
-            {"repeat", pag::PAGTimeStretchMode::Repeat},
-            {"scale", pag::PAGTimeStretchMode::Scale},
-            {"none", pag::PAGTimeStretchMode::None},
-        };
-
-        for (const auto& entry : oldLookup) {
-          if (lowerComment.find(entry.name) != std::string::npos) {
-            foundMode = entry.mode;
+        for (const auto& entry : TimeStretchModeConvert::oldLookupVector) {
+          if (lowerComment.find(entry.first) != std::string::npos) {
+            foundMode = entry.second;
             break;
           }
         }
