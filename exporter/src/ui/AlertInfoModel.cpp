@@ -121,7 +121,7 @@ int AlertInfoModel::getAlertCount() const {
 }
 
 void AlertInfoModel::jumpToUrl() {
-  QDesktopServices::openUrl(QUrl(QLatin1String("https://pag.art/docs/pag-export-verify.html")));
+  QDesktopServices::openUrl(QUrl(QLatin1String(documentationUrl)));
 }
 
 void AlertInfoModel::setAlertInfos(std::vector<AlertInfo>& infos) {
@@ -132,72 +132,30 @@ void AlertInfoModel::setAlertInfos(std::vector<AlertInfo>& infos) {
   Q_EMIT alertInfoChanged();
 }
 
-bool AlertInfoModel::WarningsAlert(std::vector<AlertInfo>& infos) {
+bool AlertInfoModel::showWarningsAlert(std::vector<AlertInfo>& infos) {
   bool hasData = !infos.empty() || !alertInfos.empty();
   if (!hasData) {
     return false;
   }
 
-  int argc = 0;
-  app = std::make_unique<QApplication>(argc, nullptr);
-  app->setObjectName("PAG-Alert");
-  alertEngine = std::make_unique<QQmlApplicationEngine>(app.get());
-
-  QQmlContext* context = alertEngine->rootContext();
-
   if (!infos.empty()) {
     setAlertInfos(infos);
   }
 
-  context->setContextProperty("alertModel", this);
-  alertEngine->load(QUrl(QStringLiteral("qrc:/qml/AlertWarning.qml")));
-  alertWindow = qobject_cast<QQuickWindow*>(alertEngine->rootObjects().first());
-  if (alertWindow) {
-    alertWindow->setPersistentGraphics(true);
-    alertWindow->setPersistentSceneGraph(true);
-    alertWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  }
-
-  alertWindow->show();
-  app->exec();
-  return true;
+  return initiallizeAlertWindow("qrc:/qml/AlertWarning.qml", "alertModel");
 }
 
-bool AlertInfoModel::ErrorsAlert(std::vector<AlertInfo>& infos) {
+bool AlertInfoModel::showErrorsAlert(std::vector<AlertInfo>& infos) {
   bool hasData = !infos.empty() || !alertInfos.empty() || !errorMessage.isEmpty();
   if (!hasData) {
     return false;
   }
 
-  int argc = 0;
-  app = std::make_unique<QApplication>(argc, nullptr);
-  app->setObjectName("PAG-Error");
-  alertEngine = std::make_unique<QQmlApplicationEngine>(app.get());
-
-  QQmlContext* context = alertEngine->rootContext();
-
   if (!infos.empty()) {
     setAlertInfos(infos);
   }
 
-  context->setContextProperty("alertInfoModel", this);
-  alertEngine->load(QUrl(QStringLiteral("qrc:/qml/AlertError.qml")));
-
-  if (alertEngine->rootObjects().isEmpty()) {
-    return false;
-  }
-
-  alertWindow = qobject_cast<QQuickWindow*>(alertEngine->rootObjects().first());
-  if (!alertWindow) {
-    return false;
-  }
-
-  alertWindow->setPersistentGraphics(true);
-  alertWindow->setPersistentSceneGraph(true);
-  alertWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  alertWindow->show();
-  app->exec();
-  return true;
+  return initiallizeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
 }
 
 std::string AlertInfoModel::browseForSave(bool useScript) {
@@ -261,6 +219,31 @@ const AlertInfo* AlertInfoModel::getAlertInfo(const QModelIndex& index) const {
     return nullptr;
   }
   return &alertInfos[index.row()];
+}
+
+bool AlertInfoModel::initiallizeAlertWindow(const QString& qmlPath, const QString& contextName) {
+  int argc = 0;
+  app = std::make_unique<QApplication>(argc, nullptr);
+  app->setObjectName(contextName == "alertModel" ? "PAG-Alert" : "PAG-Error");
+  alertEngine = std::make_unique<QQmlApplicationEngine>(app.get());
+  QQmlContext* context = alertEngine->rootContext();
+  context->setContextProperty(contextName, this);
+  alertEngine->load(QUrl(qmlPath));
+  if (alertEngine->rootObjects().isEmpty()) {
+    return false;
+  }
+
+  alertWindow = qobject_cast<QQuickWindow*>(alertEngine->rootObjects().first());
+  if (!alertWindow) {
+    return false;
+  }
+
+  alertWindow->setPersistentGraphics(true);
+  alertWindow->setPersistentSceneGraph(true);
+  alertWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  alertWindow->show();
+  app->exec();
+  return true;
 }
 
 QString AlertInfoModel::getErrorMessage() const {

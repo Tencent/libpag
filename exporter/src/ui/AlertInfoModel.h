@@ -28,8 +28,7 @@ namespace exporter {
 
 class AlertInfoModel : public QAbstractListModel {
   Q_OBJECT
-  Q_PROPERTY(
-      QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
+  Q_PROPERTY(QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
 
  public:
   enum AlertRoles {
@@ -56,13 +55,13 @@ class AlertInfoModel : public QAbstractListModel {
   Q_INVOKABLE QVariantList getAlertInfos() const;
   Q_INVOKABLE int getAlertCount() const;
   Q_INVOKABLE void jumpToUrl();
+
   QString getErrorMessage() const;
-
-  void setAlertInfos(std::vector<AlertInfo>& infos);
   void setErrorMessage(const QString& message);
-
-  bool WarningsAlert(std::vector<AlertInfo>& infos);
-  bool ErrorsAlert(std::vector<AlertInfo>& info);
+  
+  void setAlertInfos(std::vector<AlertInfo>& infos);
+  bool showWarningsAlert(std::vector<AlertInfo>& infos);
+  bool showErrorsAlert(std::vector<AlertInfo>& info);
   std::string browseForSave(bool useScript);
 
  Q_SIGNALS:
@@ -72,13 +71,15 @@ class AlertInfoModel : public QAbstractListModel {
  protected:
   QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
   const AlertInfo* getAlertInfo(const QModelIndex& index) const;
+  bool initiallizeAlertWindow(const QString& qmlPath, const QString& contextName);
 
  private:
-  std::vector<AlertInfo> alertInfos;
-  QString errorMessage;
+  std::vector<AlertInfo> alertInfos = {};
+  QString errorMessage = "";
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> alertEngine = nullptr;
   QQuickWindow* alertWindow = nullptr;
+  static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";;
 };
 
 }  // namespace exporter

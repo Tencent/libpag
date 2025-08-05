@@ -74,7 +74,7 @@ bool WindowManager::showWarnings(std::vector<AlertInfo>& infos) {
     return false;
   }
   auto alertModel = std::make_unique<AlertInfoModel>();
-  alertModel->WarningsAlert(infos);
+  alertModel->showWarningsAlert(infos);
   return true;
 }
 
@@ -83,7 +83,7 @@ bool WindowManager::showErrors(std::vector<AlertInfo>& infos) {
     return false;
   }
   auto alertModel = std::make_unique<AlertInfoModel>();
-  alertModel->ErrorsAlert(infos);
+  alertModel->showErrorsAlert(infos);
   return true;
 }
 
@@ -91,7 +91,7 @@ bool WindowManager::showSimpleError(const QString& message) {
   auto alertModel = std::make_unique<AlertInfoModel>();
   alertModel->setErrorMessage(message);
   std::vector<AlertInfo> emptyInfos;
-  bool result = alertModel->ErrorsAlert(emptyInfos);
+  bool result = alertModel->showErrorsAlert(emptyInfos);
   return result;
 }
 
