@@ -9,7 +9,7 @@
 
 namespace exporter {
 
-static NSBundle* findPAGViewerBundle(const std::shared_ptr<AppConfig>& config) {
+static NSBundle* FindPAGViewerBundle(const std::shared_ptr<AppConfig>& config) {
   @autoreleasepool {
     std::string bundleIDString = config->getPlatformSpecificConfig("bundleID");
     NSString* bundleID = [NSString stringWithUTF8String:bundleIDString.c_str()];
@@ -65,13 +65,13 @@ PAGViewerCheck::PAGViewerCheck(std::shared_ptr<AppConfig> config) : config(confi
 }
 
 bool PAGViewerCheck::isPAGViewerInstalled() {
-  return findPAGViewerBundle(config) != nil;
+  return FindPAGViewerBundle(config) != nil;
 }
 
 PackageInfo PAGViewerCheck::getPackageInfo() {
   PackageInfo info = {};
   @autoreleasepool {
-    NSBundle* bundle = findPAGViewerBundle(config);
+    NSBundle* bundle = FindPAGViewerBundle(config);
     if (bundle) {
       NSString* displayName = [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"];
       if (!displayName || [displayName length] == 0) {
