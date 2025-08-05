@@ -50,8 +50,8 @@ QString PAGChartDataModel::getMaxTime() const {
 
 QQmlListProperty<PAGCharDataItem> PAGChartDataModel::getItems() {
   return QQmlListProperty<PAGCharDataItem>(
-      this, this, &PAGChartDataModel::appendColumItem, &PAGChartDataModel::columCount,
-      &PAGChartDataModel::colum, &PAGChartDataModel::clearColumItem);
+      this, this, &PAGChartDataModel::AppendColumnItem, &PAGChartDataModel::ColumnCount,
+      &PAGChartDataModel::Column, &PAGChartDataModel::ClearColumnItem);
 }
 
 void PAGChartDataModel::addItem(PAGCharDataItem* item) {
@@ -111,20 +111,20 @@ void PAGChartDataModel::resetItems(PAGChartDataModel* model) {
   Q_EMIT itemsChange();
 }
 
-void PAGChartDataModel::appendColumItem(QQmlListProperty<PAGCharDataItem>* list,
-                                        PAGCharDataItem* item) {
+void PAGChartDataModel::AppendColumnItem(QQmlListProperty<PAGCharDataItem>* list,
+                                         PAGCharDataItem* item) {
   static_cast<PAGChartDataModel*>(list->data)->addItem(item);
 }
 
-void PAGChartDataModel::clearColumItem(QQmlListProperty<PAGCharDataItem>* list) {
+void PAGChartDataModel::ClearColumnItem(QQmlListProperty<PAGCharDataItem>* list) {
   static_cast<PAGChartDataModel*>(list->data)->clearItems();
 }
 
-PAGCharDataItem* PAGChartDataModel::colum(QQmlListProperty<PAGCharDataItem>* list, qsizetype i) {
+PAGCharDataItem* PAGChartDataModel::Column(QQmlListProperty<PAGCharDataItem>* list, qsizetype i) {
   return static_cast<PAGChartDataModel*>(list->data)->getItem(static_cast<int>(i));
 }
 
-qsizetype PAGChartDataModel::columCount(QQmlListProperty<PAGCharDataItem>* list) {
+qsizetype PAGChartDataModel::ColumnCount(QQmlListProperty<PAGCharDataItem>* list) {
   return static_cast<PAGChartDataModel*>(list->data)->getSize();
 }
 

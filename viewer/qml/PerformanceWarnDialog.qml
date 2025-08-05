@@ -4,7 +4,6 @@ import QtQuick.Controls
 Popup {
     id: popup
     width: 200
-    // height: Math.min(200, theContentHeight)
     height: 200
     visible: false
     modal: true

@@ -63,10 +63,10 @@ class PAGChartDataModel : public QObject {
   void resetItems(PAGChartDataModel* model);
 
  private:
-  static void appendColumItem(QQmlListProperty<PAGCharDataItem>* list, PAGCharDataItem* item);
-  static void clearColumItem(QQmlListProperty<PAGCharDataItem>* list);
-  static PAGCharDataItem* colum(QQmlListProperty<PAGCharDataItem>* list, qsizetype i);
-  static qsizetype columCount(QQmlListProperty<PAGCharDataItem>* list);
+  static void AppendColumnItem(QQmlListProperty<PAGCharDataItem>* list, PAGCharDataItem* item);
+  static void ClearColumnItem(QQmlListProperty<PAGCharDataItem>* list);
+  static PAGCharDataItem* Column(QQmlListProperty<PAGCharDataItem>* list, qsizetype i);
+  static qsizetype ColumnCount(QQmlListProperty<PAGCharDataItem>* list);
 
   int currentIndex = -1;
   int64_t maxTime = 0;
