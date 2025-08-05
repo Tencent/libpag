@@ -14,7 +14,7 @@ export default [
     input: 'src/wechat/pag.ts',
     output: [{ banner, file: 'wechat/lib/libpag.js', format: 'cjs', exports: 'auto', sourcemap: true }],
     plugins: [
-      esbuild({ tsconfig: 'tsconfig.json', minify: false }),
+      esbuild({ tsconfig: 'tsconfig.json', minify: false,target: 'es6', }),
       resolve({ extensions: ['.ts', '.js'] }),
       commonJs(),
       replaceFunc(),
