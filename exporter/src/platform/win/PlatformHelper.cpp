@@ -16,10 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "platform/PlatformHelper.h"
+#include <shlobj.h>
+#include <windows.h>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include "platform/PAGViewerCheck.h"
 #include "src/base/utils/Log.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/FileHelper.h"
 
@@ -72,6 +76,103 @@ std::string GetTempFolderPath() {
     TempFolderPath = AEHelper::RunScript(suites, pluginID, "Folder.temp.fsName;");
   }
   return TempFolderPath;
+}
+std::string GetDownloadsPath() {
+  wchar_t* path = nullptr;
+  HRESULT hr = SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &path);
+
+  if (SUCCEEDED(hr) && path) {
+    int size = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+    std::string result(size - 1, 0);
+    WideCharToMultiByte(CP_UTF8, 0, path, -1, &result[0], size, nullptr, nullptr);
+    CoTaskMemFree(path);
+    return result;
+  }
+
+  wchar_t userProfile[MAX_PATH] = {0};
+  if (GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH)) {
+    std::filesystem::path downloadsPath = std::filesystem::path(userProfile) / "Downloads";
+    return downloadsPath.string();
+  }
+
+  wchar_t tempPath[MAX_PATH];
+  if (GetTempPathW(MAX_PATH, tempPath)) {
+    std::filesystem::path fallbackPath = std::filesystem::path(tempPath) / "Downloads";
+    return fallbackPath.string();
+  }
+  return "";
+}
+
+std::string GetPAGViewerPath() {
+  auto configPath = GetRoamingPath() + "PAGViewerPath.txt";
+  auto pagViewerPath = FileHelper::ReadTextFile(configPath.c_str());
+  if (!pagViewerPath.empty() && FileHelper::FileIsExist(pagViewerPath)) {
+    return pagViewerPath;
+  }
+
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
+  auto check = std::make_unique<PAGViewerCheck>(config);
+  auto info = check->getPackageInfo();
+
+  if (!info.installLocation.empty()) {
+    std::filesystem::path viewerPath =
+        std::filesystem::path(info.installLocation) / "PAGViewer.exe";
+    if (FileHelper::FileIsExist(viewerPath.string())) {
+      return viewerPath.string();
+    }
+  }
+
+  return "";
+}
+
+static void StartPreview(const std::string& pagFilePath) {
+  if (!FileHelper::FileIsExist(pagFilePath)) {
+    QString errorMsg =
+        QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
+    WindowManager::GetInstance().showSimpleError(errorMsg);
+    return;
+  }
+
+  auto pagViewerPath = GetPAGViewerPath();
+  if (pagViewerPath.empty()) {
+    QString errorMsg =
+        QString::fromUtf8(Messages::PAGVIEWER_NOT_FOUND) + QString::fromStdString(pagFilePath);
+    WindowManager::GetInstance().showSimpleError(errorMsg);
+    return;
+  }
+
+  auto winCmd = "\"" + pagViewerPath + "\" \"" + pagFilePath + "\"";
+
+  STARTUPINFOA si = {0};
+  PROCESS_INFORMATION pi = {0};
+
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  if (CreateProcessA(NULL, (LPSTR)winCmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  } else {
+    QString errorMsg =
+        QString::fromUtf8(Messages::PREVIEW_LAUNCH_FAILED) + QString::number(GetLastError());
+    WindowManager::GetInstance().showSimpleError(errorMsg);
+  }
+}
+
+void PreviewPAGFile(std::string pagFilePath) {
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
+  auto checker = std::make_unique<PAGViewerCheck>(config);
+
+  if (!checker->isPAGViewerInstalled()) {
+    bool installSuccess = WindowManager::GetInstance().showPAGViewerInstallDialog(pagFilePath);
+    if (!installSuccess) {
+      return;
+    }
+  }
+  StartPreview(pagFilePath);
 }
 
 }  // namespace exporter
