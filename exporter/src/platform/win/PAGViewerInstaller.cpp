@@ -58,6 +58,30 @@ bool PAGViewerInstaller::copyToApplications(const QString& sourcePath) {
   return true;
 }
 
+InstallStatus PAGViewerInstaller::executeInstall(const QString& installerPath) {
+  QProcess installerProcess;
+  installerProcess.setProgram(installerPath);
+
+  QStringList arguments;
+  arguments << "/S";
+  installerProcess.setArguments(arguments);
+
+  installerProcess.start();
+  installerProcess.waitForFinished(INSTALLER_PROCESS_TIMEOUT_MS);
+
+  if (installerProcess.exitCode() != 0) {
+    QString error = installerProcess.readAllStandardError();
+    return InstallStatus(InstallResult::ExecutionFailed,
+                         "installer execution failed: " + error.toStdString());
+  }
+
+  if (progressCallback) {
+    progressCallback(90);
+  }
+
+  return InstallStatus(InstallResult::Success);
+}
+
 }  // namespace exporter
 
 #endif

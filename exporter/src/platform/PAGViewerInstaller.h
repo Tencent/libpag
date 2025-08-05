@@ -25,6 +25,9 @@
 #include "platform/PAGViewerCheck.h"
 
 namespace exporter {
+static constexpr int kDownloadProgressWeight = 50;
+static constexpr int UNZIP_PROCESS_TIMEOUT_MS = 300000;
+
 class PAGViewerInstaller : public QObject {
   Q_OBJECT
  public:
@@ -36,11 +39,7 @@ class PAGViewerInstaller : public QObject {
   void setProgressCallback(std::function<void(int)> callback);
 
  private:
-  InstallStatus extractAndInstall(const QString& zipPath);
-
-#ifdef Q_OS_WIN
-  InstallStatus executeInstaller(const QString& installerPath);
-#endif
+  InstallStatus executeInstall(const QString& zipPath);
 
   bool copyToApplications(const QString& sourcePath);
 
@@ -50,7 +49,11 @@ class PAGViewerInstaller : public QObject {
   std::function<void(int)> progressCallback = nullptr;
   QNetworkAccessManager* networkManager = nullptr;
   QNetworkReply* downloadReply = nullptr;
-  QString tempDir;
-  QString downloadUrl;
+  QString tempDir = "";
+#ifdef Q_OS_WIN
+  QString downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer_Installer.exe";
+#else
+  QString downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer.zip";
+#endif
 };
 }  // namespace exporter

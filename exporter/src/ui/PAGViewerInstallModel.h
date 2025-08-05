@@ -68,7 +68,7 @@ class PAGViewerInstallModel : public QObject {
  protected:
   void updateStage(InstallStage stage);
   void executeInstallation();
-  void executePreview(const std::string& filePath);
+  void startPreview(const std::string& filePath);
 
  Q_SIGNALS:
   void titleChanged();

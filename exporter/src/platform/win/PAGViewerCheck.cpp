@@ -55,7 +55,7 @@ class RegistryKey {
     }
   }
 
-  static RegistryKey open(HKEY parent, const std::wstring& subKey, REGSAM access = KEY_READ) {
+  static RegistryKey Open(HKEY parent, const std::wstring& subKey, REGSAM access = KEY_READ) {
     HKEY hKey = nullptr;
     LONG result = RegOpenKeyExW(parent, subKey.c_str(), 0, access, &hKey);
     return (result == ERROR_SUCCESS) ? RegistryKey(hKey) : RegistryKey();
@@ -81,9 +81,9 @@ std::wstring stringToWstring(const std::string& str) {
   return result;
 }
 
-static std::string wstringToString(const std::wstring& wstr) {
+static std::string WstringToString(const std::wstring& wstr) {
   if (wstr.empty()) {
-    return std::string();
+    return "";
   }
 
   auto size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), static_cast<int>(wstr.length()),
@@ -97,7 +97,7 @@ static std::string wstringToString(const std::wstring& wstr) {
   return result;
 }
 
-static std::string readRegistryStringValue(const RegistryKey& key, const std::wstring& valueName) {
+static std::string ReadRegistryStringValue(const RegistryKey& key, const std::wstring& valueName) {
   if (!key.isValid()) {
     return "";
   }
@@ -117,13 +117,13 @@ static std::string readRegistryStringValue(const RegistryKey& key, const std::ws
 
   if (result == ERROR_SUCCESS) {
     buffer.resize(wcslen(buffer.c_str()));
-    return wstringToString(buffer);
+    return WstringToString(buffer);
   }
 
   return "";
 }
 
-static std::vector<std::wstring> enumerateRegistrySubKeys(const RegistryKey& key) {
+static std::vector<std::wstring> EnumerateRegistrySubKeys(const RegistryKey& key) {
   std::vector<std::wstring> subKeys = {};
   if (!key.isValid()) {
     return subKeys;
@@ -152,11 +152,11 @@ static std::vector<std::wstring> enumerateRegistrySubKeys(const RegistryKey& key
   return subKeys;
 }
 
-static PackageInfo readPackageInfoFromRegistry(const RegistryKey& parentKey,
+static PackageInfo ReadPackageInfoFromRegistry(const RegistryKey& parentKey,
                                                const std::wstring& subKeyName) {
   PackageInfo info = {};
 
-  auto subKey = RegistryKey::open(parentKey.get(), subKeyName);
+  auto subKey = RegistryKey::Open(parentKey.get(), subKeyName);
   if (!subKey.isValid()) {
     return info;
   }
@@ -173,14 +173,14 @@ static PackageInfo readPackageInfoFromRegistry(const RegistryKey& parentKey,
   return info;
 }
 
-static void scanRegistryView(std::vector<PackageInfo>& softwareList, HKEY rootKey, REGSAM access) {
+static void ScanRegistryView(std::vector<PackageInfo>& softwareList, HKEY rootKey, REGSAM access) {
   const std::wstring uninstallKeyPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-  auto uninstallKey = RegistryKey::open(rootKey, uninstallKeyPath, KEY_READ | access);
+  auto uninstallKey = RegistryKey::Open(rootKey, uninstallKeyPath, KEY_READ | access);
   if (!uninstallKey.isValid()) {
     return;
   }
 
-  auto subKeys = enumerateRegistrySubKeys(uninstallKey);
+  auto subKeys = EnumerateRegistrySubKeys(uninstallKey);
   for (const auto& subKeyName : subKeys) {
     PackageInfo info = readSoftwareInfoFromRegistry(uninstallKey, subKeyName);
     if (!info.displayName.empty()) {
@@ -189,12 +189,12 @@ static void scanRegistryView(std::vector<PackageInfo>& softwareList, HKEY rootKe
   }
 }
 
-static std::vector<PackageInfo> scanUninstallRegistry() {
+static std::vector<PackageInfo> ScanUninstallRegistry() {
   std::vector<PackageInfo> softwareList = {};
-  scanRegistryView(softwareList, HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY);
-  scanRegistryView(softwareList, HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY);
-  scanRegistryView(softwareList, HKEY_CURRENT_USER, KEY_WOW64_64KEY);
-  scanRegistryView(softwareList, HKEY_CURRENT_USER, KEY_WOW64_32KEY);
+  ScanRegistryView(softwareList, HKEY_LOCAL_MACHINE, KEY_WOW64_64KEY);
+  ScanRegistryView(softwareList, HKEY_LOCAL_MACHINE, KEY_WOW64_32KEY);
+  ScanRegistryView(softwareList, HKEY_CURRENT_USER, KEY_WOW64_64KEY);
+  ScanRegistryView(softwareList, HKEY_CURRENT_USER, KEY_WOW64_32KEY);
   return softwareList;
 }
 
@@ -232,18 +232,18 @@ PAGViewerCheck::PAGViewerCheck(std::shared_ptr<AppConfig> config) : config(confi
 }
 
 bool PAGViewerCheck::isPAGViewerInstalled() {
-  auto results = findSoftwareByName(config->getAppName());
+  auto results = findPackageinfoByName(config->getAppName());
   return !results.empty();
 }
 
 PackageInfo PAGViewerCheck::getPackageInfo() {
-  auto results = findSoftwareByName(config->getAppName());
+  auto results = findPackageinfoByName(config->getAppName());
   return results.empty() ? PackageInfo() : results[0];
 }
 
-std::vector<PackageInfo> PAGViewerCheck::findSoftwareByName(const std::string& namePattern) {
+std::vector<PackageInfo> PAGViewerCheck::findPackageinfoByName(const std::string& namePattern) {
   std::vector<PackageInfo> results = {};
-  auto allSoftware = scanUninstallRegistry();
+  auto allSoftware = ScanUninstallRegistry();
   std::string lowerPattern = StringHelper::ToLowerCase(namePattern);
 
   for (const auto& software : allSoftware) {

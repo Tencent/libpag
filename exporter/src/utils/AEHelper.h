@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <QString>
 #include <memory>
 #include <string>
 #include "AEGP_SuiteHandler.h"
@@ -64,9 +63,17 @@ uint32_t GetLayerId(const AEGP_LayerH& layerH);
 
 void RegisterTextDocumentScript();
 
-QString GetProjectPath();
+void DeleteStream(AEGP_StreamRefH streamRefH);
 
 AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH);
+
+AEGP_StreamRefH GetMarkerStreamFromItem(const AEGP_ItemH& litemH);
+
+AEGP_StreamRefH GetMarkerStreamFromComposition(const AEGP_CompH& compH);
+
+float GetFrameRateFromItem(const AEGP_ItemH& itemH);
+
+float GetFrameRateFromComp(const AEGP_CompH& compH);
 
 const std::string TextDocumentScript = R"(
 if (typeof PAG !== 'object') {

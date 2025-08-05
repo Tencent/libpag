@@ -28,19 +28,9 @@
 #include <utility>
 
 namespace exporter {
-
-static constexpr int kDownloadProgressWeight = 50;      // 下载进度权重为50%
-static constexpr int UNZIP_PROCESS_TIMEOUT_MS = 30000;  // 解压超时30秒
-
 PAGViewerInstaller::PAGViewerInstaller(std::shared_ptr<AppConfig> config, QObject* parent)
     : QObject(parent), config(std::move(config)) {
   networkManager = new QNetworkAccessManager(this);
-#ifdef Q_OS_WIN
-  downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer_Installer.exe";
-#else
-  downloadUrl = "https://pag.qq.com/update/libpag/PAGViewer.zip";
-#endif
-
   tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + "/PAGInstaller";
 
   if (!QDir().mkpath(tempDir)) {
@@ -58,10 +48,17 @@ PAGViewerInstaller::~PAGViewerInstaller() {
 }
 
 void PAGViewerInstaller::onDownloadProgress(qint64 bytesReceived, qint64 bytesTotal) {
-  if (bytesTotal > 0 && progressCallback) {
-    int progress = static_cast<int>((bytesReceived * kDownloadProgressWeight) / bytesTotal);
-    progressCallback(progress);
+  if (!progressCallback) {
+    return;
   }
+
+  if (bytesTotal <= 0) {
+    progressCallback(0);
+    return;
+  }
+
+  int progress = static_cast<int>((bytesReceived * kDownloadProgressWeight) / bytesTotal);
+  progressCallback(progress);
 }
 
 InstallStatus PAGViewerInstaller::installPAGViewer() {
@@ -122,89 +119,11 @@ InstallStatus PAGViewerInstaller::installPAGViewer() {
     progressCallback(50);
   }
 
-#ifdef Q_OS_WIN
-  return executeInstaller(filePath);
-#else
-  return extractAndInstall(filePath);
-#endif
+  return executeInstall(filePath);
 }
 
 void PAGViewerInstaller::setProgressCallback(std::function<void(int)> callback) {
   progressCallback = std::move(callback);
 }
-
-InstallStatus PAGViewerInstaller::extractAndInstall(const QString& zipPath) {
-  QProcess unzipProcess;
-  QStringList arguments;
-
-#ifdef Q_OS_WIN
-  unzipProcess.setProgram("powershell");
-  arguments
-      << "-Command"
-      << QString("Expand-Archive -Path '%1' -DestinationPath '%2' -Force").arg(zipPath, tempDir);
-#else
-  unzipProcess.setProgram("unzip");
-  arguments << "-o"
-            << "-q" << zipPath << "-d" << tempDir;
-#endif
-  unzipProcess.setArguments(arguments);
-  unzipProcess.start();
-  unzipProcess.waitForFinished(UNZIP_PROCESS_TIMEOUT_MS);
-
-  if (unzipProcess.exitCode() != 0) {
-    QString error = unzipProcess.readAllStandardError();
-    QString output = unzipProcess.readAllStandardOutput();
-    return InstallStatus(InstallResult::ExecutionFailed, "unzip failed: " + error.toStdString());
-  }
-
-  if (progressCallback) {
-    progressCallback(80);
-  }
-
-#ifdef Q_OS_WIN
-  QString appPath = tempDir + "/PAGViewer.exe";
-#elif defined(Q_OS_MAC)
-  QString appPath = tempDir + "/PAGViewer.app";
-#endif
-  QFile appFile(appPath);
-  if (!appFile.exists()) {
-    return InstallStatus(InstallResult::ExecutionFailed, "can not find file after unzip");
-  }
-
-  if (!copyToApplications(appPath)) {
-    return InstallStatus(InstallResult::AccessDenied, "install PAGViewer failed");
-  }
-
-  if (progressCallback) {
-    progressCallback(90);
-  }
-  return InstallStatus(InstallResult::Success);
-}
-
-#ifdef Q_OS_WIN
-InstallStatus PAGViewerInstaller::executeInstaller(const QString& installerPath) {
-  QProcess installerProcess;
-  installerProcess.setProgram(installerPath);
-
-  QStringList arguments;
-  arguments << "/S";
-  installerProcess.setArguments(arguments);
-
-  installerProcess.start();
-  installerProcess.waitForFinished(INSTALLER_PROCESS_TIMEOUT_MS);
-
-  if (installerProcess.exitCode() != 0) {
-    QString error = installerProcess.readAllStandardError();
-    return InstallStatus::Error(InstallResult::ExecutionFailed,
-                                "installer execution failed: " + error.toStdString());
-  }
-
-  if (progressCallback) {
-    progressCallback(90);
-  }
-
-  return InstallStatus::Success();
-}
-#endif
 
 }  // namespace exporter

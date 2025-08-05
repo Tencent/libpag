@@ -89,7 +89,7 @@ std::string GetDownloadsPath() {
   }
 }
 
-static void executePreviewLogic(const std::string& pagFilePath) {
+static void StartPreview(const std::string& pagFilePath) {
   @autoreleasepool {
     NSString* nsFilePath = [NSString stringWithCString:pagFilePath.c_str()
                                               encoding:NSUTF8StringEncoding];
@@ -162,6 +162,6 @@ void PreviewPAGFile(std::string pagFilePath) {
       return;
     }
   }
-  executePreviewLogic(pagFilePath);
+  StartPreview(pagFilePath);
 }
 }

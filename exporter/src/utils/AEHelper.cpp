@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AEHelper.h"
-#include <QDir>
-#include <QFileInfo>
 #include <iostream>
 #include "StringHelper.h"
 #include "platform/PlatformHelper.h"
@@ -92,33 +90,50 @@ void RegisterTextDocumentScript() {
   }
 }
 
-QString GetProjectPath() {
-  AEGP_ProjectH projectHandle;
-  Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
-  AEGP_MemHandle pathMemory;
-  Suites->ProjSuite6()->AEGP_GetProjectPath(projectHandle, &pathMemory);
-  std::string filePath = StringHelper::AeMemoryHandleToString(pathMemory);
-  Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
-  if (!filePath.empty()) {
-    std::replace(filePath.begin(), filePath.end(), '\\', '/');
-  }
-  QString projectPath =
-      QDir::cleanPath(QDir::fromNativeSeparators(QString::fromStdString(filePath)));
-  QFileInfo fileInfo(projectPath);
-  return fileInfo.absolutePath();
-}
-
 AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH) {
   if (layerH == nullptr) {
     return nullptr;
   }
-
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
-  AEGP_StreamRefH streamH = nullptr;
+  AEGP_StreamRefH streamRefH;
   suites->StreamSuite4()->AEGP_GetNewLayerStream(pluginID, layerH, AEGP_LayerStream_MARKER,
-                                                 &streamH);
-  return streamH;
+                                                 &streamRefH);
+  return streamRefH;
+}
+AEGP_StreamRefH GetMarkerStreamFromItem(const AEGP_ItemH& itemH) {
+  auto compH = GetCompFromItem(itemH);
+  return GetMarkerStreamFromComposition(compH);
+}
+AEGP_StreamRefH GetMarkerStreamFromComposition(const AEGP_CompH& compH) {
+  if (compH == nullptr) {
+    return nullptr;
+  }
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  AEGP_StreamRefH streamRefH;
+  suites->CompSuite10()->AEGP_GetNewCompMarkerStream(pluginID, compH, &streamRefH);
+  return streamRefH;
+}
+
+float GetFrameRateFromItem(const AEGP_ItemH& itemH) {
+  auto compH = GetCompFromItem(itemH);
+  return GetFrameRateFromComp(compH);
+}
+
+float GetFrameRateFromComp(const AEGP_CompH& compH) {
+  const auto& suites = GetSuites();
+  A_FpLong frameRate = 24;
+  suites->CompSuite6()->AEGP_GetCompFramerate(compH, &frameRate);
+  return static_cast<float>(frameRate);
+}
+
+void DeleteStream(AEGP_StreamRefH streamRefH) {
+  if (streamRefH != nullptr) {
+    const auto& suites = GetSuites();
+    suites->StreamSuite4()->AEGP_DisposeStream(streamRefH);
+    streamRefH = nullptr;
+  }
 }
 
 std::string GetDocumentsFolderPath() {
