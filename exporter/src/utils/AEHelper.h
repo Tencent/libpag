@@ -64,7 +64,6 @@ uint32_t GetLayerId(const AEGP_LayerH& layerH);
 
 void RegisterTextDocumentScript();
 
-
 QString GetProjectPath();
 
 AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH);

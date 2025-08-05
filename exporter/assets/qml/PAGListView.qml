@@ -18,12 +18,12 @@ Rectangle {
     property var titleIconMarginTop: -2
     property var fontFamily: "PingFang SC"
 
-    property string errorIconPath: isPreview ? "../images/export_wrong.png" : "qrc:/images/export_wrong.png"
+    property string errorIconPath: isPreview ? "../images/export-wrong.png" : "qrc:/images/export-wrong.png"
     property string foldIconPath: isPreview ? "../images/folder-fold.png" : "qrc:/images/folder-fold.png"
     property string openIconPath: isPreview ? "../images/folder-unfold.png" : "qrc:/images/folder-unfold.png"
-    property string rightArrowIconPath: isPreview ? "../images/right_arrow.png" : "qrc:/images/right_arrow.png"
+    property string rightArrowIconPath: isPreview ? "../images/right-arrow.png" : "qrc:/images/right-arrow.png"
     property string bmpIconPath: isPreview ? "../images/bmp.png" : "qrc:/images/bmp.png"
-    property string warnIconPath: isPreview ? "../images/exprot_warning.png" : "qrc:/images/exprot_warning.png"
+    property string warnIconPath: isPreview ? "../images/export-warning.png" : "qrc:/images/export-warning.png"
     property var model: null
     property bool showLocationBtn: false
 

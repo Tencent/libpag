@@ -67,7 +67,7 @@ PAGWindow {
                     sourceSize.width: 20
                     sourceSize.height: 20
                     fillMode: Image.PreserveAspectFit
-                    source: "qrc:/images/export_wrong.png"
+                    source: "qrc:/images/export-wrong.png"
                 }
 
                 Text {

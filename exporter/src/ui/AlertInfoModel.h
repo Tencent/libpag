@@ -28,7 +28,8 @@ namespace exporter {
 
 class AlertInfoModel : public QAbstractListModel {
   Q_OBJECT
-  Q_PROPERTY(QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
+  Q_PROPERTY(
+      QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
 
  public:
   enum AlertRoles {
@@ -58,7 +59,7 @@ class AlertInfoModel : public QAbstractListModel {
 
   QString getErrorMessage() const;
   void setErrorMessage(const QString& message);
-  
+
   void setAlertInfos(std::vector<AlertInfo>& infos);
   bool showWarningsAlert(std::vector<AlertInfo>& infos);
   bool showErrorsAlert(std::vector<AlertInfo>& info);
@@ -71,7 +72,7 @@ class AlertInfoModel : public QAbstractListModel {
  protected:
   QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
   const AlertInfo* getAlertInfo(const QModelIndex& index) const;
-  bool initiallizeAlertWindow(const QString& qmlPath, const QString& contextName);
+  bool initializeAlertWindow(const QString& qmlPath, const QString& contextName);
 
  private:
   std::vector<AlertInfo> alertInfos = {};
@@ -79,7 +80,7 @@ class AlertInfoModel : public QAbstractListModel {
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> alertEngine = nullptr;
   QQuickWindow* alertWindow = nullptr;
-  static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";;
+  static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";
 };
 
 }  // namespace exporter

@@ -17,8 +17,9 @@
         <file>images/preview.png</file>
         <file>images/tip.png</file>
         <file>images/down-arrow.png</file>
-        <file>images/exprot_warning.png</file>
-        <file>images/export_wrong.png</file>
+        <file>images/export-warning.png</file>
+        <file>images/export-wrong.png</file>
+        <file>images/right-arrow.png</file>
 
 
         <!-- qml -->

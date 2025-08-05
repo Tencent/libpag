@@ -142,7 +142,7 @@ bool AlertInfoModel::showWarningsAlert(std::vector<AlertInfo>& infos) {
     setAlertInfos(infos);
   }
 
-  return initiallizeAlertWindow("qrc:/qml/AlertWarning.qml", "alertModel");
+  return initializeAlertWindow("qrc:/qml/AlertWarning.qml", "alertModel");
 }
 
 bool AlertInfoModel::showErrorsAlert(std::vector<AlertInfo>& infos) {
@@ -155,7 +155,7 @@ bool AlertInfoModel::showErrorsAlert(std::vector<AlertInfo>& infos) {
     setAlertInfos(infos);
   }
 
-  return initiallizeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
+  return initializeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
 }
 
 std::string AlertInfoModel::browseForSave(bool useScript) {
@@ -196,7 +196,7 @@ std::string AlertInfoModel::browseForSave(bool useScript) {
     LastFilePath = filePath;
     LastOutputPath = outputPath;
     outputPath = StringHelper::ConvertStringEncoding(outputPath);
-    StringHelper::InsureStringSuffix(outputPath, ".pag");
+    StringHelper::EnsureStringSuffix(outputPath, ".pag");
   }
   return outputPath;
 }
