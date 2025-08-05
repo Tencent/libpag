@@ -33,7 +33,8 @@ class PAGTaskFactory : public QObject {
     PAGTaskType_None,
     PAGTaskType_ExportPNG,
     PAGTaskType_ExportAPNG,
-    PAGTaskType_Profiling
+    PAGTaskType_Profiling,
+    PAGTaskType_Benchmark
   };
 
   Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,

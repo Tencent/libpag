@@ -18,12 +18,24 @@
 
 #pragma once
 
-#include <string>
+#include "codec/DataTypes.h"
+#include "task/PAGTask.h"
 
 namespace pag {
 
-const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
-const std::string UpdateChannel = "@UpdateChannel@";
-const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
+class PAGBenchmarkTask : public PAGPlayTask {
+ public:
+  PAGBenchmarkTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
 
-} // namespace pag
+ protected:
+  void onBegin() override;
+  int onFinish() override;
+  void onFrameFlush(double progress) override;
+
+ public:
+  std::shared_ptr<PerformanceData> avgPerformanceData = nullptr;
+  std::shared_ptr<PerformanceData> maxPerformanceData = nullptr;
+  std::shared_ptr<PerformanceData> firstFramePerformanceData = nullptr;
+};
+
+}  // namespace pag

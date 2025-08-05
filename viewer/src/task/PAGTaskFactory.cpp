@@ -22,6 +22,7 @@
 #include <QVariantMap>
 #include "task/export/PAGExportAPNGTask.h"
 #include "task/export/PAGExportPNGTask.h"
+#include "task/profiling/PAGBenchmarkTask.h"
 #include "task/profiling/PAGProfilingTask.h"
 
 namespace pag {
@@ -53,6 +54,10 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
     }
     case PAGTaskType::PAGTaskType_Profiling: {
       task = new PAGProfilingTask(pagFile, path);
+      break;
+    }
+    case PAGTaskType::PAGTaskType_Benchmark: {
+      task = new PAGBenchmarkTask(pagFile, path);
       break;
     }
     default: {

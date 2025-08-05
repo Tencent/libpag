@@ -22,7 +22,6 @@
 #include <QSGRendererInterface>
 #include "PAGUpdater.h"
 #include "PAGViewer.h"
-#include "profiling/PAGRunTimeDataModel.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
 #include "version.h"

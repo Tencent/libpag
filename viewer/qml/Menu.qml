@@ -61,6 +61,13 @@ Item {
                         root.command("performance-profile");
                     }
                 }
+                Action {
+                    text: qsTr("Performance Benchmark Test")
+                    enabled: root.hasPAGFile
+                    onTriggered: {
+                        root.command("performance-benchmark");
+                    }
+                }
                 PAGMenu {
                     menuWidth: windowsMenuBar.menuWidth
                     title: qsTr("Export")
@@ -248,6 +255,13 @@ Item {
                     enabled: root.hasPAGFile
                     onTriggered: {
                         root.command("performance-profile");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Performance Benchmark Test")
+                    enabled: root.hasPAGFile
+                    onTriggered: {
+                        root.command("performance-benchmark");
                     }
                 }
                 Platform.Menu {

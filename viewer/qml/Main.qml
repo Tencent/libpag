@@ -3,6 +3,7 @@ import QtCore
 import QtQuick
 import QtQuick.Dialogs
 import QtQuick.Controls
+import QtQuick.Layouts
 import Qt.labs.settings
 import Qt.labs.platform as Platform
 import "components"
@@ -45,6 +46,16 @@ PAGWindow {
         property double lastX: 0
 
         property double lastY: 0
+
+        property string benchmarkVersion: "0.0.0"
+
+        property string templateAvgRenderingTime: "30000"
+
+        property string templateFirstFrameRenderingTime: "60000"
+
+        property string uiAvgRenderingTime: "30000"
+
+        property string uiFirstFrameRenderingTime: "60000"
     }
     MainForm {
         id: mainForm
@@ -289,6 +300,21 @@ PAGWindow {
         }
     }
 
+    PAGMessageBox {
+        id: benchmarkCompleteMessageBox
+        width: 500
+        visible: false
+        height: 130 + windowTitleBarHeight
+        textSize: 12
+        title: qsTr("Performance Benchmark Test")
+        message: qsTr("Performance Benchmark Test Complete")
+    }
+
+    BusyIndicator {
+        id: benchmarkBusyIndicator
+        running: false
+    }
+
     Connections {
         id: taskConnections
         onProgressChanged: function (progress) {
@@ -307,6 +333,28 @@ PAGWindow {
             progressWindow.task = null;
             progressWindow.progressBar.value = 0;
             progressWindow.visible = false;
+        }
+    }
+
+    Connections {
+        target: benchmarkModel
+
+        function onBenchmarkComplete(isAuto, templateAvgRenderingTime, templateFirstFrameRenderingTime,
+                                     uiAvgRenderingTime, uiFirstFrameRenderingTime) {
+            settings.templateAvgRenderingTime = templateAvgRenderingTime;
+            settings.templateFirstFrameRenderingTime = templateFirstFrameRenderingTime;
+            settings.uiAvgRenderingTime = uiAvgRenderingTime;
+            settings.uiFirstFrameRenderingTime = uiFirstFrameRenderingTime;
+
+            benchmarkBusyIndicator.visible = false;
+            benchmarkBusyIndicator.running = false;
+
+            if (isAuto) {
+                settings.benchmarkVersion = Qt.application.version;
+            } else {
+                benchmarkCompleteMessageBox.visible = true;
+                benchmarkCompleteMessageBox.raise();
+            }
         }
     }
 
@@ -549,6 +597,12 @@ PAGWindow {
                 progressWindow.raise();
                 task.start();
             }
+            break;
+        case "performance-benchmark":
+            mainForm.pagView.isPlaying = false;
+            benchmarkBusyIndicator.visible = true;
+            benchmarkBusyIndicator.running = true;
+            benchmarkModel.startBenchmarkOnTemplate(false);
             break;
         default:
             console.log(`Undefined command: [${command}]`);

@@ -18,12 +18,25 @@
 
 #pragma once
 
-#include <string>
+#include <QObject>
+#include "task/profiling/PAGBenchmarkTask.h"
 
 namespace pag {
 
-const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
-const std::string UpdateChannel = "@UpdateChannel@";
-const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
+class PAGBenchmarkModel : public QObject {
+  Q_OBJECT
+ public:
+  explicit PAGBenchmarkModel(QObject* parent = nullptr);
 
-} // namespace pag
+  Q_INVOKABLE bool startBenchmarkOnTemplate(bool isAuto);
+  Q_SIGNAL void benchmarkComplete(bool isAuto, QString templateAvgRenderingTime,
+                                  QString templateFirstFrameRenderingTime,
+                                  QString uiAvgRenderingTime, QString uiFirstFrameRenderingTime);
+  Q_SLOT void onBenchmarkOnTemplateFinished(int result, QString filePath);
+
+ private:
+  bool isAuto = false;
+  QMap<QString, std::unique_ptr<PAGBenchmarkTask>> taskMap = {};
+};
+
+}  // namespace pag
