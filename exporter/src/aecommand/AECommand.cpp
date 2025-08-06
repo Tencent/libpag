@@ -97,7 +97,7 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
   }
 
   AlertInfoModel alertModel;
-  std::string outputPath = alertModel.browseForSave(true);
+  const auto& outputPath = AlertInfoModel::BrowseForSave(true);
 
   if (outputPath.empty()) {
     return err;

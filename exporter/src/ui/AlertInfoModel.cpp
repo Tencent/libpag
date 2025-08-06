@@ -39,66 +39,64 @@ int AlertInfoModel::rowCount(const QModelIndex& parent) const {
   return static_cast<int>(alertInfos.size());
 }
 
-QVariant AlertInfoModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || index.row() < 0 || index.row() >= static_cast<int>(alertInfos.size())) {
-    return QVariant();
+QVariant AlertInfoModel::data(const QModelIndex& index, const int role) const {
+  if (!isIndexValid(index)) {
+    return {};
   }
 
   const AlertInfo& alertInfo = alertInfos[index.row()];
 
   switch (role) {
-    case IsErrorRole:
+    case static_cast<int>(AlertRoles::IsErrorRole):
       return alertInfo.isError;
-    case InfoRole:
+    case static_cast<int>(AlertRoles::InfoRole):
       return QString::fromStdString(alertInfo.info);
-    case SuggestionRole:
+    case static_cast<int>(AlertRoles::SuggestionRole):
       return QString::fromStdString(alertInfo.suggest);
-    case IsFoldRole:
+    case static_cast<int>(AlertRoles::IsFoldRole):
       return alertInfo.isFold;
-    case CompoNameRole:
+    case static_cast<int>(AlertRoles::CompoNameRole):
       return QString::fromStdString(alertInfo.compName);
-    case LayerNameRole:
+    case static_cast<int>(AlertRoles::LayerNameRole):
       return QString::fromStdString(alertInfo.layerName);
-    case HasLayerNameRole:
+    case static_cast<int>(AlertRoles::HasLayerNameRole):
       return !alertInfo.layerName.empty();
-    case HasSuggestionRole:
+    case static_cast<int>(AlertRoles::HasSuggestionRole):
       return !alertInfo.suggest.empty();
     default:
-      return QVariant();
+      return {};
   }
 }
 
 QHash<int, QByteArray> AlertInfoModel::roleNames() const {
-  QHash<int, QByteArray> roles;
-  roles[IsErrorRole] = "isError";
-  roles[InfoRole] = "errorInfo";
-  roles[SuggestionRole] = "suggestion";
-  roles[IsFoldRole] = "isFold";
-  roles[CompoNameRole] = "compositionName";
-  roles[LayerNameRole] = "layerName";
-  roles[HasLayerNameRole] = "hasLayerName";
-  roles[HasSuggestionRole] = "hasSuggestion";
+  static const QHash<int, QByteArray> roles = {
+      {static_cast<int>(AlertRoles::IsErrorRole), "isError"},
+      {static_cast<int>(AlertRoles::InfoRole), "errorInfo"},
+      {static_cast<int>(AlertRoles::SuggestionRole), "suggestion"},
+      {static_cast<int>(AlertRoles::IsFoldRole), "isFold"},
+      {static_cast<int>(AlertRoles::CompoNameRole), "compositionName"},
+      {static_cast<int>(AlertRoles::LayerNameRole), "layerName"},
+      {static_cast<int>(AlertRoles::HasLayerNameRole), "hasLayerName"},
+      {static_cast<int>(AlertRoles::HasSuggestionRole), "hasSuggestion"}};
   return roles;
 }
 
-bool AlertInfoModel::setData(const QModelIndex& index, const QVariant& value, int role) {
-  if (!index.isValid() || index.row() < 0 || index.row() >= static_cast<int>(alertInfos.size())) {
+bool AlertInfoModel::setData(const QModelIndex& index, const QVariant& value, const int role) {
+  if (!isIndexValid(index)) {
     return false;
   }
 
   AlertInfo& alertInfo = alertInfos[index.row()];
 
-  switch (role) {
-    case IsFoldRole:
-      alertInfo.isFold = value.toBool();
-      Q_EMIT dataChanged(index, index);
-      return true;
-    default:
-      return false;
+  if (role == static_cast<int>(AlertRoles::IsFoldRole)) {
+    alertInfo.isFold = value.toBool();
+    Q_EMIT dataChanged(index, index);
+    return true;
   }
+  return false;
 }
 
-bool AlertInfoModel::locateAlert(int row) {
+bool AlertInfoModel::locateAlert(const int row) {
   if (row < 0 || row >= static_cast<int>(alertInfos.size())) {
     return false;
   }
@@ -120,11 +118,11 @@ int AlertInfoModel::getAlertCount() const {
   return static_cast<int>(alertInfos.size());
 }
 
-void AlertInfoModel::jumpToUrl() {
+void AlertInfoModel::JumpToUrl() {
   QDesktopServices::openUrl(QUrl(QLatin1String(documentationUrl)));
 }
 
-void AlertInfoModel::setAlertInfos(std::vector<AlertInfo>& infos) {
+void AlertInfoModel::setAlertInfos(std::vector<AlertInfo> infos) {
   beginResetModel();
   alertInfos = std::move(infos);
   endResetModel();
@@ -132,7 +130,7 @@ void AlertInfoModel::setAlertInfos(std::vector<AlertInfo>& infos) {
   Q_EMIT alertInfoChanged();
 }
 
-bool AlertInfoModel::showWarningsAlert(std::vector<AlertInfo>& infos) {
+bool AlertInfoModel::showWarningsAlert(const std::vector<AlertInfo>& infos) {
   bool hasData = !infos.empty() || !alertInfos.empty();
   if (!hasData) {
     return false;
@@ -145,7 +143,7 @@ bool AlertInfoModel::showWarningsAlert(std::vector<AlertInfo>& infos) {
   return initializeAlertWindow("qrc:/qml/AlertWarning.qml", "alertModel");
 }
 
-bool AlertInfoModel::showErrorsAlert(std::vector<AlertInfo>& infos) {
+bool AlertInfoModel::showErrorsAlert(const std::vector<AlertInfo>& infos) {
   bool hasData = !infos.empty() || !alertInfos.empty() || !errorMessage.isEmpty();
   if (!hasData) {
     return false;
@@ -158,7 +156,7 @@ bool AlertInfoModel::showErrorsAlert(std::vector<AlertInfo>& infos) {
   return initializeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
 }
 
-std::string AlertInfoModel::browseForSave(bool useScript) {
+std::string AlertInfoModel::BrowseForSave(const bool useScript) {
   auto suites = AEHelper::GetSuites();
   auto pluginID = AEHelper::GetPluginID();
   AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
@@ -179,7 +177,7 @@ std::string AlertInfoModel::browseForSave(bool useScript) {
     defaultPath = QString::fromStdString(LastOutputPath);
   }
 
-  std::string outputPath = "";
+  std::string outputPath;
   if (useScript) {
     QString scriptPath = defaultPath;
     scriptPath.replace('\\', '/');
@@ -201,7 +199,7 @@ std::string AlertInfoModel::browseForSave(bool useScript) {
   return outputPath;
 }
 
-QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) const {
+QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) {
   QVariantMap map;
   map["isError"] = alertInfo.isError;
   map["errorInfo"] = QString::fromStdString(alertInfo.info);
@@ -215,13 +213,13 @@ QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) co
 }
 
 const AlertInfo* AlertInfoModel::getAlertInfo(const QModelIndex& index) const {
-  if (!index.isValid() || index.row() < 0 || index.row() >= static_cast<int>(alertInfos.size())) {
+  if (!isIndexValid(index)) {
     return nullptr;
   }
   return &alertInfos[index.row()];
 }
 
-bool AlertInfoModel::initiallizeAlertWindow(const QString& qmlPath, const QString& contextName) {
+bool AlertInfoModel::initializeAlertWindow(const QString& qmlPath, const QString& contextName) {
   int argc = 0;
   app = std::make_unique<QApplication>(argc, nullptr);
   app->setObjectName(contextName == "alertModel" ? "PAG-Alert" : "PAG-Error");
@@ -240,10 +238,14 @@ bool AlertInfoModel::initiallizeAlertWindow(const QString& qmlPath, const QStrin
 
   alertWindow->setPersistentGraphics(true);
   alertWindow->setPersistentSceneGraph(true);
-  alertWindow->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
+  QQuickWindow::setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
   alertWindow->show();
-  app->exec();
+  QApplication::exec();
   return true;
+}
+
+bool AlertInfoModel::isIndexValid(const QModelIndex& index) const {
+  return index.isValid() && index.row() >= 0 && index.row() < static_cast<int>(alertInfos.size());
 }
 
 QString AlertInfoModel::getErrorMessage() const {

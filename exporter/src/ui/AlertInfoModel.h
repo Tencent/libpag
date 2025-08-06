@@ -32,7 +32,7 @@ class AlertInfoModel : public QAbstractListModel {
       QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
 
  public:
-  enum AlertRoles {
+  enum class AlertRoles {
     IsErrorRole = Qt::UserRole + 1,
     InfoRole,
     SuggestionRole,
@@ -47,32 +47,33 @@ class AlertInfoModel : public QAbstractListModel {
   explicit AlertInfoModel(QObject* parent = nullptr);
   ~AlertInfoModel() override;
 
-  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
-  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+  int rowCount(const QModelIndex& parent) const override;
+  QVariant data(const QModelIndex& index, int role) const override;
   QHash<int, QByteArray> roleNames() const override;
-  bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
+  bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
   Q_INVOKABLE bool locateAlert(int row);
   Q_INVOKABLE QVariantList getAlertInfos() const;
   Q_INVOKABLE int getAlertCount() const;
-  Q_INVOKABLE void jumpToUrl();
+  Q_INVOKABLE static void JumpToUrl();
 
   QString getErrorMessage() const;
   void setErrorMessage(const QString& message);
 
-  void setAlertInfos(std::vector<AlertInfo>& infos);
-  bool showWarningsAlert(std::vector<AlertInfo>& infos);
-  bool showErrorsAlert(std::vector<AlertInfo>& info);
-  std::string browseForSave(bool useScript);
+  void setAlertInfos(std::vector<AlertInfo> infos);
+  bool showWarningsAlert(const std::vector<AlertInfo>& infos);
+  bool showErrorsAlert(const std::vector<AlertInfo>& info);
+  static std::string BrowseForSave(bool useScript);
 
  Q_SIGNALS:
   void errorMessageChanged();
   void alertInfoChanged();
 
  protected:
-  QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
+  static QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo);
   const AlertInfo* getAlertInfo(const QModelIndex& index) const;
   bool initializeAlertWindow(const QString& qmlPath, const QString& contextName);
+  bool isIndexValid(const QModelIndex& index) const;
 
  private:
   std::vector<AlertInfo> alertInfos = {};

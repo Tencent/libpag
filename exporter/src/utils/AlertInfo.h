@@ -127,8 +127,6 @@ class AlertInfoManager {
                    const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList, AlertInfoType type,
                    pag::ID compId, pag::ID layerId, const std::string& addInfo = "");
 
-  void addTestWarnings(const std::vector<AlertInfo>& testWarnings);
-
   AlertInfoManager(const AlertInfoManager&) = delete;
   AlertInfoManager& operator=(const AlertInfoManager&) = delete;
 
