@@ -212,6 +212,7 @@ bool PAGView::setFile(const QString& filePath) {
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(strPath);
   Q_EMIT pagFileChanged(pagFile);
+  pagPlayer->setProgress(0);
   setProgress(0);
   setIsPlaying(true);
 

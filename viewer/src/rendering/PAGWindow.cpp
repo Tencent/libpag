@@ -52,6 +52,7 @@ void PAGWindow::open() {
   editAttributeModel = std::make_unique<PAGEditAttributeModel>();
   textLayerModel = std::make_unique<PAGTextLayerModel>();
   imageLayerModel = std::make_unique<PAGImageLayerModel>();
+  benchmarkModel = std::make_unique<PAGBenchmarkModel>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
@@ -60,6 +61,7 @@ void PAGWindow::open() {
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
   context->setContextProperty("textLayerModel", textLayerModel.get());
   context->setContextProperty("imageLayerModel", imageLayerModel.get());
+  context->setContextProperty("benchmarkModel", benchmarkModel.get());
 
   // Image Provider will be managed by QML
   auto imageProvider = new PAGImageProvider();
