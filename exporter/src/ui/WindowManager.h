@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <QString>
 #include <string>
 #include <vector>
+#include "utils/AlertInfo.h"
 
 namespace exporter {
 class WindowManager {
@@ -34,9 +36,13 @@ class WindowManager {
 
   void showExportPreviewWindow();
 
-  bool showWarnings(std::vector<std::string>& infos);
+  bool showWarnings(std::vector<AlertInfo>& infos);
 
-  bool showErrors(std::vector<std::string>& infos);
+  bool showErrors(std::vector<AlertInfo>& infos);
+
+  bool showSimpleError(const QString& message);
+
+  bool showPAGViewerInstallDialog(const std::string& pagFilePath);
 
   WindowManager(const WindowManager&) = delete;
   WindowManager& operator=(const WindowManager&) = delete;
