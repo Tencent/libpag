@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
-  workflow_dispatch:  # 添加这一行
+  workflow_dispatch:
     inputs:
       job:
         description: 'Job to run (optional)'
@@ -13,14 +13,14 @@ on:
         default: 'all'
         type: choice
         options:
-        - all
-        - ios
-        - android
-        - web
-        - win
-        - linux
-        - qt
-        - openharmony   
+          - all
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - openharmony
 
 jobs:
   ios:
@@ -388,11 +388,15 @@ jobs:
           depsync
         shell: bash
         
+      - name: Setup OpenHarmony Environment
+        run: |
+          chmod +x ohos/hvigorw
+          
       - name: Build OpenHarmony
         run: |
           mkdir -p third_party/tgfx/out/cache
           cd ohos
-          hvigorw --mode module -p product=default assembleHar
+          ./hvigorw --mode module -p product=default assembleHar
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -408,7 +412,7 @@ jobs:
         with: 
           name: openharmony_build
           path: ohos
-              
+
 
 
 
