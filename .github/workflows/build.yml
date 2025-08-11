@@ -388,10 +388,41 @@ jobs:
           depsync
         shell: bash
         
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18.20.1"
+
+      - name: Setup OpenHarmony npm registry
+        run: |
+          if [ ! -f "$HOME/.npmrc" ]; then
+            touch $HOME/.npmrc
+          fi
+          
+          if [ ! -f "ohos/.npmrc" ]; then
+            touch ohos/.npmrc
+          fi
+
+      - name: Setup OpenHarmony SDK
+        uses: openharmony-rs/setup-ohos-sdk@v0.1
+        with:
+          version: "4.1"
+          cache: true
+          fixup-path: true
+
+      - name: Install ohpm
+        run: |
+          npm install -g @ohos/ohpm
+
       - name: Setup OpenHarmony Environment
         run: |
           chmod +x ohos/hvigorw
           
+      - name: Install OpenHarmony Dependencies
+        run: |
+          cd ohos
+          ohpm install --all
+
       - name: Build OpenHarmony
         run: |
           mkdir -p third_party/tgfx/out/cache
