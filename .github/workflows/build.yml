@@ -348,3 +348,112 @@ jobs:
         with:
           name: qt_build
           path: out
+
+  openharmony:
+    runs-on: macos-latest
+    env:
+      EXAMPLE_PROJECT_PATH: example/open-harmony/sdk-11/Sample
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with: 
+          path: | 
+            third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-openharmony-
+            
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash      
+      
+      - name: Setup OpenHarmony signing certificates and keystore
+        run: |
+            echo "${{ secrets.ONIRO_APP_SIGNATURE_ZIP }}" | base64 -d > secrets.zip
+
+            unzip -o secrets.zip
+            rm secrets.zip
+
+            find .secret -type f -name "*.cer" -o -name "*.p7b" -o -name "*.p12" | head -10
+
+      - name: Modify bundleName in app.json5
+        run: |
+          sed -i '' 's/"bundleName": "[^"]*"/"bundleName": "com.example.oniromathpunching"/' ./${{ env.EXAMPLE_PROJECT_PATH }}/AppScope/app.json5
+
+      - name: Setup OpenHarmony SDK
+        uses: ./
+        
+      - name: Verify OpenHarmony Environment
+        run: |
+          which ohpm
+          ohpm -v
+
+          which hvigorw
+          cd ${{ env.EXAMPLE_PROJECT_PATH }}
+          hvigorw --version
+      
+      - name: Install OpenHarmony Dependencies
+        run : |
+          cd ${{ env.EXAMPLE_PROJECT_PATH }}
+          ohpm install --all
+
+      - name: Build OpenHarmony HAP
+        run: |
+          cd ${{ env.EXAMPLE_PROJECT_PATH }}
+          find . -name "*.json5" -o -name "*.ts" | head -20
+          
+          hvigorw --version --accept-license
+          hvigorw clean --no-parallel --no-daemon
+          hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with : 
+          path: |
+           third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          
+      - name: Upload Build Artifacts
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: openharmony-hap
+          path: |
+             ${{ env.EXAMPLE_PROJECT_PATH }}/entry/build/default/outputs/default/
+             ${{ env.EXAMPLE_PROJECT_PATH }}/build/
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: openharmony_build_logs
+          path: |
+            ${{ env.EXAMPLE_PROJECT_PATH }}
+            !${{ env.EXAMPLE_PROJECT_PATH }}/node_modules
+            !${{ env.EXAMPLE_PROJECT_PATH }}/oh_modules      
+            
+
+
+        
+      
+            
+
+   
+
+          
+
+
+      
+
+        
+
+        
+            
