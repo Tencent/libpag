@@ -5,6 +5,22 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:  # 添加这一行
+    inputs:
+      job:
+        description: 'Job to run (optional)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - ios
+        - android
+        - web
+        - win
+        - linux
+        - qt
+        - openharmony   
 
 jobs:
   ios:
