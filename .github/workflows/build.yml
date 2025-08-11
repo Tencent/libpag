@@ -399,6 +399,27 @@ jobs:
           working-directory: './ohos'
           install-dependencies: false
           
+      - name: Update local.properties for CI environment
+        run: |
+          cd ohos
+          # Check if CMD_PATH is set and use it, otherwise use default path
+          if [ -n "${CMD_PATH:-}" ]; then
+            SDK_PATH="${CMD_PATH}"
+          else
+            SDK_PATH="${HOME}/command-line-tools"
+          fi
+          echo "hwsdk.dir=${SDK_PATH}" > local.properties
+          echo "Updated local.properties with SDK path: ${SDK_PATH}"
+          cat local.properties
+          # Verify SDK path exists
+          if [ -d "${SDK_PATH}" ]; then
+            echo "SDK directory exists at: ${SDK_PATH}"
+            ls -la "${SDK_PATH}"
+          else
+            echo "Warning: SDK directory not found at: ${SDK_PATH}"
+          fi
+        shell: bash
+          
       - name: Configure ohpm registry and install dependencies
         run: |
           cd ohos
