@@ -387,44 +387,20 @@ jobs:
           npm install depsync -g
           depsync
         shell: bash
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with: 
+
+      - name: Setup OpenHarmony Build
+        uses: eclipse-oniro4openharmony/oh-app-action@main
+        with:
           node-version: "18.20.1"
-
-      - name: Setup OpenHarmony SDK
-        uses: openharmony-rs/setup-ohos-sdk@v0.1
-        with: 
-          version: "4.1"
-          cache: true
-          fixup-path: true
-
-      - name: Create local.properties
-        shell: bash
-        run: |
-          echo "hwsdk.dir=${OHOS_SDK_HOME}" > ohos/local.properties
-          echo "Created local.properties with SDK path: ${OHOS_SDK_HOME}"
-
-      - name: Configure npmrc
-        shell: bash
-        run: |
-          cd ohos
-          echo "registry=https://repo.harmonyos.com/npm/" > .npmrc
-          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> .npmrc
-          echo "@openharmony:registry=https://repo.harmonyos.com/npm/" >> .npmrc
-          echo "strict-ssl=false" >> .npmrc
-          echo "Created .npmrc with HarmonyOS registry configuration"
-
-      - name: Setup Environment
-        run: |
-          chmod +x ohos/hvigorw
-
-      - name: Build OpenHarmony
+          api-version: "12"
+          target-name: "default"
+          build-option: "--mode module -p product=default assembleHar"
+          project-path: "./ohos"
+          setup-cache: true
+          
+      - name: Additional Setup
         run: |
           mkdir -p third_party/tgfx/out/cache
-          cd ohos
-          ./hvigorw --mode module -p product=default assembleHar
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
