@@ -397,7 +397,18 @@ jobs:
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
           working-directory: './ohos'
-          install-dependencies: true
+          install-dependencies: false
+          
+      - name: Configure ohpm registry and install dependencies
+        run: |
+          cd ohos
+          # Configure ohpm registry
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+          # Verify configuration
+          ohpm config get registry
+          # Install dependencies
+          ohpm install
+        shell: bash
           
       - name: Build OpenHarmony Project
         run: |
