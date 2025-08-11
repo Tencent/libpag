@@ -413,7 +413,11 @@ jobs:
       - name: Build OpenHarmony Project
         run: |
           cd ohos
+          # Grant execute permission to hvigorw
+          chmod +x ./hvigorw
+          # Execute build command
           ./hvigorw --mode module -p product=default assembleHar
+        shell: bash
           
       - name: Additional Setup
         run: |
