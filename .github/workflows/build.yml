@@ -427,22 +427,13 @@ jobs:
         run: |
           chmod +x ohos/hvigorw
 
-      - name: Install OpenHarmony Dependencies
+      - name: Install Dependencies
+        if: ${{ inputs.install-dependencies == 'true' }}
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
         run: |
           echo "::group::Installing dependencies"
-          echo "Checking ohpm location..."
-          find $OHOS_BASE_SDK_HOME -name "ohpm" -type f 2>/dev/null || echo "ohpm not found"
-          ls -la $OHOS_BASE_SDK_HOME/toolchains/ || echo "toolchains directory not found"
-          cd ohos
-          # Try different possible paths
-          if [ -f "$OHOS_BASE_SDK_HOME/toolchains/lib/ohpm" ]; then
-            $OHOS_BASE_SDK_HOME/toolchains/lib/ohpm install --all
-          elif [ -f "$OHOS_BASE_SDK_HOME/toolchains/ohpm" ]; then
-            $OHOS_BASE_SDK_HOME/toolchains/ohpm install --all
-          else
-            echo "::error::ohpm not found in expected locations"
-            exit 1
-          fi
+          ohpm install --all
           echo "::endgroup::"
 
       - name: Build OpenHarmony
