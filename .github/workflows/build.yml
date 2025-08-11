@@ -406,6 +406,16 @@ jobs:
           echo "hwsdk.dir=${OHOS_SDK_HOME}" > ohos/local.properties
           echo "Created local.properties with SDK path: ${OHOS_SDK_HOME}"
 
+      - name: Configure npmrc
+        shell: bash
+        run: |
+          cd ohos
+          echo "registry=https://repo.harmonyos.com/npm/" > .npmrc
+          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> .npmrc
+          echo "@openharmony:registry=https://repo.harmonyos.com/npm/" >> .npmrc
+          echo "strict-ssl=false" >> .npmrc
+          echo "Created .npmrc with HarmonyOS registry configuration"
+
       - name: Setup Environment
         run: |
           chmod +x ohos/hvigorw
