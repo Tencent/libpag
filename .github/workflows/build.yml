@@ -366,22 +366,21 @@ jobs:
           path: out
 
   openharmony:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
         with:
           lfs: true
-
+          
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
         with:
           path: |
-            third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-openharmony-
-            
+
       - name: Run depsync
         run: |
           npm install depsync -g
@@ -390,10 +389,26 @@ jobs:
         
       - name: Setup Node.js
         uses: actions/setup-node@v4
-        with:
+        with: 
           node-version: "18.20.1"
 
-      - name: Setup OpenHarmony npm registry
+      - name: Set up environment variables
+        shell: bash
+        run: |
+          echo "CMD_PATH=$HOME/command-line-tools" >> $GITHUB_ENV
+          echo "PROJECT_PATH=$(pwd)/ohos" >> $GITHUB_ENV
+
+      - name:  Verify Project Structure
+        shell: bash
+        working-directory: ohos
+        run: |
+          if [ ! -f "./hvigorw" ]; then
+            echo "::error::hvigorw not found in the root of the project."
+            exit 1
+          fi
+       
+      - name: Setup .npmrc File
+        shell: bash
         run: |
           if [ ! -f "$HOME/.npmrc" ]; then
             touch $HOME/.npmrc
@@ -409,23 +424,21 @@ jobs:
 
       - name: Setup OpenHarmony SDK
         uses: openharmony-rs/setup-ohos-sdk@v0.1
-        with:
+        with: 
           version: "4.1"
           cache: true
           fixup-path: true
 
-      - name: Install ohpm
-        run: |
-          npm install -g @ohos/ohpm
-
       - name: Setup OpenHarmony Environment
         run: |
           chmod +x ohos/hvigorw
-          
+
       - name: Install OpenHarmony Dependencies
         run: |
+          echo "::group::Installing dependencies"
           cd ohos
           ohpm install --all
+          echo "::endgroup::" 
 
       - name: Build OpenHarmony
         run: |
@@ -436,38 +449,15 @@ jobs:
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
-        with:
+        with: 
           path: |
             third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-
+          
       - name: Job Failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with: 
           name: openharmony_build
-          path: ohos
-
-
-
-
-          
-          
-        
-
-
-        
-      
-            
-
-   
-
-          
-
-
-      
-
-        
-
-        
-            
+          path: ohos    
+              
