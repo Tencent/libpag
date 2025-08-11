@@ -430,6 +430,7 @@ jobs:
       - name: Install OpenHarmony Dependencies
         run: |
           echo "::group::Installing dependencies"
+          export PATH="$OHOS_BASE_SDK_HOME/toolchains:$PATH"
           cd ohos
           ohpm install --all
           echo "::endgroup::" 
