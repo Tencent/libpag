@@ -393,29 +393,6 @@ jobs:
         with: 
           node-version: "18.20.1"
 
-      - name: Set up environment variables
-        shell: bash
-        run: |
-          echo "CMD_PATH=$HOME/command-line-tools" >> $GITHUB_ENV
-          echo "PROJECT_PATH=$(pwd)/ohos" >> $GITHUB_ENV
-
-      - name:  Verify Project Structure
-        shell: bash
-        working-directory: ohos
-        run: |
-          if [ ! -f "./hvigorw" ]; then
-            echo "::error::hvigorw not found in the root of the project."
-            exit 1
-          fi
-       
-      - name: Setup .npmrc File
-        shell: bash
-        run: |
-          if [ ! -f "$HOME/.npmrc" ]; then
-            touch $HOME/.npmrc
-          fi
-          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
-
       - name: Setup OpenHarmony SDK
         uses: openharmony-rs/setup-ohos-sdk@v0.1
         with: 
@@ -423,18 +400,15 @@ jobs:
           cache: true
           fixup-path: true
 
-      - name: Setup OpenHarmony Environment
+      - name: Create local.properties
+        shell: bash
+        run: |
+          echo "hwsdk.dir=${OHOS_SDK_HOME}" > ohos/local.properties
+          echo "Created local.properties with SDK path: ${OHOS_SDK_HOME}"
+
+      - name: Setup Environment
         run: |
           chmod +x ohos/hvigorw
-
-      - name: Install Dependencies
-        if: ${{ inputs.install-dependencies == 'true' }}
-        shell: bash
-        working-directory: ${{ inputs.working-directory }}
-        run: |
-          echo "::group::Installing dependencies"
-          ohpm install --all
-          echo "::endgroup::"
 
       - name: Build OpenHarmony
         run: |
@@ -455,5 +429,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with: 
           name: openharmony_build
-          path: ohos    
-              
+          path: ohos
