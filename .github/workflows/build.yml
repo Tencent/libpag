@@ -388,15 +388,21 @@ jobs:
           depsync
         shell: bash
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.20.1'
+          
       - name: Setup OpenHarmony Build
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
-          node-version: "18.20.1"
-          api-version: "12"
-          target-name: "default"
-          build-option: "--mode module -p product=default assembleHar"
-          project-path: "./ohos"
-          setup-cache: true
+          working-directory: './ohos'
+          install-dependencies: true
+          
+      - name: Build OpenHarmony Project
+        run: |
+          cd ohos
+          ./hvigorw --mode module -p product=default assembleHar
           
       - name: Additional Setup
         run: |
