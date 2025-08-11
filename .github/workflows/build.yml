@@ -388,6 +388,46 @@ jobs:
           depsync
         shell: bash
 
+      - name: Get HarmonyOS SDK Cache
+        id: harmony-sdk-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ohos/sdk
+          key: harmony-sdk-5.0.3.140-20250802_033957
+          restore-keys: harmony-sdk-5.0.3
+          
+      - name: Download and Setup HarmonyOS 5.0 SDK
+        if: steps.harmony-sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          # Download HarmonyOS 5.0 SDK
+          cd ohos
+          mkdir -p sdk
+          echo "Downloading HarmonyOS 5.0 SDK..."
+          curl -L -o harmony-sdk.tar.gz "https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz"
+          
+          # Extract SDK
+          echo "Extracting SDK..."
+          tar -xzf harmony-sdk.tar.gz -C sdk --strip-components=1
+          
+          # Clean up
+          rm harmony-sdk.tar.gz
+        shell: bash
+        
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          # Update local.properties with correct SDK path
+          SDK_PATH="$(pwd)/sdk"
+          echo "hwsdk.dir=${SDK_PATH}" > local.properties
+          echo "Updated local.properties with SDK path: ${SDK_PATH}"
+          cat local.properties
+          
+          # Verify SDK structure
+          echo "SDK directory structure:"
+          ls -la sdk/ || echo "SDK directory not found"
+        shell: bash
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -398,27 +438,6 @@ jobs:
         with:
           working-directory: './ohos'
           install-dependencies: false
-          
-      - name: Update local.properties for CI environment
-        run: |
-          cd ohos
-          # Check if CMD_PATH is set and use it, otherwise use default path
-          if [ -n "${CMD_PATH:-}" ]; then
-            SDK_PATH="${CMD_PATH}"
-          else
-            SDK_PATH="${HOME}/command-line-tools"
-          fi
-          echo "hwsdk.dir=${SDK_PATH}" > local.properties
-          echo "Updated local.properties with SDK path: ${SDK_PATH}"
-          cat local.properties
-          # Verify SDK path exists
-          if [ -d "${SDK_PATH}" ]; then
-            echo "SDK directory exists at: ${SDK_PATH}"
-            ls -la "${SDK_PATH}"
-          else
-            echo "Warning: SDK directory not found at: ${SDK_PATH}"
-          fi
-        shell: bash
           
       - name: Configure ohpm registry and install dependencies
         run: |
@@ -443,6 +462,14 @@ jobs:
       - name: Additional Setup
         run: |
           mkdir -p third_party/tgfx/out/cache
+
+      - name: Save HarmonyOS SDK Cache
+        if: ${{ (github.event_name == 'push') && (steps.harmony-sdk-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ohos/sdk
+          key: harmony-sdk-5.0.3.140-20250802_033957
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
