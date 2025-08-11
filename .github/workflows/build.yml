@@ -398,10 +398,14 @@ jobs:
           if [ ! -f "$HOME/.npmrc" ]; then
             touch $HOME/.npmrc
           fi
-          
+          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
+          echo "@openharmony:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
+
           if [ ! -f "ohos/.npmrc" ]; then
             touch ohos/.npmrc
           fi
+          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> ohos/.npmrc
+          echo "@openharmony:registry=https://repo.harmonyos.com/npm/" >> ohos/.npmrc
 
       - name: Setup OpenHarmony SDK
         uses: openharmony-rs/setup-ohos-sdk@v0.1
