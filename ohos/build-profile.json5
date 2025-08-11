@@ -1,23 +1,18 @@
 {
   "app": {
-    "signingConfigs": [
-    ],
+    "signingConfigs": [],
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
-        "compileSdkVersion": "5.0.3",
-        "compatibleSdkVersion": "5.0.3",
+        "compileSdkVersion": "5.0.3(12)",
+        "compatibleSdkVersion": "5.0.3(12)",
         "runtimeOS": "HarmonyOS"
       }
     ],
     "buildModeSet": [
-      {
-        "name": "debug"
-      },
-      {
-        "name": "release"
-      }
+      { "name": "debug" },
+      { "name": "release" }
     ]
   },
   "modules": [
