@@ -378,6 +378,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
+            third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-openharmony-
 
