@@ -388,67 +388,11 @@ jobs:
           depsync
         shell: bash
 
-      - name: Get HarmonyOS SDK Cache
-        id: harmony-sdk-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ohos/sdk
-          key: harmony-sdk-5.0.3.140-20250802_033957
-          restore-keys: harmony-sdk-5.0.3
-          
-      - name: Download and Setup HarmonyOS 5.0 SDK
-        if: steps.harmony-sdk-cache.outputs.cache-hit != 'true'
-        run: |
-          # Download HarmonyOS 5.0 SDK
-          cd ohos
-          mkdir -p sdk
-          echo "Downloading HarmonyOS 5.0 SDK..."
-          curl -L -o harmony-sdk.tar.gz "https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz"
-          
-          # Extract SDK
-          echo "Extracting SDK..."
-          tar -xzf harmony-sdk.tar.gz -C sdk --strip-components=1
-          
-          # Clean up
-          rm harmony-sdk.tar.gz
-        shell: bash
-        
-      - name: Configure SDK Path
-        run: |
-          cd ohos
-          # Update local.properties with correct SDK path
-          SDK_PATH="$(pwd)/sdk"
-          echo "hwsdk.dir=${SDK_PATH}" > local.properties
-          echo "Updated local.properties with SDK path: ${SDK_PATH}"
-          cat local.properties
-          
-          # Verify SDK structure
-          echo "SDK directory structure:"
-          ls -la sdk/ || echo "SDK directory not found"
-        shell: bash 
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18.20.1'
-          
-      - name: Setup OpenHarmony Build
+      - name: Setup OpenHarmony Build Environment
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
           working-directory: './ohos'
-          install-dependencies: false
-          
-      - name: Configure ohpm registry and install dependencies
-        run: |
-          cd ohos
-          # Configure ohpm registry
-          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
-          # Verify configuration
-          ohpm config get registry
-          # Install dependencies
-          ohpm install
-        shell: bash
+          install-dependencies: true
           
       - name: Build OpenHarmony Project
         run: |
@@ -462,14 +406,6 @@ jobs:
       - name: Additional Setup
         run: |
           mkdir -p third_party/tgfx/out/cache
-
-      - name: Save HarmonyOS SDK Cache
-        if: ${{ (github.event_name == 'push') && (steps.harmony-sdk-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ohos/sdk
-          key: harmony-sdk-5.0.3.140-20250802_033957
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
