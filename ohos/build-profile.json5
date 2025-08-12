@@ -5,8 +5,8 @@
       {
         "name": "default",
         "signingConfig": "default",
-        "compileSdkVersion": "5.0.0(10)",
-        "compatibleSdkVersion": "5.0.0(10)",
+        "compileSdkVersion": "5.0.3(14)",
+        "compatibleSdkVersion": "5.0.3(14)",
         "runtimeOS": "HarmonyOS"
       }
     ],
