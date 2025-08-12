@@ -392,6 +392,8 @@ jobs:
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
           working-directory: './ohos'
+          api-version: '14'
+          sdk-version: '5.0.3(14)'
 
       - name: Configure SDK Path
         run: |
