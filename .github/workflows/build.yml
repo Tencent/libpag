@@ -392,8 +392,6 @@ jobs:
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
           working-directory: './ohos'
-          api-version: '14'
-          sdk-version: '5.0.3(14)'
 
       - name: Configure SDK Path
         run: |
@@ -421,7 +419,9 @@ jobs:
         run: |
           cd ohos
           chmod +x ./hvigorw
-          ./hvigorw --mode module -p product=default assembleHar --parallel
+          ./hvigorw --version --accept-license
+          ./hvigorw clean --no-parallel --no-daemon
+          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon
         shell: bash
           
       - name: Additional Setup
