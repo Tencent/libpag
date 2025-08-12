@@ -426,12 +426,7 @@ jobs:
           # Verify SDK structure
           echo "SDK directory structure:"
           ls -la sdk/ || echo "SDK directory not found"
-        shell: bash
-
-      - name: List available SDK API Levels
-        run: |
-          echo "SDK Path: ${{ env.SDK_PATH }}"
-          ls -la ${{ env.SDK_PATH }}/api/  
+        shell: bash 
         
       - name: Setup Node.js
         uses: actions/setup-node@v4
