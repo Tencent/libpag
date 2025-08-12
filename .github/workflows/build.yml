@@ -394,6 +394,33 @@ jobs:
           working-directory: './ohos'
           install-dependencies: true
           
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          # Check if CMD_PATH is set from the action
+          if [ -n "${CMD_PATH:-}" ]; then
+            SDK_PATH="${CMD_PATH}"
+          elif [ -n "${HOS_SDK_HOME:-}" ]; then
+            SDK_PATH="${HOS_SDK_HOME}"
+          else
+            SDK_PATH="${HOME}/command-line-tools"
+          fi
+          
+          echo "hwsdk.dir=${SDK_PATH}" > local.properties
+          echo "Configured local.properties with SDK path: ${SDK_PATH}"
+          cat local.properties
+          
+          # Verify SDK path exists
+          if [ -d "${SDK_PATH}" ]; then
+            echo "SDK directory found at: ${SDK_PATH}"
+            ls -la "${SDK_PATH}" | head -10
+          else
+            echo "Warning: SDK directory not found at: ${SDK_PATH}"
+            echo "Available directories in HOME:"
+            ls -la "${HOME}" | grep -E "(command|sdk|tools)" || echo "No SDK-related directories found"
+          fi
+        shell: bash
+          
       - name: Build OpenHarmony Project
         run: |
           cd ohos
