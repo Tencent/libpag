@@ -433,11 +433,6 @@ jobs:
         with:
           node-version: '18.20.1'
           
-      - name: Setup OpenHarmony Build
-        uses: eclipse-oniro4openharmony/oh-app-action@main
-        with:
-          working-directory: './ohos'
-          install-dependencies: false
           
       - name: Configure ohpm registry and install dependencies
         run: |
