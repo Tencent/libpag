@@ -393,6 +393,22 @@ jobs:
         with:
           working-directory: './ohos'
 
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          # Set SDK path from environment variables set by oh-app-action
+          if [ -n "${HOS_SDK_HOME:-}" ]; then
+            SDK_PATH="${HOS_SDK_HOME}"
+          elif [ -n "${CMD_PATH:-}" ]; then
+            SDK_PATH="${CMD_PATH}"
+          else
+            SDK_PATH="${HOME}/command-line-tools"
+          fi
+          
+          echo "hwsdk.dir=${SDK_PATH}" > local.properties
+          echo "Configured SDK path: ${SDK_PATH}"
+        shell: bash
+
       - name: Install Dependencies
         run: |
           cd ohos
