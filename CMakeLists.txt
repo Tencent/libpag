@@ -144,6 +144,8 @@ get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH BASE_DIR "${CMAKE_CURRENT
 # collects pag include directories.
 list(APPEND PAG_INCLUDES src)
 
+file(GLOB_RECURSE PAG_HEADERS include/*.h)
+list(APPEND PAG_FILES ${PAG_HEADERS})
 # collects pag source files.
 file(GLOB_RECURSE SRC_FILES
         src/base/*.*
@@ -548,7 +550,6 @@ if (PAG_BUILD_FRAMEWORK)
     set(PAG_IDENTIFIER "com.tencent.libpag")
     set_target_properties(pag PROPERTIES
             FRAMEWORK TRUE
-            PUBLIC_HEADER "${PAG_PLATFORM_HEADERS}"
             MACOSX_FRAMEWORK_IDENTIFIER ${PAG_IDENTIFIER}
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
@@ -557,6 +558,19 @@ if (PAG_BUILD_FRAMEWORK)
     if (HasParent)
         set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER} PARENT_SCOPE)
     endif ()
+    foreach (header ${PAG_HEADERS})
+        file(RELATIVE_PATH dir ${CMAKE_CURRENT_SOURCE_DIR}/include ${header})
+        get_filename_component(dir "${dir}" DIRECTORY)
+        if (dir)
+            set(location "Headers/${dir}")
+        else ()
+            set(location "Headers")
+        endif ()
+        set_source_files_properties(${header} PROPERTIES MACOSX_PACKAGE_LOCATION "${location}")
+    endforeach ()
+    foreach (header ${PAG_PLATFORM_HEADERS})
+        set_source_files_properties(${header} PROPERTIES MACOSX_PACKAGE_LOCATION "Headers")
+    endforeach ()
 endif ()
 
 if (PAG_BUILD_TESTS)

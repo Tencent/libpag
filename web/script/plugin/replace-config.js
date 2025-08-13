@@ -313,7 +313,7 @@ export const replaceFunctionConfig = [
   {
     name: 'replace _scriptDir',
     type: 'string',
-    start: `var _scriptDir = import.meta.url;`,
+    start: `var _scriptDir = import_meta.url;`,
     replaceStr: `var _scriptDir = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : void 0;`,
   },
 ];
