@@ -622,12 +622,6 @@ void AlertInfoManager::pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>
   warningList.emplace_back(AlertInfo(type, itemH, layerH, addInfo));
 }
 
-void AlertInfoManager::addTestWarnings(const std::vector<AlertInfo>& testWarnings) {
-  for (const auto& warning : testWarnings) {
-    warningList.emplace_back(warning);
-  }
-}
-
 std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {
 
   return {};

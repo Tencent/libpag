@@ -46,22 +46,22 @@ QVariant AlertInfoModel::data(const QModelIndex& index, const int role) const {
 
   const AlertInfo& alertInfo = alertInfos[index.row()];
 
-  switch (role) {
-    case static_cast<int>(AlertRoles::IsErrorRole):
+  switch (IntToAlertRole(role)) {
+    case AlertRoles::IsErrorRole:
       return alertInfo.isError;
-    case static_cast<int>(AlertRoles::InfoRole):
+    case AlertRoles::InfoRole:
       return QString::fromStdString(alertInfo.info);
-    case static_cast<int>(AlertRoles::SuggestionRole):
+    case AlertRoles::SuggestionRole:
       return QString::fromStdString(alertInfo.suggest);
-    case static_cast<int>(AlertRoles::IsFoldRole):
+    case AlertRoles::IsFoldRole:
       return alertInfo.isFold;
-    case static_cast<int>(AlertRoles::CompoNameRole):
+    case AlertRoles::CompoNameRole:
       return QString::fromStdString(alertInfo.compName);
-    case static_cast<int>(AlertRoles::LayerNameRole):
+    case AlertRoles::LayerNameRole:
       return QString::fromStdString(alertInfo.layerName);
-    case static_cast<int>(AlertRoles::HasLayerNameRole):
+    case AlertRoles::HasLayerNameRole:
       return !alertInfo.layerName.empty();
-    case static_cast<int>(AlertRoles::HasSuggestionRole):
+    case AlertRoles::HasSuggestionRole:
       return !alertInfo.suggest.empty();
     default:
       return {};
@@ -88,7 +88,7 @@ bool AlertInfoModel::setData(const QModelIndex& index, const QVariant& value, co
 
   AlertInfo& alertInfo = alertInfos[index.row()];
 
-  if (role == static_cast<int>(AlertRoles::IsFoldRole)) {
+  if (IntToAlertRole(role) == AlertRoles::IsFoldRole) {
     alertInfo.isFold = value.toBool();
     Q_EMIT dataChanged(index, index);
     return true;
@@ -109,7 +109,7 @@ bool AlertInfoModel::locateAlert(const int row) {
 QVariantList AlertInfoModel::getAlertInfos() const {
   QVariantList result;
   for (const AlertInfo& alertInfo : alertInfos) {
-    result.append(alertInfoToVariantMap(alertInfo));
+    result.append(AlertInfoToVariantMap(alertInfo));
   }
   return result;
 }
@@ -130,7 +130,7 @@ void AlertInfoModel::setAlertInfos(std::vector<AlertInfo> infos) {
   Q_EMIT alertInfoChanged();
 }
 
-bool AlertInfoModel::showWarningsAlert(const std::vector<AlertInfo>& infos) {
+bool AlertInfoModel::showWarnings(const std::vector<AlertInfo>& infos) {
   bool hasData = !infos.empty() || !alertInfos.empty();
   if (!hasData) {
     return false;
@@ -143,7 +143,7 @@ bool AlertInfoModel::showWarningsAlert(const std::vector<AlertInfo>& infos) {
   return initializeAlertWindow("qrc:/qml/AlertWarning.qml", "alertModel");
 }
 
-bool AlertInfoModel::showErrorsAlert(const std::vector<AlertInfo>& infos) {
+bool AlertInfoModel::showErrors(const std::vector<AlertInfo>& infos) {
   bool hasData = !infos.empty() || !alertInfos.empty() || !errorMessage.isEmpty();
   if (!hasData) {
     return false;
@@ -156,7 +156,7 @@ bool AlertInfoModel::showErrorsAlert(const std::vector<AlertInfo>& infos) {
   return initializeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
 }
 
-std::string AlertInfoModel::BrowseForSave(const bool useScript) {
+std::string AlertInfoModel::BrowseForSave(bool useScript) {
   auto suites = AEHelper::GetSuites();
   auto pluginID = AEHelper::GetPluginID();
   AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
@@ -169,12 +169,9 @@ std::string AlertInfoModel::BrowseForSave(const bool useScript) {
   QString fullPath = QDir(projectPath).filePath(QString::fromStdString(itemName));
   std::string filePath = fullPath.toStdString();
 
-  static std::string LastOutputPath;
-  static std::string LastFilePath;
-
   QString defaultPath = QString::fromStdString(filePath);
-  if (!LastOutputPath.empty() && LastFilePath == filePath) {
-    defaultPath = QString::fromStdString(LastOutputPath);
+  if (!lastOutputPath.empty() && lastFilePath == filePath) {
+    defaultPath = QString::fromStdString(lastOutputPath);
   }
 
   std::string outputPath;
@@ -191,16 +188,18 @@ std::string AlertInfoModel::BrowseForSave(const bool useScript) {
   }
 
   if (!outputPath.empty()) {
-    LastFilePath = filePath;
-    LastOutputPath = outputPath;
+    lastFilePath = filePath;
+    lastOutputPath = outputPath;
     outputPath = StringHelper::ConvertStringEncoding(outputPath);
     StringHelper::EnsureStringSuffix(outputPath, ".pag");
   }
   return outputPath;
 }
 
-QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) {
-  QVariantMap map;
+QVariantMap AlertInfoModel::AlertInfoToVariantMap(const AlertInfo& alertInfo) {
+  static QVariantMap map;
+  map.clear();
+
   map["isError"] = alertInfo.isError;
   map["errorInfo"] = QString::fromStdString(alertInfo.info);
   map["suggestion"] = QString::fromStdString(alertInfo.suggest);
@@ -209,6 +208,7 @@ QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) {
   map["layerName"] = QString::fromStdString(alertInfo.layerName);
   map["hasLayerName"] = !alertInfo.layerName.empty();
   map["hasSuggestion"] = !alertInfo.suggest.empty();
+
   return map;
 }
 

@@ -44,6 +44,10 @@ class AlertInfoModel : public QAbstractListModel {
   };
   Q_ENUM(AlertRoles)
 
+  static AlertRoles IntToAlertRole(int role) {
+    return static_cast<AlertRoles>(role);
+  }
+
   explicit AlertInfoModel(QObject* parent = nullptr);
   ~AlertInfoModel() override;
 
@@ -61,8 +65,8 @@ class AlertInfoModel : public QAbstractListModel {
   void setErrorMessage(const QString& message);
 
   void setAlertInfos(std::vector<AlertInfo> infos);
-  bool showWarningsAlert(const std::vector<AlertInfo>& infos);
-  bool showErrorsAlert(const std::vector<AlertInfo>& info);
+  bool showWarnings(const std::vector<AlertInfo>& infos);
+  bool showErrors(const std::vector<AlertInfo>& info);
   static std::string BrowseForSave(bool useScript);
 
  Q_SIGNALS:
@@ -70,7 +74,7 @@ class AlertInfoModel : public QAbstractListModel {
   void alertInfoChanged();
 
  protected:
-  static QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo);
+  static QVariantMap AlertInfoToVariantMap(const AlertInfo& alertInfo);
   const AlertInfo* getAlertInfo(const QModelIndex& index) const;
   bool initializeAlertWindow(const QString& qmlPath, const QString& contextName);
   bool isIndexValid(const QModelIndex& index) const;
@@ -82,6 +86,8 @@ class AlertInfoModel : public QAbstractListModel {
   std::unique_ptr<QQmlApplicationEngine> alertEngine = nullptr;
   QQuickWindow* alertWindow = nullptr;
   static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";
+  static std::string lastOutputPath;
+  static std::string lastFilePath;
 };
 
 }  // namespace exporter

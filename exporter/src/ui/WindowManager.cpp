@@ -73,8 +73,11 @@ bool WindowManager::showWarnings(std::vector<AlertInfo>& infos) {
   if (infos.empty()) {
     return false;
   }
-  auto alertModel = std::make_unique<AlertInfoModel>();
-  alertModel->showWarningsAlert(infos);
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->showWarnings(infos);
   return true;
 }
 
@@ -82,16 +85,22 @@ bool WindowManager::showErrors(std::vector<AlertInfo>& infos) {
   if (infos.empty()) {
     return false;
   }
-  auto alertModel = std::make_unique<AlertInfoModel>();
-  alertModel->showErrorsAlert(infos);
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->showErrors(infos);
   return true;
 }
 
 bool WindowManager::showSimpleError(const QString& message) {
-  auto alertModel = std::make_unique<AlertInfoModel>();
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
   alertModel->setErrorMessage(message);
   std::vector<AlertInfo> emptyInfos;
-  bool result = alertModel->showErrorsAlert(emptyInfos);
+  bool result = alertModel->showErrors(emptyInfos);
   return result;
 }
 
