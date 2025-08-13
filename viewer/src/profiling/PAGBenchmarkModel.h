@@ -19,32 +19,23 @@
 #pragma once
 
 #include <QObject>
-#include "PAGTask.h"
-#include "pag/pag.h"
+#include "task/profiling/PAGBenchmarkTask.h"
 
 namespace pag {
 
-class PAGTaskFactory : public QObject {
+class PAGBenchmarkModel : public QObject {
   Q_OBJECT
  public:
-  Q_ENUMS(PAGTaskType)
+  explicit PAGBenchmarkModel(QObject* parent = nullptr);
 
-  enum class PAGTaskType {
-    PAGTaskType_None,
-    PAGTaskType_ExportPNG,
-    PAGTaskType_ExportAPNG,
-    PAGTaskType_Profiling,
-    PAGTaskType_Benchmark
-  };
-
-  Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
-                                  const QVariantMap& extraParams = {});
-
-  void setFilePath(const std::string& filePath);
+  Q_INVOKABLE bool startBenchmarkOnTemplate(bool isAuto);
+  Q_SIGNAL void benchmarkComplete(bool isAuto, QString templateAvgRenderingTime,
+                                  QString templateFirstFrameRenderingTime);
+  Q_SLOT void onBenchmarkOnTemplateFinished(int result, QString filePath);
 
  private:
-  PAGTask* task = nullptr;
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  bool isAuto = false;
+  QMap<QString, std::shared_ptr<PAGBenchmarkTask>> taskMap = {};
 };
 
 }  // namespace pag

@@ -11,9 +11,31 @@ Item {
 
     property alias graph: graph
     property alias graphCanvas: graphCanvas
+    property alias currentFrameText: currentFrameText
+
+    property var performanceWarn1: qsTr("Rendering time too long, suggest optimizing time cost to under %1 us")
+    property var performanceWarn2: qsTr("Memory usage is too large, suggest optimizing memory cost to under 50M")
+    property var performanceWarn3: qsTr("(Run performance benchmark, results will be more accurate)")
+
+    property var performanceTip1: qsTr("Too many layers, Suggest combining same layers into composition")
+    property var performanceTip2: qsTr("Sticker scale is too large, suggest reducing sticker scale")
 
     width: defaultWidth
     height: defaultHeight
+
+    Connections {
+        target: runTimeDataModel
+        onDataChanged: {
+            currentFrameText.text = runTimeDataModel.currentFrame + "/" + runTimeDataModel.totalFrame;
+        }
+    }
+
+    Connections {
+        target: runTimeDataModel.chartDataModel
+        onItemsChange: {
+            graphCanvas.requestPaint();
+        }
+    }
 
     Column {
         spacing: 0
@@ -132,6 +154,40 @@ Item {
                         anchors.left: valueText.right
                         anchors.leftMargin: 3
                     }
+
+                    PerformanceWarnDialog {
+                        id: performanceWarnDialog
+                    }
+
+                    Image {
+                        id: performanceWarnImage
+                        width: 11
+                        height: 10
+                        visible: {
+                            if (name === "Graphics" && value > 50 && ext === "MB"){
+                                return true;
+                            }
+                            return name === "Videos" && value > 2;
+                        }
+                        anchors.top: parent.top
+                        anchors.topMargin: 4
+                        anchors.right: parent.right
+                        anchors.rightMargin: 4
+                        source: "qrc:/images/performance-warn.png"
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                performanceWarnDialog.x = performanceWarnImage.x + performanceWarnImage.width - (performanceWarnDialog.width / 2);
+                                performanceWarnDialog.y = performanceWarnImage.y + performanceWarnImage.height + 2;
+                                performanceWarnDialog.setToTop();
+                                performanceWarnDialog.clearAllTips();
+                                performanceWarnDialog.warnMessage = performanceWarn2;
+                                performanceWarnDialog.addTip(performanceTip1);
+                                performanceWarnDialog.addTip(performanceTip2);
+                                performanceWarnDialog.open();
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -161,13 +217,142 @@ Item {
                 Canvas {
                     id: graphCanvas
 
+                    property var chartDataModel: runTimeDataModel.chartDataModel
+
+                    property var warnColor: [224 / 255.0, 15 / 255.0, 66 / 255.0]
+                    property var renderColor: [0 / 255.0, 150 / 255.0, 216 /255.0]
+                    property var imageColor: [116 / 255.0, 173 / 255.0, 89 / 255.0]
+                    property var presentColor: [221 / 255.0, 178 / 255.0, 89 / 255.0]
+                    property int rectWidth: 3
+                    property int spaceX: 1
+                    property int posX: 0
+                    property int posY: 0
+
                     height: 70
                     width: graph.width
                     anchors.bottom: parent.bottom
                     renderStrategy: Canvas.Cooperative
 
-                    onPaint: {}
+                    function getRectHeight(currentValue, maxValue, maxHeight) {
+                        let height = (currentValue / maxValue) * maxHeight * 0.85 + (maxHeight * 0.05);
+                        return height;
+                    }
+
+                    function drawRect(context, rect, color) {
+                        context.save();
+                        context.fillStyle = color;
+                        context.fillRect(rect.x, rect.y, rect.width, rect.height);
+                        context.restore();
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            let index = parseInt((mouseX - graphCanvas.posX) / (graphCanvas.rectWidth + graphCanvas.spaceX));
+                            let item = runTimeDataModel.chartDataModel.items[index];
+                            if (index >= (runTimeDataModel.chartDataModel.currentIndex + 1) && index <= (runTimeDataModel.chartDataModel.currentIndex + 2)) {
+                                return;
+                            }
+                            let maxTime = Number(runTimeDataModel.chartDataModel.maxTime);
+                            let renderTime = Number(item.renderTime);
+                            let presentTime = Number(item.presentTime);
+                            let imageDecodeTime = Number(item.imageDecodeTime);
+                            let renderRectHeight = graphCanvas.getRectHeight(renderTime, maxTime, graphCanvas.height);
+                            let presentRectHeight = graphCanvas.getRectHeight(presentTime, maxTime, graphCanvas.height);
+                            let imageDecodeRectHeight = graphCanvas.getRectHeight(imageDecodeTime, maxTime, graphCanvas.height);
+                            let rectHeight = renderRectHeight + presentRectHeight + imageDecodeRectHeight;
+
+                            if ((mouseY - graphCanvas.posY) < (graphCanvas.height - rectHeight)) {
+                                return;
+                            }
+
+                            let warnMessage = performanceWarn1;
+                            let benchmarkTime = settings.templateAvgRenderingTime;
+                            if (benchmarkTime === 30000) {
+                                warnMessage += performanceWarn3;
+                            }
+                            benchmarkTime = Math.ceil(benchmarkTime / 100) * 100;
+                            warnMessage = warnMessage.arg(benchmarkTime);
+
+                            if (renderTime > benchmarkTime) {
+                                if (mouseX < (element.width  - performanceWarnDialog.width)) {
+                                    performanceWarnDialog.x = mouseX;
+                                    performanceWarnDialog.y = mouseY - performanceWarnDialog.height / 2 + 20;
+                                    performanceWarnDialog.setToLeft();
+                                } else {
+                                    performanceWarnDialog.x = mouseX - performanceWarnDialog.width;
+                                    performanceWarnDialog.y = mouseY - performanceWarnDialog.height / 2 + 20;
+                                    performanceWarnDialog.setToRight();
+                                }
+                                performanceWarnDialog.clearAllTips();
+                                performanceWarnDialog.warnMessage = warnMessage;
+                                performanceWarnDialog.addTip(performanceTip1);
+                                performanceWarnDialog.addTip(performanceTip2);
+                                performanceWarnDialog.open();
+                            }
+                        }
+                    }
+
+                    onPaint: {
+                        let context = graphCanvas.getContext("2d");
+                        let posX = graphCanvas.posX;
+                        let posY = graphCanvas.posY;
+                        context.clearRect(posX, posY, graphCanvas.width, graphCanvas.height);
+                        let spaceY = 0;
+                        let alpha = 1;
+
+                        for (let i = 0; i < chartDataModel.size; i++) {
+                            if (i <= chartDataModel.currentIndex) {
+                                alpha = 1;
+                            } else if (i <= chartDataModel.currentIndex + 2) {
+                                posX += (spaceX + rectWidth);
+                                continue;
+                            } else {
+                                alpha = 0.43;
+                            }
+
+                            let item = chartDataModel.items[i];
+                            let benchmarkTime = settings.templateAvgRenderingTime;
+                            let benchmarkFirstFrameTime = settings.templateFirstFrameRenderingTime;
+                            let renderColor_ = Qt.rgba(renderColor[0], renderColor[1], renderColor[2], alpha);
+                            let imageColor_ = Qt.rgba(imageColor[0], imageColor[1], imageColor[2], alpha);
+                            let presentColor_ = Qt.rgba(presentColor[0], presentColor[1], presentColor[2], alpha);
+                            let renderTime = Number(item.renderTime);
+                            let imageDecodeTime = Number(item.imageDecodeTime);
+                            let presentTime = Number(item.presentTime);
+
+                            if ((posX === 0 && renderTime > benchmarkFirstFrameTime) || (posX !== 0 && renderTime > benchmarkTime)) {
+                                renderColor_ = Qt.rgba(warnColor[0], warnColor[1], warnColor[2], alpha);
+                                imageColor_ = renderColor_;
+                                presentColor_ = renderColor_;
+                                spaceY -= 0.1;
+                            }
+
+                            let maxTime = Number(chartDataModel.maxTime);
+                            let rectHeight = getRectHeight(presentTime, maxTime, graphCanvas.height);
+                            let rect = {x: posX, y: graphCanvas.height - posY - rectHeight, width: rectWidth, height: rectHeight};
+                            drawRect(context, rect, presentColor_);
+                            posY += (spaceY + rectHeight);
+
+                            rectHeight = getRectHeight(imageDecodeTime, maxTime, graphCanvas.height);
+                            rect = {x: posX, y: graphCanvas.height - posY - rectHeight, width: rectWidth, height: rectHeight};
+                            drawRect(context, rect, imageColor_);
+                            posY += (spaceY + rectHeight);
+
+                            rectHeight = getRectHeight(renderTime, maxTime, graphCanvas.height);
+                            rect = {x: posX, y: graphCanvas.height - posY - rectHeight, width: rectWidth, height: rectHeight};
+                            drawRect(context, rect, renderColor_);
+                            posY = 0;
+
+                            posX += (spaceX + rectWidth);
+                        }
+                    }
                 }
+
+                PerformanceWarnDialog {
+                    id: performanceWarnDialog
+                }
+
                 Text {
                     id: currentFrameText
                     text: "0/0"
@@ -288,5 +473,9 @@ Item {
             width: parent.width
             height: 20
         }
+    }
+
+    Component.onCompleted: {
+        runTimeDataModel.chartDataSize = Math.max(60, (graphCanvas.width + 1) / 4);
     }
 }
