@@ -30,8 +30,7 @@ class PAGBenchmarkModel : public QObject {
 
   Q_INVOKABLE bool startBenchmarkOnTemplate(bool isAuto);
   Q_SIGNAL void benchmarkComplete(bool isAuto, QString templateAvgRenderingTime,
-                                  QString templateFirstFrameRenderingTime,
-                                  QString uiAvgRenderingTime, QString uiFirstFrameRenderingTime);
+                                  QString templateFirstFrameRenderingTime);
   Q_SLOT void onBenchmarkOnTemplateFinished(int result, QString filePath);
 
  private:

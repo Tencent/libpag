@@ -48,10 +48,6 @@ PAGWindow {
         property string templateAvgRenderingTime: "30000"
 
         property string templateFirstFrameRenderingTime: "60000"
-
-        property string uiAvgRenderingTime: "30000"
-
-        property string uiFirstFrameRenderingTime: "60000"
     }
     MainForm {
         id: mainForm
@@ -301,12 +297,9 @@ PAGWindow {
     Connections {
         target: benchmarkModel
 
-        function onBenchmarkComplete(isAuto, templateAvgRenderingTime, templateFirstFrameRenderingTime,
-                                     uiAvgRenderingTime, uiFirstFrameRenderingTime) {
+        function onBenchmarkComplete(isAuto, templateAvgRenderingTime, templateFirstFrameRenderingTime) {
             settings.templateAvgRenderingTime = templateAvgRenderingTime;
             settings.templateFirstFrameRenderingTime = templateFirstFrameRenderingTime;
-            settings.uiAvgRenderingTime = uiAvgRenderingTime;
-            settings.uiFirstFrameRenderingTime = uiFirstFrameRenderingTime;
 
             benchmarkBusyIndicator.visible = false;
             benchmarkBusyIndicator.running = false;

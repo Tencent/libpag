@@ -71,13 +71,9 @@ void PAGBenchmarkModel::onBenchmarkOnTemplateFinished(int, QString filePath) {
   auto task = taskMap[filePath].get();
   int64_t templateAvgRenderingTime = task->avgPerformanceData->renderingTime;
   int64_t templateFirstFrameRenderingTime = task->firstFramePerformanceData->renderingTime;
-  int64_t uiAvgRenderingTime = task->avgPerformanceData->renderingTime / 5 * 4;
-  int64_t uiFirstFrameRenderingTime = task->firstFramePerformanceData->renderingTime;
 
   Q_EMIT benchmarkComplete(isAuto, QString::number(templateAvgRenderingTime),
-                           QString::number(templateFirstFrameRenderingTime),
-                           QString::number(uiAvgRenderingTime),
-                           QString::number(uiFirstFrameRenderingTime));
+                           QString::number(templateFirstFrameRenderingTime));
 
   taskMap.remove(filePath);
 }

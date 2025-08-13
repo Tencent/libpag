@@ -101,6 +101,9 @@ void PAGRunTimeDataModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
 }
 
 void PAGRunTimeDataModel::updateChartData() {
+  if (totalFrame == 0) {
+    return;
+  }
   double ratio = static_cast<double>(chartDataSize) / totalFrame;
   auto startChartDataIndex = static_cast<int64_t>((currentFrame + 1) * ratio);
   auto startIndex =
@@ -132,7 +135,7 @@ void PAGRunTimeDataModel::updateChartData() {
     item.presentTime = presentTime;
     item.imageDecodeTime = imageDecodeTime;
     for (int64_t i = startChartDataIndex; i < endChartDataIndex; ++i) {
-      chartDataModel.updateItem(i, &item);
+      chartDataModel.updateOrInsertItem(i, &item);
     }
   }
 }
@@ -155,7 +158,7 @@ void PAGRunTimeDataModel::refreshChartDataModel() {
       item.presentTime = presentTime / count;
       item.imageDecodeTime = imageDecodeTime / count;
       while (lastChartDataIndex != currentChartDataIndex) {
-        newChartDataModel.updateItem(lastChartDataIndex, &item);
+        newChartDataModel.updateOrInsertItem(lastChartDataIndex, &item);
         ++lastChartDataIndex;
       }
       renderTime = 0;
@@ -179,7 +182,7 @@ void PAGRunTimeDataModel::refreshChartDataModel() {
     item.presentTime = presentTime / count;
     item.imageDecodeTime = imageDecodeTime / count;
     while (lastChartDataIndex != currentChartDataIndex) {
-      newChartDataModel.updateItem(lastChartDataIndex, &item);
+      newChartDataModel.updateOrInsertItem(lastChartDataIndex, &item);
       ++lastChartDataIndex;
     }
   }
