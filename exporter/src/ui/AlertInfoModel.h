@@ -67,14 +67,14 @@ class AlertInfoModel : public QAbstractListModel {
   void setAlertInfos(std::vector<AlertInfo> infos);
   bool showWarnings(const std::vector<AlertInfo>& infos);
   bool showErrors(const std::vector<AlertInfo>& info);
-  static std::string BrowseForSave(bool useScript);
+  std::string browseForSave(bool useScript);
 
  Q_SIGNALS:
   void errorMessageChanged();
   void alertInfoChanged();
 
  protected:
-  static QVariantMap AlertInfoToVariantMap(const AlertInfo& alertInfo);
+  QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
   const AlertInfo* getAlertInfo(const QModelIndex& index) const;
   bool initializeAlertWindow(const QString& qmlPath, const QString& contextName);
   bool isIndexValid(const QModelIndex& index) const;
@@ -85,9 +85,10 @@ class AlertInfoModel : public QAbstractListModel {
   std::unique_ptr<QApplication> app = nullptr;
   std::unique_ptr<QQmlApplicationEngine> alertEngine = nullptr;
   QQuickWindow* alertWindow = nullptr;
+  mutable QVariantMap alertInfoVariantMap;
   static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";
-  static std::string lastOutputPath;
-  static std::string lastFilePath;
+  std::string lastOutputPath;
+  std::string lastFilePath;
 };
 
 }  // namespace exporter

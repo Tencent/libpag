@@ -109,7 +109,7 @@ bool AlertInfoModel::locateAlert(const int row) {
 QVariantList AlertInfoModel::getAlertInfos() const {
   QVariantList result;
   for (const AlertInfo& alertInfo : alertInfos) {
-    result.append(AlertInfoToVariantMap(alertInfo));
+    result.append(alertInfoToVariantMap(alertInfo));
   }
   return result;
 }
@@ -156,7 +156,7 @@ bool AlertInfoModel::showErrors(const std::vector<AlertInfo>& infos) {
   return initializeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
 }
 
-std::string AlertInfoModel::BrowseForSave(bool useScript) {
+std::string AlertInfoModel::browseForSave(bool useScript) {
   auto suites = AEHelper::GetSuites();
   auto pluginID = AEHelper::GetPluginID();
   AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
@@ -196,20 +196,19 @@ std::string AlertInfoModel::BrowseForSave(bool useScript) {
   return outputPath;
 }
 
-QVariantMap AlertInfoModel::AlertInfoToVariantMap(const AlertInfo& alertInfo) {
-  static QVariantMap map;
-  map.clear();
+QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) const {
+  alertInfoVariantMap.clear();
 
-  map["isError"] = alertInfo.isError;
-  map["errorInfo"] = QString::fromStdString(alertInfo.info);
-  map["suggestion"] = QString::fromStdString(alertInfo.suggest);
-  map["isFold"] = alertInfo.isFold;
-  map["compositionName"] = QString::fromStdString(alertInfo.compName);
-  map["layerName"] = QString::fromStdString(alertInfo.layerName);
-  map["hasLayerName"] = !alertInfo.layerName.empty();
-  map["hasSuggestion"] = !alertInfo.suggest.empty();
+  alertInfoVariantMap["isError"] = alertInfo.isError;
+  alertInfoVariantMap["errorInfo"] = QString::fromStdString(alertInfo.info);
+  alertInfoVariantMap["suggestion"] = QString::fromStdString(alertInfo.suggest);
+  alertInfoVariantMap["isFold"] = alertInfo.isFold;
+  alertInfoVariantMap["compositionName"] = QString::fromStdString(alertInfo.compName);
+  alertInfoVariantMap["layerName"] = QString::fromStdString(alertInfo.layerName);
+  alertInfoVariantMap["hasLayerName"] = !alertInfo.layerName.empty();
+  alertInfoVariantMap["hasSuggestion"] = !alertInfo.suggest.empty();
 
-  return map;
+  return alertInfoVariantMap;
 }
 
 const AlertInfo* AlertInfoModel::getAlertInfo(const QModelIndex& index) const {

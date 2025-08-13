@@ -99,8 +99,7 @@ bool WindowManager::showSimpleError(const QString& message) {
     alertModel = std::make_unique<AlertInfoModel>();
   }
   alertModel->setErrorMessage(message);
-  std::vector<AlertInfo> emptyInfos;
-  bool result = alertModel->showErrors(emptyInfos);
+  bool result = alertModel->showErrors({});
   return result;
 }
 
