@@ -249,11 +249,11 @@ Item {
                         anchors.fill: parent
                         onClicked: {
                             let index = parseInt((mouseX - graphCanvas.posX) / (graphCanvas.rectWidth + graphCanvas.spaceX));
-                            let item = chartDataModel.items[index];
-                            if (index >= (chartDataModel.currentIndex + 1) && index <= (chartDataModel.currentIndex + 2)) {
+                            let item = runTimeDataModel.chartDataModel.items[index];
+                            if (index >= (runTimeDataModel.chartDataModel.currentIndex + 1) && index <= (runTimeDataModel.chartDataModel.currentIndex + 2)) {
                                 return;
                             }
-                            let maxTime = Number(chartDataModel.maxTime);
+                            let maxTime = Number(runTimeDataModel.chartDataModel.maxTime);
                             let renderTime = Number(item.renderTime);
                             let presentTime = Number(item.presentTime);
                             let imageDecodeTime = Number(item.imageDecodeTime);

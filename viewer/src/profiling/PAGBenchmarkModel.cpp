@@ -28,8 +28,8 @@ PAGBenchmarkModel::PAGBenchmarkModel(QObject* parent) : QObject(parent) {
 
 bool PAGBenchmarkModel::startBenchmarkOnTemplate(bool isAuto) {
   this->isAuto = isAuto;
-  QString templatePAGFilePath = ":pag/jzznm.pag";
-  QString templatePNGFilePath = ":images/scene.png";
+  QString templatePAGFilePath = ":pag/performance-baseline.pag";
+  QString templatePNGFilePath = ":images/window-icon.png";
 
   QFile pagQFile(templatePAGFilePath);
   QFile pngQFile(templatePNGFilePath);
