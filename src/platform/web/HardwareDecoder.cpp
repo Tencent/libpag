@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include <emscripten.h>
 #include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
@@ -85,6 +86,9 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
   val promise = videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
-  return imageReader->acquireNextBuffer(promise);
+  while (!videoReader.call<bool>("isPrepareCompleted")) {
+    emscripten_sleep(10);
+  }
+  return imageReader->acquireNextBuffer();
 }
 }  // namespace pag

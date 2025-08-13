@@ -95,6 +95,7 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
+  private prepareCompletedFlag: boolean = false;
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
@@ -137,56 +138,77 @@ export class VideoReader {
     }
   }
 
-  public async prepare(targetFrame: number, playbackRate: number) {
-    this.setError(null); // reset error
-    this.isSought = false; // reset seek status
-    const { currentTime } = this.videoEl!;
-    const targetTime = targetFrame / this.frameRate;
-    if (currentTime === 0 && targetTime === 0) {
-      if (!this.canplay && !SAFARI_OR_IOS_WEBVIEW) {
-        await waitVideoCanPlay(this.videoEl!);
-      } else {
-        try {
-          await this.play();
-        } catch (e) {
-          this.setError(e);
-        }
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => {
-            this.pause();
-            resolve();
-          });
-        });
-      }
-    } else {
-      if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
-        // Current frame
-      } else if (this.staticTimeRanges?.contains(targetFrame)) {
-        // Static frame
-        await this.seek(targetTime, false);
-        return;
-      } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
-        // Within tolerable frame rate deviation
-      } else {
-        // Seek and play
-        this.isSought = true;
-        await this.seek(targetTime);
-        return;
-      }
-    }
-
-    const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
-    if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
-      this.videoEl!.playbackRate = targetPlaybackRate;
-    }
-
-    if (this.isPlaying && this.videoEl!.paused) {
+  public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
+    return new Promise<void>(async (resolve, reject) => {
       try {
-        await this.play();
-      } catch (e) {
-        this.setError(e);
+        this.prepareCompletedFlag = false;
+        this.setError(null); // reset error
+        this.isSought = false; // reset seek status
+        const { currentTime } = this.videoEl!;
+        const targetTime = targetFrame / this.frameRate;
+
+        if (currentTime === 0 && targetTime === 0) {
+          if (!this.canplay && !SAFARI_OR_IOS_WEBVIEW) {
+            await waitVideoCanPlay(this.videoEl!);
+          } else {
+            try {
+              await this.play();
+            } catch (e) {
+              this.setError(e);
+              reject(e);
+              return;
+            }
+            await new Promise<void>((resolveInner) => {
+              requestAnimationFrame(() => {
+                this.pause();
+                resolveInner();
+              });
+            });
+          }
+        } else {
+          if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
+            // Current frame
+          } else if (this.staticTimeRanges?.contains(targetFrame)) {
+            // Static frame
+            await this.seek(targetTime, false);
+            resolve();  // Ensure promise resolves
+            return;
+          } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
+            // Within tolerable frame rate deviation
+          } else {
+            // Seek and play
+            this.isSought = true;
+            await this.seek(targetTime);
+            resolve();
+            return;
+          }
+        }
+
+        const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
+        if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
+          this.videoEl!.playbackRate = targetPlaybackRate;
+        }
+
+        if (this.isPlaying && this.videoEl!.paused) {
+          try {
+            await this.play();
+          } catch (e) {
+            this.setError(e);
+            reject(e);
+            return;
+          }
+        }
+        resolve();
+      } catch (error) {
+        reject(error);
+      } finally {
+        this.prepareCompletedFlag = true;
       }
-    }
+    });
+  }
+
+  public isPrepareCompleted(): boolean {
+    return this.prepareCompletedFlag;
   }
 
   public getVideo() {
