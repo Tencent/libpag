@@ -42,9 +42,10 @@ jobs:
 
       - name: Build iOS
         run: |
+          mkdir -p third_party/tgfx/out/cache
           cd ios
-          node gen_ios -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
-          xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+          node gen_ios
+          xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -93,8 +94,9 @@ jobs:
 
       - name: Build Android
         run: |
+          mkdir -p third_party/tgfx/out/cache
           cd android
-          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
+          ./gradlew assembleRelease -Parm64-only --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -126,8 +128,8 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
-          restore-keys: tgfx-environment-web-
+          key: libpag-environment-web-20241106
+          restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -165,7 +167,7 @@ jobs:
         run: |
           cd web
           emsdk/emsdk_env
-          npm run build:st:debug
+          npm run build
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -174,7 +176,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
+          key: libpag-environment-web-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -219,7 +221,8 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
+          New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
+          node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -268,7 +271,11 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
+          mkdir -p third_party/tgfx/out/cache
+          cd linux
+          ./build_pag.sh
+          cmake -B ./build -DCMAKE_BUILD_TYPE=Release
+          cmake --build ./build -- -j 12
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -283,10 +290,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux_build
-          path: out
+          path: linux
 
   qt:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -313,18 +320,19 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          host: 'linux'
+          host: 'mac'
           target: 'desktop'
           version: '6.8.3'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
-          cache: 'true'
           aqtversion: '==3.2.1'
+          cache: 'true'
           cache-key-prefix: 'install-qt-action'
 
       - name: Build QT
         run: |
-          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
+          mkdir -p third_party/tgfx/out/cache
+          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -342,12 +350,12 @@ jobs:
           path: out
 
   openharmony:
-    runs-on: macos-latest
-    steps:
+      runs-on: macos-latest
+      steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
         with:
-          lfs: true
+            lfs: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -390,8 +398,8 @@ jobs:
           cd $HOME/ohpm
           curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
           if [ -f "ohpm.tgz" ]; then
-            tar -xzf ohpm.tgz
-            echo "$HOME/ohpm/bin" >> $GITHUB_PATH
+          tar -xzf ohpm.tgz
+          echo "$HOME/ohpm/bin" >> $GITHUB_PATH
           fi
 
       - name: Install Dependencies & Build
@@ -402,7 +410,7 @@ jobs:
           if command -v ohpm &> /dev/null; then
             ohpm install --all
           fi
-          ./hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
+            ./hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
 
 
       - name: Job Failed
