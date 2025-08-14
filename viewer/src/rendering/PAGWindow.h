@@ -27,6 +27,7 @@
 #include "editing/PAGImageProvider.h"
 #include "editing/PAGTextLayerModel.h"
 #include "editing/PAGTreeViewModel.h"
+#include "profiling/PAGBenchmarkModel.h"
 #include "profiling/PAGRunTimeDataModel.h"
 
 namespace pag {
@@ -56,6 +57,7 @@ class PAGWindow : public QObject {
   std::unique_ptr<PAGEditAttributeModel> editAttributeModel = nullptr;
   std::unique_ptr<PAGTextLayerModel> textLayerModel = nullptr;
   std::unique_ptr<PAGImageLayerModel> imageLayerModel = nullptr;
+  std::unique_ptr<PAGBenchmarkModel> benchmarkModel = nullptr;
 };
 
 }  // namespace pag

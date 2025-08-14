@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AECommand.h"
+#include "export/PAGExport.h"
+#include "platform/PlatformHelper.h"
+#include "ui/AlertInfoModel.h"
 #include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/AEResource.h"
+#include "utils/AlertInfo.h"
 namespace exporter {
 
 AEGP_Command AECommand::PAGExporterCMD = 0L;
@@ -86,6 +90,21 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+
+  AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
+  if (activeItemH == nullptr) {
+    return err;
+  }
+
+  AlertInfoModel alertModel;
+  const auto& outputPath = AlertInfoModel::BrowseForSave(true);
+
+  if (outputPath.empty()) {
+    return err;
+  }
+
+  PreviewPAGFile(outputPath);
+
   return err;
 }
 
