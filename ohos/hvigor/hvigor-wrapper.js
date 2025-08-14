@@ -5,20 +5,17 @@
  * 如需自定义缓存目录，仅需修改 hvigorHome / cacheDir 字段
  */
 module.exports = {
-    /* 构建工具及插件版本 */
-    hvigorVersion: '2.4.2',
+    hvigorVersion: '1.6.0',
     dependencies: {
-      '@ohos/hvigor-ohos-plugin': '2.4.2'
+        '@ohos/hvigor-ohos-plugin': '1.6.0'
     },
-  
-    /* 构建运行时配置 */
-    hvigorHome: '/Users/runner/.hvigor',   // CI 里改成可写路径
-    cacheDir: '/Users/runner/.hvigor/cache',
+
+    hvigorHome: process.env.HVIGOR_HOME || path.join(os.homedir(), '.hvigor'),
+    cacheDir: process.env.HVIGOR_CACHE_DIR || path.join(process.env.HVIGOR_HOME || path.join(os.homedir(), '.hvigor'), 'cache'),
     enableDaemon: true,
-    daemonTimeout: 60 * 60 * 1000, // 1h
+    daemonTimeout: 60 * 60 * 1000,
     logLevel: 'INFO',
     enableIncremental: true,
     enableParallel: true,
     enableTypeCheck: false
-  };
-  
+};
