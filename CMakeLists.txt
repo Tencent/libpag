@@ -391,40 +391,15 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
 elseif (OHOS)
-    message("-------------------------------------ohos--------------------")
     if (USE_NATIVE_PLATFORM)
         find_library(GLESV3_LIB GLESv3)
-        message("-------------------------------------test--------------------")
         list(APPEND PAG_SHARED_LIBS ${GLESV3_LIB})
         find_library(EGL_LIB EGL)
         list(APPEND PAG_SHARED_LIBS ${EGL_LIB})
         find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z)
         find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z)
-        
-        # 修复：尝试查找新版本的库名称
         find_library(PIXELMAP_LIB pixelmap)
         find_library(IMAGE_SOURCE_LIB image_source)
-        
-        # 如果找不到旧名称，尝试新名称或跳过
-        if (NOT PIXELMAP_LIB)
-            message(WARNING "PIXELMAP_LIB not found, trying alternative names...")
-            find_library(PIXELMAP_LIB pixelmap.z)
-        endif()
-        
-        if (NOT IMAGE_SOURCE_LIB)
-            message(WARNING "IMAGE_SOURCE_LIB not found, trying alternative names...")
-            find_library(IMAGE_SOURCE_LIB image_source.z)
-        endif()
-        
-        # 如果仍然找不到，使用 NDK 版本
-        if (NOT PIXELMAP_LIB)
-            set(PIXELMAP_LIB ${PIXELMAP_NDK_LIB})
-        endif()
-        
-        if (NOT IMAGE_SOURCE_LIB)
-            set(IMAGE_SOURCE_LIB ${IMAGE_SOURCE_NDK_LIB})
-        endif()
-        
         find_library(ACE_NDK_LIB ace_ndk.z)
         find_library(HILOG_NDK_LIB hilog_ndk.z)
         find_library(ACE_NAPI_LIB ace_napi.z)
@@ -436,35 +411,11 @@ elseif (OHOS)
         find_library(NATIVE_MEDIA_CORE_LIB native_media_core)
         find_library(NATIVE_MEDIA_VDEC_LIB native_media_vdec)
         find_library(NATIVE_RAWFILE_Z_LIB rawfile.z)
-        
-        # 修复：确保所有库都存在才添加
-        set(OHOS_LIBS 
-            ${PIXELMAP_NDK_LIB} 
-            ${IMAGE_SOURCE_NDK_LIB} 
-            ${PIXELMAP_LIB}
-            ${IMAGE_SOURCE_LIB} 
-            ${ACE_NDK_LIB} 
-            ${HILOG_NDK_LIB} 
-            ${ACE_NAPI_LIB}
-            ${NATIVE_BUFFER_LIB} 
-            ${NATIVE_WINDOW_LIB} 
-            ${NATIVE_IMAGE_LIB}
-            ${NATIVE_MEDIA_CODECBASE_LIB} 
-            ${NATIVE_MEDIA_CORE_LIB} 
-            ${NATIVE_MEDIA_VDEC_LIB}
-            ${NATIVE_VSYNC_LIB} 
-            ${NATIVE_RAWFILE_Z_LIB}
-        )
-        
-        # 过滤掉未找到的库
-        set(VALID_OHOS_LIBS "")
-        foreach(lib ${OHOS_LIBS})
-            if(lib)
-                list(APPEND VALID_OHOS_LIBS ${lib})
-            endif()
-        endforeach()
-        
-        list(APPEND PAG_SHARED_LIBS ${VALID_OHOS_LIBS})
+        list(APPEND PAG_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
+                ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB}
+                ${NATIVE_BUFFER_LIB} ${NATIVE_WINDOW_LIB} ${NATIVE_IMAGE_LIB}
+                ${NATIVE_MEDIA_CODECBASE_LIB} ${NATIVE_MEDIA_CORE_LIB} ${NATIVE_MEDIA_VDEC_LIB}
+                ${NATIVE_VSYNC_LIB} ${NATIVE_RAWFILE_Z_LIB})
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
