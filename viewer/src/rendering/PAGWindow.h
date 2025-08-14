@@ -42,6 +42,7 @@ class PAGWindow : public QObject {
 
   void open();
   QString getFilePath();
+  QQmlApplicationEngine* getEngine();
 
   static QList<PAGWindow*> AllWindows;
 

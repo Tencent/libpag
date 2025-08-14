@@ -49,6 +49,12 @@ Item {
                     }
                 }
                 Action {
+                    text: qsTr("Check for Updates")
+                    onTriggered: {
+                        root.command("check-for-updates");
+                    }
+                }
+                Action {
                     text: qsTr("Performance Test")
                     enabled: root.hasPAGFile
                     onTriggered: {
@@ -193,6 +199,14 @@ Item {
                     role: "ApplicationSpecificRole"
                     onTriggered: {
                         root.command("open-commerce-page");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("Check for Updates")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("check-for-updates");
                     }
                 }
                 Platform.MenuItem {

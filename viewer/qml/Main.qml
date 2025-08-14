@@ -3,6 +3,7 @@ import QtCore
 import QtQuick
 import QtQuick.Dialogs
 import QtQuick.Controls
+import QtQuick.Layouts
 import Qt.labs.settings
 import Qt.labs.platform as Platform
 import "components"
@@ -37,6 +38,10 @@ PAGWindow {
         property bool isShowVideoFrames: true
 
         property bool isUseEnglish: true
+
+        property bool isUseBeta: false
+
+        property bool isAutoCheckUpdate: true
 
         property double lastX: 0
 
@@ -140,12 +145,26 @@ PAGWindow {
         width: 500
         height: 160 + windowTitleBarHeight
         title: qsTr("Settings")
+        autoCheckForUpdates: settings.isAutoCheckUpdate
+        useBeta: settings.isUseBeta
         useEnglish: settings.isUseEnglish
         onUseEnglishChanged: {
             if (!settingsWindow.visible || settingsWindow.useEnglish === settings.isUseEnglish) {
                 return;
             }
             settings.isUseEnglish = settingsWindow.useEnglish;
+        }
+        onAutoCheckForUpdatesChanged: {
+            if (!settingsWindow.visible || settingsWindow.autoCheckForUpdates === settings.isAutoCheckUpdate) {
+                return;
+            }
+            settings.isAutoCheckUpdate = settingsWindow.autoCheckForUpdates;
+        }
+        onUseBetaChanged: {
+            if (!settingsWindow.visible || settingsWindow.useBeta === settings.isUseBeta) {
+                return;
+            }
+            settings.isUseBeta = settingsWindow.useBeta;
         }
     }
 
@@ -181,6 +200,26 @@ PAGWindow {
 
         visible: false
         title: qsTr("Select Save Path")
+    }
+
+    Timer {
+        id: startupTimer
+        repeat: false
+        interval: 1000
+        onTriggered: {
+            if (settings.isAutoCheckUpdate) {
+                checkForUpdates(true);
+            }
+        }
+    }
+
+    Timer {
+        id: updateTimer
+        repeat: true
+        interval: 1000 * 60 * 60 * 24
+        onTriggered: {
+            checkForUpdates(true);
+        }
     }
 
     PAGWindow {
@@ -291,6 +330,9 @@ PAGWindow {
             })
         });
         menuBar.command.connect(onCommand);
+
+        startupTimer.start();
+        updateTimer.start();
     }
 
     function updateProgress() {
@@ -338,6 +380,14 @@ PAGWindow {
                 viewWindow.width = viewWindow.width + widthChange;
             }
         }
+    }
+
+    function updateAvailable(hasNewVersion) {
+        mainForm.controlForm.updateAvailable = hasNewVersion;
+    }
+
+    function checkForUpdates(keepSilent) {
+        checkUpdateModel.checkForUpdates(keepSilent, settings.isUseBeta);
     }
 
     function onCommand(command) {
@@ -485,6 +535,9 @@ PAGWindow {
             };
             openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);
             openFileDialog.open();
+            break;
+        case "check-for-updates":
+            checkForUpdates(false);
             break;
         case "performance-profile":
             let task = taskFactory.createTask(PAGTaskFactory.PAGTaskType_Profiling, mainForm.pagView.filePath);
