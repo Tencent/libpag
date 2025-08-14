@@ -23,6 +23,9 @@
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
+namespace emscripten {
+class val;
+}
 using namespace emscripten;
 
 namespace pag {
@@ -37,10 +40,9 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto staticTimeRanges = demuxer->getStaticTimeRanges();
   mp4Data = demuxer->getMp4Data();
   auto videoReaderClass = val::module_property("VideoReader");
-  videoReader = videoReaderClass
-                    .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())),
-                               _width, _height, sequence->frameRate, staticTimeRanges)
-                    .await();
+  videoReader = videoReaderClass.call<val>(
+      "create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width, _height,
+      sequence->frameRate, staticTimeRanges);
   auto video = videoReader.call<val>("getVideo");
   if (!video.isNull()) {
     imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
@@ -85,10 +87,12 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
-  val promise = videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
-  while (!videoReader.call<bool>("isPrepareCompleted")) {
-    emscripten_sleep(10);
+  videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
+  std::string timestamp = videoReader.call<std::string>("getCurrentTimestamp");
+  if (decodedTimestamp.empty() || decodedTimestamp != timestamp) {
+    decodedTimestamp = timestamp;
+    lastDecodedBuffer = imageReader->acquireNextBuffer();
   }
-  return imageReader->acquireNextBuffer();
+  return lastDecodedBuffer;
 }
 }  // namespace pag

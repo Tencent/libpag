@@ -49,34 +49,13 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
 };
 
 export class VideoReader {
-  public static async create(
+  public static create(
     source: Uint8Array | HTMLVideoElement,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-  ): Promise<VideoReaderInterfaces> {
-    if (WORKER) {
-      const proxyId = await new Promise<number>((resolve) => {
-        // TODO: source as HTMLVideoElement in WebWorker version.
-        const uint8Array = source as Uint8Array;
-        const buffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength);
-        postMessage(
-          self,
-          {
-            name: WorkerMessageType.VideoReader_constructor,
-            args: [buffer, width, height, frameRate, staticTimeRanges, true],
-          },
-          (res) => {
-            resolve(res);
-          },
-          [buffer],
-        );
-      });
-      const videoReader = new WorkerVideoReader(proxyId);
-      PAGModule.currentPlayer?.linkVideoReader(videoReader);
-      return videoReader;
-    }
+  ): VideoReaderInterfaces {
     return new VideoReader(source, width, height, frameRate, staticTimeRanges);
   }
 
@@ -95,7 +74,7 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
-  private prepareCompletedFlag: boolean = false;
+  private decodedTimestamp: string = '';
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
@@ -139,9 +118,7 @@ export class VideoReader {
   }
 
   public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
-    return new Promise<void>(async (resolve, reject) => {
-      try {
-        this.prepareCompletedFlag = false;
+    const promise =new Promise<void>(async (resolve, reject) => {
         this.setError(null); // reset error
         this.isSought = false; // reset seek status
         const { currentTime } = this.videoEl!;
@@ -155,6 +132,7 @@ export class VideoReader {
               await this.play();
             } catch (e) {
               this.setError(e);
+              this.decodedTimestamp = Date.now().toString();
               reject(e);
               return;
             }
@@ -171,6 +149,7 @@ export class VideoReader {
           } else if (this.staticTimeRanges?.contains(targetFrame)) {
             // Static frame
             await this.seek(targetTime, false);
+            this.decodedTimestamp = Date.now().toString();
             resolve();  // Ensure promise resolves
             return;
           } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
@@ -179,6 +158,7 @@ export class VideoReader {
             // Seek and play
             this.isSought = true;
             await this.seek(targetTime);
+            this.decodedTimestamp = Date.now().toString();
             resolve();
             return;
           }
@@ -194,21 +174,19 @@ export class VideoReader {
             await this.play();
           } catch (e) {
             this.setError(e);
+            this.decodedTimestamp = Date.now().toString();
             reject(e);
             return;
           }
         }
+        this.decodedTimestamp = Date.now().toString();
         resolve();
-      } catch (error) {
-        reject(error);
-      } finally {
-        this.prepareCompletedFlag = true;
-      }
     });
+    await promise;
   }
 
-  public isPrepareCompleted(): boolean {
-    return this.prepareCompletedFlag;
+  public getCurrentTimestamp(): string {
+    return this.decodedTimestamp;
   }
 
   public getVideo() {
