@@ -10,8 +10,8 @@ module.exports = {
         '@ohos/hvigor-ohos-plugin': '1.6.0'
     },
 
-    hvigorHome: process.env.HVIGOR_HOME || path.join(os.homedir(), '.hvigor'),
-    cacheDir: process.env.HVIGOR_CACHE_DIR || path.join(process.env.HVIGOR_HOME || path.join(os.homedir(), '.hvigor'), 'cache'),
+    hvigorHome: '/Users/runner/.hvigor',
+    cacheDir: '/Users/runner/.hvigor/cache',
     enableDaemon: true,
     daemonTimeout: 60 * 60 * 1000,
     logLevel: 'INFO',
