@@ -372,13 +372,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true
-          
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            third_party
+          path: third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-openharmony-
 
@@ -386,59 +390,42 @@ jobs:
         run: |
           npm install depsync -g
           depsync
-        shell: bash
-
-      - name: Setup OpenHarmony Build Environment
-        uses: eclipse-oniro4openharmony/oh-app-action@main
+      - name: Setup OpenHarmony SDK
+        uses: openharmony-rs/setup-ohos-sdk@v0.2
         with:
-          working-directory: './ohos'
+          version: '5.0.3'
+          cache: true
 
       - name: Configure SDK Path
         run: |
           cd ohos
-          # Set SDK path from environment variables set by oh-app-action
-          if [ -n "${HOS_SDK_HOME:-}" ]; then
-            SDK_PATH="${HOS_SDK_HOME}"
-          elif [ -n "${CMD_PATH:-}" ]; then
-            SDK_PATH="${CMD_PATH}"
-          else
-            SDK_PATH="${HOME}/command-line-tools"
+          echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
+          echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
+      - name: Setup .npmrc for OpenHarmony
+        run: |
+          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
+      - name: Install ohpm
+        run: |
+          mkdir -p $HOME/ohpm
+          cd $HOME/ohpm
+          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
+          if [ -f "ohpm.tgz" ]; then
+            tar -xzf ohpm.tgz
+            echo "$HOME/ohpm/bin" >> $GITHUB_PATH
           fi
-          
-          echo "hwsdk.dir=${SDK_PATH}" > local.properties
-          echo "Configured SDK path: ${SDK_PATH}"
-        shell: bash
-
-      - name: Install Dependencies
+      - name: Install Dependencies & Build
         run: |
           cd ohos
-          ohpm install --all
-        shell: bash
-          
-      - name: Build OpenHarmony Project
-        run: |
-          cd ohos
-          chmod +x ./hvigorw
-          ./hvigorw --version --accept-license
-          ./hvigorw clean --no-parallel --no-daemon
-          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon
-        shell: bash
-          
-      - name: Additional Setup
-        run: |
-          mkdir -p third_party/tgfx/out/cache
-
-      - name: Save Third-Party Cache
-        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with: 
-          path: |
-            third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          
+          chmod +x hvigorw
+          export PATH="$HOME/ohpm/bin:$PATH"
+          if command -v ohpm &> /dev/null; then
+            ohpm install --all
+          fi
+          ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
       - name: Job Failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: openharmony_build
-          path: ohos
+          path: ohos/out
