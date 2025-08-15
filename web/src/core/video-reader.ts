@@ -71,7 +71,7 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
-  private decodedTimestamp: string = '';
+  private currentFrame: number=0;
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
@@ -125,7 +125,7 @@ export class VideoReader {
               await this.play();
             } catch (e) {
               this.setError(e);
-              this.decodedTimestamp = Date.now().toString();
+              this.currentFrame = targetFrame;
               reject(e);
               return;
             }
@@ -142,7 +142,7 @@ export class VideoReader {
           } else if (this.staticTimeRanges?.contains(targetFrame)) {
             // Static frame
             await this.seek(targetTime, false);
-            this.decodedTimestamp = Date.now().toString();
+            this.currentFrame = targetFrame;
             resolve();  // Ensure promise resolves
             return;
           } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
@@ -151,7 +151,7 @@ export class VideoReader {
             // Seek and play
             this.isSought = true;
             await this.seek(targetTime);
-            this.decodedTimestamp = Date.now().toString();
+            this.currentFrame = targetFrame;
             resolve();
             return;
           }
@@ -167,19 +167,19 @@ export class VideoReader {
             await this.play();
           } catch (e) {
             this.setError(e);
-            this.decodedTimestamp = Date.now().toString();
+            this.currentFrame = targetFrame;
             reject(e);
             return;
           }
         }
-        this.decodedTimestamp = Date.now().toString();
+        this.currentFrame = targetFrame;
         resolve();
     });
     await promise;
   }
 
-  public getCurrentTimestamp(): string {
-    return this.decodedTimestamp;
+  public getCurrentFrame(): number {
+    return this.currentFrame;
   }
 
   public getVideo() {

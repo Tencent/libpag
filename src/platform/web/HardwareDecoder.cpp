@@ -88,9 +88,9 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
   videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
-  std::string timestamp = videoReader.call<std::string>("getCurrentTimestamp");
-  if (decodedTimestamp.empty() || decodedTimestamp != timestamp) {
-    decodedTimestamp = timestamp;
+  int frameId = videoReader.call<int>("getCurrentFrame");
+  if (currentFrame < 0 || currentFrame != frameId) {
+    currentFrame = frameId;
     lastDecodedBuffer = imageReader->acquireNextBuffer();
   }
   return lastDecodedBuffer;
