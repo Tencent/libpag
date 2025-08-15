@@ -7,7 +7,7 @@ Item {
     required property var pagView
     property bool hasPAGFile: (pagView && pagView.filePath !== "")
 
-    property bool hasNewVersion: false
+    property bool updateAvailable: false
 
     property bool lastPlayStatusIsPlaying: false
 
@@ -225,8 +225,8 @@ Item {
                 id: updateButton
                 width: 44
                 height: 44
-                enabled: hasNewVersion
-                visible: hasNewVersion
+                enabled: updateAvailable
+                visible: updateAvailable
                 focusPolicy: Qt.NoFocus
                 opacity: mouseArea.pressed ? 0.5 : 1.0
                 indicator: Image {

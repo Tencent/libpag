@@ -19,6 +19,7 @@
 #include "PAGWindow.h"
 #include <QQmlContext>
 #include "PAGRenderThread.h"
+#include "PAGViewer.h"
 #include "PAGWindowHelper.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
@@ -63,6 +64,9 @@ void PAGWindow::open() {
   context->setContextProperty("imageLayerModel", imageLayerModel.get());
   context->setContextProperty("benchmarkModel", benchmarkModel.get());
 
+  auto viewer = static_cast<PAGViewer*>(qApp);
+  context->setContextProperty("checkUpdateModel", viewer->getCheckUpdateModel());
+
   // Image Provider will be managed by QML
   auto imageProvider = new PAGImageProvider();
   imageProvider->setImageLayerModel(imageLayerModel.get());
@@ -99,6 +103,10 @@ void PAGWindow::open() {
 
 QString PAGWindow::getFilePath() {
   return filePath;
+}
+
+QQmlApplicationEngine* PAGWindow::getEngine() {
+  return engine.get();
 }
 
 }  // namespace pag

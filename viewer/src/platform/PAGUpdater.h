@@ -18,15 +18,11 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include <string>
 
 namespace pag {
 
-class PAGWindowHelper : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
-};
+void InitUpdater();
+void CheckForUpdates(bool keepSilent, const std::string& url);
 
 }  // namespace pag

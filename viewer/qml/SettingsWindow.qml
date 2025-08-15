@@ -5,7 +5,13 @@ import "components"
 PAGWindow {
     id: settingsWindow
 
+    property bool autoCheckForUpdates: true
+
+    property bool useBeta: true
+
     property bool useEnglish: true
+
+    property int contentHeight: 30
 
     minimumWidth: width
     maximumWidth: width
@@ -55,25 +61,112 @@ PAGWindow {
                 spacing: 0
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
+                width: parent.width
 
                 Item {
                     width: 1
-                    height: (parent.height - useEnglishCheckBox.height) / 2
+                    height: (parent.height - settingsWindow.contentHeight * 3) / 2
+                }
+
+                CheckBox {
+                    id: autoCheckForUpdatesCheckBox
+                    checked: settingsWindow.autoCheckForUpdates
+                    width: parent.width
+                    height: settingsWindow.contentHeight
+                    text: qsTr("Check For Updates Automatically")
+                    scale: 0.6
+                    font.pixelSize: 22
+                    padding: 0
+                    spacing: 0
+                    anchors.left: parent.left
+                    anchors.leftMargin: -80
+                    focusPolicy: Qt.ClickFocus
+                    display: AbstractButton.TextBesideIcon
+                    indicator: Image {
+                        height: 32
+                        anchors.left: parent.left
+                        source: parent.checked ? "qrc:/images/checked.png" : "qrc:/images/unchecked.png"
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        anchors.left: parent.indicator.right
+                        anchors.leftMargin: 8
+                        font: parent.font
+                        color: "#FFFFFF"
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onCheckedChanged: {
+                        if (settingsWindow.autoCheckForUpdates === autoCheckForUpdatesCheckBox.checked) {
+                            return;
+                        }
+                        settingsWindow.autoCheckForUpdates = autoCheckForUpdatesCheckBox.checked;
+                    }
+
+                    Rectangle {
+                        color: "#FFFFFF"
+                    }
+                }
+
+                CheckBox {
+                    id: useBetaCheckBox
+                    checked: settingsWindow.useBeta
+                    width: parent.width
+                    height: settingsWindow.contentHeight
+                    text: qsTr("Use PAG and AE Export Plugin in Beta Version")
+                    scale: 0.6
+                    font.pixelSize: 22
+                    padding: 0
+                    spacing: 0
+                    anchors.left: parent.left
+                    anchors.leftMargin: -80
+                    focusPolicy: Qt.ClickFocus
+                    display: AbstractButton.TextBesideIcon
+                    indicator: Image {
+                        height: 32
+                        anchors.left: parent.left
+                        source: parent.checked ? "qrc:/images/checked.png" : "qrc:/images/unchecked.png"
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        anchors.left: parent.indicator.right
+                        anchors.leftMargin: 8
+                        font: parent.font
+                        color: "#FFFFFF"
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onCheckedChanged: {
+                        if (settingsWindow.useBeta === useBetaCheckBox.checked) {
+                            return;
+                        }
+                        settingsWindow.useBeta = useBetaCheckBox.checked;
+                    }
+
+                    Rectangle {
+                        color: "#FFFFFF"
+                    }
                 }
 
                 CheckBox {
                     id: useEnglishCheckBox
                     checked: settingsWindow.useEnglish
-                    height: 30
+                    width: parent.width
+                    height: settingsWindow.contentHeight
                     text: qsTr("Use English - Take Effect After Restart")
                     scale: 0.6
                     font.pixelSize: 22
                     padding: 0
                     spacing: 0
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.horizontalCenterOffset: 20 - (parent.width / 4)
+                    anchors.left: parent.left
+                    anchors.leftMargin: -80
                     focusPolicy: Qt.ClickFocus
                     display: AbstractButton.TextBesideIcon
+                    indicator: Image {
+                        id: indicatorImg
+                        height: 32
+                        width: 32
+                        anchors.left: parent.left
+                        source: useEnglishCheckBox.checked ? "qrc:/images/checked.png" : "qrc:/images/unchecked.png"
+                    }
                     contentItem: Text {
                         text: parent.text
                         anchors.left: parent.indicator.right
@@ -93,7 +186,7 @@ PAGWindow {
 
             Item {
                 width: 1
-                height: (parent.height - useEnglishCheckBox.height) / 2
+                height: (parent.height - settingsWindow.contentHeight * 3) / 2
             }
         }
     }
