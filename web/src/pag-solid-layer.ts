@@ -1,11 +1,10 @@
 import { PAGModule } from './pag-module';
 import { PAGLayer } from './pag-layer';
-import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 
 import type { Color } from './types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGSolidLayer extends PAGLayer {
   /**
    * Make a empty PAGSolidLayer with specified size.

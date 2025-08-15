@@ -1,9 +1,8 @@
 import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
-import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGSurface {
   /**
    * Make a PAGSurface from canvas.
