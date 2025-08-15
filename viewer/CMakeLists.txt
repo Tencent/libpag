@@ -10,13 +10,20 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
+if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+    set(ARCH arm64)
+    set(CMAKE_SYSTEM_PROCESSOR "arm64")
+elseif (CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+    set(ARCH x64)
+    set(CMAKE_SYSTEM_PROCESSOR "x86_64")
+endif ()
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
 endif ()
 
 if (MSVC)
-    add_compile_options("/utf-8")
-    add_compile_options(/GR-)
+    add_compile_options("/utf-8" /GR /bigobj)
 endif (MSVC)
 
 # Sets flags
@@ -54,6 +61,35 @@ list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_
         Qt${QT_VERSION_MAJOR}::QuickControls2)
 qt_add_resources(QT_RESOURCES res.qrc)
 
+message(STATUS "Generate Version File")
+if (DEFINED ENV{MajorVersion})
+    set(MajorVersion $ENV{MajorVersion})
+else ()
+    set(MajorVersion "1")
+endif()
+if (DEFINED ENV{MinorVersion})
+    set(MinorVersion $ENV{MinorVersion})
+else ()
+    set(MinorVersion "0")
+endif ()
+if (DEFINED ENV{BK_CI_BUILD_NO})
+    set(BuildNumber $ENV{BK_CI_BUILD_NO})
+else()
+    set(BuildNumber "0")
+endif ()
+if ($ENV{isBetaVersion} MATCHES "false")
+    set(UpdateChannel "stable")
+else ()
+    set(UpdateChannel "beta")
+endif ()
+configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
+    ${CMAKE_SOURCE_DIR}/src/version.h
+    @ONLY
+)
+
+message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
+message(STATUS "Update Channel: ${UpdateChannel}")
+
 if (APPLE)
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${APPLICATION_SERVICES_FRAMEWORK})
@@ -89,9 +125,11 @@ set(PAG_BUILD_FRAMEWORK OFF)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
 
-set(RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGRttr.hpp")
 execute_process(COMMAND bash -c "${CMAKE_CURRENT_SOURCE_DIR}/sync_deps.sh")
-execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX}")
+    set(RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGRttr.hpp")
+    execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
+endif()
 
 # collects pag include directories.
 set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)

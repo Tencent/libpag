@@ -1,5 +1,21 @@
 {
   "version": "1.3.12",
+  "repos": {
+    "common": [
+      {
+        "url": "https://github.com/libpag/H264EncoderTools.git",
+        "commit": "adc19cd6f00c183201d168c569ba3ca89d7e99a5",
+        "dir": "third_party/H264EncoderTools"
+      }
+    ],
+    "mac": [
+      {
+        "url": "https://github.com/create-dmg/create-dmg.git",
+        "commit": "118f131aa57c1278aca806eb37cf5021e9064198",
+        "dir": "tools/create-dmg"
+      }
+    ]
+  },
   "files": {
     "win": [
       {

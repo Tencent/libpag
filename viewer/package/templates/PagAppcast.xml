@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+  <channel>
+    <title>PAGViewer's Changelog</title>
+    <description>Most recent changes with links to updates.</description>
+    <language>en</language>
+    <item>
+      <title>Version ~version~(~version~)</title>
+      <pubDate>~time~</pubDate>
+      <enclosure url="~url~" sparkle:version="~version~" sparkle:shortVersionString="~version~" sparkle:dsaSignature="~zipDSAHash~" sparkle:edSignature="~zipEDDSAHash~" length="~zipLength~" type="application/octet-stream"/>
+      <sparkle:minimumSystemVersion>10.7</sparkle:minimumSystemVersion>
+      <forceUpdateVersion>2.0.0</forceUpdateVersion>
+      <description>https://pag.art/changelog/pag-viewer.html</description>
+    </item>
+  </channel>
+</rss>
