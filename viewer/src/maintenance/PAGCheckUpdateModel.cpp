@@ -62,16 +62,11 @@ void PAGUpdateVersionFetcher::parseAppcast(const QByteArray& data) {
   QString sparkleNs = "http://www.andymatuschak.org/xml-namespaces/sparkle";
   while (!xml.atEnd()) {
     xml.readNext();
-    if (xml.isStartElement() && xml.name() == "item") {
-      while (!(xml.isEndElement() && xml.name() == "item")) {
-        xml.readNext();
-        if (xml.isStartElement() && xml.name() == "enclosure") {
-          QString version = xml.attributes().value(sparkleNs, "version").toString();
-          if (!version.isEmpty()) {
-            Q_EMIT versionFound(url, version);
-            return;
-          }
-        }
+    if (xml.isStartElement() && xml.name() == "enclosure") {
+      QString version = xml.attributes().value(sparkleNs, "version").toString();
+      if (!version.isEmpty()) {
+        Q_EMIT versionFound(url, version);
+        return;
       }
     }
   }
@@ -79,14 +74,11 @@ void PAGUpdateVersionFetcher::parseAppcast(const QByteArray& data) {
   Q_EMIT versionFound(url, "0");
 }
 
-QVector<QString> PAGCheckUpdateModel::AvailableUpdateUrls = {};
-QMap<QString, QString> PAGCheckUpdateModel::AvailableUpdates = {};
-
 PAGCheckUpdateModel::PAGCheckUpdateModel(QObject* parent) : QObject(parent) {
 }
 
 void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
-  if (!AvailableUpdateUrls.empty()) {
+  if (!availableUpdateUrls.empty()) {
     qDebug() << "Checking for updates is already in progress, please try again later";
     return;
   }
@@ -102,8 +94,8 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
   QString baseUrl = data.data();
   qDebug() << "get update base url: " << baseUrl;
 
-  AvailableUpdates.clear();
-  AvailableUpdateUrls.clear();
+  availableUpdates.clear();
+  availableUpdateUrls.clear();
 
   if (baseUrl.isEmpty()) {
     qDebug() << "No update url found";
@@ -113,13 +105,13 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
   QString productType = QSysInfo::productType();
   QString AppcastName = (productType == "windows" ? "PagAppcastWindows.xml" : "PagAppcast.xml");
   QString updateUrl = baseUrl + AppcastName;
-  AvailableUpdateUrls.push_back(updateUrl);
+  availableUpdateUrls.push_back(updateUrl);
   if (isUseBeta) {
     updateUrl = baseUrl + "beta/" + AppcastName;
-    AvailableUpdateUrls.push_back(updateUrl);
+    availableUpdateUrls.push_back(updateUrl);
   }
 
-  for (const auto& url : AvailableUpdateUrls) {
+  for (const auto& url : availableUpdateUrls) {
     auto* thread = new QThread();
     auto* fetcher = new PAGUpdateVersionFetcher(url);
     fetcher->moveToThread(thread);
@@ -136,14 +128,14 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
 
 void PAGCheckUpdateModel::getUpdateVersion(const QString& url, const QString& version) {
   qDebug() << "Get Version: " << version << " from " << url;
-  AvailableUpdates[url] = version;
-  if (AvailableUpdates.size() < AvailableUpdateUrls.size()) {
+  availableUpdates[url] = version;
+  if (availableUpdates.size() < availableUpdateUrls.size()) {
     return;
   }
 
-  QString selectedUrl = AvailableUpdateUrls.first();
+  QString selectedUrl = availableUpdateUrls.first();
   QString selectedVersion = "";
-  for (const auto& [theUrl, theVersion] : AvailableUpdates.asKeyValueRange()) {
+  for (const auto& [theUrl, theVersion] : availableUpdates.asKeyValueRange()) {
     if (selectedVersion.isEmpty()) {
       selectedUrl = theUrl;
       selectedVersion = theVersion;
@@ -156,9 +148,9 @@ void PAGCheckUpdateModel::getUpdateVersion(const QString& url, const QString& ve
   }
 
   QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
-    AvailableUpdates.clear();
-    AvailableUpdateUrls.clear();
-    PAGUpdater::CheckForUpdates(keepSilent, selectedUrl.toStdString());
+    availableUpdates.clear();
+    availableUpdateUrls.clear();
+    CheckForUpdates(keepSilent, selectedUrl.toStdString());
   });
 }
 

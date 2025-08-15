@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
   qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
   app.openFile(filePath.data());
 
-  pag::PAGUpdater::InitUpdater();
+  pag::InitUpdater();
 
   return QApplication::exec();
 }

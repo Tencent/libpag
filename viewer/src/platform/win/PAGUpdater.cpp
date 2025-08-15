@@ -25,8 +25,7 @@
 namespace pag {
 
 static void WinSparkleDidFindUpdateCallback() {
-  for (int i = 0; i < PAGWindow::AllWindows.size(); i++) {
-    auto window = PAGWindow::AllWindows[i];
+  for (auto window : PAGWindow::AllWindows) {
     auto root = window->getEngine()->rootObjects().first();
     if (root) {
       QMetaObject::invokeMethod(root, "updateAvailable", Q_ARG(QVariant, true));
@@ -34,7 +33,7 @@ static void WinSparkleDidFindUpdateCallback() {
   }
 }
 
-void PAGUpdater::InitUpdater() {
+void InitUpdater() {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
   auto wVersion = converter.from_bytes(AppVersion);
   win_sparkle_set_appcast_url("");
@@ -43,7 +42,7 @@ void PAGUpdater::InitUpdater() {
   win_sparkle_init();
 }
 
-void PAGUpdater::CheckForUpdates(bool keepSilent, const std::string& url) {
+void CheckForUpdates(bool keepSilent, const std::string& url) {
   win_sparkle_set_appcast_url(url.c_str());
   win_sparkle_set_did_find_update_callback(WinSparkleDidFindUpdateCallback);
   if (keepSilent) {

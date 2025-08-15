@@ -51,7 +51,7 @@ static SPUStandardUpdaterController* updaterController = nil;
 
 namespace pag {
 
-void PAGUpdater::InitUpdater() {
+void InitUpdater() {
   if (updaterDelegate == nil) {
     updaterDelegate = [[PAGUpdaterDelegate alloc] init];
   }
@@ -68,7 +68,7 @@ void PAGUpdater::InitUpdater() {
   }
 }
 
-void PAGUpdater::CheckForUpdates(bool keepSilent, const std::string& url) {
+void CheckForUpdates(bool keepSilent, const std::string& url) {
   if (updaterController == nil) {
     qDebug() << "Updater is not initialized";
     return;

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <QMap>
 #include <QObject>
 
 namespace pag {
@@ -31,7 +32,7 @@ class PAGNetworkFetcher : public QObject {
   Q_SIGNAL void fetched(const QByteArray& data);
 
  protected:
-  QString url;
+  QString url = "";
 };
 
 class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
@@ -53,8 +54,8 @@ class PAGCheckUpdateModel : public QObject {
   void getUpdateVersion(const QString& url, const QString& version);
 
   static int CompareAppVersion(const QString& version1, const QString& version2);
-  static QVector<QString> AvailableUpdateUrls;
-  static QMap<QString, QString> AvailableUpdates;
+  QVector<QString> availableUpdateUrls = {};
+  QMap<QString, QString> availableUpdates = {};
 
  private:
   bool isUseBeta = false;
