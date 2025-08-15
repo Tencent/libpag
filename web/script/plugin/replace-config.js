@@ -284,9 +284,15 @@ export const replaceFunctionConfig = [
   },
   {
     name: 'replace libpag.wasm name',
-    type: 'string',
-    start: 'libpag.wasm',
-    replaceStr: 'libpag.wasm.br',
+    start: 'var wasmBinaryFile;',
+    end: 'function getBinary(file)',
+    replaceStr:`
+    var wasmBinaryFile;
+    wasmBinaryFile = "libpag.wasm.br";
+    if (!isDataURI(wasmBinaryFile)) {
+      wasmBinaryFile = locateFile(wasmBinaryFile);
+    }
+    `,
   },
   {
     name: 'fix get gl get framebuffer',
@@ -303,5 +309,11 @@ export const replaceFunctionConfig = [
     type: 'string',
     start: `if (!ext.includes("lose_context") && !ext.includes("debug"))`,
     replaceStr: `if (!ext.includes("lose_context") && !ext.includes("debug") && !ext.includes("WEBGL_webcodecs_video_frame"))`,
+  },
+  {
+    name: 'replace _scriptDir',
+    type: 'string',
+    start: `var _scriptDir = import_meta.url;`,
+    replaceStr: `var _scriptDir = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : void 0;`,
   },
 ];

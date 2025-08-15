@@ -18,33 +18,24 @@
 
 #pragma once
 
-#include <QObject>
-#include "PAGTask.h"
-#include "pag/pag.h"
+#include "codec/DataTypes.h"
+#include "task/PAGTask.h"
 
 namespace pag {
 
-class PAGTaskFactory : public QObject {
-  Q_OBJECT
+class PAGBenchmarkTask : public PAGPlayTask {
  public:
-  Q_ENUMS(PAGTaskType)
+  PAGBenchmarkTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
 
-  enum class PAGTaskType {
-    PAGTaskType_None,
-    PAGTaskType_ExportPNG,
-    PAGTaskType_ExportAPNG,
-    PAGTaskType_Profiling,
-    PAGTaskType_Benchmark
-  };
+ protected:
+  void onBegin() override;
+  int onFinish() override;
+  void onFrameFlush(double progress) override;
 
-  Q_INVOKABLE PAGTask* createTask(PAGTaskType taskType, const QString& outPath,
-                                  const QVariantMap& extraParams = {});
-
-  void setFilePath(const std::string& filePath);
-
- private:
-  PAGTask* task = nullptr;
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+ public:
+  std::shared_ptr<PerformanceData> avgPerformanceData = nullptr;
+  std::shared_ptr<PerformanceData> maxPerformanceData = nullptr;
+  std::shared_ptr<PerformanceData> firstFramePerformanceData = nullptr;
 };
 
 }  // namespace pag

@@ -30,7 +30,11 @@ export const createPAGWorker = (pagWorkerOptions: PAGWorkerOptions = {}) => {
   if (pagWorkerOptions.locateFile) {
     option.fileUrl = pagWorkerOptions.locateFile('libpag.wasm');
   }
-  const worker = new Worker(scriptUrl, pagWorkerOptions.workerOptions);
+  const workerOptions = pagWorkerOptions.workerOptions || {};
+  const worker = new Worker(scriptUrl, {
+    ...workerOptions,
+    type: 'module'
+  });
   return postMessage(worker, { name: WorkerMessageType.PAGInit, args: [option] }, () => {
     addGlobalWorkerListener(worker);
     return worker;

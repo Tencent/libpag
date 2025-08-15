@@ -21,6 +21,10 @@
         <file>images/revert.png</file>
         <file>images/checked.png</file>
         <file>images/unchecked.png</file>
+        <file>images/left-transparent-background.png</file>
+        <file>images/right-transparent-background.png</file>
+        <file>images/top-transparent-background.png</file>
+        <file>images/performance-warn.png</file>
 
         <!-- svg -->
         <file>images/close-dark.svg</file>
@@ -42,6 +46,7 @@
         <file>qml/TextListView.qml</file>
         <file>qml/TextEditDialog.qml</file>
         <file>qml/ImageListView.qml</file>
+        <file>qml/PerformanceWarnDialog.qml</file>
         <file>qml/utils/qmldir</file>
         <file>qml/utils/Utils.qml</file>
         <file>qml/components/PAGMenu.qml</file>
@@ -49,5 +54,9 @@
         <file>qml/components/PAGWindow.qml</file>
         <file>qml/components/PAGTabButton.qml</file>
         <file>qml/components/PAGRectangle.qml</file>
+        <file>qml/components/PAGMessageBox.qml</file>
+
+        <!-- pag -->
+        <file>pag/performance-baseline.pag</file>
     </qresource>
 </RCC>

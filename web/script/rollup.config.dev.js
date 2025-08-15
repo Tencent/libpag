@@ -17,6 +17,16 @@ const plugins = [
   alias({
     entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
   }),
+  {
+    name: 'preserve-import-meta-url',
+    resolveImportMeta(property, options) {
+      // Preserve the original behavior of `import.meta.url`.
+      if (property === 'url') {
+        return 'import.meta.url';
+      }
+      return null;
+    },
+  },
 ];
 
 export default [
