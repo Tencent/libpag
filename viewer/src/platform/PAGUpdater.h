@@ -22,10 +22,7 @@
 
 namespace pag {
 
-class PAGUpdater {
- public:
-  static void InitUpdater();
-  static void CheckForUpdates(bool keepSilent, const std::string& url);
-};
+void InitUpdater();
+void CheckForUpdates(bool keepSilent, const std::string& url);
 
 }  // namespace pag
