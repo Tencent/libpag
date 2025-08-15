@@ -36,11 +36,6 @@ export default [
     plugins: plugins,
   },
   {
-    input: 'demo/worker.ts',
-    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
-    plugins: plugins,
-  },
-  {
     input: 'src/pag.ts',
     output: { name: 'libpag', banner, file: 'demo/libpag.js', format: 'umd', exports: 'named', sourcemap: true },
     plugins: plugins,

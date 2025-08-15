@@ -5,11 +5,8 @@ import {
   VIDEO_PLAYBACK_RATE_MIN,
 } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
-import { IPHONE, WECHAT, SAFARI_OR_IOS_WEBVIEW, WORKER } from '../utils/ua';
+import { IPHONE, WECHAT, SAFARI_OR_IOS_WEBVIEW } from '../utils/ua';
 import { PAGModule } from '../pag-module';
-import { WorkerMessageType } from '../worker/events';
-import { WorkerVideoReader } from '../worker/video-reader';
-import { postMessage } from '../worker/utils';
 
 import type { TimeRange, VideoReader as VideoReaderInterfaces } from '../interfaces';
 import type { PAGPlayer } from '../pag-player';
@@ -82,7 +79,6 @@ export class VideoReader {
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-    isWorker = false,
   ) {
     if (isInstanceOf(source, globalThis.HTMLVideoElement)) {
       this.videoEl = source as HTMLVideoElement;
@@ -111,9 +107,6 @@ export class VideoReader {
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
-    }
-    if (!isWorker) {
-      this.linkPlayer(PAGModule.currentPlayer);
     }
   }
 
@@ -191,21 +184,6 @@ export class VideoReader {
 
   public getVideo() {
     return this.videoEl;
-  }
-
-  // Only work in web worker version
-  public async generateBitmap() {
-    // Batter than createImageBitmap from video element in benchmark
-    if (!this.bitmapCanvas) {
-      this.bitmapCanvas = new OffscreenCanvas(this.width, this.height);
-      this.bitmapCanvas!.width = this.width;
-      this.bitmapCanvas!.height = this.height;
-      this.bitmapCtx = this.bitmapCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
-    }
-    this.bitmapCtx?.fillRect(0, 0, this.width, this.height);
-    this.bitmapCtx?.drawImage(this.videoEl as HTMLVideoElement, 0, 0, this.width, this.height);
-    this.bitmap = await createImageBitmap(this.bitmapCanvas);
-    return this.bitmap;
   }
 
   public async play() {
