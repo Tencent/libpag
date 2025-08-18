@@ -222,7 +222,16 @@ armPluginExePath="${armPluginPath}/Contents/MacOS/PAGExporter"
 cp -fr ${x86PluginPath} ${PluginPath}
 lipo -create ${x86PluginExePath} ${armPluginExePath} -output ${PluginExePath}
 
-# 3.5.2 拷贝相关工具
+# 3.5.2 合并并拷贝ffaudio
+print "[ 合并并拷贝ffaudio ]"
+x86FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/x64/libffaudio.dylib"
+armFfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/arm64/libffaudio.dylib"
+PluginFrameworksDir="${PluginPath}/Contents/Frameworks"
+FfaudioPath="${PluginFrameworksDir}/libffaudio.dylib"
+mkdir -p ${PluginFrameworksDir}
+lipo -create ${x86FfaudioPath} ${armFfaudioPath} -output ${FfaudioPath}
+
+# 3.5.3 拷贝相关工具
 print "[ 拷贝相关工具 ]"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
 cp -f ${EncoderToolsPath} ${ResourcesDir}
