@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGUpdater.h"
+#include <windows.h>
 #include <winsparkle/winsparkle.h>
-#include <codecvt>
 #include "rendering/PAGWindow.h"
 #include "version.h"
 
@@ -34,10 +34,11 @@ static void WinSparkleDidFindUpdateCallback() {
 }
 
 void InitUpdater() {
-  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-  auto wVersion = converter.from_bytes(AppVersion);
+  int size = MultiByteToWideChar(CP_UTF8, 0, AppVersion.c_str(), -1, nullptr, 0);
+  auto wVersion = std::vector<wchar_t>(size);
+  MultiByteToWideChar(CP_UTF8, 0, AppVersion.c_str(), -1, wVersion.data(), size);
   win_sparkle_set_appcast_url("");
-  win_sparkle_set_app_details(L"pag.art", L"PAGViewer", wVersion.c_str());
+  win_sparkle_set_app_details(L"pag.art", L"PAGViewer", wVersion.data());
   win_sparkle_set_automatic_check_for_updates(0);
   win_sparkle_init();
 }
