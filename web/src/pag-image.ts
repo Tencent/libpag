@@ -1,15 +1,13 @@
 import { AlphaType, ColorType, PAGScaleMode } from './types';
-import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGImage {
   /**
    * Create pag image from image file.
    */
-  @wasmAsyncMethod
   public static async fromFile(data: File): Promise<PAGImage> {
     return new Promise((resolve, reject) => {
       const image = new Image();

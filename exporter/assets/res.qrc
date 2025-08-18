@@ -17,14 +17,24 @@
         <file>images/preview.png</file>
         <file>images/tip.png</file>
         <file>images/down-arrow.png</file>
+        <file>images/export-warning.png</file>
+        <file>images/export-wrong.png</file>
+        <file>images/right-arrow.png</file>
+
 
         <!-- qml -->
         <file>qml/PAGComboBox.qml</file>
+        <file>qml/PAGListView.qml</file>
+        <file>qml/TextHelper.qml</file>
+        <file>qml/ErrorTextArea.qml</file>
         <file>qml/PAGRectangle.qml</file>
         <file>qml/PAGTabButton.qml</file>
         <file>qml/PAGTextInput.qml</file>
         <file>qml/PAGWindow.qml</file>
         <file>qml/ConfigWindow.qml</file>
+        <file>qml/AlertWarning.qml</file>
+        <file>qml/AlertError.qml</file>
+        <file>qml/PAGViewerInstall.qml</file>
 
     </qresource>
 </RCC>

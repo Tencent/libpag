@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <QString>
 #include <memory>
 #include <string>
 #include "AEGP_SuiteHandler.h"
@@ -62,6 +63,10 @@ uint32_t GetItemIdFromLayer(const AEGP_LayerH& layerH);
 uint32_t GetLayerId(const AEGP_LayerH& layerH);
 
 void RegisterTextDocumentScript();
+
+QString GetProjectPath();
+
+AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH);
 
 void DeleteStream(AEGP_StreamRefH streamRefH);
 

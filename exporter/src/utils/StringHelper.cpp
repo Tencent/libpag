@@ -337,4 +337,14 @@ std::u16string Utf8ToUtf16(const std::string& u8str) {
   return u16str;
 }
 
+void EnsureStringSuffix(std::string& filePath, const std::string& suffix) {
+  if (filePath.size() >= suffix.size()) {
+    auto tail = filePath.substr(filePath.size() - suffix.size());
+    if (std::equal(tail.begin(), tail.end(), suffix.begin(), suffix.end(),
+                   [](char a, char b) { return std::tolower(a) == std::tolower(b); })) {
+      return;
+    }
+  }
+  filePath += suffix;
+}
 }  // namespace StringHelper

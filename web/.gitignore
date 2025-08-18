@@ -7,6 +7,7 @@ package-lock.json
 lib
 types
 src/wasm
+src/wasm-mt
 src/build-pag
 src/.pag.wasm.md5
 dist

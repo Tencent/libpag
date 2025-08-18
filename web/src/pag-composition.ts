@@ -1,12 +1,11 @@
 import { PAGModule } from './pag-module';
 import { PAGLayer } from './pag-layer';
-import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { layer2typeLayer, proxyVector } from './utils/type-utils';
 
 import type { Marker } from './types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
   /**
    * Make a empty PAGComposition with specified size.

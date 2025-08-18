@@ -19,9 +19,10 @@
 #include "WindowManager.h"
 #include <QFile>
 #include <QtGui/QFont>
-#include <QtWidgets/QApplication>
 #include <memory>
+#include "AlertInfoModel.h"
 #include "ConfigModel.h"
+#include "PAGViewerInstallModel.h"
 #include "utils/AEHelper.h"
 
 namespace exporter {
@@ -68,14 +69,43 @@ void WindowManager::initializeQtEnvironment() {
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 }
 
-bool WindowManager::showWarnings(std::vector<std::string>& /*infos*/) {
-
+bool WindowManager::showWarnings(std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return false;
+  }
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->showWarnings(infos);
   return true;
 }
 
-bool WindowManager::showErrors(std::vector<std::string>& /*infos*/) {
-
+bool WindowManager::showErrors(std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return false;
+  }
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->showErrors(infos);
   return true;
+}
+
+bool WindowManager::showSimpleError(const QString& message) {
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->setErrorMessage(message);
+  bool result = alertModel->showErrors({});
+  return result;
+}
+
+bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
+  auto installModel = std::make_unique<PAGViewerInstallModel>();
+  return installModel->showInstallDialog(pagFilePath);
 }
 
 }  // namespace exporter

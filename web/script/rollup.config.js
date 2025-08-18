@@ -62,36 +62,6 @@ const umdMinConfig = {
   plugins: [...plugins, terser()],
 };
 
-const workerUmdConfig = {
-  input: 'src/worker/client.ts',
-  output: [
-    {
-      name: 'libpag',
-      banner,
-      format: 'umd',
-      exports: 'named',
-      sourcemap: true,
-      file: 'lib/libpag.worker.js',
-    },
-  ],
-  plugins: [...plugins],
-};
-
-const workerUmdMinConfig = {
-  input: 'src/worker/client.ts',
-  output: [
-    {
-      name: 'libpag',
-      banner,
-      format: 'umd',
-      exports: 'named',
-      sourcemap: true,
-      file: 'lib/libpag.worker.min.js',
-    },
-  ],
-  plugins: [...plugins, terser()],
-};
-
 export default [
   umdConfig,
   umdMinConfig,
@@ -103,24 +73,9 @@ export default [
     ],
     plugins: [...plugins],
   },
-  workerUmdConfig,
-  workerUmdMinConfig,
-  {
-    input: 'src/worker/client.ts',
-    output: [
-      { banner, file: 'lib/libpag.worker.esm.js', format: 'esm', sourcemap: true },
-      { banner, file: 'lib/libpag.worker.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
-    ],
-    plugins: [...plugins],
-  },
   {
     input: 'demo/index.ts',
     output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-    plugins: plugins,
-  },
-  {
-    input: 'demo/worker.ts',
-    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
     plugins: plugins,
   },
 ];
