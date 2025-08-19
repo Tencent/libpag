@@ -183,6 +183,18 @@ Item {
                         root.command("open-commerce-page");
                     }
                 }
+                Action {
+                    text: qsTr("Install Plugin")
+                    onTriggered: {
+                        root.command("install-plugin");
+                    }
+                }
+                Action {
+                    text: qsTr("Uninstall Plugin")
+                    onTriggered: {
+                        root.command("uninstall-plugin");
+                    }
+                }
             }
         }
     }
@@ -200,6 +212,22 @@ Item {
                     role: "ApplicationSpecificRole"
                     onTriggered: {
                         root.command("open-commerce-page");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("Install Plugin")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("install-plugin");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
+                    text: qsTr("Uninstall Plugin")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("uninstall-plugin");
                     }
                 }
                 Platform.MenuItem {

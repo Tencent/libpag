@@ -23,6 +23,13 @@ if (NOT AE_SDK_PATH)
     include("./AESDK.cfg")
 endif ()
 
+# Load Qt shared configuration for plugin development
+set(QT_SHARED_CONFIG_PATH "${CMAKE_SOURCE_DIR}/qt_shared_config.json")
+if(EXISTS "${QT_SHARED_CONFIG_PATH}")
+    file(READ "${QT_SHARED_CONFIG_PATH}" QT_SHARED_CONFIG_JSON)
+    message(STATUS "Loaded Qt shared configuration for PAGExporter plugin")
+endif()
+
 # configures the local installation path of the QT library.
 if (NOT CMAKE_PREFIX_PATH)
     if (NOT EXISTS ${PROJECT_SOURCE_DIR}/QTCMAKE.cfg)
@@ -132,6 +139,11 @@ if (APPLE)
             MACOSX_BUNDLE_GUI_IDENTIFIER "com.example.PAGExporter"
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/resource/mac/PAGExporter.plugin-Info.plist"
             OUTPUT_NAME "PAGExporter"
+            # Configure for shared Qt libraries with host application
+            INSTALL_RPATH "@loader_path/../../Frameworks"
+            BUILD_WITH_INSTALL_RPATH TRUE
+            MACOSX_RPATH TRUE
+            SKIP_BUILD_RPATH FALSE
     )
 
     add_custom_command(

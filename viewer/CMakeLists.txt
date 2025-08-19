@@ -96,10 +96,12 @@ execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/Rttr
 # collects pag include directories.
 set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
-list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
+list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX "src/platform/mac/.*")
+list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX "src/platform/win/.*")
 if (APPLE)
     list(APPEND PAG_VIEWER_INCLUDES src/platform/mac)
-    file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/mac/*.*)
+    file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/mac/*.m src/platform/mac/*.mm)
+
 elseif (WIN32)
     list(APPEND PAG_VIEWER_INCLUDES src/platform/win)
     file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/win/*.*)
@@ -112,6 +114,8 @@ if (APPLE)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/mac/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
+    set_target_properties(PAGViewer PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/package_mac/Info-debug.plist)
+
 elseif (WIN32)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/win/include)
