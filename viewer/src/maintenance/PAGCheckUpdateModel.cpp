@@ -18,63 +18,23 @@
 
 #include "PAGCheckUpdateModel.h"
 #include <QCoreApplication>
-#include <QEventLoop>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QThread>
-#include <QXmlStreamReader>
+#include <QDebug>
+#include "PAGNetworkFetcher.h"
 #include "PAGUpdater.h"
 
 namespace pag {
 
 static const QString ServerUrl = "https://pag.qq.com/server.html";
 
-PAGNetworkFetcher::PAGNetworkFetcher(const QString& url, QObject* parent)
-    : QObject(parent), url(url) {
-}
-
-void PAGNetworkFetcher::fetch() {
-  QNetworkAccessManager manager;
-  QNetworkReply* reply = manager.get(QNetworkRequest(QUrl(url)));
-
-  QEventLoop eventLoop;
-  connect(reply, &QNetworkReply::finished, &eventLoop, &QEventLoop::quit);
-  eventLoop.exec();
-
-  if (reply->error() == QNetworkReply::NoError) {
-    Q_EMIT fetched(reply->readAll());
-  } else {
-    Q_EMIT fetched({});
-  }
-
-  reply->deleteLater();
-  Q_EMIT finished();
-}
-
-PAGUpdateVersionFetcher::PAGUpdateVersionFetcher(const QString& url, QObject* parent)
-    : PAGNetworkFetcher(url, parent) {
-  connect(this, &PAGUpdateVersionFetcher::fetched, this, &PAGUpdateVersionFetcher::parseAppcast);
-}
-
-void PAGUpdateVersionFetcher::parseAppcast(const QByteArray& data) {
-  QXmlStreamReader xml(data);
-
-  QString sparkleNs = "http://www.andymatuschak.org/xml-namespaces/sparkle";
-  while (!xml.atEnd()) {
-    xml.readNext();
-    if (xml.isStartElement() && xml.name() == "enclosure") {
-      QString version = xml.attributes().value(sparkleNs, "version").toString();
-      if (!version.isEmpty()) {
-        Q_EMIT versionFound(url, version);
-        return;
-      }
-    }
-  }
-
-  Q_EMIT versionFound(url, "0");
-}
-
 PAGCheckUpdateModel::PAGCheckUpdateModel(QObject* parent) : QObject(parent) {
+  threadPool = std::make_unique<QThreadPool>();
+  threadPool->setMaxThreadCount(2);
+}
+
+PAGCheckUpdateModel::~PAGCheckUpdateModel() {
+  if (threadPool) {
+    threadPool->waitForDone();
+  }
 }
 
 void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
@@ -112,21 +72,15 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
   }
 
   for (const auto& url : availableUpdateUrls) {
-    auto* thread = new QThread();
-    auto* fetcher = new PAGUpdateVersionFetcher(url);
-    fetcher->moveToThread(thread);
-    connect(thread, &QThread::started, fetcher, &PAGUpdateVersionFetcher::fetch);
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater);
-    connect(fetcher, &PAGUpdateVersionFetcher::finished, thread, &QThread::quit);
-    connect(fetcher, &PAGUpdateVersionFetcher::finished, fetcher,
-            &PAGUpdateVersionFetcher::deleteLater);
-    connect(fetcher, &PAGUpdateVersionFetcher::versionFound, this,
+    auto* task = new PAGUpdateVersionFetcherTask(url);
+    connect(task, &PAGUpdateVersionFetcherTask::versionFound, this,
             &PAGCheckUpdateModel::getUpdateVersion);
-    thread->start();
+    task->setAutoDelete(true);
+    threadPool->start(task);
   }
 }
 
-void PAGCheckUpdateModel::getUpdateVersion(const QString& url, const QString& version) {
+void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
   qDebug() << "Get Version: " << version << " from " << url;
   availableUpdates[url] = version;
   if (availableUpdates.size() < availableUpdateUrls.size()) {

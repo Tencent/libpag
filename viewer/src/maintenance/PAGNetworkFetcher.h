@@ -18,29 +18,38 @@
 
 #pragma once
 
-#include <QMap>
 #include <QObject>
-#include <QThreadPool>
+#include <QRunnable>
 
 namespace pag {
 
-class PAGCheckUpdateModel : public QObject {
+class PAGNetworkFetcher : public QObject {
   Q_OBJECT
  public:
-  explicit PAGCheckUpdateModel(QObject* parent = nullptr);
-  ~PAGCheckUpdateModel() override;
-  Q_INVOKABLE void checkForUpdates(bool keepSlient, bool isUseBeta);
-  void getAppcast(const QByteArray& data);
-  void getUpdateVersion(QString url, QString version);
+  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
+  void fetch();
+  Q_SIGNAL void finished();
+  Q_SIGNAL void fetched(const QByteArray& data);
 
-  static int CompareAppVersion(const QString& version1, const QString& version2);
-  QVector<QString> availableUpdateUrls = {};
-  QMap<QString, QString> availableUpdates = {};
+ protected:
+  QString url = "";
+};
+
+class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
+  Q_OBJECT
+ public:
+  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
+  Q_SIGNAL void versionFound(const QString& url, const QString& version);
 
  private:
-  bool isUseBeta = false;
-  bool keepSilent = false;
-  std::unique_ptr<QThreadPool> threadPool = nullptr;
+  void parseAppcast(const QByteArray& data);
+};
+
+class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
+  Q_OBJECT
+ public:
+  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
+  void run() override;
 };
 
 }  // namespace pag
