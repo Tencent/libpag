@@ -52,7 +52,7 @@ print "[ 编译 ]"
 print "[ 编译x86 ]"
 x86BuildDir="${BuildDir}/build_x86"
 
-cmake -S ${SourceDir} -B ${x86BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
+cmake -S ${SourceDir} -B ${x86BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
 if [ $? -ne 0 ];
 then
     echo "构建PAGViewer x86失败"
@@ -70,7 +70,7 @@ fi
 print "[ 编译arm64 ]"
 armBuildDir="${BuildDir}/build_arm"
 
-cmake -S ${SourceDir} -B ${armBuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake -S ${SourceDir} -B ${armBuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
 if [ $? -ne 0 ];
 then
     echo "构建PAGViewer arm64失败"
