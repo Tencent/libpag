@@ -20,9 +20,11 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
+#include "PAGUpdater.h"
 #include "PAGViewer.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
+#include "version.h"
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;
@@ -63,6 +65,8 @@ int main(int argc, char* argv[]) {
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
   app.openFile(filePath.data());
+
+  pag::InitUpdater();
 
   return QApplication::exec();
 }
