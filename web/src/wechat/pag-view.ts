@@ -3,7 +3,7 @@ import { PAGView as NativePAGView } from '../pag-view';
 
 import { RenderCanvas } from '../core/render-canvas';
 import { BackendContext } from '../core/backend-context';
-import { destroyVerify, wasmAwaitRewind } from '../utils/decorators';
+import { destroyVerify } from '../utils/decorators';
 
 import type { PAGComposition } from '../pag-composition';
 import type { wx } from './interfaces';
@@ -35,7 +35,6 @@ function isOffscreenCanvas(canvas: any): boolean {
 }
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGView extends NativePAGView {
   /**
    * Create pag view.

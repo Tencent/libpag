@@ -15,8 +15,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif ()
 
 if (MSVC)
-    add_compile_options("/utf-8")
-    add_compile_options(/GR-)
+    add_compile_options("/utf-8" /GR- /bigobj)
 endif (MSVC)
 
 # Sets flags
@@ -53,6 +52,35 @@ list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
         Qt${QT_VERSION_MAJOR}::QuickControls2)
 qt_add_resources(QT_RESOURCES res.qrc)
+
+message(STATUS "Generate Version File")
+if (DEFINED ENV{MajorVersion})
+    set(MajorVersion "$ENV{MajorVersion}")
+else ()
+    set(MajorVersion "1")
+endif()
+if (DEFINED ENV{MinorVersion})
+    set(MinorVersion "$ENV{MinorVersion}")
+else ()
+    set(MinorVersion "0")
+endif ()
+if (DEFINED ENV{BK_CI_BUILD_NO})
+    set(BuildNumber "$ENV{BK_CI_BUILD_NO}")
+else()
+    set(BuildNumber "0")
+endif ()
+if ($ENV{isStableVersion} MATCHES "true")
+    set(UpdateChannel "stable")
+else ()
+    set(UpdateChannel "beta")
+endif ()
+configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
+    ${CMAKE_SOURCE_DIR}/src/version.h
+    @ONLY
+)
+
+message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
+message(STATUS "Update Channel: ${UpdateChannel}")
 
 if (APPLE)
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)

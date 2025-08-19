@@ -1,13 +1,12 @@
 import { PAGModule } from './pag-module';
 import { PAGLayer } from './pag-layer';
-import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { proxyVector } from './utils/type-utils';
 
 import type { PAGImage } from './pag-image';
 import type { PAGVideoRange } from './types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGImageLayer extends PAGLayer {
   /**
    * Make a empty PAGImageLayer with specified size.

@@ -20,10 +20,13 @@
 #include <QEvent>
 #include <QObject>
 #include "rendering/PAGWindow.h"
+#include "version.h"
 
 namespace pag {
 
 PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
+  setApplicationVersion((AppVersion + (UpdateChannel == "beta" ? "-beta" : "")).data());
+  checkUpdateModel = std::make_unique<PAGCheckUpdateModel>();
 }
 
 bool PAGViewer::event(QEvent* event) {
@@ -55,6 +58,10 @@ void PAGViewer::openFile(QString path) {
   }
 
   window->openFile(path);
+}
+
+PAGCheckUpdateModel* PAGViewer::getCheckUpdateModel() {
+  return checkUpdateModel.get();
 }
 
 void PAGViewer::onWindowDestroyed(PAGWindow* window) {
