@@ -7,15 +7,7 @@ import type { PAGSolidLayer } from '../pag-solid-layer';
 import type { PAGTextLayer } from '../pag-text-layer';
 
 const rewindData = (fn: (...args: any[]) => any, scope: any, ...args: any[]) => {
-  if (PAGModule.Asyncify.currData !== null) {
-    const currData = PAGModule.Asyncify.currData;
-    PAGModule.Asyncify.currData = null;
-    const ret = fn.call(scope, ...args);
-    PAGModule.Asyncify.currData = currData;
-    return ret;
-  } else {
-    return fn.call(scope, ...args);
-  }
+  return fn.call(scope, ...args);
 };
 
 export const proxyVector = <T extends (...args: any) => any>(

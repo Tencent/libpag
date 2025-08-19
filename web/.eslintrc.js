@@ -8,7 +8,7 @@ module.exports = {
     'max-params': ['error', 9],
   },
   parserOptions: {
-    lib: ['dom', 'ES5', 'ES6', 'DOM.Iterable', 'WebWorker'],
+    lib: ['dom', 'ES5', 'ES6', 'DOM.Iterable'],
   },
   globals: {
     globalThis: true,

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable", "WebWorker"],
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
     "target": "ES2020",
     "declaration": true,
     "declarationDir": "./types",
@@ -15,5 +15,5 @@
     },
     "resolveJsonModule": true
   },
-  "include": ["src/pag.ts", "src/worker/client.ts"]
+  "include": ["src/pag.ts"]
 }
