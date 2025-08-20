@@ -75,8 +75,8 @@ else ()
     set(UpdateChannel "beta")
 endif ()
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
-    ${CMAKE_SOURCE_DIR}/src/version.h
-    @ONLY
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
 )
 
 message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
@@ -124,15 +124,12 @@ execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/Rttr
 # collects pag include directories.
 set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
-list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX "src/platform/mac/.*")
-list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX "src/platform/win/.*")
+list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
+list(APPEND PAG_VIEWER_INCLUDES src/platform)
 if (APPLE)
-    list(APPEND PAG_VIEWER_INCLUDES src/platform/mac)
-    file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/mac/*.m src/platform/mac/*.mm)
-
+    file(GLOB PLATFORM_SOURCE_FILES src/platform/*.* src/platform/mac/*.*)
 elseif (WIN32)
-    list(APPEND PAG_VIEWER_INCLUDES src/platform/win)
-    file(GLOB_RECURSE PLATFORM_SOURCE_FILES src/platform/win/*.*)
+    file(GLOB PLATFORM_SOURCE_FILES src/platform/*.* src/platform/win/*.*)
 endif ()
 list(APPEND PAG_VIEWER_SOURCE_FILES ${PLATFORM_SOURCE_FILES})
 
@@ -142,12 +139,10 @@ if (APPLE)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/mac/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
-    set_target_properties(PAGViewer PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/package_mac/Info-debug.plist)
-
 elseif (WIN32)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/win/include)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/win/include)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/win/include)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/debug/win/include)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/debug/win/include)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/debug/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
 endif ()

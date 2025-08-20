@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PluginInstaller.h"
+#include "platform/PluginInstaller.h"
 #include <shlobj.h>
 #include <windows.h>
 #include <QApplication>
@@ -26,9 +26,11 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryFile>
+#include <QRegularExpression>
 
 namespace pag {
 
@@ -58,25 +60,67 @@ void PluginInstaller::showMessage(const QString& title, const QString& message, 
 QStringList PluginInstaller::getAeInstallPaths() {
   QStringList paths;
 
-  // Check common AE installation paths
-  QStringList basePaths = {"C:/Program Files/Adobe", "C:/Program Files (x86)/Adobe",
-                           "D:/Program Files/Adobe", "D:/Program Files (x86)/Adobe"};
+  // Primary method: Check Windows Registry for accurate AE installations
+  const QStringList registryPaths = {
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe",
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe",
+    "HKEY_CURRENT_USER\\SOFTWARE\\Adobe"
+  };
 
-  for (const QString& basePath : basePaths) {
-    for (int year = 2017; year <= 2030; ++year) {
-      QString aePath = QString("%1/Adobe After Effects %2/Support Files").arg(basePath).arg(year);
-      if (QDir(aePath).exists() && QFile::exists(aePath + "/AfterFX.exe")) {
-        paths << aePath;
-      }
-
-      // Also check CC versions
-      QString ccPath =
-          QString("%1/Adobe After Effects CC %2/Support Files").arg(basePath).arg(year);
-      if (QDir(ccPath).exists() && QFile::exists(ccPath + "/AfterFX.exe")) {
-        paths << ccPath;
+  for (const QString& regPath : registryPaths) {
+    QSettings registry(regPath, QSettings::NativeFormat);
+    const QStringList adobeKeys = registry.childGroups();
+    
+    for (const QString& key : adobeKeys) {
+      if (key.contains("After Effects", Qt::CaseInsensitive)) {
+        QSettings aeRegistry(regPath + "\\" + key, QSettings::NativeFormat);
+        QString installPath = aeRegistry.value("InstallPath").toString();
+        if (!installPath.isEmpty()) {
+          QString supportFilesPath = QDir::cleanPath(installPath + "/Support Files");
+          if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
+            paths << supportFilesPath;
+          }
+        }
       }
     }
   }
+
+  // Fallback: Check Creative Cloud Uninstall registry
+  QSettings ccRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", 
+                      QSettings::NativeFormat);
+  const QStringList uninstallKeys = ccRegistry.childGroups();
+  
+  for (const QString& key : uninstallKeys) {
+    QSettings appRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key, 
+                         QSettings::NativeFormat);
+    QString displayName = appRegistry.value("DisplayName").toString();
+    if (displayName.contains("Adobe After Effects", Qt::CaseInsensitive)) {
+      QString installLocation = appRegistry.value("InstallLocation").toString();
+      if (!installLocation.isEmpty()) {
+        QString supportFilesPath = QDir::cleanPath(installLocation + "/Support Files");
+        if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
+          if (!paths.contains(supportFilesPath)) {
+            paths << supportFilesPath;
+          }
+        }
+      }
+    }
+  }
+
+  // Remove duplicates and sort by version
+  paths.removeDuplicates();
+  
+  // Sort by version number extracted from path
+  std::sort(paths.begin(), paths.end(), [](const QString& a, const QString& b) {
+    QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+    QRegularExpressionMatch matchA = versionRegex.match(a);
+    QRegularExpressionMatch matchB = versionRegex.match(b);
+    
+    int versionA = matchA.hasMatch() ? matchA.captured(1).toInt() : 0;
+    int versionB = matchB.hasMatch() ? matchB.captured(1).toInt() : 0;
+    
+    return versionA > versionB;
+  });
 
   return paths;
 }
@@ -153,7 +197,7 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
 
     if (!QFile::exists(source)) {
       qDebug() << "Plugin source not found:" << source;
-      return false;  // 保持原有返回值，由调用者处理错误类型
+      return false;
     }
 
     // Create target directory
