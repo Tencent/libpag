@@ -1,0 +1,6 @@
+src/version.h
+tools/*RttrAutoRegister*
+tools/libclang.dll
+src/editing/rttr/
+build_*/
+cmake-build-*/
