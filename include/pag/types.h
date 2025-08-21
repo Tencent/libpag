@@ -874,49 +874,37 @@ class PAG_API Matrix {
    * Sets horizontal scale factor.
    * @param v  horizontal scale factor to store
    */
-  void setScaleX(float v) {
-    values[SCALE_X] = v;
-  }
+  void setScaleX(float v);
 
   /**
    * Sets the vertical scale factor.
    * @param v  vertical scale factor to store
    */
-  void setScaleY(float v) {
-    values[SCALE_Y] = v;
-  }
+  void setScaleY(float v);
 
   /**
    * Sets vertical skew factor.
    * @param v  vertical skew factor to store
    */
-  void setSkewY(float v) {
-    values[SKEW_Y] = v;
-  }
+  void setSkewY(float v);
 
   /**
    * Sets the horizontal skew factor.
    * @param v  horizontal skew factor to store
    */
-  void setSkewX(float v) {
-    values[SKEW_X] = v;
-  }
+  void setSkewX(float v);
 
   /**
    * Sets horizontal translation.
    * @param v  horizontal translation to store
    */
-  void setTranslateX(float v) {
-    values[TRANS_X] = v;
-  }
+  void setTranslateX(float v);
 
   /**
    * Sets vertical translation.
    * @param v  vertical translation to store
    */
-  void setTranslateY(float v) {
-    values[TRANS_Y] = v;
-  }
+  void setTranslateY(float v);
 
   /**
    * Sets all values from parameters. Sets matrix to:
@@ -1360,7 +1348,13 @@ class PAG_API Matrix {
   static const Matrix& Invalid();
 
  private:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-private-field"
+  static constexpr int RectStayRectMask = 0x10;
+  static constexpr int UnknownMask = 0x80;
+  static constexpr int AllMasks = 0x10 | 0x20 | 0x40;
   float values[6];
+  mutable int32_t typeMask;
   /**
    * Matrix organizes its values in row order. These members correspond to each value in Matrix.
    */
@@ -1370,6 +1364,7 @@ class PAG_API Matrix {
   static constexpr int SKEW_Y = 3;   //!< vertical skew factor
   static constexpr int SCALE_Y = 4;  //!< vertical scale factor
   static constexpr int TRANS_Y = 5;  //!< vertical translation
+#pragma clang diagnostic pop
 };
 
 /**
@@ -1418,21 +1413,21 @@ enum class PAG_API PAGTimeStretchMode : uint8_t {
    * Keep the original playing speed, and display the last frame if the content's duration is less
    * than target duration.
    */
-    None = 0,
+  None = 0,
   /*
    * Change the playing speed of the content to fit target duration.
    */
-    Scale = 1,
+  Scale = 1,
   /**
    * Keep the original playing speed, but repeat the content if the content's duration is less than
    * target duration. This is the default mode.
    */
-    Repeat = 2,
+  Repeat = 2,
   /**
    * Keep the original playing speed, but repeat the content in reversed if the content's duration
    * is less than target duration.
    */
-    RepeatInverted = 3
+  RepeatInverted = 3
 };
 
 enum class PAG_API ParagraphJustification : uint8_t {
@@ -1445,11 +1440,7 @@ enum class PAG_API ParagraphJustification : uint8_t {
   FullJustifyLastLineFull = 6
 };
 
-enum class PAG_API TextDirection : uint8_t {
-  Default = 0,
-  Horizontal = 1,
-  Vertical = 2
-};
+enum class PAG_API TextDirection : uint8_t { Default = 0, Horizontal = 1, Vertical = 2 };
 
 /**
  * The Text object stores a value for a TextLayer's Source Text property.

@@ -37,14 +37,14 @@ class RadialBlurUniforms : public Uniforms {
 
 class RadialBlurFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE;
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID;
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, const tgfx::Rect& contentBounds,
                                             tgfx::Point* offset);
 
   explicit RadialBlurFilter(double amount, const tgfx::Point& center)
-      : RuntimeFilter(Type()), amount(amount), center(center) {
+      : amount(amount), center(center) {
   }
   ~RadialBlurFilter() override = default;
 
