@@ -33,7 +33,6 @@ class PluginInstaller : public QObject {
   explicit PluginInstaller(QObject* parent = nullptr);
   ~PluginInstaller() override;
 
-  // Public API
   bool hasUpdate() const;
   InstallResult installPlugins(bool force = false);
   InstallResult uninstallPlugins();
@@ -47,7 +46,6 @@ class PluginInstaller : public QObject {
   void uninstallCompleted(InstallResult result, const QString& message);
 
  private:
-  // Platform-specific implementations (implemented in platform-specific cpp files)
   bool checkAeRunning();
   bool requestConfirmation(const QString& title, const QString& message);
   void showMessage(const QString& title, const QString& message, bool isWarning = false);
@@ -62,14 +60,12 @@ class PluginInstaller : public QObject {
   bool copyPluginFiles(const QStringList& plugins, bool force) const;
   bool removePluginFiles(const QStringList& plugins) const;
 
-  // Common helper functions (implemented in common cpp)
   int64_t getPluginVersion(const QString& pluginPath) const;
   QStringList getPluginList() const;
 
   void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;
 
-  // Version parsing helper
   struct Version {
     int major = 0, minor = 0, patch = 0, build = 0;
 

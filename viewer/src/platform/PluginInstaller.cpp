@@ -28,7 +28,6 @@
 namespace pag {
 
 PluginInstaller::PluginInstaller(QObject* parent) : QObject(parent) {
-  // Initialize any required resources or settings here
 }
 
 PluginInstaller::~PluginInstaller() = default;
@@ -62,8 +61,6 @@ InstallResult PluginInstaller::installPlugins(bool force) {
       return InstallResult::UnknownError;
     }
   }
-
-  // Check if AE is running and wait for it to close
   while (checkAeRunning()) {
     if (!requestConfirmation(tr("Please close Adobe After Effects"),
                              tr("Adobe After Effects is currently running. Please close it and "
@@ -73,8 +70,6 @@ InstallResult PluginInstaller::installPlugins(bool force) {
   }
 
   QStringList plugins = getPluginList();
-
-  // Check if all source files exist before attempting installation
   for (const QString& plugin : plugins) {
     QString sourcePath = getPluginSourcePath(plugin);
     if (!QFile::exists(sourcePath)) {
@@ -109,7 +104,6 @@ InstallResult PluginInstaller::uninstallPlugins() {
     return InstallResult::UnknownError;
   }
 
-  // Check if AE is running and wait for it to close
   while (checkAeRunning()) {
     if (!requestConfirmation(tr("Please close Adobe After Effects"),
                              tr("Adobe After Effects is currently running. Please close it and "
@@ -164,7 +158,6 @@ int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
          (static_cast<int64_t>(version.patch) << 16) | (static_cast<int64_t>(version.build) << 0);
 }
 
-// Version struct implementation
 PluginInstaller::Version::Version(const QString& versionStr) {
   QStringList parts = versionStr.split('.');
   if (parts.size() >= 1) major = parts[0].toInt();

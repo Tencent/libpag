@@ -26,7 +26,6 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QProcess>
-#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryFile>
@@ -60,7 +59,6 @@ void PluginInstaller::showMessage(const QString& title, const QString& message, 
 QStringList PluginInstaller::getAeInstallPaths() {
   QStringList paths;
 
-  // Primary method: Check Windows Registry for accurate AE installations
   const QStringList registryPaths = {
     "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe",
     "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe",
@@ -85,7 +83,6 @@ QStringList PluginInstaller::getAeInstallPaths() {
     }
   }
 
-  // Fallback: Check Creative Cloud Uninstall registry
   QSettings ccRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", 
                       QSettings::NativeFormat);
   const QStringList uninstallKeys = ccRegistry.childGroups();
@@ -106,11 +103,8 @@ QStringList PluginInstaller::getAeInstallPaths() {
       }
     }
   }
-
-  // Remove duplicates and sort by version
   paths.removeDuplicates();
-  
-  // Sort by version number extracted from path
+
   std::sort(paths.begin(), paths.end(), [](const QString& a, const QString& b) {
     QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
     QRegularExpressionMatch matchA = versionRegex.match(a);
@@ -150,38 +144,30 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
 }
 
 QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
-  // For Windows, we might need to read version from file properties
-  // For now, return empty string - this would need platform-specific implementation
-  // to read version info from .aex files
   Q_UNUSED(pluginPath);
   return QString();
 }
 
 bool PluginInstaller::executeWithPrivileges(const QString& command) const {
-  // Create temporary batch file
   QTemporaryFile tempFile;
   tempFile.setFileTemplate(QDir::tempPath() + "/install_plugin_XXXXXX.bat");
-  tempFile.setAutoRemove(false);  // We'll remove it manually
+  tempFile.setAutoRemove(false);
 
   if (!tempFile.open()) {
-    qDebug() << "Failed to create temporary batch file";
     return false;
   }
 
   QString batPath = tempFile.fileName();
   tempFile.write("@echo off\n");
-  tempFile.write("chcp 65001 > nul\n");  // Set UTF-8 encoding
+  tempFile.write("chcp 65001 > nul\n");
   tempFile.write(command.toUtf8());
   tempFile.write("\necho.\necho Press any key to continue...\npause > nul\n");
   tempFile.close();
 
-  // Execute with elevated privileges
   HINSTANCE result = ShellExecuteW(
       nullptr, L"runas", L"cmd.exe",
       QString("/c \"%1\"").arg(QDir::toNativeSeparators(batPath)).toStdWString().c_str(), nullptr,
       SW_SHOW);
-
-  // Clean up
   QFile::remove(batPath);
 
   return reinterpret_cast<intptr_t>(result) > 32;
@@ -196,22 +182,18 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
     QString target = getPluginInstallPath(plugin);
 
     if (!QFile::exists(source)) {
-      qDebug() << "Plugin source not found:" << source;
       return false;
     }
 
-    // Create target directory
     QString targetDir = QFileInfo(target).absolutePath();
     commands
         << QString("if not exist \"%1\" mkdir \"%1\"").arg(QDir::toNativeSeparators(targetDir));
 
     if (plugin == "com.tencent.pagconfig") {
-      // Copy directory recursively
       commands << QString("xcopy /Y /E /I \"%1\" \"%2\"")
                       .arg(QDir::toNativeSeparators(source))
                       .arg(QDir::toNativeSeparators(target));
     } else {
-      // Copy single file
       commands << QString("copy /Y \"%1\" \"%2\"")
                       .arg(QDir::toNativeSeparators(source))
                       .arg(QDir::toNativeSeparators(target));
@@ -233,11 +215,8 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     QString target = getPluginInstallPath(plugin);
 
     if (plugin == "com.tencent.pagconfig") {
-      // Remove directory
-      commands
-          << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(QDir::toNativeSeparators(target));
+      commands << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(QDir::toNativeSeparators(target));
     } else {
-      // Remove file
       commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(target));
     }
   }
