@@ -238,32 +238,9 @@ bool Text::getPath(tgfx::Path* path) const {
 void Text::prepare(RenderCache*) const {
 }
 
-static std::vector<TextStyle> GetGlyphStyles(const GlyphHandle& glyph) {
-  std::vector<TextStyle> styles = {};
-  if (glyph->getStyle() == TextStyle::Fill) {
-    styles.push_back(TextStyle::Fill);
-  } else if (glyph->getStyle() == TextStyle::Stroke) {
-    styles.push_back(TextStyle::Stroke);
-  } else {
-    if (glyph->getStrokeOverFill()) {
-      styles.push_back(TextStyle::Fill);
-      styles.push_back(TextStyle::Stroke);
-    } else {
-      styles.push_back(TextStyle::Stroke);
-      styles.push_back(TextStyle::Fill);
-    }
-  }
-  return styles;
-}
-
 void Text::draw(Canvas* canvas) const {
-  auto textAtlas = canvas->getCache()->getTextAtlas(textBlock.get());
-  if (textAtlas != nullptr) {
-    draw(canvas, textAtlas);
-  } else {
-    drawTextRuns(canvas, 0);
-    drawTextRuns(canvas, 1);
-  }
+  drawTextRuns(canvas, 0);
+  drawTextRuns(canvas, 1);
 }
 
 struct Parameters {
@@ -272,80 +249,6 @@ struct Parameters {
   std::vector<tgfx::Rect> rects;
   std::vector<tgfx::Color> colors;
 };
-
-static void Draw(Canvas* canvas, const TextAtlas* atlas, const Parameters& parameters) {
-  if (parameters.matrices.empty()) {
-    return;
-  }
-  canvas->drawAtlas(atlas->getAtlasImage(parameters.imageIndex), parameters.matrices.data(),
-                    parameters.rects.data(),
-                    parameters.colors.empty() ? nullptr : parameters.colors.data(),
-                    parameters.matrices.size());
-}
-
-static bool RectStaysRectAndNoScale(const tgfx::Matrix& matrix) {
-  float m00 = matrix.getScaleX();
-  float m01 = matrix.getSkewX();
-  float m10 = matrix.getSkewY();
-  float m11 = matrix.getScaleY();
-  if (m01 != 0 || m10 != 0) {
-    return m00 == 0 && m11 == 0 && std::abs(m10) == 1.f && std::abs(m01) == 1.f;
-  } else {
-    return std::abs(m00) == 1.f && std::abs(m11) == 1.f;
-  }
-}
-
-void Text::draw(Canvas* canvas, const TextAtlas* textAtlas) const {
-  Parameters parameters = {};
-  auto viewMatrix = canvas->getMatrix();
-  canvas->setMatrix(tgfx::Matrix::I());
-  float atlasScaleInverted = 1.f / textAtlas->totalScale();
-  for (auto& glyph : glyphs) {
-    if (!glyph->isVisible()) {
-      continue;
-    }
-    auto styles = GetGlyphStyles(glyph);
-    AtlasLocator locator;
-    for (auto style : styles) {
-      tgfx::BytesKey bytesKey;
-      glyph->computeAtlasKey(&bytesKey, style);
-      if (!textAtlas->getLocator(bytesKey, &locator)) {
-        continue;
-      }
-      if (parameters.imageIndex != locator.imageIndex) {
-        Draw(canvas, textAtlas, parameters);
-        parameters = {};
-        parameters.imageIndex = locator.imageIndex;
-      }
-      auto matrix = tgfx::Matrix::I();
-      matrix.postTranslate(locator.glyphBounds.x(), locator.glyphBounds.y());
-      matrix.postScale(atlasScaleInverted, atlasScaleInverted);
-      matrix.postConcat(glyph->getTotalMatrix());
-      matrix.postConcat(viewMatrix);
-      if (RectStaysRectAndNoScale(matrix)) {
-        auto rect = tgfx::Rect::MakeWH(locator.location.width(), locator.location.height());
-        matrix.mapRect(&rect);
-        matrix.postTranslate(std::round(rect.left) - rect.left, std::round(rect.top) - rect.top);
-      }
-      parameters.matrices.emplace_back(matrix);
-      parameters.rects.emplace_back(locator.location);
-      if (glyph->getFont().hasColor()) {
-        auto alpha = canvas->getAlpha();
-        canvas->setAlpha(alpha * glyph->getAlpha());
-        Draw(canvas, textAtlas, parameters);
-        parameters = {};
-        canvas->setAlpha(alpha);
-      } else {
-        auto color =
-            ToTGFX(style == TextStyle::Stroke ? glyph->getStrokeColor() : glyph->getFillColor());
-        color.alpha *= glyph->getAlpha();
-        parameters.colors.emplace_back(color);
-      }
-    }
-  }
-  Draw(canvas, textAtlas, parameters);
-  canvas->setMatrix(viewMatrix);
-}
 
 void Text::drawTextRuns(Canvas* canvas, int paintIndex) const {
   auto totalMatrix = canvas->getMatrix();

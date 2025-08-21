@@ -36,9 +36,9 @@ class AlphaEdgeDetectEffectUniforms : public Uniforms {
 
 class AlphaEdgeDetectLayerEffect : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE;
-  explicit AlphaEdgeDetectLayerEffect() : RuntimeFilter(Type()) {
-  }
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
+
+  AlphaEdgeDetectLayerEffect() = default;
 
   std::string onBuildFragmentShader() const override;
 

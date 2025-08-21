@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskSequenceReader.h"
+#include <tgfx/core/ImageCodec.h>
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Buffer.h"
@@ -118,7 +119,8 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
     }
     imageBuffer = tgfx::ImageBuffer::MakeFrom(renderBuffer);
   } else {
-    imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
+    auto codec = tgfx::ImageCodec::MakeFrom(info, pixels);
+    imageBuffer = codec ? codec->makeBuffer() : nullptr;
   }
   return imageBuffer;
 }

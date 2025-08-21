@@ -64,11 +64,14 @@ std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
 }
 
 void LayerStylesFilter::applyFilter(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+  if (image == nullptr) {
+    return;
+  }
   for (const auto& layerStyleFilter : layerStyleFilters) {
     layerStyleFilter->draw(canvas, image);
   }
   if (drawSource) {
-    canvas->drawImage(image);
+    canvas->drawImage(std::move(image));
   }
 }
 
