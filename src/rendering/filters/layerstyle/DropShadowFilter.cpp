@@ -92,7 +92,7 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getStrokeFilter() const {
 std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getDropShadowFilter() const {
   float blurSizeX = sizeX * (1.f - spread) * 2.f;
   float blurSizeY = sizeY * (1.f - spread) * 2.f;
-  return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurSizeX, blurSizeY, color);
+  return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurSizeX / 2, blurSizeY / 2, color);
 }
 
 }  // namespace pag
