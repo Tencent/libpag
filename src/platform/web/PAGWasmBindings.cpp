@@ -160,7 +160,7 @@ bool PAGBindInit() {
                 }))
       .function("_imageBytes", optional_override([](PAGImageLayer& pagImageLayer) {
                   ByteData* result = pagImageLayer.imageBytes();
-                  if (result->length() == 0) {
+                  if (!result || result->length() == 0) {
                     return val::null();
                   }
                   return val(typed_memory_view(result->length(), result->data()));
@@ -210,7 +210,7 @@ bool PAGBindInit() {
       .function("_swapLayerAt", &PAGComposition::swapLayerAt)
       .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
                   ByteData* result = pagComposition.audioBytes();
-                  if (result->length() == 0) {
+                  if (result || result->length() == 0) {
                     return val::null();
                   }
                   return val(typed_memory_view(result->length(), result->data()));
