@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,29 @@
 
 #pragma once
 
-#include <QApplication>
-#include "maintenance/PAGCheckUpdateModel.h"
-#include "rendering/PAGWindow.h"
+#include <QMap>
+#include <QObject>
+#include <QThreadPool>
 
 namespace pag {
 
-class PAGViewer : public QApplication {
+class PAGCheckUpdateModel : public QObject {
   Q_OBJECT
  public:
-  PAGViewer(int& argc, char** argv);
+  explicit PAGCheckUpdateModel(QObject* parent = nullptr);
+  ~PAGCheckUpdateModel() override;
+  Q_INVOKABLE void checkForUpdates(bool keepSlient, bool isUseBeta);
+  void getAppcast(const QByteArray& data);
+  void getUpdateVersion(QString url, QString version);
 
-  bool event(QEvent* event) override;
-  void openFile(QString path);
-  PAGCheckUpdateModel* getCheckUpdateModel();
-
-  Q_SLOT void onWindowDestroyed(PAGWindow* window);
+  static int CompareAppVersion(const QString& version1, const QString& version2);
+  QVector<QString> availableUpdateUrls = {};
+  QMap<QString, QString> availableUpdates = {};
 
  private:
-  std::unique_ptr<PAGCheckUpdateModel> checkUpdateModel = nullptr;
+  bool isUseBeta = false;
+  bool keepSilent = false;
+  std::unique_ptr<QThreadPool> threadPool = nullptr;
 };
 
 }  // namespace pag

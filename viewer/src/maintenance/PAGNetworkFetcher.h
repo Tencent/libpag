@@ -18,15 +18,38 @@
 
 #pragma once
 
-#include <QQuickWindow>
+#include <QObject>
+#include <QRunnable>
 
 namespace pag {
 
-class PAGWindowHelper : public QObject {
+class PAGNetworkFetcher : public QObject {
   Q_OBJECT
  public:
-  explicit PAGWindowHelper(QObject* parent = nullptr);
-  Q_INVOKABLE void setWindowStyle(QQuickWindow* quickWindow, double red, double green, double blue);
+  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
+  void fetch();
+  Q_SIGNAL void finished();
+  Q_SIGNAL void fetched(const QByteArray& data);
+
+ protected:
+  QString url = "";
+};
+
+class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
+  Q_OBJECT
+ public:
+  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
+  Q_SIGNAL void versionFound(const QString& url, const QString& version);
+
+ private:
+  void parseAppcast(const QByteArray& data);
+};
+
+class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
+  Q_OBJECT
+ public:
+  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
+  void run() override;
 };
 
 }  // namespace pag

@@ -18,10 +18,12 @@
 
 #pragma once
 
-#include <QFileInfo>
+#include <string>
 
-namespace pag::Utils {
+namespace pag {
 
-void openFileInFinder(QFileInfo& fileInfo);
+const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
+const std::string UpdateChannel = "@UpdateChannel@";
+const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
 
-}  // namespace pag::Utils
+} // namespace pag
