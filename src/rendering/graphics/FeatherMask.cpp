@@ -23,7 +23,6 @@
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/utils/PathUtil.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/Surface.h"
 
 namespace pag {

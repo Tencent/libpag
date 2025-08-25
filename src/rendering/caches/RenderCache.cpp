@@ -176,13 +176,11 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
     assetImages.erase(assetID);
     decodedAssetImages.erase(assetID);
     clearSequenceCache(assetID);
-    removeTextAtlas(assetID);
   }
 }
 
 void RenderCache::releaseAll() {
   clearAllSnapshots();
-  clearAllTextAtlas();
   graphicsMemory = 0;
   clearAllSequenceCaches();
   contextID = 0;
@@ -200,13 +198,13 @@ void RenderCache::detachFromContext() {
   clearExpiredSnapshots();
   if (!timestamps.empty()) {
     // Always purge recycled resources that haven't been used in 1 frame.
-    context->purgeResourcesNotUsedSince(timestamps.back(), true);
+    context->purgeResourcesNotUsedSince(timestamps.back());
   }
   if (context->memoryUsage() + graphicsMemory > PURGEABLE_GRAPHICS_MEMORY &&
       timestamps.size() == PURGEABLE_EXPIRED_FRAME) {
     // Purge all types of resources that haven't been used in 10 frames when the total memory usage
     // is over 20M.
-    context->purgeResourcesNotUsedSince(timestamps.front(), false);
+    context->purgeResourcesNotUsedSince(timestamps.front());
   }
   timestamps.push(std::chrono::steady_clock::now());
   while (timestamps.size() > PURGEABLE_EXPIRED_FRAME) {
@@ -286,54 +284,6 @@ void RenderCache::removeSnapshotFromLRU(Snapshot* snapshot) {
   if (position != snapshotPositions.end()) {
     snapshotLRU.erase(position->second);
   }
-}
-
-TextAtlas* RenderCache::getTextAtlas(ID assetID) const {
-  auto textAtlas = textAtlases.find(assetID);
-  if (textAtlas == textAtlases.end()) {
-    return nullptr;
-  }
-  return textAtlas->second;
-}
-
-TextAtlas* RenderCache::getTextAtlas(const TextBlock* textBlock) {
-  auto maxScaleFactor = stage->getAssetMaxScale(textBlock->assetID());
-  auto textAtlas = getTextAtlas(textBlock->assetID());
-  if (textAtlas && (textAtlas->textGlyphsID() != textBlock->id() ||
-                    fabsf(textAtlas->scaleFactor() - maxScaleFactor) > SCALE_FACTOR_PRECISION)) {
-    removeTextAtlas(textBlock->assetID());
-    textAtlas = nullptr;
-  }
-  if (textAtlas) {
-    return textAtlas;
-  }
-  if (maxScaleFactor < SCALE_FACTOR_PRECISION) {
-    return nullptr;
-  }
-  textAtlas = TextAtlas::Make(textBlock, this, maxScaleFactor).release();
-  if (textAtlas) {
-    graphicsMemory += textAtlas->memoryUsage();
-    textAtlases[textBlock->assetID()] = textAtlas;
-  }
-  return textAtlas;
-}
-
-void RenderCache::removeTextAtlas(ID assetID) {
-  auto textAtlas = textAtlases.find(assetID);
-  if (textAtlas == textAtlases.end()) {
-    return;
-  }
-  graphicsMemory -= textAtlas->second->memoryUsage();
-  delete textAtlas->second;
-  textAtlases.erase(textAtlas);
-}
-
-void RenderCache::clearAllTextAtlas() {
-  for (auto atlas : textAtlases) {
-    graphicsMemory -= atlas.second->memoryUsage();
-    delete atlas.second;
-  }
-  textAtlases.clear();
 }
 
 void RenderCache::clearAllSnapshots() {

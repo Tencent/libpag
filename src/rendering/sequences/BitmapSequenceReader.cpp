@@ -96,7 +96,8 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
     tgfx::HardwareBufferUnlock(hardWareBuffer);
     imageBuffer = tgfx::ImageBuffer::MakeFrom(hardWareBuffer);
   } else {
-    imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
+    auto codec = tgfx::ImageCodec::MakeFrom(info, pixels);
+    imageBuffer = codec ? codec->makeBuffer() : nullptr;
   }
   lastDecodeFrame = targetFrame;
   return imageBuffer;

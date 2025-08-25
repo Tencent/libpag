@@ -38,7 +38,9 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
       glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
       continue;
     }
-    textFont.setTypeface(shapedGlyph.typeface);
+    if (shapedGlyph.typeface != nullptr) {
+      textFont.setTypeface(shapedGlyph.typeface);
+    }
     auto glyph =
         std::shared_ptr<Glyph>(new Glyph(shapedGlyph.glyphIDs, name, textFont, isVertical, paint));
     glyphMap[name] = glyph;
