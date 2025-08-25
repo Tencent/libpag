@@ -79,7 +79,7 @@ std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getStrokeFilter() const {
 std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getDropShadowFilter() const {
   auto blurSizeX = sizeX * (1.f - spread) * 2.f / range;
   auto blurSizeY = sizeY * (1.f - spread) * 2.f / range;
-  return tgfx::ImageFilter::DropShadowOnly(0, 0, blurSizeX, blurSizeY, color);
+  return tgfx::ImageFilter::DropShadowOnly(0, 0, blurSizeX / 2, blurSizeY / 2, color);
 }
 
 }  // namespace pag

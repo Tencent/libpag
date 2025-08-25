@@ -129,7 +129,7 @@ void FeatherMask::draw(Canvas* parentCanvas) const {
     if (mask->maskFeather) {
       auto blurrinessX = mask->maskFeather->getValueAt(layerFrame).x;
       auto blurrinessY = mask->maskFeather->getValueAt(layerFrame).y;
-      blurPaint.setImageFilter(tgfx::ImageFilter::Blur(blurrinessX, blurrinessY));
+      blurPaint.setImageFilter(tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2));
     }
     canvas->save();
     canvas->setMatrix(tgfx::Matrix::MakeTrans(maskBounds.x(), maskBounds.y()));
