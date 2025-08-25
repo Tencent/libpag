@@ -117,7 +117,10 @@ if (typeof window !== 'undefined') {
       textDoc.strokeOverFill = true;
       textDoc.tracking = 600;
       pagFile.replaceText(0, textDoc);
-      console.log(pagFile.getTextData(0));
+      const newtextDoc=pagFile.getTextData(0);
+      console.log(newtextDoc);
+      textDoc.delete();
+      newtextDoc.delete();
       await pagView.flush();
     });
     document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
@@ -445,7 +448,7 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
     pagComposition.destroy();
   }
   pagComposition = pagView.getComposition();
-  audioEl = new AudioPlayer(pagComposition.audioBytes());
+  audioEl = new AudioPlayer(null);
   return pagView;
 };
 

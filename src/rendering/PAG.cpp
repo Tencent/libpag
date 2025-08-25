@@ -27,6 +27,7 @@ std::string PAG::SDKVersion() {
 }
 }  // namespace pag
 
+#ifdef PAG_BUILD_FOR_WEB
 // Error: Undefined symbol: main
 // Note: A `main` function must be implemented as the entry point for the application.
 // Without it, the WebAssembly build will fail. Ensure that you have defined a `main` function
@@ -35,3 +36,5 @@ std::string PAG::SDKVersion() {
 int main() {
   return 0;
 }
+
+#endif
