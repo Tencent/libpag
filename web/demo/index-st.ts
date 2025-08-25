@@ -28,7 +28,7 @@ let isMobile = false;
 
 if (typeof window !== 'undefined') {
   window.onload = async () => {
-    PAG = await PAGInit({ locateFile: (file: string) => '../lib/wasm-mt/' + file });
+    PAG = await PAGInit({ locateFile: (file: string) => '../lib/wasm/' + file });
     // Mobile
     isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
     if (isMobile) {
@@ -275,7 +275,6 @@ if (typeof window !== 'undefined') {
       pagView.setCacheScale(cacheScale);
     });
   };
-
 }
 
 const existsLayer = (pagLayer: object) => {
@@ -425,10 +424,12 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
     console.log('onAnimationCancel', event);
   });
   pagView.addListener('onAnimationRepeat', (event) => {
+    console.log('onAnimationRepeat', event);
     audioEl.stop();
     audioEl.play();
   });
   pagView.addListener('onAnimationUpdate', (event) => {
+    console.log('onAnimationUpdate', event);
     document.getElementById('fps')!.innerText = `PAG View FPS: ${pagView.getDebugData().FPS}`;
   });
   pagView.addListener('onAnimationPlay', (event) => {

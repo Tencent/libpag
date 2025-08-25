@@ -514,12 +514,22 @@ bool PAGBindInit() {
       .property("strokeOverFill", &TextDocument::strokeOverFill)
       .property("strokeWidth", &TextDocument::strokeWidth)
       .property("text", &TextDocument::text)
-      .property("justification", &TextDocument::justification)
+      .property("justification", optional_override([](const TextDocument& textDocument) {
+                  return static_cast<uint8_t>(textDocument.justification);
+                }),
+                optional_override([](TextDocument& textDocument, uint8_t val) {
+                  textDocument.justification = static_cast<ParagraphJustification>(val);
+                }))
       .property("leading", &TextDocument::leading)
       .property("tracking", &TextDocument::tracking)
       .property("backgroundColor", &TextDocument::backgroundColor)
       .property("backgroundAlpha", &TextDocument::backgroundAlpha)
-      .property("direction", &TextDocument::direction);
+      .property("direction", optional_override([](const TextDocument& textDocument) {
+                  return static_cast<uint8_t>(textDocument.direction);
+                }),
+                optional_override([](TextDocument& textDocument, uint8_t val) {
+                  textDocument.direction = static_cast<TextDirection>(val);
+                }));
 
   value_object<Rect>("Rect")
       .field("left", &Rect::left)

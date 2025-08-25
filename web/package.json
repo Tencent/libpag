@@ -7,11 +7,14 @@
   "browser": "lib/libpag.umd.js",
   "typings": "types/web/pag.d.ts",
   "scripts": {
-    "build:js": "rimraf --glob lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
+    "build:js": "rimraf --glob lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm-mt && tsc -p ./tsconfig.type.json",
+    "build:js:st": "rimraf --glob lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm && tsc -p ./tsconfig.type.json",
     "build:wx:js": "rimraf --glob wechat/lib/*.js wechat/lib/*.map wechat/lib/*.br wechat/types/* && rollup -c ./script/rollup.config.wx.js && tsc -p ./wechat/tsconfig.type.json && brotli ./wechat/lib/libpag.wasm",
-    "build": "node script/cmake.demo.js && npm run build:js",
+    "build": "node script/cmake.demo.js -a wasm-mt && npm run build:js && node script/restore.file.js",
+    "build:st": "node script/cmake.demo.js -a wasm && npm run build:js:st && node script/restore.file.js",
     "build:wx": "node script/cmake.demo.wx.js && npm run build:wx:js",
-    "build:debug": "node script/cmake.demo.js --debug && npm run build:js",
+    "build:debug": "node script/cmake.demo.js -a wasm-mt --debug && npm run build:js && node script/restore.file.js",
+    "build:debug:st": "node script/cmake.demo.js -a wasm --debug && npm run build:js:st && node script/restore.file.js",
     "build:wx:debug": "node script/cmake.demo.wx.js --debug && npm run build:wx:js",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",
     "dev:wx": "rollup -c ./script/rollup.config.wx.dev.js -w",
@@ -24,7 +27,9 @@
     "cypress": "cypress run --browser chrome",
     "server": "http-server -p 8080 . -c-1 --cors -o demo",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
-    "brotli": "brotli ./lib/libpag.wasm"
+    "brotli": "brotli ./lib/libpag.wasm",
+    "server:mt": "node server.js wasm-mt",
+    "server:st": "node server.js wasm"
   },
   "repository": {
     "type": "git",
@@ -72,5 +77,8 @@
     "zenoslin",
     "lvpengwei"
   ],
-  "author": "libpag"
+  "author": "libpag",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
 }
