@@ -82,8 +82,10 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
           pixmap.clear();
         }
         auto offset = pixmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
-        auto result = codec->readPixels(
-            pixmap.info(), reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
+        auto info = tgfx::ImageInfo::Make(codec->width(), codec->height(), pixmap.colorType(),
+                                          pixmap.alphaType(), pixmap.rowBytes());
+        auto result =
+            codec->readPixels(info, reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
         if (!result) {
           tgfx::HardwareBufferUnlock(hardWareBuffer);
           return nullptr;
