@@ -21,14 +21,16 @@
       {
         "url": "https://github.com/libpag/rttr-auto-register/releases/download/v1.0/RttrAutoRegister-win.zip",
         "dir": "tools",
-        "unzip": true
+        "unzip": true,
+        "timeout": 100000
       }
     ],
     "mac": [
       {
         "url": "https://github.com/libpag/rttr-auto-register/releases/download/v1.0/RttrAutoRegister-mac.zip",
         "dir": "tools",
-        "unzip": true
+        "unzip": true,
+        "timeout": 100000
       }
     ]
   },
