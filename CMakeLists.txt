@@ -520,8 +520,8 @@ endif ()
 
 if (WEB)
     add_executable(pag ${PAG_FILES})
-    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1 -sASYNCIFY
-            -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
+    list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
+            -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
             -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1)
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)

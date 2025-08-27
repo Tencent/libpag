@@ -51,6 +51,46 @@ std::unique_ptr<ByteData> CopyDataFromUint8Array(const val& emscriptenData) {
   return buffer;
 }
 
+emscripten::val PAGLayerToJsObject(std::shared_ptr<PAGLayer> pagLayer) {
+  emscripten::val layerObject = emscripten::val::null();
+  if (!pagLayer) {
+    return layerObject;
+  }
+
+  switch (pagLayer->layerType()) {
+    case LayerType::Solid: {
+      layerObject = emscripten::val(std::static_pointer_cast<PAGSolidLayer>(pagLayer));
+      break;
+    }
+    case LayerType::Text: {
+      layerObject = emscripten::val(std::static_pointer_cast<PAGTextLayer>(pagLayer));
+      break;
+    }
+    case LayerType::Shape: {
+      layerObject = emscripten::val(std::static_pointer_cast<PAGShapeLayer>(pagLayer));
+      break;
+    }
+    case LayerType::Image: {
+      layerObject = emscripten::val(std::static_pointer_cast<PAGImageLayer>(pagLayer));
+      break;
+    }
+    case LayerType::PreCompose: {
+      if (pagLayer->isPAGFile()) {
+        layerObject = emscripten::val(std::static_pointer_cast<PAGFile>(pagLayer));
+      } else {
+        layerObject = emscripten::val(std::static_pointer_cast<PAGComposition>(pagLayer));
+      }
+      break;
+    }
+    default: {
+      layerObject = emscripten::val(pagLayer);
+      break;
+    }
+  }
+
+  return layerObject;
+}
+
 bool PAGBindInit() {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
@@ -197,20 +237,31 @@ bool PAGBindInit() {
       .function("_height", &PAGComposition::height)
       .function("_setContentSize", &PAGComposition::setContentSize)
       .function("_numChildren", &PAGComposition::numChildren)
-      .function("_getLayerAt", &PAGComposition::getLayerAt)
+      .function("_getLayerAt",
+                optional_override([](PAGComposition& pagComposition, int index) -> emscripten::val {
+                  return PAGLayerToJsObject(pagComposition.getLayerAt(index));
+                }))
       .function("_getLayerIndex", &PAGComposition::getLayerIndex)
       .function("_setLayerIndex", &PAGComposition::setLayerIndex)
       .function("_addLayer", &PAGComposition::addLayer)
       .function("_addLayerAt", &PAGComposition::addLayerAt)
       .function("_contains", &PAGComposition::contains)
-      .function("_removeLayer", &PAGComposition::removeLayer)
+      .function("_removeLayer",
+                optional_override([](PAGComposition& pagComposition,
+                                     std::shared_ptr<PAGLayer> pagLayer) -> emscripten::val {
+                  return PAGLayerToJsObject(pagComposition.removeLayer(pagLayer));
+                }))
       .function("_removeLayerAt", &PAGComposition::removeLayerAt)
+      .function("_removeLayerAt",
+                optional_override([](PAGComposition& pagComposition, int index) -> emscripten::val {
+                  return PAGLayerToJsObject(pagComposition.removeLayerAt(index));
+                }))
       .function("_removeAllLayers", &PAGComposition::removeAllLayers)
       .function("_swapLayer", &PAGComposition::swapLayer)
       .function("_swapLayerAt", &PAGComposition::swapLayerAt)
       .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
                   ByteData* result = pagComposition.audioBytes();
-                  if (result || result->length() == 0) {
+                  if (!result || result->length() == 0) {
                     return val::null();
                   }
                   return val(typed_memory_view(result->length(), result->data()));
@@ -229,8 +280,26 @@ bool PAGBindInit() {
       .function("_audioStartTime", optional_override([](PAGComposition& pagComposition) {
                   return static_cast<int>(pagComposition.audioStartTime());
                 }))
-      .function("_getLayersByName", &PAGComposition::getLayersByName)
-      .function("_getLayersUnderPoint", &PAGComposition::getLayersUnderPoint);
+      .function("_getLayersByName",
+                optional_override([](PAGComposition& pagComposition, const std::string& layerName) {
+                  auto layerVector = pagComposition.getLayersByName(layerName);
+                  int size = layerVector.size();
+                  emscripten::val jsArray = emscripten::val::array();
+                  for (int i = 0; i < size; ++i) {
+                    jsArray.call<void>("push", PAGLayerToJsObject(layerVector[i]));
+                  }
+                  return jsArray;
+                }))
+      .function("_getLayersUnderPoint",
+                optional_override([](PAGComposition& pagComposition, float localX, float localY) {
+                  auto layerVector = pagComposition.getLayersUnderPoint(localX, localY);
+                  int size = layerVector.size();
+                  emscripten::val jsArray = emscripten::val::array();
+                  for (int i = 0; i < size; ++i) {
+                    jsArray.call<void>("push", PAGLayerToJsObject(layerVector[i]));
+                  }
+                  return jsArray;
+                }));
 
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
@@ -252,8 +321,14 @@ bool PAGBindInit() {
       .function("_replaceImage", &PAGFile::replaceImage)
       .function("_getLayersByEditableIndex",
                 optional_override([](PAGFile& pagFile, int editableIndex, int layerType) {
-                  return pagFile.getLayersByEditableIndex(editableIndex,
-                                                          static_cast<LayerType>(layerType));
+                  auto layerVector = pagFile.getLayersByEditableIndex(
+                      editableIndex, static_cast<LayerType>(layerType));
+                  int size = layerVector.size();
+                  emscripten::val jsArray = emscripten::val::array();
+                  for (int i = 0; i < size; ++i) {
+                    jsArray.call<void>("push", PAGLayerToJsObject(layerVector[i]));
+                  }
+                  return jsArray;
                 }))
       .function(
           "_getEditableIndices", optional_override([](PAGFile& pagFile, int layerType) {
@@ -399,7 +474,10 @@ bool PAGBindInit() {
                   pagPlayer.setScaleMode(static_cast<PAGScaleMode>(scaleMode));
                 }))
       .function("_setSurface", &PAGPlayer::setSurface)
-      .function("_getComposition", &PAGPlayer::getComposition)
+      .function("_getComposition", optional_override([](PAGPlayer& pagPlayer) -> emscripten::val {
+                  auto composition = pagPlayer.getComposition();
+                  return PAGLayerToJsObject(composition);
+                }))
       .function("_setComposition", &PAGPlayer::setComposition)
       .function("_getSurface", &PAGPlayer::getSurface)
       .function("_matrix", &PAGPlayer::matrix)
@@ -409,7 +487,16 @@ bool PAGBindInit() {
       .function("_autoClear", &PAGPlayer::autoClear)
       .function("_setAutoClear", &PAGPlayer::setAutoClear)
       .function("_getBounds", &PAGPlayer::getBounds)
-      .function("_getLayersUnderPoint", &PAGPlayer::getLayersUnderPoint)
+      .function("_getLayersUnderPoint",
+                optional_override([](PAGPlayer& pagPlayer, float surfaceX, float surfaceY) {
+                  auto layerVector = pagPlayer.getLayersUnderPoint(surfaceX, surfaceY);
+                  int size = layerVector.size();
+                  emscripten::val jsArray = emscripten::val::array();
+                  for (int i = 0; i < size; ++i) {
+                    jsArray.call<void>("push", PAGLayerToJsObject(layerVector[i]));
+                  }
+                  return jsArray;
+                }))
       .function("_hitTestPoint", &PAGPlayer::hitTestPoint)
       .function("_renderingTime", optional_override([](PAGPlayer& pagPlayer) {
                   return static_cast<int>(pagPlayer.renderingTime());

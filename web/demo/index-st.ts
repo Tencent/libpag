@@ -28,7 +28,7 @@ let isMobile = false;
 
 if (typeof window !== 'undefined') {
   window.onload = async () => {
-    PAG = await PAGInit({ locateFile: (file: string) => '../lib/wasm/' + file });
+    PAG = await PAGInit({ locateFile: (file: string) => '../lib/' + file });
     // Mobile
     isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
     if (isMobile) {

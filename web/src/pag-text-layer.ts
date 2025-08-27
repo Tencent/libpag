@@ -81,6 +81,7 @@ export class PAGTextLayer extends PAGLayer {
    * Returns the text layer's text.
    */
   public text(): string {
+    console.log("text this.wasmIns:",this.wasmIns);
     return this.wasmIns._text() as string;
   }
   /**

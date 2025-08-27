@@ -12,13 +12,12 @@ process.argv.push("pag");
 require("../../build_pag");
 
 const getArgValue = (argName, defaultValue = "wasm") => process.argv.includes(argName) ? process.argv[process.argv.indexOf(argName) + 1] : defaultValue;
-const filePath=getArgValue("-a");
 
-if (!fs.existsSync(`../lib/${filePath}`)) {
-    fs.mkdirSync(`../lib/${filePath}`, {recursive: true});
-}
-if (!fs.existsSync("../wechat/lib")) {
-    fs.mkdirSync("../wechat/lib", {recursive: true});
+const arch=getArgValue("-a");
+const libPath = (arch==="wasm-mt" ? "../lib-mt" : "../lib");
+
+if (!fs.existsSync(`${libPath}`)) {
+    fs.mkdirSync(`${libPath}`, {recursive: true});
 }
 
-fs.copyFileSync(`../src/${filePath}/libpag.wasm`, `../lib/${filePath}/libpag.wasm`);
+fs.copyFileSync(`../src/${arch}/libpag.wasm`, `${libPath}/libpag.wasm`);
