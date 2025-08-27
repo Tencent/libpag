@@ -55,73 +55,73 @@ AESDKPath="${PAG_AE_SDK_Path}"
 # 2 Compile
 print "[ Compile ]"
 
-# 2.1 Compile PAGViewer-x86
-print "[ Compile x86 ]"
-x86BuildDir="${BuildDir}/build_x86"
+# 2.1 Compile PAGViewer-x86_64
+print "[ Compile x86_64 ]"
+x86_64BuildDir="${BuildDir}/build_x86_64"
 
-cmake -S ${SourceDir} -B ${x86BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
+cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
 if [ $? -ne 0 ];
 then
-    echo "Build PAGViewer-x86 failed"
+    echo "Build PAGViewer-x86_64 failed"
     exit 1
 fi
 
-cmake --build ${x86BuildDir} --target PAGViewer -j 8
+cmake --build ${x86_64BuildDir} --target PAGViewer -j 8
 if [ $? -ne 0 ];
 then
-    echo "Compile PAGViewer-x86 failed"
+    echo "Compile PAGViewer-x86_64 failed"
     exit 1
 fi
 
 # 2.2 Compile PAGViewer-arm
 print "[ Compile arm64 ]"
-armBuildDir="${BuildDir}/build_arm"
+arm64BuildDir="${BuildDir}/build_arm64"
 
-cmake -S ${SourceDir} -B ${armBuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
+cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-arm64 failed"
     exit 1
 fi
 
-cmake --build ${armBuildDir} --target PAGViewer -j 8
+cmake --build ${arm64BuildDir} --target PAGViewer -j 8
 if [ $? -ne 0 ];
 then
     echo "Compile PAGViewer-arm64 failed"
     exit 1
 fi
 
-# 2.3 Compile PAGExporter-x86
-print "[ Compile PAGExporter-x86 ]"
+# 2.3 Compile PAGExporter-x86_64
+print "[ Compile PAGExporter-x86_64 ]"
 PluginSourceDir="$(dirname "${SourceDir}")/exporter"
-x86BuildDirForPlugin="${x86BuildDir}/Plugin"
+x86_64BuildDirForPlugin="${x86_64BuildDir}/Plugin"
 
-cmake -S ${PluginSourceDir} -B ${x86BuildDirForPlugin} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_PROCESSOR=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DAE_SDK_PATH="${AESDKPath}"
+cmake -S ${PluginSourceDir} -B ${x86_64BuildDirForPlugin} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DAE_SDK_PATH="${AESDKPath}"
 if [ $? -ne 0 ];
 then
-    echo "Build PAGExporter-x86 failed"
+    echo "Build PAGExporter-x86_64 failed"
     exit 1
 fi
 
-cmake --build ${x86BuildDirForPlugin} --target PAGExporter -j 8
+cmake --build ${x86_64BuildDirForPlugin} --target PAGExporter -j 8
 if [ $? -ne 0 ];
 then
-    echo "Compile PAGExporter-x86 failed"
+    echo "Compile PAGExporter-x86_64 failed"
     exit 1
 fi
 
-# 2.4 Compile PAGExporter-arm
+# 2.4 Compile PAGExporter-arm64
 print "[ Compile PAGExporter-arm64 ]"
-armBuildDirForPlugin="${armBuildDir}/Plugin"
+arm64BuildDirForPlugin="${arm64BuildDir}/Plugin"
 
-cmake -S ${PluginSourceDir} -B ${armBuildDirForPlugin} -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DAE_SDK_PATH="${AESDKPath}"
+cmake -S ${PluginSourceDir} -B ${arm64BuildDirForPlugin} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DAE_SDK_PATH="${AESDKPath}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGExporter-arm64 failed"
     exit 1
 fi
 
-cmake --build ${armBuildDirForPlugin} --target PAGExporter -j 8
+cmake --build ${arm64BuildDirForPlugin} --target PAGExporter -j 8
 if [ $? -ne 0 ];
 then
     echo "Compile PAGExporter-arm64 failed"
@@ -147,11 +147,11 @@ print "[ Merge PAGViewer ]"
 AppDir="${BuildDir}/PAGViewer.app"
 ExeDir="${AppDir}/Contents/MacOS"
 ExePath="${ExeDir}/PAGViewer"
-x86ExePath="${x86BuildDir}/PAGViewer"
-armExePath="${armBuildDir}/PAGViewer"
+x86_64ExePath="${x86_64BuildDir}/PAGViewer"
+arm64ExePath="${arm64BuildDir}/PAGViewer"
 
 mkdir -p ${ExeDir}
-lipo -create ${x86ExePath} ${armExePath} -output ${ExePath}
+lipo -create ${x86_64ExePath} ${arm64ExePath} -output ${ExePath}
 
 # 3.2 Obtain the dependencies of PAGViewer
 print "[ Obtain the dependencies of PAGViewer ]"
@@ -228,21 +228,21 @@ print "[ Merge PAGExporter and copy related tools ]"
 print "[ Merge PAGExporter ]"
 PluginPath="${ResourcesDir}/PAGExporter.plugin"
 PluginExePath="${PluginPath}/Contents/MacOS/PAGExporter"
-x86PluginPath="${x86BuildDirForPlugin}/PAGExporter.plugin"
-armPluginPath="${armBuildDirForPlugin}/PAGExporter.plugin"
-x86PluginExePath="${x86PluginPath}/Contents/MacOS/PAGExporter"
-armPluginExePath="${armPluginPath}/Contents/MacOS/PAGExporter"
-cp -fr ${x86PluginPath} ${PluginPath}
-lipo -create ${x86PluginExePath} ${armPluginExePath} -output ${PluginExePath}
+x86_64PluginPath="${x86_64BuildDirForPlugin}/PAGExporter.plugin"
+arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
+x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
+arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
+cp -fr ${x86_64PluginPath} ${PluginPath}
+lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
 
 # 3.5.2 Merge and copy ffaudio
 print "[ Merge and copy ffaudio ]"
-x86FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/x64/libffaudio.dylib"
-armFfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/arm64/libffaudio.dylib"
+x64FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/x64/libffaudio.dylib"
+arm64FfaudioPath="${PluginSourceDir}/vendor/ffaudio/mac/arm64/libffaudio.dylib"
 PluginFrameworksDir="${PluginPath}/Contents/Frameworks"
 FfaudioPath="${PluginFrameworksDir}/libffaudio.dylib"
 mkdir -p ${PluginFrameworksDir}
-lipo -create ${x86FfaudioPath} ${armFfaudioPath} -output ${FfaudioPath}
+lipo -create ${x64FfaudioPath} ${arm64FfaudioPath} -output ${FfaudioPath}
 
 # 3.5.3 Copy related tools
 print "[ Copy related tools ]"
@@ -393,6 +393,7 @@ then
         zip --symlinks -r -q -X "${ZipFile}" "${AppDir}"
 
         SignScript="${SourceDir}/package/sign_update.sh"
+        chmod +x "${SignScript}"
 
         ${SignScript} ${BuildDir}/${ZipFile} ${DSAPrivateKey} > DSASignHash.txt
         ZipDSAHash=$(tr '\n' ' ' < DSASignHash.txt | sed '$s/ //g')
