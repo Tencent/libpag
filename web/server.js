@@ -32,7 +32,7 @@ app.get('/', (req, res) => {
   res.send('Hello, tgfx-benchmark!');
 });
 
-const port = 8061;
+const port = 8081;
 const args = process.argv.slice(2);
 const fileName = args.includes('wasm-mt') ? 'index': 'index-st';
 app.listen(port, () => {
