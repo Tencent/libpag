@@ -38,7 +38,7 @@ class DropShadowFilter : public LayerStyleFilter {
  private:
   std::shared_ptr<tgfx::ImageFilter> getStrokeFilter() const;
 
-  std::shared_ptr<tgfx::ImageFilter> getDropShadowFilter() const;
+  std::shared_ptr<tgfx::ImageFilter> getDropShadowFilter(float offsetX, float offsetY) const;
 
   DropShadowStyle* layerStyle = nullptr;
   tgfx::Color color = tgfx::Color::Black();

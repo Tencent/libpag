@@ -32,7 +32,6 @@ void DropShadowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
                               const tgfx::Point& sourceScale) {
   auto totalScale = tgfx::Point::Make(filterScale.x * sourceScale.x, filterScale.y * sourceScale.y);
   spread = layerStyle->spread->getValueAt(layerFrame);
-  spread *= (spread == 1.f) ? 1.f : 0.8f;
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto size = layerStyle->size->getValueAt(layerFrame);
@@ -55,7 +54,7 @@ void DropShadowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
 bool DropShadowFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (spread == 0.f) {
-    filter = getDropShadowFilter();
+    filter = getDropShadowFilter(offsetX, offsetY);
   } else if (spread == 1.f) {
     filter = getStrokeFilter();
   } else {
@@ -63,7 +62,7 @@ bool DropShadowFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) 
     if (strokeFilter == nullptr) {
       return false;
     }
-    auto dropShadowFilter = getDropShadowFilter();
+    auto dropShadowFilter = getDropShadowFilter(0, 0);
     if (dropShadowFilter == nullptr) {
       return false;
     }
@@ -89,9 +88,10 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getStrokeFilter() const {
   return SolidStrokeFilter::CreateFilter(strokeOption, mode);
 }
 
-std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getDropShadowFilter() const {
-  float blurSizeX = sizeX * (1.f - spread) * 2.f;
-  float blurSizeY = sizeY * (1.f - spread) * 2.f;
+std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getDropShadowFilter(float offsetX,
+                                                                         float offsetY) const {
+  float blurSizeX = sizeX * (1.f - spread);
+  float blurSizeY = sizeY * (1.f - spread);
   return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurSizeX / 2, blurSizeY / 2, color);
 }
 

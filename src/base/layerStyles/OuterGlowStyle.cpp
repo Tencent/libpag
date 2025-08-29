@@ -47,9 +47,8 @@ void OuterGlowStyle::transformBounds(Rect* contentBounds, const Point& filterSca
   auto spreadValue = spread->getValueAt(layerFrame);
   auto sizeValue = size->getValueAt(layerFrame);
   auto rangeValue = range->getValueAt(layerFrame);
-  spreadValue *= (spreadValue == 1.f) ? 1.f : 0.8f;
   auto spreadSize = sizeValue * spreadValue / rangeValue;
-  auto blurSize = sizeValue * (1.f - spreadValue) * 2.f / rangeValue;
+  auto blurSize = sizeValue * (1.f - spreadValue) / rangeValue;
   auto blurXSize = blurSize * filterScale.x;
   auto blurYSize = blurSize * filterScale.y;
   contentBounds->outset(spreadSize * filterScale.x, spreadSize * filterScale.y);

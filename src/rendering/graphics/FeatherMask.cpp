@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FeatherMask.h"
+#include <tgfx/core/Recorder.h>
 #include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
@@ -41,14 +42,9 @@ tgfx::Rect MeasureFeatherMaskBounds(const std::vector<MaskData*>& masks, Frame l
     auto expansion = mask->maskExpansion->getValueAt(layerFrame);
     ExpandPath(&maskPath, expansion);
     auto bounds = maskPath.getBounds();
-    if (bounds.right > maskBounds.right) {
-      maskBounds.right = bounds.right;
-    }
-    if (bounds.bottom > maskBounds.bottom) {
-      maskBounds.bottom = bounds.bottom;
-    }
+    maskBounds.join(bounds);
   }
-  maskBounds.outset(maskBounds.width() * 0.1, maskBounds.height() * 0.1);
+  maskBounds.roundOut();
   return maskBounds;
 }
 
@@ -81,14 +77,7 @@ std::shared_ptr<tgfx::Surface> MakeAlphaSurface(tgfx::Context* context, int widt
 }
 
 void FeatherMask::draw(Canvas* parentCanvas) const {
-  auto surface =
-      MakeAlphaSurface(parentCanvas->getContext(), static_cast<int>(ceilf(bounds.width())),
-                       static_cast<int>(ceilf(bounds.height())));
-  if (surface == nullptr) {
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(tgfx::Matrix::MakeTrans(bounds.x(), bounds.y()));
+  parentCanvas->clipRect(bounds);
   bool isFirst = true;
   for (auto* mask : masks) {
     auto path = mask->maskPath->getValueAt(layerFrame);
@@ -114,28 +103,18 @@ void FeatherMask::draw(Canvas* parentCanvas) const {
     if (width == 0 || height == 0) {
       continue;
     }
-    auto maskSurface = MakeAlphaSurface(parentCanvas->getContext(), width, height);
-    if (maskSurface == nullptr) {
-      return;
-    }
-    auto maskCanvas = maskSurface->getCanvas();
-    maskCanvas->setMatrix(tgfx::Matrix::MakeTrans(-maskBounds.x(), -maskBounds.y()));
     tgfx::Paint maskPaint;
     float alpha = ToAlpha(mask->maskOpacity->getValueAt(layerFrame));
     maskPaint.setAlpha(alpha);
-    maskCanvas->drawPath(maskPath, maskPaint);
-    auto maskImage = maskSurface->makeImageSnapshot();
     tgfx::Paint blurPaint;
     if (mask->maskFeather) {
       auto blurrinessX = mask->maskFeather->getValueAt(layerFrame).x;
       auto blurrinessY = mask->maskFeather->getValueAt(layerFrame).y;
       blurPaint.setImageFilter(tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2));
     }
-    canvas->save();
-    canvas->setMatrix(tgfx::Matrix::MakeTrans(maskBounds.x(), maskBounds.y()));
-    canvas->drawImage(maskImage, &blurPaint);
-    canvas->restore();
+    parentCanvas->save();
+    parentCanvas->drawPath(maskPath, blurPaint);
+    parentCanvas->restore();
   }
-  parentCanvas->drawImage(surface->makeImageSnapshot());
 }
 }  // namespace pag
