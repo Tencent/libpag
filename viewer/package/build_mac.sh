@@ -434,16 +434,11 @@ cp -R -P "${AppDir}" "${BuildDir}/dmg_content"
 
 CreateDmgTool="${SourceDir}/tools/create-dmg/create-dmg"
 
-for ((i=1; i < 4; i++));
-do
-    createDmg "${CreateDmgTool}" "${BuildDir}/dmg_content" "${BuildDir}/PAGViewer.dmg" "${SourceDir}/images/dmgIcon.icns" "${SourceDir}/images/dmg-background.png"
-    if [  $? -eq 0 ];
-    then
-        echo "create dmg success"
-        break
-    else
-        echo "create dmg failed"
-        continue;
-    fi
-done
+createDmg "${CreateDmgTool}" "${BuildDir}/dmg_content" "${BuildDir}/PAGViewer.dmg" "${SourceDir}/images/dmgIcon.icns" "${SourceDir}/images/dmg-background.png"
+if [  $? -eq 0 ];
+then
+    echo "create dmg success"
+else
+    echo "create dmg failed"
+fi
 
