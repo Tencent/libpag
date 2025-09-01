@@ -12,13 +12,13 @@ describe('PAGTextLayer', async () => {
   let pagTextLayer: PAGTextLayer;
 
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
 
-      const buffer = await global.fetch('http://127.0.0.1:8080/demo/assets/test2.pag').then((res) => res.arrayBuffer());
+      const buffer = await global.fetch('/demo/assets/test2.pag').then((res) => res.arrayBuffer());
       const pagFile = await PAG.PAGFile.load(buffer);
       expect(pagFile.wasmIns).to.be.a('Object');
       const layers = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text);

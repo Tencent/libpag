@@ -25,12 +25,12 @@
     "prettier": "prettier --check \"src/**/*.ts\"",
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
     "UnitTest": "node ./script/UnitTest.js",
-    "cypress": "time cypress run --browser electron --headless ",
+    "cypress": "cypress run --browser electron --headless ",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
     "brotli": "brotli ./lib/libpag.wasm",
     "server:mt": "node server.js wasm-mt",
     "server:st": "node server.js wasm",
-    "server:eypress": "http-server -p 8080"
+    "server:cypress": "http-server -p 8080"
   },
   "repository": {
     "type": "git",
@@ -81,6 +81,8 @@
   ],
   "author": "libpag",
   "dependencies": {
+    "abort-controller": "^3.0.0",
+    "cross-spawn": "^7.0.6",
     "express": "^5.1.0"
   }
 }

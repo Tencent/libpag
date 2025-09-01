@@ -1,5 +1,5 @@
 {
-  "baseUrl": "http://127.0.0.1:8080/cypress/",
+  "baseUrl": "http://localhost:8080/",
   "defaultCommandTimeout": 8000,
   "video": false,
   "screenshotOnRunFailure": false,

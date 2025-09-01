@@ -10,7 +10,7 @@ describe('PAGTextLayer', async () => {
   let PAGTypes: typeof Libpag.types;
 
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();

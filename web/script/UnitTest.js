@@ -1,20 +1,26 @@
-const { exec, spawn } = require('child_process');
+// UnitTest.js
+const { performance } = require('perf_hooks');
+const spawn = require('cross-spawn');
+const { AbortController } = require('abort-controller');
 
 const controller = new AbortController();
 const { signal } = controller;
-const grep = spawn('npm', ['run', 'server:eypress'], { signal });
-grep.on('error', (err) => {
-  // 如果控制器中止，则这将在 err 为 AbortError 的情况下被调用
+
+// 1. 启动 server
+const server = spawn('npm', ['run', 'server:cypress'], {
+  stdio: 'inherit',
+  signal,
+});
+server.on('error', err => {
+  if (err.code !== 'ABORT_ERR') console.error(err);
 });
 
-const ls = spawn('npm', ['run', 'cypress']);
-ls.stdout.on('data', (data) => {
-  console.log(`${data}`);
-});
-ls.stderr.on('data', (data) => {
-  console.error(`${data}`);
-});
-ls.on('close', (code) => {
-  controller.abort(); // stop server process
-  console.log(`child process exited with code ${code}`);
+// 2. 启动 cypress 并计时
+const start = performance.now();
+const cypress = spawn('npm', ['run', 'cypress'], { stdio: 'inherit' });
+
+cypress.on('close', code => {
+  const duration = ((performance.now() - start) / 1000).toFixed(3);
+  console.log(`cypress exit code: ${code}, elapsed: ${duration}s`);
+  controller.abort();      // 关闭 server
 });

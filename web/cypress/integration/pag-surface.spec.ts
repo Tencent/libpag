@@ -9,7 +9,7 @@ describe('PAGSurface', () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -52,7 +52,7 @@ describe('PAGSurface', () => {
     const pagSurface = makePAGSurfaceFromFrameBuffer();
     const pagPlayer = PAG.PAGPlayer.create();
     const buffer = await global
-      .fetch('http://127.0.0.1:8080/demo/assets/AudioMarker.pag')
+      .fetch('/demo/assets/AudioMarker.pag')
       .then((res) => res.arrayBuffer());
     const pagFile = await PAG.PAGFile.load(buffer);
     expect(pagFile.wasmIns).to.be.a('Object');

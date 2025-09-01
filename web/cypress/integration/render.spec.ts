@@ -3,10 +3,10 @@ import { PAGInit } from '../../src/pag';
 
 describe('Common render', () => {
   it('Vector render', () => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: { PAGInit: typeof PAGInit } }) => {
       const PAG = await window.libpag.PAGInit({});
-      const pagUrl = '../demo/assets/like.pag';
+      const pagUrl = '/demo/assets/like.pag';
       const fileBlob = await window.fetch(pagUrl).then((response) => response.blob());
       const file = new window.File([fileBlob], pagUrl.replace(/(.*\/)*([^.]+)/i, '$2'));
       const pagFile = await PAG.PAGFile.load(file);
@@ -33,10 +33,10 @@ describe('Common render', () => {
   });
 
   it('Video render', () => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: { PAGInit: typeof PAGInit } }) => {
       const PAG = await window.libpag.PAGInit({});
-      const pagUrl = '../demo/assets/particle_video.pag';
+      const pagUrl = '/demo/assets/particle_video.pag';
       const fileBlob = await window.fetch(pagUrl).then((response) => response.blob());
       const file = new window.File([fileBlob], pagUrl.replace(/(.*\/)*([^.]+)/i, '$2'));
       const pagFile = await PAG.PAGFile.load(file);
@@ -63,10 +63,10 @@ describe('Common render', () => {
   });
 
   it('Text render', () => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: { PAGInit: typeof PAGInit } }) => {
       const PAG = await window.libpag.PAGInit({});
-      const pagUrl = '../demo/assets/test2.pag';
+      const pagUrl = '/demo/assets/test2.pag';
       const fileBlob = await window.fetch(pagUrl).then((response) => response.blob());
       const file = new window.File([fileBlob], pagUrl.replace(/(.*\/)*([^.]+)/i, '$2'));
       const pagFile = await PAG.PAGFile.load(file);

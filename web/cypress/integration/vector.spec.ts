@@ -11,14 +11,14 @@ describe('PAGImage', () => {
   let PAGTypes: typeof Libpag.types;
   let layers: Libpag.types.Vector<PAGImageLayer>;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
 
       const buffer = await global
-        .fetch('http://127.0.0.1:8080/demo/assets/AudioMarker.pag')
+        .fetch('/demo/assets/AudioMarker.pag')
         .then((res) => res.arrayBuffer());
       const pagFile = await PAG.PAGFile.load(buffer);
       layers = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Image) as Libpag.types.Vector<PAGImageLayer>;

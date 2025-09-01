@@ -55,7 +55,7 @@ describe('PAGFile', () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -69,7 +69,7 @@ describe('PAGFile', () => {
 
   let pagFile: PAGFile;
   it('Load from arrayBuffer', async () => {
-    const buffer = await global.fetch('http://127.0.0.1:8080/demo/assets/test2.pag').then((res) => res.arrayBuffer());
+    const buffer = await global.fetch('/demo/assets/test2.pag').then((res) => res.arrayBuffer());
     pagFile = await PAG.PAGFile.load(buffer);
     expect(pagFile.wasmIns).to.be.a('object');
   });

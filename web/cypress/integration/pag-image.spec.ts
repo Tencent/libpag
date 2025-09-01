@@ -10,7 +10,7 @@ describe('PAGImage', () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -20,7 +20,7 @@ describe('PAGImage', () => {
 
   let pagImage: PAGImage;
   it('Make from file', async () => {
-    const imageBlob = await global.fetch('http://127.0.0.1:8080/demo/assets/cat.png').then((res) => res.blob());
+    const imageBlob = await global.fetch('http://localhost:8080/demo/assets/cat.png').then((res) => res.blob());
     pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
     expect(pagImage.wasmIns).to.be.a('object');
   });
@@ -28,7 +28,7 @@ describe('PAGImage', () => {
   it('Make from source', async () => {
     const image = await new Promise<HTMLImageElement>((resolve) => {
       const image = new window.Image();
-      image.src = 'http://127.0.0.1:8080/demo/assets/cat.png';
+      image.src = '/demo/assets/cat.png';
       image.onload = () => {
         resolve(image);
       };

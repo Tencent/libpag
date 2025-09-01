@@ -10,7 +10,7 @@ describe('PAGImage', () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -25,7 +25,7 @@ describe('PAGImage', () => {
 
   it('Get size', async () => {
     const buffer = await global
-      .fetch('http://127.0.0.1:8080/demo/assets/AudioMarker.pag')
+      .fetch('/demo/assets/AudioMarker.pag')
       .then((res) => res.arrayBuffer());
     pagComposition = (await PAG.PAGFile.load(buffer)) as PAGComposition;
     expect(pagComposition.wasmIns).to.be.a('object');

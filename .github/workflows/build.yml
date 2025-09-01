@@ -163,11 +163,25 @@ jobs:
           depsync
         shell: bash
 
-      - name: Build Web
+      - name: Build Web:st
         run: |
           cd web
           emsdk/emsdk_env
-          npm run build
+          npm run build:st
+
+      - name: Build Web:mt
+        run: |
+          cd web
+          emsdk/emsdk_env
+          npm run build:mt
+
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: web
+          start: npm run server:cypress
+          wait-on: 'http://localhost:8080'
+          command: npm run cypress
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
