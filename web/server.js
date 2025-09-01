@@ -1,7 +1,6 @@
-import { exec } from 'child_process';
-import express from 'express';
+const express = require('express');
 const app = express();
-import path from 'path';
+const path = require('path');
 
 // Enable SharedArrayBuffer
 app.use((req, res, next) => {
@@ -40,5 +39,5 @@ app.listen(port, () => {
 
   const url = `http://localhost:${port}/${fileName}.html`;
   const start = (process.platform === 'darwin'? 'open': 'start');
-  exec(start + ' ' + url);
+  require('child_process').exec(start + ' ' + url);
 });

@@ -2,7 +2,7 @@ const { exec, spawn } = require('child_process');
 
 const controller = new AbortController();
 const { signal } = controller;
-const grep = spawn('npm', ['run', 'server'], { signal });
+const grep = spawn('npm', ['run', 'server:eypress'], { signal });
 grep.on('error', (err) => {
   // 如果控制器中止，则这将在 err 为 AbortError 的情况下被调用
 });

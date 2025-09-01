@@ -1,4 +1,13 @@
 {
   "baseUrl": "http://127.0.0.1:8080/cypress/",
-  "defaultCommandTimeout": 10000
+  "defaultCommandTimeout": 8000,
+  "video": false,
+  "screenshotOnRunFailure": false,
+  "pageLoadTimeout": 60000,
+  "viewportWidth": 1280,
+  "viewportHeight": 720,
+  "retries": {
+    "runMode": 1,
+    "openMode": 0
+  }
 }

@@ -15,9 +15,12 @@ export const saveData = (filename: string, data: Uint8Array) => {
 
 export const compareData = (filename, compareArray: Uint8Array | Uint8ClampedArray) => {
   cy.task('readData', filename).then(async (data: { [key: string]: number }) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     expect(!!data).to.be.true;
     const buffer = nodeUint8Array2uint8Array(data);
     const res = compare(compareArray, buffer);
+    cy.pause();
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     expect(res).to.be.true;
   });
 };
