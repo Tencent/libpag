@@ -34,7 +34,7 @@ describe('PAGLayer', async () => {
   });
 
   it('Get layerName', async () => {
-    expect(pagLayer.layerName()).to.be.eq('');
+    expect(pagLayer.layerName()).to.be.eq('SolidLayer');
   });
 
   it('Get/Set matrix', () => {
@@ -138,5 +138,9 @@ describe('PAGLayer', async () => {
 
   it('Is PAGFile', () => {
     expect(pagLayer.isPAGFile()).to.be.eq(false);
+  });
+
+  it('As TypeLayer', () => {
+    expect(pagLayer.asTypeLayer().layerType()).to.be.eq(PAGTypes.LayerType.Solid);
   });
 });

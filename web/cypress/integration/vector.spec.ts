@@ -17,9 +17,7 @@ describe('PAGImage', () => {
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
 
-      const buffer = await global
-        .fetch('/demo/assets/AudioMarker.pag')
-        .then((res) => res.arrayBuffer());
+      const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
       const pagFile = await PAG.PAGFile.load(buffer);
       layers = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Image) as Libpag.types.Vector<PAGImageLayer>;
     });

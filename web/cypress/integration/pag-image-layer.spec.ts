@@ -15,9 +15,7 @@ describe('PAGImageLayer', async () => {
       global = window;
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
-      const buffer = await global
-        .fetch('/demo/assets/AudioMarker.pag')
-        .then((res) => res.arrayBuffer());
+      const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
       const pagFile = await PAG.PAGFile.load(buffer);
       pagImageLayer = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Image).get(0) as PAGImageLayer;
     });
@@ -31,6 +29,20 @@ describe('PAGImageLayer', async () => {
 
   it('Get videoRanges', async () => {
     expect(pagImageLayer.getVideoRanges().length).to.be.eq(5);
+  });
+
+  it('Replace Image', async () => {
+    const imageBlob = await global.fetch('/demo/assets/cat.png').then((res) => res.blob());
+    const pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
+    expect(pagImage.wasmIns).to.be.a('object');
+    pagImageLayer.replaceImage(pagImage);
+  });
+
+  it('Set Image', async () => {
+    const imageBlob = await global.fetch('/demo/assets/cat.png').then((res) => res.blob());
+    const pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
+    expect(pagImage.wasmIns).to.be.a('object');
+    pagImageLayer.setImage(pagImage);
   });
 
   it('layerTime to content', async () => {

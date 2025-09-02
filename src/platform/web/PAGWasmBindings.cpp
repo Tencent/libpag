@@ -251,7 +251,6 @@ bool PAGBindInit() {
                                      std::shared_ptr<PAGLayer> pagLayer) -> emscripten::val {
                   return PAGLayerToJsObject(pagComposition.removeLayer(pagLayer));
                 }))
-      .function("_removeLayerAt", &PAGComposition::removeLayerAt)
       .function("_removeLayerAt",
                 optional_override([](PAGComposition& pagComposition, int index) -> emscripten::val {
                   return PAGLayerToJsObject(pagComposition.removeLayerAt(index));

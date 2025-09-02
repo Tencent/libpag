@@ -26,19 +26,25 @@ describe('PAGTextLayer', async () => {
     });
   });
 
-  it('Get/Set font', async () => {
+  it('Get/Set font', () => {
     expect(pagTextLayer.wasmIns).to.be.a('Object');
     expect(pagTextLayer.font().fontFamily).to.be.eq('Yuanti SC');
     pagTextLayer.setFont(PAG.PAGFont.create('Arial', 'Regular'));
     expect(pagTextLayer.font().fontFamily).to.be.eq('Arial');
   });
 
-  it('Get/Set fillColor', async () => {
+  it('Get/Set fillColor', () => {
     const fillColor = pagTextLayer.fillColor();
     expect(fillColor).to.be.eql({ blue: 86, green: 35, red: 231 });
     fillColor.red = 255;
     pagTextLayer.setFillColor(fillColor);
     expect(pagTextLayer.fillColor().red).to.be.eq(255);
+  });
+
+  it('Get/Set fontSize', () => {
+    expect(pagTextLayer.fontSize()).to.be.eq(120);
+    pagTextLayer.setFontSize(125);
+    expect(pagTextLayer.fontSize()).to.be.eq(125);
   });
 
   it('Get/Set strokeColor', () => {
