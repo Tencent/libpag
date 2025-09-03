@@ -396,8 +396,8 @@ export class PAGView {
    * Returns a ImageBitmap object capturing the contents of the PAGView. Subsequent rendering of
    * the PAGView will not be captured. Returns null if the PAGView hasn't been presented yet.
    */
-  public makeSnapshot() {
-    return createImageBitmap(this.canvasElement!);
+  public async makeSnapshot() {
+    return await createImageBitmap(this.canvasElement!);
   }
 
   public destroy() {

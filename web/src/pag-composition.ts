@@ -149,8 +149,8 @@ export class PAGComposition extends PAGLayer {
     const wasmIns = this.wasmIns._getLayersByName(layerName);
     if (!wasmIns) throw new Error(`Get layers by ${layerName} fail!`);
     const layerArray = VecArray.create();
-    for (let i = 0; i < wasmIns.length; i++) {
-      layerArray.push(layer2typeLayer(wasmIns[i]));
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
     }
     return layerArray;
   }
@@ -162,8 +162,8 @@ export class PAGComposition extends PAGLayer {
     const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
     if (!wasmIns) throw new Error(`Get layers under point ${localX},${localY} fail!`);
     const layerArray = VecArray.create();
-    for (let i = 0; i < wasmIns.length; i++) {
-      layerArray.push(layer2typeLayer(wasmIns[i]));
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
     }
     return layerArray;
   }

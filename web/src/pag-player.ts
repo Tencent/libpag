@@ -237,8 +237,8 @@ export class PAGPlayer {
     const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
     if (!wasmIns) throw new Error(`Get layers under point, x: ${localX} y:${localY} fail!`);
     const layerArray = VecArray.create();
-    for (let i = 0; i < wasmIns.length; i++) {
-      layerArray.push(layer2typeLayer(wasmIns[i]));
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
     }
     return layerArray;
   }

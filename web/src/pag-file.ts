@@ -101,8 +101,8 @@ export class PAGFile extends PAGComposition {
         if (!wasmIns) throw new Error(`Get ${getLayerTypeName(layerType)} layers by ${editableIndex} fail!`);
 
         const layerArray = VecArray.create();
-        for (let i = 0; i < wasmIns.length; i++) {
-            layerArray.push(layer2typeLayer(wasmIns[i]));
+        for (const wasmIn of wasmIns) {
+          layerArray.push(layer2typeLayer(wasmIn));
         }
         return layerArray;
     }
@@ -140,8 +140,8 @@ export class PAGFile extends PAGComposition {
     }
 
     /**
-     * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
-     * to its default value.
+     * Make a copy of the original file, any modification to current file has no effect on the result
+     * file.
      */
     public copyOriginal(): PAGFile {
         const wasmIns = this.wasmIns._copyOriginal();

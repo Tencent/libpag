@@ -31,12 +31,19 @@ export interface FontMetrics {
   capHeight: number;
 }
 
+export interface Stroke {
+  width: number;
+  cap: ctor;
+  join: ctor;
+  miterLimit: number;
+}
+
 export interface ScalerContext {
   fontString: (fauxBold: boolean, fauxItalic: boolean) => string;
   getAdvance: (text: string) => number;
   getBounds: (text: string, fauxBold: boolean, fauxItalic: boolean) => Rect;
   getFontMetrics: () => FontMetrics;
-  generateImage: (text: string, bounds: Rect) => TexImageSource | OffscreenCanvas;
+  readPixels: (text: string, bounds: Rect, fauxBold: boolean, stroke?: Stroke) => Uint8Array;
 }
 
 export interface ScalerContextConstructor {

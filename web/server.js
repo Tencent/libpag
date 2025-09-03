@@ -9,8 +9,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('', express.static(path.join('./')));
-app.use('', express.static(path.join('demo/')));
 // 配置静态文件服务，显式设置.wasm文件的MIME类型
 app.use('', express.static(path.join('./'), {
   setHeaders: (res, filePath) => {
@@ -19,16 +17,9 @@ app.use('', express.static(path.join('./'), {
     }
   }
 }));
-app.use('', express.static(path.join('demo/'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.wasm')) {
-      res.set('Content-Type', 'application/wasm');
-    }
-  }
-}));
 
 app.get('/', (req, res) => {
-  res.send('Hello, tgfx-benchmark!');
+  res.send('Hello, libpag demo!');
 });
 
 const port = 8081;
@@ -37,7 +28,7 @@ const fileName = args.includes('wasm-mt') ? 'index': 'index-st';
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 
-  const url = `http://localhost:${port}/${fileName}.html`;
+  const url = `http://localhost:${port}/demo/${fileName}.html`;
   const start = (process.platform === 'darwin'? 'open': 'start');
   require('child_process').exec(start + ' ' + url);
 });
