@@ -123,7 +123,14 @@ static std::vector<std::vector<GlyphHandle>> CopyLines(
     std::vector<GlyphHandle> glyphLine;
     glyphLine.reserve(line.size());
     for (const auto& glyph : line) {
-      glyphLine.emplace_back(std::make_shared<Glyph>(*glyph));
+      auto finalGlyph = std::make_shared<Glyph>(*glyph);
+      if (glyph->getStyle() != TextStyle::Fill && glyph->getStrokeWidth() < 0.1f) {
+        if (glyph->getStyle() == TextStyle::Stroke) {
+          continue;
+        }
+        finalGlyph->setStyle(TextStyle::Fill);
+      }
+      glyphLine.emplace_back(std::move(finalGlyph));
     }
     glyphLines.emplace_back(glyphLine);
   }

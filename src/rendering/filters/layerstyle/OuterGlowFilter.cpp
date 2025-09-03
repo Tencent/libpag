@@ -60,10 +60,11 @@ bool OuterGlowFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   if (!filter) {
     return false;
   }
+  tgfx::Point offset;
+  image = image->makeWithFilter(filter, &offset);
   tgfx::Paint paint;
-  paint.setImageFilter(filter);
   paint.setAlpha(alpha);
-  canvas->drawImage(std::move(image), &paint);
+  canvas->drawImage(std::move(image), offset.x, offset.y, &paint);
   return true;
 }
 

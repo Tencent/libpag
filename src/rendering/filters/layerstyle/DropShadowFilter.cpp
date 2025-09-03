@@ -71,10 +71,11 @@ bool DropShadowFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) 
   if (!filter) {
     return false;
   }
+  tgfx::Point point;
+  image = image->makeWithFilter(filter, &point);
   tgfx::Paint paint;
-  paint.setImageFilter(filter);
   paint.setAlpha(alpha);
-  canvas->drawImage(std::move(image), &paint);
+  canvas->drawImage(std::move(image), point.x, point.y, &paint);
   return true;
 }
 
@@ -90,9 +91,9 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getStrokeFilter() const {
 
 std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getDropShadowFilter(float offsetX,
                                                                          float offsetY) const {
-  float blurSizeX = sizeX * (1.f - spread);
-  float blurSizeY = sizeY * (1.f - spread);
-  return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurSizeX / 2, blurSizeY / 2, color);
+  float blurSizeX = sizeX * (1.f - spread) / 2;
+  float blurSizeY = sizeY * (1.f - spread) / 2;
+  return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurSizeX, blurSizeY, color);
 }
 
 }  // namespace pag
