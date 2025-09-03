@@ -43,9 +43,8 @@ void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterSc
                                       Frame layerFrame) const {
   auto spreadValue = spread->getValueAt(layerFrame);
   auto sizeValue = size->getValueAt(layerFrame);
-  spreadValue *= (spreadValue == 1.f) ? 1.f : 0.8f;
   auto spreadSize = sizeValue * spreadValue;
-  auto blurSize = sizeValue * (1.f - spreadValue) * 2.f;
+  auto blurSize = sizeValue * (1.f - spreadValue);
   auto blurXSize = blurSize * filterScale.x;
   auto blurYSize = blurSize * filterScale.y;
   auto distanceValue = distance->getValueAt(layerFrame);
