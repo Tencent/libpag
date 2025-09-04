@@ -169,13 +169,7 @@ jobs:
           emsdk/emsdk_env
           npm run build:st
 
-      - name: Build Web:mt
-        run: |
-          cd web
-          emsdk/emsdk_env
-          npm run build:mt
-
-      - name: Cypress run
+      - name: Cypress run:st
         uses: cypress-io/github-action@v6
         with:
           working-directory: web
