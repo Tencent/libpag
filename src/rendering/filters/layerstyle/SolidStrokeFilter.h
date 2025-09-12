@@ -67,14 +67,11 @@ class SolidStrokeFilter : public RuntimeFilter {
       const SolidStrokeOption& option, SolidStrokeMode mode,
       std::shared_ptr<tgfx::Image> source = nullptr);
 
-  SolidStrokeFilter(tgfx::UniqueType type, const SolidStrokeOption& option)
-      : RuntimeFilter(std::move(type)), option(option) {
+  SolidStrokeFilter(const SolidStrokeOption& option) : option(option) {
   }
 
-  SolidStrokeFilter(tgfx::UniqueType type, const SolidStrokeOption& option,
-                    std::shared_ptr<tgfx::Image> originalImage)
-      : RuntimeFilter(std::move(type), {std::move(originalImage)}), option(option),
-        hasOriginalImage(true) {
+  SolidStrokeFilter(const SolidStrokeOption& option, std::shared_ptr<tgfx::Image> originalImage)
+      : RuntimeFilter({std::move(originalImage)}), option(option), hasOriginalImage(true) {
   }
 
   std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
@@ -96,13 +93,13 @@ class SolidStrokeFilter : public RuntimeFilter {
 
 class SolidStrokeNormalFilter : public SolidStrokeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   static std::shared_ptr<SolidStrokeNormalFilter> Make(SolidStrokeOption option,
                                                        std::shared_ptr<tgfx::Image> originalImage);
-  explicit SolidStrokeNormalFilter(SolidStrokeOption option) : SolidStrokeFilter(Type(), option) {
+  explicit SolidStrokeNormalFilter(SolidStrokeOption option) : SolidStrokeFilter(option) {
   }
   SolidStrokeNormalFilter(SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage)
-      : SolidStrokeFilter(Type(), option, std::move(originalImage)) {
+      : SolidStrokeFilter(option, std::move(originalImage)) {
   }
 
   std::string onBuildFragmentShader() const override;
@@ -110,16 +107,16 @@ class SolidStrokeNormalFilter : public SolidStrokeFilter {
 
 class SolidStrokeThickFilter : public SolidStrokeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   static std::shared_ptr<SolidStrokeThickFilter> Make(SolidStrokeOption option,
                                                       std::shared_ptr<tgfx::Image> originalImage);
 
-  explicit SolidStrokeThickFilter(SolidStrokeOption option) : SolidStrokeFilter(Type(), option) {
+  explicit SolidStrokeThickFilter(SolidStrokeOption option) : SolidStrokeFilter(option) {
   }
 
   SolidStrokeThickFilter(SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage)
-      : SolidStrokeFilter(Type(), option, std::move(originalImage)) {
+      : SolidStrokeFilter(option, std::move(originalImage)) {
   }
 
   std::string onBuildFragmentShader() const override;

@@ -174,8 +174,8 @@ std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> inp
 
 BulgeFilter::BulgeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
                          float bulgeHeight, float pinning)
-    : RuntimeFilter(Type()), horizontalRadius(horizontalRadius), verticalRadius(verticalRadius),
-      bulgeCenter(bulgeCenter), bulgeHeight(bulgeHeight), pinning(pinning) {
+    : horizontalRadius(horizontalRadius), verticalRadius(verticalRadius), bulgeCenter(bulgeCenter),
+      bulgeHeight(bulgeHeight), pinning(pinning) {
 }
 
 std::string BulgeFilter::onBuildVertexShader() const {

@@ -47,16 +47,15 @@ void OuterGlowStyle::transformBounds(Rect* contentBounds, const Point& filterSca
   auto spreadValue = spread->getValueAt(layerFrame);
   auto sizeValue = size->getValueAt(layerFrame);
   auto rangeValue = range->getValueAt(layerFrame);
-  spreadValue *= (spreadValue == 1.f) ? 1.f : 0.8f;
   auto spreadSize = sizeValue * spreadValue / rangeValue;
-  auto blurSize = sizeValue * (1.f - spreadValue) * 2.f / rangeValue;
+  auto blurSize = sizeValue * (1.f - spreadValue) / rangeValue;
   auto blurXSize = blurSize * filterScale.x;
   auto blurYSize = blurSize * filterScale.y;
   contentBounds->outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
   if (spreadValue != 1.f) {
-    *contentBounds = ToPAG(
-        tgfx::ImageFilter::DropShadowOnly(0.f, 0.f, blurXSize, blurYSize, tgfx::Color::White())
-            ->filterBounds(*ToTGFX(contentBounds)));
+    *contentBounds = ToPAG(tgfx::ImageFilter::DropShadowOnly(0.f, 0.f, blurXSize / 2, blurYSize / 2,
+                                                             tgfx::Color::White())
+                               ->filterBounds(*ToTGFX(contentBounds)));
   }
 }
 

@@ -42,11 +42,11 @@ std::shared_ptr<tgfx::Image> GaussianBlurFilter::Apply(std::shared_ptr<tgfx::Ima
   blurrinessY *= filterScale.y * sourceScale.y;
   std::shared_ptr<tgfx::ImageFilter> filter;
   if (repeatEdgePixels) {
-    filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
+    filter = tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2, tgfx::TileMode::Clamp);
     tgfx::Rect clipBounds = tgfx::Rect::MakeWH(input->width(), input->height());
     return input->makeWithFilter(filter, offset, &clipBounds);
   }
-  filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
+  filter = tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2);
   return input->makeWithFilter(filter, offset);
 }
 

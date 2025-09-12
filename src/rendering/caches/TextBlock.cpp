@@ -22,9 +22,6 @@
 namespace pag {
 static void AddGlyph(const GlyphHandle& glyph, std::vector<GlyphHandle>* atlasGlyphs,
                      std::vector<tgfx::BytesKey>* atlasKeys) {
-  if (glyph->getStyle() == TextStyle::Stroke && glyph->getStrokeWidth() < 0.1f) {
-    return;
-  }
   tgfx::BytesKey atlasKey;
   glyph->computeAtlasKey(&atlasKey, glyph->getStyle());
   if (std::find(atlasKeys->begin(), atlasKeys->end(), atlasKey) != atlasKeys->end()) {

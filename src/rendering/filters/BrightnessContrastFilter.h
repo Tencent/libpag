@@ -32,13 +32,13 @@ class BrightnessContrastUniforms : public Uniforms {
 
 class BrightnessContrastFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, tgfx::Point* offset);
 
   BrightnessContrastFilter(float brightness, float contrast)
-      : RuntimeFilter(Type()), brightness(brightness), contrast(contrast) {
+      : brightness(brightness), contrast(contrast) {
   }
 
   std::string onBuildFragmentShader() const override;

@@ -31,7 +31,7 @@ class GlowMergeUniforms : public Uniforms {
 
 class GlowMergeRuntimeFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   GlowMergeRuntimeFilter(float progress, std::shared_ptr<tgfx::Image> blurImage);
 
  protected:
