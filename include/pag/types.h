@@ -1350,9 +1350,6 @@ class PAG_API Matrix {
  private:
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
-  static constexpr int RectStayRectMask = 0x10;
-  static constexpr int UnknownMask = 0x80;
-  static constexpr int AllMasks = 0x10 | 0x20 | 0x40;
   float values[6];
   mutable int32_t typeMask;
   /**
