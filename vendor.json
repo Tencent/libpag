@@ -38,7 +38,8 @@
           "rttr_core_lib"
         ],
         "arguments": [
-          "-DBUILD_STATIC=TRUE"
+          "-DBUILD_STATIC=TRUE",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ],
         "includes": [
           "${SOURCE_DIR}/src/rttr",
