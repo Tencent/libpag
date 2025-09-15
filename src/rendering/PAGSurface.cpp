@@ -223,7 +223,10 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   } else {
     tgfx::BackendSemaphore semaphore = {};
     context->flush(&semaphore);
-    signalSemaphore->initGL(semaphore.glSync());
+    tgfx::GLSyncInfo signalInfo = {};
+    if (semaphore.getGLSync(&signalInfo)) {
+      signalSemaphore->initGL(signalInfo.sync);
+    }
   }
   cache->detachFromContext();
   context->submit();
@@ -287,7 +290,6 @@ tgfx::Context* PAGSurface::lockContext() {
 #ifndef PAG_BUILD_FOR_WEB
     glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
 #endif
-    context->resetState();
   }
   return context;
 }

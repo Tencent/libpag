@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "rendering/caches/TextAtlas.h"
 #include "rendering/caches/TextBlock.h"
 #include "rendering/graphics/Graphic.h"
 #include "tgfx/core/Paint.h"
@@ -63,8 +62,6 @@ class Text : public Graphic {
  private:
   Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns, const tgfx::Rect& bounds,
        bool hasAlpha, std::shared_ptr<TextBlock> textBlock);
-
-  void draw(Canvas* canvas, const TextAtlas* textAtlas) const;
 
   void drawTextRuns(Canvas* canvas, int paintIndex) const;
 
