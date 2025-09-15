@@ -21,6 +21,7 @@
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 
