@@ -48,22 +48,23 @@ enum class ExportScenes {
 };
 
 struct ConfigParam {
+  bool exportLayerName = true;
+  bool exportFontFile = false;
+  int imageQuality = 80;
+  int sequenceQuality = 80;
   int bitmapKeyFrameInterval = 60;
   int bitmapMaxResolution = 720;
-  float frameRate = 24.0f;
-  float scale = 1.0f;
-  TagMode tagMode = TagMode::Stable;
-  ExportScenes scenes = ExportScenes::General;
+  float scale = 1.0;
+  float frameRate = 24.0;
+  float imagePixelRatio = 2.0;
   uint16_t exportTagLevel = 1023;
-  int imageQuality = 80;
-  float imagePixelRatio = 2.0f;
-  std::string sequenceSuffix = "_bmp";
-  bool enableLayerName = true;
-  bool enableFontFile = false;
-  int sequenceQuality = 80;
-  bool enableCompressionPanel = false;
-  pag::CompositionType sequenceType = pag::CompositionType::Video;
-  bool enableFontAudio = true;
+  TagMode tagMode = TagMode::Stable;
   Language language = Language::Auto;
+  ExportScenes scenes = ExportScenes::General;
+  pag::CompositionType sequenceType = pag::CompositionType::Video;
+
+  bool isTagCodeEnable(pag::TagCode code) const {
+    return exportTagLevel >= static_cast<uint16_t>(code);
+  }
 };
 }  // namespace exporter

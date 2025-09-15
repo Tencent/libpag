@@ -17,11 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StringHelper.h"
+#include <QFile>
+#include <QTextStream>
 #include <iostream>
 #include "AEHelper.h"
 #include "src/base/utils/Log.h"
 
 namespace StringHelper {
+
+const std::string CompositionBmpSuffix = "_bmp";
 
 std::string AeMemoryHandleToString(const AEGP_MemHandle& handle) {
   const auto& suites = AEHelper::GetSuites();
@@ -337,6 +341,37 @@ std::u16string Utf8ToUtf16(const std::string& u8str) {
   return u16str;
 }
 
+std::string GetJavaScriptFromQRC(const QString& jsPath) {
+  QFile jsFile(jsPath);
+  if (!jsFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return "";
+  }
+
+  QTextStream in(&jsFile);
+  in.setEncoding(QStringConverter::Encoding::Utf8);
+  QString jsContent = in.readAll();
+  jsFile.close();
+  return jsContent.toStdString();
+}
+
+bool IsEndWidthSuffix(const std::string& str, const std::string& suffix) {
+  if (str.length() < suffix.length()) {
+    return false;
+  }
+
+  std::string newStr = str.substr(str.length() - suffix.length(), suffix.length());
+  std::transform(newStr.begin(), newStr.end(), newStr.begin(), ::tolower);
+
+  return newStr == suffix;
+}
+
+QString ColorToQString(pag::Color color) {
+  return QString("#%1%2%3")
+      .arg(color.red, 2, 16, QChar('0'))
+      .arg(color.green, 2, 16, QChar('0'))
+      .arg(color.blue, 2, 16, QChar('0'));
+}
+
 void EnsureStringSuffix(std::string& filePath, const std::string& suffix) {
   if (filePath.size() >= suffix.size()) {
     auto tail = filePath.substr(filePath.size() - suffix.size());
@@ -347,4 +382,5 @@ void EnsureStringSuffix(std::string& filePath, const std::string& suffix) {
   }
   filePath += suffix;
 }
+
 }  // namespace StringHelper

@@ -20,26 +20,24 @@
 #include <fstream>
 #include <iostream>
 #include "ExportComposition.h"
+#include "Marker.h"
 #include "src/base/utils/Log.h"
 #include "utils/AEHelper.h"
+#include "utils/AETypeTransform.h"
 #include "utils/FileHelper.h"
+#include "utils/UniqueID.h"
+
 namespace exporter {
 
-PAGExport::PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath)
-    : session(std::make_shared<PAGExportSession>(outputPath)), timeSetter(activeItemH, -100.0f) {
-}
-
 bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
-                           bool enableAudio) {
+                           bool exportAudio, bool hardwareEncode) {
   bool res = false;
   do {
     if (activeItemH == nullptr || outputPath.empty()) {
       break;
     }
-    PAGExport pagExport(activeItemH, outputPath);
-    pagExport.session->enableAudio = enableAudio;
-
-    auto pagFile = pagExport.exportPAG(activeItemH);
+    PAGExport pagExport(activeItemH, outputPath, exportAudio, hardwareEncode);
+    auto pagFile = pagExport.exportAsFile();
     if (pagFile == nullptr) {
       break;
     }
@@ -63,13 +61,32 @@ bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, const std::string& out
   return res;
 }
 
-std::shared_ptr<pag::File> PAGExport::exportPAG(const AEGP_ItemH& activeItemH) {
+bool PAGExport::ExportFile(PAGExport* pagExport) {
+  bool res = false;
+  do {
+    auto pagFile = pagExport->exportAsFile();
+    if (pagFile == nullptr) {
+      break;
+    }
 
-  auto id = AEHelper::GetItemId(activeItemH);
-  ScopedAssign<pag::ID> arCI(session->curCompId, id);
-  ExportComposition(session, activeItemH);
+    const auto bytes = pag::Codec::Encode(pagFile);
+    if (bytes->length() == 0) {
+      break;
+    }
+    if (!FileHelper::WriteToFile(pagExport->session->outputPath,
+                                 reinterpret_cast<char*>(bytes->data()),
+                                 static_cast<std::streamsize>(bytes->length()))) {
+      break;
+    }
 
-  return nullptr;
+    if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+      break;
+    }
+
+    res = true;
+  } while (false);
+
+  return res;
 }
 
 bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
@@ -88,6 +105,109 @@ bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
   } while (false);
 
   return res;
+}
+
+PAGExport::PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath, bool exportAudio,
+                     bool hardwareEncode)
+    : itemH(activeItemH), session(std::make_shared<PAGExportSession>(activeItemH, outputPath)),
+      timeSetter(activeItemH, -100.0f) {
+  session->exportAudio = exportAudio;
+  session->hardwareEncode = hardwareEncode;
+}
+
+std::shared_ptr<pag::File> PAGExport::exportAsFile() {
+  return nullptr;
+}
+
+void PAGExport::addRootComposition() const {
+  const auto& Suites = AEHelper::GetSuites();
+  auto* mainComposition = session->compositions[session->compositions.size() - 1];
+  AEGP_CompH compH = AEHelper::GetItemCompH(itemH);
+
+  A_Time workAreaStart = {};
+  A_Time workAreaDuration = {};
+  Suites->CompSuite6()->AEGP_GetCompWorkAreaStart(compH, &workAreaStart);
+  Suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compH, &workAreaDuration);
+  pag::Frame start = AEHelper::AETimeToTime(workAreaStart, session->frameRate);
+  pag::Frame end = start + AEHelper::AETimeToTime(workAreaDuration, session->frameRate);
+  auto duration = mainComposition->duration;
+  if (start == 0) {
+    if (duration > end) {
+      mainComposition->duration = end;
+    }
+    return;
+  }
+
+  duration = end - start;
+
+  auto rootComposition = new pag::VectorComposition();
+  auto rootLayer = new pag::PreComposeLayer();
+  rootLayer->id = GetLayerUniqueID(session->compositions);
+  rootLayer->transform = new pag::Transform2D();
+  rootLayer->transform->position = new pag::Property<pag::Point>();
+  rootLayer->transform->anchorPoint = new pag::Property<pag::Point>();
+  rootLayer->transform->scale = new pag::Property<pag::Point>();
+  rootLayer->transform->rotation = new pag::Property<float>();
+  rootLayer->transform->opacity = new pag::Property<pag::Opacity>();
+  rootLayer->transform->anchorPoint->value.x = 0;
+  rootLayer->transform->anchorPoint->value.y = 0;
+  rootLayer->transform->position->value.x = 0;
+  rootLayer->transform->position->value.y = 0;
+  rootLayer->transform->scale->value.x = 1.0f;
+  rootLayer->transform->scale->value.y = 1.0f;
+  rootLayer->transform->rotation->value = 0.0f;
+  rootLayer->transform->opacity->value = pag::Opaque;
+  rootLayer->composition = mainComposition;
+  rootLayer->containingComposition = rootComposition;
+  rootLayer->startTime = 0;
+  rootLayer->duration = duration;
+  rootLayer->compositionStartTime = -start;
+
+  rootComposition->layers.push_back(rootLayer);
+  rootComposition->width = mainComposition->width;
+  rootComposition->height = mainComposition->height;
+  rootComposition->duration = duration;
+  rootComposition->frameRate = mainComposition->frameRate;
+  rootComposition->id = GetCompositionUniqueID(session->compositions);
+  rootComposition->backgroundColor = mainComposition->backgroundColor;
+
+  rootComposition->audioBytes = mainComposition->audioBytes;
+  rootComposition->audioMarkers = mainComposition->audioMarkers;
+  rootComposition->audioStartTime = mainComposition->audioStartTime;
+  mainComposition->audioBytes = nullptr;
+  mainComposition->audioMarkers.clear();
+  mainComposition->audioStartTime = pag::ZeroFrame;
+
+  session->compositions.push_back(rootComposition);
+}
+
+std::vector<pag::ImageBytes*> PAGExport::getRefImages(
+    const std::vector<pag::Composition*>& compositions) {
+  std::unordered_set<pag::ImageBytes*> refImages = {};
+  for (const auto& composition : compositions) {
+    if (composition->type() != pag::CompositionType::Vector) {
+      continue;
+    }
+    for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+      auto imageLayer = static_cast<pag::ImageLayer*>(layer);
+      if (layer->type() == pag::LayerType::Image && imageLayer->imageBytes) {
+        refImages.insert(imageLayer->imageBytes);
+      }
+    }
+  }
+
+  std::vector<pag::ImageBytes*> images = {};
+  for (auto image : session->imageBytesList) {
+    if (refImages.count(image)) {
+      images.push_back(image);
+    } else {
+      delete image;
+    }
+  }
+  return images;
+}
+
+void PAGExport::exportResources(std::vector<pag::Composition*>&) {
 }
 
 }  // namespace exporter

@@ -17,12 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AEResource.h"
+#include <QStandardPaths>
+#include <map>
 #include "AEHelper.h"
+#include "StringHelper.h"
+#include "export/Marker.h"
 
 namespace exporter {
 
-static AEResourceType GetResourceType(const std::shared_ptr<AEGP_SuiteHandler>& suites,
-                                      AEGP_ItemH& item) {
+AEResourceType GetAEItemResourceType(AEGP_ItemH& item) {
+  const std::shared_ptr<AEGP_SuiteHandler>& suites = AEHelper::GetSuites();
+
   AEGP_ItemType itemType = AEGP_ItemType_NONE;
   suites->ItemSuite8()->AEGP_GetItemType(item, &itemType);
   if (itemType == AEGP_ItemType_FOLDER) {
@@ -59,7 +64,7 @@ bool HasCompositionResource() {
     AEGP_ItemH item;
     suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &item);
     while (item != nullptr) {
-      auto type = GetResourceType(suites, item);
+      auto type = GetAEItemResourceType(item);
       if (type == AEResourceType::Composition) {
         return true;
       }
@@ -69,6 +74,88 @@ bool HasCompositionResource() {
     }
   }
   return false;
+}
+
+std::vector<std::shared_ptr<AEResource>> AEResource::getAEResourceList() {
+  std::vector<std::shared_ptr<AEResource>> resources;
+  std::map<A_long, std::shared_ptr<AEResource>> resourceMap;
+
+  const auto& suites = AEHelper::GetSuites();
+  A_long projectsNum = 0;
+  suites->ProjSuite6()->AEGP_GetNumProjects(&projectsNum);
+  for (A_long index = 0; index < projectsNum; index++) {
+    AEGP_ProjectH projectHandle = nullptr;
+    suites->ProjSuite6()->AEGP_GetProjectByIndex(index, &projectHandle);
+    A_char projectName[AEGP_MAX_PROJ_NAME_SIZE];
+    suites->ProjSuite6()->AEGP_GetProjectName(projectHandle, projectName);
+    AEGP_ItemH itemH = nullptr;
+    suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &itemH);
+    while (itemH != nullptr) {
+      A_long id = AEHelper::GetItemID(itemH);
+      if (id != 0) {
+        auto item = std::make_shared<AEResource>();
+        auto type = GetAEItemResourceType(itemH);
+        if (type != AEResourceType::Unknown) {
+          item->type = type;
+          item->ID = id;
+          item->name = AEHelper::GetItemName(itemH);
+          item->itemH = itemH;
+          item->isExportAsBmp =
+              StringHelper::IsEndWidthSuffix(item->name, StringHelper::CompositionBmpSuffix);
+          resources.push_back(item);
+          resourceMap[id] = item;
+          auto parentID = AEHelper::GetItemParentID(itemH);
+          auto parentIter = resourceMap.find(parentID);
+          if (parentIter != resourceMap.end()) {
+            parentIter->second->file.children.push_back(item);
+            item->file.parent = parentIter->second.get();
+          }
+        }
+      }
+
+      AEGP_ItemH nextItemHandle = nullptr;
+      suites->ItemSuite6()->AEGP_GetNextProjItem(projectHandle, itemH, &nextItemHandle);
+      itemH = nextItemHandle;
+    }
+  }
+
+  auto iter = resources.begin();
+  while (iter != resources.end()) {
+    if ((*iter)->type != AEResourceType::Folder && (*iter)->type != AEResourceType::Composition) {
+      iter = resources.erase(iter);
+      continue;
+    }
+    if ((*iter)->type == AEResourceType::Folder && (*iter)->file.children.empty()) {
+      auto parent = (*iter)->file.parent;
+      if (parent != nullptr) {
+        parent->file.children.erase(
+            std::find(parent->file.children.begin(), parent->file.children.end(), *iter));
+      }
+      iter = resources.erase(iter);
+      continue;
+    }
+
+    ++iter;
+  }
+
+  return resources;
+}
+
+AEResource::AEResource() {
+  initSavePath();
+}
+
+void AEResource::setSavePath(const std::string& savePath) {
+  this->savePath = savePath;
+  Marker::SetCompositionStoragePath(savePath, itemH);
+}
+
+void AEResource::initSavePath() {
+  std::string path = Marker::GetCompositionStoragePath(itemH);
+  if (path.empty()) {
+    path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation).toStdString();
+  }
+  savePath = path;
 }
 
 }  // namespace exporter

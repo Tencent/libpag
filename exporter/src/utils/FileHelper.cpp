@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FileHelper.h"
+#include <QDesktopServices>
+#include <QDir>
+#include <QUrl>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include "src/base/utils/Log.h"
+
 namespace fs = std::filesystem;
 
 namespace FileHelper {
@@ -37,6 +41,10 @@ std::string ReadTextFile(const std::string& filename) {
 }
 
 size_t WriteTextFile(const std::string& fileName, const char* text) {
+  auto parentPath = fs::path(fileName).parent_path();
+  if (!parentPath.empty() && !fs::exists(parentPath)) {
+    fs::create_directories(parentPath);
+  }
   std::ofstream file(fileName, std::ios::out);
   if (!file.is_open()) {
     return 0;
@@ -88,6 +96,10 @@ bool CopyFile(const std::string& src, const std::string& dst) {
 
 bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
                  std::ios::openmode mode) {
+  auto parentPath = fs::path(filePath).parent_path();
+  if (!parentPath.empty() && !fs::exists(parentPath)) {
+    fs::create_directories(parentPath);
+  }
   std::ofstream file(filePath, mode);
   if (!file) {
     LOGE("Failed to open file: %s", filePath.c_str());
@@ -107,6 +119,41 @@ bool WriteToFile(const std::string& filePath, const char* data, std::streamsize 
 
   file.close();
   return true;
+}
+
+bool DeleteFile(const std::string& path) {
+  return fs::remove_all(path);
+}
+
+bool CreateDir(const std::string& path) {
+  return fs::create_directories(path);
+}
+
+int ReadFileData(const std::string& filePath, uint8_t* buf, size_t bufSize) {
+  std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+  if (!file) {
+    return 0;
+  }
+
+  size_t fileSize = file.tellg();
+  file.seekg(0);
+  file.read(reinterpret_cast<char*>(buf), std::min(fileSize, bufSize));
+  if (fileSize < bufSize) {
+    buf[fileSize] = '\0';
+  }
+  return std::min(fileSize, bufSize);
+}
+
+std::string GetFileName(const std::string& filePath) {
+  return fs::path(filePath).filename().string();
+}
+
+std::string GetDir(const std::string& filePath) {
+  return fs::path(filePath).parent_path().string();
+}
+
+void OpenPAGFile(const std::string& filePath) {
+  QDesktopServices::openUrl(QUrl::fromLocalFile(filePath.data()));
 }
 
 }  // namespace FileHelper

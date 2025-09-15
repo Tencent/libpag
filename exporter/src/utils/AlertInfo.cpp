@@ -563,7 +563,7 @@ std::string AlertInfo::getMessage() {
 }
 
 void AlertInfo::select() {
-  AEHelper::SelectItem(itemH, layerH);
+  AEHelper::SelectLayer(itemH, layerH);
 }
 
 static std::vector<AlertInfo> GetInfoList(std::vector<AlertInfo>& warningList, bool bWarning,
@@ -586,11 +586,11 @@ bool AlertInfoManager::showAlertInfo(bool showWarning, bool showError) {
   for (auto info : warnings) {
     saveWarnings.emplace_back(info);
   }
-  auto ret = (errors.size() > 0);
-  if (ret && showError) {
+  bool ret = true;
+  if (!errors.empty() && showError) {
     ret = WindowManager::GetInstance().showErrors(errors);
   }
-  if (!ret && showWarning) {
+  if (ret && showWarning) {
     ret = WindowManager::GetInstance().showWarnings(warnings);
   }
   warningList.clear();
@@ -613,12 +613,8 @@ AlertInfoManager& AlertInfoManager::GetInstance() {
   return instance;
 }
 
-void AlertInfoManager::pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
-                                   const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList,
-                                   AlertInfoType type, pag::ID compId, pag::ID layerId,
-                                   const std::string& addInfo) {
-  auto itemH = GetHandleById(compItemHList, compId);
-  auto layerH = GetHandleById(layerHList, layerId);
+void AlertInfoManager::pushWarning(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH,
+                                   AlertInfoType type, const std::string& addInfo) {
   warningList.emplace_back(AlertInfo(type, itemH, layerH, addInfo));
 }
 

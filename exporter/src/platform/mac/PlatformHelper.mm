@@ -18,6 +18,7 @@
 
 #include "platform/PlatformHelper.h"
 #import <AppKit/AppKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
 #include <string>
 #include "platform/PAGViewerCheck.h"
@@ -67,6 +68,11 @@ std::string GetTempFolderPath() {
     }
   }
   return TempFolderPath;
+}
+
+bool IsAEWindowActive() {
+  NSRunningApplication* frontApp = [[NSWorkspace sharedWorkspace] frontmostApplication];
+  return [frontApp.bundleIdentifier containsString:@"com.adobe.AfterEffects"];
 }
 
 std::string GetDownloadsPath() {
@@ -126,7 +132,6 @@ static void StartPreview(const std::string& pagFilePath) {
     NSURL* fileURL = [NSURL fileURLWithPath:nsFilePath];
     if (!fileURL) {
       QString errorMsg = QString::fromUtf8(Messages::INVALID_FILE_PATH);
-      ;
       WindowManager::GetInstance().showSimpleError(errorMsg);
       return;
     }
@@ -150,6 +155,7 @@ static void StartPreview(const std::string& pagFilePath) {
     }
   }
 }
+
 void PreviewPAGFile(std::string pagFilePath) {
   auto config = std::make_shared<AppConfig>();
   config->setAppName("PAGViewer.app");
@@ -164,4 +170,29 @@ void PreviewPAGFile(std::string pagFilePath) {
   }
   StartPreview(pagFilePath);
 }
+
+void ScaleGraphics(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride, int dstWidth,
+                   int dstHeight, int srcWidth, int srcHeight) {
+  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+
+  CGContextRef dstCtx =
+      CGBitmapContextCreate(dstRGBA, (size_t)dstWidth, (size_t)dstHeight, 8, (size_t)dstStride,
+                            colorSpace, kCGImageAlphaPremultipliedLast);
+
+  CGContextRef srcCtx =
+      CGBitmapContextCreate(srcRGBA, (size_t)srcWidth, (size_t)srcHeight, 8, (size_t)srcStride,
+                            colorSpace, kCGImageAlphaPremultipliedLast);
+  CGImageRef imageRef = CGBitmapContextCreateImage(srcCtx);
+
+  auto dstRect = CGRectMake(0, 0, (size_t)dstWidth, (size_t)dstHeight);
+  CGContextSetInterpolationQuality(dstCtx, kCGInterpolationLow);
+  CGContextClearRect(dstCtx, dstRect);
+  CGContextDrawImage(dstCtx, dstRect, imageRef);
+
+  CGImageRelease(imageRef);
+  CGContextRelease(srcCtx);
+  CGContextRelease(dstCtx);
+  CGColorSpaceRelease(colorSpace);
+}
+
 }

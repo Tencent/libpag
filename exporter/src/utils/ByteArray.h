@@ -31,7 +31,8 @@ class ByteArray final {
  public:
   ByteArray() = default;
 
-  ByteArray(const uint8_t* data, size_t length) : dataView(data, length, CheckByteOrder()) {
+  ByteArray(const uint8_t* data, size_t length)
+      : dataView(data, length, tgfx::ByteOrder::BigEndian) {
   }
 
   /**

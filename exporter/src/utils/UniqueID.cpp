@@ -16,36 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <QQmlApplicationEngine>
-#include <QQuickWindow>
-#include <QVariantMap>
-#include "Config/ConfigParam.h"
+#include "UniqueID.h"
 
 namespace exporter {
-class ConfigModel : public QObject {
-  Q_OBJECT
+pag::ID GetLayerUniqueID(const std::vector<pag::Composition*>& compositions) {
+  pag::ID id = 2000;
+  for (const auto& composition : compositions) {
+    if (composition->type() == pag::CompositionType::Vector) {
+      for (const auto& layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+        if (id <= layer->id) {
+          id = layer->id + 1;
+        }
+      }
+    }
+  }
+  return id;
+}
 
- public:
-  ConfigModel(QObject* parent = nullptr);
-  ~ConfigModel();
+pag::ID GetCompositionUniqueID(const std::vector<pag::Composition*>& compositions) {
+  pag::ID id = 1000;
+  for (const auto& composition : compositions) {
+    if (id <= composition->id) {
+      id = composition->id + 1;
+    }
+  }
+  return id;
+}
 
-  void initConfigWindow();
-  void showConfig() const;
-
-  Q_INVOKABLE void saveConfig();
-  Q_INVOKABLE void resetToDefault();
-  Q_INVOKABLE void setLanguage(int value);
-  Q_INVOKABLE void updateConfigFromQML(const QVariantMap& configData);
-
-  Q_INVOKABLE QVariantMap getDefaultConfig() const;
-  Q_INVOKABLE QVariantMap getCurrentConfig() const;
-
- private:
-  static QVariantMap ConfigParamToVariantMap(const ConfigParam& config);
-  std::unique_ptr<QApplication> app = nullptr;
-  std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
-  QQuickWindow* configWindow = nullptr;
-  ConfigParam currentConfig;
-};
 }  // namespace exporter

@@ -78,6 +78,7 @@ A_Err AECommand::OnClickPanel(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showExportPanelWindow();
   return err;
 }
 
@@ -90,21 +91,7 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
-
-  AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
-  if (activeItemH == nullptr) {
-    return err;
-  }
-
-  AlertInfoModel alertModel;
-  const auto& outputPath = AlertInfoModel::BrowseForSave(true);
-
-  if (outputPath.empty()) {
-    return err;
-  }
-
-  PreviewPAGFile(outputPath);
-
+  WindowManager::GetInstance().showExportWindow();
   return err;
 }
 
@@ -118,6 +105,7 @@ A_Err AECommand::OnClickPreview(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showExportPreviewWindow();
   return err;
 }
 

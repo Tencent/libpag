@@ -17,10 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AEHelper.h"
+#include <QDir>
+#include <QFileInfo>
+#include <fstream>
 #include <iostream>
+#include "AETypeTransform.h"
+#include "ImageData.h"
 #include "StringHelper.h"
+#include "TempFileDelete.h"
 #include "platform/PlatformHelper.h"
 #include "src/base/utils/Log.h"
+
 namespace AEHelper {
 
 AEGP_PluginID PluginID = 0L;
@@ -30,128 +37,219 @@ std::string AeVersion = "";
 
 int32_t MAJORVERSION = 23;
 
-void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
-  Suites = std::make_shared<AEGP_SuiteHandler>(basicSuite);
-  PluginID = id;
-}
-
-AEGP_ItemH GetActiveCompositionItem() {
-  const auto& suites = GetSuites();
-  AEGP_ItemH activeItemH = nullptr;
-  suites->ItemSuite6()->AEGP_GetActiveItem(&activeItemH);
-  if (activeItemH == nullptr) {
-    AEGP_ProjectH projectHandle;
-    suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
-    suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &activeItemH);
-  }
-  if (activeItemH == nullptr) {
-    return nullptr;
-  }
-  AEGP_ItemType itemType = AEGP_ItemType_NONE;
-  suites->ItemSuite6()->AEGP_GetItemType(activeItemH, &itemType);
-  if (itemType != AEGP_ItemType_COMP) {
-    return nullptr;
-  }
-  return activeItemH;
-}
-
-AEGP_PluginID GetPluginID() {
-  return PluginID;
-}
-
-std::shared_ptr<AEGP_SuiteHandler> GetSuites() {
-  return Suites;
-}
-
-std::string RunScript(std::shared_ptr<AEGP_SuiteHandler> suites, AEGP_PluginID pluginID,
-                      const std::string& scriptText) {
-  AEGP_MemHandle scriptResult;
-  AEGP_MemHandle errorResult;
-  suites->UtilitySuite6()->AEGP_ExecuteScript(pluginID, scriptText.c_str(), FALSE, &scriptResult,
-                                              &errorResult);
-  A_char* result = nullptr;
-  suites->MemorySuite1()->AEGP_LockMemHandle(scriptResult, reinterpret_cast<void**>(&result));
-  std::string resultText = result;
-  suites->MemorySuite1()->AEGP_FreeMemHandle(scriptResult);
-  A_char* error = nullptr;
-  suites->MemorySuite1()->AEGP_LockMemHandle(errorResult, reinterpret_cast<void**>(&error));
-  std::string errorText = error;
-  suites->MemorySuite1()->AEGP_FreeMemHandle(errorResult);
-  return resultText;
-}
-
-void RegisterTextDocumentScript() {
-  static bool hasInit = false;
-  if (!hasInit) {
-    const auto& suites = GetSuites();
-    auto pluginID = GetPluginID();
-    RunScript(suites, pluginID, TextDocumentScript);
-    hasInit = true;
-  }
-}
-
-AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH) {
-  if (layerH == nullptr) {
-    return nullptr;
-  }
-  const auto& suites = GetSuites();
-  auto pluginID = GetPluginID();
-  AEGP_StreamRefH streamRefH;
-  suites->StreamSuite4()->AEGP_GetNewLayerStream(pluginID, layerH, AEGP_LayerStream_MARKER,
-                                                 &streamRefH);
-  return streamRefH;
-}
-AEGP_StreamRefH GetMarkerStreamFromItem(const AEGP_ItemH& itemH) {
-  auto compH = GetCompFromItem(itemH);
-  return GetMarkerStreamFromComposition(compH);
-}
-AEGP_StreamRefH GetMarkerStreamFromComposition(const AEGP_CompH& compH) {
-  if (compH == nullptr) {
-    return nullptr;
-  }
-  const auto& suites = GetSuites();
-  auto pluginID = GetPluginID();
-  AEGP_StreamRefH streamRefH;
-  suites->CompSuite10()->AEGP_GetNewCompMarkerStream(pluginID, compH, &streamRefH);
-  return streamRefH;
-}
-
-float GetFrameRateFromItem(const AEGP_ItemH& itemH) {
-  auto compH = GetCompFromItem(itemH);
-  return GetFrameRateFromComp(compH);
-}
-
-float GetFrameRateFromComp(const AEGP_CompH& compH) {
-  const auto& suites = GetSuites();
-  A_FpLong frameRate = 24;
-  suites->CompSuite6()->AEGP_GetCompFramerate(compH, &frameRate);
-  return static_cast<float>(frameRate);
-}
-
-void DeleteStream(AEGP_StreamRefH streamRefH) {
-  if (streamRefH != nullptr) {
-    const auto& suites = GetSuites();
-    suites->StreamSuite4()->AEGP_DisposeStream(streamRefH);
-    streamRefH = nullptr;
-  }
-}
+// Static member definitions
+int32_t AEVersion::MajorVerison = 0;
+int32_t AEVersion::MinorVersion = 0;
 
 std::string GetDocumentsFolderPath() {
   if (DocumentsFolderPath.empty()) {
-    const auto& suites = GetSuites();
-    auto pluginID = GetPluginID();
-    DocumentsFolderPath = RunScript(suites, pluginID, "Folder.myDocuments.fsName;");
+    DocumentsFolderPath = RunScript("Folder.myDocuments.fsName;");
   }
   return DocumentsFolderPath;
 }
 
 std::string GetAeVersion() {
   if (AeVersion.empty()) {
-    const auto& suites = GetSuites();
-    auto pluginID = GetPluginID();
-    AeVersion = RunScript(suites, pluginID, "app.version");
+    AeVersion = RunScript("app.version");
   }
   return AeVersion;
+}
+
+/* Common Interface */
+std::shared_ptr<AEGP_SuiteHandler> GetSuites() {
+  return Suites;
+}
+
+AEGP_PluginID GetPluginID() {
+  return PluginID;
+}
+
+QString GetProjectName() {
+  AEGP_ProjectH projectHandle;
+  Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
+  AEGP_MemHandle pathMemory;
+  Suites->ProjSuite6()->AEGP_GetProjectPath(projectHandle, &pathMemory);
+  std::string filePath = StringHelper::AeMemoryHandleToString(pathMemory);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
+  if (!filePath.empty()) {
+    std::replace(filePath.begin(), filePath.end(), '\\', '/');
+  }
+  QString projectPath =
+      QDir::cleanPath(QDir::fromNativeSeparators(QString::fromStdString(filePath)));
+  QFileInfo fileInfo(projectPath);
+  return fileInfo.fileName();
+}
+
+QString GetProjectPath() {
+  AEGP_ProjectH projectHandle;
+  Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
+  AEGP_MemHandle pathMemory;
+  Suites->ProjSuite6()->AEGP_GetProjectPath(projectHandle, &pathMemory);
+  std::string filePath = StringHelper::AeMemoryHandleToString(pathMemory);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
+  if (!filePath.empty()) {
+    std::replace(filePath.begin(), filePath.end(), '\\', '/');
+  }
+  QString projectPath =
+      QDir::cleanPath(QDir::fromNativeSeparators(QString::fromStdString(filePath)));
+  QFileInfo fileInfo(projectPath);
+  return fileInfo.absolutePath();
+}
+
+AEGP_ItemH GetActiveCompositionItem() {
+  AEGP_ItemH activeItemH = nullptr;
+  Suites->ItemSuite6()->AEGP_GetActiveItem(&activeItemH);
+  if (activeItemH == nullptr) {
+    AEGP_ProjectH projectHandle;
+    Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
+    Suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &activeItemH);
+  }
+  if (activeItemH == nullptr) {
+    return nullptr;
+  }
+  AEGP_ItemType itemType = AEGP_ItemType_NONE;
+  Suites->ItemSuite6()->AEGP_GetItemType(activeItemH, &itemType);
+  if (itemType != AEGP_ItemType_COMP) {
+    return nullptr;
+  }
+  return activeItemH;
+}
+
+void GetRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
+                    A_long& height, AEGP_RenderOptionsH& renderOptions) {
+  Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
+  Suites->RenderOptionsSuite3()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
+
+  AEGP_FrameReceiptH frameReceipt;
+  Suites->RenderSuite5()->AEGP_RenderAndCheckoutFrame(renderOptions, nullptr, nullptr,
+                                                      &frameReceipt);
+
+  AEGP_WorldH imageWorld;
+  Suites->RenderSuite5()->AEGP_GetReceiptWorld(frameReceipt, &imageWorld);
+  Suites->WorldSuite3()->AEGP_GetSize(imageWorld, &width, &height);
+
+  PF_Pixel* pixels;
+  Suites->WorldSuite3()->AEGP_GetBaseAddr8(imageWorld, &pixels);
+  Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &rowBytesLength);
+
+  if (width > 0 && height > 0 && rowBytesLength > 0) {
+    if (rgbaBytes == nullptr) {
+      stride = 4 * width;
+      rgbaBytes = new uint8_t[stride * height + stride * 2];
+    }
+    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, rgbaBytes, stride);
+  }
+  Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
+}
+
+void GetLayerRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
+                         A_long& width, A_long& height, AEGP_LayerRenderOptionsH& renderOptions) {
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
+
+  AEGP_FrameReceiptH frameReceipt;
+  Suites->RenderSuite5()->AEGP_RenderAndCheckoutLayerFrame(renderOptions, nullptr, nullptr,
+                                                           &frameReceipt);
+
+  AEGP_WorldH imageWorld;
+  Suites->RenderSuite5()->AEGP_GetReceiptWorld(frameReceipt, &imageWorld);
+  Suites->WorldSuite3()->AEGP_GetSize(imageWorld, &width, &height);
+
+  PF_Pixel* pixels;
+  Suites->WorldSuite3()->AEGP_GetBaseAddr8(imageWorld, &pixels);
+  Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &rowBytesLength);
+
+  if (width > 0 && height > 0 && rowBytesLength > 0) {
+    if (rgbaBytes == nullptr) {
+      stride = rowBytesLength;
+      rgbaBytes = new uint8_t[stride * height + stride * 2];
+    }
+    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, rgbaBytes, stride);
+  }
+  Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
+}
+
+std::vector<char> GetProjectFileBytes() {
+  std::vector<char> fileBytes = {};
+  AEGP_ProjectH projectH = nullptr;
+  Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectH);
+
+  AEGP_MemHandle pathMemory;
+  Suites->ProjSuite6()->AEGP_GetProjectPath(projectH, &pathMemory);
+  char16_t* projectPath = nullptr;
+  Suites->MemorySuite1()->AEGP_LockMemHandle(pathMemory, reinterpret_cast<void**>(&projectPath));
+
+  std::string filePath = StringHelper::Utf16ToUtf8(projectPath);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
+
+  A_Boolean isDirty = 0;
+  Suites->ProjSuite6()->AEGP_ProjectIsDirty(projectH, &isDirty);
+  bool isAEPX = false;
+
+  if (!filePath.empty()) {
+    auto extension = filePath.substr(filePath.size() - 5, 5);
+    isAEPX = StringHelper::ToLowerCase(extension) == ".aepx";
+  }
+
+  exporter::TempFileDelete tempFile;
+  if (isDirty || isAEPX) {
+    filePath = exporter::GetTempFolderPath() + u8"/.PAGAutoSave.aep";
+    tempFile.setFilePath(filePath);
+    auto path = StringHelper::Utf8ToUtf16(filePath);
+    Suites->ProjSuite6()->AEGP_SaveProjectToPath(
+        projectH, reinterpret_cast<const A_UTF16Char*>(path.c_str()));
+  }
+
+  filePath = StringHelper::ConvertStringEncoding(filePath);
+
+  std::ifstream t(filePath, std::ios::binary);
+  if (!t.is_open()) {
+    return fileBytes;
+  }
+
+  t.seekg(0, std::ios::end);
+  auto fileLength = t.tellg();
+  t.seekg(0, std::ios::beg);
+
+  fileBytes.resize(fileLength);
+  t.read(fileBytes.data(), fileLength);
+  t.close();
+
+  return fileBytes;
+}
+
+void SetRenderTime(const AEGP_RenderOptionsH& renderOptions, float frameRate, pag::Frame frame) {
+  A_Time time = {};
+  time.value = static_cast<A_long>(1000 * frame);
+  time.scale = static_cast<A_u_long>(std::lround(1000 * frameRate));
+  Suites->RenderOptionsSuite3()->AEGP_SetTime(renderOptions, time);
+
+  A_Time currentTime = {};
+  Suites->RenderOptionsSuite3()->AEGP_GetTime(renderOptions, &currentTime);
+  if (currentTime.value != time.value || currentTime.scale != time.scale) {
+    LOGE("GetCompositionFrameImage: GetTime failed.");
+  }
+}
+
+void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id) {
+  Suites = std::make_shared<AEGP_SuiteHandler>(basicSuite);
+  PluginID = id;
+}
+
+std::string RunScript(const std::string& scriptText) {
+  AEGP_MemHandle scriptResult;
+  AEGP_MemHandle errorResult;
+  Suites->UtilitySuite6()->AEGP_ExecuteScript(PluginID, scriptText.c_str(), FALSE, &scriptResult,
+                                              &errorResult);
+  A_char* result = nullptr;
+  Suites->MemorySuite1()->AEGP_LockMemHandle(scriptResult, reinterpret_cast<void**>(&result));
+  std::string resultText = result;
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(scriptResult);
+  A_char* error = nullptr;
+  Suites->MemorySuite1()->AEGP_LockMemHandle(errorResult, reinterpret_cast<void**>(&error));
+  std::string errorText = error;
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(errorResult);
+  return resultText;
 }
 
 void RunScriptPreWarm() {
@@ -166,7 +264,7 @@ void RunScriptPreWarm() {
 
 bool CheckAeVersion() {
   int32_t majorVersion = 0;
-  if (AeVersion.empty()) {
+  if (AeVersion.empty() || AEVersion::MajorVerison == 0) {
     return false;
   }
   try {
@@ -190,23 +288,37 @@ bool CheckAeVersion() {
   return false;
 }
 
-std::string GetItemName(const AEGP_ItemH& itemH) {
-  std::string itemName;
-  if (itemH == nullptr) {
-    return itemName;
-  }
-  const auto& suites = GetSuites();
-  auto pluginID = GetPluginID();
-  AEGP_MemHandle nameMemory = nullptr;
-  suites->ItemSuite8()->AEGP_GetItemName(pluginID, itemH, &nameMemory);
-  if (!nameMemory) {
-    return itemName;
-  }
-  itemName = StringHelper::AeMemoryHandleToString(nameMemory);
-  suites->MemorySuite1()->AEGP_FreeMemHandle(nameMemory);
+void SetMajorVersion(const int32_t majorVersion) {
+  AEVersion::MajorVerison = majorVersion;
+}
 
-  itemName = StringHelper::DeleteLastSpace(itemName);
-  return itemName;
+void setMinorVersion(const int32_t minorVersion) {
+  AEVersion::MinorVersion = minorVersion;
+}
+
+void RegisterTextDocumentScript() {
+  static bool hasInit = false;
+  if (!hasInit) {
+    std::string textDocumentScript =
+        StringHelper::GetJavaScriptFromQRC(":/scripts/GetTextDocument.js");
+    RunScript(textDocumentScript);
+    hasInit = true;
+  }
+}
+
+/* Layer Interface */
+uint32_t GetLayerID(const AEGP_LayerH& layerH) {
+  A_long id = 0;
+  if (layerH != nullptr) {
+    Suites->LayerSuite6()->AEGP_GetLayerID(layerH, &id);
+  }
+  return static_cast<uint32_t>(id);
+}
+
+uint32_t GetLayerItemID(const AEGP_LayerH& layerH) {
+  auto itemH = GetLayerItemH(layerH);
+  auto id = GetItemID(itemH);
+  return id;
 }
 
 std::string GetLayerName(const AEGP_LayerH& layerH) {
@@ -214,11 +326,9 @@ std::string GetLayerName(const AEGP_LayerH& layerH) {
   if (layerH == nullptr) {
     return layerName;
   }
-  const auto& suites = GetSuites();
-  auto pluginID = GetPluginID();
   AEGP_MemHandle layerNameHandle = nullptr;
   AEGP_MemHandle sourceNameHandle = nullptr;
-  suites->LayerSuite6()->AEGP_GetLayerName(pluginID, layerH, &layerNameHandle, &sourceNameHandle);
+  Suites->LayerSuite6()->AEGP_GetLayerName(PluginID, layerH, &layerNameHandle, &sourceNameHandle);
   if (!layerNameHandle || !sourceNameHandle) {
     return layerName;
   }
@@ -226,42 +336,85 @@ std::string GetLayerName(const AEGP_LayerH& layerH) {
   if (layerName.empty()) {
     layerName = StringHelper::AeMemoryHandleToString(sourceNameHandle);
   }
-  suites->MemorySuite1()->AEGP_FreeMemHandle(layerNameHandle);
-  suites->MemorySuite1()->AEGP_FreeMemHandle(sourceNameHandle);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(layerNameHandle);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(sourceNameHandle);
 
   layerName = StringHelper::DeleteLastSpace(layerName);
   return layerName;
 }
 
-AEGP_ItemH GetItemFromComp(const AEGP_CompH& compH) {
-  const auto& suites = GetSuites();
-  AEGP_ItemH itemH = nullptr;
-  if (compH != nullptr) {
-    suites->CompSuite6()->AEGP_GetItemFromComp(compH, &itemH);
-  }
+AEGP_ItemH GetLayerItemH(const AEGP_LayerH& layerH) {
+  AEGP_ItemH itemH;
+  Suites->LayerSuite6()->AEGP_GetLayerSourceItem(layerH, &itemH);
   return itemH;
 }
 
-std::string GetCompName(const AEGP_CompH& compH) {
-  if (compH == nullptr) {
-    return "";
-  }
-  auto itemH = GetItemFromComp(compH);
-  return GetItemName(itemH);
+pag::Ratio GetLayerStretch(const AEGP_LayerH& layerH) {
+  A_Ratio ratio = {};
+  Suites->LayerSuite6()->AEGP_GetLayerStretch(layerH, &ratio);
+  return {ratio.num, ratio.den};
 }
 
-void SelectItem(const AEGP_ItemH& itemH) {
-  const auto& suites = GetSuites();
-  if (itemH != nullptr) {
-    suites->ItemSuite6()->AEGP_SelectItem(itemH, true, true);
-    suites->CommandSuite1()->AEGP_DoCommand(
-        3061);  // 3061: Open selection, ignoring any modifier keys.
-  }
+pag::Frame GetLayerStartTime(const AEGP_LayerH& layerH, float frameRate) {
+  A_Time inPoint = {};
+  Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerH, AEGP_LTimeMode_CompTime, &inPoint);
+  return static_cast<pag::Frame>(std::round(inPoint.value * frameRate / inPoint.scale));
 }
 
-void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
-  const auto& suites = GetSuites();
-  auto pluginID = GetPluginID();
+pag::Frame GetLayerDuration(const AEGP_LayerH& layerH, float frameRate) {
+  A_Time duration = {};
+  Suites->LayerSuite6()->AEGP_GetLayerDuration(layerH, AEGP_LTimeMode_CompTime, &duration);
+  return static_cast<pag::Frame>(std::round(duration.value * frameRate / duration.scale));
+}
+
+AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerH) {
+  AEGP_LayerFlags flags;
+  Suites->LayerSuite6()->AEGP_GetLayerFlags(layerH, &flags);
+  return flags;
+}
+
+AEGP_LayerH GetLayerParentLayerH(const AEGP_LayerH& layerH) {
+  AEGP_LayerH parentLayerH;
+  Suites->LayerSuite6()->AEGP_GetLayerParent(layerH, &parentLayerH);
+  return parentLayerH;
+}
+
+pag::BlendMode GetLayerBlendMode(const AEGP_LayerH& layerH) {
+  AEGP_LayerTransferMode transferMode = {};
+  Suites->LayerSuite6()->AEGP_GetLayerTransferMode(layerH, &transferMode);
+  return AEXferToBlendMode(transferMode.mode);
+}
+
+AEGP_LayerH GetLayerTrackMatteLayerH(const AEGP_LayerH& layerH) {
+  AEGP_LayerH trackMatteLayerH = nullptr;
+  Suites->LayerSuite9()->AEGP_GetTrackMatteLayer(layerH, &trackMatteLayerH);
+  return trackMatteLayerH;
+}
+
+pag::TrackMatteType GetLayerTrackMatteType(const AEGP_LayerH& layerH) {
+  A_Boolean hasTrackMatte = false;
+  Suites->LayerSuite6()->AEGP_DoesLayerHaveTrackMatte(layerH, &hasTrackMatte);
+  if (!hasTrackMatte) {
+    return pag::TrackMatteType::None;
+  }
+
+  AEGP_LayerTransferMode transferMode = {};
+  Suites->LayerSuite6()->AEGP_GetLayerTransferMode(layerH, &transferMode);
+  return AETrackMatteToTrackMatteType(transferMode.track_matte);
+}
+
+A_long GetLayerEffectNum(const AEGP_LayerH& layerH) {
+  AEGP_LayerFlags layerFlags;
+  Suites->LayerSuite6()->AEGP_GetLayerFlags(layerH, &layerFlags);
+  if ((layerFlags & AEGP_LayerFlag_EFFECTS_ACTIVE) == 0) {
+    return 0;
+  }
+  A_long numEffects = 0;
+  Suites->EffectSuite4()->AEGP_GetLayerNumEffects(layerH, &numEffects);
+  return numEffects;
+}
+
+void SelectLayer(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
   if (itemH == nullptr) {
     return;
   }
@@ -269,69 +422,248 @@ void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
   AEGP_CollectionItemV2 collectionItem;
   AEGP_StreamRefH streamH;
   if (hasLayer) {
-    suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(pluginID, layerH, &streamH);
+    Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(PluginID, layerH, &streamH);
     collectionItem.type = AEGP_CollectionItemType_LAYER;
     collectionItem.u.layer.layerH = layerH;
     collectionItem.stream_refH = streamH;
   }
 
-  suites->ItemSuite6()->AEGP_SelectItem(itemH, true, true);
+  Suites->ItemSuite6()->AEGP_SelectItem(itemH, true, true);
   if (!hasLayer) {
-    suites->CommandSuite1()->AEGP_DoCommand(
-        3061);  // 3061: Open selection, ignoring any modifier keys.
+    /* 3061: Open selection, ignoring any modifier keys. */
+    Suites->CommandSuite1()->AEGP_DoCommand(3061);
     return;
   }
 
-  auto compH = GetCompFromItem(itemH);
+  auto compH = GetItemCompH(itemH);
   AEGP_Collection2H collectionH = nullptr;
-  suites->CollectionSuite2()->AEGP_NewCollection(pluginID, &collectionH);
-  suites->CollectionSuite2()->AEGP_CollectionPushBack(collectionH, &collectionItem);
-  suites->CompSuite6()->AEGP_SetSelection(compH, collectionH);
-  suites->CommandSuite1()->AEGP_DoCommand(
-      3061);  // 3061: Open selection, ignoring any modifier keys.
-  suites->CollectionSuite2()->AEGP_DisposeCollection(collectionH);
+  Suites->CollectionSuite2()->AEGP_NewCollection(PluginID, &collectionH);
+  Suites->CollectionSuite2()->AEGP_CollectionPushBack(collectionH, &collectionItem);
+  Suites->CompSuite6()->AEGP_SetSelection(compH, collectionH);
+  /* 3061: Open selection, ignoring any modifier keys. */
+  Suites->CommandSuite1()->AEGP_DoCommand(3061);
+  Suites->CollectionSuite2()->AEGP_DisposeCollection(collectionH);
 }
 
-AEGP_CompH GetCompFromItem(const AEGP_ItemH& itemH) {
-  const auto& suites = GetSuites();
-  AEGP_CompH compH = nullptr;
-  if (itemH != nullptr) {
-    suites->CompSuite6()->AEGP_GetCompFromItem(itemH, &compH);
-  }
-  return compH;
-}
-
-uint32_t GetItemId(const AEGP_ItemH& itemH) {
-  const auto& suites = GetSuites();
+/* Item Interface */
+uint32_t GetItemID(const AEGP_ItemH& itemH) {
   A_long id = 0;
   if (itemH != nullptr) {
-    suites->ItemSuite6()->AEGP_GetItemID(itemH, &id);
+    Suites->ItemSuite6()->AEGP_GetItemID(itemH, &id);
   }
   return static_cast<uint32_t>(id);
 }
 
-uint32_t GetItemIdFromLayer(const AEGP_LayerH& layerH) {
-  auto itemH = GetItemFromLayer(layerH);
-  auto id = GetItemId(itemH);
+uint32_t GetItemParentID(const AEGP_ItemH& item) {
+  uint32_t id = 0;
+  AEGP_ItemH parentItem = nullptr;
+  Suites->ItemSuite6()->AEGP_GetItemParentFolder(item, &parentItem);
+  if (parentItem != nullptr) {
+    id = GetItemID(parentItem);
+  }
   return id;
 }
 
-uint32_t GetLayerId(const AEGP_LayerH& layerH) {
-  const auto& suites = GetSuites();
-  A_long id = 0;
-  if (layerH != nullptr) {
-    suites->LayerSuite6()->AEGP_GetLayerID(layerH, &id);
+std::string GetItemName(const AEGP_ItemH& itemH) {
+  std::string itemName;
+  if (itemH == nullptr) {
+    return itemName;
   }
-  return static_cast<uint32_t>(id);
+  AEGP_MemHandle nameMemory = nullptr;
+  Suites->ItemSuite8()->AEGP_GetItemName(PluginID, itemH, &nameMemory);
+  if (!nameMemory) {
+    return itemName;
+  }
+  itemName = StringHelper::AeMemoryHandleToString(nameMemory);
+  Suites->MemorySuite1()->AEGP_FreeMemHandle(nameMemory);
+
+  itemName = StringHelper::DeleteLastSpace(itemName);
+  return itemName;
 }
 
-AEGP_ItemH GetItemFromLayer(const AEGP_LayerH& layerH) {
-  const auto& suites = GetSuites();
-  AEGP_ItemH itemH = nullptr;
-  if (layerH != nullptr) {
-    suites->LayerSuite6()->AEGP_GetLayerSourceItem(layerH, &itemH);
+AEGP_CompH GetItemCompH(const AEGP_ItemH& item) {
+  AEGP_CompH compH = nullptr;
+  Suites->CompSuite6()->AEGP_GetCompFromItem(item, &compH);
+  return compH;
+}
+
+float GetItemFrameRate(const AEGP_ItemH& item) {
+  auto compH = GetItemCompH(item);
+  A_FpLong frameRate = 0;
+  Suites->CompSuite6()->AEGP_GetCompFramerate(compH, &frameRate);
+  return static_cast<float>(frameRate);
+}
+
+pag::Frame GetItemDuration(const AEGP_ItemH& item) {
+  A_Time time = {};
+  Suites->ItemSuite6()->AEGP_GetItemDuration(item, &time);
+  A_FpLong frameRate = GetItemFrameRate(item);
+  return static_cast<pag::Frame>(std::round(time.value * frameRate / time.scale));
+}
+
+QSize GetItemDimensions(const AEGP_ItemH& itemH) {
+  A_long width = 0;
+  A_long height = 0;
+  Suites->ItemSuite8()->AEGP_GetItemDimensions(itemH, &width, &height);
+  return {width, height};
+}
+
+QImage GetCompositionFrameImage(const AEGP_ItemH& itemH, pag::Frame frame) {
+  AEGP_RenderOptionsH renderOptions = nullptr;
+  float frameRate = GetItemFrameRate(itemH);
+
+  Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemH, &renderOptions);
+  if (renderOptions == nullptr) {
+    LOGE("GetCompositionFrameImage: NewFromItem failed.");
+    return {};
   }
+  Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
+  SetRenderTime(renderOptions, frameRate, frame);
+
+  uint8_t* rgbaBytes = nullptr;
+  A_u_long stride = 0;
+  A_u_long rowBytesLength = 0;
+  A_long width = 0;
+  A_long height = 0;
+  GetRenderFrame(rgbaBytes, rowBytesLength, stride, width, height, renderOptions);
+  if (width > 0 && height > 0 && rgbaBytes != nullptr) {
+    QImage image(rgbaBytes, width, height, stride, QImage::Format_RGBA8888);
+    QImage saveImage = image.copy();
+    delete[] rgbaBytes;
+    return saveImage;
+  }
+  return {};
+}
+
+void SetItemName(const AEGP_ItemH& item, const std::string& name) {
+  std::u16string u16str = StringHelper::Utf8ToUtf16(name);
+  Suites->ItemSuite8()->AEGP_SetItemName(item, reinterpret_cast<const A_UTF16Char*>(u16str.data()));
+}
+
+void SelectItem(const AEGP_ItemH& itemH) {
+  if (itemH != nullptr) {
+    Suites->ItemSuite6()->AEGP_SelectItem(itemH, true, true);
+    /* 3061: Open selection, ignoring any modifier keys. */
+    Suites->CommandSuite1()->AEGP_DoCommand(3061);
+  }
+}
+
+/* Composition Interface  */
+std::string GetCompName(const AEGP_CompH& compH) {
+  auto itemH = GetCompItemH(compH);
+  return GetItemName(itemH);
+}
+
+AEGP_ItemH GetCompItemH(const AEGP_CompH& compH) {
+  AEGP_ItemH itemH = nullptr;
+  Suites->CompSuite6()->AEGP_GetItemFromComp(compH, &itemH);
   return itemH;
+}
+
+pag::Color GetCompBackgroundColor(const AEGP_CompH& compH) {
+  AEGP_ColorVal color;
+  Suites->CompSuite6()->AEGP_GetCompBGColor(compH, &color);
+  return AEColorToColor(color);
+}
+
+bool IsStaticComposition(const AEGP_CompH& compH) {
+  bool isStatic = true;
+  AEGP_ItemH itemH = GetCompItemH(compH);
+  pag::Frame totalFrames = GetItemDuration(itemH);
+  if (totalFrames <= 1) {
+    return isStatic;
+  }
+
+  AEGP_RenderOptionsH renderOptions = nullptr;
+  float frameRate = GetItemFrameRate(itemH);
+
+  Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemH, &renderOptions);
+  if (renderOptions == nullptr) {
+    return isStatic;
+  }
+
+  uint8_t* curData = nullptr;
+  uint8_t* preData = nullptr;
+  A_u_long stride = 0;
+  pag::Frame step = 1;
+  while (true) {
+    pag::Frame value = totalFrames / step;
+    if (value < 100) {
+      break;
+    }
+    step *= 10;
+  }
+  for (pag::Frame frame = 0; frame < totalFrames; frame += step) {
+    SetRenderTime(renderOptions, frameRate, frame);
+    A_long width = 0;
+    A_long height = 0;
+    A_u_long rowBytesLength = 0;
+    GetRenderFrame(curData, rowBytesLength, stride, width, height, renderOptions);
+    if (curData != nullptr && preData != nullptr) {
+      if (!exporter::ImageIsStatic(curData, preData, width, height, stride)) {
+        isStatic = false;
+        break;
+      }
+    }
+    std::swap(curData, preData);
+  }
+
+  delete curData;
+  delete preData;
+
+  return isStatic;
+}
+
+std::string GetStreamMatchName(const AEGP_StreamRefH& streamH) {
+  char matchName[200];
+  Suites->DynamicStreamSuite4()->AEGP_GetMatchName(streamH, matchName);
+  return matchName;
+}
+
+bool IsStreamHidden(const AEGP_StreamRefH& streamH) {
+  AEGP_DynStreamFlags flags;
+  Suites->DynamicStreamSuite4()->AEGP_GetDynamicStreamFlags(streamH, &flags);
+  return static_cast<bool>(flags & AEGP_DynStreamFlag_HIDDEN);
+}
+
+bool IsStreamActive(const AEGP_StreamRefH& streamH) {
+  AEGP_DynStreamFlags flags;
+  Suites->DynamicStreamSuite4()->AEGP_GetDynamicStreamFlags(streamH, &flags);
+  return (flags & AEGP_DynStreamFlag_ACTIVE_EYEBALL) > 0;
+}
+
+AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerH) {
+  if (layerH == nullptr) {
+    return nullptr;
+  }
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  AEGP_StreamRefH streamRefH;
+  suites->StreamSuite4()->AEGP_GetNewLayerStream(pluginID, layerH, AEGP_LayerStream_MARKER,
+                                                 &streamRefH);
+  return streamRefH;
+}
+AEGP_StreamRefH GetItemMarkerStream(const AEGP_ItemH& itemH) {
+  auto compH = GetItemCompH(itemH);
+  return GetCompositionMarkerStream(compH);
+}
+AEGP_StreamRefH GetCompositionMarkerStream(const AEGP_CompH& compH) {
+  if (compH == nullptr) {
+    return nullptr;
+  }
+  const auto& suites = GetSuites();
+  auto pluginID = GetPluginID();
+  AEGP_StreamRefH streamRefH;
+  suites->CompSuite10()->AEGP_GetNewCompMarkerStream(pluginID, compH, &streamRefH);
+  return streamRefH;
+}
+
+void DeleteStream(AEGP_StreamRefH streamRefH) {
+  if (streamRefH != nullptr) {
+    const auto& suites = GetSuites();
+    suites->StreamSuite4()->AEGP_DisposeStream(streamRefH);
+    streamRefH = nullptr;
+  }
 }
 
 }  // namespace AEHelper
