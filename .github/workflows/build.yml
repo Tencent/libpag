@@ -169,6 +169,11 @@ jobs:
           emsdk/emsdk_env
           npm run build:st
 
+      - name: Create dummy lockfile for cypress-io/github-action
+        shell: pwsh
+        run: |
+          if (!(Test-Path web/package-lock.json)) { "{}" | Out-File web/package-lock.json -Encoding ASCII }
+
       - name: Cypress run:st
         uses: cypress-io/github-action@v6
         with:
