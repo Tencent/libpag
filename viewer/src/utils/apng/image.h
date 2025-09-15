@@ -38,13 +38,13 @@ struct Image {
   unsigned int w, h, bpp, type;
   int ps, ts;
   rgb pl[256];
-  unsigned char tr[256];
+  unsigned char _tr[256];
   unsigned int delay_num, delay_den;
   unsigned char* p;
   ROW* rows;
   Image() : w(0), h(0), bpp(0), type(0), ps(0), ts(0), delay_num(1), delay_den(10), p(0), rows(0) {
     memset(pl, 255, sizeof(pl));
-    memset(tr, 255, sizeof(tr));
+    memset(_tr, 255, sizeof(_tr));
   }
   ~Image() {
   }
@@ -63,7 +63,7 @@ struct Image {
   void init(unsigned int w, unsigned int h, Image* image) {
     init(w, h, image->bpp, image->type);
     if ((ps = image->ps) != 0) memcpy(&pl[0], &image->pl[0], ps * 3);
-    if ((ts = image->ts) != 0) memcpy(&tr[0], &image->tr[0], ts);
+    if ((ts = image->ts) != 0) memcpy(&_tr[0], &image->_tr[0], ts);
   }
   void init(Image* image) {
     init(image->w, image->h, image);

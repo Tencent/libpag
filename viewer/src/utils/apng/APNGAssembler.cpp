@@ -540,16 +540,16 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
   if (coltype == 0) {
     if (img[0].ts) {
       has_tcolor = 1;
-      tcolor = img[0].tr[1];
+      tcolor = img[0]._tr[1];
     }
   } else if (coltype == 2) {
     if (img[0].ts) {
       has_tcolor = 1;
-      tcolor = (((img[0].tr[5] << 8) + img[0].tr[3]) << 8) + img[0].tr[1];
+      tcolor = (((img[0]._tr[5] << 8) + img[0]._tr[3]) << 8) + img[0]._tr[1];
     }
   } else if (coltype == 3) {
     for (int c = 0; c < img[0].ts; c++)
-      if (img[0].tr[c] == 0) {
+      if (img[0]._tr[c] == 0) {
         has_tcolor = 1;
         tcolor = c;
         break;
@@ -602,7 +602,7 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
 
   if (img[0].ps > 0) write_chunk(f, "PLTE", (unsigned char*)(&img[0].pl), img[0].ps * 3);
 
-  if (img[0].ts > 0) write_chunk(f, "tRNS", img[0].tr, img[0].ts);
+  if (img[0].ts > 0) write_chunk(f, "tRNS", img[0]._tr, img[0].ts);
 
   op_zstream1.data_type = Z_BINARY;
   op_zstream1.zalloc = Z_NULL;

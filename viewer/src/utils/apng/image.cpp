@@ -78,19 +78,19 @@ int load_png(char* szName, Image* image) {
 
   if (png_get_tRNS(png_ptr, info_ptr, &trans_alpha, &image->ts, &trans_color) && image->ts > 0) {
     if (type == PNG_COLOR_TYPE_GRAY) {
-      image->tr[0] = 0;
-      image->tr[1] = trans_color->gray & 0xFF;
+      image->_tr[0] = 0;
+      image->_tr[1] = trans_color->gray & 0xFF;
       image->ts = 2;
     } else if (type == PNG_COLOR_TYPE_RGB) {
-      image->tr[0] = 0;
-      image->tr[1] = trans_color->red & 0xFF;
-      image->tr[2] = 0;
-      image->tr[3] = trans_color->green & 0xFF;
-      image->tr[4] = 0;
-      image->tr[5] = trans_color->blue & 0xFF;
+      image->_tr[0] = 0;
+      image->_tr[1] = trans_color->red & 0xFF;
+      image->_tr[2] = 0;
+      image->_tr[3] = trans_color->green & 0xFF;
+      image->_tr[4] = 0;
+      image->_tr[5] = trans_color->blue & 0xFF;
       image->ts = 6;
     } else if (type == PNG_COLOR_TYPE_PALETTE)
-      memcpy(image->tr, trans_alpha, image->ts);
+      memcpy(image->_tr, trans_alpha, image->ts);
   }
 
   png_read_image(png_ptr, image->rows);
@@ -231,7 +231,7 @@ unsigned char find_common_coltype(std::vector<Image>& img) {
 
   for (size_t i = 1; i < img.size(); i++) {
     if (img[0].ps != img[i].ps || memcmp(img[0].pl, img[i].pl, img[0].ps * 3) != 0) coltype = 6;
-    else if (img[0].ts != img[i].ts || memcmp(img[0].tr, img[i].tr, img[0].ts) != 0)
+    else if (img[0].ts != img[i].ts || memcmp(img[0]._tr, img[i]._tr, img[0].ts) != 0)
       coltype = 6;
     else if (img[i].type != 3) {
       if (coltype != 3) coltype |= img[i].type;
@@ -258,7 +258,7 @@ void up0to6(Image* image) {
     dp = image->rows[y];
     for (x = 0; x < image->w; x++) {
       g = *sp++;
-      a = (image->ts > 0 && image->tr[1] == g) ? 0 : 255;
+      a = (image->ts > 0 && image->_tr[1] == g) ? 0 : 255;
       *dp++ = g;
       *dp++ = g;
       *dp++ = g;
@@ -286,7 +286,8 @@ void up2to6(Image* image) {
       r = *sp++;
       g = *sp++;
       b = *sp++;
-      a = (image->ts > 0 && image->tr[1] == r && image->tr[3] == g && image->tr[5] == b) ? 0 : 255;
+      a = (image->ts > 0 && image->_tr[1] == r && image->_tr[3] == g && image->_tr[5] == b) ? 0
+                                                                                            : 255;
       *dp++ = r;
       *dp++ = g;
       *dp++ = b;
@@ -313,7 +314,7 @@ void up3to6(Image* image) {
       *dp++ = image->pl[*sp].r;
       *dp++ = image->pl[*sp].g;
       *dp++ = image->pl[*sp].b;
-      *dp++ = image->tr[*sp++];
+      *dp++ = image->_tr[*sp++];
     }
   }
   delete[] image->p;
@@ -493,7 +494,7 @@ void down6(std::vector<Image>& img) {
   for (i = 0; i < 256; i++) {
     col[i].num = 0;
     col[i].r = col[i].g = col[i].b = i;
-    col[i].a = image->tr[i] = 255;
+    col[i].a = image->_tr[i] = 255;
   }
 
   for (i = 0; i < img.size(); i++) {
@@ -548,8 +549,8 @@ void down6(std::vector<Image>& img) {
 
       for (i = 0; i < 256; i++)
         if (gray[i] == 0) {
-          image->tr[0] = 0;
-          image->tr[1] = t = i;
+          image->_tr[0] = 0;
+          image->_tr[1] = t = i;
           image->ts = 2;
           break;
         }
@@ -591,8 +592,8 @@ void down6(std::vector<Image>& img) {
         image->pl[i].r = col[i].r;
         image->pl[i].g = col[i].g;
         image->pl[i].b = col[i].b;
-        image->tr[i] = col[i].a;
-        if (image->tr[i] != 255) image->ts = i + 1;
+        image->_tr[i] = col[i].a;
+        if (image->_tr[i] != 255) image->ts = i + 1;
       }
     }
   } else if (grayscale) /* 6 -> 4 */
@@ -612,12 +613,12 @@ void down6(std::vector<Image>& img) {
   {
     for (i = 0; i < 4096; i++)
       if (cube[i] == 0) {
-        image->tr[0] = 0;
-        image->tr[1] = (i >> 4) & 0xF0;
-        image->tr[2] = 0;
-        image->tr[3] = i & 0xF0;
-        image->tr[4] = 0;
-        image->tr[5] = (i << 4) & 0xF0;
+        image->_tr[0] = 0;
+        image->_tr[1] = (i >> 4) & 0xF0;
+        image->_tr[2] = 0;
+        image->_tr[3] = i & 0xF0;
+        image->_tr[4] = 0;
+        image->_tr[5] = (i << 4) & 0xF0;
         image->ts = 6;
         break;
       }
@@ -633,9 +634,9 @@ void down6(std::vector<Image>& img) {
             b = *sp++;
             a = *sp++;
             if (a == 0) {
-              *dp++ = image->tr[1];
-              *dp++ = image->tr[3];
-              *dp++ = image->tr[5];
+              *dp++ = image->_tr[1];
+              *dp++ = image->_tr[3];
+              *dp++ = image->_tr[5];
             } else {
               *dp++ = r;
               *dp++ = g;
@@ -675,8 +676,8 @@ void down2(std::vector<Image>& img) {
         r = *sp++;
         g = *sp++;
         b = *sp++;
-        a = (image->ts > 0 && image->tr[1] == r && image->tr[3] == g && image->tr[5] == b) ? 0
-                                                                                           : 255;
+        a = (image->ts > 0 && image->_tr[1] == r && image->_tr[3] == g && image->_tr[5] == b) ? 0
+                                                                                              : 255;
 
         if (a != 0) {
           if (r != g || g != b) grayscale = 0;
@@ -727,16 +728,16 @@ void down2(std::vector<Image>& img) {
         for (y = 0; y < image->h; y++) {
           sp = dp = img[i].rows[y];
           for (x = 0; x < image->w; x++, sp += 3) {
-            *dp++ = (image->ts > 0 && image->tr[1] == sp[0] && image->tr[3] == sp[1] &&
-                     image->tr[5] == sp[2])
+            *dp++ = (image->ts > 0 && image->_tr[1] == sp[0] && image->_tr[3] == sp[1] &&
+                     image->_tr[5] == sp[2])
                         ? t
                         : sp[0];
           }
         }
       }
       if (ts > 0) {
-        image->tr[0] = 0;
-        image->tr[1] = t;
+        image->_tr[0] = 0;
+        image->_tr[1] = t;
         image->ts = ts;
       }
     } else /* 2 -> 3 */
@@ -755,7 +756,7 @@ void down2(std::vector<Image>& img) {
             r = *sp++;
             g = *sp++;
             b = *sp++;
-            a = (image->ts > 0 && image->tr[1] == r && image->tr[3] == g && image->tr[5] == b)
+            a = (image->ts > 0 && image->_tr[1] == r && image->_tr[3] == g && image->_tr[5] == b)
                     ? 0
                     : 255;
             for (k = 0; k < colors; k++)
@@ -770,8 +771,8 @@ void down2(std::vector<Image>& img) {
         image->pl[i].r = col[i].r;
         image->pl[i].g = col[i].g;
         image->pl[i].b = col[i].b;
-        image->tr[i] = col[i].a;
-        if (image->tr[i] != 255) image->ts = i + 1;
+        image->_tr[i] = col[i].a;
+        if (image->_tr[i] != 255) image->ts = i + 1;
       }
     }
   }
@@ -794,7 +795,7 @@ void down4(std::vector<Image>& img) {
   for (i = 0; i < 256; i++) {
     col[i].num = 0;
     col[i].r = col[i].g = col[i].b = i;
-    col[i].a = image->tr[i] = 255;
+    col[i].a = image->_tr[i] = 255;
   }
 
   for (i = 0; i < img.size(); i++) {
@@ -842,8 +843,8 @@ void down4(std::vector<Image>& img) {
 
     for (i = 0; i < 256; i++)
       if (gray[i] == 0) {
-        image->tr[0] = 0;
-        image->tr[1] = t = i;
+        image->_tr[0] = 0;
+        image->_tr[1] = t = i;
         image->ts = 2;
         break;
       }
@@ -883,8 +884,8 @@ void down4(std::vector<Image>& img) {
       image->pl[i].r = col[i].r;
       image->pl[i].g = col[i].g;
       image->pl[i].b = col[i].b;
-      image->tr[i] = col[i].a;
-      if (image->tr[i] != 255) image->ts = i + 1;
+      image->_tr[i] = col[i].a;
+      if (image->_tr[i] != 255) image->ts = i + 1;
     }
   }
 }
@@ -908,7 +909,7 @@ void down3(std::vector<Image>& img) {
       col[c].r = image->pl[c].r;
       col[c].g = image->pl[c].g;
       col[c].b = image->pl[c].b;
-      col[c].a = image->tr[c];
+      col[c].a = image->_tr[c];
     } else {
       col[c].r = col[c].g = col[c].b = c;
       col[c].a = 255;
@@ -959,8 +960,8 @@ void down3(std::vector<Image>& img) {
     image->ps = 0;
     image->ts = 0;
     if (ts > 0) {
-      image->tr[0] = 0;
-      image->tr[1] = t;
+      image->_tr[0] = 0;
+      image->_tr[1] = t;
       image->ts = ts;
     }
   }
@@ -991,7 +992,7 @@ void optim_palette(std::vector<Image>& img) {
       col[c].r = image->pl[c].r;
       col[c].g = image->pl[c].g;
       col[c].b = image->pl[c].b;
-      col[c].a = image->tr[c];
+      col[c].a = image->_tr[c];
     } else {
       col[c].r = col[c].g = col[c].b = c;
       col[c].a = 255;
@@ -1031,7 +1032,7 @@ void optim_palette(std::vector<Image>& img) {
         r = image->pl[*sp].r;
         g = image->pl[*sp].g;
         b = image->pl[*sp].b;
-        a = image->tr[*sp];
+        a = image->_tr[*sp];
         for (c = 0; c < image->ps; c++)
           if (col[c].r == r && col[c].g == g && col[c].b == b && col[c].a == a) break;
         *sp++ = c;
@@ -1043,9 +1044,9 @@ void optim_palette(std::vector<Image>& img) {
     image->pl[i].r = col[i].r;
     image->pl[i].g = col[i].g;
     image->pl[i].b = col[i].b;
-    image->tr[i] = col[i].a;
+    image->_tr[i] = col[i].a;
     if (col[i].num != 0) image->ps = i + 1;
-    if (image->tr[i] != 255) image->ts = i + 1;
+    if (image->_tr[i] != 255) image->ts = i + 1;
   }
 }
 
@@ -1072,12 +1073,12 @@ void add_transp2(std::vector<Image>& img) {
 
   for (i = 0; i < 4096; i++)
     if (cube[i] == 0) {
-      image->tr[0] = 0;
-      image->tr[1] = (i >> 4) & 0xF0;
-      image->tr[2] = 0;
-      image->tr[3] = i & 0xF0;
-      image->tr[4] = 0;
-      image->tr[5] = (i << 4) & 0xF0;
+      image->_tr[0] = 0;
+      image->_tr[1] = (i >> 4) & 0xF0;
+      image->_tr[2] = 0;
+      image->_tr[3] = i & 0xF0;
+      image->_tr[4] = 0;
+      image->_tr[5] = (i << 4) & 0xF0;
       image->ts = 6;
       break;
     }
@@ -1100,8 +1101,8 @@ void add_transp0(std::vector<Image>& img) {
 
   for (i = 0; i < 256; i++)
     if (gray[i] == 0) {
-      image->tr[0] = 0;
-      image->tr[1] = i;
+      image->_tr[0] = 0;
+      image->_tr[1] = i;
       image->ts = 2;
       break;
     }
