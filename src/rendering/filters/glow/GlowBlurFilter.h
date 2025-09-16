@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -32,7 +32,7 @@ class GlowBlurUniforms : public Uniforms {
 
 class GlowBlurRuntimeFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset, float resizeRatio);
 
  protected:

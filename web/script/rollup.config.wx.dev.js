@@ -16,13 +16,23 @@ export default [
       { banner, file: 'demo/wechat-miniprogram/utils/libpag.js', format: 'cjs', exports: 'auto', sourcemap: false },
     ],
     plugins: [
-      esbuild({ tsconfig: 'tsconfig.json', minify: false }),
+      esbuild({ tsconfig: 'tsconfig.json', minify: false,target: 'es6', }),
       resolve({ extensions: ['.ts', '.js'] }),
       commonJs(),
       replaceFunc(),
       alias({
         entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
       }),
+      {
+        name: 'preserve-import-meta-url',
+        resolveImportMeta(property, options) {
+          // Preserve the original behavior of `import.meta.url`.
+          if (property === 'url') {
+            return 'import.meta.url';
+          }
+          return null;
+        },
+      },
     ],
   },
 ];

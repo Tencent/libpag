@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -53,14 +53,14 @@ float& Matrix::operator[](int index) {
     default:
       break;
   }
-  return values[index];
+  return ToTGFX(this)->operator[](index);
 }
 
 void Matrix::set(int index, float value) {
   if (index > 5) {
     return;
   }
-  values[index] = value;
+  ToTGFX(this)->set(index, value);
 }
 
 void Matrix::get9(float buffer[9]) const {
@@ -234,4 +234,29 @@ const Matrix& Matrix::Invalid() {
                                                 FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
   return invalid;
 }
+
+void Matrix::setScaleX(float v) {
+  ToTGFX(this)->setScaleX(v);
+}
+
+void Matrix::setScaleY(float v) {
+  ToTGFX(this)->setScaleY(v);
+}
+
+void Matrix::setSkewY(float v) {
+  ToTGFX(this)->setSkewY(v);
+}
+
+void Matrix::setSkewX(float v) {
+  ToTGFX(this)->setSkewX(v);
+}
+
+void Matrix::setTranslateX(float v) {
+  ToTGFX(this)->setTranslateX(v);
+}
+
+void Matrix::setTranslateY(float v) {
+  ToTGFX(this)->setTranslateY(v);
+}
+
 }  // namespace pag

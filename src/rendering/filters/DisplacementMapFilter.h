@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -54,7 +54,7 @@ class DisplacementMapEffectUniforms : public Uniforms {
 
 class DisplacementMapFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Layer* layer, RenderCache* cache,
@@ -69,7 +69,7 @@ class DisplacementMapFilter : public RuntimeFilter {
                         bool expandOutput, float effectOpacity, tgfx::Matrix layerMatrix,
                         tgfx::Size size, tgfx::Size displacementSize, tgfx::Rect contentBounds,
                         std::shared_ptr<tgfx::Image> sourceImage)
-      : RuntimeFilter(Type(), {std::move(sourceImage)}),
+      : RuntimeFilter({std::move(sourceImage)}),
         useForHorizontalDisplacement(useForHorizontalDisplacement),
         maxHorizontalDisplacement(maxHorizontalDisplacement),
         useForVerticalDisplacement(useForVerticalDisplacement),

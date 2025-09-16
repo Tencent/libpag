@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -263,8 +263,12 @@ bool PAGBindInit() {
             }
             return res;
           }))
-      .function("_timeStretchMode", &PAGFile::timeStretchMode)
-      .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
+      .function("_timeStretchMode", optional_override([](PAGFile& pagFile) {
+                  return static_cast<int>(pagFile.timeStretchMode());
+                }))
+      .function("_setTimeStretchMode", optional_override([](PAGFile& pagfile, int timeStretchMode) {
+                  pagfile.setTimeStretchMode(static_cast<PAGTimeStretchMode>(timeStretchMode));
+                }))
       .function("_setDuration", optional_override([](PAGFile& pagFile, int duration) {
                   return pagFile.setDuration(static_cast<int64_t>(duration));
                 }))
@@ -360,8 +364,12 @@ bool PAGBindInit() {
                       }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height)
-      .function("_scaleMode", &PAGImage::scaleMode)
-      .function("_setScaleMode", &PAGImage::setScaleMode)
+      .function("_scaleMode", optional_override([](PAGImage& pagImage) {
+                  return static_cast<int>(pagImage.scaleMode());
+                }))
+      .function("_setScaleMode", optional_override([](PAGImage& pagImage, int scaleMode) {
+                  pagImage.setScaleMode(static_cast<PAGScaleMode>(scaleMode));
+                }))
       .function("_matrix", &PAGImage::matrix)
       .function("_setMatrix", &PAGImage::setMatrix);
 
@@ -384,8 +392,12 @@ bool PAGBindInit() {
       .function("_setCacheScale", &PAGPlayer::setCacheScale)
       .function("_maxFrameRate", &PAGPlayer::maxFrameRate)
       .function("_setMaxFrameRate", &PAGPlayer::setMaxFrameRate)
-      .function("_scaleMode", &PAGPlayer::scaleMode)
-      .function("_setScaleMode", &PAGPlayer::setScaleMode)
+      .function("_scaleMode", optional_override([](PAGPlayer& pagPlayer) {
+                  return static_cast<int>(pagPlayer.scaleMode());
+                }))
+      .function("_setScaleMode", optional_override([](PAGPlayer& pagPlayer, int scaleMode) {
+                  pagPlayer.setScaleMode(static_cast<PAGScaleMode>(scaleMode));
+                }))
       .function("_setSurface", &PAGPlayer::setSurface)
       .function("_getComposition", &PAGPlayer::getComposition)
       .function("_setComposition", &PAGPlayer::setComposition)

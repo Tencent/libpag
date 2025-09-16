@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 
@@ -118,7 +119,8 @@ std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame target
     }
     imageBuffer = tgfx::ImageBuffer::MakeFrom(renderBuffer);
   } else {
-    imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
+    auto codec = tgfx::ImageCodec::MakeFrom(info, pixels);
+    imageBuffer = codec ? codec->makeBuffer() : nullptr;
   }
   return imageBuffer;
 }

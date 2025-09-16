@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -38,7 +38,9 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
       glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
       continue;
     }
-    textFont.setTypeface(shapedGlyph.typeface);
+    if (shapedGlyph.typeface != nullptr) {
+      textFont.setTypeface(shapedGlyph.typeface);
+    }
     auto glyph =
         std::shared_ptr<Glyph>(new Glyph(shapedGlyph.glyphIDs, name, textFont, isVertical, paint));
     glyphMap[name] = glyph;

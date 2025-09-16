@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,7 @@
 #include <QVariantMap>
 #include "task/export/PAGExportAPNGTask.h"
 #include "task/export/PAGExportPNGTask.h"
+#include "task/profiling/PAGBenchmarkTask.h"
 #include "task/profiling/PAGProfilingTask.h"
 
 namespace pag {
@@ -53,6 +54,10 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
     }
     case PAGTaskType::PAGTaskType_Profiling: {
       task = new PAGProfilingTask(pagFile, path);
+      break;
+    }
+    case PAGTaskType::PAGTaskType_Benchmark: {
+      task = new PAGBenchmarkTask(pagFile, path);
       break;
     }
     default: {

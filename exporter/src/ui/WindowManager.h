@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,15 @@
 
 #pragma once
 
+#include <QString>
+#include <string>
+#include <vector>
+#include "utils/AlertInfo.h"
+
 namespace exporter {
 class WindowManager {
  public:
-  static WindowManager& getInstance();
+  static WindowManager& GetInstance();
 
   void initializeQtEnvironment();
 
@@ -30,6 +35,14 @@ class WindowManager {
   void showPAGConfigWindow();
 
   void showExportPreviewWindow();
+
+  bool showWarnings(std::vector<AlertInfo>& infos);
+
+  bool showErrors(std::vector<AlertInfo>& infos);
+
+  bool showSimpleError(const QString& message);
+
+  bool showPAGViewerInstallDialog(const std::string& pagFilePath);
 
   WindowManager(const WindowManager&) = delete;
   WindowManager& operator=(const WindowManager&) = delete;

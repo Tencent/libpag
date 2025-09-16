@@ -1,19 +1,17 @@
 import { PAGModule } from './pag-module';
 import { PAGComposition } from './pag-composition';
 import { transferToArrayBuffer } from './utils/common';
-import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-utils';
 
 import type { PAGImage } from './pag-image';
 import { LayerType, PAGTimeStretchMode, TextDocument } from './types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGFile extends PAGComposition {
   /**
    * Load pag file from file.
    */
-  @wasmAsyncMethod
   public static async load(data: File | Blob | ArrayBuffer) {
     const buffer = await transferToArrayBuffer(data);
     if (!buffer)

@@ -7,7 +7,6 @@ import { BackendContext } from './core/backend-context';
 import { PAGModule } from './pag-module';
 import { RenderCanvas } from './core/render-canvas';
 import { Clock } from './utils/clock';
-import { WORKER } from './utils/ua';
 import { isInstanceOf } from './utils/type-utils';
 
 import type { PAGComposition } from './pag-composition';
@@ -485,24 +484,14 @@ export class PAGView {
   }
 
   protected setTimer() {
-    if (WORKER) {
-      this.timer = self.setTimeout(() => {
-        this.flushLoop();
-      }, (1 / this.frameRate) * 1000);
-    } else {
       this.timer = globalThis.requestAnimationFrame(() => {
         this.flushLoop();
       });
-    }
   }
 
   protected clearTimer(): void {
     if (this.timer) {
-      if (WORKER) {
-        self.clearTimeout(this.timer);
-      } else {
-        globalThis.cancelAnimationFrame(this.timer);
-      }
+      globalThis.cancelAnimationFrame(this.timer);
       this.timer = null;
     }
   }

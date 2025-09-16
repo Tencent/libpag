@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,22 @@
 #include "tgfx/core/Surface.h"
 
 namespace pag {
+tgfx::SamplingOptions GetSamplingOptions(const tgfx::Matrix& matrix, tgfx::Image* image) {
+  if (image == nullptr) {
+    return {};
+  }
+  auto mipmapMode = image->hasMipmaps() ? tgfx::MipmapMode::Linear : tgfx::MipmapMode::None;
+  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipmapMode);
+  if (matrix.isTranslate()) {
+    float tx = matrix.getTranslateX();
+    float ty = matrix.getTranslateY();
+    if (std::floor(tx) == tx && std::floor(ty) == ty) {
+      samplingOptions.filterMode = tgfx::FilterMode::Nearest;
+    }
+  }
+  return samplingOptions;
+}
+
 struct CanvasState {
   float alpha = 1.0f;
   tgfx::BlendMode blendMode = tgfx::BlendMode::SrcOver;

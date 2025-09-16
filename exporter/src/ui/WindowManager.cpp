@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,13 +19,15 @@
 #include "WindowManager.h"
 #include <QFile>
 #include <QtGui/QFont>
-#include <QtQuick/QQuickWindow>
-#include <QtWidgets/QApplication>
+#include <memory>
+#include "AlertInfoModel.h"
+#include "ConfigModel.h"
+#include "PAGViewerInstallModel.h"
 #include "utils/AEHelper.h"
 
 namespace exporter {
 
-WindowManager& WindowManager::getInstance() {
+WindowManager& WindowManager::GetInstance() {
   static WindowManager instance;
   return instance;
 }
@@ -39,6 +41,8 @@ void WindowManager::showPanelExporterWindow() {
 }
 
 void WindowManager::showPAGConfigWindow() {
+  auto configModel = std::make_unique<ConfigModel>();
+  configModel->showConfig();
 }
 
 void WindowManager::showExportPreviewWindow() {
@@ -63,6 +67,45 @@ void WindowManager::initializeQtEnvironment() {
   QApplication::setFont(defaultFonts);
 #endif
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+}
+
+bool WindowManager::showWarnings(std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return false;
+  }
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->showWarnings(infos);
+  return true;
+}
+
+bool WindowManager::showErrors(std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return false;
+  }
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->showErrors(infos);
+  return true;
+}
+
+bool WindowManager::showSimpleError(const QString& message) {
+  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
+  if (!alertModel) {
+    alertModel = std::make_unique<AlertInfoModel>();
+  }
+  alertModel->setErrorMessage(message);
+  bool result = alertModel->showErrors({});
+  return result;
+}
+
+bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
+  auto installModel = std::make_unique<PAGViewerInstallModel>();
+  return installModel->showInstallDialog(pagFilePath);
 }
 
 }  // namespace exporter

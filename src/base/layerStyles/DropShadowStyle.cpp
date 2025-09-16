@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -43,9 +43,8 @@ void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterSc
                                       Frame layerFrame) const {
   auto spreadValue = spread->getValueAt(layerFrame);
   auto sizeValue = size->getValueAt(layerFrame);
-  spreadValue *= (spreadValue == 1.f) ? 1.f : 0.8f;
   auto spreadSize = sizeValue * spreadValue;
-  auto blurSize = sizeValue * (1.f - spreadValue) * 2.f;
+  auto blurSize = sizeValue * (1.f - spreadValue);
   auto blurXSize = blurSize * filterScale.x;
   auto blurYSize = blurSize * filterScale.y;
   auto distanceValue = distance->getValueAt(layerFrame);
@@ -61,8 +60,8 @@ void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterSc
   if (spreadValue == 1.f) {
     contentBounds->offset(offsetX, offsetY);
   } else {
-    *contentBounds = ToPAG(tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurXSize, blurYSize,
-                                                             tgfx::Color::White())
+    *contentBounds = ToPAG(tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurXSize / 2,
+                                                             blurYSize / 2, tgfx::Color::White())
                                ->filterBounds(*ToTGFX(contentBounds)));
   }
 }

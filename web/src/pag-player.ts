@@ -1,7 +1,7 @@
 import { PAGModule } from './pag-module';
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
-import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { getWasmIns, layer2typeLayer, proxyVector } from './utils/type-utils';
 import { Matrix } from './core/matrix';
 
@@ -11,7 +11,6 @@ import type { PAGScaleMode, Rect } from './types';
 import type { VideoReader } from './interfaces';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGPlayer {
   public static create(): PAGPlayer {
     const wasmIns = new PAGModule._PAGPlayer();
@@ -36,7 +35,6 @@ export class PAGPlayer {
    * Apply all pending changes to the target surface immediately. Returns true if the content has
    * changed.
    */
-  @wasmAsyncMethod
   public async flush() {
     return PAGModule.webAssemblyQueue.exec<boolean>(this.wasmIns._flush, this.wasmIns);
   }
@@ -44,7 +42,6 @@ export class PAGPlayer {
    * [Internal] Apply all pending changes to the target surface immediately. Returns true if the content has
    * changed.
    */
-  @wasmAsyncMethod
   public async flushInternal(callback: (res: boolean) => void) {
     const res = await PAGModule.webAssemblyQueue.exec<boolean>(async () => {
       PAGModule.currentPlayer = this;

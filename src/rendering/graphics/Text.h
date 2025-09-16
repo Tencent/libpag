@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "rendering/caches/TextAtlas.h"
 #include "rendering/caches/TextBlock.h"
 #include "rendering/graphics/Graphic.h"
 #include "tgfx/core/Paint.h"
@@ -63,8 +62,6 @@ class Text : public Graphic {
  private:
   Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns, const tgfx::Rect& bounds,
        bool hasAlpha, std::shared_ptr<TextBlock> textBlock);
-
-  void draw(Canvas* canvas, const TextAtlas* textAtlas) const;
 
   void drawTextRuns(Canvas* canvas, int paintIndex) const;
 

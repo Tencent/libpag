@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -50,38 +50,16 @@ std::shared_ptr<hb_face_t> CreateHBFace(std::shared_ptr<tgfx::Typeface> typeface
     return nullptr;
   }
   std::shared_ptr<hb_face_t> hbFace;
-  auto data = typeface->getBytes();
-  if (data && !data->empty()) {
-    auto wrapper = new PtrWrapper<tgfx::Data>(data);
-    auto blob = std::shared_ptr<hb_blob_t>(
-        hb_blob_create(static_cast<const char*>(data->data()),
-                       static_cast<unsigned int>(data->size()), HB_MEMORY_MODE_READONLY,
-                       static_cast<void*>(wrapper),
-                       [](void* ctx) { delete reinterpret_cast<PtrWrapper<tgfx::Data>*>(ctx); }),
-        hb_blob_destroy);
-    if (hb_blob_get_empty() == blob.get()) {
-      return nullptr;
-    }
-    hb_blob_make_immutable(blob.get());
-    if (hb_face_count(blob.get()) > 0) {
-      hbFace = std::shared_ptr<hb_face_t>(hb_face_create(blob.get(), 0), hb_face_destroy);
-      if (hb_face_get_empty() == hbFace.get() || hb_face_get_glyph_count(hbFace.get()) == 0) {
-        hbFace = nullptr;
-      }
-    }
+  auto wrapper = new PtrWrapper<tgfx::Typeface>(typeface);
+  hbFace = std::shared_ptr<hb_face_t>(
+      hb_face_create_for_tables(
+          HBGetTable, static_cast<void*>(wrapper),
+          [](void* ctx) { delete reinterpret_cast<PtrWrapper<tgfx::Typeface>*>(ctx); }),
+      hb_face_destroy);
+  if (hb_face_get_empty() == hbFace.get()) {
+    return nullptr;
   }
-  if (hbFace == nullptr) {
-    auto wrapper = new PtrWrapper<tgfx::Typeface>(typeface);
-    hbFace = std::shared_ptr<hb_face_t>(
-        hb_face_create_for_tables(
-            HBGetTable, static_cast<void*>(wrapper),
-            [](void* ctx) { delete reinterpret_cast<PtrWrapper<tgfx::Typeface>*>(ctx); }),
-        hb_face_destroy);
-    if (hb_face_get_empty() == hbFace.get()) {
-      return nullptr;
-    }
-    hb_face_set_index(hbFace.get(), 0);
-  }
+  hb_face_set_index(hbFace.get(), 0);
   if (hbFace == nullptr) {
     return nullptr;
   }

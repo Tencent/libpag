@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -73,10 +73,11 @@ bool StrokeFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   if (filter == nullptr) {
     return false;
   }
+  tgfx::Point offset;
+  image = image->makeWithFilter(filter, &offset);
   tgfx::Paint paint;
-  paint.setImageFilter(filter);
   paint.setAlpha(alpha);
-  canvas->drawImage(image, &paint);
+  canvas->drawImage(image, offset.x, offset.y, &paint);
   return true;
 }
 }  // namespace pag

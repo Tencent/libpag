@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -48,7 +48,7 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterSca
     blurrinessX = 0;
     blurrinessY *= filterScale.y;
   }
-  if (auto blur = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY)) {
+  if (auto blur = tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2)) {
     *contentBounds = ToPAG(blur->filterBounds(*ToTGFX(contentBounds)));
   }
 }

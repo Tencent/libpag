@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,10 +20,13 @@
 #include <QEvent>
 #include <QObject>
 #include "rendering/PAGWindow.h"
+#include "version.h"
 
 namespace pag {
 
 PAGViewer::PAGViewer(int& argc, char** argv) : QApplication(argc, argv) {
+  setApplicationVersion((AppVersion + (UpdateChannel == "beta" ? "-beta" : "")).data());
+  checkUpdateModel = std::make_unique<PAGCheckUpdateModel>();
 }
 
 bool PAGViewer::event(QEvent* event) {
@@ -55,6 +58,10 @@ void PAGViewer::openFile(QString path) {
   }
 
   window->openFile(path);
+}
+
+PAGCheckUpdateModel* PAGViewer::getCheckUpdateModel() {
+  return checkUpdateModel.get();
 }
 
 void PAGViewer::onWindowDestroyed(PAGWindow* window) {

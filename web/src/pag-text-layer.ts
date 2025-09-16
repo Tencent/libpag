@@ -1,12 +1,11 @@
 import { PAGModule } from './pag-module';
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
-import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 
 import type { Color, TextDocument } from './types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGTextLayer extends PAGLayer {
   public static make(
     duration: number,

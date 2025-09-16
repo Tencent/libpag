@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #include "PAGWindow.h"
 #include <QQmlContext>
 #include "PAGRenderThread.h"
+#include "PAGViewer.h"
 #include "PAGWindowHelper.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
@@ -52,6 +53,7 @@ void PAGWindow::open() {
   editAttributeModel = std::make_unique<PAGEditAttributeModel>();
   textLayerModel = std::make_unique<PAGTextLayerModel>();
   imageLayerModel = std::make_unique<PAGImageLayerModel>();
+  benchmarkModel = std::make_unique<PAGBenchmarkModel>();
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
@@ -60,6 +62,10 @@ void PAGWindow::open() {
   context->setContextProperty("editAttributeModel", editAttributeModel.get());
   context->setContextProperty("textLayerModel", textLayerModel.get());
   context->setContextProperty("imageLayerModel", imageLayerModel.get());
+  context->setContextProperty("benchmarkModel", benchmarkModel.get());
+
+  auto viewer = static_cast<PAGViewer*>(qApp);
+  context->setContextProperty("checkUpdateModel", viewer->getCheckUpdateModel());
 
   // Image Provider will be managed by QML
   auto imageProvider = new PAGImageProvider();
@@ -97,6 +103,10 @@ void PAGWindow::open() {
 
 QString PAGWindow::getFilePath() {
   return filePath;
+}
+
+QQmlApplicationEngine* PAGWindow::getEngine() {
+  return engine.get();
 }
 
 }  // namespace pag

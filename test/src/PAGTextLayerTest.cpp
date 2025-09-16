@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -352,7 +352,7 @@ PAG_TEST(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   auto bounds = pagPlayer->getBounds(textLayer);
   bounds.round();
-  auto defaultBounds = Rect::MakeXYWH(354, 1458, 385, 343);
+  auto defaultBounds = Rect::MakeLTRB(361, 1465, 732, 1794);
   EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText(
@@ -362,7 +362,7 @@ PAG_TEST(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
   bounds.round();
-  defaultBounds = Rect::MakeXYWH(354, 1458, 385, 324);
+  defaultBounds = Rect::MakeLTRB(361, 1465, 732, 1775);
   EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText(
@@ -378,7 +378,7 @@ PAG_TEST(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
   bounds.round();
-  defaultBounds = Rect::MakeXYWH(468, 1549, 148, 155);
+  defaultBounds = Rect::MakeLTRB(475, 1556, 609, 1697);
   EXPECT_TRUE(bounds == defaultBounds);
 }
 

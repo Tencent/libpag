@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,6 @@
 #include <memory>
 #include <queue>
 #include <unordered_set>
-#include "TextAtlas.h"
 #include "TextBlock.h"
 #include "pag/file.h"
 #include "pag/pag.h"
@@ -127,8 +126,6 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
-  TextAtlas* getTextAtlas(const TextBlock* textBlock);
-
   /**
    * Prepares an image for the next getAssetImage() call, which may schedule an asynchronous
    * decoding task immediately.
@@ -177,7 +174,6 @@ class RenderCache : public Performance {
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
-  std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> assetImages = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
   std::unordered_map<ID, std::vector<SequenceImageQueue*>> sequenceCaches = {};
@@ -201,11 +197,6 @@ class RenderCache : public Performance {
   void clearAllSequenceCaches();
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();
-
-  // text atlas caches:
-  void clearAllTextAtlas();
-  void removeTextAtlas(ID assetID);
-  TextAtlas* getTextAtlas(ID assetID) const;
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);

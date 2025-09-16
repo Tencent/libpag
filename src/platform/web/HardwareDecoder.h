@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,6 @@
 #include <mutex>
 #include "pag/pag.h"
 #include "rendering/video/VideoDecoderFactory.h"
-#include "tgfx/core/ImageReader.h"
 #include "tgfx/platform/web/VideoElementReader.h"
 
 namespace pag {
@@ -55,6 +54,8 @@ class HardwareDecoder : public VideoDecoder {
   int32_t _height = 0;
   float frameRate = 30.0f;
   std::unique_ptr<ByteData> mp4Data = nullptr;
+  int currentFrame = -1;
+  std::shared_ptr<tgfx::ImageBuffer> lastDecodedBuffer = nullptr;
 
   explicit HardwareDecoder(const VideoFormat& format);
 

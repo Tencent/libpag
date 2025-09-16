@@ -17,7 +17,7 @@ import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
 
-import type { ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
+import type { ScalerContextConstructor, VideoDecoderConstructor } from './interfaces';
 
 import type { ArrayBufferImage } from '@tgfx//wechat/array-buffer-image';
 import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect, } from '@tgfx/types';
@@ -104,7 +104,6 @@ export interface PAG extends EmscriptenModule {
   PAGTextLayer: typeof PAGTextLayer;
   PAGImageLayer: typeof PAGImageLayer;
   PAGSolidLayer: typeof PAGSolidLayer;
-  WebMask: WebMaskConstructor;
   ScalerContext: ScalerContextConstructor;
   VideoReader: VideoDecoderConstructor;
   GlobalCanvas: typeof GlobalCanvas;

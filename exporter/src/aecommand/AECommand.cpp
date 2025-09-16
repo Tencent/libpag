@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AECommand.h"
+#include "export/PAGExport.h"
+#include "platform/PlatformHelper.h"
+#include "ui/AlertInfoModel.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/AEResource.h"
-
+#include "utils/AlertInfo.h"
 namespace exporter {
 
 AEGP_Command AECommand::PAGExporterCMD = 0L;
@@ -60,6 +64,7 @@ A_Err AECommand::OnClickConfig(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showPAGConfigWindow();
   return err;
 }
 
@@ -85,6 +90,21 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+
+  AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
+  if (activeItemH == nullptr) {
+    return err;
+  }
+
+  AlertInfoModel alertModel;
+  const auto& outputPath = AlertInfoModel::BrowseForSave(true);
+
+  if (outputPath.empty()) {
+    return err;
+  }
+
+  PreviewPAGFile(outputPath);
+
   return err;
 }
 

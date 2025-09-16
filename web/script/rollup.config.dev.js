@@ -17,17 +17,22 @@ const plugins = [
   alias({
     entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../third_party/tgfx/web/src') }],
   }),
+  {
+    name: 'preserve-import-meta-url',
+    resolveImportMeta(property, options) {
+      // Preserve the original behavior of `import.meta.url`.
+      if (property === 'url') {
+        return 'import.meta.url';
+      }
+      return null;
+    },
+  },
 ];
 
 export default [
   {
     input: 'demo/index.ts',
     output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-    plugins: plugins,
-  },
-  {
-    input: 'demo/worker.ts',
-    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
     plugins: plugins,
   },
   {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -23,7 +23,6 @@
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/utils/PathUtil.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/Surface.h"
 
 namespace pag {
@@ -130,7 +129,7 @@ void FeatherMask::draw(Canvas* parentCanvas) const {
     if (mask->maskFeather) {
       auto blurrinessX = mask->maskFeather->getValueAt(layerFrame).x;
       auto blurrinessY = mask->maskFeather->getValueAt(layerFrame).y;
-      blurPaint.setImageFilter(tgfx::ImageFilter::Blur(blurrinessX, blurrinessY));
+      blurPaint.setImageFilter(tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2));
     }
     canvas->save();
     canvas->setMatrix(tgfx::Matrix::MakeTrans(maskBounds.x(), maskBounds.y()));

@@ -1,10 +1,9 @@
 import { readFile } from './utils/common';
 import { defaultFontNames } from '@tgfx/utils/font-family';
-import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGFont {
   /**
    * Create PAGFont instance.
@@ -18,7 +17,6 @@ export class PAGFont {
   /**
    * Register custom font family in the browser.
    */
-  @wasmAsyncMethod
   public static async registerFont(family: string, data: File) {
     const buffer = (await readFile(data)) as ArrayBuffer;
     if (!buffer || !(buffer.byteLength > 0)) {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -42,11 +42,11 @@ std::shared_ptr<tgfx::Image> GaussianBlurFilter::Apply(std::shared_ptr<tgfx::Ima
   blurrinessY *= filterScale.y * sourceScale.y;
   std::shared_ptr<tgfx::ImageFilter> filter;
   if (repeatEdgePixels) {
-    filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tgfx::TileMode::Clamp);
+    filter = tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2, tgfx::TileMode::Clamp);
     tgfx::Rect clipBounds = tgfx::Rect::MakeWH(input->width(), input->height());
     return input->makeWithFilter(filter, offset, &clipBounds);
   }
-  filter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY);
+  filter = tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2);
   return input->makeWithFilter(filter, offset);
 }
 

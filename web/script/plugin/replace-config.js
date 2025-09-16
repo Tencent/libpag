@@ -165,7 +165,6 @@ export const replaceFunctionConfig = [
         args1.push('argType' + i2);
         args2.push(argTypes[i2 + 2]);
       }
-      args2.push(Asyncify);
       if (!needsDestructorStack) {
         for (var i2 = isClassMethodFunc ? 1 : 2; i2 < argTypes.length; ++i2) {
           var paramName = i2 === 1 ? 'thisWired' : 'arg' + (i2 - 2) + 'Wired';
@@ -228,7 +227,7 @@ export const replaceFunctionConfig = [
               return ret;
             }
           }
-          return Asyncify.currData ? Asyncify.whenDone().then(onDone) : onDone(rv);
+          return onDone(rv);
         });
       }
       var invokerFunction = anonymous.apply({}, args2);
@@ -284,9 +283,15 @@ export const replaceFunctionConfig = [
   },
   {
     name: 'replace libpag.wasm name',
-    type: 'string',
-    start: 'libpag.wasm',
-    replaceStr: 'libpag.wasm.br',
+    start: 'var wasmBinaryFile;',
+    end: 'function getBinary(file)',
+    replaceStr:`
+    var wasmBinaryFile;
+    wasmBinaryFile = "libpag.wasm.br";
+    if (!isDataURI(wasmBinaryFile)) {
+      wasmBinaryFile = locateFile(wasmBinaryFile);
+    }
+    `,
   },
   {
     name: 'fix get gl get framebuffer',
@@ -303,5 +308,11 @@ export const replaceFunctionConfig = [
     type: 'string',
     start: `if (!ext.includes("lose_context") && !ext.includes("debug"))`,
     replaceStr: `if (!ext.includes("lose_context") && !ext.includes("debug") && !ext.includes("WEBGL_webcodecs_video_frame"))`,
+  },
+  {
+    name: 'replace _scriptDir',
+    type: 'string',
+    start: `var _scriptDir = import_meta.url;`,
+    replaceStr: `var _scriptDir = typeof document !== "undefined" && document.currentScript ? document.currentScript.src : void 0;`,
   },
 ];

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,10 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "platform/PlatformHelper.h"
+#include <shlobj.h>
+#include <windows.h>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include "platform/PAGViewerCheck.h"
+#include "src/base/utils/Log.h"
+#include "ui/WindowManager.h"
 #include "utils/AEHelper.h"
+#include "utils/FileHelper.h"
 
 namespace fs = std::filesystem;
 std::string TempFolderPath = "";
@@ -40,10 +46,10 @@ std::string GetRoamingPath() {
 }
 
 bool CreateFolder(const std::string& path) {
-  if (!fs::exists(path)) {
+  if (!FileHelper::FileIsExist(path)) {
     std::error_code errorCode;
     if (!fs::create_directories(path, errorCode)) {
-      printf("Create %s failed: %s\n", path.c_str(), errorCode.message().c_str());
+      LOGE("Create %s failed: %s", path.c_str(), errorCode.message().c_str());
       return false;
     }
   }
@@ -70,6 +76,103 @@ std::string GetTempFolderPath() {
     TempFolderPath = AEHelper::RunScript(suites, pluginID, "Folder.temp.fsName;");
   }
   return TempFolderPath;
+}
+std::string GetDownloadsPath() {
+  wchar_t* path = nullptr;
+  HRESULT hr = SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &path);
+
+  if (SUCCEEDED(hr) && path) {
+    int size = WideCharToMultiByte(CP_UTF8, 0, path, -1, nullptr, 0, nullptr, nullptr);
+    std::string result(size - 1, 0);
+    WideCharToMultiByte(CP_UTF8, 0, path, -1, &result[0], size, nullptr, nullptr);
+    CoTaskMemFree(path);
+    return result;
+  }
+
+  wchar_t userProfile[MAX_PATH] = {0};
+  if (GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH)) {
+    std::filesystem::path downloadsPath = std::filesystem::path(userProfile) / "Downloads";
+    return downloadsPath.string();
+  }
+
+  wchar_t tempPath[MAX_PATH];
+  if (GetTempPathW(MAX_PATH, tempPath)) {
+    std::filesystem::path fallbackPath = std::filesystem::path(tempPath) / "Downloads";
+    return fallbackPath.string();
+  }
+  return "";
+}
+
+std::string GetPAGViewerPath() {
+  auto configPath = GetRoamingPath() + "PAGViewerPath.txt";
+  auto pagViewerPath = FileHelper::ReadTextFile(configPath.c_str());
+  if (!pagViewerPath.empty() && FileHelper::FileIsExist(pagViewerPath)) {
+    return pagViewerPath;
+  }
+
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
+  auto check = std::make_unique<PAGViewerCheck>(config);
+  auto info = check->getPackageInfo();
+
+  if (!info.installLocation.empty()) {
+    std::filesystem::path viewerPath =
+        std::filesystem::path(info.installLocation) / "PAGViewer.exe";
+    if (FileHelper::FileIsExist(viewerPath.string())) {
+      return viewerPath.string();
+    }
+  }
+
+  return "";
+}
+
+static void StartPreview(const std::string& pagFilePath) {
+  if (!FileHelper::FileIsExist(pagFilePath)) {
+    QString errorMsg =
+        QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
+    WindowManager::GetInstance().showSimpleError(errorMsg);
+    return;
+  }
+
+  auto pagViewerPath = GetPAGViewerPath();
+  if (pagViewerPath.empty()) {
+    QString errorMsg =
+        QString::fromUtf8(Messages::PAGVIEWER_NOT_FOUND) + QString::fromStdString(pagFilePath);
+    WindowManager::GetInstance().showSimpleError(errorMsg);
+    return;
+  }
+
+  auto winCmd = "\"" + pagViewerPath + "\" \"" + pagFilePath + "\"";
+
+  STARTUPINFOA si = {0};
+  PROCESS_INFORMATION pi = {0};
+
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
+
+  if (CreateProcessA(NULL, (LPSTR)winCmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  } else {
+    QString errorMsg =
+        QString::fromUtf8(Messages::PREVIEW_LAUNCH_FAILED) + QString::number(GetLastError());
+    WindowManager::GetInstance().showSimpleError(errorMsg);
+  }
+}
+
+void PreviewPAGFile(std::string pagFilePath) {
+  auto config = std::make_shared<AppConfig>();
+  config->setAppName("PAGViewer");
+  auto checker = std::make_unique<PAGViewerCheck>(config);
+
+  if (!checker->isPAGViewerInstalled()) {
+    bool installSuccess = WindowManager::GetInstance().showPAGViewerInstallDialog(pagFilePath);
+    if (!installSuccess) {
+      return;
+    }
+  }
+  StartPreview(pagFilePath);
 }
 
 }  // namespace exporter

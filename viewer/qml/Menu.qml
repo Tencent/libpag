@@ -49,10 +49,23 @@ Item {
                     }
                 }
                 Action {
+                    text: qsTr("Check for Updates")
+                    onTriggered: {
+                        root.command("check-for-updates");
+                    }
+                }
+                Action {
                     text: qsTr("Performance Test")
                     enabled: root.hasPAGFile
                     onTriggered: {
                         root.command("performance-profile");
+                    }
+                }
+                Action {
+                    text: qsTr("Performance Benchmark Test")
+                    enabled: root.hasPAGFile
+                    onTriggered: {
+                        root.command("performance-benchmark");
                     }
                 }
                 PAGMenu {
@@ -197,6 +210,14 @@ Item {
                 }
                 Platform.MenuItem {
                     visible: windowActive
+                    text: qsTr("Check for Updates")
+                    role: "ApplicationSpecificRole"
+                    onTriggered: {
+                        root.command("check-for-updates");
+                    }
+                }
+                Platform.MenuItem {
+                    visible: windowActive
                     text: qsTr("Preference Settings")
                     role: "ApplicationSpecificRole"
                     onTriggered: {
@@ -234,6 +255,13 @@ Item {
                     enabled: root.hasPAGFile
                     onTriggered: {
                         root.command("performance-profile");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Performance Benchmark Test")
+                    enabled: root.hasPAGFile
+                    onTriggered: {
+                        root.command("performance-benchmark");
                     }
                 }
                 Platform.Menu {

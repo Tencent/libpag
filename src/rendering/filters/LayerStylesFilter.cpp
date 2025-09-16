@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -64,11 +64,14 @@ std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
 }
 
 void LayerStylesFilter::applyFilter(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
+  if (image == nullptr) {
+    return;
+  }
   for (const auto& layerStyleFilter : layerStyleFilters) {
     layerStyleFilter->draw(canvas, image);
   }
   if (drawSource) {
-    canvas->drawImage(image);
+    canvas->drawImage(std::move(image));
   }
 }
 

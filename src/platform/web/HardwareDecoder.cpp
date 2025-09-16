@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,11 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include <emscripten.h>
 #include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
+namespace emscripten {
+class val;
+}
 using namespace emscripten;
 
 namespace pag {
@@ -36,10 +40,9 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto staticTimeRanges = demuxer->getStaticTimeRanges();
   mp4Data = demuxer->getMp4Data();
   auto videoReaderClass = val::module_property("VideoReader");
-  videoReader = videoReaderClass
-                    .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())),
-                               _width, _height, sequence->frameRate, staticTimeRanges)
-                    .await();
+  videoReader = videoReaderClass.call<val>(
+      "create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width, _height,
+      sequence->frameRate, staticTimeRanges);
   auto video = videoReader.call<val>("getVideo");
   if (!video.isNull()) {
     imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
@@ -84,7 +87,12 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
-  val promise = videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
-  return imageReader->acquireNextBuffer(promise);
+  videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
+  int frameId = videoReader.call<int>("getCurrentFrame");
+  if (currentFrame < 0 || currentFrame != frameId) {
+    currentFrame = frameId;
+    lastDecodedBuffer = imageReader->acquireNextBuffer();
+  }
+  return lastDecodedBuffer;
 }
 }  // namespace pag

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -32,17 +32,17 @@ static const char FRAGMENT_SHADER[] = R"(
         uniform float mColorizeHue;
         uniform float mColorizeSaturation;
         uniform float mColorizeLightness;
-    
+
         #define EPSILON 1e-10
         vec3 saturate(vec3 v) { return clamp(v, vec3(0.0), vec3(1.0)); }
-    
+
         vec3 HUEtoRGB(float H) {
             float R = abs(H * 6.0 - 3.0) - 1.0;
             float G = 2.0 - abs(H * 6.0 - 2.0);
             float B = 2.0 - abs(H * 6.0 - 4.0);
             return saturate(vec3(R,G,B));
         }
-    
+
         vec3 RGBtoHCV(vec3 RGB) {
             vec4 P = (RGB.g < RGB.b) ? vec4(RGB.bg, -1.0, 2.0/3.0) : vec4(RGB.gb, 0.0, -1.0/3.0);
             vec4 Q = (RGB.r < P.x) ? vec4(P.xyw, RGB.r) : vec4(RGB.r, P.yzx);
@@ -113,8 +113,8 @@ std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Im
 HueSaturationFilter::HueSaturationFilter(float hue, float saturation, float lightness,
                                          float colorize, float colorizeHue,
                                          float colorizeSaturation, float colorizeLightness)
-    : RuntimeFilter(Type()), hue(hue), saturation(saturation), lightness(lightness),
-      colorize(colorize), colorizeHue(colorizeHue), colorizeSaturation(colorizeSaturation),
+    : hue(hue), saturation(saturation), lightness(lightness), colorize(colorize),
+      colorizeHue(colorizeHue), colorizeSaturation(colorizeSaturation),
       colorizeLightness(colorizeLightness) {
 }
 

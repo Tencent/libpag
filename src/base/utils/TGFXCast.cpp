@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -159,7 +159,7 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
   sampler.id = glInfo.id;
   sampler.target = glInfo.target;
   sampler.format = glInfo.format;
-  return {sampler, texture.width(), texture.height()};
+  return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
 }
 
 BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
@@ -186,8 +186,8 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
 }
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
-  tgfx::BackendSemaphore glSemaphore = {};
-  glSemaphore.initGL(semaphore.glSync());
+  tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
+  tgfx::BackendSemaphore glSemaphore = {syncInfo};
   return glSemaphore;
 }
 }  // namespace pag
