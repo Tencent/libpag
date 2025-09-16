@@ -1112,13 +1112,6 @@ class PAG_API PAGFile : public PAGComposition {
   PAGTimeStretchMode timeStretchMode() const;
 
   /**
-   * This function returns the internal time stretch mode without any thread safety mechanism.
-   * It directly accesses the internal `_timeStretchMode` variable.
-   * This function is typically used when thread safety is not a concern (e.g., single-threaded contexts).
-   */
-  PAGTimeStretchMode timeStretchModeInternal() const;
-
-  /**
    * Set the timeStretchMode of this file.
    */
   void setTimeStretchMode(PAGTimeStretchMode value);
@@ -1160,6 +1153,7 @@ class PAG_API PAGFile : public PAGComposition {
                            std::shared_ptr<TextDocument> textData);
   void replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
                             std::shared_ptr<PAGImage> image);
+  PAGTimeStretchMode timeStretchModeInternal() const;
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;
@@ -1170,6 +1164,8 @@ class PAG_API PAGFile : public PAGComposition {
   friend class LayerRenderer;
 
   friend class AudioClip;
+
+  friend class HardwareDecoder;
 };
 
 class Composition;

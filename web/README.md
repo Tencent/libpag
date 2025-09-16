@@ -116,7 +116,7 @@ You can find the API documentation [here](https://pag.io/docs/apis-web.html).
 
 ### Cross-Origin Security Requirements
 
-To mitigate side-channel attacks, modern browsers enforce strict environment restrictions on enabling `SharedArrayBuffer`. Enabling Wasm multithreading requires satisfying **Cross-Origin Isolation** conditions.
+To mitigate side-channel attacks, modern browsers enforce strict environment restrictions on enabling [SharedArrayBuffer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer). Enabling Wasm multithreading requires satisfying **Cross-Origin Isolation** conditions.
 
 #### Required Response Headers
 
@@ -127,11 +127,7 @@ To enable cross-origin isolation, the server must set the following HTTP respons
 | `Cross-Origin-Opener-Policy` (COOP)   | `same-origin`         | Isolates the current browsing context from cross-origin documents  |
 | `Cross-Origin-Embedder-Policy` (COEP) | `require-corp`        | Restricts embedded resources to those complying with CORP or CORS policies |
 
-> **Example:**
-> ```
-> Cross-Origin-Opener-Policy: same-origin
-> Cross-Origin-Embedder-Policy: require-corp
-> ```
+For more details, see the [SharedArrayBuffer documentation](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer).
 
 #### Notes
 

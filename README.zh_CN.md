@@ -165,7 +165,7 @@ ohpm install
   });
 </script>
 ```
-Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sdk.html#web-%E7%AB%AF%E6%8E%A5%E5%85%A5)
+Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sdk.html)
 
 ### 范例工程
 

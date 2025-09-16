@@ -109,7 +109,7 @@ Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接�
 
 ### 跨域安全性要求
 
-为了防范侧信道攻击，现代浏览器对启用 `SharedArrayBuffer` 施加了严格的环境限制。开启 Wasm 多线程必须满足 **跨域隔离（Cross-Origin Isolation）** 条件。
+为了防范侧信道攻击，现代浏览器对启用 [SharedArrayBuffer](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) 施加了严格的环境限制。开启 Wasm 多线程必须满足 **跨域隔离（Cross-Origin Isolation）** 条件。
 #### 必须配置的响应头
 
 为启用跨域隔离，服务端必须为所有相关资源（html、wasm、js等）设置以下 HTTP 响应头：
@@ -119,11 +119,7 @@ Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接�
 | `Cross-Origin-Opener-Policy` (COOP)   | `same-origin`          | 将当前上下文与跨域文档隔离          |
 | `Cross-Origin-Embedder-Policy` (COEP) | `require-corp`         | 限制嵌入当前页面的资源必须遵守 CORP 或 CORS 策略 |
 
-> **示例：**
-> ```
-> Cross-Origin-Opener-Policy: same-origin
-> Cross-Origin-Embedder-Policy: require-corp
-> ```
+详细信息见 [SharedArrayBuffer文档](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer)。
 
 #### 注意事项
 
