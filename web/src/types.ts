@@ -19,7 +19,7 @@ import { RenderCanvas } from './core/render-canvas';
 
 import type { ScalerContextConstructor, VideoDecoderConstructor } from './interfaces';
 
-import type { ArrayBufferImage } from '@tgfx//wechat/array-buffer-image';
+import type { ArrayBufferImage } from '@tgfx/wechat/array-buffer-image';
 import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect, } from '@tgfx/types';
 export type { EmscriptenGL, ctor, Point, Vector, Rect };
 

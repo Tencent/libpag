@@ -43,7 +43,7 @@ export interface ScalerContext {
   getAdvance: (text: string) => number;
   getBounds: (text: string, fauxBold: boolean, fauxItalic: boolean) => Rect;
   getFontMetrics: () => FontMetrics;
-  readPixels: (text: string, bounds: Rect, fauxBold: boolean, stroke?: Stroke) => Uint8Array;
+  readPixels: (text: string, bounds: Rect, fauxBold: boolean, stroke?: Stroke) => Uint8Array | null;
 }
 
 export interface ScalerContextConstructor {
