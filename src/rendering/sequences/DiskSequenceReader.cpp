@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskSequenceReader.h"
+#include <tgfx/core/ImageCodec.h>
 #include "base/utils/TGFXCast.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Buffer.h"

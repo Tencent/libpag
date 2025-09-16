@@ -10,6 +10,7 @@ src/wasm
 src/wasm-mt
 src/build-pag
 src/.pag.wasm.md5
+src/.pag.wasm-mt.md5
 dist
 emsdk/
 api-docs
@@ -19,3 +20,7 @@ cypress/videos
 cypress/screenshots
 demo/wechat-miniprogram/utils/libpag.js
 demo/wechat-miniprogram/utils/libpag.wasm.br
+demo/wasm
+demo/wasm-mt
+lib-mt
+refresh-lib.sh

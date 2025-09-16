@@ -4,6 +4,7 @@
 import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGPlayer } from '../../src/pag-player';
+import type { PAGFile } from '../../src/pag-file';
 
 describe('PAGPlayer', () => {
   let PAG: PAG;
@@ -12,7 +13,7 @@ describe('PAGPlayer', () => {
   let pagPlayer: PAGPlayer;
 
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -27,23 +28,34 @@ describe('PAGPlayer', () => {
   };
 
   const getPAGFile = async () => {
-    const buffer = await global
-      .fetch('http://127.0.0.1:8080/demo/assets/AudioMarker.pag')
-      .then((res) => res.arrayBuffer());
+    const buffer = await global.fetch('/demo/assets/AudioMarker.pag').then((res) => res.arrayBuffer());
     const pagFile = await PAG.PAGFile.load(buffer);
     expect(pagFile.wasmIns).to.be.a('Object');
     return pagFile;
   };
 
-  it('Create', () => {
+  it('Create PAGPlayer', () => {
     createPAGPlayer();
+  });
+
+  it('PAGPlayer flush', async () => {
+    pagPlayer = createPAGPlayer();
+    pagPlayer.prepare();
+    const res = await pagPlayer.flush();
+    expect(res).to.be.eq(false);
   });
 
   it('Get/Set PAGComposition', async () => {
     pagPlayer = createPAGPlayer();
     const pagFile = await getPAGFile();
     pagPlayer.setComposition(pagFile);
-    expect(pagPlayer.getComposition().wasmIns).to.be.a('Object');
+    const compositon = pagPlayer.getComposition() as PAGFile;
+    expect(compositon.wasmIns).to.be.a('Object');
+
+    const imageBlob = await global.fetch('/demo/assets/cat.png').then((res) => res.blob());
+    const pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
+    expect(pagImage.wasmIns).to.be.a('object');
+    compositon.replaceImage(1, pagImage);
   });
 
   it('Get/Set PAGSurface', async () => {
@@ -105,6 +117,11 @@ describe('PAGPlayer', () => {
     pagPlayer.setMatrix(matrix);
     matrix = pagPlayer.matrix();
     expect(matrix.a).to.be.eq(2);
+  });
+
+  it('Next Frame', () => {
+    pagPlayer.nextFrame();
+    pagPlayer.prepare();
   });
 
   it('Get/Set autoClear', () => {

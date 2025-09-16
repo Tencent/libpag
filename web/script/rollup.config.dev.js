@@ -8,6 +8,10 @@ import { readFileSync } from 'node:fs';
 
 const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
+const arch = process.env.ARCH;
+const demoName = (arch === 'wasm-mt'? 'index': 'index-st');
+
+require("./update.pag.import");
 
 const plugins = [
   esbuild({ tsconfig: "tsconfig.json", minify: false }),
@@ -31,13 +35,8 @@ const plugins = [
 
 export default [
   {
-    input: 'demo/index.ts',
-    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
+    input: `demo/${demoName}.ts`,
+    output: { banner, file: `demo/${arch}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
-  },
-  {
-    input: 'src/pag.ts',
-    output: { name: 'libpag', banner, file: 'demo/libpag.js', format: 'umd', exports: 'named', sourcemap: true },
-    plugins: plugins,
-  },
+  }
 ];
