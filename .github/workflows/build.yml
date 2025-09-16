@@ -163,7 +163,7 @@ jobs:
           depsync
         shell: bash
 
-      - name: Build Web:st
+      - name: Build Web
         run: |
           cd web
           emsdk/emsdk_env
