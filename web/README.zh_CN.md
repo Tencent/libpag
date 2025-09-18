@@ -1,6 +1,6 @@
 <img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[官网](https://pag.io) | [English](./README.md) | 简体中文 | [Weblite版本](./web/lite) | [小程序版本](./web/wechat) | [小程序lite版本](./web/lite/wechat)
+[官网](https://pag.io) | [English](./README.md) | 简体中文 | [Weblite版本](./lite/README.md) | [小程序版本](./wechat/README.md) | [小程序lite版本](./lite/wechat/README.md)
 
 ## 介绍
 
@@ -91,6 +91,99 @@ Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接�
 
 更多的 API 接口可以阅读 [API 文档](https://pag.io/api.html#/apis/web/)。
 
+`上述步骤接入的是 libpag 单线程版本，若要接入多线程版本请参考如下接入指南。`
+
+## 多线程接入指南
+
+### 多线程支持基础
+
+[WebAssembly 多线程](https://emscripten.org/docs/porting/pthreads.html) 依赖于浏览器对 [SharedArrayBuffer](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) 的支持。通过 `SharedArrayBuffer` 和 `Web Worker` ，多线程 Wasm 模块可以实现并行计算以提升性能。
+
+- **主要机制**：
+    - Wasm 线程使用共享内存 `SharedArrayBuffer` 实现数据同步与通信。
+    - 利用 `Web Worker` 作为执行上下文，加载同一个 wasm 模块的多个线程实例。
+
+- **使用条件**：
+    - Wasm 编译时需启用 `threads` 等相关编译特性（例如 Emscripten 的 `-pthread` 支持）。
+    - 运行环境须支持 `SharedArrayBuffer` 和 `Web Worker`。
+
+### 跨域安全性要求
+
+为了防范侧信道攻击，现代浏览器对启用 [SharedArrayBuffer](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) 施加了严格的环境限制。开启 Wasm 多线程必须满足 **跨域隔离（Cross-Origin Isolation）** 条件。
+#### 必须配置的响应头
+
+为启用跨域隔离，服务端必须为所有相关资源（html、wasm、js等）设置以下 HTTP 响应头：
+
+| 头部名称                      | 示例值                | 作用说明                             |
+|----------------------------|---------------------|----------------------------------|
+| `Cross-Origin-Opener-Policy` (COOP)   | `same-origin`          | 将当前上下文与跨域文档隔离          |
+| `Cross-Origin-Embedder-Policy` (COEP) | `require-corp`         | 限制嵌入当前页面的资源必须遵守 CORP 或 CORS 策略 |
+
+详细信息见 [SharedArrayBuffer文档](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer)。
+
+#### 注意事项
+
+- **必须通过 HTTPS（或 localhost）访问页面和相关资源**
+  浏览器仅在 [安全上下文](https://developer.mozilla.org/zh-CN/docs/Web/Security/Secure_Contexts) 中启用跨域隔离和 SharedArrayBuffer，多线程功能依赖此安全环境。
+- HTTP 协议下不允许启用跨域隔离，多线程支持将被禁用
+
+### Browser（推荐）
+
+接入多线程的 Web 端代码与单线程相同，但服务端要符合上述接入要求，否则多线程会加载失败。
+
+#### 注意事项
+- **禁止直接从公共 CDN（如 npm CDN）跨域加载 wasm 资源**
+  大多数公共 npm CDN（如 unpkg、jsDelivr 等）不会为静态资源默认设置 COOP/COEP 相关头，也不会对所有请求启用跨源隔离。
+  因此，将 wasm/js 上传至此类 CDN 并通过跨域方式加载时，浏览器不会开启共享内存，多线程功能将被禁用。建议将 wasm/js 与页面文件部署至同源服务器，避免出现跨域加载导致多线程失效的问题。
+- 多线程 wasm/js 不会发布至 npm 官网，可从 [release](https://github.com/Tencent/libpag/releases) 下载 web 端压缩包后自行部署使用。
+
+### 本地编译
+
+```bash
+# ./web
+$ npm run build:mt
+```
+
+这将会在 `web/lib-mt` 目录中生成 wasm/js，接下来，您可以通过运行以下命令启动一个 HTTP 服务器运行本地 demo
+
+```bash
+# ./web
+$ npm run server:mt
+```
+
+Chrome 浏览器打开 `http://localhost:8081/index.html` 即可看到效果
+
+可根据如下步骤编译 debug 版本
+
+```bash
+# ./web
+$ npm run build:debug:mt
+$ npm run server:mt
+```
+
+>**⚠️** 在多线程版本中，如果修改了编译输出文件 libpag.min.js 的文件名，需要在 libpag.min.js 文件内搜索关键字 "libpag.min.js" ，并将所有出现的 "libpag.min.js" 替换为新的文件名。  
+>否则程序将无法运行。以下是修改示例：
+
+修改前
+
+```js
+    // 文件名: libpag.min.js
+    var worker = new Worker(new URL("libpag.min.js", import.meta.url), {
+     type: "module",
+     name: "em-pthread"
+    });
+```
+
+修改后
+
+```js
+    // 文件名: libpag.min.test.js
+    var worker = new Worker(new URL("libpag.min.test.js", import.meta.url), {
+     type: "module",
+     name: "em-pthread"
+    });
+```
+
 ## 浏览器兼容性
 
 | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome for Android | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari on iOS | QQ Browser Mobile |
@@ -158,49 +251,52 @@ PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行�
 
 ## 参与开发
 
+> 本节介绍的是 libpag 单线程版本的开发、测试流程
+
 ### 前置工作
 
 需要确保已经可编译 C++ libpag 库，并且安装 [Emscripten 套件](https://emscripten.org/docs/getting_started/downloads.html) 和 Node 依赖
 
 ```bash
 # 安装Node依赖
+# ./web
 $ npm install
 ```
 
 ### 开发流程
 
-执行 `build.sh debug` 来获得 `libpag.wasm` 文件
+执行如下命令编译 wasm/js
 
 ```bash
-# ./web 目录下
-$ npm run build:debug
+# ./web
+$ npm run build:debug:st
 ```
+
+这将会在 `web/lib` 目录中生成 wasm/js
 
 开启 Typescript 自动编译(可选)，修改 Typescript 文件会自动打包到 Javascript 文件
 
 ```bash
-# web目录下
-$ npm run dev
+# ./web
+$ npm run dev:st
 ```
 
 启动 HTTP 服务
 
 ```bash
-# web目录下
-$ npm run server
+# ./web
+$ npm run server:st
 ```
 
-Chrome 浏览器打开 `http://localhost:8081/demo/index.html` 即可看到效果
+Chrome 浏览器打开 `http://localhost:8081/index-st.html` 即可看到效果
 
 需要断点调试时，可以安装 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)，并打开 Chrome DevTools > 设置 > 实验 > 勾选「WebAssembly Debugging: Enable DWARF support」选项启用 SourceMap 支持。现在就可以在 Chrome DevTools 中对 C++ 文件进行断点调试了。
 
 ### 生产流程
 
-执行 `build.sh` 脚本
-
 ```bash
-# ./web 目录下
-$ npm run build
+# ./web
+$ npm run build:st
 ```
 
 ### CLion 编译
@@ -216,17 +312,20 @@ $ npm run build
 打包生产版本
 
 ```bash
-$ npm run build
+# ./web
+$ npm run build:st
 ```
 
 启动测试 HTTP 服务
 
 ```bash
-$ npm run server
+# ./web
+$ npm run server:st
 ```
 
 启动 cypress 测试
 
 ```bash
+# ./web
 $ npm run test
 ```

@@ -19,7 +19,7 @@ import { RenderCanvas } from './core/render-canvas';
 
 import type { ScalerContextConstructor, VideoDecoderConstructor } from './interfaces';
 
-import type { ArrayBufferImage } from '@tgfx//wechat/array-buffer-image';
+import type { ArrayBufferImage } from '@tgfx/wechat/array-buffer-image';
 import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect, } from '@tgfx/types';
 export type { EmscriptenGL, ctor, Point, Vector, Rect };
 
@@ -518,4 +518,48 @@ export declare class SoftwareDecoder {
 
 export declare class SoftwareDecoderFactory {
   public createSoftwareDecoder(pag: PAG): SoftwareDecoder | null;
+}
+
+
+export class VecArray extends Array {
+  private isDeleted = false;
+
+  private constructor(...items: any[]) {
+    super(...items);
+    Object.setPrototypeOf(this, VecArray.prototype);
+  }
+
+  public static create(): VecArray {
+    return new VecArray();
+  }
+
+  public get(index: number): any {
+    this.ensureNotDeleted();
+    if (index < 0 || index >= this.length) {
+      throw new RangeError('Index out of bounds');
+    }
+    return this[index];
+  }
+
+  public push_back(value: any): void {
+    this.ensureNotDeleted();
+    this.push(value);
+  }
+
+  public size(): number {
+    this.ensureNotDeleted();
+    return this.length;
+  }
+
+  public delete(): void {
+    this.ensureNotDeleted();
+    this.length = 0;
+    this.isDeleted = true;
+  }
+
+  private ensureNotDeleted(): void {
+    if (this.isDeleted) {
+      throw new Error('This VecArray instance has been deleted.');
+    }
+  }
 }

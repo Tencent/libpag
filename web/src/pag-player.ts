@@ -7,7 +7,7 @@ import { Matrix } from './core/matrix';
 
 import { PAGComposition } from './pag-composition';
 import type { PAGLayer } from './pag-layer';
-import type { PAGScaleMode, Rect } from './types';
+import {PAGScaleMode, Rect, VecArray} from './types';
 import type { VideoReader } from './interfaces';
 
 @destroyVerify
@@ -236,7 +236,11 @@ export class PAGPlayer {
   public getLayersUnderPoint(localX: number, localY: number) {
     const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
     if (!wasmIns) throw new Error(`Get layers under point, x: ${localX} y:${localY} fail!`);
-    return proxyVector(wasmIns, layer2typeLayer);
+    const layerArray = VecArray.create();
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
+    }
+    return layerArray;
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point

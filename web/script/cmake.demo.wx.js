@@ -14,9 +14,6 @@ process.argv.push("pag");
 require("./setup.emsdk.wx");
 require("../../build_pag");
 
-if (!fs.existsSync("../lib")) {
-    fs.mkdirSync("../lib", {recursive: true});
-}
 if (!fs.existsSync("../wechat/lib")) {
     fs.mkdirSync("../wechat/lib", {recursive: true});
 }

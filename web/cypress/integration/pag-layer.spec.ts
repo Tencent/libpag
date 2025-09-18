@@ -11,7 +11,7 @@ describe('PAGLayer', async () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -23,7 +23,7 @@ describe('PAGLayer', async () => {
   let pagLayer: PAGLayer;
 
   it('Get uniqueID', async () => {
-    const buffer = await global.fetch('http://127.0.0.1:8080/demo/assets/test2.pag').then((res) => res.arrayBuffer());
+    const buffer = await global.fetch('/demo/assets/test2.pag').then((res) => res.arrayBuffer());
     pagFile = await PAG.PAGFile.load(buffer);
     pagLayer = pagFile.getLayerAt(0);
     expect(pagLayer.uniqueID()).to.be.eq(16);
@@ -34,7 +34,7 @@ describe('PAGLayer', async () => {
   });
 
   it('Get layerName', async () => {
-    expect(pagLayer.layerName()).to.be.eq('');
+    expect(pagLayer.layerName()).to.be.eq('SolidLayer');
   });
 
   it('Get/Set matrix', () => {
@@ -138,5 +138,9 @@ describe('PAGLayer', async () => {
 
   it('Is PAGFile', () => {
     expect(pagLayer.isPAGFile()).to.be.eq(false);
+  });
+
+  it('As TypeLayer', () => {
+    expect(pagLayer.asTypeLayer().layerType()).to.be.eq(PAGTypes.LayerType.Solid);
   });
 });

@@ -1,6 +1,6 @@
 <img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[官网](https://pag.io) | [English](../README.md) | [Web版本](../README.zh_CN.md) | [Weblite版本](../lite) | 小程序版本 | [小程序lite版本](../lite/wechat)
+[官网](https://pag.io) | [English](../README.md) | [Web版本](../README.zh_CN.md) | [Weblite版本](../lite/README.md) | 小程序版本 | [小程序lite版本](../lite/wechat/README.md)
 
 ## 介绍
 
