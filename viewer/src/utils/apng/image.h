@@ -38,13 +38,13 @@ struct Image {
   unsigned int w, h, bpp, type;
   int ps, ts;
   rgb pl[256];
-  unsigned char _tr[256];
+  unsigned char transparency[256];
   unsigned int delay_num, delay_den;
   unsigned char* p;
   ROW* rows;
   Image() : w(0), h(0), bpp(0), type(0), ps(0), ts(0), delay_num(1), delay_den(10), p(0), rows(0) {
     memset(pl, 255, sizeof(pl));
-    memset(_tr, 255, sizeof(_tr));
+    memset(transparency, 255, sizeof(transparency));
   }
   ~Image() {
   }
@@ -62,8 +62,12 @@ struct Image {
   }
   void init(unsigned int w, unsigned int h, Image* image) {
     init(w, h, image->bpp, image->type);
-    if ((ps = image->ps) != 0) memcpy(&pl[0], &image->pl[0], ps * 3);
-    if ((ts = image->ts) != 0) memcpy(&_tr[0], &image->_tr[0], ts);
+    if ((ps = image->ps) != 0) {
+      memcpy(&pl[0], &image->pl[0], ps * 3);
+    }
+    if ((ts = image->ts) != 0) {
+      memcpy(&transparency[0], &image->transparency[0], ts);
+    }
   }
   void init(Image* image) {
     init(image->w, image->h, image);
@@ -75,12 +79,12 @@ struct Image {
 };
 
 int load_image(char* szName, Image* image);
-unsigned char find_common_coltype(std::vector<Image>& img);
+unsigned char find_common_coltype(std::vector<Image>& images);
 void optim_upconvert(Image* image, unsigned char coltype);
-void optim_duplicates(std::vector<Image>& img, unsigned int first);
+void optim_duplicates(std::vector<Image>& images, unsigned int first);
 void optim_dirty_transp(Image* image);
-void optim_downconvert(std::vector<Image>& img);
-void optim_palette(std::vector<Image>& img);
-void optim_add_transp(std::vector<Image>& img);
+void optim_downconvert(std::vector<Image>& images);
+void optim_palette(std::vector<Image>& images);
+void optim_add_transp(std::vector<Image>& images);
 
 #endif /* IMAGE_H */
