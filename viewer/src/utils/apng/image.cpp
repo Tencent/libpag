@@ -35,7 +35,9 @@ int load_png(char* szName, Image* image) {
   png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
   png_infop info_ptr = png_create_info_struct(png_ptr);
 
-  if (!png_ptr || !info_ptr) return 1;
+  if (!png_ptr || !info_ptr) {
+    return 1;
+  }
 
   if ((f = fopen(szName, "rb")) == 0) {
     printf("Error: can't open '%s'\n", szName);
@@ -54,9 +56,11 @@ int load_png(char* szName, Image* image) {
   png_read_info(png_ptr, info_ptr);
   unsigned int depth = png_get_bit_depth(png_ptr, info_ptr);
   if (depth < 8) {
-    if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_PALETTE) png_set_packing(png_ptr);
-    else
+    if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_PALETTE) {
+      png_set_packing(png_ptr);
+    } else {
       png_set_expand(png_ptr);
+    }
   } else if (depth > 8) {
     png_set_expand(png_ptr);
     png_set_strip_16(png_ptr);
@@ -73,8 +77,9 @@ int load_png(char* szName, Image* image) {
   png_color_16p trans_color;
   png_bytep trans_alpha;
 
-  if (png_get_PLTE(png_ptr, info_ptr, &palette, &image->ps))
+  if (png_get_PLTE(png_ptr, info_ptr, &palette, &image->ps)) {
     memcpy(image->pl, palette, image->ps * 3);
+  }
 
   if (png_get_tRNS(png_ptr, info_ptr, &trans_alpha, &image->ts, &trans_color) && image->ts > 0) {
     if (type == PNG_COLOR_TYPE_GRAY) {
@@ -89,8 +94,9 @@ int load_png(char* szName, Image* image) {
       image->transparency[4] = 0;
       image->transparency[5] = trans_color->blue & 0xFF;
       image->ts = 6;
-    } else if (type == PNG_COLOR_TYPE_PALETTE)
+    } else if (type == PNG_COLOR_TYPE_PALETTE) {
       memcpy(image->transparency, trans_alpha, image->ts);
+    }
   }
 
   png_read_image(png_ptr, image->rows);
@@ -114,37 +120,46 @@ int load_tga(char* szName, Image* image) {
     return 1;
   }
 
-  if (fread(&header, 1, 18, f) != 18) goto fail;
+  if (fread(&header, 1, 18, f) != 18) {
+    goto fail;
+  }
 
   w = header[12] + header[13] * 256;
   h = header[14] + header[15] * 256;
   compressed = header[2] & 8;
   top_bottom = header[17] & 0x20;
 
-  if ((header[2] & 7) == 1 && header[16] == 8 && header[1] == 1 && header[7] == 24)
+  if ((header[2] & 7) == 1 && header[16] == 8 && header[1] == 1 && header[7] == 24) {
     image->init(w, h, 1, 3);
-  else if ((header[2] & 7) == 3 && header[16] == 8)
+  } else if ((header[2] & 7) == 3 && header[16] == 8) {
     image->init(w, h, 1, 0);
-  else if ((header[2] & 7) == 2 && header[16] == 24)
+  } else if ((header[2] & 7) == 2 && header[16] == 24) {
     image->init(w, h, 3, 2);
-  else if ((header[2] & 7) == 2 && header[16] == 32)
+  } else if ((header[2] & 7) == 2 && header[16] == 32) {
     image->init(w, h, 4, 6);
-  else
+  } else {
     goto fail;
+  }
 
-  if (header[0] != 0) fseek(f, header[0], SEEK_CUR);
+  if (header[0] != 0) {
+    fseek(f, header[0], SEEK_CUR);
+  }
 
   if (header[1] == 1) {
     unsigned int start = header[3] + header[4] * 256;
     unsigned int size = header[5] + header[6] * 256;
     for (i = start; i < start + size && i < 256; i++) {
-      if (fread(&col, 1, 3, f) != 3) goto fail;
+      if (fread(&col, 1, 3, f) != 3) {
+        goto fail;
+      }
       image->pl[i].r = col[2];
       image->pl[i].g = col[1];
       image->pl[i].b = col[0];
     }
     image->ps = i;
-    if (start + size > 256) fseek(f, (start + size - 256) * 3, SEEK_CUR);
+    if (start + size > 256) {
+      fseek(f, (start + size - 256) * 3, SEEK_CUR);
+    }
   }
 
   for (j = 0; j < h; j++) {
@@ -152,46 +167,66 @@ int load_tga(char* szName, Image* image) {
     if (compressed == 0) {
       if (image->bpp >= 3) {
         for (i = 0; i < w; i++) {
-          if (fread(&col, 1, image->bpp, f) != image->bpp) goto fail;
+          if (fread(&col, 1, image->bpp, f) != image->bpp) {
+            goto fail;
+          }
           *row++ = col[2];
           *row++ = col[1];
           *row++ = col[0];
-          if (image->bpp == 4) *row++ = col[3];
+          if (image->bpp == 4) {
+            *row++ = col[3];
+          }
         }
       } else {
-        if (fread(row, 1, w, f) != w) goto fail;
+        if (fread(row, 1, w, f) != w) {
+          goto fail;
+        }
       }
     } else {
       i = 0;
       while (i < w) {
-        if (fread(&c, 1, 1, f) != 1) goto fail;
+        if (fread(&c, 1, 1, f) != 1) {
+          goto fail;
+        }
         n = (c & 0x7F) + 1;
 
         if ((c & 0x80) != 0) {
           if (image->bpp >= 3) {
-            if (fread(&col, 1, image->bpp, f) != image->bpp) goto fail;
+            if (fread(&col, 1, image->bpp, f) != image->bpp) {
+              goto fail;
+            }
             for (k = 0; k < n; k++) {
               *row++ = col[2];
               *row++ = col[1];
               *row++ = col[0];
-              if (image->bpp == 4) *row++ = col[3];
+              if (image->bpp == 4) {
+                *row++ = col[3];
+              }
             }
           } else {
-            if (fread(&col, 1, 1, f) != 1) goto fail;
+            if (fread(&col, 1, 1, f) != 1) {
+              goto fail;
+            }
             memset(row, col[0], n);
             row += n;
           }
         } else {
           if (image->bpp >= 3) {
             for (k = 0; k < n; k++) {
-              if (fread(&col, 1, image->bpp, f) != image->bpp) goto fail;
+              if (fread(&col, 1, image->bpp, f) != image->bpp) {
+                goto fail;
+              }
               *row++ = col[2];
               *row++ = col[1];
               *row++ = col[0];
-              if (image->bpp == 4) *row++ = col[3];
+              if (image->bpp == 4) {
+                *row++ = col[3];
+              }
             }
           } else {
-            if (fread(row, 1, n, f) != n) goto fail;
+            if (fread(row, 1, n, f) != n) {
+              goto fail;
+            }
             row += n;
           }
         }
@@ -216,9 +251,11 @@ int load_image(char* szName, Image* image) {
     fclose(f);
 
     if (res == 1) {
-      if (sign == 0x474E5089) return load_png(szName, image);
-      else
+      if (sign == 0x474E5089) {
+        return load_png(szName, image);
+      } else {
         return load_tga(szName, image);
+      }
     }
   }
 
@@ -226,21 +263,24 @@ int load_image(char* szName, Image* image) {
   return 1;
 }
 
-unsigned char find_common_coltype(std::vector<Image>& image) {
-  unsigned char coltype = image[0].type;
+unsigned char find_common_coltype(std::vector<Image>& images) {
+  unsigned char coltype = images[0].type;
 
-  for (size_t i = 1; i < image.size(); i++) {
-    if (image[0].ps != image[i].ps || memcmp(image[0].pl, image[i].pl, image[0].ps * 3) != 0)
+  for (size_t i = 1; i < images.size(); i++) {
+    if (images[0].ps != images[i].ps || memcmp(images[0].pl, images[i].pl, images[0].ps * 3) != 0) {
       coltype = 6;
-    else if (image[0].ts != image[i].ts ||
-             memcmp(image[0].transparency, image[i].transparency, image[0].ts) != 0)
+    } else if (images[0].ts != images[i].ts ||
+               memcmp(images[0].transparency, images[i].transparency, images[0].ts) != 0) {
       coltype = 6;
-    else if (image[i].type != 3) {
-      if (coltype != 3) coltype |= image[i].type;
-      else
+    } else if (images[i].type != 3) {
+      if (coltype != 3) {
+        coltype |= images[i].type;
+      } else {
         coltype = 6;
-    } else if (coltype != 3)
+      }
+    } else if (coltype != 3) {
       coltype = 6;
+    }
   }
   return coltype;
 }
@@ -392,17 +432,19 @@ void up0to2(Image* image) {
 }
 
 void optim_upconvert(Image* image, unsigned char coltype) {
-  if (image->type == 0 && coltype == 6) up0to6(image);
-  else if (image->type == 2 && coltype == 6)
+  if (image->type == 0 && coltype == 6) {
+    up0to6(image);
+  } else if (image->type == 2 && coltype == 6) {
     up2to6(image);
-  else if (image->type == 3 && coltype == 6)
+  } else if (image->type == 3 && coltype == 6) {
     up3to6(image);
-  else if (image->type == 4 && coltype == 6)
+  } else if (image->type == 4 && coltype == 6) {
     up4to6(image);
-  else if (image->type == 0 && coltype == 4)
+  } else if (image->type == 0 && coltype == 4) {
     up0to4(image);
-  else if (image->type == 0 && coltype == 2)
+  } else if (image->type == 0 && coltype == 2) {
     up0to2(image);
+  }
 }
 
 void optim_dirty_transp(Image* image) {
@@ -411,14 +453,18 @@ void optim_dirty_transp(Image* image) {
     for (y = 0; y < image->h; y++) {
       unsigned char* sp = image->rows[y];
       for (x = 0; x < image->w; x++, sp += 4) {
-        if (sp[3] == 0) sp[0] = sp[1] = sp[2] = 0;
+        if (sp[3] == 0) {
+          sp[0] = sp[1] = sp[2] = 0;
+        }
       }
     }
   } else if (image->type == 4) {
     for (y = 0; y < image->h; y++) {
       unsigned char* sp = image->rows[y];
       for (x = 0; x < image->w; x++, sp += 2) {
-        if (sp[1] == 0) sp[0] = 0;
+        if (sp[1] == 0) {
+          sp[0] = 0;
+        }
       }
     }
   }
@@ -428,31 +474,36 @@ int different(Image* image1, Image* image2) {
   return memcmp(image1->p, image2->p, image1->w * image1->h * image1->bpp);
 }
 
-void optim_duplicates(std::vector<Image>& image, unsigned int first) {
+void optim_duplicates(std::vector<Image>& images, unsigned int first) {
   unsigned int i = first;
 
-  while (++i < image.size()) {
-    if (different(&image[i - 1], &image[i])) continue;
+  while (++i < images.size()) {
+    if (different(&images[i - 1], &images[i])) {
+      continue;
+    }
 
     i--;
-    unsigned int num = image[i].delay_num;
-    unsigned int den = image[i].delay_den;
+    unsigned int num = images[i].delay_num;
+    unsigned int den = images[i].delay_den;
 
-    image[i].free();
-    image.erase(image.begin() + i);
+    images[i].free();
+    images.erase(images.begin() + i);
 
-    if (image[i].delay_den == den) image[i].delay_num += num;
-    else {
-      image[i].delay_num = num = num * image[i].delay_den + den * image[i].delay_num;
-      image[i].delay_den = den = den * image[i].delay_den;
+    if (images[i].delay_den == den) {
+      images[i].delay_num += num;
+    } else {
+      images[i].delay_num = num = num * images[i].delay_den + den * images[i].delay_num;
+      images[i].delay_den = den = den * images[i].delay_den;
       while (num && den) {
-        if (num > den) num = num % den;
-        else
+        if (num > den) {
+          num = num % den;
+        } else {
           den = den % num;
+        }
       }
       num += den;
-      image[i].delay_num /= num;
-      image[i].delay_den /= num;
+      images[i].delay_num /= num;
+      images[i].delay_den /= num;
     }
   }
 }
@@ -463,18 +514,18 @@ typedef struct {
 } COLORS;
 
 int cmp_colors(const void* arg1, const void* arg2) {
-  if (((COLORS*)arg1)->a != ((COLORS*)arg2)->a)
+  if (((COLORS*)arg1)->a != ((COLORS*)arg2)->a) {
     return (int)(((COLORS*)arg1)->a) - (int)(((COLORS*)arg2)->a);
-
-  if (((COLORS*)arg1)->num != ((COLORS*)arg2)->num)
+  }
+  if (((COLORS*)arg1)->num != ((COLORS*)arg2)->num) {
     return (int)(((COLORS*)arg2)->num) - (int)(((COLORS*)arg1)->num);
-
-  if (((COLORS*)arg1)->r != ((COLORS*)arg2)->r)
+  }
+  if (((COLORS*)arg1)->r != ((COLORS*)arg2)->r) {
     return (int)(((COLORS*)arg1)->r) - (int)(((COLORS*)arg2)->r);
-
-  if (((COLORS*)arg1)->g != ((COLORS*)arg2)->g)
+  }
+  if (((COLORS*)arg1)->g != ((COLORS*)arg2)->g) {
     return (int)(((COLORS*)arg1)->g) - (int)(((COLORS*)arg2)->g);
-
+  }
   return (int)(((COLORS*)arg1)->b) - (int)(((COLORS*)arg2)->b);
 }
 
@@ -511,15 +562,20 @@ void down6(std::vector<Image>& images) {
         a = *sp++;
 
         if (a != 0) {
-          if (a != 255) simple_transp = 0;
-          else if (((r | g | b) & 15) == 0)
+          if (a != 255) {
+            simple_transp = 0;
+          } else if (((r | g | b) & 15) == 0) {
             cube[(r << 4) + g + (b >> 4)] = 1;
+          }
 
-          if (r != g || g != b) grayscale = 0;
-          else
+          if (r != g || g != b) {
+            grayscale = 0;
+          } else {
             gray[r] = 1;
-        } else
+          }
+        } else {
           full_transp = 1;
+        }
 
         if (colors <= 256) {
           int found = 0;
@@ -572,7 +628,9 @@ void down6(std::vector<Image>& images) {
       image->type = 3;
       image->bpp = 1;
 
-      if (full_transp == 0 && colors < 256) col[colors++].a = 0;
+      if (full_transp == 0 && colors < 256) {
+        col[colors++].a = 0;
+      }
 
       qsort(&col[0], colors, sizeof(COLORS), cmp_colors);
 
@@ -584,8 +642,11 @@ void down6(std::vector<Image>& images) {
             g = *sp++;
             b = *sp++;
             a = *sp++;
-            for (k = 0; k < colors; k++)
-              if (col[k].r == r && col[k].g == g && col[k].b == b && col[k].a == a) break;
+            for (k = 0; k < colors; k++) {
+              if (col[k].r == r && col[k].g == g && col[k].b == b && col[k].a == a) {
+                break;
+              }
+            }
             *dp++ = k;
           }
         }
@@ -597,7 +658,9 @@ void down6(std::vector<Image>& images) {
         image->pl[i].g = col[i].g;
         image->pl[i].b = col[i].b;
         image->transparency[i] = col[i].a;
-        if (image->transparency[i] != 255) image->ts = i + 1;
+        if (image->transparency[i] != 255) {
+          image->ts = i + 1;
+        }
       }
     }
   } else if (grayscale) /* 6 -> 4 */
@@ -686,20 +749,24 @@ void down2(std::vector<Image>& images) {
                 : 255;
 
         if (a != 0) {
-          if (r != g || g != b) grayscale = 0;
-          else
+          if (r != g || g != b) {
+            grayscale = 0;
+          } else {
             gray[r] = 1;
-        } else
+          }
+        } else {
           full_transp = 1;
+        }
 
         if (colors <= 256) {
           int found = 0;
-          for (k = 0; k < colors; k++)
+          for (k = 0; k < colors; k++) {
             if (col[k].r == r && col[k].g == g && col[k].b == b && col[k].a == a) {
               found = 1;
               col[k].num++;
               break;
             }
+          }
           if (found == 0) {
             if (colors < 256) {
               col[colors].num++;
@@ -751,7 +818,9 @@ void down2(std::vector<Image>& images) {
       image->type = 3;
       image->bpp = 1;
 
-      if (full_transp == 0 && colors < 256) col[colors++].a = 0;
+      if (full_transp == 0 && colors < 256) {
+        col[colors++].a = 0;
+      }
 
       qsort(&col[0], colors, sizeof(COLORS), cmp_colors);
 
@@ -766,8 +835,11 @@ void down2(std::vector<Image>& images) {
                  image->transparency[5] == b)
                     ? 0
                     : 255;
-            for (k = 0; k < colors; k++)
-              if (col[k].r == r && col[k].g == g && col[k].b == b && col[k].a == a) break;
+            for (k = 0; k < colors; k++) {
+              if (col[k].r == r && col[k].g == g && col[k].b == b && col[k].a == a) {
+                break;
+              }
+            }
             *dp++ = k;
           }
         }
@@ -779,7 +851,9 @@ void down2(std::vector<Image>& images) {
         image->pl[i].g = col[i].g;
         image->pl[i].b = col[i].b;
         image->transparency[i] = col[i].a;
-        if (image->transparency[i] != 255) image->ts = i + 1;
+        if (image->transparency[i] != 255) {
+          image->ts = i + 1;
+        }
       }
     }
   }
@@ -813,20 +887,24 @@ void down4(std::vector<Image>& images) {
         a = *sp++;
 
         if (a != 0) {
-          if (a != 255) simple_transp = 0;
-          else
+          if (a != 255) {
+            simple_transp = 0;
+          } else {
             gray[g] = 1;
-        } else
+          }
+        } else {
           full_transp = 1;
+        }
 
         if (colors <= 256) {
           int found = 0;
-          for (k = 0; k < colors; k++)
+          for (k = 0; k < colors; k++) {
             if (col[k].g == g && col[k].a == a) {
               found = 1;
               col[k].num++;
               break;
             }
+          }
           if (found == 0) {
             if (colors < 256) {
               col[colors].num++;
@@ -869,7 +947,9 @@ void down4(std::vector<Image>& images) {
     image->type = 3;
     image->bpp = 1;
 
-    if (full_transp == 0 && colors < 256) col[colors++].a = 0;
+    if (full_transp == 0 && colors < 256) {
+      col[colors++].a = 0;
+    }
 
     qsort(&col[0], colors, sizeof(COLORS), cmp_colors);
 
@@ -879,8 +959,11 @@ void down4(std::vector<Image>& images) {
         for (x = 0; x < image->w; x++) {
           g = *sp++;
           a = *sp++;
-          for (k = 0; k < colors; k++)
-            if (col[k].g == g && col[k].a == a) break;
+          for (k = 0; k < colors; k++) {
+            if (col[k].g == g && col[k].a == a) {
+              break;
+            }
+          }
           *dp++ = k;
         }
       }
@@ -892,7 +975,9 @@ void down4(std::vector<Image>& images) {
       image->pl[i].g = col[i].g;
       image->pl[i].b = col[i].b;
       image->transparency[i] = col[i].a;
-      if (image->transparency[i] != 255) image->ts = i + 1;
+      if (image->transparency[i] != 255) {
+        image->ts = i + 1;
+      }
     }
   }
 }
@@ -926,18 +1011,22 @@ void down3(std::vector<Image>& images) {
   for (i = 0; i < images.size(); i++) {
     for (y = 0; y < image->h; y++) {
       sp = images[i].rows[y];
-      for (x = 0; x < image->w; x++) col[*sp++].num++;
+      for (x = 0; x < image->w; x++) {
+        col[*sp++].num++;
+      }
     }
   }
 
   for (i = 0; i < 256; i++)
     if (col[i].num != 0) {
       if (col[i].a != 0) {
-        if (col[i].a != 255) simple_transp = 0;
-        else if (col[i].r != col[i].g || col[i].g != col[i].b)
+        if (col[i].a != 255) {
+          simple_transp = 0;
+        } else if (col[i].r != col[i].g || col[i].g != col[i].b) {
           grayscale = 0;
-        else
+        } else {
           gray[col[i].g] = 1;
+        }
       }
     }
 
@@ -975,13 +1064,15 @@ void down3(std::vector<Image>& images) {
 }
 
 void optim_downconvert(std::vector<Image>& images) {
-  if (images[0].type == 6) down6(images);
-  else if (images[0].type == 2)
+  if (images[0].type == 6) {
+    down6(images);
+  } else if (images[0].type == 2) {
     down2(images);
-  else if (images[0].type == 4)
+  } else if (images[0].type == 4) {
     down4(images);
-  else if (images[0].type == 3)
+  } else if (images[0].type == 3) {
     down3(images);
+  }
 }
 
 void optim_palette(std::vector<Image>& images) {
@@ -1009,7 +1100,9 @@ void optim_palette(std::vector<Image>& images) {
   for (i = 0; i < images.size(); i++) {
     for (y = 0; y < image->h; y++) {
       sp = images[i].rows[y];
-      for (x = 0; x < image->w; x++) col[*sp++].num++;
+      for (x = 0; x < image->w; x++) {
+        col[*sp++].num++;
+      }
     }
   }
 
@@ -1040,8 +1133,11 @@ void optim_palette(std::vector<Image>& images) {
         g = image->pl[*sp].g;
         b = image->pl[*sp].b;
         a = image->transparency[*sp];
-        for (c = 0; c < image->ps; c++)
-          if (col[c].r == r && col[c].g == g && col[c].b == b && col[c].a == a) break;
+        for (c = 0; c < image->ps; c++) {
+          if (col[c].r == r && col[c].g == g && col[c].b == b && col[c].a == a) {
+            break;
+          }
+        }
         *sp++ = c;
       }
     }
@@ -1052,8 +1148,12 @@ void optim_palette(std::vector<Image>& images) {
     image->pl[i].g = col[i].g;
     image->pl[i].b = col[i].b;
     image->transparency[i] = col[i].a;
-    if (col[i].num != 0) image->ps = i + 1;
-    if (image->transparency[i] != 255) image->ts = i + 1;
+    if (col[i].num != 0) {
+      image->ps = i + 1;
+    }
+    if (image->transparency[i] != 255) {
+      image->ts = i + 1;
+    }
   }
 }
 
@@ -1073,12 +1173,14 @@ void add_transp2(std::vector<Image>& images) {
         r = *sp++;
         g = *sp++;
         b = *sp++;
-        if (((r | g | b) & 15) == 0) cube[(r << 4) + g + (b >> 4)] = 1;
+        if (((r | g | b) & 15) == 0) {
+          cube[(r << 4) + g + (b >> 4)] = 1;
+        }
       }
     }
   }
 
-  for (i = 0; i < 4096; i++)
+  for (i = 0; i < 4096; i++) {
     if (cube[i] == 0) {
       image->transparency[0] = 0;
       image->transparency[1] = (i >> 4) & 0xF0;
@@ -1089,6 +1191,7 @@ void add_transp2(std::vector<Image>& images) {
       image->ts = 6;
       break;
     }
+  }
 }
 
 void add_transp0(std::vector<Image>& images) {
@@ -1102,23 +1205,28 @@ void add_transp0(std::vector<Image>& images) {
   for (i = 0; i < images.size(); i++) {
     for (y = 0; y < image->h; y++) {
       sp = images[i].rows[y];
-      for (x = 0; x < image->w; x++) gray[*sp++] = 1;
+      for (x = 0; x < image->w; x++) {
+        gray[*sp++] = 1;
+      }
     }
   }
 
-  for (i = 0; i < 256; i++)
+  for (i = 0; i < 256; i++) {
     if (gray[i] == 0) {
       image->transparency[0] = 0;
       image->transparency[1] = i;
       image->ts = 2;
       break;
     }
+  }
 }
 
 void optim_add_transp(std::vector<Image>& images) {
   if (images[0].ts == 0) {
-    if (images[0].type == 2) add_transp2(images);
-    else if (images[0].type == 0)
+    if (images[0].type == 2) {
+      add_transp2(images);
+    } else if (images[0].type == 0) {
       add_transp0(images);
+    }
   }
 }

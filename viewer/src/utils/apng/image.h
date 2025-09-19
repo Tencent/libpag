@@ -58,7 +58,9 @@ struct Image {
     delete[] p;
     rows = new ROW[h];
     rows[0] = p = new unsigned char[h * rowbytes];
-    for (unsigned int j = 1; j < h; j++) rows[j] = rows[j - 1] + rowbytes;
+    for (unsigned int j = 1; j < h; j++) {
+      rows[j] = rows[j - 1] + rowbytes;
+    }
   }
   void init(unsigned int w, unsigned int h, Image* image) {
     init(w, h, image->bpp, image->type);
