@@ -171,4 +171,12 @@ void PreviewPAGFile(std::string pagFilePath) {
   StartPreview(pagFilePath);
 }
 
+std::filesystem::path Utf8StrToLocalPath(const std::string& utf8) {
+  return {utf8};
+}
+
+std::string LocalPathToUtf8Str(const std::filesystem::path& path) {
+  return path.u8string();
+}
+
 }

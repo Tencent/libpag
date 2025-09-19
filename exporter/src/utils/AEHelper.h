@@ -26,13 +26,6 @@
 
 namespace exporter {
 
-enum class ImageFillMode {
-  None = 0,
-  Stretch,
-  LetterBox,
-  Zoom,
-};
-
 struct AEVersion {
   static int32_t MajorVerison;
   static int32_t MinorVersion;

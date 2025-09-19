@@ -21,12 +21,6 @@
 #include "src/base/utils/Log.h"
 namespace exporter {
 
-tgfx::ByteOrder CheckByteOrder() {
-  const int i = 1;
-  const auto p = reinterpret_cast<const char*>(&i);
-  return *p == 0 ? tgfx::ByteOrder::BigEndian : tgfx::ByteOrder::LittleEndian;
-}
-
 void ByteArray::setPosition(size_t value) {
   if (value < dataView.size()) {
     _position = value;

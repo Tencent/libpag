@@ -19,6 +19,7 @@
 #pragma once
 #include <filesystem>
 #include <string>
+#include "platform/PlatformHelper.h"
 
 namespace exporter {
 
@@ -51,9 +52,10 @@ void OpenPAGFile(const std::string& filePath);
 
 template <typename... Args>
 std::string JoinPaths(const std::string& first, Args&&... args) {
-  std::filesystem::path result = first;
-  (result /= ... /= std::forward<Args>(args));
-  return result.lexically_normal().string();
+  std::filesystem::path result = Utf8StrToLocalPath(first);
+  (void)std::initializer_list<int>{(result /= Utf8StrToLocalPath(std::forward<Args>(args)), 0)...};
+  result = result.lexically_normal();
+  return LocalPathToUtf8Str(result);
 }
 
 }  // namespace exporter

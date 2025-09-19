@@ -185,4 +185,12 @@ void PreviewPAGFile(std::string pagFilePath) {
   StartPreview(pagFilePath);
 }
 
+std::filesystem::path Utf8StrToLocalPath(const std::string& utf8) {
+  return {QString::fromUtf8(utf8.c_str()).toStdWString()};
+}
+
+std::string LocalPathToUtf8Str(const std::filesystem::path& path) {
+  return QString::fromStdWString(path.wstring()).toUtf8().toStdString();
+}
+
 }  // namespace exporter

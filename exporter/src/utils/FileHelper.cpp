@@ -41,17 +41,19 @@ std::string ReadTextFile(const std::string& filename) {
 }
 
 size_t WriteTextFile(const std::string& fileName, const char* text) {
-  auto parentPath = fs::path(fileName).parent_path();
+  auto path = Utf8StrToLocalPath(fileName);
+  auto parentPath = path.parent_path();
   if (!parentPath.empty() && !fs::exists(parentPath)) {
     fs::create_directories(parentPath);
   }
-  std::ofstream file(fileName, std::ios::out);
+  std::ofstream file(path, std::ios::out);
   if (!file.is_open()) {
     return 0;
   }
   file << text;
+  auto size = static_cast<size_t>(file.tellp());
   file.close();
-  return file.tellp();
+  return size;
 }
 
 size_t WriteTextFile(const std::string& fileName, const std::string& text) {
@@ -63,9 +65,8 @@ size_t GetFileSize(const std::string& fileName) {
     return 0;
   }
   std::error_code ec;
-  size_t ret = fs::file_size(fileName, ec);
-
-  return ret;
+  auto ret = fs::file_size(Utf8StrToLocalPath(fileName), ec);
+  return ec ? 0 : ret;
 }
 
 bool FileIsExist(const std::string& fileName) {
@@ -73,21 +74,21 @@ bool FileIsExist(const std::string& fileName) {
     return false;
   }
   std::error_code ec;
-  bool ret = fs::exists(fileName, ec);
-  return ret;
+  return fs::exists(Utf8StrToLocalPath(fileName), ec);
 }
 
 bool CopyFile(const std::string& src, const std::string& dst) {
   try {
-    if (!FileIsExist(src)) {
+    auto srcPath = Utf8StrToLocalPath(src);
+    if (!fs::exists(srcPath)) {
       return false;
     }
-    auto parentPath = fs::path(dst).parent_path();
-    if (!FileIsExist(parentPath.string())) {
-
+    auto dstPath = Utf8StrToLocalPath(dst);
+    auto parentPath = dstPath.parent_path();
+    if (!parentPath.empty() && !fs::exists(parentPath)) {
       fs::create_directories(parentPath);
     }
-    fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
+    fs::copy_file(srcPath, dstPath, fs::copy_options::overwrite_existing);
     return true;
   } catch (...) {
     return false;
@@ -96,11 +97,12 @@ bool CopyFile(const std::string& src, const std::string& dst) {
 
 bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
                  std::ios::openmode mode) {
-  auto parentPath = fs::path(filePath).parent_path();
+  auto path = Utf8StrToLocalPath(filePath);
+  auto parentPath = path.parent_path();
   if (!parentPath.empty() && !fs::exists(parentPath)) {
     fs::create_directories(parentPath);
   }
-  std::ofstream file(filePath, mode);
+  std::ofstream file(path, mode);
   if (!file) {
     LOGE("Failed to open file: %s", filePath.c_str());
     return false;
@@ -145,11 +147,11 @@ int ReadFileData(const std::string& filePath, uint8_t* buf, size_t bufSize) {
 }
 
 std::string GetFileName(const std::string& filePath) {
-  return fs::path(filePath).filename().string();
+  return LocalPathToUtf8Str(Utf8StrToLocalPath(filePath).filename());
 }
 
 std::string GetDir(const std::string& filePath) {
-  return fs::path(filePath).parent_path().string();
+  return LocalPathToUtf8Str(Utf8StrToLocalPath(filePath).parent_path());
 }
 
 void OpenPAGFile(const std::string& filePath) {
