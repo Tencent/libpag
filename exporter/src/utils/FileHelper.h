@@ -20,7 +20,7 @@
 #include <filesystem>
 #include <string>
 
-namespace FileHelper {
+namespace exporter {
 
 std::string ReadTextFile(const std::string& filename);
 
@@ -56,4 +56,4 @@ std::string JoinPaths(const std::string& first, Args&&... args) {
   return result.lexically_normal().string();
 }
 
-}  // namespace FileHelper
+}  // namespace exporter

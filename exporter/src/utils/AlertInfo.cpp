@@ -552,8 +552,8 @@ AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH,
     suggest = unknownErrorInfo.toStdString();
   }
 
-  compName = AEHelper::GetItemName(itemH);
-  layerName = AEHelper::GetLayerName(layerH);
+  compName = GetItemName(itemH);
+  layerName = GetLayerName(layerH);
 
   isError = (type > AlertInfoType::OtherWarning);
 }
@@ -563,7 +563,7 @@ std::string AlertInfo::getMessage() {
 }
 
 void AlertInfo::select() {
-  AEHelper::SelectLayer(itemH, layerH);
+  SelectLayer(itemH, layerH);
 }
 
 static std::vector<AlertInfo> GetInfoList(std::vector<AlertInfo>& warningList, bool bWarning,

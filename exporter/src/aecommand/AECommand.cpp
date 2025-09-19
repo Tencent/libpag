@@ -36,8 +36,8 @@ A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon /*globalRefcon*/,
                               AEGP_WindowType /*windowType*/) {
   A_Err err = A_Err_NONE;
   A_Err err2 = A_Err_NONE;
-  const auto& suites = AEHelper::GetSuites();
-  AEGP_ItemH active_itemH = AEHelper::GetActiveCompositionItem();
+  const auto& suites = GetSuites();
+  AEGP_ItemH active_itemH = GetActiveCompositionItem();
   if (active_itemH) {
     ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGExporterCMD));
     ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGPreviewCMD));

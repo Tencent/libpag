@@ -35,8 +35,8 @@ void ConvertARGBToRGBA(const uint8_t* argb, int width, int height, int srcStride
 void ClipTransparentEdge(ImageRect& rect, const uint8_t* srcData, int width, int height,
                          int stride);
 
-void ScaleCoreGraphics(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride,
-                       int dstWidth, int dstHeight, int srcWidth, int srcHeight);
+void ScalePixels(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride, int dstWidth,
+                 int dstHeight, int srcWidth, int srcHeight);
 
 void GetImageDiffRect(ImageRect& rect, const uint8_t* preImage, const uint8_t* curImage, int width,
                       int height, int stride);

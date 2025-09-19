@@ -25,26 +25,26 @@ namespace exporter {
 
 pag::CompositionType GetCompositionType(const std::shared_ptr<PAGExportSession>& session,
                                         const AEGP_CompH& compH) {
-  auto compName = AEHelper::GetCompName(compH);
-  compName = StringHelper::ToLowerCase(compName);
+  auto compName = GetCompName(compH);
+  compName = ToLowerCase(compName);
 
-  if (compName.length() < StringHelper::CompositionBmpSuffix.size()) {
+  if (compName.length() < CompositionBmpSuffix.size()) {
     return pag::CompositionType::Vector;
   }
 
-  if (!StringHelper::IsEndWidthSuffix(compName, StringHelper::CompositionBmpSuffix)) {
+  if (!IsEndWidthSuffix(compName, CompositionBmpSuffix)) {
     return pag::CompositionType::Vector;
   }
 
   if (session->configParam.sequenceType == pag::CompositionType::Video &&
-      session->configParam.isTagCodeEnable(pag::TagCode::VideoSequence)) {
-    if (session->exportStaticCompAsBmp && AEHelper::IsStaticComposition(compH)) {
+      session->configParam.isTagCodeSupport(pag::TagCode::VideoSequence)) {
+    if (session->exportStaticCompAsBmp && IsStaticComposition(compH)) {
       return pag::CompositionType::Bitmap;
     }
     return pag::CompositionType::Video;
   }
 
-  if (session->configParam.isTagCodeEnable(pag::TagCode::BitmapSequence)) {
+  if (session->configParam.isTagCodeSupport(pag::TagCode::BitmapSequence)) {
     return pag::CompositionType::Bitmap;
   }
 
@@ -53,23 +53,20 @@ pag::CompositionType GetCompositionType(const std::shared_ptr<PAGExportSession>&
 
 void GetCompositionAttributes(const std::shared_ptr<PAGExportSession>& session,
                               const AEGP_CompH& compH, pag::Composition* composition) {
-  AEGP_ItemH itemH = AEHelper::GetCompItemH(compH);
-  composition->id = AEHelper::GetItemID(itemH);
-  composition->duration = AEHelper::GetItemDuration(itemH);
-  composition->backgroundColor = AEHelper::GetCompBackgroundColor(compH);
+  AEGP_ItemH itemH = GetCompItemH(compH);
+  composition->id = GetItemID(itemH);
+  composition->duration = GetItemDuration(itemH);
+  composition->backgroundColor = GetCompBackgroundColor(compH);
   if (session->frameRate == -1) {
-    composition->frameRate = AEHelper::GetItemFrameRate(itemH);
+    composition->frameRate = GetItemFrameRate(itemH);
     session->frameRate = composition->frameRate;
   } else {
     composition->frameRate = session->frameRate;
   }
-  auto size = AEHelper::GetItemDimensions(itemH);
+  auto size = GetItemDimensions(itemH);
   composition->width = size.width();
   composition->height = size.height();
-
-  if (session->itemHMap.find(composition->id) == session->itemHMap.end()) {
-    session->itemHMap[composition->id] = itemH;
-  }
+  session->itemHMap[composition->id] = itemH;
 
   if (composition->type() != pag::CompositionType::Vector) {
     auto frames =
@@ -79,7 +76,7 @@ void GetCompositionAttributes(const std::shared_ptr<PAGExportSession>& session,
 }
 
 void ExportComposition(const std::shared_ptr<PAGExportSession>& session, const AEGP_ItemH& itemH) {
-  auto id = AEHelper::GetItemID(itemH);
+  auto id = GetItemID(itemH);
   session->itemHMap[id] = itemH;
 
   ScopedAssign<pag::ID> compID(session->compID, id);
@@ -88,7 +85,7 @@ void ExportComposition(const std::shared_ptr<PAGExportSession>& session, const A
     return;
   }
 
-  auto compH = AEHelper::GetItemCompH(itemH);
+  auto compH = GetItemCompH(itemH);
   auto compositionType = GetCompositionType(session, compH);
   switch (compositionType) {
     case pag::CompositionType::Video:

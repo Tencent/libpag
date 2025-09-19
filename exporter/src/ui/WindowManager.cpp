@@ -40,7 +40,7 @@ WindowManager& WindowManager::GetInstance() {
 }
 
 WindowManager::WindowManager() {
-  AEHelper::RunScriptPreWarm();
+  RunScriptPreWarm();
   initializeQtEnvironment();
   translator = std::make_unique<QTranslator>();
 }

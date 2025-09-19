@@ -63,7 +63,7 @@ struct ConfigParam {
   ExportScenes scenes = ExportScenes::General;
   pag::CompositionType sequenceType = pag::CompositionType::Video;
 
-  bool isTagCodeEnable(pag::TagCode code) const {
+  bool isTagCodeSupport(pag::TagCode code) const {
     return exportTagLevel >= static_cast<uint16_t>(code);
   }
 };

@@ -28,7 +28,7 @@
 #include "platform/PlatformHelper.h"
 #include "src/base/utils/Log.h"
 
-namespace AEHelper {
+namespace exporter {
 
 AEGP_PluginID PluginID = 0L;
 std::shared_ptr<AEGP_SuiteHandler> Suites = nullptr;
@@ -69,7 +69,7 @@ QString GetProjectName() {
   Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
   AEGP_MemHandle pathMemory;
   Suites->ProjSuite6()->AEGP_GetProjectPath(projectHandle, &pathMemory);
-  std::string filePath = StringHelper::AeMemoryHandleToString(pathMemory);
+  std::string filePath = AeMemoryHandleToString(pathMemory);
   Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
   if (!filePath.empty()) {
     std::replace(filePath.begin(), filePath.end(), '\\', '/');
@@ -85,7 +85,7 @@ QString GetProjectPath() {
   Suites->ProjSuite6()->AEGP_GetProjectByIndex(0, &projectHandle);
   AEGP_MemHandle pathMemory;
   Suites->ProjSuite6()->AEGP_GetProjectPath(projectHandle, &pathMemory);
-  std::string filePath = StringHelper::AeMemoryHandleToString(pathMemory);
+  std::string filePath = AeMemoryHandleToString(pathMemory);
   Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
   if (!filePath.empty()) {
     std::replace(filePath.begin(), filePath.end(), '\\', '/');
@@ -179,7 +179,7 @@ std::vector<char> GetProjectFileBytes() {
   char16_t* projectPath = nullptr;
   Suites->MemorySuite1()->AEGP_LockMemHandle(pathMemory, reinterpret_cast<void**>(&projectPath));
 
-  std::string filePath = StringHelper::Utf16ToUtf8(projectPath);
+  std::string filePath = Utf16ToUtf8(projectPath);
   Suites->MemorySuite1()->AEGP_FreeMemHandle(pathMemory);
 
   A_Boolean isDirty = 0;
@@ -188,32 +188,32 @@ std::vector<char> GetProjectFileBytes() {
 
   if (!filePath.empty()) {
     auto extension = filePath.substr(filePath.size() - 5, 5);
-    isAEPX = StringHelper::ToLowerCase(extension) == ".aepx";
+    isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
   exporter::TempFileDelete tempFile;
   if (isDirty || isAEPX) {
     filePath = exporter::GetTempFolderPath() + u8"/.PAGAutoSave.aep";
     tempFile.setFilePath(filePath);
-    auto path = StringHelper::Utf8ToUtf16(filePath);
+    auto path = Utf8ToUtf16(filePath);
     Suites->ProjSuite6()->AEGP_SaveProjectToPath(
         projectH, reinterpret_cast<const A_UTF16Char*>(path.c_str()));
   }
 
-  filePath = StringHelper::ConvertStringEncoding(filePath);
+  filePath = ConvertStringEncoding(filePath);
 
-  std::ifstream t(filePath, std::ios::binary);
-  if (!t.is_open()) {
+  std::ifstream fileStream(filePath, std::ios::binary);
+  if (!fileStream.is_open()) {
     return fileBytes;
   }
 
-  t.seekg(0, std::ios::end);
-  auto fileLength = t.tellg();
-  t.seekg(0, std::ios::beg);
+  fileStream.seekg(0, std::ios::end);
+  auto fileLength = fileStream.tellg();
+  fileStream.seekg(0, std::ios::beg);
 
   fileBytes.resize(fileLength);
-  t.read(fileBytes.data(), fileLength);
-  t.close();
+  fileStream.read(fileBytes.data(), fileLength);
+  fileStream.close();
 
   return fileBytes;
 }
@@ -288,19 +288,18 @@ bool CheckAeVersion() {
   return false;
 }
 
-void SetMajorVersion(const int32_t majorVersion) {
+void SetMajorVersion(int32_t majorVersion) {
   AEVersion::MajorVerison = majorVersion;
 }
 
-void setMinorVersion(const int32_t minorVersion) {
+void setMinorVersion(int32_t minorVersion) {
   AEVersion::MinorVersion = minorVersion;
 }
 
 void RegisterTextDocumentScript() {
   static bool hasInit = false;
   if (!hasInit) {
-    std::string textDocumentScript =
-        StringHelper::GetJavaScriptFromQRC(":/scripts/GetTextDocument.js");
+    std::string textDocumentScript = GetJavaScriptFromQRC(":/scripts/GetTextDocument.js");
     RunScript(textDocumentScript);
     hasInit = true;
   }
@@ -332,14 +331,14 @@ std::string GetLayerName(const AEGP_LayerH& layerH) {
   if (!layerNameHandle || !sourceNameHandle) {
     return layerName;
   }
-  layerName = StringHelper::AeMemoryHandleToString(layerNameHandle);
+  layerName = AeMemoryHandleToString(layerNameHandle);
   if (layerName.empty()) {
-    layerName = StringHelper::AeMemoryHandleToString(sourceNameHandle);
+    layerName = AeMemoryHandleToString(sourceNameHandle);
   }
   Suites->MemorySuite1()->AEGP_FreeMemHandle(layerNameHandle);
   Suites->MemorySuite1()->AEGP_FreeMemHandle(sourceNameHandle);
 
-  layerName = StringHelper::DeleteLastSpace(layerName);
+  layerName = DeleteLastSpace(layerName);
   return layerName;
 }
 
@@ -474,10 +473,10 @@ std::string GetItemName(const AEGP_ItemH& itemH) {
   if (!nameMemory) {
     return itemName;
   }
-  itemName = StringHelper::AeMemoryHandleToString(nameMemory);
+  itemName = AeMemoryHandleToString(nameMemory);
   Suites->MemorySuite1()->AEGP_FreeMemHandle(nameMemory);
 
-  itemName = StringHelper::DeleteLastSpace(itemName);
+  itemName = DeleteLastSpace(itemName);
   return itemName;
 }
 
@@ -536,7 +535,7 @@ QImage GetCompositionFrameImage(const AEGP_ItemH& itemH, pag::Frame frame) {
 }
 
 void SetItemName(const AEGP_ItemH& item, const std::string& name) {
-  std::u16string u16str = StringHelper::Utf8ToUtf16(name);
+  std::u16string u16str = Utf8ToUtf16(name);
   Suites->ItemSuite8()->AEGP_SetItemName(item, reinterpret_cast<const A_UTF16Char*>(u16str.data()));
 }
 
@@ -666,4 +665,4 @@ void DeleteStream(AEGP_StreamRefH streamRefH) {
   }
 }
 
-}  // namespace AEHelper
+}  // namespace exporter

@@ -23,7 +23,7 @@
 #include "pag/file.h"
 #include "pag/types.h"
 
-namespace StringHelper {
+namespace exporter {
 
 extern const std::string CompositionBmpSuffix;
 
@@ -74,4 +74,4 @@ QString ColorToQString(pag::Color color);
 
 void EnsureStringSuffix(std::string& filePath, const std::string& suffix);
 
-}  // namespace StringHelper
+}  // namespace exporter

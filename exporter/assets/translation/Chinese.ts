@@ -9,7 +9,7 @@
     </message>
     <message>
         <source>Placeholder image and text in composition cannot edit after converting to BMP</source>
-        <translation type="vanished">转成BMP后, 合成中的占位图和文字将不支持编辑</translation>
+        <translation type="vanished">转换为BMP后，合成中的占位图和文本将无法编辑</translation>
     </message>
     <message>
         <source>Cancel</source>

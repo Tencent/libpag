@@ -27,7 +27,7 @@
 
 namespace fs = std::filesystem;
 
-namespace FileHelper {
+namespace exporter {
 
 std::string ReadTextFile(const std::string& filename) {
   std::ifstream inputStream(filename);
@@ -156,4 +156,4 @@ void OpenPAGFile(const std::string& filePath) {
   QDesktopServices::openUrl(QUrl::fromLocalFile(filePath.data()));
 }
 
-}  // namespace FileHelper
+}  // namespace exporter

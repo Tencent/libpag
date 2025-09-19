@@ -38,7 +38,7 @@ void PAGExportSession::RecordWarning(AlertInfoType type, const std::string& addI
 pag::GradientColorHandle PAGExportSession::GetGradientColors(
     const std::vector<std::string>& matchNames, int index) {
   if (CurrentSession == nullptr) {
-    return AEHelper::GetDefaultGradientColors();
+    return GetDefaultGradientColors();
   }
   return CurrentSession->GetGradientColorsFromFileBytes(matchNames, index);
 }
@@ -110,20 +110,20 @@ void PAGExportSession::pushWarning(AlertInfoType type, const std::string& addInf
 pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
     const std::vector<std::string>& matchNames, int index) {
   if (fileBytes.empty()) {
-    fileBytes = AEHelper::GetProjectFileBytes();
+    fileBytes = GetProjectFileBytes();
   }
   if (fileBytes.empty()) {
-    return AEHelper::GetDefaultGradientColors();
+    return GetDefaultGradientColors();
   }
 
   ByteArray bytes(reinterpret_cast<uint8_t*>(fileBytes.data()), fileBytes.size());
-  bytes = AEPReader::ReadBody(&bytes);
-  auto compositions = AEPReader::ReadCompositions(&bytes);
+  bytes = ReadBody(&bytes);
+  auto compositions = ReadCompositions(&bytes);
 
   ByteArray layerBytes = {};
   for (auto& composition : compositions) {
     if (composition.id == static_cast<int>(compID)) {
-      auto layers = AEPReader::ReadLayers(&composition.bytes);
+      auto layers = ReadLayers(&composition.bytes);
       for (const auto& layer : layers) {
         if (static_cast<pag::ID>(layer.id) == layerID) {
           layerBytes = layer.bytes;
@@ -135,24 +135,24 @@ pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
   }
 
   if (layerBytes.empty()) {
-    return AEHelper::GetDefaultGradientColors();
+    return GetDefaultGradientColors();
   }
 
   std::string gradientText;
   for (int i = 0; layerBytes.bytesAvailable() > 0 && i <= index; ++i) {
-    auto groupTag = AEPReader::ReadFirstGroupByMatchNames(&layerBytes, matchNames);
+    auto groupTag = ReadFirstGroupByMatchNames(&layerBytes, matchNames);
     if (groupTag.bytes.empty()) {
       break;
     }
 
     if (i == index) {
-      auto tag = AEPReader::ReadFirstTagByName(&groupTag.bytes, "GCky");
+      auto tag = ReadFirstTagByName(&groupTag.bytes, "GCky");
       if (tag.bytes.empty()) {
         break;
       }
 
       while (tag.bytes.bytesAvailable()) {
-        auto stringTag = AEPReader::ReadTag(&tag.bytes);
+        auto stringTag = ReadTag(&tag.bytes);
         if (stringTag.bytes.empty()) {
           break;
         }
@@ -163,7 +163,7 @@ pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
     }
   }
 
-  return AEHelper::XmlToGradientColor(gradientText);
+  return XmlToGradientColor(gradientText);
 }
 
 bool PAGExportSession::isVideoLayer(pag::ID id) {

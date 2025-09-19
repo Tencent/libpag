@@ -31,80 +31,58 @@ namespace exporter {
 
 bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
                            bool exportAudio, bool hardwareEncode) {
-  bool res = false;
-  do {
-    if (activeItemH == nullptr || outputPath.empty()) {
-      break;
-    }
-    PAGExport pagExport(activeItemH, outputPath, exportAudio, hardwareEncode);
-    auto pagFile = pagExport.exportAsFile();
-    if (pagFile == nullptr) {
-      break;
-    }
+  if (activeItemH == nullptr || outputPath.empty()) {
+    return false;
+  }
+  PAGExport pagExport(activeItemH, outputPath, exportAudio, hardwareEncode);
+  auto pagFile = pagExport.exportAsFile();
+  if (pagFile == nullptr) {
+    return false;
+  }
 
-    const auto bytes = pag::Codec::Encode(pagFile);
-    if (bytes->length() == 0) {
-      break;
-    }
-    if (!FileHelper::WriteToFile(outputPath, reinterpret_cast<char*>(bytes->data()),
-                                 static_cast<std::streamsize>(bytes->length()))) {
-      break;
-    }
+  auto bytes = pag::Codec::Encode(pagFile);
+  if (bytes->length() == 0) {
+    return false;
+  }
+  if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+    return false;
+  }
+  if (!WriteToFile(outputPath, reinterpret_cast<char*>(bytes->data()),
+                   static_cast<std::streamsize>(bytes->length()))) {
+    return false;
+  }
 
-    if (!ValidatePAGFile(bytes->data(), bytes->length())) {
-      break;
-    }
-
-    res = true;
-  } while (false);
-
-  return res;
+  return true;
 }
 
 bool PAGExport::ExportFile(PAGExport* pagExport) {
-  bool res = false;
-  do {
-    auto pagFile = pagExport->exportAsFile();
-    if (pagFile == nullptr) {
-      break;
-    }
+  auto pagFile = pagExport->exportAsFile();
+  if (pagFile == nullptr) {
+    return false;
+  }
+  auto bytes = pag::Codec::Encode(pagFile);
+  if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+    return false;
+  }
+  if (!WriteToFile(pagExport->session->outputPath, reinterpret_cast<char*>(bytes->data()),
+                   static_cast<std::streamsize>(bytes->length()))) {
+    return false;
+  }
 
-    const auto bytes = pag::Codec::Encode(pagFile);
-    if (bytes->length() == 0) {
-      break;
-    }
-    if (!FileHelper::WriteToFile(pagExport->session->outputPath,
-                                 reinterpret_cast<char*>(bytes->data()),
-                                 static_cast<std::streamsize>(bytes->length()))) {
-      break;
-    }
-
-    if (!ValidatePAGFile(bytes->data(), bytes->length())) {
-      break;
-    }
-
-    res = true;
-  } while (false);
-
-  return res;
+  return true;
 }
 
 bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
-  int res = false;
-  do {
-    const auto pagFileDecoded = pag::File::Load(data, size);
-    if (pagFileDecoded == nullptr) {
-      break;
-    }
-    const auto bytes = pag::Codec::Encode(pagFileDecoded);
-    if (bytes->length() != size) {
-      LOGI("warning: bytes->length(%zu) != data.size(%zu)", bytes->length(), size);
-    }
+  auto pagFileDecoded = pag::File::Load(data, size);
+  if (pagFileDecoded == nullptr) {
+    return false;
+  }
+  auto bytes = pag::Codec::Encode(pagFileDecoded);
+  if (bytes->length() != size) {
+    LOGI("warning: bytes->length(%zu) != data.size(%zu)", bytes->length(), size);
+  }
 
-    res = true;
-  } while (false);
-
-  return res;
+  return true;
 }
 
 PAGExport::PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath, bool exportAudio,
@@ -120,16 +98,16 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 }
 
 void PAGExport::addRootComposition() const {
-  const auto& Suites = AEHelper::GetSuites();
+  const auto& Suites = GetSuites();
   auto* mainComposition = session->compositions[session->compositions.size() - 1];
-  AEGP_CompH compH = AEHelper::GetItemCompH(itemH);
+  AEGP_CompH compH = GetItemCompH(itemH);
 
   A_Time workAreaStart = {};
   A_Time workAreaDuration = {};
   Suites->CompSuite6()->AEGP_GetCompWorkAreaStart(compH, &workAreaStart);
   Suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compH, &workAreaDuration);
-  pag::Frame start = AEHelper::AETimeToTime(workAreaStart, session->frameRate);
-  pag::Frame end = start + AEHelper::AETimeToTime(workAreaDuration, session->frameRate);
+  pag::Frame start = AETimeToTime(workAreaStart, session->frameRate);
+  pag::Frame end = start + AETimeToTime(workAreaDuration, session->frameRate);
   auto duration = mainComposition->duration;
   if (start == 0) {
     if (duration > end) {

@@ -22,7 +22,7 @@
 #include <tinyxml2.h>
 #include <QStringList>
 
-namespace AEHelper {
+namespace exporter {
 
 pag::Color AEColorToColor(AEGP_ColorVal color) {
   pag::Color pagColor = {};
@@ -732,4 +732,4 @@ pag::GradientColorHandle XmlToGradientColor(const std::string& xml) {
   return gradientColor;
 }
 
-}  // namespace AEHelper
+}  // namespace exporter

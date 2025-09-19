@@ -26,7 +26,7 @@
 namespace exporter {
 
 AEResourceType GetAEItemResourceType(AEGP_ItemH& item) {
-  const std::shared_ptr<AEGP_SuiteHandler>& suites = AEHelper::GetSuites();
+  const auto& suites = GetSuites();
 
   AEGP_ItemType itemType = AEGP_ItemType_NONE;
   suites->ItemSuite8()->AEGP_GetItemType(item, &itemType);
@@ -54,7 +54,7 @@ AEResourceType GetAEItemResourceType(AEGP_ItemH& item) {
 }
 
 bool HasCompositionResource() {
-  const auto& suites = AEHelper::GetSuites();
+  const auto& suites = GetSuites();
   A_long numProjects = 0;
   suites->ProjSuite6()->AEGP_GetNumProjects(&numProjects);
   for (A_long i = 0; i < numProjects; i++) {
@@ -76,11 +76,11 @@ bool HasCompositionResource() {
   return false;
 }
 
-std::vector<std::shared_ptr<AEResource>> AEResource::getAEResourceList() {
-  std::vector<std::shared_ptr<AEResource>> resources;
-  std::map<A_long, std::shared_ptr<AEResource>> resourceMap;
+std::vector<std::shared_ptr<AEResource>> AEResource::GetAEResourceList() {
+  std::vector<std::shared_ptr<AEResource>> resources = {};
+  std::map<A_long, std::shared_ptr<AEResource>> resourceMap = {};
 
-  const auto& suites = AEHelper::GetSuites();
+  const auto& suites = GetSuites();
   A_long projectsNum = 0;
   suites->ProjSuite6()->AEGP_GetNumProjects(&projectsNum);
   for (A_long index = 0; index < projectsNum; index++) {
@@ -91,20 +91,19 @@ std::vector<std::shared_ptr<AEResource>> AEResource::getAEResourceList() {
     AEGP_ItemH itemH = nullptr;
     suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &itemH);
     while (itemH != nullptr) {
-      A_long id = AEHelper::GetItemID(itemH);
+      A_long id = GetItemID(itemH);
       if (id != 0) {
         auto item = std::make_shared<AEResource>();
         auto type = GetAEItemResourceType(itemH);
         if (type != AEResourceType::Unknown) {
           item->type = type;
           item->ID = id;
-          item->name = AEHelper::GetItemName(itemH);
+          item->name = GetItemName(itemH);
           item->itemH = itemH;
-          item->isExportAsBmp =
-              StringHelper::IsEndWidthSuffix(item->name, StringHelper::CompositionBmpSuffix);
+          item->isExportAsBmp = IsEndWidthSuffix(item->name, CompositionBmpSuffix);
           resources.push_back(item);
           resourceMap[id] = item;
-          auto parentID = AEHelper::GetItemParentID(itemH);
+          auto parentID = GetItemParentID(itemH);
           auto parentIter = resourceMap.find(parentID);
           if (parentIter != resourceMap.end()) {
             parentIter->second->file.children.push_back(item);
@@ -147,11 +146,11 @@ AEResource::AEResource() {
 
 void AEResource::setSavePath(const std::string& savePath) {
   this->savePath = savePath;
-  Marker::SetCompositionStoragePath(savePath, itemH);
+  SetCompositionStoragePath(savePath, itemH);
 }
 
 void AEResource::initSavePath() {
-  std::string path = Marker::GetCompositionStoragePath(itemH);
+  std::string path = GetCompositionStoragePath(itemH);
   if (path.empty()) {
     path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation).toStdString();
   }

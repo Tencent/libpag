@@ -148,7 +148,7 @@ static void WriteBitmapConfig(XMLElement* root, ConfigParam* configParam) {
   XMLElement* bitmap = doc->NewElement("bitmap");
   root->InsertEndChild(bitmap);
 
-  AddElement(bitmap, "sequence-suffix", StringHelper::CompositionBmpSuffix);
+  AddElement(bitmap, "sequence-suffix", CompositionBmpSuffix);
   AddElement(bitmap, "sequence-type", std::to_string(static_cast<int>(configParam->sequenceType)));
   AddElement(bitmap, "sequence-quality", std::to_string(configParam->sequenceQuality));
   AddElement(bitmap, "keyframe-interval", std::to_string(configParam->bitmapKeyFrameInterval));
@@ -204,7 +204,7 @@ bool ReadConfigFile(ConfigParam* configParam) {
   }
 
   std::string filename = configPath + "PAGConfig.xml";
-  if (!FileHelper::FileIsExist(filename)) {
+  if (!FileIsExist(filename)) {
     WriteDefaultConfigFile(filename.c_str());
     return false;
   }

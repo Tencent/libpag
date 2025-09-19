@@ -18,7 +18,7 @@
 
 #include "ImageData.h"
 #include <webp/encode.h>
-#include "platform/PlatformHelper.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace exporter {
 
@@ -79,9 +79,15 @@ void ClipTransparentEdge(ImageRect& rect, const uint8_t* srcData, int width, int
   }
 }
 
-void ScaleCoreGraphics(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride,
-                       int dstWidth, int dstHeight, int srcWidth, int srcHeight) {
-  ScaleGraphics(dstRGBA, dstStride, srcRGBA, srcStride, dstWidth, dstHeight, srcWidth, srcHeight);
+void ScalePixels(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride, int dstWidth,
+                 int dstHeight, int srcWidth, int srcHeight) {
+  std::shared_ptr<tgfx::Data> data = tgfx::Data::MakeWithoutCopy(srcRGBA, srcStride * srcHeight);
+  auto imageInfo = tgfx::ImageInfo::Make(srcWidth, srcHeight, tgfx::ColorType::RGBA_8888,
+                                         tgfx::AlphaType::Premultiplied, srcStride);
+  auto codec = tgfx::ImageCodec::MakeFrom(imageInfo, data);
+  auto scaleImageInfo = tgfx::ImageInfo::Make(dstWidth, dstHeight, tgfx::ColorType::RGBA_8888,
+                                              tgfx::AlphaType::Premultiplied, dstStride);
+  codec->readPixels(scaleImageInfo, dstRGBA);
 }
 
 void GetImageDiffRect(ImageRect& rect, const uint8_t* preImage, const uint8_t* curImage, int width,

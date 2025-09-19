@@ -24,7 +24,7 @@
 #include "AE_GeneralPlug.h"
 #include "rendering/caches/FrameCache.h"
 
-namespace AEHelper {
+namespace exporter {
 
 enum class ImageFillMode {
   None = 0,
@@ -36,7 +36,6 @@ enum class ImageFillMode {
 struct AEVersion {
   static int32_t MajorVerison;
   static int32_t MinorVersion;
-  int32_t MAJORVERSION = 123;
 };
 
 /* Common Interface */
@@ -68,9 +67,9 @@ void RunScriptPreWarm();
 
 bool CheckAeVersion();
 
-void SetMajorVersion(const int32_t majorVersion);
+void SetMajorVersion(int32_t majorVersion);
 
-void setMinorVersion(const int32_t minorVersion);
+void setMinorVersion(int32_t minorVersion);
 
 void RegisterTextDocumentScript();
 
@@ -148,4 +147,4 @@ AEGP_StreamRefH GetItemMarkerStream(const AEGP_ItemH& litemH);
 
 AEGP_StreamRefH GetCompositionMarkerStream(const AEGP_CompH& compH);
 
-}  // namespace AEHelper
+}  // namespace exporter

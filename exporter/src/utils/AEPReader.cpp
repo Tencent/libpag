@@ -19,7 +19,7 @@
 #include "AEPReader.h"
 #include <iostream>
 
-namespace AEPReader {
+namespace exporter {
 
 std::string ReadKeyName(ByteArray* bytes) {
   char name[5] = {0};
@@ -185,4 +185,4 @@ std::vector<Layer> ReadLayers(ByteArray* bytes) {
   return list;
 }
 
-}  // namespace AEPReader
+}  // namespace exporter

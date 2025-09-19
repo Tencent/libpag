@@ -20,7 +20,7 @@
 #include <cmath>
 #include "ScopedHelper.h"
 
-namespace Helper {
+namespace exporter {
 
 #define MaxBezierTValue 0x3FFFFFFF
 
@@ -172,4 +172,4 @@ void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
   }
 }
 
-}  // namespace Helper
+}  // namespace exporter

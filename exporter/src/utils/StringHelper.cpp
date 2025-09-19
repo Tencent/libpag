@@ -23,12 +23,12 @@
 #include "AEHelper.h"
 #include "src/base/utils/Log.h"
 
-namespace StringHelper {
+namespace exporter {
 
 const std::string CompositionBmpSuffix = "_bmp";
 
 std::string AeMemoryHandleToString(const AEGP_MemHandle& handle) {
-  const auto& suites = AEHelper::GetSuites();
+  const auto& suites = GetSuites();
   char16_t* str = nullptr;
   suites->MemorySuite1()->AEGP_LockMemHandle(handle, reinterpret_cast<void**>(&str));
 
@@ -119,7 +119,7 @@ bool StringToBoolean(const std::string& value, const bool defaultValue) {
   if (value.empty()) {
     return defaultValue;
   }
-  auto lowerValue = StringHelper::ToLowerCase(value);
+  auto lowerValue = ToLowerCase(value);
   return lowerValue == "true";
 }
 
@@ -383,4 +383,4 @@ void EnsureStringSuffix(std::string& filePath, const std::string& suffix) {
   filePath += suffix;
 }
 
-}  // namespace StringHelper
+}  // namespace exporter

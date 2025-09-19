@@ -21,7 +21,7 @@
 #include <pag/file.h>
 #include "PAGExportSession.h"
 
-namespace Helper {
+namespace exporter {
 
 using LayerHandler = void (*)(const std::shared_ptr<exporter::PAGExportSession>& session,
                               pag::Layer* layer, void* ctx);
@@ -45,4 +45,4 @@ void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
                      std::vector<pag::Composition*>& compositions, pag::LayerType layerType,
                      LayerHandler handler, void* ctx);
 
-}  // namespace Helper
+}  // namespace exporter

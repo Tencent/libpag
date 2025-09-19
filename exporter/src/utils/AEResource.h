@@ -31,7 +31,7 @@ enum class AEResourceType { Unknown, Folder, Composition, Image };
 
 class AEResource {
  public:
-  static std::vector<std::shared_ptr<AEResource>> getAEResourceList();
+  static std::vector<std::shared_ptr<AEResource>> GetAEResourceList();
 
   AEResource();
   void setSavePath(const std::string& savePath);

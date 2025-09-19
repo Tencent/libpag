@@ -23,7 +23,7 @@
 #include <QJsonArray>
 #include <QString>
 
-namespace AEHelper {
+namespace exporter {
 
 pag::Color AEColorToColor(AEGP_ColorVal color);
 
@@ -104,4 +104,4 @@ pag::GradientColorHandle GetDefaultGradientColors();
 
 pag::GradientColorHandle XmlToGradientColor(const std::string& xml);
 
-}  // namespace AEHelper
+}  // namespace exporter
