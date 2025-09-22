@@ -18,38 +18,38 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include "audio/model/AudioSource.h"
+#include "ffmovie/movie.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+using SampleData = ffmovie::SampleData;
+using AudioOutputConfig = ffmovie::AudioOutputConfig;
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
+class AudioSourceReader {
  public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  static std::shared_ptr<AudioSourceReader> Make(
+      const std::shared_ptr<AudioSource>& source, int trackID,
+      const std::shared_ptr<AudioOutputConfig>& outputConfig);
+
+  explicit AudioSourceReader(const std::shared_ptr<AudioSource>& source, int trackID,
+                             const std::shared_ptr<AudioOutputConfig>& outputConfig);
+
+  bool isValid();
+  void seek(int64_t time);
+  SampleData getNextFrame();
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  bool sendData();
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  bool advance = false;
+  int trackID = 0;
+  int64_t startTime = 0;
+  int64_t startOffset = 0;
+  std::shared_ptr<AudioSource> source = nullptr;
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
+  std::shared_ptr<ffmovie::FFAudioDemuxer> demuxer = nullptr;
+  std::shared_ptr<ffmovie::FFAudioDecoder> decoder = nullptr;
 };
 
 }  // namespace pag

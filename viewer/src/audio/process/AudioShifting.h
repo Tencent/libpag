@@ -18,38 +18,30 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include "audio/reader/AudioSourceReader.h"
+#include "ffmovie/movie.h"
+#include "sonic.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+using SmapleData = ffmovie::SampleData;
+using AudioOutputConfig = ffmovie::AudioOutputConfig;
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
+class AudioShifting {
  public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  explicit AudioShifting(const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  ~AudioShifting();
+  void setSpeed(float speed);
+  void setVolume(float volume);
+  void setPitch(float pitch);
+  int sendAudioBytes(const SmapleData& audioData);
+  int sendInputEOS();
+  SampleData readAudioBytes();
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
-
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  sonicStream stream = nullptr;
+  std::vector<int16_t> buffer = {};
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
 };
 
 }  // namespace pag

@@ -18,38 +18,31 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include <QThread>
+#include "PAGAudioReader.h"
+#include "PAGAudioRender.h"
+#include "pag/pag.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
+class PAGAudioPlayer : public QObject {
   Q_OBJECT
  public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+  explicit PAGAudioPlayer();
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  void setVolume(float volume);
+  void setProgress(double percent);
+  void setIsPlaying(bool isPlaying);
+  void setComposition(const std::shared_ptr<PAGFile>& pagFile);
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  Q_SIGNAL void seekInternal(int64_t time);
+  Q_SIGNAL void setIsPlayingInternal(bool isPlaying);
+  Q_SIGNAL void setVolumeInternal(float volume);
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGAudioReader> audioReader = nullptr;
+  std::shared_ptr<PAGAudioRender> audioRender = nullptr;
 };
 
 }  // namespace pag

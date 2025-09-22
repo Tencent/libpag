@@ -18,38 +18,37 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include <unordered_map>
+#include "base/utils/Log.h"
+#include "codec/NALUType.h"
+#include "ffmovie/movie.h"
+#include "pag/types.h"
+#include "rendering/video/VideoDemuxer.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
+class MovieDemuxer : public VideoDemuxer {
  public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+  static std::unique_ptr<MovieDemuxer> Make(const std::string& path, NALUType startCodeType);
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  bool advance();
+  bool needSeeking(int64_t currentTime, int64_t targetTime) override;
+  void reset() override;
+  void seekTo(int64_t timestamp) override;
+  void selectTrack(int trackID);
+  int getTrackID() const;
+  int getRotation() const;
+  int getTrackCount();
+  int64_t getSampleTimeAt(int64_t targetTime) override;
+  int64_t getSampleTime();
+  VideoFormat getFormat() override;
+  VideoSample nextSample() override;
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  explicit MovieDemuxer(std::unique_ptr<ffmovie::FFVideoDemuxer> demuxer);
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  int trackID = 0;
+  int rotation = 0;
+  std::unique_ptr<ffmovie::FFVideoDemuxer> demuxer = nullptr;
 };
-
 }  // namespace pag

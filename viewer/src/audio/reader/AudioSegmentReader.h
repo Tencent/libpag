@@ -17,39 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <QObject>
-#include <QRunnable>
+#include <memory>
+#include "AudioSourceReader.h"
+#include "audio/model/AudioTrackSegment.h"
+#include "audio/process/AudioShifting.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
+class AudioSegmentReader {
  public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+  static std::shared_ptr<AudioSegmentReader> Make(
+      AudioTrackSegment* segment, const std::shared_ptr<AudioOutputConfig>& outputConfig);
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  AudioSegmentReader(AudioTrackSegment* segment,
+                     const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  bool isValid();
+  void seek(int64_t time);
+  SampleData getNextSample();
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  SampleData getNextSampleInternal();
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  bool inputEOS = false;
+  float speed = 1.0f;
+  int64_t startOffset = 0;
+  int64_t endOffset = 0;
+  int64_t currentOffset = 0;
+  AudioTrackSegment* segment = nullptr;
+  std::vector<uint8_t> emptyBuffer = {};
+  std::shared_ptr<AudioShifting> shifting = nullptr;
+  std::shared_ptr<AudioSourceReader> reader = nullptr;
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
+
+  friend class AudioTrackReader;
 };
 
 }  // namespace pag

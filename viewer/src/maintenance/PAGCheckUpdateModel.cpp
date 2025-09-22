@@ -73,9 +73,10 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
 
   for (const auto& url : availableUpdateUrls) {
     auto* task = new PAGUpdateVersionFetcherTask(url);
+    task->setAutoDelete(false);
     connect(task, &PAGUpdateVersionFetcherTask::versionFound, this,
             &PAGCheckUpdateModel::getUpdateVersion);
-    task->setAutoDelete(true);
+    connect(task, &PAGUpdateVersionFetcherTask::finished, task, &QObject::deleteLater);
     threadPool->start(task);
   }
 }
@@ -104,7 +105,7 @@ void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
   QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
     availableUpdates.clear();
     availableUpdateUrls.clear();
-    CheckForUpdates(keepSilent, selectedUrl.toStdString());
+    // CheckForUpdates(keepSilent, selectedUrl.toStdString());
   });
 }
 

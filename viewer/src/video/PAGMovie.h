@@ -18,38 +18,32 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include "MovieInfo.h"
+#include "audio/model/AudioClip.h"
+#include "pag/pag.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
+class PAGMovie : public PAGImage {
  public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
+  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
+                                                int64_t duration, float speed = 1.0f,
+                                                float volume = 1.0f);
+
+  int64_t duration();
+  std::vector<AudioClip> generateAudioClips();
 
  protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
+  bool isStill() const override;
+  Frame getContentFrame(int64_t time) const override;
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  PAGMovie(const std::shared_ptr<MovieInfo>& movieInfo, float volume);
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  float volume = 1.0f;
+  std::shared_ptr<MovieInfo> movieInfo = nullptr;
 };
 
 }  // namespace pag

@@ -79,7 +79,7 @@ PAGWindow {
                 let oldHeight = viewWindow.height;
                 let preferredSize = pagView.preferredSize;
                 let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
-                let height = Math.max(viewWindow.minimumHeight, preferredSize.height);
+                let height = Math.max(viewWindow.minimumHeight, preferredSize.height + controlForm.height);
                 if (mainForm.rightItemLoader.status === Loader.Ready) {
                     width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
                 }

@@ -17,39 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <cstdint>
+#include "pag/types.h"
 
-#include <QObject>
-#include <QRunnable>
+namespace pag::Utils {
 
-namespace pag {
+int64_t SampleLengthToCount(int64_t length, int channels);
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+int64_t SampleLengthToTime(int64_t length, int sampleRate, int channels);
 
- protected:
-  QString url = "";
-};
+int64_t SampleCountToLength(int64_t count, int channels);
 
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+int64_t SampleTimeToLength(int64_t time, int sampleRate, int channels);
 
- private:
-  void parseAppcast(const QByteArray& data);
-};
+int64_t MergeSamples(const std::vector<std::shared_ptr<ByteData>>& audioSamples, uint8_t* buffer);
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
-};
-
-}  // namespace pag
+}  // namespace pag::Utils

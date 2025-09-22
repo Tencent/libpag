@@ -18,38 +18,42 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include <list>
+#include "AudioTrackReader.h"
+#include "audio/model/AudioAsset.h"
+#include "pag/pag.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
-
- protected:
-  QString url = "";
+struct PAGAudioSample {
+  int64_t time = 0;
+  int64_t duration = 0;
+  int64_t length = 0;
+  uint8_t* data = nullptr;
 };
 
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
+class AudioReader {
  public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  static std::shared_ptr<AudioReader> Make(const std::shared_ptr<AudioAsset>& audio,
+                                           const std::shared_ptr<AudioOutputConfig>& outputConfig);
+
+  void seek(int64_t time);
+  void clearBuffer();
+  void onAudioChanged();
+  std::shared_ptr<PAGAudioSample> getNextSample();
+  std::shared_ptr<AudioOutputConfig> getOutputConfig();
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  explicit AudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig);
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  int64_t getNextSampleInternal();
+
+  int64_t currentReadTime = 0;
+  int64_t currentOutputLength = 0;
+  tgfx::Buffer buffer = {};
+  std::shared_ptr<AudioAsset> audio = nullptr;
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
+  std::list<std::shared_ptr<AudioTrackReader>> readers = {};
 };
 
 }  // namespace pag

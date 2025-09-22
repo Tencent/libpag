@@ -74,6 +74,10 @@ void CheckForUpdates(bool keepSilent, const std::string& url) {
     return;
   }
 
+#ifdef DEBUG
+  return;
+#endif
+
   @autoreleasepool {
     if (updaterDelegate) {
       updaterDelegate.showUI = !keepSilent;

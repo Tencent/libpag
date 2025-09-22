@@ -20,6 +20,7 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
+#include "audio/PAGAudioPlayer.h"
 #include "pag/pag.h"
 #include "platform/qt/GPUDrawable.h"
 #include "rendering/PAGRenderThread.h"
@@ -78,6 +79,7 @@ class PAGView : public QQuickItem {
   Q_SIGNAL void pagFileChanged(const std::shared_ptr<pag::PAGFile>& pagFile);
 
   Q_SLOT void flush() const;
+  Q_SLOT void onWindowActiveChanged();
 
   Q_INVOKABLE bool setFile(const QString& filePath);
   Q_INVOKABLE void firstFrame();
@@ -93,6 +95,7 @@ class PAGView : public QQuickItem {
   int editableImageLayerCount = 0;
   int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
+  bool lastIsPlaying = true;
   qreal lastWidth = 0;
   qreal lastHeight = 0;
   qreal lastPixelRatio = 1;
@@ -102,6 +105,7 @@ class PAGView : public QQuickItem {
   std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
+  std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
 
   friend class PAGRenderThread;
 };

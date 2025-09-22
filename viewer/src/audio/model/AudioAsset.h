@@ -18,38 +18,31 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include "AudioTrack.h"
+#include "pag/types.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
+class AudioAsset {
  public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+  static std::shared_ptr<AudioAsset> Make(const std::string& filePath);
+  static std::shared_ptr<AudioAsset> Make(const std::shared_ptr<ByteData>& data);
+  static std::shared_ptr<AudioAsset> Make(const std::shared_ptr<AudioSource>& source);
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+  int64_t duration();
+  std::vector<std::shared_ptr<AudioTrack>> getTracks();
+  std::shared_ptr<AudioSource> getSource();
+  std::shared_ptr<AudioTrack> addTrack(int preferredTrackID = -1);
+  void setSource(const std::shared_ptr<AudioSource>& source);
+  void loadValues();
+  void removeTrack(int trackID);
+  void removeAllTracks();
 
  private:
-  void parseAppcast(const QByteArray& data);
-};
+  int generateTrackID();
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  std::shared_ptr<AudioSource> source = nullptr;
+  std::vector<std::shared_ptr<AudioTrack>> tracks = {};
 };
 
 }  // namespace pag

@@ -88,6 +88,7 @@ void PAGWindow::open() {
   connect(window, SIGNAL(closing(QQuickCloseEvent*)), this, SLOT(onPAGViewerDestroyed()),
           Qt::QueuedConnection);
   connect(window, &QQuickWindow::afterRendering, pagView, &PAGView::flush);
+  connect(window, &QQuickWindow::activeChanged, pagView, &PAGView::onWindowActiveChanged);
   connect(pagView, &PAGView::filePathChanged, taskFactory, &PAGTaskFactory::setFilePath);
   connect(pagView, &PAGView::fileChanged, treeViewModel.get(), &PAGTreeViewModel::setFile);
   connect(pagView, &PAGView::pagFileChanged, editAttributeModel.get(),

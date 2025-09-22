@@ -16,40 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <QObject>
-#include <QRunnable>
+#include "AudioSource.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+AudioSource::AudioSource(const std::string& filePath) : filePath(filePath) {
+  auto demuxer = ffmovie::FFAudioDemuxer::Make(filePath);
+  this->demuxer = std::move(demuxer);
+}
 
- protected:
-  QString url = "";
-};
+AudioSource::AudioSource(const std::shared_ptr<ByteData>& data) : data(data) {
+  auto demuxer = ffmovie::FFAudioDemuxer::Make(data->data(), data->length());
+  this->demuxer = std::move(demuxer);
+}
 
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
+bool AudioSource::operator==(const AudioSource& source) {
+  return !isEmpty() && (filePath == source.filePath || data == source.data);
+}
 
- private:
-  void parseAppcast(const QByteArray& data);
-};
+bool AudioSource::isEmpty() const {
+  return filePath.empty() && data == nullptr;
+}
 
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
-};
+std::shared_ptr<ffmovie::FFAudioDemuxer> AudioSource::getDemuxer() const {
+  return demuxer;
+}
 
 }  // namespace pag

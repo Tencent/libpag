@@ -18,38 +18,21 @@
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
+#include "audio/model/AudioSource.h"
+#include "pag/types.h"
 
 namespace pag {
 
-class PAGNetworkFetcher : public QObject {
-  Q_OBJECT
- public:
-  explicit PAGNetworkFetcher(const QString& url, QObject* parent = nullptr);
-  void fetch();
-  Q_SIGNAL void finished();
-  Q_SIGNAL void fetched(const QByteArray& data);
+struct AudioTrackSegment {
+  explicit AudioTrackSegment(const TimeRange& targetRange);
+  AudioTrackSegment(const std::shared_ptr<AudioSource>& source, int trackID,
+                    const TimeRange& sourceRange, const TimeRange& targetRange);
+  bool isEmpty() const;
 
- protected:
-  QString url = "";
-};
-
-class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(QString url, QString version);
-
- private:
-  void parseAppcast(const QByteArray& data);
-};
-
-class PAGUpdateVersionFetcherTask : public PAGUpdateVersionFetcher, public QRunnable {
-  Q_OBJECT
- public:
-  explicit PAGUpdateVersionFetcherTask(const QString& url, QObject* parent = nullptr);
-  void run() override;
+  int sourceTrackID = -1;
+  std::shared_ptr<AudioSource> source = nullptr;
+  TimeRange sourceRange = {-1, -1};
+  TimeRange targetRange = {-1, -1};
 };
 
 }  // namespace pag

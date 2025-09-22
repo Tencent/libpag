@@ -32,11 +32,25 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   renderThread = std::make_unique<PAGRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
   drawable->moveToThread(renderThread.get());
+  audioPlayer = std::make_unique<PAGAudioPlayer>();
 }
 
 void PAGView::flush() const {
   if (isPlaying_) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  }
+}
+
+void PAGView::onWindowActiveChanged() {
+  if (window()->isActive()) {
+    if (lastIsPlaying) {
+      setIsPlaying(true);
+    }
+  } else {
+    lastIsPlaying = isPlaying_;
+    if (isPlaying_) {
+      setIsPlaying(false);
+    }
   }
 }
 
@@ -165,6 +179,7 @@ void PAGView::setIsPlaying(bool isPlaying) {
   if (this->isPlaying_ == isPlaying) {
     return;
   }
+  audioPlayer->setIsPlaying(isPlaying);
   this->isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
   if (isPlaying) {
@@ -184,6 +199,7 @@ void PAGView::setProgress(double progress) {
   if (this->progress == progress) {
     return;
   }
+  audioPlayer->setProgress(progress);
   pagPlayer->setProgress(progress);
   this->progress = progress;
   Q_EMIT progressChanged(progress);
@@ -207,12 +223,15 @@ bool PAGView::setFile(const QString& filePath) {
   pagFile = newPagFile;
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
+  audioPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(strPath);
   Q_EMIT pagFileChanged(pagFile);
+  audioPlayer->setVolume(1.0f);
   pagPlayer->setProgress(0);
+  audioPlayer->setProgress(0);
   setProgress(0);
   setIsPlaying(true);
 
@@ -300,4 +319,5 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
 }
+
 }  // namespace pag
