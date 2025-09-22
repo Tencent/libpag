@@ -7,8 +7,8 @@ PAGWindow {
     property bool showOK: true
     property int textSize: 12
     property string message: ""
-    signal accepted()
-    signal canceled()
+    signal accepted
+    signal canceled
 
     maximumHeight: height
     maximumWidth: width

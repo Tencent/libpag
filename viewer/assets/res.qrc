@@ -58,5 +58,8 @@
 
         <!-- pag -->
         <file>pag/performance-baseline.pag</file>
+
+        <!-- qm -->
+        <file>translation/Chinese.qm</file>
     </qresource>
 </RCC>

@@ -136,9 +136,11 @@ void APNGAssembler::write_IDATs(FILE* f, unsigned int frame, unsigned char* data
     unsigned int ds = length;
     if (ds > 32768) ds = 32768;
 
-    if (frame == 0) write_chunk(f, "IDAT", data, ds);
-    else
+    if (frame == 0) {
+      write_chunk(f, "IDAT", data, ds);
+    } else {
       write_chunk(f, "fdAT", data, ds + 4);
+    }
 
     data += ds;
     length -= ds;
@@ -193,8 +195,9 @@ void APNGAssembler::deflate_rect_fin([[maybe_unused]] int deflate_method, [[mayb
       memcpy(dp, image->rows[j] + xbytes, rowbytes);
       dp += rowbytes;
     }
-  } else
+  } else {
     process_rect(image, xbytes, rowbytes, y, h, bpp, dest);
+  }
 
   z_stream fin_zstream;
 
@@ -225,7 +228,9 @@ void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
   unsigned int diffnum = 0;
   unsigned int over_is_possible = 1;
 
-  if (!has_tcolor) over_is_possible = 0;
+  if (!has_tcolor) {
+    over_is_possible = 0;
+  }
 
   if (bpp == 1) {
     for (j = 0; j < h; j++) {
@@ -236,13 +241,24 @@ void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
         unsigned char c = *pb++;
         if (*pa++ != c) {
           diffnum++;
-          if (has_tcolor && c == tcolor) over_is_possible = 0;
-          if (i < x_min) x_min = i;
-          if (i > x_max) x_max = i;
-          if (j < y_min) y_min = j;
-          if (j > y_max) y_max = j;
-        } else
+          if (has_tcolor && c == tcolor) {
+            over_is_possible = 0;
+          }
+          if (i < x_min) {
+            x_min = i;
+          }
+          if (i > x_max) {
+            x_max = i;
+          }
+          if (j < y_min) {
+            y_min = j;
+          }
+          if (j > y_max) {
+            y_max = j;
+          }
+        } else {
           c = tcolor;
+        }
 
         *pc++ = c;
       }
@@ -257,13 +273,24 @@ void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
         unsigned int c2 = *pb++;
         if ((c1 != c2) && ((c1 >> 8) || (c2 >> 8))) {
           diffnum++;
-          if ((c2 >> 8) != 0xFF) over_is_possible = 0;
-          if (i < x_min) x_min = i;
-          if (i > x_max) x_max = i;
-          if (j < y_min) y_min = j;
-          if (j > y_max) y_max = j;
-        } else
+          if ((c2 >> 8) != 0xFF) {
+            over_is_possible = 0;
+          }
+          if (i < x_min) {
+            x_min = i;
+          }
+          if (i > x_max) {
+            x_max = i;
+          }
+          if (j < y_min) {
+            y_min = j;
+          }
+          if (j > y_max) {
+            y_max = j;
+          }
+        } else {
           c2 = 0;
+        }
 
         *pc++ = c2;
       }
@@ -278,13 +305,24 @@ void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
         unsigned int c2 = (pb[2] << 16) + (pb[1] << 8) + pb[0];
         if (c1 != c2) {
           diffnum++;
-          if (has_tcolor && c2 == tcolor) over_is_possible = 0;
-          if (i < x_min) x_min = i;
-          if (i > x_max) x_max = i;
-          if (j < y_min) y_min = j;
-          if (j > y_max) y_max = j;
-        } else
+          if (has_tcolor && c2 == tcolor) {
+            over_is_possible = 0;
+          }
+          if (i < x_min) {
+            x_min = i;
+          }
+          if (i > x_max) {
+            x_max = i;
+          }
+          if (j < y_min) {
+            y_min = j;
+          }
+          if (j > y_max) {
+            y_max = j;
+          }
+        } else {
           c2 = tcolor;
+        }
 
         memcpy(pc, &c2, 3);
         pa += 3;
@@ -302,14 +340,24 @@ void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
         unsigned int c2 = *pb++;
         if ((c1 != c2) && ((c1 >> 24) || (c2 >> 24))) {
           diffnum++;
-          if ((c2 >> 24) != 0xFF) over_is_possible = 0;
-          if (i < x_min) x_min = i;
-          if (i > x_max) x_max = i;
-          if (j < y_min) y_min = j;
-          if (j > y_max) y_max = j;
-        } else
+          if ((c2 >> 24) != 0xFF) {
+            over_is_possible = 0;
+          }
+          if (i < x_min) {
+            x_min = i;
+          }
+          if (i > x_max) {
+            x_max = i;
+          }
+          if (j < y_min) {
+            y_min = j;
+          }
+          if (j > y_max) {
+            y_max = j;
+          }
+        } else {
           c2 = 0;
-
+        }
         *pc++ = c2;
       }
     }
@@ -327,7 +375,9 @@ void APNGAssembler::get_rect(unsigned int w, unsigned int h, Image* image1, Imag
 
   deflate_rect_op(image2, x0, y0, w0, h0, bpp, zbuf_size, n * 2);
 
-  if (over_is_possible) deflate_rect_op(temp, x0, y0, w0, h0, bpp, zbuf_size, n * 2 + 1);
+  if (over_is_possible) {
+    deflate_rect_op(temp, x0, y0, w0, h0, bpp, zbuf_size, n * 2 + 1);
+  }
 }
 
 void APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, int h, int bpp,
@@ -360,7 +410,9 @@ void APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, 
     for (i = bpp; i < rowbytes; i++) {
       v = out[i] = row[i] - row[i - bpp];
       sum += (v < 128) ? v : 256 - v;
-      if (sum > mins) break;
+      if (sum > mins) {
+        break;
+      }
     }
     if (sum < mins) {
       mins = sum;
@@ -373,7 +425,9 @@ void APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, 
       for (i = 0; i < rowbytes; i++) {
         v = out[i] = row[i] - prev[i];
         sum += (v < 128) ? v : 256 - v;
-        if (sum > mins) break;
+        if (sum > mins) {
+          break;
+        }
       }
       if (sum < mins) {
         mins = sum;
@@ -389,7 +443,9 @@ void APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, 
       for (i = bpp; i < rowbytes; i++) {
         v = out[i] = row[i] - (prev[i] + row[i - bpp]) / 2;
         sum += (v < 128) ? v : 256 - v;
-        if (sum > mins) break;
+        if (sum > mins) {
+          break;
+        }
       }
       if (sum < mins) {
         mins = sum;
@@ -414,7 +470,9 @@ void APNGAssembler::process_rect(Image* image, int xbytes, int rowbytes, int y, 
         p = (pa <= pb && pa <= pc) ? a : (pb <= pc) ? b : c;
         v = out[i] = row[i] - p;
         sum += (v < 128) ? v : 256 - v;
-        if (sum > mins) break;
+        if (sum > mins) {
+          break;
+        }
       }
       if (sum < mins) {
         best_row = paeth_row;
@@ -460,10 +518,14 @@ int APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned 
                "%%0%dd%%s", i);
       cur = 0;
       snprintf(szNext, sizeof(szNext), szFormat, cur, szExt);
-      if ((f = fopen(szNext, "rb")) != 0) break;
+      if ((f = fopen(szNext, "rb")) != 0) {
+        break;
+      }
       cur = 1;
       snprintf(szNext, sizeof(szNext), szFormat, cur, szExt);
-      if ((f = fopen(szNext, "rb")) != 0) break;
+      if ((f = fopen(szNext, "rb")) != 0) {
+        break;
+      }
     }
 
     if (f != NULL) {
@@ -474,9 +536,15 @@ int APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned 
     }
   } else {
     for (i = 0; i < 6; i++) {
-      if (szImage == szExt - i) break;
-      if (*(szExt - i - 1) < '0') break;
-      if (*(szExt - i - 1) > '9') break;
+      if (szImage == szExt - i) {
+        break;
+      }
+      if (*(szExt - i - 1) < '0') {
+        break;
+      }
+      if (*(szExt - i - 1) > '9') {
+        break;
+      }
     }
     cur = static_cast<unsigned int>(atoi(szExt - i));
     strcpy(szFormat, szImage);
@@ -502,7 +570,9 @@ int APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned 
   for (i = 0; i < frames; i++) {
     snprintf(szNext, sizeof(szNext), szFormat, cur + i, szExt);
 
-    if (load_image(szNext, &img[i])) return 1;
+    if (load_image(szNext, &img[i])) {
+      return 1;
+    }
 
     img[i].delay_num = static_cast<unsigned int>(delay_num);
     img[i].delay_den = static_cast<unsigned int>(delay_den);
@@ -514,8 +584,12 @@ int APNGAssembler::load_image_sequence(char* szImage, [[maybe_unused]] unsigned 
       if (fgets(szStr, 256, f) != NULL) {
         int d1, d2;
         if (sscanf(szStr, "delay=%d/%d", &d1, &d2) == 2) {
-          if (d1 != 0) img[i].delay_num = static_cast<unsigned int>(d1);
-          if (d2 != 0) img[i].delay_den = static_cast<unsigned int>(d2);
+          if (d1 != 0) {
+            img[i].delay_num = static_cast<unsigned int>(d1);
+          }
+          if (d2 != 0) {
+            img[i].delay_den = static_cast<unsigned int>(d2);
+          }
         }
       }
       fclose(f);
@@ -540,22 +614,24 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
   if (coltype == 0) {
     if (img[0].ts) {
       has_tcolor = 1;
-      tcolor = img[0].tr[1];
+      tcolor = img[0].transparency[1];
     }
   } else if (coltype == 2) {
     if (img[0].ts) {
       has_tcolor = 1;
-      tcolor = (((img[0].tr[5] << 8) + img[0].tr[3]) << 8) + img[0].tr[1];
+      tcolor =
+          (((img[0].transparency[5] << 8) + img[0].transparency[3]) << 8) + img[0].transparency[1];
     }
   } else if (coltype == 3) {
     for (int c = 0; c < img[0].ts; c++)
-      if (img[0].tr[c] == 0) {
+      if (img[0].transparency[c] == 0) {
         has_tcolor = 1;
         tcolor = c;
         break;
       }
-  } else
+  } else {
     has_tcolor = 1;
+  }
 
   FILE* f;
   if ((f = fopen(szOut, "wb")) == 0) {
@@ -596,13 +672,19 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
 
   write_chunk(f, "IHDR", buf_IHDR, 13);
 
-  if (img.size() > 1) write_chunk(f, "acTL", buf_acTL, 8);
-  else
+  if (img.size() > 1) {
+    write_chunk(f, "acTL", buf_acTL, 8);
+  } else {
     first = 0;
+  }
 
-  if (img[0].ps > 0) write_chunk(f, "PLTE", (unsigned char*)(&img[0].pl), img[0].ps * 3);
+  if (img[0].ps > 0) {
+    write_chunk(f, "PLTE", (unsigned char*)(&img[0].pl), img[0].ps * 3);
+  }
 
-  if (img[0].ts > 0) write_chunk(f, "tRNS", img[0].tr, img[0].ts);
+  if (img[0].ts > 0) {
+    write_chunk(f, "tRNS", img[0].transparency, img[0].ts);
+  }
 
   op_zstream1.data_type = Z_BINARY;
   op_zstream1.zalloc = Z_NULL;
@@ -644,7 +726,9 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
   unsigned char dop = 0;
   next_seq_num = 0;
 
-  for (j = 0; j < 6; j++) op[j].valid = 0;
+  for (j = 0; j < 6; j++) {
+    op[j].valid = 0;
+  }
   deflate_rect_op(&img[0], x0, y0, w0, h0, bpp, zbuf_size, 0);
   deflate_rect_fin(deflate_method, iter, zbuf, &zsize, bpp, dest, zbuf_size, 0);
 
@@ -652,7 +736,9 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
     write_IDATs(f, 0, zbuf, zsize, idat_size);
 
     printf("saving %s (frame %d of %d)\n", szOut, 1, visible);
-    for (j = 0; j < 6; j++) op[j].valid = 0;
+    for (j = 0; j < 6; j++) {
+      op[j].valid = 0;
+    }
     deflate_rect_op(&img[1], x0, y0, w0, h0, bpp, zbuf_size, 0);
     deflate_rect_fin(deflate_method, iter, zbuf, &zsize, bpp, dest, zbuf_size, 0);
   }
@@ -665,26 +751,37 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
 //            printf("saving %s (frame %d of %d)\n", szOut, i-first+2, visible);
 #endif
 
-    for (j = 0; j < 6; j++) op[j].valid = 0;
+    for (j = 0; j < 6; j++) {
+      op[j].valid = 0;
+    }
 
     /* dispose = none */
     get_rect(width, height, &img[i], &img[i + 1], &over1, bpp, zbuf_size, has_tcolor, tcolor, 0);
 
     /* dispose = background */
     if (has_tcolor) {
-      for (j = 0; j < height; j++) memcpy(temp.rows[j], img[i].rows[j], rowbytes);
-      if (coltype == 2)
-        for (j = 0; j < h0; j++)
-          for (k = 0; k < w0; k++) memcpy(temp.rows[j + y0] + (k + x0) * 3, &tcolor, 3);
-      else
-        for (j = 0; j < h0; j++) memset(temp.rows[j + y0] + x0 * bpp, tcolor, w0 * bpp);
+      for (j = 0; j < height; j++) {
+        memcpy(temp.rows[j], img[i].rows[j], rowbytes);
+      }
+      if (coltype == 2) {
+        for (j = 0; j < h0; j++) {
+          for (k = 0; k < w0; k++) {
+            memcpy(temp.rows[j + y0] + (k + x0) * 3, &tcolor, 3);
+          }
+        }
+      } else {
+        for (j = 0; j < h0; j++) {
+          memset(temp.rows[j + y0] + x0 * bpp, tcolor, w0 * bpp);
+        }
+      }
 
       get_rect(width, height, &temp, &img[i + 1], &over2, bpp, zbuf_size, has_tcolor, tcolor, 1);
     }
 
     /* dispose = previous */
-    if (i > first)
+    if (i > first) {
       get_rect(width, height, &rest, &img[i + 1], &over3, bpp, zbuf_size, has_tcolor, tcolor, 2);
+    }
 
     op_min = op[0].size;
     op_best = 0;
@@ -712,15 +809,24 @@ int APNGAssembler::save_apng(const char* szOut, std::vector<Image>& img, unsigne
     write_IDATs(f, i, zbuf, zsize, idat_size);
 
     /* process apng dispose - exportStart */
-    if (dop != 2)
-      for (j = 0; j < height; j++) memcpy(rest.rows[j], img[i].rows[j], rowbytes);
+    if (dop != 2) {
+      for (j = 0; j < height; j++) {
+        memcpy(rest.rows[j], img[i].rows[j], rowbytes);
+      }
+    }
 
     if (dop == 1) {
-      if (coltype == 2)
-        for (j = 0; j < h0; j++)
-          for (k = 0; k < w0; k++) memcpy(rest.rows[j + y0] + (k + x0) * 3, &tcolor, 3);
-      else
-        for (j = 0; j < h0; j++) memset(rest.rows[j + y0] + x0 * bpp, tcolor, w0 * bpp);
+      if (coltype == 2) {
+        for (j = 0; j < h0; j++) {
+          for (k = 0; k < w0; k++) {
+            memcpy(rest.rows[j + y0] + (k + x0) * 3, &tcolor, 3);
+          }
+        }
+      } else {
+        for (j = 0; j < h0; j++) {
+          memset(rest.rows[j + y0] + x0 * bpp, tcolor, w0 * bpp);
+        }
+      }
     }
     /* process apng dispose - end */
 

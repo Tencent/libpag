@@ -94,15 +94,13 @@ Popup {
         }
     }
 
-
-
     function addTip(newString) {
-        tipMessageList.push(newString)
-        tipMessageList = tipMessageList.slice()
+        tipMessageList.push(newString);
+        tipMessageList = tipMessageList.slice();
     }
 
     function clearAllTips() {
-        tipMessageList = []
+        tipMessageList = [];
     }
 
     function setToTop() {

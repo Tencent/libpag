@@ -57,7 +57,11 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Q
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
         Qt${QT_VERSION_MAJOR}::QuickControls2)
-qt_add_resources(QT_RESOURCES res.qrc)
+find_program(LUPDATE_EXECUTABLE lupdate REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease REQUIRED)
+execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
+execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
+qt_add_resources(QT_RESOURCES assets/res.qrc)
 
 message(STATUS "Generate Version File")
 if (DEFINED ENV{MajorVersion})
