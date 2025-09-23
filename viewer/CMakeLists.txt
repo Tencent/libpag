@@ -181,6 +181,8 @@ elseif (WIN32)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/win/${ARCH}/ffmovie.lib)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sonic/win/${ARCH}/sonic.lib)
 endif ()
 
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})

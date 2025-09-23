@@ -73,9 +73,7 @@ std::shared_ptr<AudioTrack> AudioAsset::addTrack(int preferredTrackID) {
 }
 
 void AudioAsset::setSource(const std::shared_ptr<AudioSource>& source) {
-  if (this->source != nullptr && !this->source->isEmpty()) {
-    tracks.clear();
-  }
+  tracks.clear();
   this->source = source;
   loadValues();
 }
