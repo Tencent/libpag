@@ -86,28 +86,28 @@ std::vector<std::shared_ptr<AEResource>> AEResource::GetAEResourceList() {
   for (A_long index = 0; index < projectsNum; index++) {
     AEGP_ProjectH projectHandle = nullptr;
     suites->ProjSuite6()->AEGP_GetProjectByIndex(index, &projectHandle);
-    A_char projectName[AEGP_MAX_PROJ_NAME_SIZE];
+    A_char projectName[AEGP_MAX_PROJ_NAME_SIZE] = {0};
     suites->ProjSuite6()->AEGP_GetProjectName(projectHandle, projectName);
     AEGP_ItemH itemH = nullptr;
     suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &itemH);
     while (itemH != nullptr) {
       A_long id = GetItemID(itemH);
       if (id != 0) {
-        auto item = std::make_shared<AEResource>();
+        auto resource = std::make_shared<AEResource>();
         auto type = GetAEItemResourceType(itemH);
         if (type != AEResourceType::Unknown) {
-          item->type = type;
-          item->ID = id;
-          item->name = GetItemName(itemH);
-          item->itemH = itemH;
-          item->isExportAsBmp = IsEndWidthSuffix(item->name, CompositionBmpSuffix);
-          resources.push_back(item);
-          resourceMap[id] = item;
+          resource->type = type;
+          resource->ID = id;
+          resource->name = GetItemName(itemH);
+          resource->itemH = itemH;
+          resource->isExportAsBmp = IsEndWidthSuffix(resource->name, CompositionBmpSuffix);
+          resources.push_back(resource);
+          resourceMap[id] = resource;
           auto parentID = GetItemParentID(itemH);
           auto parentIter = resourceMap.find(parentID);
           if (parentIter != resourceMap.end()) {
-            parentIter->second->file.children.push_back(item);
-            item->file.parent = parentIter->second.get();
+            parentIter->second->file.children.push_back(resource);
+            resource->file.parent = parentIter->second.get();
           }
         }
       }

@@ -357,6 +357,9 @@ pag::Ratio GetLayerStretch(const AEGP_LayerH& layerH) {
 pag::Frame GetLayerStartTime(const AEGP_LayerH& layerH, float frameRate) {
   A_Time inPoint = {};
   Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerH, AEGP_LTimeMode_CompTime, &inPoint);
+  if (inPoint.scale == 0) {
+    return 0;
+  }
   return static_cast<pag::Frame>(std::round(inPoint.value * frameRate / inPoint.scale));
 }
 
@@ -614,7 +617,7 @@ bool IsStaticComposition(const AEGP_CompH& compH) {
 }
 
 std::string GetStreamMatchName(const AEGP_StreamRefH& streamH) {
-  char matchName[200];
+  char matchName[200] = {0};
   Suites->DynamicStreamSuite4()->AEGP_GetMatchName(streamH, matchName);
   return matchName;
 }

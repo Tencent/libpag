@@ -20,8 +20,8 @@
 
 #include <AEGP_SuiteHandler.h>
 #include <AE_GeneralPlug.h>
-#include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "codec/tags/ImageFillRule.h"
 
@@ -57,9 +57,9 @@ class AEResource {
   };
 
   struct CompositionRelationship {
-    std::map<A_long, bool> exportAsBmpMap = {};
-    std::map<A_long, TextLayerFlags> textLayerFlagMap = {};
-    std::map<A_long, PlaceholderImageFlags> imagesLayerFlagMap = {};
+    std::unordered_map<A_long, bool> exportAsBmpMap = {};
+    std::unordered_map<A_long, TextLayerFlags> textLayerFlagMap = {};
+    std::unordered_map<A_long, PlaceholderImageFlags> imagesLayerFlagMap = {};
 
     // Only save the current object's own resources, not the children's resources
     std::vector<Layer> textLayers = {};

@@ -21,7 +21,7 @@
 #include <vector>
 #include "nlohmann/json.hpp"
 #include "utils/AETypeTransform.h"
-#include "utils/Helper.h"
+#include "utils/LayerHelper.h"
 #include "utils/StringHelper.h"
 
 using json = nlohmann::json;

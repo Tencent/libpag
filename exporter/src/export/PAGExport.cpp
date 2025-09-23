@@ -29,50 +29,7 @@
 
 namespace exporter {
 
-bool PAGExport::ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
-                           bool exportAudio, bool hardwareEncode) {
-  if (activeItemH == nullptr || outputPath.empty()) {
-    return false;
-  }
-  PAGExport pagExport(activeItemH, outputPath, exportAudio, hardwareEncode);
-  auto pagFile = pagExport.exportAsFile();
-  if (pagFile == nullptr) {
-    return false;
-  }
-
-  auto bytes = pag::Codec::Encode(pagFile);
-  if (bytes->length() == 0) {
-    return false;
-  }
-  if (!ValidatePAGFile(bytes->data(), bytes->length())) {
-    return false;
-  }
-  if (!WriteToFile(outputPath, reinterpret_cast<char*>(bytes->data()),
-                   static_cast<std::streamsize>(bytes->length()))) {
-    return false;
-  }
-
-  return true;
-}
-
-bool PAGExport::ExportFile(PAGExport* pagExport) {
-  auto pagFile = pagExport->exportAsFile();
-  if (pagFile == nullptr) {
-    return false;
-  }
-  auto bytes = pag::Codec::Encode(pagFile);
-  if (!ValidatePAGFile(bytes->data(), bytes->length())) {
-    return false;
-  }
-  if (!WriteToFile(pagExport->session->outputPath, reinterpret_cast<char*>(bytes->data()),
-                   static_cast<std::streamsize>(bytes->length()))) {
-    return false;
-  }
-
-  return true;
-}
-
-bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
+static bool ValidatePAGFile(uint8_t* data, size_t size) {
   auto pagFileDecoded = pag::File::Load(data, size);
   if (pagFileDecoded == nullptr) {
     return false;
@@ -85,12 +42,38 @@ bool PAGExport::ValidatePAGFile(uint8_t* data, size_t size) {
   return true;
 }
 
-PAGExport::PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath, bool exportAudio,
-                     bool hardwareEncode)
-    : itemH(activeItemH), session(std::make_shared<PAGExportSession>(activeItemH, outputPath)),
-      timeSetter(activeItemH, -100.0f) {
-  session->exportAudio = exportAudio;
-  session->hardwareEncode = hardwareEncode;
+PAGExport::PAGExport(const PAGExportConfigParam& configParam)
+    : itemH(configParam.activeItemH),
+      session(std::make_shared<PAGExportSession>(configParam.activeItemH, configParam.outputPath)),
+      timeSetter(configParam.activeItemH, -100.0f) {
+  session->exportAudio = configParam.exportAudio;
+  session->hardwareEncode = configParam.hardwareEncode;
+  session->exportActually = configParam.exportActually;
+  session->showAlertInfo = configParam.showAlertInfo;
+}
+
+bool PAGExport::exportFile() {
+  if (itemH == nullptr || session->outputPath.empty()) {
+    return false;
+  }
+  auto pagFile = exportAsFile();
+  if (pagFile == nullptr) {
+    return false;
+  }
+
+  const auto bytes = pag::Codec::Encode(pagFile);
+  if (bytes->length() == 0) {
+    return false;
+  }
+  if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+    return false;
+  }
+  if (!WriteToFile(session->outputPath, reinterpret_cast<char*>(bytes->data()),
+                   static_cast<std::streamsize>(bytes->length()))) {
+    return false;
+  }
+
+  return true;
 }
 
 std::shared_ptr<pag::File> PAGExport::exportAsFile() {

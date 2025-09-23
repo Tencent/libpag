@@ -74,8 +74,8 @@ bool WindowManager::showSimpleError(const QString&) {
 }
 
 bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
-  auto installModel = std::make_unique<PAGViewerInstallModel>();
-  return installModel->showInstallDialog(pagFilePath);
+  PAGViewerInstallModel installModel;
+  return installModel.showInstallDialog(pagFilePath);
 }
 
 void WindowManager::initializeQtEnvironment() {

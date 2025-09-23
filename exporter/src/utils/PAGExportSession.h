@@ -48,6 +48,7 @@ class PAGExportSession {
   bool isVideoLayer(pag::ID id);
   AEGP_LayerH getLayerHByID(pag::ID id);
 
+  bool exportActually = true;
   bool videoHasAlpha = false;
   bool videoAlphaDetected = false;
   bool showAlertInfo = false;

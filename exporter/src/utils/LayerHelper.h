@@ -29,10 +29,6 @@ using LayerHandler = void (*)(const std::shared_ptr<exporter::PAGExportSession>&
 using LayerHandlerWithTime = void (*)(const std::shared_ptr<exporter::PAGExportSession>& session,
                                       pag::Layer* layer, pag::Frame startTime, void* ctx);
 
-float GetCubicLength(float startX, float startY, float startZ, float controlX1, float controlY1,
-                     float controlZ1, float controlX2, float controlY2, float controlZ2, float endX,
-                     float endY, float endZ, float precision = 0.005f);
-
 void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
                      pag::Composition* composition, pag::LayerType layerType, pag::Frame startTime,
                      LayerHandlerWithTime handler, void* ctx);
