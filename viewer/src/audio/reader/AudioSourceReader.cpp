@@ -36,6 +36,9 @@ std::shared_ptr<AudioSourceReader> AudioSourceReader::Make(
 AudioSourceReader::AudioSourceReader(const std::shared_ptr<AudioSource>& source, int trackID,
                                      const std::shared_ptr<AudioOutputConfig>& outputConfig)
     : trackID(trackID), source(source), outputConfig(outputConfig) {
+  if (source == nullptr) {
+    return;
+  }
   demuxer = source->getDemuxer();
   if (demuxer == nullptr) {
     return;
