@@ -115,7 +115,7 @@ AEGP_ItemH GetActiveCompositionItem() {
   return activeItemH;
 }
 
-void GetRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
+void GetRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
                     A_long& height, AEGP_RenderOptionsH& renderOptions) {
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   Suites->RenderOptionsSuite3()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
@@ -133,16 +133,17 @@ void GetRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& strid
   Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &rowBytesLength);
 
   if (width > 0 && height > 0 && rowBytesLength > 0) {
-    if (rgbaBytes == nullptr) {
+    if (*rgbaBytes == nullptr) {
       stride = 4 * width;
-      rgbaBytes = new uint8_t[stride * height + stride * 2];
+      *rgbaBytes = new uint8_t[stride * height + stride * 2];
     }
-    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, rgbaBytes, stride);
+    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, *rgbaBytes,
+                                stride);
   }
   Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
 }
 
-void GetLayerRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
+void GetLayerRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
                          A_long& width, A_long& height, AEGP_LayerRenderOptionsH& renderOptions) {
   Suites->LayerRenderOptionsSuite2()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   Suites->LayerRenderOptionsSuite2()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
@@ -160,11 +161,12 @@ void GetLayerRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& 
   Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &rowBytesLength);
 
   if (width > 0 && height > 0 && rowBytesLength > 0) {
-    if (rgbaBytes == nullptr) {
+    if (*rgbaBytes == nullptr) {
       stride = rowBytesLength;
-      rgbaBytes = new uint8_t[stride * height + stride * 2];
+      *rgbaBytes = new uint8_t[stride * height + stride * 2];
     }
-    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, rgbaBytes, stride);
+    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, *rgbaBytes,
+                                stride);
   }
   Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
 }

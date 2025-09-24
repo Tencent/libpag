@@ -42,10 +42,10 @@ QString GetProjectPath();
 
 AEGP_ItemH GetActiveCompositionItem();
 
-void GetRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
+void GetRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
                     A_long& height, AEGP_RenderOptionsH& renderOptions);
 
-void GetLayerRenderFrame(uint8*& rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
+void GetLayerRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
                          A_long& width, A_long& height, AEGP_LayerRenderOptionsH& renderOptions);
 
 std::vector<char> GetProjectFileBytes();

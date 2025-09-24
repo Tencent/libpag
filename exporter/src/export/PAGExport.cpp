@@ -82,15 +82,15 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 
 void PAGExport::addRootComposition() const {
   const auto& Suites = GetSuites();
-  auto* mainComposition = session->compositions[session->compositions.size() - 1];
+  auto mainComposition = session->compositions[session->compositions.size() - 1];
   AEGP_CompH compH = GetItemCompH(itemH);
 
   A_Time workAreaStart = {};
   A_Time workAreaDuration = {};
   Suites->CompSuite6()->AEGP_GetCompWorkAreaStart(compH, &workAreaStart);
   Suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compH, &workAreaDuration);
-  pag::Frame start = AETimeToTime(workAreaStart, session->frameRate);
-  pag::Frame end = start + AETimeToTime(workAreaDuration, session->frameRate);
+  pag::Frame start = AEDurationToFrame(workAreaStart, session->frameRate);
+  pag::Frame end = start + AEDurationToFrame(workAreaDuration, session->frameRate);
   auto duration = mainComposition->duration;
   if (start == 0) {
     if (duration > end) {

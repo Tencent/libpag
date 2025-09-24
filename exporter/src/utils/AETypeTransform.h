@@ -33,7 +33,7 @@ pag::TrackMatteType AETrackMatteToTrackMatteType(int value);
 
 pag::MaskMode AEMaskModeToMaskMode(int value);
 
-pag::Frame AETimeToTime(A_Time time, float frameRate);
+pag::Frame AEDurationToFrame(A_Time time, float frameRate);
 
 pag::ParagraphJustification AEJustificationToJustification(int value);
 

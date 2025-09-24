@@ -290,7 +290,7 @@ std::vector<pag::Marker*> ExportMarkers(const std::shared_ptr<PAGExportSession>&
     A_Time duration;
     suites->MarkerSuite2()->AEGP_GetMarkerDuration(markerP, &duration);
 
-    auto* marker = new pag::Marker();
+    auto marker = new pag::Marker();
     marker->comment = comment;
     marker->startTime = session->configParam.frameRate * keyTime.value / keyTime.scale;
     marker->duration = session->configParam.frameRate * duration.value / duration.scale;
@@ -595,7 +595,7 @@ void ExportTimeStretch(std::shared_ptr<pag::File>& file,
 
   A_Time durationTime = {};
   suites->ItemSuite6()->AEGP_GetItemDuration(itemH, &durationTime);
-  auto compositionDuration = AETimeToTime(durationTime, session->frameRate);
+  auto compositionDuration = AEDurationToFrame(durationTime, session->frameRate);
 
   auto optInfo = GetTimeStretchInfo(itemH);
   if (optInfo.has_value()) {
@@ -752,7 +752,7 @@ void ExportImageFillMode(std::shared_ptr<pag::File>& file, const AEGP_ItemH& ite
     return;
   }
 
-  std::unordered_map<pag::ID, pag::PAGScaleMode> imageFillModeMap = {};
+  std::unordered_map<pag::ID, pag::PAGScaleMode> imageFillModeMap(file->images.size());
   for (const auto& image : file->images) {
     imageFillModeMap.emplace(image->id, GetImageFillMode(itemH, image->id));
   }
@@ -901,8 +901,8 @@ std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH) {
 
       float frameRate = GetItemFrameRate(itemH);
 
-      TimeStretchInfo result = {*foundMode, AETimeToTime(time, frameRate),
-                                AETimeToTime(duration, frameRate)};
+      TimeStretchInfo result = {*foundMode, AEDurationToFrame(time, frameRate),
+                                AEDurationToFrame(duration, frameRate)};
 
       DeleteStream(markerStreamH);
       return result;

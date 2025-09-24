@@ -101,9 +101,9 @@ void GetImageDiffRect(ImageRect& rect, const uint8_t* preImage, const uint8_t* c
   int maxY = 0;
 
   for (int y = 0; y < height; y++) {
-    const auto* preData =
+    const auto preData =
         reinterpret_cast<const uint32_t*>(static_cast<const void*>(preImage + y * stride));
-    const auto* curData =
+    const auto curData =
         reinterpret_cast<const uint32_t*>(static_cast<const void*>(curImage + y * stride));
 
     for (int x = 0; x < width; x++) {
@@ -265,8 +265,8 @@ void OddPaddingRGBA(uint8_t* inData, int inDataStride, int width, int height) {
 
 bool ImageIsStatic(const uint8_t* pCur, const uint8_t* pRef, int width, int height, int stride) {
   for (int y = 0; y < height; y++) {
-    const auto* pCurU32 = static_cast<const uint32_t*>(static_cast<const void*>(pCur + y * stride));
-    const auto* pRefU32 = static_cast<const uint32_t*>(static_cast<const void*>(pRef + y * stride));
+    const auto pCurU32 = static_cast<const uint32_t*>(static_cast<const void*>(pCur + y * stride));
+    const auto pRefU32 = static_cast<const uint32_t*>(static_cast<const void*>(pRef + y * stride));
 
     for (int x = 0; x < width; x++) {
       if (pCurU32[x] != pRefU32[x]) {

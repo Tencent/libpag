@@ -110,7 +110,7 @@ pag::MaskMode AEMaskModeToMaskMode(int value) {
   }
 }
 
-pag::Frame AETimeToTime(A_Time time, float frameRate) {
+pag::Frame AEDurationToFrame(A_Time time, float frameRate) {
   return static_cast<pag::Frame>(round(time.value * frameRate / time.scale));
 }
 

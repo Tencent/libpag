@@ -42,7 +42,7 @@ class ProgressModel : public QObject {
   void setExportStatus(ExportStatus status);
   void setCurrentFrame(double currentFrame);
   void setTotalFrame(double totalFrame);
-  void addProgress(double value = 1.0);
+  void updateProgress(double value = 1.0);
   void addTotalFrame(double value);
 
   Q_SIGNAL void exportStatusChanged(int exportStatus);

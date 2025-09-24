@@ -35,7 +35,7 @@ static void ReadCommonConfig(XMLElement* commonElement, ConfigParam* configParam
   }
 
   if (XMLElement* tagLevelElement = commonElement->FirstChildElement("tag-level")) {
-    if (const auto* tagModeText = GetChildElementText(tagLevelElement, "mode")) {
+    if (const auto tagModeText = GetChildElementText(tagLevelElement, "mode")) {
       if (SafeStringEqual(tagModeText, "beta")) {
         configParam->tagMode = TagMode::Beta;
       } else if (SafeStringEqual(tagModeText, "custom")) {
@@ -45,32 +45,32 @@ static void ReadCommonConfig(XMLElement* commonElement, ConfigParam* configParam
       }
     }
 
-    if (const auto* customLevelText = GetChildElementText(tagLevelElement, "custom-level")) {
+    if (const auto customLevelText = GetChildElementText(tagLevelElement, "custom-level")) {
       configParam->exportTagLevel = SafeStringToInt<uint16_t>(customLevelText, 1023);
     }
   }
 
-  if (const auto* imageQualityText = GetChildElementText(commonElement, "image-quality")) {
+  if (const auto imageQualityText = GetChildElementText(commonElement, "image-quality")) {
     configParam->imageQuality = SafeStringToInt(imageQualityText, 80);
   }
 
-  if (const auto* imagePixelRatioText = GetChildElementText(commonElement, "image-pixel-ratio")) {
+  if (const auto imagePixelRatioText = GetChildElementText(commonElement, "image-pixel-ratio")) {
     configParam->imagePixelRatio = SafeStringToFloat(imagePixelRatioText, 2.0f);
   }
 
-  if (const auto* enableLayerNameText = GetChildElementText(commonElement, "enable-layer-name")) {
+  if (const auto enableLayerNameText = GetChildElementText(commonElement, "enable-layer-name")) {
     configParam->exportLayerName = SafeStringToInt(enableLayerNameText, 1) != 0;
   }
 
-  if (const auto* enableFontFileText = GetChildElementText(commonElement, "enable-font-file")) {
+  if (const auto enableFontFileText = GetChildElementText(commonElement, "enable-font-file")) {
     configParam->exportFontFile = SafeStringToInt(enableFontFileText, 0) != 0;
   }
 
-  if (const auto* exportScenseText = GetChildElementText(commonElement, "export-scense")) {
+  if (const auto exportScenseText = GetChildElementText(commonElement, "export-scense")) {
     configParam->scenes = static_cast<ExportScenes>(SafeStringToInt(exportScenseText, 0));
   }
 
-  if (const auto* exportLanguageText = GetChildElementText(commonElement, "export-language")) {
+  if (const auto exportLanguageText = GetChildElementText(commonElement, "export-language")) {
     configParam->language = static_cast<Language>(SafeStringToInt(exportLanguageText, 0));
   }
 }
@@ -80,20 +80,20 @@ static void ReadBitmapConfig(XMLElement* bitmapElement, ConfigParam* configParam
     return;
   }
 
-  if (const auto* sequenceTypeText = GetChildElementText(bitmapElement, "sequence-type")) {
+  if (const auto sequenceTypeText = GetChildElementText(bitmapElement, "sequence-type")) {
     configParam->sequenceType =
         static_cast<pag::CompositionType>(SafeStringToInt(sequenceTypeText, 1));
   }
 
-  if (const auto* sequenceQualityText = GetChildElementText(bitmapElement, "sequence-quality")) {
+  if (const auto sequenceQualityText = GetChildElementText(bitmapElement, "sequence-quality")) {
     configParam->sequenceQuality = SafeStringToInt(sequenceQualityText, 80);
   }
 
-  if (const auto* keyframeIntervalText = GetChildElementText(bitmapElement, "keyframe-interval")) {
+  if (const auto keyframeIntervalText = GetChildElementText(bitmapElement, "keyframe-interval")) {
     configParam->bitmapKeyFrameInterval = SafeStringToInt(keyframeIntervalText, 60);
   }
 
-  if (const auto* maxResolutionText = GetChildElementText(bitmapElement, "max-resolution")) {
+  if (const auto maxResolutionText = GetChildElementText(bitmapElement, "max-resolution")) {
     configParam->bitmapMaxResolution = SafeStringToInt(maxResolutionText, 720);
   }
 

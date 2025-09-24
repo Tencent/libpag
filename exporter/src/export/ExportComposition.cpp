@@ -104,14 +104,14 @@ void ExportComposition(const std::shared_ptr<PAGExportSession>& session, const A
 
 void ExportVideoComposition(const std::shared_ptr<PAGExportSession>& session,
                             const AEGP_CompH& compH) {
-  auto* composition = new pag::VideoComposition();
+  auto composition = new pag::VideoComposition();
   GetCompositionAttributes(session, compH, composition);
   session->compositions.push_back(composition);
 }
 
 void ExportBitmapComposition(const std::shared_ptr<PAGExportSession>& session,
                              const AEGP_CompH& compH) {
-  auto* composition = new pag::BitmapComposition();
+  auto composition = new pag::BitmapComposition();
   GetCompositionAttributes(session, compH, composition);
   session->compositions.push_back(composition);
 }

@@ -66,7 +66,7 @@ void ProgressModel::setTotalFrame(double totalFrame) {
   }
 }
 
-void ProgressModel::addProgress(double value) {
+void ProgressModel::updateProgress(double value) {
   currentFrame += value;
   if (currentFrame >= totalFrame) {
     currentFrame = totalFrame;
