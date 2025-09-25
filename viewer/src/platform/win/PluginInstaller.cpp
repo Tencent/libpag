@@ -68,7 +68,7 @@ QStringList PluginInstaller::getAeInstallPaths() {
   for (const QString& regPath : registryPaths) {
     QSettings registry(regPath, QSettings::NativeFormat);
     const QStringList adobeKeys = registry.childGroups();
-    
+
     for (const QString& key : adobeKeys) {
       if (key.contains("After Effects", Qt::CaseInsensitive)) {
         QSettings aeRegistry(regPath + "\\" + key, QSettings::NativeFormat);
@@ -83,12 +83,12 @@ QStringList PluginInstaller::getAeInstallPaths() {
     }
   }
 
-  QSettings ccRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", 
+  QSettings ccRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
                       QSettings::NativeFormat);
   const QStringList uninstallKeys = ccRegistry.childGroups();
-  
+
   for (const QString& key : uninstallKeys) {
-    QSettings appRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key, 
+    QSettings appRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key,
                          QSettings::NativeFormat);
     QString displayName = appRegistry.value("DisplayName").toString();
     if (displayName.contains("Adobe After Effects", Qt::CaseInsensitive)) {

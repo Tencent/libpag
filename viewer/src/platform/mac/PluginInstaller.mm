@@ -42,11 +42,33 @@
 namespace pag {
 
 bool PluginInstaller::checkAeRunning() {
-  QProcess process;
-  process.start("pgrep", QStringList() << "-f"
-                                       << "Adobe After Effects");
-  process.waitForFinished(3000);
-  return process.exitCode() == 0 && !process.readAllStandardOutput().isEmpty();
+  qDebug() << "PluginInstaller: Checking if Adobe After Effects is running...";
+
+  NSArray<NSRunningApplication*>* runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
+
+  if (!runningApps) {
+    qWarning() << "PluginInstaller: Failed to get running applications list";
+    return false;
+  }
+
+  NSUInteger appCount = [runningApps count];
+  qDebug() << "PluginInstaller: Scanning" << appCount << "running applications";
+
+  for (NSRunningApplication* app in runningApps) {
+    NSString* bundleIdentifier = [app bundleIdentifier];
+
+    if (bundleIdentifier) {
+      QString bundleId = QString::fromNSString(bundleIdentifier);
+
+      if (bundleId == "com.adobe.AfterEffects" || bundleId.startsWith("com.adobe.AfterEffects")) {
+        qDebug() << "PluginInstaller: Adobe After Effects is running (Bundle ID:" << bundleId << ")";
+        return true;
+      }
+    }
+  }
+
+  qDebug() << "PluginInstaller: Adobe After Effects is not running";
+  return false;
 }
 
 bool PluginInstaller::requestConfirmation(const QString& title, const QString& message) {
@@ -103,15 +125,12 @@ QStringList PluginInstaller::getAeInstallPaths() {
 
 QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
   QString resourcesPath;
-
-  // Use bundle to get resources path
   NSBundle* bundle = [NSBundle mainBundle];
   NSString* bundleResourcesPath = [bundle resourcePath];
   if (bundleResourcesPath) {
     resourcesPath = QString::fromNSString(bundleResourcesPath);
     qDebug() << "PluginInstaller: Bundle resources path:" << resourcesPath;
   } else {
-    // Fallback to relative path if bundle method fails
     resourcesPath = QDir(QCoreApplication::applicationDirPath()).filePath("../Resources");
     qDebug() << "PluginInstaller: Using fallback path:" << resourcesPath;
   }
@@ -132,22 +151,6 @@ QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
 }
 
 QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
-  // 测试模式开关 - 取消下面这行的注释来启用测试目录
-//#define PAG_PLUGIN_TEST_MODE
-
-#ifdef PAG_PLUGIN_TEST_MODE
-  // 硬编码的测试目录 - 请修改为你实际的测试路径
-  static const QString kTestBasePath = "/Users/codywwang/Desktop/pag_plugin_test";
-
-  if (pluginName == "com.tencent.pagconfig") {
-    return kTestBasePath + "/Adobe/CEP/extensions/" + pluginName;
-  } else if (pluginName == "H264EncoderTools") {
-    return kTestBasePath + "/H264EncoderTools/" + pluginName;
-  } else {
-    return kTestBasePath + "/Adobe/MediaCore/" + pluginName + ".plugin";
-  }
-#else
-  // 原有的系统目录逻辑
   if (pluginName == "com.tencent.pagconfig") {
     return "/Library/Application Support/Adobe/CEP/extensions/" + pluginName;
   } else if (pluginName == "H264EncoderTools") {
@@ -157,7 +160,6 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
     return "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/" + pluginName +
            ".plugin";
   }
-#endif
 }
 
 QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
