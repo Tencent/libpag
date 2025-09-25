@@ -63,25 +63,41 @@ void PluginInstaller::showMessage(const QString& title, const QString& message, 
   msgBox.exec();
 }
 
+QStringList detectSpecialVersion(){
+  QStringList specialPaths;
+
+  QString latestPath = "/Applications/Adobe After Effects/Adobe After Effects.app";
+  if(QDir(latestPath).exists()){
+    specialPaths << latestPath;
+  }
+
+  QString betaPath = "/Applications/Adobe After Effects (Beta)/Adobe After Effects (Beta).app";
+  if(QDir(betaPath).exists()){
+    specialPaths << betaPath;
+  }
+
+  return specialPaths;
+}
+
 QStringList PluginInstaller::getAeInstallPaths() {
   QStringList paths;
+  int currentYear = QDate::currentDate().year();
+  int startYear = qMax(minSupportedYear, currentYear - 10);
+  int endYear = qMin(maxSupportedYear, currentYear + 2);
 
-  // Check common AE installation paths on macOS
-  for (int year = 2017; year <= 2030; ++year) {
-    QString aePath =
-        QString("/Applications/Adobe After Effects %1/Adobe After Effects %1.app").arg(year);
-    if (QDir(aePath).exists()) {
+  for(int year = startYear; year <= endYear; ++year) {
+    QString aePath = QString("/Applications/Adobe After Effects %1/Adobe After Effects %1.app").arg(year);
+    if(QDir(aePath).exists()){
       paths << aePath;
     }
 
-    // Also check CC versions
-    QString ccPath =
-        QString("/Applications/Adobe After Effects CC %1/Adobe After Effects CC %1.app").arg(year);
-    if (QDir(ccPath).exists()) {
+    QString ccPath = QString("/Applications/Adobe After Effects CC %1/Adobe After Effects CC %1.app").arg(year);
+    if(QDir(ccPath).exists()){
       paths << ccPath;
     }
   }
 
+  paths << detectSpecialVersion();
   return paths;
 }
 
@@ -378,6 +394,16 @@ void PluginInstaller::DeleteQtResource(char cmd[], int cmdSize) const {
         snprintf(cmd + strlen(cmd), cmdSize - strlen(cmd), "sh '%s'\n", [deleteShellPath UTF8String]);
       }
 }
+
+ void PluginInstaller::setYearRange(int minYear, int maxYear) {
+      if (minYear > maxYear) {
+          qWarning() << "Invalid year range:" << minYear << "-" << maxYear;
+          return;
+      }
+
+      minSupportedYear = qMax(2010, minYear);
+      maxSupportedYear = qMin(2050, maxYear);
+  }
 
 
 }  // namespace pag

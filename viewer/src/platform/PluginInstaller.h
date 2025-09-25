@@ -30,6 +30,10 @@ class PluginInstaller : public QObject {
   Q_OBJECT
 
  public:
+
+  static constexpr int DefaultMinYear = 2017;
+  static constexpr int DefaultMaxYear = 2030;
+
   explicit PluginInstaller(QObject* parent = nullptr);
   ~PluginInstaller() override;
 
@@ -39,6 +43,8 @@ class PluginInstaller : public QObject {
 
   QString getInstalledVersion() const;
   bool isPluginInstalled() const;
+
+  void setYearRange(int minYear, int maxYear);
 
  Q_SIGNALS:
   void updateChecked(bool hasUpdate);
@@ -74,6 +80,9 @@ class PluginInstaller : public QObject {
     bool operator>(const Version& other) const;
     QString toString() const;
   };
+
+  int minSupportedYear = DefaultMinYear;
+  int maxSupportedYear = DefaultMaxYear;
 };
 
 }  // namespace pag
