@@ -10,12 +10,18 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
+if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_OSX_ARCHITECTURES MATCHES "aarch64")
+    set(ARCH arm64)
+elseif (CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" OR CMAKE_OSX_ARCHITECTURES MATCHES "amd64")
+    set(ARCH x64)
+endif ()
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
 endif ()
 
 if (MSVC)
-    add_compile_options("/utf-8" /GR- /bigobj)
+    add_compile_options("/utf-8" /GR /bigobj)
 endif (MSVC)
 
 # Sets flags
@@ -51,7 +57,11 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Q
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
         Qt${QT_VERSION_MAJOR}::QuickControls2)
-qt_add_resources(QT_RESOURCES res.qrc)
+find_program(LUPDATE_EXECUTABLE lupdate REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease REQUIRED)
+execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
+execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
+qt_add_resources(QT_RESOURCES assets/res.qrc)
 
 message(STATUS "Generate Version File")
 if (DEFINED ENV{MajorVersion})
@@ -75,8 +85,8 @@ else ()
     set(UpdateChannel "beta")
 endif ()
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
-        ${CMAKE_SOURCE_DIR}/src/version.h
-        @ONLY
+    ${CMAKE_SOURCE_DIR}/src/version.h
+    @ONLY
 )
 
 message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
@@ -115,14 +125,36 @@ set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_FRAMEWORK OFF)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
+list(APPEND PAG_OPTIONS "-DPAG_USE_QT=${PAG_USE_QT}")
+list(APPEND PAG_OPTIONS "-DPAG_USE_RTTR=${PAG_USE_RTTR}")
+list(APPEND PAG_OPTIONS "-DPAG_USE_LIBAVC=${PAG_USE_LIBAVC}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
+list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    list(APPEND PAG_OPTIONS "-d")
+    string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
+endif ()
+set(PAG_OUTPUT_DIR ${CMAKE_BINARY_DIR}/libpag)
+set(PAG_OUTPUT_LIB ${PAG_OUTPUT_DIR}/${ARCH}/libpag${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(PAG_OUTPUT_MD5 ${PAG_OUTPUT_DIR}/.pag.${ARCH}.md5)
+add_custom_target(pag
+        COMMAND node ${CMAKE_SOURCE_DIR}/../build_pag ${PAG_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${PAG_OUTPUT_DIR}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        BYPRODUCTS ${PAG_OUTPUT_LIB} ${PAG_OUTPUT_MD5}
+        VERBATIM USES_TERMINAL)
+list(APPEND PAG_VIEWER_PLATFORM_LIBS ${PAG_OUTPUT_LIB})
+list(APPEND PAG_DEPEND_TARGETS pag)
 
-set(RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGRttr.hpp")
 execute_process(COMMAND bash -c "${CMAKE_CURRENT_SOURCE_DIR}/sync_deps.sh")
-execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX}")
+    set(RTTR_OUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/editing/rttr/PAGRttr.hpp")
+    execute_process(COMMAND bash -c "chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} && ${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE_SUFFIX} -s ${CMAKE_CURRENT_SOURCE_DIR}/../include/pag -o ${RTTR_OUT_PATH} -m PAG_API -i ${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
+endif()
 
 # collects pag include directories.
 set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
+set(PAG_VIEWER_SYSTEM_INCLUDES ./src/editing/rttr)
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
 list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
 list(APPEND PAG_VIEWER_INCLUDES src/platform)
@@ -134,19 +166,22 @@ endif ()
 list(APPEND PAG_VIEWER_SOURCE_FILES ${PLATFORM_SOURCE_FILES})
 
 add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
+if (PAG_DEPEND_TARGETS)
+    add_dependencies(PAGViewer ${PAG_DEPEND_TARGETS})
+endif ()
 if (APPLE)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/mac/include)
+    list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/mac/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
 elseif (WIN32)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/out/rttr/debug/win/include)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/debug/win/include)
-    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/debug/win/include)
+    list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/win/include)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/win/include)
+    list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
 endif ()
 
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
-target_include_directories(PAGViewer SYSTEM PRIVATE ./src/editing/rttr)
-target_link_libraries(PAGViewer pag ${PAG_VIEWER_PLATFORM_LIBS} ${VIEWER_VENDOR_LIBRARIES})
+target_include_directories(PAGViewer SYSTEM PRIVATE ${PAG_VIEWER_SYSTEM_INCLUDES})
+target_link_libraries(PAGViewer ${PAG_VIEWER_PLATFORM_LIBS} ${VIEWER_VENDOR_LIBRARIES})

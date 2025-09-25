@@ -49,10 +49,10 @@ class MotionBlurFilter : public RuntimeFilter {
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Layer* layer,
                                             Frame layerFrame, const tgfx::Rect& contentBounds,
                                             tgfx::Point* offset);
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   MotionBlurFilter(const std::array<float, 9>& preMatrix, const std::array<float, 9>& curMatrix)
-      : RuntimeFilter(Type()), _previousMatrix(preMatrix), _currentMatrix(curMatrix) {
+      : _previousMatrix(preMatrix), _currentMatrix(curMatrix) {
   }
   ~MotionBlurFilter() override = default;
 

@@ -73,10 +73,11 @@ bool StrokeFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
   if (filter == nullptr) {
     return false;
   }
+  tgfx::Point offset;
+  image = image->makeWithFilter(filter, &offset);
   tgfx::Paint paint;
-  paint.setImageFilter(filter);
   paint.setAlpha(alpha);
-  canvas->drawImage(image, &paint);
+  canvas->drawImage(image, offset.x, offset.y, &paint);
   return true;
 }
 }  // namespace pag

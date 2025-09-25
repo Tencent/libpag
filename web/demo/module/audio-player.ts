@@ -9,7 +9,7 @@ export class AudioPlayer {
       this.audioEl.style.display = 'none';
       this.audioEl.controls = true;
       this.audioEl.preload = 'auto';
-      const blob = new Blob([audioBytes], { type: 'audio/mp3' });
+      const blob = new Blob([audioBytes.slice()], { type: 'audio/mp3' });
       this.audioEl.src = URL.createObjectURL(blob);
       this.isDestroyed = false;
     } else {

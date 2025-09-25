@@ -25,13 +25,13 @@
 namespace pag {
 class CornerPinFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE;
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID;
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, const tgfx::Point& sourceScale,
                                             tgfx::Point* offset);
 
-  explicit CornerPinFilter(const Point cornerPoints[4]) : RuntimeFilter(Type()) {
+  explicit CornerPinFilter(const Point cornerPoints[4]) {
     for (int i = 0; i < 4; i++) {
       this->cornerPoints[i] = ToTGFX(cornerPoints[i]);
     }

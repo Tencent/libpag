@@ -164,7 +164,7 @@ Item {
                         width: 11
                         height: 10
                         visible: {
-                            if (name === "Graphics" && value > 50 && ext === "MB"){
+                            if (name === "Graphics" && value > 50 && ext === "MB") {
                                 return true;
                             }
                             return name === "Videos" && value > 2;
@@ -220,7 +220,7 @@ Item {
                     property var chartDataModel: runTimeDataModel.chartDataModel
 
                     property var warnColor: [224 / 255.0, 15 / 255.0, 66 / 255.0]
-                    property var renderColor: [0 / 255.0, 150 / 255.0, 216 /255.0]
+                    property var renderColor: [0 / 255.0, 150 / 255.0, 216 / 255.0]
                     property var imageColor: [116 / 255.0, 173 / 255.0, 89 / 255.0]
                     property var presentColor: [221 / 255.0, 178 / 255.0, 89 / 255.0]
                     property int rectWidth: 3
@@ -275,7 +275,7 @@ Item {
                             warnMessage = warnMessage.arg(benchmarkTime);
 
                             if (renderTime > benchmarkTime) {
-                                if (mouseX < (element.width  - performanceWarnDialog.width)) {
+                                if (mouseX < (element.width - performanceWarnDialog.width)) {
                                     performanceWarnDialog.x = mouseX;
                                     performanceWarnDialog.y = mouseY - performanceWarnDialog.height / 2 + 20;
                                     performanceWarnDialog.setToLeft();
@@ -330,17 +330,32 @@ Item {
 
                             let maxTime = Number(chartDataModel.maxTime);
                             let rectHeight = getRectHeight(presentTime, maxTime, graphCanvas.height);
-                            let rect = {x: posX, y: graphCanvas.height - posY - rectHeight, width: rectWidth, height: rectHeight};
+                            let rect = {
+                                x: posX,
+                                y: graphCanvas.height - posY - rectHeight,
+                                width: rectWidth,
+                                height: rectHeight
+                            };
                             drawRect(context, rect, presentColor_);
                             posY += (spaceY + rectHeight);
 
                             rectHeight = getRectHeight(imageDecodeTime, maxTime, graphCanvas.height);
-                            rect = {x: posX, y: graphCanvas.height - posY - rectHeight, width: rectWidth, height: rectHeight};
+                            rect = {
+                                x: posX,
+                                y: graphCanvas.height - posY - rectHeight,
+                                width: rectWidth,
+                                height: rectHeight
+                            };
                             drawRect(context, rect, imageColor_);
                             posY += (spaceY + rectHeight);
 
                             rectHeight = getRectHeight(renderTime, maxTime, graphCanvas.height);
-                            rect = {x: posX, y: graphCanvas.height - posY - rectHeight, width: rectWidth, height: rectHeight};
+                            rect = {
+                                x: posX,
+                                y: graphCanvas.height - posY - rectHeight,
+                                width: rectWidth,
+                                height: rectHeight
+                            };
                             drawRect(context, rect, renderColor_);
                             posY = 0;
 

@@ -8,16 +8,16 @@ process.argv.push("-o");
 process.argv.push("../src");
 process.argv.push("-p");
 process.argv.push("web");
-process.argv.push("-a");
-process.argv.push("wasm");
 process.argv.push("pag");
 require("../../build_pag");
 
-if (!fs.existsSync("../lib")) {
-    fs.mkdirSync("../lib", {recursive: true});
-}
-if (!fs.existsSync("../wechat/lib")) {
-    fs.mkdirSync("../wechat/lib", {recursive: true});
-}
-fs.copyFileSync("../src/wasm/libpag.wasm", "../lib/libpag.wasm")
+const getArgValue = (argName, defaultValue = "wasm") => process.argv.includes(argName) ? process.argv[process.argv.indexOf(argName) + 1] : defaultValue;
 
+const arch=getArgValue("-a");
+const libPath = (arch==="wasm-mt" ? "../lib-mt" : "../lib");
+
+if (!fs.existsSync(`${libPath}`)) {
+    fs.mkdirSync(`${libPath}`, {recursive: true});
+}
+
+fs.copyFileSync(`../src/${arch}/libpag.wasm`, `${libPath}/libpag.wasm`);

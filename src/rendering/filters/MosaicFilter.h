@@ -39,13 +39,13 @@ class MosaicUniforms : public Uniforms {
 
 class MosaicFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, tgfx::Point* offset);
 
   MosaicFilter(float horizontalBlocks, float verticalBlocks, bool sharpColors)
-      : RuntimeFilter(Type()), horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
+      : horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
         sharpColors(sharpColors) {
   }
 

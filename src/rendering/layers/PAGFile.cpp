@@ -177,6 +177,10 @@ PAGTimeStretchMode PAGFile::timeStretchMode() const {
   return _timeStretchMode;
 }
 
+PAGTimeStretchMode PAGFile::timeStretchModeInternal() const {
+  return _timeStretchMode;
+}
+
 void PAGFile::setTimeStretchMode(PAGTimeStretchMode value) {
   LockGuard autoLock(rootLocker);
   _timeStretchMode = value;

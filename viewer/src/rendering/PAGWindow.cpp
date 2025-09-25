@@ -18,6 +18,7 @@
 
 #include "PAGWindow.h"
 #include <QQmlContext>
+#include <QSettings>
 #include "PAGRenderThread.h"
 #include "PAGViewer.h"
 #include "PAGWindowHelper.h"
@@ -46,6 +47,7 @@ void PAGWindow::onPAGViewerDestroyed() {
 }
 
 void PAGWindow::open() {
+  translator = std::make_unique<QTranslator>();
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
   treeViewModel = std::make_unique<PAGTreeViewModel>();
@@ -54,6 +56,11 @@ void PAGWindow::open() {
   textLayerModel = std::make_unique<PAGTextLayerModel>();
   imageLayerModel = std::make_unique<PAGImageLayerModel>();
   benchmarkModel = std::make_unique<PAGBenchmarkModel>();
+
+  bool result = translator->load(":translation/Chinese.qm");
+  if (result && !isUseEnglish() && qApp != nullptr) {
+    qApp->installTranslator(translator.get());
+  }
 
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
@@ -99,6 +106,15 @@ void PAGWindow::open() {
           &PAGImageLayerModel::setPAGFile);
   connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
           &PAGRunTimeDataModel::updateData);
+}
+
+bool PAGWindow::isUseEnglish() {
+  QSettings settings;
+  auto value = settings.value("isUseEnglish");
+  if (!value.isNull()) {
+    return value.toBool();
+  }
+  return true;
 }
 
 QString PAGWindow::getFilePath() {

@@ -1,6 +1,6 @@
 # libpag-lite
 
-[官网](https://pag.io) | [English](../README.md) | [Web 版本](../README.zh_CN.md) | Web lite版本 | [小程序版本](../wechat) | [小程序lite版本](./wechat)
+[官网](https://pag.io) | [English](../README.md) | [Web 版本](../README.zh_CN.md) | Web lite版本 | [小程序版本](../wechat/README.md) | [小程序lite版本](./wechat/README.md)
 
 ## 介绍
 

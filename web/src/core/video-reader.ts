@@ -94,7 +94,8 @@ export class VideoReader {
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
       });
-      const blob = new Blob([source as Uint8Array], { type: 'video/mp4' });
+      const buffer = (source as Uint8Array).slice();
+      const blob = new Blob([buffer], { type: 'video/mp4' });
       this.videoEl.src = URL.createObjectURL(blob);
       if (IPHONE) {
         // use load() will make a bug on Chrome.

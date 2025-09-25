@@ -83,7 +83,7 @@ int64_t HardwareDecoder::presentationTime() {
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   float playbackRate = 1;
-  if (rootFile != nullptr && rootFile->timeStretchMode() == PAGTimeStretchMode::Scale) {
+  if (rootFile != nullptr && rootFile->timeStretchModeInternal() == PAGTimeStretchMode::Scale) {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);

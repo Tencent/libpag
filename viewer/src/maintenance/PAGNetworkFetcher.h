@@ -39,7 +39,7 @@ class PAGUpdateVersionFetcher : public PAGNetworkFetcher {
   Q_OBJECT
  public:
   explicit PAGUpdateVersionFetcher(const QString& url, QObject* parent = nullptr);
-  Q_SIGNAL void versionFound(const QString& url, const QString& version);
+  Q_SIGNAL void versionFound(QString url, QString version);
 
  private:
   void parseAppcast(const QByteArray& data);

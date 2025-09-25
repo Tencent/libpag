@@ -49,7 +49,7 @@ class MotionTileUniforms : public Uniforms {
 
 class MotionTileFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE;
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID;
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, const tgfx::Rect& contentBounds,
@@ -58,7 +58,7 @@ class MotionTileFilter : public RuntimeFilter {
   explicit MotionTileFilter(Point tileCenter, float tileWidth, float tileHeight, float outputWidth,
                             float outputHeight, bool mirrorEdges, float phase,
                             bool horizontalPhaseShift)
-      : RuntimeFilter(Type()), tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
+      : tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
         outputWidth(outputWidth), outputHeight(outputHeight), mirrorEdges(mirrorEdges),
         phase(phase), horizontalPhaseShift(horizontalPhaseShift) {
   }

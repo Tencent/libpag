@@ -63,13 +63,12 @@ struct LevelsIndividualFilterParam {
 
 class LevelsIndividualFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, tgfx::Point* offset);
 
-  explicit LevelsIndividualFilter(const LevelsIndividualFilterParam& param)
-      : RuntimeFilter(Type()), param(param) {
+  explicit LevelsIndividualFilter(const LevelsIndividualFilterParam& param) : param(param) {
   }
 
  protected:

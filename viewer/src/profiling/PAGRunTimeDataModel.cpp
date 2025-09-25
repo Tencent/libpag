@@ -104,6 +104,9 @@ void PAGRunTimeDataModel::updateChartData() {
   if (totalFrame == 0) {
     return;
   }
+  if (chartDataSize == 0) {
+    return;
+  }
   double ratio = static_cast<double>(chartDataSize) / totalFrame;
   auto startChartDataIndex = static_cast<int64_t>((currentFrame + 1) * ratio);
   auto startIndex =

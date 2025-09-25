@@ -48,7 +48,7 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterSca
     blurrinessX = 0;
     blurrinessY *= filterScale.y;
   }
-  if (auto blur = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY)) {
+  if (auto blur = tgfx::ImageFilter::Blur(blurrinessX / 2, blurrinessY / 2)) {
     *contentBounds = ToPAG(blur->filterBounds(*ToTGFX(contentBounds)));
   }
 }
