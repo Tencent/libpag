@@ -47,6 +47,8 @@ bool PluginInstaller::checkAeRunning() {
   if (!runningApps) {
     return false;
   }
+
+  NSUInteger appCount = [runningApps count];
   for (NSRunningApplication* app in runningApps) {
     NSString* bundleIdentifier = [app bundleIdentifier];
 
@@ -196,6 +198,9 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   args << "-e" << appleScriptCommand;
 
   process.start("osascript", args);
+  bool finished = process.waitForFinished(300000);
+
+
   if (process.exitCode() != 0) {
     QString error = process.readAllStandardError();
 
@@ -214,6 +219,9 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
     args << "-e" << fallbackAppleScript;
 
     process.start("osascript", args);
+    bool fallbackFinished = process.waitForFinished(300000);
+
+
     if (process.exitCode() != 0) {
       error = process.readAllStandardError();
       return false;
