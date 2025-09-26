@@ -682,13 +682,17 @@ PAGScaleMode PAGImageLayer::getDefaultScaleMode() {
   if (imageLayer && imageLayer->imageFillRule) {
     return imageLayer->imageFillRule->scaleMode;
   }
-  if (file && file->editableImages != nullptr && file->imageScaleModes != nullptr) {
-    auto iter =
-        std::find(file->editableImages->begin(), file->editableImages->end(), editableIndex());
-    auto distance = std::distance(file->editableImages->begin(), iter);
-    if (iter != file->editableImages->end() &&
-        static_cast<size_t>(distance) < file->imageScaleModes->size()) {
-      return file->imageScaleModes->at(distance);
+  if (file != nullptr && file->imageScaleModes != nullptr) {
+    if (file->editableImages != nullptr) {
+      auto iter =
+          std::find(file->editableImages->begin(), file->editableImages->end(), editableIndex());
+      auto distance = std::distance(file->editableImages->begin(), iter);
+      if (iter != file->editableImages->end() &&
+          static_cast<size_t>(distance) < file->imageScaleModes->size()) {
+        return file->imageScaleModes->at(distance);
+      }
+    } else if (file->imageScaleModes->size() > static_cast<size_t>(editableIndex())) {
+      return file->imageScaleModes->at(editableIndex());
     }
   }
 
