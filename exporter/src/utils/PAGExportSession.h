@@ -33,14 +33,7 @@ namespace exporter {
 
 class PAGExportSession {
  public:
-  static void RecordWarning(AlertInfoType type, const std::string& addInfo = "");
-  static pag::GradientColorHandle GetGradientColors(const std::vector<std::string>& matchNames,
-                                                    int index);
-  static PAGExportSession* CurrentSession;
-
   PAGExportSession(const AEGP_ItemH& activeItemH, const std::string& outputPath);
-  void setCurrent();
-  void unsetCurrent();
   void checkParamValid();
   void pushWarning(AlertInfoType type, const std::string& addInfo = "");
   pag::GradientColorHandle GetGradientColorsFromFileBytes(

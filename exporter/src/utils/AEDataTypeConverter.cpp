@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AETypeTransform.h"
+#include "AEDataTypeConverter.h"
 #include <AE_EffectCB.h>
 #include <src/base/utils/Log.h>
 #include <tinyxml2.h>
@@ -622,7 +622,7 @@ pag::GradientColorHandle GetDefaultGradientColors() {
   return gradientColor;
 }
 
-static std::vector<std::vector<float>> extractFloatArraysByKey(const std::string& xmlContent,
+static std::vector<std::vector<float>> ExtractFloatArraysByKey(const std::string& xmlContent,
                                                                const std::string& keyName) {
   using namespace tinyxml2;
 
@@ -676,7 +676,7 @@ static std::vector<std::vector<float>> extractFloatArraysByKey(const std::string
 static std::vector<pag::AlphaStop> ParseAlphaStops(const std::string& xml) {
   std::vector<pag::AlphaStop> list = {};
 
-  auto alphaStopList = extractFloatArraysByKey(xml, "Stops Alpha");
+  auto alphaStopList = ExtractFloatArraysByKey(xml, "Stops Alpha");
   for (const auto& alphaStop : alphaStopList) {
     if (alphaStop.size() < 3) {
       return {};
@@ -692,7 +692,7 @@ static std::vector<pag::AlphaStop> ParseAlphaStops(const std::string& xml) {
 
 static std::vector<pag::ColorStop> ParseColorStops(const std::string& xml) {
   std::vector<pag::ColorStop> list = {};
-  auto colorStopList = extractFloatArraysByKey(xml, "Stops Color");
+  auto colorStopList = ExtractFloatArraysByKey(xml, "Stops Color");
   for (const auto& colorStop : colorStopList) {
     if (colorStop.size() < 6) {
       return {};

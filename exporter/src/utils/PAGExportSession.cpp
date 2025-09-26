@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGExportSession.h"
+#include "AEDataTypeConverter.h"
 #include "AEHelper.h"
 #include "AEPReader.h"
-#include "AETypeTransform.h"
 #include "ByteArray.h"
 #include "StringHelper.h"
 #include "config/ConfigFile.h"
@@ -27,35 +27,9 @@
 
 namespace exporter {
 
-PAGExportSession* PAGExportSession::CurrentSession = nullptr;
-
-void PAGExportSession::RecordWarning(AlertInfoType type, const std::string& addInfo) {
-  if (CurrentSession) {
-    CurrentSession->pushWarning(type, addInfo);
-  }
-}
-
-pag::GradientColorHandle PAGExportSession::GetGradientColors(
-    const std::vector<std::string>& matchNames, int index) {
-  if (CurrentSession == nullptr) {
-    return GetDefaultGradientColors();
-  }
-  return CurrentSession->GetGradientColorsFromFileBytes(matchNames, index);
-}
-
 PAGExportSession::PAGExportSession(const AEGP_ItemH& activeItemH, const std::string& outputPath)
     : itemH(activeItemH), outputPath(outputPath) {
   checkParamValid();
-}
-
-void PAGExportSession::setCurrent() {
-  CurrentSession = this;
-}
-
-void PAGExportSession::unsetCurrent() {
-  if (CurrentSession == this) {
-    CurrentSession = nullptr;
-  }
 }
 
 void PAGExportSession::checkParamValid() {

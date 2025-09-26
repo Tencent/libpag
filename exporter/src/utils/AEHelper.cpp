@@ -21,7 +21,7 @@
 #include <QFileInfo>
 #include <fstream>
 #include <iostream>
-#include "AETypeTransform.h"
+#include "AEDataTypeConverter.h"
 #include "ImageData.h"
 #include "StringHelper.h"
 #include "TempFileDelete.h"
@@ -529,7 +529,7 @@ QImage GetCompositionFrameImage(const AEGP_ItemH& itemH, pag::Frame frame) {
   A_u_long rowBytesLength = 0;
   A_long width = 0;
   A_long height = 0;
-  GetRenderFrame(rgbaBytes, rowBytesLength, stride, width, height, renderOptions);
+  GetRenderFrame(&rgbaBytes, rowBytesLength, stride, width, height, renderOptions);
   if (width > 0 && height > 0 && rgbaBytes != nullptr) {
     QImage image(rgbaBytes, width, height, stride, QImage::Format_RGBA8888);
     QImage saveImage = image.copy();
@@ -602,7 +602,7 @@ bool IsStaticComposition(const AEGP_CompH& compH) {
     A_long width = 0;
     A_long height = 0;
     A_u_long rowBytesLength = 0;
-    GetRenderFrame(curData, rowBytesLength, stride, width, height, renderOptions);
+    GetRenderFrame(&curData, rowBytesLength, stride, width, height, renderOptions);
     if (curData != nullptr && preData != nullptr) {
       if (!exporter::ImageIsStatic(curData, preData, width, height, stride)) {
         isStatic = false;
@@ -612,8 +612,12 @@ bool IsStaticComposition(const AEGP_CompH& compH) {
     std::swap(curData, preData);
   }
 
-  delete curData;
-  delete preData;
+  if (curData != nullptr) {
+    delete[] curData;
+  }
+  if (preData != nullptr) {
+    delete[] preData;
+  }
 
   return isStatic;
 }

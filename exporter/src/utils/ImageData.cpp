@@ -40,37 +40,37 @@ void ConvertARGBToRGBA(const uint8_t* argb, int width, int height, int srcStride
 
 void ClipTransparentEdge(ImageRect& rect, const uint8_t* srcData, int width, int height,
                          int stride) {
-  int minx = width - 1;
-  int miny = height - 1;
-  int maxx = 0;
-  int maxy = 0;
+  int minX = width - 1;
+  int minY = height - 1;
+  int maxX = 0;
+  int maxY = 0;
 
   for (int y = 0; y < height; y++) {
     const uint8_t* data = srcData + y * stride + 0;
 
     for (int x = 0; x < width; x++) {
       if (data[x * 4 + 3] != 0) {
-        if (minx > x) {
-          minx = x;
+        if (minX > x) {
+          minX = x;
         }
-        if (maxx < x) {
-          maxx = x;
+        if (maxX < x) {
+          maxX = x;
         }
-        if (miny > y) {
-          miny = y;
+        if (minY > y) {
+          minY = y;
         }
-        if (maxy < y) {
-          maxy = y;
+        if (maxY < y) {
+          maxY = y;
         }
       }
     }
   }
 
-  if (minx <= maxx) {
-    rect.xPos = minx;
-    rect.yPos = miny;
-    rect.width = maxx - minx + 1;
-    rect.height = maxy - miny + 1;
+  if (minX <= maxX) {
+    rect.xPos = minX;
+    rect.yPos = minY;
+    rect.width = maxX - minX + 1;
+    rect.height = maxY - minY + 1;
   } else {
     rect.xPos = 0;
     rect.yPos = 0;

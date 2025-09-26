@@ -20,7 +20,7 @@
 #include <unordered_map>
 #include <vector>
 #include "nlohmann/json.hpp"
-#include "utils/AETypeTransform.h"
+#include "utils/AEDataTypeConverter.h"
 #include "utils/LayerHelper.h"
 #include "utils/StringHelper.h"
 
@@ -515,8 +515,7 @@ void SetImageFillMode(pag::PAGScaleMode mode, const AEGP_ItemH& itemH, pag::ID i
     return;
   }
   std::string modeString = modeToStringMap.at(mode);
-  nlohmann::json value = json::value_t::string;
-  value = modeString;
+  nlohmann::json value = modeString;
   AddMarkerToComposition(itemH, keyString, value);
 }
 
@@ -526,8 +525,7 @@ void SetLayerEditable(bool isEditable, const AEGP_ItemH& itemH, pag::ID id) {
   if (isEditable) {
     return;
   }
-  nlohmann::json value = json::value_t::number_integer;
-  value = 1;
+  nlohmann::json value = 1;
   AddMarkerToComposition(itemH, keyString, value);
 }
 
@@ -537,8 +535,7 @@ void SetCompositionStoragePath(const std::string& path, const AEGP_ItemH& itemH)
   if (path.empty()) {
     return;
   }
-  nlohmann::json value = json::value_t::string;
-  value = path;
+  nlohmann::json value = path;
   AddMarkerToComposition(itemH, keyString, value);
 }
 
@@ -570,8 +567,7 @@ void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemH) {
 
   DeleteAllTimeStretchInfo(itemH);
   std::string keyString = "TimeStretchMode";
-  nlohmann::json value = nlohmann::json::value_t::string;
-  value = TimeStretchModeToString(info.mode);
+  nlohmann::json value = TimeStretchModeToString(info.mode);
   std::string modeString = TimeStretchModeToString(info.mode);
 
   A_Time keyTime;
@@ -627,7 +623,7 @@ void ExportImageLayerEditable(std::shared_ptr<pag::File>& file,
     return;
   }
 
-  int imageCount = static_cast<int>(file->images.size());
+  auto imageCount = static_cast<int>(file->images.size());
   std::vector<bool> isEditable(imageCount, false);
   bool hasNonEditableImage = false;
 
