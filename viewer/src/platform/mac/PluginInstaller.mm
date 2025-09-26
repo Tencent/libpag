@@ -42,18 +42,13 @@
 namespace pag {
 
 bool PluginInstaller::checkAeRunning() {
-  qDebug() << "PluginInstaller: Checking if Adobe After Effects is running...";
-
-  NSArray<NSRunningApplication*>* runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
+   NSArray<NSRunningApplication*>* runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
 
   if (!runningApps) {
-    qWarning() << "PluginInstaller: Failed to get running applications list";
     return false;
   }
 
   NSUInteger appCount = [runningApps count];
-  qDebug() << "PluginInstaller: Scanning" << appCount << "running applications";
-
   for (NSRunningApplication* app in runningApps) {
     NSString* bundleIdentifier = [app bundleIdentifier];
 
@@ -61,13 +56,11 @@ bool PluginInstaller::checkAeRunning() {
       QString bundleId = QString::fromNSString(bundleIdentifier);
 
       if (bundleId == "com.adobe.AfterEffects" || bundleId.startsWith("com.adobe.AfterEffects")) {
-        qDebug() << "PluginInstaller: Adobe After Effects is running (Bundle ID:" << bundleId << ")";
         return true;
       }
     }
   }
 
-  qDebug() << "PluginInstaller: Adobe After Effects is not running";
   return false;
 }
 
@@ -129,10 +122,8 @@ QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
   NSString* bundleResourcesPath = [bundle resourcePath];
   if (bundleResourcesPath) {
     resourcesPath = QString::fromNSString(bundleResourcesPath);
-    qDebug() << "PluginInstaller: Bundle resources path:" << resourcesPath;
   } else {
     resourcesPath = QDir(QCoreApplication::applicationDirPath()).filePath("../Resources");
-    qDebug() << "PluginInstaller: Using fallback path:" << resourcesPath;
   }
 
   QString fullPath;
@@ -144,8 +135,6 @@ QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
     fullPath = resourcesPath + "/" + pluginName + ".plugin";
   }
 
-  qDebug() << "PluginInstaller: Plugin" << pluginName << "source path:" << fullPath;
-  qDebug() << "PluginInstaller: Path exists:" << QFile::exists(fullPath);
 
   return fullPath;
 }
@@ -178,62 +167,44 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   QProcess process;
   QStringList args;
 
-  // 添加详细的调试日志
-  qDebug() << "PluginInstaller: Executing command with privileges:" << command;
-
-  // 使用ditto代替cp，并在复制后清除扩展属性
   QString enhancedCommand = command;
   enhancedCommand.replace("cp -r ", "ditto ");
 
-  // 在每个复制操作后添加清除扩展属性的命令
-  // 修复：对复制的目标文件执行xattr，而不是目标目录
   QStringList commandParts = enhancedCommand.split(" && ");
   for (int i = 0; i < commandParts.size(); ++i) {
     if (commandParts[i].startsWith("ditto ")) {
-      // 提取源文件和目标目录
+
       QRegularExpression re("ditto '([^']+)' '([^']+)'");
       QRegularExpressionMatch match = re.match(commandParts[i]);
       if (match.hasMatch()) {
         QString sourcePath = match.captured(1);
         QString targetDir = match.captured(2);
-
-        // 构建完整的目标路径
         QString sourceFileName = QFileInfo(sourcePath).fileName();
         QString fullTargetPath = targetDir + "/" + sourceFileName;
-
-        // 对复制后的文件清除扩展属性
         commandParts[i] += QString(" && xattr -cr '%1' 2>/dev/null || true").arg(fullTargetPath);
       }
     }
   }
   enhancedCommand = commandParts.join(" && ");
-  qDebug() << "PluginInstaller: Enhanced command:" << enhancedCommand;
 
-  // Escape the command properly for AppleScript
+
   QString escapedCommand = enhancedCommand;
   escapedCommand.replace("\"", "\\\"");
   escapedCommand.replace("\\", "\\\\");
 
   QString appleScriptCommand =
       QString("do shell script \"%1\" with administrator privileges").arg(escapedCommand);
-  qDebug() << "PluginInstaller: AppleScript command:" << appleScriptCommand;
 
   args << "-e" << appleScriptCommand;
 
   process.start("osascript", args);
-  bool finished = process.waitForFinished(300000);  // 30 second timeout
+  bool finished = process.waitForFinished(300000);
 
-  qDebug() << "PluginInstaller: Process finished:" << finished;
-  qDebug() << "PluginInstaller: Exit code:" << process.exitCode();
-  qDebug() << "PluginInstaller: Standard output:" << process.readAllStandardOutput();
-  qDebug() << "PluginInstaller: Standard error:" << process.readAllStandardError();
 
   if (process.exitCode() != 0) {
     QString error = process.readAllStandardError();
-    qDebug() << "AppleScript execution failed:" << error;
 
-    // 如果ditto失败，尝试使用cp作为备选方案
-    qDebug() << "PluginInstaller: Trying fallback command...";
+
     QString fallbackCommand = command;
     fallbackCommand.replace("cp -r ", "cp -r ");
 
@@ -243,7 +214,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 
     QString fallbackAppleScript =
         QString("do shell script \"%1\" with administrator privileges").arg(escapedCommand);
-    qDebug() << "PluginInstaller: Fallback AppleScript command:" << fallbackAppleScript;
 
     args.clear();
     args << "-e" << fallbackAppleScript;
@@ -251,19 +221,13 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
     process.start("osascript", args);
     bool fallbackFinished = process.waitForFinished(300000);
 
-    qDebug() << "PluginInstaller: Fallback process finished:" << fallbackFinished;
-    qDebug() << "PluginInstaller: Fallback exit code:" << process.exitCode();
-    qDebug() << "PluginInstaller: Fallback standard output:" << process.readAllStandardOutput();
-    qDebug() << "PluginInstaller: Fallback standard error:" << process.readAllStandardError();
 
     if (process.exitCode() != 0) {
       error = process.readAllStandardError();
-      qDebug() << "Fallback command also failed:" << error;
       return false;
     }
   }
 
-  qDebug() << "PluginInstaller: Command executed successfully";
   return true;
 }
 
@@ -271,47 +235,26 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
   Q_UNUSED(force);
   QStringList commands;
 
-  qDebug() << "PluginInstaller: Starting to copy" << plugins.size() << "plugins";
 
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
     QString target = getPluginInstallPath(plugin);
 
-    // 添加调试信息输出
-    qDebug() << "PluginInstaller: Installing plugin:" << plugin;
-    qDebug() << "  Source path:" << source;
-    qDebug() << "  Target path:" << target;
-
     if (!QFile::exists(source)) {
-      qDebug() << "PluginInstaller: ERROR - Plugin source not found:" << source;
       return false;
     } else {
-      qDebug() << "PluginInstaller: Source file/directory exists";
     }
 
     QString targetDir = QFileInfo(target).absolutePath();
-    qDebug() << "PluginInstaller: Target directory:" << targetDir;
-
-    // 构建命令
     QString mkdirCmd = QString("mkdir -p '%1'").arg(targetDir);
     QString rmCmd = QString("rm -rf '%1'").arg(target);
     QString cpCmd;
 
-    // Copy new plugin
     if (plugin == "com.tencent.pagconfig") {
-      // Copy directory recursively
       cpCmd = QString("cp -r '%1' '%2'").arg(source, targetDir);
-      qDebug() << "PluginInstaller: Copying directory for" << plugin;
     } else {
-      // Copy single file/plugin
       cpCmd = QString("cp -r '%1' '%2'").arg(source, targetDir);
-      qDebug() << "PluginInstaller: Copying file/plugin for" << plugin;
     }
-
-    qDebug() << "PluginInstaller: Adding commands:";
-    qDebug() << "  mkdir:" << mkdirCmd;
-    qDebug() << "  rm:" << rmCmd;
-    qDebug() << "  cp:" << cpCmd;
 
     commands << mkdirCmd;
     commands << rmCmd;
@@ -319,42 +262,17 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
   }
 
   if (commands.isEmpty()) {
-    qDebug() << "PluginInstaller: No commands to execute";
     return true;
   }
 
-  // Add Qt resource copying command
   char qtResourceCmd[4096] = {0};
   CopyQtResource(qtResourceCmd, sizeof(qtResourceCmd));
   if (strlen(qtResourceCmd) > 0) {
     commands << QString::fromUtf8(qtResourceCmd).trimmed();
-    qDebug() << "PluginInstaller: Added Qt resource copying command";
   }
 
   QString fullCommand = commands.join(" && ");
-  qDebug() << "PluginInstaller: Full command to execute:" << fullCommand;
-
-  bool result = executeWithPrivileges(fullCommand);
-  qDebug() << "PluginInstaller: Copy operation result:" << result;
-
-  if (result) {
-    qDebug() << "PluginInstaller: Verifying installation (note: verification may fail due to "
-                "system directory permissions)...";
-    for (const QString& plugin : plugins) {
-      QString target = getPluginInstallPath(plugin);
-      bool exists = QFile::exists(target);
-      qDebug() << "PluginInstaller: Plugin" << plugin << "exists at target:" << exists << "("
-               << target << ")";
-      if (!exists) {
-        qDebug() << "PluginInstaller: Note - QFile::exists returned false, but this may be due to "
-                    "permission restrictions on system directories";
-        qDebug() << "PluginInstaller: The actual installation status should be verified by "
-                    "checking the Adobe After Effects plugin menu";
-      }
-    }
-  }
-
-  return result;
+  return executeWithPrivileges(fullCommand);
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
@@ -369,12 +287,10 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     return true;
   }
 
-  // Add Qt resource deletion command
   char deleteQtResourceCmd[4096] = {0};
   DeleteQtResource(deleteQtResourceCmd, sizeof(deleteQtResourceCmd));
   if (strlen(deleteQtResourceCmd) > 0) {
     commands << QString::fromUtf8(deleteQtResourceCmd).trimmed();
-    qDebug() << "PluginInstaller: Added Qt resource deletion command";
   }
 
   QString fullCommand = commands.join(" && ");
