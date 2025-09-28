@@ -813,9 +813,9 @@ bool JPAGImageView::present(std::shared_ptr<tgfx::Image> image) {
   tgfx::Matrix imageMatrix = tgfx::Matrix::MakeScale(1.0 / _renderScale);
   imageMatrix.postConcat(_matrix);
   canvas->save();
-  canvas->concat(imageMatrix);  
+  canvas->concat(imageMatrix);
   canvas->drawImage(image);
-  canvas->restore(); 
+  canvas->restore();
   context->flushAndSubmit();
   targetWindow->present(context);
   context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
