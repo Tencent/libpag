@@ -34,7 +34,8 @@ void ReadEditableIndices(DecodeStream* stream) {
 }
 
 TagCode WriteEditableIndices(EncodeStream* stream, const File* file) {
-  if (file->editableImages != nullptr) {
+  if (file->editableImages != nullptr &&
+      file->editableImages->size() != static_cast<size_t>(file->numImages())) {
     stream->writeEncodedUint32(static_cast<uint32_t>(file->editableImages->size()));
     for (int index : *file->editableImages) {
       stream->writeEncodedInt32(index);
@@ -43,7 +44,8 @@ TagCode WriteEditableIndices(EncodeStream* stream, const File* file) {
     stream->writeEncodedUint32(0);
   }
 
-  if (file->editableTexts != nullptr) {
+  if (file->editableTexts != nullptr &&
+      file->editableTexts->size() != static_cast<size_t>(file->numTexts())) {
     stream->writeEncodedUint32(static_cast<uint32_t>(file->editableTexts->size()));
     for (int index : *file->editableTexts) {
       stream->writeEncodedInt32(index);
