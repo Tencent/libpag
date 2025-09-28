@@ -42,7 +42,7 @@
 namespace pag {
 
 bool PluginInstaller::checkAeRunning() {
-   NSArray<NSRunningApplication*>* runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
+  NSArray<NSRunningApplication*>* runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
 
   if (!runningApps) {
     return false;
@@ -76,16 +76,16 @@ void PluginInstaller::showMessage(const QString& title, const QString& message, 
   msgBox.exec();
 }
 
-QStringList detectSpecialVersion(){
+QStringList detectSpecialVersion() {
   QStringList specialPaths;
 
   QString latestPath = "/Applications/Adobe After Effects/Adobe After Effects.app";
-  if(QDir(latestPath).exists()){
+  if (QDir(latestPath).exists()) {
     specialPaths << latestPath;
   }
 
   QString betaPath = "/Applications/Adobe After Effects (Beta)/Adobe After Effects (Beta).app";
-  if(QDir(betaPath).exists()){
+  if (QDir(betaPath).exists()) {
     specialPaths << betaPath;
   }
 
@@ -98,14 +98,16 @@ QStringList PluginInstaller::getAeInstallPaths() {
   int startYear = qMax(minSupportedYear, currentYear - 10);
   int endYear = qMin(maxSupportedYear, currentYear + 2);
 
-  for(int year = startYear; year <= endYear; ++year) {
-    QString aePath = QString("/Applications/Adobe After Effects %1/Adobe After Effects %1.app").arg(year);
-    if(QDir(aePath).exists()){
+  for (int year = startYear; year <= endYear; ++year) {
+    QString aePath =
+        QString("/Applications/Adobe After Effects %1/Adobe After Effects %1.app").arg(year);
+    if (QDir(aePath).exists()) {
       paths << aePath;
     }
 
-    QString ccPath = QString("/Applications/Adobe After Effects CC %1/Adobe After Effects CC %1.app").arg(year);
-    if(QDir(ccPath).exists()){
+    QString ccPath =
+        QString("/Applications/Adobe After Effects CC %1/Adobe After Effects CC %1.app").arg(year);
+    if (QDir(ccPath).exists()) {
       paths << ccPath;
     }
   }
@@ -132,7 +134,6 @@ QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
   } else {
     fullPath = resourcesPath + "/" + pluginName + ".plugin";
   }
-
 
   return fullPath;
 }
@@ -171,7 +172,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   QStringList commandParts = enhancedCommand.split(" && ");
   for (int i = 0; i < commandParts.size(); ++i) {
     if (commandParts[i].startsWith("ditto ")) {
-
       QRegularExpression re("ditto '([^']+)' '([^']+)'");
       QRegularExpressionMatch match = re.match(commandParts[i]);
       if (match.hasMatch()) {
@@ -185,7 +185,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   }
   enhancedCommand = commandParts.join(" && ");
 
-
   QString escapedCommand = enhancedCommand;
   escapedCommand.replace("\"", "\\\"");
   escapedCommand.replace("\\", "\\\\");
@@ -198,7 +197,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   process.start("osascript", args);
   if (process.exitCode() != 0) {
     QString error = process.readAllStandardError();
-
 
     QString fallbackCommand = command;
     fallbackCommand.replace("cp -r ", "cp -r ");
@@ -216,7 +214,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
     process.start("osascript", args);
     bool fallbackFinished = process.waitForFinished(300000);
 
-
     if (process.exitCode() != 0) {
       error = process.readAllStandardError();
       return false;
@@ -229,7 +226,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) const {
   Q_UNUSED(force);
   QStringList commands;
-
 
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
@@ -300,23 +296,22 @@ void PluginInstaller::CopyQtResource(char cmd[], int cmdSize) const {
   }
 }
 
-
 void PluginInstaller::DeleteQtResource(char cmd[], int cmdSize) const {
-      NSString* deleteShellPath = [[NSBundle mainBundle] pathForResource:@"delete_qt_resource" ofType:@"sh"];
-      if (deleteShellPath != nil) {
-        snprintf(cmd + strlen(cmd), cmdSize - strlen(cmd), "sh '%s'\n", [deleteShellPath UTF8String]);
-      }
+  NSString* deleteShellPath = [[NSBundle mainBundle] pathForResource:@"delete_qt_resource"
+                                                              ofType:@"sh"];
+  if (deleteShellPath != nil) {
+    snprintf(cmd + strlen(cmd), cmdSize - strlen(cmd), "sh '%s'\n", [deleteShellPath UTF8String]);
+  }
 }
 
- void PluginInstaller::setYearRange(int minYear, int maxYear) {
-      if (minYear > maxYear) {
-          qWarning() << "Invalid year range:" << minYear << "-" << maxYear;
-          return;
-      }
-
-      minSupportedYear = qMax(2010, minYear);
-      maxSupportedYear = qMin(2050, maxYear);
+void PluginInstaller::setYearRange(int minYear, int maxYear) {
+  if (minYear > maxYear) {
+    qWarning() << "Invalid year range:" << minYear << "-" << maxYear;
+    return;
   }
 
+  minSupportedYear = qMax(2010, minYear);
+  maxSupportedYear = qMin(2050, maxYear);
+}
 
 }  // namespace pag

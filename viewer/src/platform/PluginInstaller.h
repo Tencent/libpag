@@ -30,7 +30,6 @@ class PluginInstaller : public QObject {
   Q_OBJECT
 
  public:
-
   static constexpr int DefaultMinYear = 2017;
   static constexpr int DefaultMaxYear = 2030;
 

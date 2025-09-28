@@ -26,10 +26,10 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryFile>
-#include <QRegularExpression>
 
 namespace pag {
 
@@ -59,11 +59,9 @@ void PluginInstaller::showMessage(const QString& title, const QString& message, 
 QStringList PluginInstaller::getAeInstallPaths() {
   QStringList paths;
 
-  const QStringList registryPaths = {
-    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe",
-    "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe",
-    "HKEY_CURRENT_USER\\SOFTWARE\\Adobe"
-  };
+  const QStringList registryPaths = {"HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe",
+                                     "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe",
+                                     "HKEY_CURRENT_USER\\SOFTWARE\\Adobe"};
 
   for (const QString& regPath : registryPaths) {
     QSettings registry(regPath, QSettings::NativeFormat);
@@ -83,13 +81,15 @@ QStringList PluginInstaller::getAeInstallPaths() {
     }
   }
 
-  QSettings ccRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-                      QSettings::NativeFormat);
+  QSettings ccRegistry(
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+      QSettings::NativeFormat);
   const QStringList uninstallKeys = ccRegistry.childGroups();
 
   for (const QString& key : uninstallKeys) {
-    QSettings appRegistry("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key,
-                         QSettings::NativeFormat);
+    QSettings appRegistry(
+        "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key,
+        QSettings::NativeFormat);
     QString displayName = appRegistry.value("DisplayName").toString();
     if (displayName.contains("Adobe After Effects", Qt::CaseInsensitive)) {
       QString installLocation = appRegistry.value("InstallLocation").toString();
@@ -109,10 +109,10 @@ QStringList PluginInstaller::getAeInstallPaths() {
     QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
     QRegularExpressionMatch matchA = versionRegex.match(a);
     QRegularExpressionMatch matchB = versionRegex.match(b);
-    
+
     int versionA = matchA.hasMatch() ? matchA.captured(1).toInt() : 0;
     int versionB = matchB.hasMatch() ? matchB.captured(1).toInt() : 0;
-    
+
     return versionA > versionB;
   });
 
@@ -215,7 +215,8 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     QString target = getPluginInstallPath(plugin);
 
     if (plugin == "com.tencent.pagconfig") {
-      commands << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(QDir::toNativeSeparators(target));
+      commands
+          << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(QDir::toNativeSeparators(target));
     } else {
       commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(target));
     }
