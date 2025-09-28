@@ -85,8 +85,8 @@ else ()
     set(UpdateChannel "beta")
 endif ()
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
-    ${CMAKE_SOURCE_DIR}/src/version.h
-    @ONLY
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
 )
 
 message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
@@ -121,6 +121,7 @@ endif ()
 set(PAG_USE_QT ON)
 set(PAG_USE_RTTR ON)
 set(PAG_USE_LIBAVC OFF)
+set(PAG_BUILD_TESTS OFF)
 set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_FRAMEWORK OFF)
 
@@ -128,6 +129,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 list(APPEND PAG_OPTIONS "-DPAG_USE_QT=${PAG_USE_QT}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_RTTR=${PAG_USE_RTTR}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_LIBAVC=${PAG_USE_LIBAVC}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_TESTS=${PAG_BUILD_TESTS}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
 list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
