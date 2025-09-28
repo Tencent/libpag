@@ -227,8 +227,6 @@ std::vector<int> PAGFile::getEditableIndices(LayerType layerType) {
         return *file->editableTexts;
       }
       break;
-    case LayerType::Solid:
-      return {-1};
     default:
       break;
   }
