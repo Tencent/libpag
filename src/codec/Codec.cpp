@@ -304,5 +304,12 @@ void Codec::UpdateFileAttributes(std::shared_ptr<File> file, CodecContext* conte
   file->editableImages = context->editableImages;
   file->editableTexts = context->editableTexts;
   file->imageScaleModes = context->imageScaleModes;
+  if (file->editableImages == nullptr && file->imageScaleModes != nullptr &&
+      file->imageLayers.size() == file->imageScaleModes->size()) {
+    file->editableImages = new std::vector<int>(file->imageScaleModes->size());
+    for (size_t i = 0; i < file->editableImages->size(); i++) {
+      file->editableImages->at(i) = i;
+    }
+  }
 }
 }  // namespace pag
