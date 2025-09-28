@@ -40,6 +40,7 @@
 @end
 
 namespace pag {
+static constexpr int cmdBufSize = 4096;
 
 bool PluginInstaller::checkAeRunning() {
   NSArray<NSRunningApplication*>* runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
@@ -195,11 +196,12 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   args << "-e" << appleScriptCommand;
 
   process.start("osascript", args);
+  process.waitForFinished(30000);
   if (process.exitCode() != 0) {
     QString error = process.readAllStandardError();
 
     QString fallbackCommand = command;
-    fallbackCommand.replace("cp -r ", "cp -r ");
+    // fallbackCommand.replace("cp -r ", "cp -r ");
 
     escapedCommand = fallbackCommand;
     escapedCommand.replace("\"", "\\\"");
@@ -232,7 +234,6 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
 
     if (!QFile::exists(source)) {
       return false;
-    } else {
     }
 
     QString targetDir = QFileInfo(target).absolutePath();
@@ -255,7 +256,7 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
     return true;
   }
 
-  char qtResourceCmd[4096] = {0};
+  char qtResourceCmd[cmdBufSize] = {0};
   CopyQtResource(qtResourceCmd, sizeof(qtResourceCmd));
   if (strlen(qtResourceCmd) > 0) {
     commands << QString::fromUtf8(qtResourceCmd).trimmed();
@@ -277,7 +278,7 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     return true;
   }
 
-  char deleteQtResourceCmd[4096] = {0};
+  char deleteQtResourceCmd[cmdBufSize] = {0};
   DeleteQtResource(deleteQtResourceCmd, sizeof(deleteQtResourceCmd));
   if (strlen(deleteQtResourceCmd) > 0) {
     commands << QString::fromUtf8(deleteQtResourceCmd).trimmed();

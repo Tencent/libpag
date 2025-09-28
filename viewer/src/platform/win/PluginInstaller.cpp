@@ -103,7 +103,6 @@ QStringList PluginInstaller::getAeInstallPaths() {
       }
     }
   }
-  paths.removeDuplicates();
 
   std::sort(paths.begin(), paths.end(), [](const QString& a, const QString& b) {
     QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
