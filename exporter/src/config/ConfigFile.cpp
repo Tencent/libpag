@@ -25,6 +25,7 @@
 #include "tinyxml2.h"
 #include "utils/ConfigUtils.h"
 #include "utils/FileHelper.h"
+#include "utils/StringHelper.h"
 
 using namespace tinyxml2;
 namespace exporter {
@@ -34,7 +35,7 @@ static void ReadCommonConfig(XMLElement* commonElement, ConfigParam* configParam
   }
 
   if (XMLElement* tagLevelElement = commonElement->FirstChildElement("tag-level")) {
-    if (const auto* tagModeText = GetChildElementText(tagLevelElement, "mode")) {
+    if (const auto tagModeText = GetChildElementText(tagLevelElement, "mode")) {
       if (SafeStringEqual(tagModeText, "beta")) {
         configParam->tagMode = TagMode::Beta;
       } else if (SafeStringEqual(tagModeText, "custom")) {
@@ -44,37 +45,32 @@ static void ReadCommonConfig(XMLElement* commonElement, ConfigParam* configParam
       }
     }
 
-    if (const auto* customLevelText = GetChildElementText(tagLevelElement, "custom-level")) {
+    if (const auto customLevelText = GetChildElementText(tagLevelElement, "custom-level")) {
       configParam->exportTagLevel = SafeStringToInt<uint16_t>(customLevelText, 1023);
     }
   }
 
-  if (const auto* imageQualityText = GetChildElementText(commonElement, "image-quality")) {
+  if (const auto imageQualityText = GetChildElementText(commonElement, "image-quality")) {
     configParam->imageQuality = SafeStringToInt(imageQualityText, 80);
   }
 
-  if (const auto* imagePixelRatioText = GetChildElementText(commonElement, "image-pixel-ratio")) {
+  if (const auto imagePixelRatioText = GetChildElementText(commonElement, "image-pixel-ratio")) {
     configParam->imagePixelRatio = SafeStringToFloat(imagePixelRatioText, 2.0f);
   }
 
-  if (const auto* enableLayerNameText = GetChildElementText(commonElement, "enable-layer-name")) {
-    configParam->enableLayerName = SafeStringToInt(enableLayerNameText, 1) != 0;
+  if (const auto enableLayerNameText = GetChildElementText(commonElement, "enable-layer-name")) {
+    configParam->exportLayerName = SafeStringToInt(enableLayerNameText, 1) != 0;
   }
 
-  if (const auto* enableCompressionPanelText =
-          GetChildElementText(commonElement, "enable-compression-panel")) {
-    configParam->enableCompressionPanel = SafeStringToInt(enableCompressionPanelText, 0) != 0;
+  if (const auto enableFontFileText = GetChildElementText(commonElement, "enable-font-file")) {
+    configParam->exportFontFile = SafeStringToInt(enableFontFileText, 0) != 0;
   }
 
-  if (const auto* enableFontFileText = GetChildElementText(commonElement, "enable-font-file")) {
-    configParam->enableFontFile = SafeStringToInt(enableFontFileText, 0) != 0;
-  }
-
-  if (const auto* exportScenseText = GetChildElementText(commonElement, "export-scense")) {
+  if (const auto exportScenseText = GetChildElementText(commonElement, "export-scense")) {
     configParam->scenes = static_cast<ExportScenes>(SafeStringToInt(exportScenseText, 0));
   }
 
-  if (const auto* exportLanguageText = GetChildElementText(commonElement, "export-language")) {
+  if (const auto exportLanguageText = GetChildElementText(commonElement, "export-language")) {
     configParam->language = static_cast<Language>(SafeStringToInt(exportLanguageText, 0));
   }
 }
@@ -84,33 +80,26 @@ static void ReadBitmapConfig(XMLElement* bitmapElement, ConfigParam* configParam
     return;
   }
 
-  if (const auto* sequenceSuffixText = GetChildElementText(bitmapElement, "sequence-suffix")) {
-    configParam->sequenceSuffix = sequenceSuffixText;
-  }
-
-  if (const auto* sequenceTypeText = GetChildElementText(bitmapElement, "sequence-type")) {
+  if (const auto sequenceTypeText = GetChildElementText(bitmapElement, "sequence-type")) {
     configParam->sequenceType =
         static_cast<pag::CompositionType>(SafeStringToInt(sequenceTypeText, 1));
   }
 
-  if (const auto* sequenceQualityText = GetChildElementText(bitmapElement, "sequence-quality")) {
+  if (const auto sequenceQualityText = GetChildElementText(bitmapElement, "sequence-quality")) {
     configParam->sequenceQuality = SafeStringToInt(sequenceQualityText, 80);
   }
 
-  if (const auto* keyframeIntervalText = GetChildElementText(bitmapElement, "keyframe-interval")) {
+  if (const auto keyframeIntervalText = GetChildElementText(bitmapElement, "keyframe-interval")) {
     configParam->bitmapKeyFrameInterval = SafeStringToInt(keyframeIntervalText, 60);
   }
 
-  if (const auto* maxResolutionText = GetChildElementText(bitmapElement, "max-resolution")) {
+  if (const auto maxResolutionText = GetChildElementText(bitmapElement, "max-resolution")) {
     configParam->bitmapMaxResolution = SafeStringToInt(maxResolutionText, 720);
   }
 
   if (XMLElement* sequencesElement = bitmapElement->FirstChildElement("sequences")) {
     if (const XMLElement* sequenceElement = sequencesElement->FirstChildElement("sequence")) {
-      double frameRate = 24.0;
-      if (sequenceElement->DoubleAttribute("framerate", frameRate) == XML_SUCCESS) {
-        configParam->frameRate = static_cast<float>(frameRate);
-      }
+      configParam->frameRate = sequenceElement->FloatAttribute("framerate", 24.0);
     }
   }
 
@@ -147,10 +136,9 @@ static void WriteCommonConfig(XMLElement* root, ConfigParam* configParam) {
 
   AddElement(common, "image-quality", std::to_string(configParam->imageQuality));
   AddElement(common, "image-pixel-ratio", FormatFloat(configParam->imagePixelRatio, 1));
-  AddElement(common, "enable-compression-panel",
-             std::to_string(configParam->enableCompressionPanel ? 1 : 0));
-  AddElement(common, "enable-layer-name", std::to_string(configParam->enableLayerName ? 1 : 0));
-  AddElement(common, "enable-font-file", std::to_string(configParam->enableFontFile ? 1 : 0));
+  AddElement(common, "enable-compression-panel", std::to_string(1));
+  AddElement(common, "enable-layer-name", std::to_string(configParam->exportLayerName ? 1 : 0));
+  AddElement(common, "enable-font-file", std::to_string(configParam->exportFontFile ? 1 : 0));
   AddElement(common, "export-scense", std::to_string(static_cast<int>(configParam->scenes)));
   AddElement(common, "export-language", std::to_string(static_cast<int>(configParam->language)));
 }
@@ -160,7 +148,7 @@ static void WriteBitmapConfig(XMLElement* root, ConfigParam* configParam) {
   XMLElement* bitmap = doc->NewElement("bitmap");
   root->InsertEndChild(bitmap);
 
-  AddElement(bitmap, "sequence-suffix", configParam->sequenceSuffix);
+  AddElement(bitmap, "sequence-suffix", CompositionBmpSuffix);
   AddElement(bitmap, "sequence-type", std::to_string(static_cast<int>(configParam->sequenceType)));
   AddElement(bitmap, "sequence-quality", std::to_string(configParam->sequenceQuality));
   AddElement(bitmap, "keyframe-interval", std::to_string(configParam->bitmapKeyFrameInterval));
@@ -216,7 +204,7 @@ bool ReadConfigFile(ConfigParam* configParam) {
   }
 
   std::string filename = configPath + "PAGConfig.xml";
-  if (!FileHelper::FileIsExist(filename)) {
+  if (!FileIsExist(filename)) {
     WriteDefaultConfigFile(filename.c_str());
     return false;
   }

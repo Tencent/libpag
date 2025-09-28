@@ -30,6 +30,7 @@ class AlertInfoModel : public QAbstractListModel {
   Q_OBJECT
   Q_PROPERTY(
       QString errorMessage READ getErrorMessage WRITE setErrorMessage NOTIFY errorMessageChanged)
+  Q_PROPERTY(int count READ getCount NOTIFY alertCountChanged)
 
  public:
   enum class AlertRoles {
@@ -62,16 +63,15 @@ class AlertInfoModel : public QAbstractListModel {
   Q_INVOKABLE static void JumpToUrl();
 
   QString getErrorMessage() const;
+  int getCount() const;
   void setErrorMessage(const QString& message);
 
   void setAlertInfos(std::vector<AlertInfo> infos);
-  bool showWarnings(const std::vector<AlertInfo>& infos);
-  bool showErrors(const std::vector<AlertInfo>& info);
-  std::string browseForSave(bool useScript);
 
  Q_SIGNALS:
   void errorMessageChanged();
   void alertInfoChanged();
+  void alertCountChanged();
 
  protected:
   QVariantMap alertInfoToVariantMap(const AlertInfo& alertInfo) const;
@@ -82,13 +82,11 @@ class AlertInfoModel : public QAbstractListModel {
  private:
   std::vector<AlertInfo> alertInfos = {};
   QString errorMessage = "";
-  std::unique_ptr<QApplication> app = nullptr;
-  std::unique_ptr<QQmlApplicationEngine> alertEngine = nullptr;
   QQuickWindow* alertWindow = nullptr;
   mutable QVariantMap alertInfoVariantMap;
   static constexpr char documentationUrl[] = "https://pag.art/docs/pag-export-verify.html";
-  std::string lastOutputPath;
-  std::string lastFilePath;
+  std::string lastOutputPath = "";
+  std::string lastFilePath = "";
 };
 
 }  // namespace exporter

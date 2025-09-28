@@ -1,6 +1,7 @@
 /third_party
 /cmake-build-*
 /vendor/AfterEffectsSDK
+/assets/translation/Chinese.qm
 *.cfg
 *.rsrc
 *_bak*

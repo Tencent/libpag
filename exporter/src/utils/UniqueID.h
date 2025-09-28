@@ -15,30 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "ScopedHelper.h"
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include "AEHelper.h"
-namespace fs = std::filesystem;
+
+#pragma once
+
+#include <pag/file.h>
 
 namespace exporter {
 
-ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
-    : itemHandle(itemHandle) {
-  const auto& suites = GetSuites();
-  suites->ItemSuite8()->AEGP_GetItemCurrentTime(itemHandle, &orgTime);
+pag::ID GetLayerUniqueID(const std::vector<pag::Composition*>& compositions);
 
-  A_Time newTime = {static_cast<A_long>(time * 100), 100};
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &newTime);
-}
-
-ScopedTimeSetter::~ScopedTimeSetter() {
-  const auto& suites = GetSuites();
-  if (itemHandle == nullptr) {
-    return;
-  }
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &orgTime);
-}
+pag::ID GetCompositionUniqueID(const std::vector<pag::Composition*>& compositions);
 
 }  // namespace exporter

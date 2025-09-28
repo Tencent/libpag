@@ -22,6 +22,7 @@
 #include <QFileDialog>
 #include <QQmlContext>
 #include <QThread>
+#include "WindowManager.h"
 #include "utils/AEHelper.h"
 #include "utils/StringHelper.h"
 
@@ -128,72 +129,7 @@ void AlertInfoModel::setAlertInfos(std::vector<AlertInfo> infos) {
   endResetModel();
 
   Q_EMIT alertInfoChanged();
-}
-
-bool AlertInfoModel::showWarnings(const std::vector<AlertInfo>& infos) {
-  bool hasData = !infos.empty() || !alertInfos.empty();
-  if (!hasData) {
-    return false;
-  }
-
-  if (!infos.empty()) {
-    setAlertInfos(infos);
-  }
-
-  return initializeAlertWindow("qrc:/qml/AlertWarning.qml", "alertModel");
-}
-
-bool AlertInfoModel::showErrors(const std::vector<AlertInfo>& infos) {
-  bool hasData = !infos.empty() || !alertInfos.empty() || !errorMessage.isEmpty();
-  if (!hasData) {
-    return false;
-  }
-
-  if (!infos.empty()) {
-    setAlertInfos(infos);
-  }
-
-  return initializeAlertWindow("qrc:/qml/AlertError.qml", "alertInfoModel");
-}
-
-std::string AlertInfoModel::browseForSave(bool useScript) {
-  auto suites = AEHelper::GetSuites();
-  auto pluginID = AEHelper::GetPluginID();
-  AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
-  if (activeItemH == nullptr) {
-    return "";
-  }
-  std::string itemName = AEHelper::GetItemName(activeItemH);
-  QString projectPath = AEHelper::GetProjectPath();
-
-  QString fullPath = QDir(projectPath).filePath(QString::fromStdString(itemName));
-  std::string filePath = fullPath.toStdString();
-
-  QString defaultPath = QString::fromStdString(filePath);
-  if (!lastOutputPath.empty() && lastFilePath == filePath) {
-    defaultPath = QString::fromStdString(lastOutputPath);
-  }
-
-  std::string outputPath;
-  if (useScript) {
-    QString scriptPath = defaultPath;
-    scriptPath.replace('\\', '/');
-    auto scriptText = "var file = new File(\"" + scriptPath.toStdString() + "\");\n" +
-                      "var result = file.saveDlg();\n" + "result ? result.fsName : '';";
-    outputPath = AEHelper::RunScript(suites, pluginID, scriptText);
-  } else {
-    QString saveFilePath = QFileDialog::getSaveFileName(QApplication::topLevelWidgets().value(0),
-                                                        QObject::tr("选择存储路径"), defaultPath);
-    outputPath = saveFilePath.toStdString();
-  }
-
-  if (!outputPath.empty()) {
-    lastFilePath = filePath;
-    lastOutputPath = outputPath;
-    outputPath = StringHelper::ConvertStringEncoding(outputPath);
-    StringHelper::EnsureStringSuffix(outputPath, ".pag");
-  }
-  return outputPath;
+  Q_EMIT alertCountChanged();
 }
 
 QVariantMap AlertInfoModel::alertInfoToVariantMap(const AlertInfo& alertInfo) const {
@@ -218,37 +154,16 @@ const AlertInfo* AlertInfoModel::getAlertInfo(const QModelIndex& index) const {
   return &alertInfos[index.row()];
 }
 
-bool AlertInfoModel::initializeAlertWindow(const QString& qmlPath, const QString& contextName) {
-  int argc = 0;
-  app = std::make_unique<QApplication>(argc, nullptr);
-  app->setObjectName(contextName == "alertModel" ? "PAG-Alert" : "PAG-Error");
-  alertEngine = std::make_unique<QQmlApplicationEngine>(app.get());
-  QQmlContext* context = alertEngine->rootContext();
-  context->setContextProperty(contextName, this);
-  alertEngine->load(QUrl(qmlPath));
-  if (alertEngine->rootObjects().isEmpty()) {
-    return false;
-  }
-
-  alertWindow = qobject_cast<QQuickWindow*>(alertEngine->rootObjects().first());
-  if (!alertWindow) {
-    return false;
-  }
-
-  alertWindow->setPersistentGraphics(true);
-  alertWindow->setPersistentSceneGraph(true);
-  QQuickWindow::setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  alertWindow->show();
-  QApplication::exec();
-  return true;
-}
-
 bool AlertInfoModel::isIndexValid(const QModelIndex& index) const {
   return index.isValid() && index.row() >= 0 && index.row() < static_cast<int>(alertInfos.size());
 }
 
 QString AlertInfoModel::getErrorMessage() const {
   return errorMessage;
+}
+
+int AlertInfoModel::getCount() const {
+  return static_cast<int>(alertInfos.size());
 }
 
 void AlertInfoModel::setErrorMessage(const QString& message) {

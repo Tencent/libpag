@@ -36,8 +36,8 @@ A_Err AECommand::OnUpdateMenu(AEGP_GlobalRefcon /*globalRefcon*/,
                               AEGP_WindowType /*windowType*/) {
   A_Err err = A_Err_NONE;
   A_Err err2 = A_Err_NONE;
-  const auto& suites = AEHelper::GetSuites();
-  AEGP_ItemH active_itemH = AEHelper::GetActiveCompositionItem();
+  const auto& suites = GetSuites();
+  AEGP_ItemH active_itemH = GetActiveCompositionItem();
   if (active_itemH) {
     ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGExporterCMD));
     ERR(suites->CommandSuite1()->AEGP_EnableCommand(PAGPreviewCMD));
@@ -78,6 +78,7 @@ A_Err AECommand::OnClickPanel(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showExportPanelWindow();
   return err;
 }
 
@@ -90,21 +91,7 @@ A_Err AECommand::OnClickExporter(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
-
-  AEGP_ItemH activeItemH = AEHelper::GetActiveCompositionItem();
-  if (activeItemH == nullptr) {
-    return err;
-  }
-
-  AlertInfoModel alertModel;
-  const auto& outputPath = AlertInfoModel::BrowseForSave(true);
-
-  if (outputPath.empty()) {
-    return err;
-  }
-
-  PreviewPAGFile(outputPath);
-
+  WindowManager::GetInstance().showExportWindow();
   return err;
 }
 
@@ -118,6 +105,7 @@ A_Err AECommand::OnClickPreview(AEGP_GlobalRefcon /*globalRefcon*/,
     return err;
   }
   *handled = TRUE;
+  WindowManager::GetInstance().showExportPreviewWindow();
   return err;
 }
 

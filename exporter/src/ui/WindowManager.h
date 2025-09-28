@@ -18,27 +18,32 @@
 
 #pragma once
 
+#include <QApplication>
 #include <QString>
+#include <QTranslator>
 #include <string>
 #include <vector>
 #include "utils/AlertInfo.h"
 
 namespace exporter {
+
 class WindowManager {
  public:
   static WindowManager& GetInstance();
 
   void initializeQtEnvironment();
 
-  void showPanelExporterWindow();
+  void showExportPanelWindow();
 
   void showPAGConfigWindow();
 
   void showExportPreviewWindow();
 
-  bool showWarnings(std::vector<AlertInfo>& infos);
+  void showExportWindow();
 
-  bool showErrors(std::vector<AlertInfo>& infos);
+  bool showWarnings(const std::vector<AlertInfo>& infos);
+
+  bool showErrors(const std::vector<AlertInfo>& infos);
 
   bool showSimpleError(const QString& message);
 
@@ -51,7 +56,15 @@ class WindowManager {
   WindowManager& operator=(WindowManager&&) = delete;
 
  private:
+  void init();
+
+  std::unique_ptr<QTranslator> translator = nullptr;
+  std::unique_ptr<QApplication> app = nullptr;
   WindowManager();
   ~WindowManager() = default;
+
+  int argc = 0;
+  char** argv = nullptr;
 };
+
 }  // namespace exporter

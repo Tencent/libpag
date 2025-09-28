@@ -19,14 +19,11 @@
 #include "AEPReader.h"
 #include <iostream>
 
-namespace AEPReader {
+namespace exporter {
 
 std::string ReadKeyName(ByteArray* bytes) {
   char name[5] = {0};
   for (int i = 0; i < 4; i++) {
-    if (bytes->bytesAvailable() <= 0) {
-      break;
-    }
     name[i] = bytes->readInt8();
   }
   return std::string(name);
@@ -121,7 +118,7 @@ Tag ReadFirstGroupByMatchNames(ByteArray* bytes, const std::vector<std::string>&
   return {};
 }
 
-static void ReadCompositions(ByteArray* bytes, std::vector<Composition> list) {
+static void ReadCompositions(ByteArray* bytes, std::vector<Composition>& list) {
   while (bytes->bytesAvailable() > 0) {
     auto item = ReadFirstTagByName(bytes, "Item");
     if (item.bytes.empty()) {
@@ -188,4 +185,4 @@ std::vector<Layer> ReadLayers(ByteArray* bytes) {
   return list;
 }
 
-}  // namespace AEPReader
+}  // namespace exporter
