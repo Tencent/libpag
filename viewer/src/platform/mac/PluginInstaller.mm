@@ -212,7 +212,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
     args << "-e" << fallbackAppleScript;
 
     process.start("osascript", args);
-    bool fallbackFinished = process.waitForFinished(300000);
 
     if (process.exitCode() != 0) {
       error = process.readAllStandardError();
