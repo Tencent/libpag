@@ -461,6 +461,11 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
+      - name: Install missing peer dependency @ohos/hvigor
+        run: |
+          pnpm add @ohos/hvigor@3.2.4
+    
+
       - name: Build Harmony
         run: |
           cd ohos
