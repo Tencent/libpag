@@ -20,7 +20,7 @@ on:
           - win
           - linux
           - qt
-          - openharmony
+          - ohos
         default: 'all'
 
 jobs:
