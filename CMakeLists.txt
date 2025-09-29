@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAG)
 
-if (NOT DEFINED OHOS)
-    if (CMAKE_SYSTEM_NAME STREQUAL "OpenHarmony" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-        set(OHOS ON)
-    endif ()
-endif ()
-
 # Uncomment the next 4 lines to build libpag for Intel cpus on Apple Silicon devices.
 #if (APPLE AND NOT IOS)
 #    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
