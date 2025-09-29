@@ -3,7 +3,7 @@
   "buildOption": {
     "externalNativeOptions": {
       "path": "../../CMakeLists.txt",
-      "arguments": "-DOHOS_STL=c++_static",
+      "arguments": "-DOHOS=ON -DUSE_NATIVE_PLATFORM=ON -DOHOS_STL=c++_static",
       "cppFlags": ""
     }
   },
