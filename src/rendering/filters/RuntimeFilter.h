@@ -61,9 +61,8 @@ class RuntimeProgram : public tgfx::RuntimeProgram {
 
 class RuntimeFilter : public tgfx::RuntimeEffect {
  public:
-  explicit RuntimeFilter(tgfx::UniqueType type,
-                         const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
-      : RuntimeEffect(std::move(type), extraInputs) {
+  explicit RuntimeFilter(const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
+      : RuntimeEffect(extraInputs) {
   }
 
   std::unique_ptr<tgfx::RuntimeProgram> onCreateProgram(tgfx::Context* context) const override;

@@ -23,7 +23,7 @@
 namespace pag::FileSerializer {
 
 auto getWrappedInstance(const rttr::instance& item) {
-  return item.get_type().get_raw_type().is_wrapper() ? item.get_wrapped_instance() : item;
+  return item.get_type().is_wrapper() ? item.get_wrapped_instance() : item;
 }
 
 auto getWrappedType(const rttr::type& type) {

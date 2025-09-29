@@ -1,12 +1,11 @@
 import { PAGComposition } from './pag-composition';
-import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { Matrix } from './core/matrix';
 import { layer2typeLayer, proxyVector } from './utils/type-utils';
 
 import type { LayerType, Marker, Rect } from './types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGLayer {
   public wasmIns: any;
   public isDestroyed = false;
@@ -227,7 +226,7 @@ export class PAGLayer {
    * Returns this layer as a type layer.
    */
   public asTypeLayer() {
-    return layer2typeLayer(this);
+    return layer2typeLayer(this.wasmIns);
   }
 
   public isDelete(): boolean {

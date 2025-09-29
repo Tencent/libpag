@@ -159,7 +159,7 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
   sampler.id = glInfo.id;
   sampler.target = glInfo.target;
   sampler.format = glInfo.format;
-  return {sampler, texture.width(), texture.height()};
+  return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
 }
 
 BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
@@ -186,8 +186,8 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
 }
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
-  tgfx::BackendSemaphore glSemaphore = {};
-  glSemaphore.initGL(semaphore.glSync());
+  tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
+  tgfx::BackendSemaphore glSemaphore = {syncInfo};
   return glSemaphore;
 }
 }  // namespace pag

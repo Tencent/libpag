@@ -54,7 +54,7 @@ class DisplacementMapEffectUniforms : public Uniforms {
 
 class DisplacementMapFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Layer* layer, RenderCache* cache,
@@ -69,7 +69,7 @@ class DisplacementMapFilter : public RuntimeFilter {
                         bool expandOutput, float effectOpacity, tgfx::Matrix layerMatrix,
                         tgfx::Size size, tgfx::Size displacementSize, tgfx::Rect contentBounds,
                         std::shared_ptr<tgfx::Image> sourceImage)
-      : RuntimeFilter(Type(), {std::move(sourceImage)}),
+      : RuntimeFilter({std::move(sourceImage)}),
         useForHorizontalDisplacement(useForHorizontalDisplacement),
         maxHorizontalDisplacement(maxHorizontalDisplacement),
         useForVerticalDisplacement(useForVerticalDisplacement),

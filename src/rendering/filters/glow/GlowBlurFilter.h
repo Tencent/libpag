@@ -32,7 +32,7 @@ class GlowBlurUniforms : public Uniforms {
 
 class GlowBlurRuntimeFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset, float resizeRatio);
 
  protected:

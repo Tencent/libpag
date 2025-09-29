@@ -1,17 +1,16 @@
 import { PAGModule } from './pag-module';
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
-import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { destroyVerify } from './utils/decorators';
 import { getWasmIns, layer2typeLayer, proxyVector } from './utils/type-utils';
 import { Matrix } from './core/matrix';
 
 import { PAGComposition } from './pag-composition';
 import type { PAGLayer } from './pag-layer';
-import type { PAGScaleMode, Rect } from './types';
+import {PAGScaleMode, Rect, VecArray} from './types';
 import type { VideoReader } from './interfaces';
 
 @destroyVerify
-@wasmAwaitRewind
 export class PAGPlayer {
   public static create(): PAGPlayer {
     const wasmIns = new PAGModule._PAGPlayer();
@@ -36,7 +35,6 @@ export class PAGPlayer {
    * Apply all pending changes to the target surface immediately. Returns true if the content has
    * changed.
    */
-  @wasmAsyncMethod
   public async flush() {
     return PAGModule.webAssemblyQueue.exec<boolean>(this.wasmIns._flush, this.wasmIns);
   }
@@ -44,7 +42,6 @@ export class PAGPlayer {
    * [Internal] Apply all pending changes to the target surface immediately. Returns true if the content has
    * changed.
    */
-  @wasmAsyncMethod
   public async flushInternal(callback: (res: boolean) => void) {
     const res = await PAGModule.webAssemblyQueue.exec<boolean>(async () => {
       PAGModule.currentPlayer = this;
@@ -239,7 +236,11 @@ export class PAGPlayer {
   public getLayersUnderPoint(localX: number, localY: number) {
     const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
     if (!wasmIns) throw new Error(`Get layers under point, x: ${localX} y:${localY} fail!`);
-    return proxyVector(wasmIns, layer2typeLayer);
+    const layerArray = VecArray.create();
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
+    }
+    return layerArray;
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point

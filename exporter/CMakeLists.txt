@@ -10,6 +10,12 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
+if (CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_OSX_ARCHITECTURES MATCHES "aarch64")
+    set(ARCH arm64)
+elseif (CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" OR CMAKE_OSX_ARCHITECTURES MATCHES "amd64")
+    set(ARCH x64)
+endif ()
+
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
 endif ()
@@ -111,16 +117,39 @@ set(PAG_USE_RTTR OFF)
 set(PAG_USE_LIBAVC ON)
 set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_TESTS OFF)
+set(PAG_BUILD_FRAMEWORK OFF)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./libpag)
-
+list(APPEND PAG_OPTIONS "-DPAG_USE_QT=${PAG_USE_QT}")
+list(APPEND PAG_OPTIONS "-DPAG_USE_RTTR=${PAG_USE_RTTR}")
+list(APPEND PAG_OPTIONS "-DPAG_USE_LIBAVC=${PAG_USE_LIBAVC}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_TESTS=${PAG_BUILD_TESTS}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
+list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    list(APPEND PAG_OPTIONS "-d")
+    string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
+endif ()
+set(PAG_OUTPUT_DIR ${CMAKE_BINARY_DIR}/libpag)
+set(PAG_OUTPUT_LIB ${PAG_OUTPUT_DIR}/${ARCH}/libpag${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(PAG_OUTPUT_MD5 ${PAG_OUTPUT_DIR}/.pag.${ARCH}.md5)
+add_custom_target(pag
+        COMMAND node ${CMAKE_SOURCE_DIR}/../build_pag ${PAG_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${PAG_OUTPUT_DIR}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        BYPRODUCTS ${PAG_OUTPUT_LIB} ${PAG_OUTPUT_MD5}
+        VERBATIM USES_TERMINAL)
+list(APPEND libs ${PAG_OUTPUT_LIB})
+list(APPEND PAG_DEPEND_TARGETS pag)
 
 add_library(PAGExporter MODULE ${PAG_EXPORTER_SOURCE_FILES} ${PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES} ${QT_RESOURCES})
+if (PAG_DEPEND_TARGETS)
+    add_dependencies(PAGExporter ${PAG_DEPEND_TARGETS})
+endif ()
 
 target_include_directories(PAGExporter SYSTEM PRIVATE ${PAG_EXPORTER_THIRD_PARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${PAG_EXPORTER_INCLUDES})
-target_link_libraries(PAGExporter  pag ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Network)
+target_link_libraries(PAGExporter ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Network)
 
 if (APPLE)
     target_link_libraries(PAGExporter "-framework AppKit" compression)

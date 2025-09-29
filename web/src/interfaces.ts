@@ -1,4 +1,3 @@
-import type { WebFont } from '@tgfx/core/web-mask';
 import type { ctor, Point, Rect, Vector } from './types';
 
 export interface TimeRange {
@@ -32,30 +31,22 @@ export interface FontMetrics {
   capHeight: number;
 }
 
+export interface Stroke {
+  width: number;
+  cap: ctor;
+  join: ctor;
+  miterLimit: number;
+}
+
 export interface ScalerContext {
   fontString: (fauxBold: boolean, fauxItalic: boolean) => string;
   getAdvance: (text: string) => number;
   getBounds: (text: string, fauxBold: boolean, fauxItalic: boolean) => Rect;
   getFontMetrics: () => FontMetrics;
-  generateImage: (text: string, bounds: Rect) => TexImageSource | OffscreenCanvas;
+  readPixels: (text: string, bounds: Rect, fauxBold: boolean, stroke?: Stroke) => Uint8Array | null;
 }
 
 export interface ScalerContextConstructor {
   isEmoji: (text: string) => boolean;
   new (fontName: string, fontStyle: string, size: number, fauxBold: boolean, fauxItalic: boolean): ScalerContext;
 }
-
-export interface WebMask {
-  fillPath: (path: Path2D, fillType: ctor) => void;
-  fillText: (webFont: WebFont, texts: Vector<string>, positions: Vector<Point>, matrixWasmIns: any) => void;
-  strokeText: (
-    webFont: WebFont,
-    stroke: { width: number; cap: ctor; join: ctor; miterLimit: number },
-    texts: Vector<string>,
-    positions: Vector<Point>,
-    matrixWasmIns: any,
-  ) => void;
-  clear: () => void;
-}
-
-export type WebMaskConstructor = new (canvas: HTMLCanvasElement | OffscreenCanvas) => WebMask;

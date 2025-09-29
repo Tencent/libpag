@@ -55,7 +55,7 @@ describe('PAGFile', () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -69,13 +69,13 @@ describe('PAGFile', () => {
 
   let pagFile: PAGFile;
   it('Load from arrayBuffer', async () => {
-    const buffer = await global.fetch('http://127.0.0.1:8080/demo/assets/test2.pag').then((res) => res.arrayBuffer());
+    const buffer = await global.fetch('/demo/assets/test2.pag').then((res) => res.arrayBuffer());
     pagFile = await PAG.PAGFile.load(buffer);
     expect(pagFile.wasmIns).to.be.a('object');
   });
 
   it('Get tagLevel', async () => {
-    expect(pagFile.tagLevel()).to.be.eq(29);
+    expect(pagFile.tagLevel()).to.be.eq(52);
   });
 
   it('Get layer number', async () => {
@@ -103,6 +103,22 @@ describe('PAGFile', () => {
     pagFile.replaceText(0, textData);
     const pagLayer = pagLayers.get(0);
     expect(pagLayer.text()).to.be.eq('test');
+  });
+
+  it('Replace Image', async () => {
+    const buffer = await global.fetch('/demo/assets/test.pag').then((res) => res.arrayBuffer());
+    const pagFileImage = await PAG.PAGFile.load(buffer);
+    expect(pagFileImage.wasmIns).to.be.a('object');
+
+    const imageBlob = await global.fetch('/demo/assets/cat.png').then((res) => res.blob());
+    const pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
+    expect(pagImage.wasmIns).to.be.a('object');
+
+    pagFileImage.replaceImage(0, pagImage);
+  });
+
+  it('Get Layers By EditableIndex', () => {
+    expect(pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Text).size()).to.be.eq(1);
   });
 
   it('Get editable indices', () => {

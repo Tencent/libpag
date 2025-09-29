@@ -5,11 +5,8 @@ import {
   VIDEO_PLAYBACK_RATE_MIN,
 } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
-import { IPHONE, WECHAT, SAFARI_OR_IOS_WEBVIEW, WORKER } from '../utils/ua';
+import { IPHONE, WECHAT, SAFARI_OR_IOS_WEBVIEW } from '../utils/ua';
 import { PAGModule } from '../pag-module';
-import { WorkerMessageType } from '../worker/events';
-import { WorkerVideoReader } from '../worker/video-reader';
-import { postMessage } from '../worker/utils';
 
 import type { TimeRange, VideoReader as VideoReaderInterfaces } from '../interfaces';
 import type { PAGPlayer } from '../pag-player';
@@ -49,34 +46,13 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
 };
 
 export class VideoReader {
-  public static async create(
+  public static create(
     source: Uint8Array | HTMLVideoElement,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-  ): Promise<VideoReaderInterfaces> {
-    if (WORKER) {
-      const proxyId = await new Promise<number>((resolve) => {
-        // TODO: source as HTMLVideoElement in WebWorker version.
-        const uint8Array = source as Uint8Array;
-        const buffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength);
-        postMessage(
-          self,
-          {
-            name: WorkerMessageType.VideoReader_constructor,
-            args: [buffer, width, height, frameRate, staticTimeRanges, true],
-          },
-          (res) => {
-            resolve(res);
-          },
-          [buffer],
-        );
-      });
-      const videoReader = new WorkerVideoReader(proxyId);
-      PAGModule.currentPlayer?.linkVideoReader(videoReader);
-      return videoReader;
-    }
+  ): VideoReaderInterfaces {
     return new VideoReader(source, width, height, frameRate, staticTimeRanges);
   }
 
@@ -95,6 +71,7 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
+  private currentFrame: number=0;
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
@@ -102,7 +79,6 @@ export class VideoReader {
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-    isWorker = false,
   ) {
     if (isInstanceOf(source, globalThis.HTMLVideoElement)) {
       this.videoEl = source as HTMLVideoElement;
@@ -118,7 +94,8 @@ export class VideoReader {
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
       });
-      const blob = new Blob([source as Uint8Array], { type: 'video/mp4' });
+      const buffer = (source as Uint8Array).slice();
+      const blob = new Blob([buffer], { type: 'video/mp4' });
       this.videoEl.src = URL.createObjectURL(blob);
       if (IPHONE) {
         // use load() will make a bug on Chrome.
@@ -132,80 +109,82 @@ export class VideoReader {
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
     }
-    if (!isWorker) {
-      this.linkPlayer(PAGModule.currentPlayer);
-    }
   }
 
-  public async prepare(targetFrame: number, playbackRate: number) {
-    this.setError(null); // reset error
-    this.isSought = false; // reset seek status
-    const { currentTime } = this.videoEl!;
-    const targetTime = targetFrame / this.frameRate;
-    if (currentTime === 0 && targetTime === 0) {
-      if (!this.canplay && !SAFARI_OR_IOS_WEBVIEW) {
-        await waitVideoCanPlay(this.videoEl!);
-      } else {
-        try {
-          await this.play();
-        } catch (e) {
-          this.setError(e);
-        }
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => {
-            this.pause();
+  public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
+    const promise =new Promise<void>(async (resolve, reject) => {
+        this.setError(null); // reset error
+        this.isSought = false; // reset seek status
+        const { currentTime } = this.videoEl!;
+        const targetTime = targetFrame / this.frameRate;
+
+        if (currentTime === 0 && targetTime === 0) {
+          if (!this.canplay && !SAFARI_OR_IOS_WEBVIEW) {
+            await waitVideoCanPlay(this.videoEl!);
+          } else {
+            try {
+              await this.play();
+            } catch (e) {
+              this.setError(e);
+              this.currentFrame = targetFrame;
+              reject(e);
+              return;
+            }
+            await new Promise<void>((resolveInner) => {
+              requestAnimationFrame(() => {
+                this.pause();
+                resolveInner();
+              });
+            });
+          }
+        } else {
+          if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
+            // Current frame
+          } else if (this.staticTimeRanges?.contains(targetFrame)) {
+            // Static frame
+            await this.seek(targetTime, false);
+            this.currentFrame = targetFrame;
+            resolve();  // Ensure promise resolves
+            return;
+          } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
+            // Within tolerable frame rate deviation
+          } else {
+            // Seek and play
+            this.isSought = true;
+            await this.seek(targetTime);
+            this.currentFrame = targetFrame;
             resolve();
-          });
-        });
-      }
-    } else {
-      if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
-        // Current frame
-      } else if (this.staticTimeRanges?.contains(targetFrame)) {
-        // Static frame
-        await this.seek(targetTime, false);
-        return;
-      } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
-        // Within tolerable frame rate deviation
-      } else {
-        // Seek and play
-        this.isSought = true;
-        await this.seek(targetTime);
-        return;
-      }
-    }
+            return;
+          }
+        }
 
-    const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
-    if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
-      this.videoEl!.playbackRate = targetPlaybackRate;
-    }
+        const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
+        if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
+          this.videoEl!.playbackRate = targetPlaybackRate;
+        }
 
-    if (this.isPlaying && this.videoEl!.paused) {
-      try {
-        await this.play();
-      } catch (e) {
-        this.setError(e);
-      }
-    }
+        if (this.isPlaying && this.videoEl!.paused) {
+          try {
+            await this.play();
+          } catch (e) {
+            this.setError(e);
+            this.currentFrame = targetFrame;
+            reject(e);
+            return;
+          }
+        }
+        this.currentFrame = targetFrame;
+        resolve();
+    });
+    await promise;
+  }
+
+  public getCurrentFrame(): number {
+    return this.currentFrame;
   }
 
   public getVideo() {
     return this.videoEl;
-  }
-
-  // Only work in web worker version
-  public async generateBitmap() {
-    // Batter than createImageBitmap from video element in benchmark
-    if (!this.bitmapCanvas) {
-      this.bitmapCanvas = new OffscreenCanvas(this.width, this.height);
-      this.bitmapCanvas!.width = this.width;
-      this.bitmapCanvas!.height = this.height;
-      this.bitmapCtx = this.bitmapCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
-    }
-    this.bitmapCtx?.fillRect(0, 0, this.width, this.height);
-    this.bitmapCtx?.drawImage(this.videoEl as HTMLVideoElement, 0, 0, this.width, this.height);
-    this.bitmap = await createImageBitmap(this.bitmapCanvas);
-    return this.bitmap;
   }
 
   public async play() {

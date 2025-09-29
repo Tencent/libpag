@@ -20,6 +20,7 @@
 
 #include <QQmlApplicationEngine>
 #include <QString>
+#include <QTranslator>
 #include "PAGView.h"
 #include "PAGWindowHelper.h"
 #include "editing/PAGEditAttributeModel.h"
@@ -43,6 +44,8 @@ class PAGWindow : public QObject {
 
   void open();
   QString getFilePath();
+  QQmlApplicationEngine* getEngine();
+  bool isUseEnglish();
 
   static QList<PAGWindow*> AllWindows;
 
@@ -50,6 +53,7 @@ class PAGWindow : public QObject {
   QString filePath = "";
   QQuickWindow* window = nullptr;
   PAGView* pagView = nullptr;
+  std::unique_ptr<QTranslator> translator = nullptr;
   std::unique_ptr<PAGWindowHelper> windowHelper = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
   std::unique_ptr<PAGTreeViewModel> treeViewModel = nullptr;

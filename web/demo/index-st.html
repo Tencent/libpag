@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link rel="stylesheet" href="./index.css" />
+  </head>
+  <body>
+    <div id="waiting">libpag loading...</div>
+    <div id="container" class="container" style="display: none">
+      <div>
+        <canvas class="canvas" id="pag" width="640" height="640"></canvas>
+        <div class="tablecloth" id="tablecloth"></div>
+        <div id="editLayer-content"></div>
+        <p id="test"></p>
+      </div>
+      <div class="ml-24">
+        <div>
+          <button class="mt-24" id="btn-upload-pag">Load custom PAG</button>
+          <button class="mt-24" id="btn-test-vector-pag">Test vector PAG</button>
+          <button class="mt-24" id="btn-test-video-pag">Test video PAG</button>
+          <button class="mt-24" id="btn-test-text-pag">Test font PAG</button>
+          <button class="mt-24" id="btn-test-font">Load test font</button>
+          <button class="mt-24" id="btn-enabled-decoder">Enabled software decoder</button>
+          <button class="mt-24" id="btn-disabled-decoder">Disabled software decoder</button>
+          <input id="upload-pag" type="file" style="display: none" accept=".pag" />
+        </div>
+        <section id="control" style="display: none">
+          <div class="performance mt-24">
+            <p class="performance-title">Performance</p>
+            <p class="performance-label" id="decode-time">PAG File decode time:</p>
+            <p class="performance-label" id="initialized-time">PAG View initialized time:</p>
+            <p class="performance-label" id="fps">PAG View FPS:</p>
+          </div>
+          <div class="container-1">
+            <section class="ac-container">
+              <div>
+                <input class="ac-check" id="ac-1" name="accordion-1" type="checkbox" checked />
+                <label for="ac-1">PAGView </label>
+                <article class="ac-large">
+                  <div class="mt-24">
+                    <button id="btn-play">Play</button>
+                    <button id="btn-pause">Pause</button>
+                    <button id="btn-stop">Stop</button>
+                    <button id="btn-destroy">Destroy</button>
+                    <button id="btn-flush">Flush</button>
+                  </div>
+                  <div class="mt-24">
+                    Repeat count:
+                    <input id="repeatCount" type="number" value="0" />
+                    <button id="setRepeatCount">Set</button>
+                  </div>
+                  <div class="mt-24">
+                    <button id="btn-maxFrameRate">Get max frame rate</button>
+                    Max frame rate
+                    <input id="maxFrameRate" type="number" value="0" />
+                    <button id="setMaxFrameRate">Set</button>
+                  </div>
+                  <div class="mt-24">
+                    <button class="mt-24" id="btn-scaleMode">Get scale mode</button>
+                    Scale mode
+                    <select id="scaleMode">
+                      <option value="0">None</option>
+                      <option value="1">Stretch</option>
+                      <option value="2" selected>LetterBox</option>
+                      <option value="3">Zoom</option>
+                    </select>
+                    <button id="setScaleMode" class="mt-24">Set</button>
+                  </div>
+                  <div class="mt-24">
+                    <button id="btn-getProgress">Get progress</button>
+                    Progress
+                    <input id="progress" type="number" value="0" />
+                    <button id="setProgress">Set</button>
+                  </div>
+                  <button class="mt-24" id="btn-videoEnabled">VideoEnabled status</button>
+                  <button class="mt-24" id="btn-setVideoEnabled">Set videoEnabled</button>
+                  <button class="mt-24" id="btn-cacheEnabled">CacheEnabled status</button>
+                  <button class="mt-24" id="btn-setCacheEnabled">Set cacheEnabled</button>
+                  <button class="mt-24" id="btn-freeCache">FreeCache</button>
+                  <button class="mt-24" id="btn-makeSnapshot">makeSnapshot</button>
+                  <div class="mt-24">
+                    <button id="btn-cacheScale">CacheScale status</button>
+                    CacheScale
+                    <input id="cacheScale" type="number" value="1" />
+                    <button id="btn-setCacheScale">Set cacheScale</button>
+                  </div>
+                </article>
+              </div>
+              <div>
+                <input class="ac-check" id="ac-2" name="accordion-1" type="checkbox" />
+                <label for="ac-2">PAGFile</label>
+                <article class="ac-large">
+                  <div class="mt-24">
+                    <button id="btn-pagfile-get-duration">Get duration</button>
+                    PAGFile duration
+                    <input id="input-pagfile-duration" type="number" value="0" />
+                    <button id="btn-pagfile-set-duration">setDuration</button>
+                  </div>
+                  <div class="mt-24">
+                    <button id="btn-pagfile-time-stretch-mode">Get timeStretchMode</button>
+                    timeStretchMode
+                    <select id="select-time-stretch-mode">
+                      <option value="0">None</option>
+                      <option value="1">Scale</option>
+                      <option value="2" selected>Repeat</option>
+                      <option value="3">RepeatInverted</option>
+                    </select>
+                    <button id="btn-pagfile-set-time-stretch-mode">setTimeStretchMode</button>
+                  </div>
+                </article>
+              </div>
+              <div>
+                <input class="ac-check" id="ac-3" name="accordion-1" type="checkbox" />
+                <label for="ac-3">PAGComposition</label>
+                <article class="ac-large">
+                  <div class="support-method">
+                    <div class="title">pag-wasm-bindings-method:</div>
+                    width, height, setContentSize, numChildren, getLayerAt, getLayerIndex, swapLayerAt, contains,
+                    audioStartTime, audioMarkers, audioMarkers, removeLayerAt, removeAllLayers, addLayer, addLayerAt,
+                    getLayersByName, getLayersUnderPoint
+                  </div>
+                  <button class="mt-24" id="btn-composition">Test API</button>
+                </article>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="./wasm/libpag.js"></script>
+  </body>
+</html>

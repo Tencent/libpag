@@ -18,7 +18,9 @@
 
 #include "PAGWindow.h"
 #include <QQmlContext>
+#include <QSettings>
 #include "PAGRenderThread.h"
+#include "PAGViewer.h"
 #include "PAGWindowHelper.h"
 #include "profiling/PAGRunTimeDataModel.h"
 #include "task/PAGTaskFactory.h"
@@ -45,6 +47,7 @@ void PAGWindow::onPAGViewerDestroyed() {
 }
 
 void PAGWindow::open() {
+  translator = std::make_unique<QTranslator>();
   engine = std::make_unique<QQmlApplicationEngine>();
   windowHelper = std::make_unique<PAGWindowHelper>();
   treeViewModel = std::make_unique<PAGTreeViewModel>();
@@ -54,6 +57,11 @@ void PAGWindow::open() {
   imageLayerModel = std::make_unique<PAGImageLayerModel>();
   benchmarkModel = std::make_unique<PAGBenchmarkModel>();
 
+  bool result = translator->load(":translation/Chinese.qm");
+  if (result && !isUseEnglish() && qApp != nullptr) {
+    qApp->installTranslator(translator.get());
+  }
+
   auto context = engine->rootContext();
   context->setContextProperty("windowHelper", windowHelper.get());
   context->setContextProperty("treeViewModel", treeViewModel.get());
@@ -62,6 +70,9 @@ void PAGWindow::open() {
   context->setContextProperty("textLayerModel", textLayerModel.get());
   context->setContextProperty("imageLayerModel", imageLayerModel.get());
   context->setContextProperty("benchmarkModel", benchmarkModel.get());
+
+  auto viewer = static_cast<PAGViewer*>(qApp);
+  context->setContextProperty("checkUpdateModel", viewer->getCheckUpdateModel());
 
   // Image Provider will be managed by QML
   auto imageProvider = new PAGImageProvider();
@@ -97,8 +108,21 @@ void PAGWindow::open() {
           &PAGRunTimeDataModel::updateData);
 }
 
+bool PAGWindow::isUseEnglish() {
+  QSettings settings;
+  auto value = settings.value("isUseEnglish");
+  if (!value.isNull()) {
+    return value.toBool();
+  }
+  return true;
+}
+
 QString PAGWindow::getFilePath() {
   return filePath;
+}
+
+QQmlApplicationEngine* PAGWindow::getEngine() {
+  return engine.get();
 }
 
 }  // namespace pag

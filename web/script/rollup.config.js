@@ -10,6 +10,12 @@ import { readFileSync } from 'node:fs';
 
 const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
+const arch = process.env.ARCH;
+const libPath = (arch === 'wasm-mt' ? "lib-mt" : "lib");
+const demoName = (arch === 'wasm-mt'? 'index': 'index-st');
+
+require("./update.pag.import");
+
 
 const plugins = [
   esbuild({ tsconfig: 'tsconfig.json', minify: false }),
@@ -41,7 +47,7 @@ const umdConfig = {
       format: 'umd',
       exports: 'named',
       sourcemap: true,
-      file: pkg.browser,
+      file: `${libPath}/libpag.umd.js`,
     },
   ],
   plugins: [...plugins],
@@ -56,37 +62,7 @@ const umdMinConfig = {
       format: 'umd',
       exports: 'named',
       sourcemap: true,
-      file: 'lib/libpag.min.js',
-    },
-  ],
-  plugins: [...plugins, terser()],
-};
-
-const workerUmdConfig = {
-  input: 'src/worker/client.ts',
-  output: [
-    {
-      name: 'libpag',
-      banner,
-      format: 'umd',
-      exports: 'named',
-      sourcemap: true,
-      file: 'lib/libpag.worker.js',
-    },
-  ],
-  plugins: [...plugins],
-};
-
-const workerUmdMinConfig = {
-  input: 'src/worker/client.ts',
-  output: [
-    {
-      name: 'libpag',
-      banner,
-      format: 'umd',
-      exports: 'named',
-      sourcemap: true,
-      file: 'lib/libpag.worker.min.js',
+      file: `${libPath}/libpag.min.js`,
     },
   ],
   plugins: [...plugins, terser()],
@@ -98,29 +74,14 @@ export default [
   {
     input: 'src/pag.ts',
     output: [
-      { banner, file: pkg.module, format: 'esm', sourcemap: true },
-      { banner, file: pkg.main, format: 'cjs', exports: 'auto', sourcemap: true },
-    ],
-    plugins: [...plugins],
-  },
-  workerUmdConfig,
-  workerUmdMinConfig,
-  {
-    input: 'src/worker/client.ts',
-    output: [
-      { banner, file: 'lib/libpag.worker.esm.js', format: 'esm', sourcemap: true },
-      { banner, file: 'lib/libpag.worker.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
+      { banner, file: `${libPath}/libpag.esm.js`, format: 'esm', sourcemap: true },
+      { banner, file: `${libPath}/libpag.cjs.js`, format: 'cjs', exports: 'auto', sourcemap: true },
     ],
     plugins: [...plugins],
   },
   {
-    input: 'demo/index.ts',
-    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-    plugins: plugins,
-  },
-  {
-    input: 'demo/worker.ts',
-    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
+    input: `demo/${demoName}.ts`,
+    output: { banner, file: `demo/${arch}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
   },
 ];

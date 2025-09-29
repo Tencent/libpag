@@ -304,5 +304,19 @@ void Codec::UpdateFileAttributes(std::shared_ptr<File> file, CodecContext* conte
   file->editableImages = context->editableImages;
   file->editableTexts = context->editableTexts;
   file->imageScaleModes = context->imageScaleModes;
+  if (file->editableImages == nullptr) {
+    auto maxIndex = file->numImages();
+    file->editableImages = new std::vector<int>(maxIndex);
+    for (int i = 0; i < maxIndex; i++) {
+      file->editableImages->at(i) = i;
+    }
+  }
+  if (file->editableTexts == nullptr) {
+    auto maxIndex = file->numTexts();
+    file->editableTexts = new std::vector<int>(maxIndex);
+    for (int i = 0; i < maxIndex; i++) {
+      file->editableTexts->at(i) = i;
+    }
+  }
 }
 }  // namespace pag

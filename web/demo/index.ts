@@ -3,9 +3,11 @@ import { AudioPlayer } from './module/audio-player';
 
 import type { PAGFile } from '../src/pag-file';
 import type { PAGView } from '../src/pag-view';
-import type { PAG as PAGNamespace } from '../src/types';
+import  {type PAG as PAGNamespace,LayerType } from '../src/types';
 import type { PAGComposition } from '../src/pag-composition';
 import type { PAGImageLayer } from '../src/pag-image-layer';
+import type * as Libpag from "../src/pag";
+import type {PAGTextLayer} from "../src/pag-text-layer";
 
 declare global {
   interface Window {
@@ -26,254 +28,259 @@ let PAG: PAGNamespace;
 let canvasElementSize = 640;
 let isMobile = false;
 
-window.onload = async () => {
-  PAG = await PAGInit({ locateFile: (file: string) => '../lib/' + file });
-  // Mobile
-  isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-  if (isMobile) {
-    document
-      .querySelector('meta[name="viewport"]')
-      ?.setAttribute(
-        'content',
-        'viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no',
-      );
-    await loadScript('https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js');
-    const vconsole = new window.VConsole();
-    canvasElementSize = 320;
-    const canvas = document.getElementById('pag') as HTMLCanvasElement;
-    canvas.width = canvasElementSize;
-    canvas.height = canvasElementSize;
-    const tablecloth = document.getElementById('tablecloth');
-    tablecloth!.style.width = `${canvasElementSize}px`;
-    tablecloth!.style.height = `${canvasElementSize}px`;
-  }
-
-  console.log(`wasm loaded! SDKVersion ${PAG.SDKVersion()}`, PAG);
-
-  document.getElementById('waiting')!.style.display = 'none';
-  document.getElementById('container')!.style.display = isMobile ? 'block' : '';
-
-  // 加载测试字体
-  document.getElementById('btn-test-font')?.addEventListener('click', () => {
-    const url = './assets/SourceHanSerifCN-Regular.ttf';
-    fetch(url)
-      .then((response) => response.blob())
-      .then(async (blob) => {
-        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-        await PAG.PAGFont.registerFont('SourceHanSerifCN', file);
-        console.log(`已加载${file.name}`);
-      });
-  });
-
-  // 加载PAG
-  document.getElementById('btn-upload-pag')?.addEventListener('click', () => {
-    document.getElementById('upload-pag')?.click();
-  });
-  document.getElementById('upload-pag')?.addEventListener('change', (event: any) => {
-    if (event.target) {
-      createPAGView(event.target.files[0] as File);
+if (typeof window !== 'undefined') {
+  window.onload = async () => {
+    PAG = await PAGInit({ locateFile: (file: string) => '../lib-mt/' + file });
+    // Mobile
+    isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+    if (isMobile) {
+      document
+          .querySelector('meta[name="viewport"]')
+          ?.setAttribute(
+              'content',
+              'viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no',
+          );
+      await loadScript('https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js');
+      const vconsole = new window.VConsole();
+      canvasElementSize = 320;
+      const canvas = document.getElementById('pag') as HTMLCanvasElement;
+      canvas.width = canvasElementSize;
+      canvas.height = canvasElementSize;
+      const tablecloth = document.getElementById('tablecloth');
+      tablecloth!.style.width = `${canvasElementSize}px`;
+      tablecloth!.style.height = `${canvasElementSize}px`;
     }
-  });
-  document.getElementById('btn-test-vector-pag')?.addEventListener('click', () => {
-    const url = './assets/like.pag';
-    fetch(url)
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => {
-        createPAGView(arrayBuffer);
-      });
-  });
-  document.getElementById('btn-test-video-pag')?.addEventListener('click', () => {
-    const url = './assets/particle_video.pag';
-    fetch(url)
-      .then((response) => response.blob())
-      .then((blob) => {
-        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-        createPAGView(file);
-      });
-  });
-  document.getElementById('btn-test-text-pag')?.addEventListener('click', async () => {
-    const url = './assets/test2.pag';
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-    await createPAGView(file);
-    const textDoc = pagFile.getTextData(0);
-    console.log(textDoc);
-    textDoc.text = '替换后的文字🤔#️⃣#*️⃣*1️⃣🔟🇨🇳🏴󠁧󠁢󠁥󠁮󠁧󠁿🤡👨🏼‍🦱👨‍👨‍👧‍👦';
-    textDoc.fillColor = { red: 255, green: 255, blue: 255 };
-    textDoc.applyFill = true;
-    textDoc.backgroundAlpha = 100;
-    textDoc.backgroundColor = { red: 255, green: 0, blue: 0 };
-    textDoc.baselineShift = 200;
-    textDoc.fauxBold = true;
-    textDoc.fauxItalic = false;
-    textDoc.fontFamily = 'SourceHanSerifCN';
-    textDoc.fontSize = 100;
-    textDoc.justification = types.ParagraphJustification.CenterJustify;
-    textDoc.strokeWidth = 20;
-    textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
-    textDoc.applyStroke = true;
-    textDoc.strokeOverFill = true;
-    textDoc.tracking = 600;
-    pagFile.replaceText(0, textDoc);
-    console.log(pagFile.getTextData(0));
-    await pagView.flush();
-  });
-  document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
-    if (!window.ffavc) await loadScript('https://cdn.jsdelivr.net/npm/ffavc@latest/lib/ffavc.min.js');
-    const FFAVC = await window.ffavc.FFAVCInit();
-    const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
-    PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
-    console.log('=== 开启 ffavc 软件解码 ===');
-  });
-  document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
-    if (window.ffavc) {
+
+    console.log(`wasm loaded! SDKVersion ${PAG.SDKVersion()}`, PAG);
+
+    document.getElementById('waiting')!.style.display = 'none';
+    document.getElementById('container')!.style.display = isMobile ? 'block' : '';
+
+    // 加载测试字体
+    document.getElementById('btn-test-font')?.addEventListener('click', () => {
+      const url = './assets/SourceHanSerifCN-Regular.ttf';
+      fetch(url)
+          .then((response) => response.blob())
+          .then(async (blob) => {
+            const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+            await PAG.PAGFont.registerFont('SourceHanSerifCN', file);
+            console.log(`已加载${file.name}`);
+          });
+    });
+
+    // 加载PAG
+    document.getElementById('btn-upload-pag')?.addEventListener('click', () => {
+      document.getElementById('upload-pag')?.click();
+    });
+    document.getElementById('upload-pag')?.addEventListener('change', (event: any) => {
+      if (event.target) {
+        createPAGView(event.target.files[0] as File);
+      }
+    });
+    document.getElementById('btn-test-vector-pag')?.addEventListener('click', () => {
+      const url = './assets/like.pag';
+      fetch(url)
+          .then((response) => response.arrayBuffer())
+          .then((arrayBuffer) => {
+            createPAGView(arrayBuffer);
+          });
+    });
+    document.getElementById('btn-test-video-pag')?.addEventListener('click', () => {
+      const url = './assets/particle_video.pag';
+      fetch(url)
+          .then((response) => response.blob())
+          .then((blob) => {
+            const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+            createPAGView(file);
+          });
+    });
+    document.getElementById('btn-test-text-pag')?.addEventListener('click', async () => {
+      const url = './assets/test2.pag';
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+      await createPAGView(file);
+      const textDoc = pagFile.getTextData(0);
+      console.log(textDoc);
+      textDoc.text = '替换后的文字🤔#️⃣#*️⃣*1️⃣🔟🇨🇳🏴󠁧󠁢󠁥󠁮󠁧󠁿🤡👨🏼‍🦱👨‍👨‍👧‍👦';
+      textDoc.fillColor = { red: 255, green: 255, blue: 255 };
+      textDoc.applyFill = true;
+      textDoc.backgroundAlpha = 100;
+      textDoc.backgroundColor = { red: 255, green: 0, blue: 0 };
+      textDoc.baselineShift = 200;
+      textDoc.fauxBold = true;
+      textDoc.fauxItalic = false;
+      textDoc.fontFamily = 'SourceHanSerifCN';
+      textDoc.fontSize = 100;
+      textDoc.justification = types.ParagraphJustification.CenterJustify;
+      textDoc.strokeWidth = 20;
+      textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
+      textDoc.applyStroke = true;
+      textDoc.strokeOverFill = true;
+      textDoc.tracking = 600;
+      pagFile.replaceText(0, textDoc);
+      const newtextDoc=pagFile.getTextData(0);
+      textDoc.delete();
+      newtextDoc.delete();
+      await pagView.flush();
+    });
+    document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
+      if (!window.ffavc) await loadScript('https://cdn.jsdelivr.net/npm/ffavc@latest/lib/ffavc.min.js');
       const FFAVC = await window.ffavc.FFAVCInit();
       const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
       PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
-    }
-  });
+      console.log('=== 开启 ffavc 软件解码 ===');
+    });
+    document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
+      if (window.ffavc) {
+        const FFAVC = await window.ffavc.FFAVCInit();
+        const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
+        PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
+      }
+    });
 
-  // Get PAGFile duration
-  document.getElementById('btn-pagfile-get-duration')?.addEventListener('click', () => {
-    const duration = pagFile.duration();
-    console.log(`PAGFile duration ${duration}`);
-  });
+    // Get PAGFile duration
+    document.getElementById('btn-pagfile-get-duration')?.addEventListener('click', () => {
+      const duration = pagFile.duration();
+      console.log(`PAGFile duration ${duration}`);
+    });
 
-  // PAGFile setDuration
-  document.getElementById('btn-pagfile-set-duration')?.addEventListener('click', () => {
-    const duration = Number((document.getElementById('input-pagfile-duration') as HTMLInputElement).value);
-    pagFile.setDuration(duration);
-    console.log(`Set PAGFile duration ${duration} `);
-  });
+    // PAGFile setDuration
+    document.getElementById('btn-pagfile-set-duration')?.addEventListener('click', () => {
+      const duration = Number((document.getElementById('input-pagfile-duration') as HTMLInputElement).value);
+      pagFile.setDuration(duration);
+      console.log(`Set PAGFile duration ${duration} `);
+    });
 
-  // Get timeStretchMode
-  document.getElementById('btn-pagfile-time-stretch-mode')?.addEventListener('click', () => {
-    const timeStretchMode = pagFile.timeStretchMode();
-    console.log(`PAGFile timeStretchMode ${timeStretchMode} `);
-  });
+    // Get timeStretchMode
+    document.getElementById('btn-pagfile-time-stretch-mode')?.addEventListener('click', () => {
+      const timeStretchMode = pagFile.timeStretchMode();
+      console.log(`PAGFile timeStretchMode ${timeStretchMode} `);
+    });
 
-  document.getElementById('btn-pagfile-set-time-stretch-mode')?.addEventListener('click', () => {
-    const mode = Number((document.getElementById('select-time-stretch-mode') as HTMLSelectElement).value);
-    pagFile.setTimeStretchMode(mode);
-    console.log(`Set PAGFile timeStretchMode ${mode}`);
-  });
+    document.getElementById('btn-pagfile-set-time-stretch-mode')?.addEventListener('click', () => {
+      const mode = Number((document.getElementById('select-time-stretch-mode') as HTMLSelectElement).value);
+      pagFile.setTimeStretchMode(mode);
+      console.log(`Set PAGFile timeStretchMode ${mode}`);
+    });
 
-  // 控制
-  document.getElementById('btn-play')?.addEventListener('click', () => {
-    pagView.play();
-    audioEl.play();
-    console.log('开始');
-  });
-  document.getElementById('btn-pause')?.addEventListener('click', () => {
-    pagView.pause();
-    audioEl.pause();
-    console.log('暂停');
-  });
-  document.getElementById('btn-stop')?.addEventListener('click', () => {
-    pagView.stop();
-    audioEl.stop();
-    console.log('停止');
-  });
-  document.getElementById('btn-destroy')?.addEventListener('click', () => {
-    pagView.destroy();
-    audioEl.destroy();
-    console.log('销毁');
-  });
+    // 控制
+    document.getElementById('btn-play')?.addEventListener('click', () => {
+      pagView.play();
+      audioEl.play();
+      console.log('开始');
+    });
+    document.getElementById('btn-pause')?.addEventListener('click', () => {
+      pagView.pause();
+      audioEl.pause();
+      console.log('暂停');
+    });
+    document.getElementById('btn-stop')?.addEventListener('click', () => {
+      pagView.stop();
+      audioEl.stop();
+      console.log('停止');
+    });
+    document.getElementById('btn-destroy')?.addEventListener('click', () => {
+      pagView.destroy();
+      audioEl.destroy();
+      console.log('销毁');
+    });
 
-  document.getElementById('btn-flush')?.addEventListener('click', () => {
-    pagView.flush();
-    console.log('刷新');
-  });
+    document.getElementById('btn-flush')?.addEventListener('click', () => {
+      pagView.flush();
+      console.log('刷新');
+    });
 
-  // 获取进度
-  document.getElementById('btn-getProgress')?.addEventListener('click', () => {
-    console.log(`当前进度：${pagView.getProgress()}`);
-  });
+    // 获取进度
+    document.getElementById('btn-getProgress')?.addEventListener('click', () => {
+      console.log(`当前进度：${pagView.getProgress()}`);
+    });
 
-  // 设置进度
-  document.getElementById('setProgress')?.addEventListener('click', () => {
-    let progress = Number((document.getElementById('progress') as HTMLInputElement).value);
-    if (!(progress >= 0 && progress <= 1)) {
-      alert('请输入0～1之间');
-    }
-    pagView.setProgress(progress);
-    console.log(`已设置进度：${progress}`);
-  });
+    // 设置进度
+    document.getElementById('setProgress')?.addEventListener('click', () => {
+      let progress = Number((document.getElementById('progress') as HTMLInputElement).value);
+      if (!(progress >= 0 && progress <= 1)) {
+        alert('请输入0～1之间');
+      }
+      pagView.setProgress(progress);
+      console.log(`已设置进度：${progress}`);
+    });
 
-  // 设置循环次数
-  document.getElementById('setRepeatCount')?.addEventListener('click', () => {
-    let repeatCount = Number((document.getElementById('repeatCount') as HTMLInputElement).value);
-    pagView.setRepeatCount(repeatCount);
-    console.log(`已设置循环次数：${repeatCount}`);
-  });
+    // 设置循环次数
+    document.getElementById('setRepeatCount')?.addEventListener('click', () => {
+      let repeatCount = Number((document.getElementById('repeatCount') as HTMLInputElement).value);
+      pagView.setRepeatCount(repeatCount);
+      console.log(`已设置循环次数：${repeatCount}`);
+    });
 
-  // maxFrameRate
-  document.getElementById('btn-maxFrameRate')?.addEventListener('click', () => {
-    console.log(`maxFrameRate: ${pagView.maxFrameRate()}`);
-  });
-  document.getElementById('setMaxFrameRate')?.addEventListener('click', () => {
-    let maxFrameRate = Number((document.getElementById('maxFrameRate') as HTMLInputElement).value);
-    pagView.setMaxFrameRate(maxFrameRate);
-  });
+    // maxFrameRate
+    document.getElementById('btn-maxFrameRate')?.addEventListener('click', () => {
+      console.log(`maxFrameRate: ${pagView.maxFrameRate()}`);
+    });
+    document.getElementById('setMaxFrameRate')?.addEventListener('click', () => {
+      let maxFrameRate = Number((document.getElementById('maxFrameRate') as HTMLInputElement).value);
+      pagView.setMaxFrameRate(maxFrameRate);
+    });
 
-  // scaleMode
-  document.getElementById('btn-scaleMode')?.addEventListener('click', () => {
-    console.log(`scaleMode: ${pagView.scaleMode()}`);
-  });
-  document.getElementById('setScaleMode')?.addEventListener('click', () => {
-    let scaleMode = Number((document.getElementById('scaleMode') as HTMLSelectElement).value);
-    pagView.setScaleMode(scaleMode);
-  });
+    // scaleMode
+    document.getElementById('btn-scaleMode')?.addEventListener('click', () => {
+      console.log(`scaleMode: ${pagView.scaleMode()}`);
+    });
+    document.getElementById('setScaleMode')?.addEventListener('click', () => {
+      let scaleMode = Number((document.getElementById('scaleMode') as HTMLSelectElement).value);
+      pagView.setScaleMode(scaleMode);
+    });
 
-  // videoEnabled
-  videoEnabled = true;
-  document.getElementById('btn-videoEnabled')?.addEventListener('click', () => {
-    videoEnabled = pagView.videoEnabled();
-    console.log(`videoEnabled status: ${videoEnabled}`);
-  });
-  document.getElementById('btn-setVideoEnabled')?.addEventListener('click', () => {
-    pagView.setVideoEnabled(!videoEnabled);
-  });
+    // videoEnabled
+    videoEnabled = true;
+    document.getElementById('btn-videoEnabled')?.addEventListener('click', () => {
+      videoEnabled = pagView.videoEnabled();
+      console.log(`videoEnabled status: ${videoEnabled}`);
+    });
+    document.getElementById('btn-setVideoEnabled')?.addEventListener('click', () => {
+      pagView.setVideoEnabled(!videoEnabled);
+    });
 
-  // cacheEnabled
-  cacheEnabled = true;
-  document.getElementById('btn-cacheEnabled')?.addEventListener('click', () => {
-    cacheEnabled = pagView.cacheEnabled();
-    console.log(`cacheEnabled status: ${cacheEnabled}`);
-  });
-  document.getElementById('btn-setCacheEnabled')?.addEventListener('click', () => {
-    pagView.setCacheEnabled(!cacheEnabled);
-  });
+    // cacheEnabled
+    cacheEnabled = true;
+    document.getElementById('btn-cacheEnabled')?.addEventListener('click', () => {
+      cacheEnabled = pagView.cacheEnabled();
+      console.log(`cacheEnabled status: ${cacheEnabled}`);
+    });
+    document.getElementById('btn-setCacheEnabled')?.addEventListener('click', () => {
+      pagView.setCacheEnabled(!cacheEnabled);
+    });
 
-  // PAGComposition
-  document.getElementById('btn-composition')?.addEventListener('click', () => {
-    testPAGCompositionAPi();
-  });
+    // PAGComposition
+    document.getElementById('btn-composition')?.addEventListener('click', () => {
+      testPAGCompositionAPi();
+    });
 
-  // freeCache
-  document.getElementById('btn-freeCache')?.addEventListener('click', () => {
-    pagView.freeCache();
-  });
-  // freeCache
-  document.getElementById('btn-makeSnapshot')?.addEventListener('click', () => {
-    pagView.makeSnapshot().then((bitmap) => console.log('makeSnapshot:', bitmap));
-  });
+    // freeCache
+    document.getElementById('btn-freeCache')?.addEventListener('click', () => {
+      pagView.freeCache();
+    });
+    // freeCache
+    document.getElementById('btn-makeSnapshot')?.addEventListener('click', () => {
+      pagView.makeSnapshot().then((bitmap) => console.log('makeSnapshot:', bitmap));
+    });
 
-  // cacheScale
-  globalCacheScale = 1;
-  document.getElementById('btn-cacheScale')?.addEventListener('click', () => {
-    globalCacheScale = pagView.cacheScale();
-    console.log(`cacheScale status: ${globalCacheScale}`);
-  });
-  document.getElementById('btn-setCacheScale')?.addEventListener('click', () => {
-    let cacheScale = Number((document.getElementById('cacheScale') as HTMLInputElement).value);
-    if (!(cacheScale >= 0 && cacheScale <= 1)) {
-      alert('请输入0～1之间');
-    }
-    pagView.setCacheScale(cacheScale);
-  });
-};
+    // cacheScale
+    globalCacheScale = 1;
+    document.getElementById('btn-cacheScale')?.addEventListener('click', () => {
+      globalCacheScale = pagView.cacheScale();
+      console.log(`cacheScale status: ${globalCacheScale}`);
+    });
+    document.getElementById('btn-setCacheScale')?.addEventListener('click', () => {
+      let cacheScale = Number((document.getElementById('cacheScale') as HTMLInputElement).value);
+      if (!(cacheScale >= 0 && cacheScale <= 1)) {
+        alert('请输入0～1之间');
+      }
+      pagView.setCacheScale(cacheScale);
+    });
+  };
+
+}
 
 const existsLayer = (pagLayer: object) => {
   if (pagLayer) return true;
@@ -422,12 +429,10 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
     console.log('onAnimationCancel', event);
   });
   pagView.addListener('onAnimationRepeat', (event) => {
-    console.log('onAnimationRepeat', event);
     audioEl.stop();
     audioEl.play();
   });
   pagView.addListener('onAnimationUpdate', (event) => {
-    console.log('onAnimationUpdate', event);
     document.getElementById('fps')!.innerText = `PAG View FPS: ${pagView.getDebugData().FPS}`;
   });
   pagView.addListener('onAnimationPlay', (event) => {

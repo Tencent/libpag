@@ -22,7 +22,6 @@
 #include <mutex>
 #include "pag/pag.h"
 #include "rendering/video/VideoDecoderFactory.h"
-#include "tgfx/core/ImageReader.h"
 #include "tgfx/platform/web/VideoElementReader.h"
 
 namespace pag {
@@ -55,6 +54,8 @@ class HardwareDecoder : public VideoDecoder {
   int32_t _height = 0;
   float frameRate = 30.0f;
   std::unique_ptr<ByteData> mp4Data = nullptr;
+  int currentFrame = -1;
+  std::shared_ptr<tgfx::ImageBuffer> lastDecodedBuffer = nullptr;
 
   explicit HardwareDecoder(const VideoFormat& format);
 

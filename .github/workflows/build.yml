@@ -128,6 +128,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
+            web/package-lock.json
           key: libpag-environment-web-20241106
           restore-keys: libpag-environment-web-
 
@@ -167,7 +168,15 @@ jobs:
         run: |
           cd web
           emsdk/emsdk_env
-          npm run build
+          npm run build:st
+
+      - name: Cypress run:st
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: web
+          start: npm run server:cypress
+          wait-on: 'http://localhost:8080'
+          command: npm run cypress
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -176,6 +185,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
+            web/package-lock.json
           key: libpag-environment-web-20241106
 
       - name: Save Third-Party Cache

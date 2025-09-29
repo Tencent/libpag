@@ -165,7 +165,6 @@ export const replaceFunctionConfig = [
         args1.push('argType' + i2);
         args2.push(argTypes[i2 + 2]);
       }
-      args2.push(Asyncify);
       if (!needsDestructorStack) {
         for (var i2 = isClassMethodFunc ? 1 : 2; i2 < argTypes.length; ++i2) {
           var paramName = i2 === 1 ? 'thisWired' : 'arg' + (i2 - 2) + 'Wired';
@@ -228,7 +227,7 @@ export const replaceFunctionConfig = [
               return ret;
             }
           }
-          return Asyncify.currData ? Asyncify.whenDone().then(onDone) : onDone(rv);
+          return onDone(rv);
         });
       }
       var invokerFunction = anonymous.apply({}, args2);

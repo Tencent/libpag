@@ -20,7 +20,6 @@
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 
