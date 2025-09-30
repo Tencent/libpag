@@ -377,7 +377,7 @@ jobs:
           path: out
 
   ohos:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -395,7 +395,7 @@ jobs:
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-linux-x64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
