@@ -358,3 +358,109 @@ jobs:
         with:
           name: qt_build
           path: out
+
+  ohos:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get CLI Tools Cache
+        id: cli-tools-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/ohos-cmd-tools
+          key: ohos-cli-5.0.9.310-mac-arm64-x64
+          restore-keys: ohos-cli-
+
+      - name: Install CLI Tools
+        if: steps.cli-tools-cache.outputs.cache-hit != 'true'
+        run: |
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
+          curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
+          unzip -q /tmp/cmdtools.zip -d /tmp
+          sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
+
+      - name: Save CLI Tools Cache
+        if: ${{ (github.event_name == 'push') && (steps.cli-tools-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: /opt/ohos-cmd-tools
+          key: ohos-cli-5.0.9.310-mac-arm64-x64
+
+      - name: Configure Environment
+        run: |
+          CLI_DIR=/opt/ohos-cmd-tools
+          echo "$CLI_DIR/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
+          echo "$CLI_DIR/ohpm/bin"                       >> $GITHUB_PATH
+          echo "$CLI_DIR/hvigor/bin"                     >> $GITHUB_PATH
+          echo "DEVECO_SDK_HOME=$CLI_DIR/sdk"            >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME"                    >> $GITHUB_ENV
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup pnpm
+        run: |
+          npm install -g pnpm@8.13.1
+          echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
+
+      - name: Cache hvigor & ohpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hvigor
+            ~/.ohpm
+          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          restore-keys: |
+            hvigor-${{ runner.os }}-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-openharmony-
+
+      - name: Configure npm registry
+        run: |
+          npm config set registry https://repo.huaweicloud.com/repository/npm/
+          npm config set "@ohos:registry" https://repo.harmonyos.com/npm/      
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Install ohpm dependencies
+        run: |
+          cd ohos
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+          ohpm install --all
+          pnpm add @ohos/hvigor@3.2.4
+
+      - name: Build Harmony
+        run: |
+          cd ohos
+          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
+          hvigorw assembleHar --mode module -p module=libpag@default -p product=default --no-daemon
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-mac-arm64-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ohos_build
+          path: ohos/out
