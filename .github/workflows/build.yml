@@ -449,7 +449,7 @@ jobs:
         run: |
           cd ohos
           hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleHar --mode module -p module=entry@default -p module=libpag@default -p product=default --build-option libpag:externalNativeOptions.arguments="-DOHOS=ON -DUSE_NATIVE_PLATFORM=ON -DOHOS_STL=c++_static" --no-daemon
+          hvigorw assembleHar --mode module -p module=libpag@default -p product=default --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
