@@ -372,7 +372,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-linux-x64
+          key: ohos-cli-5.0.9.310-mac-arm64-x64
           restore-keys: ohos-cli-
 
       - name: Install CLI Tools
@@ -388,7 +388,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-linux-x64
+          key: ohos-cli-5.0.9.310-mac-arm64-x64
 
       - name: Configure Environment
         run: |
@@ -456,7 +456,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-mac-arm64-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
