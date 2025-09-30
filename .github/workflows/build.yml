@@ -6,23 +6,6 @@ on:
   push:
     branches: [ main ]
 
-  workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Platform to build (optional, leave empty to build all)'
-        required: false
-        type: choice
-        options:
-          - all
-          - ios
-          - android
-          - web
-          - win
-          - linux
-          - qt
-          - ohos
-        default: 'all'
-
 jobs:
   ios:
     runs-on: macos-latest
