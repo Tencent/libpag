@@ -377,7 +377,7 @@ jobs:
           path: out
 
   ohos:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -389,13 +389,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-linux-x64
+          key: ohos-cli-5.0.9.310-mac-arm64-x64
           restore-keys: ohos-cli-
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-linux-x64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
@@ -405,7 +405,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-linux-x64
+          key: ohos-cli-5.0.9.310-mac-arm64-x64
 
       - name: Configure Environment
         run: |
@@ -445,11 +445,6 @@ jobs:
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-openharmony-
 
-      - name: Configure npm registry
-        run: |
-          npm config set registry https://repo.huaweicloud.com/repository/npm/
-          npm config set "@ohos:registry" https://repo.harmonyos.com/npm/      
-
       - name: Run depsync
         run: |
           npm install depsync -g
@@ -461,23 +456,18 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
-      - name: Install missing peer dependency @ohos/hvigor
-        run: |
-          pnpm add @ohos/hvigor@3.2.4
-    
-
       - name: Build Harmony
         run: |
           cd ohos
           hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleHar --mode module -p module=library1@default -p product=default --no-daemon
+          hvigorw assembleHar --mode module -p module=libpag -p buildMode=release --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-mac-arm64-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
