@@ -74,7 +74,15 @@ QStringList PluginInstaller::getAeInstallPaths() {
         if (!installPath.isEmpty()) {
           QString supportFilesPath = QDir::cleanPath(installPath + "/Support Files");
           if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
-            paths << supportFilesPath;
+            // Extract version from registry key name
+            QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+            QRegularExpressionMatch match = versionRegex.match(key);
+            if (match.hasMatch()) {
+              int version = match.captured(1).toInt();
+              paths << QString("%1|%2").arg(supportFilesPath).arg(version);
+            } else {
+              paths << supportFilesPath;
+            }
           }
         }
       }
@@ -96,55 +104,160 @@ QStringList PluginInstaller::getAeInstallPaths() {
       if (!installLocation.isEmpty()) {
         QString supportFilesPath = QDir::cleanPath(installLocation + "/Support Files");
         if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
-          if (!paths.contains(supportFilesPath)) {
-            paths << supportFilesPath;
+          // Extract version from display name
+          QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+          QRegularExpressionMatch match = versionRegex.match(displayName);
+          QString pathWithVersion;
+          if (match.hasMatch()) {
+            int version = match.captured(1).toInt();
+            pathWithVersion = QString("%1|%2").arg(supportFilesPath).arg(version);
+          } else {
+            pathWithVersion = supportFilesPath;
+          }
+
+          if (!paths.contains(pathWithVersion)) {
+            paths << pathWithVersion;
           }
         }
       }
     }
   }
 
+  // Sort by version number (highest first)
   std::sort(paths.begin(), paths.end(), [](const QString& a, const QString& b) {
-    QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
-    QRegularExpressionMatch matchA = versionRegex.match(a);
-    QRegularExpressionMatch matchB = versionRegex.match(b);
+    int versionA = 0, versionB = 0;
 
-    int versionA = matchA.hasMatch() ? matchA.captured(1).toInt() : 0;
-    int versionB = matchB.hasMatch() ? matchB.captured(1).toInt() : 0;
+    // Extract version from path string (format: "path|version")
+    if (a.contains('|')) {
+      versionA = a.split('|').last().toInt();
+    } else {
+      // Try to extract version from path
+      QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+      QRegularExpressionMatch matchA = versionRegex.match(a);
+      versionA = matchA.hasMatch() ? matchA.captured(1).toInt() : 0;
+    }
+
+    if (b.contains('|')) {
+      versionB = b.split('|').last().toInt();
+    } else {
+      QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+      QRegularExpressionMatch matchB = versionRegex.match(b);
+      versionB = matchB.hasMatch() ? matchB.captured(1).toInt() : 0;
+    }
 
     return versionA > versionB;
   });
 
-  return paths;
+  // Remove version information from paths for return
+  QStringList cleanPaths;
+  for (const QString& path : paths) {
+    if (path.contains('|')) {
+      cleanPaths << path.split('|').first();
+    } else {
+      cleanPaths << path;
+    }
+  }
+
+  return cleanPaths;
+}
+
+QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
+  if (pluginName == "com.tencent.pagconfig") {
+    return pluginName; // Directory, no extension
+  } else if (pluginName == "H264EncoderTools") {
+    return pluginName + ".exe";
+  } else {
+    return pluginName + ".aex";
+  }
 }
 
 QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
   QString appDir = QCoreApplication::applicationDirPath();
+  QString fullName = getPluginFullName(pluginName);
 
   if (pluginName == "com.tencent.pagconfig") {
-    return appDir + "/" + pluginName;
-  } else if (pluginName == "H264EncoderTools") {
-    return appDir + "/" + pluginName + ".exe";
+    return appDir + "/" + fullName;
   } else {
-    return appDir + "/" + pluginName + ".aex";
+    return appDir + "/" + fullName;
   }
 }
 
 QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
+  QString fullName = getPluginFullName(pluginName);
+
   if (pluginName == "com.tencent.pagconfig") {
     QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return roaming + "/Adobe/CEP/extensions/" + pluginName;
+    return roaming + "/Adobe/CEP/extensions/" + fullName;
   } else if (pluginName == "H264EncoderTools") {
     QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return roaming + "/H264EncoderTools/" + pluginName + ".exe";
+    return roaming + "/H264EncoderTools/" + fullName;
   } else {
-    return "C:/Program Files/Adobe/Common/Plug-ins/7.0/MediaCore/" + pluginName + ".aex";
+    return "C:/Program Files/Adobe/Common/Plug-ins/7.0/MediaCore/" + fullName;
   }
 }
 
 QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
   Q_UNUSED(pluginPath);
   return QString();
+}
+
+int PluginInstaller::getAeVersionForPath(const QString& aePath) const {
+  // Check registry paths for version information
+  const QStringList registryPaths = {"HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe",
+                                     "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe",
+                                     "HKEY_CURRENT_USER\\SOFTWARE\\Adobe"};
+
+  for (const QString& regPath : registryPaths) {
+    QSettings registry(regPath, QSettings::NativeFormat);
+    const QStringList adobeKeys = registry.childGroups();
+
+    for (const QString& key : adobeKeys) {
+      if (key.contains("After Effects", Qt::CaseInsensitive)) {
+        QSettings aeRegistry(regPath + "\\" + key, QSettings::NativeFormat);
+        QString installPath = aeRegistry.value("InstallPath").toString();
+        if (!installPath.isEmpty()) {
+          QString supportFilesPath = QDir::cleanPath(installPath + "/Support Files");
+          if (supportFilesPath == aePath) {
+            // Extract version from registry key name
+            QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+            QRegularExpressionMatch match = versionRegex.match(key);
+            if (match.hasMatch()) {
+              return match.captured(1).toInt();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Check uninstall registry
+  QSettings ccRegistry(
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+      QSettings::NativeFormat);
+  const QStringList uninstallKeys = ccRegistry.childGroups();
+
+  for (const QString& key : uninstallKeys) {
+    QSettings appRegistry(
+        "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key,
+        QSettings::NativeFormat);
+    QString displayName = appRegistry.value("DisplayName").toString();
+    if (displayName.contains("Adobe After Effects", Qt::CaseInsensitive)) {
+      QString installLocation = appRegistry.value("InstallLocation").toString();
+      if (!installLocation.isEmpty()) {
+        QString supportFilesPath = QDir::cleanPath(installLocation + "/Support Files");
+        if (supportFilesPath == aePath) {
+          // Extract version from display name
+          QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+          QRegularExpressionMatch match = versionRegex.match(displayName);
+          if (match.hasMatch()) {
+            return match.captured(1).toInt();
+          }
+        }
+      }
+    }
+  }
+
+  return 0; // Unknown version
 }
 
 bool PluginInstaller::executeWithPrivileges(const QString& command) const {

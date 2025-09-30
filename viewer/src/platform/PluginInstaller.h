@@ -58,6 +58,8 @@ class PluginInstaller : public QObject {
   QStringList getAeInstallPaths();
   QString getPluginSourcePath(const QString& pluginName) const;
   QString getPluginInstallPath(const QString& pluginName) const;
+  QString getPluginFullName(const QString& pluginName) const;
+  int getAeVersionForPath(const QString& aePath) const;
 
   QString getPluginVersionString(const QString& pluginPath) const;
   bool executeWithPrivileges(const QString& command) const;

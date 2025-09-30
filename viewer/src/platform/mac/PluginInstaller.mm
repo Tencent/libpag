@@ -117,6 +117,16 @@ QStringList PluginInstaller::getAeInstallPaths() {
   return paths;
 }
 
+QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
+  if (pluginName == "com.tencent.pagconfig") {
+    return pluginName; // Directory, no extension
+  } else if (pluginName == "H264EncoderTools") {
+    return pluginName; // Directory, no extension
+  } else {
+    return pluginName + ".plugin";
+  }
+}
+
 QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
   QString resourcesPath;
   NSBundle* bundle = [NSBundle mainBundle];
@@ -127,33 +137,46 @@ QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
     resourcesPath = QDir(QCoreApplication::applicationDirPath()).filePath("../Resources");
   }
 
-  QString fullPath;
-  if (pluginName == "com.tencent.pagconfig") {
-    fullPath = resourcesPath + "/" + pluginName;
-  } else if (pluginName == "H264EncoderTools") {
-    fullPath = resourcesPath + "/" + pluginName;
-  } else {
-    fullPath = resourcesPath + "/" + pluginName + ".plugin";
-  }
-
-  return fullPath;
+  QString fullName = getPluginFullName(pluginName);
+  return resourcesPath + "/" + fullName;
 }
 
 QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
+  QString fullName = getPluginFullName(pluginName);
+
   if (pluginName == "com.tencent.pagconfig") {
-    return "/Library/Application Support/Adobe/CEP/extensions/" + pluginName;
+    return "/Library/Application Support/Adobe/CEP/extensions/" + fullName;
   } else if (pluginName == "H264EncoderTools") {
     QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return roaming + "/H264EncoderTools/" + pluginName;
+    return roaming + "/H264EncoderTools/" + fullName;
   } else {
-    return "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/" + pluginName +
-           ".plugin";
+    return "/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore/" + fullName;
   }
 }
 
 QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
-  QString plistPath = pluginPath.endsWith(".plugin") ? pluginPath + "/Contents/Info.plist"
-                                                     : pluginPath + ".plugin/Contents/Info.plist";
+  QString plistPath;
+
+  // Handle different plugin types
+  if (pluginPath.endsWith(".plugin")) {
+    plistPath = pluginPath + "/Contents/Info.plist";
+  } else {
+    // For directory-based plugins like com.tencent.pagconfig, check if it has a .plugin subdirectory
+    QString pluginDirPath = pluginPath + ".plugin";
+    if (QDir(pluginDirPath).exists()) {
+      plistPath = pluginDirPath + "/Contents/Info.plist";
+    } else {
+      // Fallback: try to find any .plugin directory in the path
+      QDir pluginDir(pluginPath);
+      QStringList entries = pluginDir.entryList(QDir::Dirs);
+      for (const QString& entry : entries) {
+        if (entry.endsWith(".plugin")) {
+          plistPath = pluginPath + "/" + entry + "/Contents/Info.plist";
+          break;
+        }
+      }
+    }
+  }
 
   if (!QFile::exists(plistPath)) {
     return QString();
