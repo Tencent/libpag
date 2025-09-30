@@ -141,7 +141,7 @@ enum class RTTR_AUTO_REGISTER_CLASS TagCode {
   EncryptedData = 89,
   Transform3D = 90,
   CameraOption = 91,
-  
+
   StrokeStyle = 92,
   OuterGlowStyle = 93,
   ImageScaleModes = 94,
@@ -403,7 +403,7 @@ enum class PAG_API MaskMode : uint8_t {
   Lighten = 4,
   Darken = 5,
   Difference = 6,
-  Accum = 7   // real add, not screen (not exposed in UI!)
+  Accum = 7  // real add, not screen (not exposed in UI!)
 };
 
 class PAG_API MaskData {
@@ -623,11 +623,7 @@ class PAG_API BulgeEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class PAG_API BlurDimensionsDirection : uint8_t {
-  All = 0,
-  Horizontal = 1,
-  Vertical = 2
-};
+enum class PAG_API BlurDimensionsDirection : uint8_t { All = 0, Horizontal = 1, Vertical = 2 };
 
 class PAG_API FastBlurEffect : public Effect {
  public:
@@ -728,7 +724,7 @@ class PAG_API DisplacementMapEffect : public Effect {
 
   bool verify() const override;
 
-  Layer* RTTR_SKIP_REGISTER_PROPERTY displacementMapLayer = nullptr;                   // ref layer
+  Layer* RTTR_SKIP_REGISTER_PROPERTY displacementMapLayer = nullptr;  // ref layer
   Property<DisplacementMapSource>* useForHorizontalDisplacement = nullptr;
   Property<float>* maxHorizontalDisplacement = nullptr;
   Property<DisplacementMapSource>* useForVerticalDisplacement = nullptr;
@@ -740,15 +736,9 @@ class PAG_API DisplacementMapEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class PAG_API RadialBlurMode : uint8_t {
-  Spin = 0,
-  Zoom = 1
-};
+enum class PAG_API RadialBlurMode : uint8_t { Spin = 0, Zoom = 1 };
 
-enum class PAG_API RadialBlurAntialias : uint8_t {
-  Low = 0,
-  High = 1
-};
+enum class PAG_API RadialBlurAntialias : uint8_t { Low = 0, High = 1 };
 
 class PAG_API RadialBlurEffect : public Effect {
  public:
@@ -865,8 +855,10 @@ class PAG_API HueSaturationEffect : public Effect {
 
   ChannelControlType channelControl = ChannelControlType::Master;
   std::vector<float> hue = std::vector<float>(static_cast<size_t>(ChannelControlType::Count), 0.0f);
-  std::vector<float> saturation = std::vector<float>(static_cast<size_t>(ChannelControlType::Count), 0.0f);
-  std::vector<float> lightness = std::vector<float>(static_cast<size_t>(ChannelControlType::Count), 0.0f);
+  std::vector<float> saturation =
+      std::vector<float>(static_cast<size_t>(ChannelControlType::Count), 0.0f);
+  std::vector<float> lightness =
+      std::vector<float>(static_cast<size_t>(ChannelControlType::Count), 0.0f);
   bool colorize = false;
   Property<float>* colorizeHue = nullptr;
   Property<float>* colorizeSaturation = nullptr;
@@ -875,7 +867,13 @@ class PAG_API HueSaturationEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class RTTR_AUTO_REGISTER_CLASS LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay, OuterGlow };
+enum class RTTR_AUTO_REGISTER_CLASS LayerStyleType {
+  Unknown,
+  DropShadow,
+  Stroke,
+  GradientOverlay,
+  OuterGlow
+};
 
 enum class RTTR_AUTO_REGISTER_CLASS LayerStylePosition { Above, Blow };
 
@@ -921,39 +919,17 @@ class PAG_API LayerStyle {
   RTTR_ENABLE()
 };
 
-enum class PAG_API StrokePosition : uint8_t {
-  Outside = 0,
-  Inside = 1,
-  Center = 2,
-  Invalid = 255
-};
+enum class PAG_API StrokePosition : uint8_t { Outside = 0, Inside = 1, Center = 2, Invalid = 255 };
 
-enum class PAG_API GlowColorType : uint8_t {
-  SingleColor = 0,
-  Gradient = 1
-};
+enum class PAG_API GlowColorType : uint8_t { SingleColor = 0, Gradient = 1 };
 
-enum class PAG_API GlowTechniqueType : uint8_t {
-  Softer = 0,
-  Precise = 1
-};
+enum class PAG_API GlowTechniqueType : uint8_t { Softer = 0, Precise = 1 };
 
-enum class PAG_API LineCap : uint8_t {
-  Butt = 0,
-  Round = 1,
-  Square = 2
-};
+enum class PAG_API LineCap : uint8_t { Butt = 0, Round = 1, Square = 2 };
 
-enum class PAG_API LineJoin : uint8_t {
-  Miter = 0,
-  Round = 1,
-  Bevel = 2
-};
+enum class PAG_API LineJoin : uint8_t { Miter = 0, Round = 1, Bevel = 2 };
 
-enum class PAG_API FillRule : uint8_t {
-  NonZeroWinding = 0,
-  EvenOdd = 1
-};
+enum class PAG_API FillRule : uint8_t { NonZeroWinding = 0, EvenOdd = 1 };
 
 enum class PAG_API GradientFillType : uint8_t {
   Linear = 0,
@@ -1135,12 +1111,7 @@ class PAG_API TextPathOptions {
   bool verify() const;
 };
 
-enum class PAG_API AnchorPointGrouping : uint8_t{
-  Character = 0,
-  Word = 1,
-  Line = 2,
-  All = 3
-};
+enum class PAG_API AnchorPointGrouping : uint8_t { Character = 0, Word = 1, Line = 2, All = 3 };
 
 class PAG_API TextMoreOptions {
  public:
@@ -1154,10 +1125,7 @@ class PAG_API TextMoreOptions {
   bool verify() const;
 };
 
-enum class PAG_API TextRangeSelectorUnits : uint8_t {
-  Percentage = 0,
-  Index = 1
-};
+enum class PAG_API TextRangeSelectorUnits : uint8_t { Percentage = 0, Index = 1 };
 
 enum class PAG_API TextSelectorBasedOn : uint8_t {
   Characters = 0,
@@ -1185,17 +1153,9 @@ enum class PAG_API TextRangeSelectorShape : uint8_t {
   Smooth = 5
 };
 
-enum class PAG_API TextAnimatorTrackingType : uint8_t {
-  BeforeAndAfter = 0,
-  Before = 1,
-  After = 2
-};
+enum class PAG_API TextAnimatorTrackingType : uint8_t { BeforeAndAfter = 0, Before = 1, After = 2 };
 
-enum class PAG_API TextSelectorType : uint8_t {
-  Range = 0,
-  Wiggly = 1,
-  Expression = 2
-};
+enum class PAG_API TextSelectorType : uint8_t { Range = 0, Wiggly = 1, Expression = 2 };
 
 class PAG_API TextSelector {
  public:
@@ -1414,10 +1374,7 @@ class PAG_API EllipseElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
-enum class PAG_API PolyStarType : uint8_t {
-  Star = 0,
-  Polygon = 1
-};
+enum class PAG_API PolyStarType : uint8_t { Star = 0, Polygon = 1 };
 
 class PAG_API PolyStarElement : public ShapeElement {
  public:
@@ -1585,10 +1542,7 @@ class PAG_API MergePathsElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
-enum class PAG_API TrimPathsType : uint8_t {
-  Simultaneously = 0,
-  Individually = 1
-};
+enum class PAG_API TrimPathsType : uint8_t { Simultaneously = 0, Individually = 1 };
 
 class PAG_API TrimPathsElement : public ShapeElement {
  public:
@@ -1626,10 +1580,7 @@ class PAG_API RepeaterTransform {
   bool verify() const;
 };
 
-enum class PAG_API RepeaterOrder : uint8_t {
-  Below = 0,
-  Above = 1
-};
+enum class PAG_API RepeaterOrder : uint8_t { Below = 0, Above = 1 };
 
 class PAG_API RepeaterElement : public ShapeElement {
  public:
@@ -1724,11 +1675,7 @@ enum class PAG_API TrackMatteType : uint8_t {
   LumaInverted = 4
 };
 
-enum class PAG_API CachePolicy : uint8_t {
-  Auto = 0,
-  Enable = 1,
-  Disable = 2
-};
+enum class PAG_API CachePolicy : uint8_t { Auto = 0, Enable = 1, Disable = 2 };
 
 /**
  * The Layer object provides access to layers within compositions.
@@ -1760,7 +1707,8 @@ class PAG_API Layer {
    */
   Layer* RTTR_SKIP_REGISTER_PROPERTY parent = nullptr;  // layer reference
 
-  VectorComposition* RTTR_SKIP_REGISTER_PROPERTY containingComposition = nullptr;  // composition reference
+  VectorComposition* RTTR_SKIP_REGISTER_PROPERTY containingComposition =
+      nullptr;  // composition reference
 
   /**
    * The name of the layer.
@@ -2391,13 +2339,12 @@ class PAG_API File {
    * file.
    */
   static std::shared_ptr<File> Load(const void* bytes, size_t length,
-                                    const std::string& filePath = "",
-                                    const std::string& password = "");
+                                    const std::string& filePath = "");
   /**
    *  Load a pag file from path, return null if the file does not exist or the data is not a pag
    * file.
    */
-  static std::shared_ptr<File> Load(const std::string& filePath, const std::string& password = "");
+  static std::shared_ptr<File> Load(const std::string& filePath);
 
   ~File();
 
