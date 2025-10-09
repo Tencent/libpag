@@ -163,7 +163,7 @@ QStringList PluginInstaller::getAeInstallPaths() {
 
 QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
   if (pluginName == "com.tencent.pagconfig") {
-    return pluginName; // Directory, no extension
+    return pluginName;  // Directory, no extension
   } else if (pluginName == "H264EncoderTools") {
     return pluginName + ".exe";
   } else {
@@ -257,7 +257,7 @@ int PluginInstaller::getAeVersionForPath(const QString& aePath) const {
     }
   }
 
-  return 0; // Unknown version
+  return 0;  // Unknown version
 }
 
 bool PluginInstaller::executeWithPrivileges(const QString& command) const {

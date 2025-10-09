@@ -119,9 +119,9 @@ QStringList PluginInstaller::getAeInstallPaths() {
 
 QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
   if (pluginName == "com.tencent.pagconfig") {
-    return pluginName; // Directory, no extension
+    return pluginName;  // Directory, no extension
   } else if (pluginName == "H264EncoderTools") {
-    return pluginName; // Directory, no extension
+    return pluginName;  // Directory, no extension
   } else {
     return pluginName + ".plugin";
   }
@@ -161,7 +161,8 @@ QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const
   if (pluginPath.endsWith(".plugin")) {
     plistPath = pluginPath + "/Contents/Info.plist";
   } else {
-    // For directory-based plugins like com.tencent.pagconfig, check if it has a .plugin subdirectory
+    // For directory-based plugins like com.tencent.pagconfig, check if it has a .plugin
+    // subdirectory
     QString pluginDirPath = pluginPath + ".plugin";
     if (QDir(pluginDirPath).exists()) {
       plistPath = pluginDirPath + "/Contents/Info.plist";
