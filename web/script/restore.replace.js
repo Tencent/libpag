@@ -49,7 +49,7 @@ function replaceInFile(filePath, searchString, replacement) {
     }
 }
 
-function replaceStringInFiles() {
+function replaceFileNameInFiles() {
     const dir = path.resolve(__dirname, "../lib-mt/");
     const extension = '.js';
     const searchString = 'libpag.js';
@@ -61,7 +61,36 @@ function replaceStringInFiles() {
     });
 }
 
-restoreFile(filePath);
-if(argv.a !==undefined && argv.a ==="wasm-mt"){
-    replaceStringInFiles();
+function getDepth(filePath, rootDir) {
+    const relative = path.relative(rootDir, path.dirname(filePath));
+    if (!relative) return 0;
+    return relative.split(path.sep).filter(Boolean).length;
+}
+
+function buildReplacementPath(depth) {
+    const prefix = '../'.repeat(depth + 2);
+    return prefix + 'third_party/tgfx/web/src/';
+}
+
+function replacePathInFiles(rootDir) {
+    const extension = '.d.ts';
+    const searchString = '@tgfx/';
+
+    const files = getFilesInDir(rootDir, extension);
+
+    files.forEach(file => {
+        const depth = getDepth(file, rootDir);
+        const targetStr = buildReplacementPath(depth);
+        replaceInFile(file, searchString, targetStr);
+    });
+}
+
+if(argv.a ==="wasm-mt" || argv.a ==="wasm"){
+    restoreFile(filePath);
+    if(argv.a ==="wasm-mt"){
+        replaceFileNameInFiles();
+    }
+    replacePathInFiles(path.resolve(__dirname, "../types/web/src"));
+}else if(argv.a ==="wechat"){
+    replacePathInFiles(path.resolve(__dirname, "../wechat/types/web/src"));
 }
