@@ -25,14 +25,16 @@ Item {
 
     Connections {
         target: runTimeDataModel
-        onDataChanged: {
-            currentFrameText.text = runTimeDataModel.currentFrame + "/" + runTimeDataModel.totalFrame;
+
+        function onDataChanged() {
+            currentFrameText.text = runTimeDataModel.currentFrame + "/" + runTimeDataModel.totalFrame
         }
     }
 
     Connections {
         target: runTimeDataModel.chartDataModel
-        onItemsChange: {
+
+        function onItemsChanged() {
             graphCanvas.requestPaint();
         }
     }
@@ -164,7 +166,7 @@ Item {
                         width: 11
                         height: 10
                         visible: {
-                            if (name === "Graphics" && value > 50 && ext === "MB") {
+                            if (name === "Graphics" && value > 50 && unit === "MB") {
                                 return true;
                             }
                             return name === "Videos" && value > 2;
