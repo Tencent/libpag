@@ -34,9 +34,11 @@ class PAGImageLayerModel : public QAbstractListModel {
   QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
   QImage requestImage(int index);
 
+  Q_SIGNAL void imageChanged();
+
   Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
 
-  Q_INVOKABLE void replaceImage(int index, const QString& filePath);
+  Q_INVOKABLE void changeImage(int index, const QString& filePath);
   Q_INVOKABLE void revertImage(int index);
   Q_INVOKABLE int convertIndex(int index);
 
@@ -44,6 +46,8 @@ class PAGImageLayerModel : public QAbstractListModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
  private:
+  void replaceImage(int index, const std::shared_ptr<PAGImage>& image);
+
   QSet<int> revertSet = {};
   QMap<int, QImage> imageLayers = {};
   std::shared_ptr<PAGFile> pagFile = nullptr;
