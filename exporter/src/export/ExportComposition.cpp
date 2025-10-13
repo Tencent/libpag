@@ -90,15 +90,15 @@ void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_Ite
   switch (compositionType) {
     case pag::CompositionType::Video:
       ExportVideoComposition(session, compH);
-      return;
+      break;
     case pag::CompositionType::Bitmap:
       ExportBitmapComposition(session, compH);
-      return;
+      break;
     case pag::CompositionType::Vector:
       ExportVectorComposition(session, compH);
-      return;
+      break;
     default:
-      return;
+      break;
   }
 }
 
