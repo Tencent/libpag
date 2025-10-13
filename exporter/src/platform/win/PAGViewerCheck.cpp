@@ -260,15 +260,14 @@ std::vector<PackageInfo> PAGViewerCheck::findPackageinfoByName(const std::string
 }
 
 InstallStatus PAGViewerCheck::installPAGViewer() {
-  std::string installerPathStr = config->getInstallerPath();
-  if (installerPathStr.empty() || installerPathStr.length() > MAX_PATH) {
-    return InstallStatus(InstallResult::InvalidPath, "Invalid installer path: " + installerPathStr);
+  std::string installerPath = config->getInstallerPath();
+  if (installerPath.empty() || installerPath.length() > MAX_PATH) {
+    return InstallStatus(InstallResult::InvalidPath, "Invalid installer path: " + installerPath);
   }
 
-  std::wstring installerPathW = stringToWstring(installerPathStr);
-  if (!FileHelper::FileIsExist(installerPathStr)) {
-    return InstallStatus(InstallResult::FileNotFound,
-                         "Installer file not found: " + installerPathStr);
+  std::wstring installerPathW = stringToWstring(installerPath);
+  if (!FileHelper::FileIsExist(installerPath)) {
+    return InstallStatus(InstallResult::FileNotFound, "Installer file not found: " + installerPath);
   }
 
   SHELLEXECUTEINFOW sei = {sizeof(sei)};

@@ -55,7 +55,6 @@ std::string GetAeVersion() {
   return AeVersion;
 }
 
-/* Common Interface */
 std::shared_ptr<AEGP_SuiteHandler> GetSuites() {
   return Suites;
 }
@@ -307,7 +306,6 @@ void RegisterTextDocumentScript() {
   }
 }
 
-/* Layer Interface */
 uint32_t GetLayerID(const AEGP_LayerH& layerH) {
   A_long id = 0;
   if (layerH != nullptr) {
@@ -449,7 +447,6 @@ void SelectLayer(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH) {
   Suites->CollectionSuite2()->AEGP_DisposeCollection(collectionH);
 }
 
-/* Item Interface */
 uint32_t GetItemID(const AEGP_ItemH& itemH) {
   A_long id = 0;
   if (itemH != nullptr) {
@@ -552,7 +549,6 @@ void SelectItem(const AEGP_ItemH& itemH) {
   }
 }
 
-/* Composition Interface  */
 std::string GetCompName(const AEGP_CompH& compH) {
   auto itemH = GetCompItemH(compH);
   return GetItemName(itemH);

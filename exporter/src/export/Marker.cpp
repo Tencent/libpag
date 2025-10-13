@@ -145,18 +145,18 @@ static std::optional<nlohmann::json> FindKeyFromComment(const std::string& comme
   return json[key];
 }
 
-static std::optional<nlohmann::json> FindMarkerFromStream(const AEGP_StreamRefH& markerStreamH,
+static std::optional<nlohmann::json> FindMarkerFromStream(const AEGP_StreamRefH& markerStream,
                                                           const std::string& key) {
-  if (markerStreamH == nullptr) {
+  if (markerStream == nullptr) {
     return std::nullopt;
   }
 
   const auto& suites = GetSuites();
   A_long numKeyframes = 0;
-  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
+  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStream, &numKeyframes);
 
   for (A_long index = 0; index < numKeyframes; ++index) {
-    if (auto optComment = GetMarkerComment(markerStreamH, index)) {
+    if (auto optComment = GetMarkerComment(markerStream, index)) {
       if (auto jsonValue = FindKeyFromComment(*optComment, key)) {
         return jsonValue;
       }
@@ -171,13 +171,13 @@ static std::optional<nlohmann::json> FindMarkerFromComposition(const AEGP_ItemH&
     return std::nullopt;
   }
 
-  AEGP_StreamRefH markerStreamH = GetItemMarkerStream(itemH);
-  if (markerStreamH == nullptr) {
+  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemH);
+  if (markerStream == nullptr) {
     return std::nullopt;
   }
 
-  auto result = FindMarkerFromStream(markerStreamH, key);
-  DeleteStream(markerStreamH);
+  auto result = FindMarkerFromStream(markerStream, key);
+  DeleteStream(markerStream);
   return result;
 }
 
@@ -186,37 +186,37 @@ static std::optional<nlohmann::json> FindMarkerFromLayer(const AEGP_LayerH& laye
   if (layerH == nullptr) {
     return std::nullopt;
   }
-  AEGP_StreamRefH markerStreamH = GetLayerMarkerStream(layerH);
-  if (markerStreamH == nullptr) {
+  AEGP_StreamRefH markerStream = GetLayerMarkerStream(layerH);
+  if (markerStream == nullptr) {
     return std::nullopt;
   }
 
-  auto result = FindMarkerFromStream(markerStreamH, key);
-  DeleteStream(markerStreamH);
+  auto result = FindMarkerFromStream(markerStream, key);
+  DeleteStream(markerStream);
   return result;
 }
 
-static bool DeleteMarkerByIndex(const AEGP_StreamRefH markerStreamH, int index) {
-  if (markerStreamH == nullptr) {
+static bool DeleteMarkerByIndex(const AEGP_StreamRefH markerStream, int index) {
+  if (markerStream == nullptr) {
     return false;
   }
 
   const auto& suites = GetSuites();
-  A_Err err = suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStreamH, index);
+  A_Err err = suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStream, index);
   return err == A_Err_NONE;
 }
 
-static void DeleteMarkerFromStream(const AEGP_StreamRefH markerStreamH, const std::string& key) {
-  if (markerStreamH == nullptr || key.empty()) {
+static void DeleteMarkerFromStream(const AEGP_StreamRefH markerStream, const std::string& key) {
+  if (markerStream == nullptr || key.empty()) {
     return;
   }
 
   const auto& suites = GetSuites();
   A_long numKeyframes = 0;
-  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
+  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStream, &numKeyframes);
 
   for (A_long index = numKeyframes - 1; index >= 0; --index) {
-    auto optComment = GetMarkerComment(markerStreamH, index);
+    auto optComment = GetMarkerComment(markerStream, index);
     if (!optComment.has_value()) {
       continue;
     }
@@ -228,9 +228,9 @@ static void DeleteMarkerFromStream(const AEGP_StreamRefH markerStreamH, const st
 
     json.erase(key);
     if (json.empty()) {
-      DeleteMarkerByIndex(markerStreamH, index);
+      DeleteMarkerByIndex(markerStream, index);
     } else {
-      SetMarkerComment(markerStreamH, index, json.dump(), {});
+      SetMarkerComment(markerStream, index, json.dump(), {});
     }
   }
 }
@@ -240,12 +240,12 @@ static void DeleteMarkerFromComposition(const AEGP_ItemH& itemH, const std::stri
     return;
   }
 
-  auto markerStreamH = GetItemMarkerStream(itemH);
-  DeleteMarkerFromStream(markerStreamH, key);
-  DeleteStream(markerStreamH);
+  auto markerStream = GetItemMarkerStream(itemH);
+  DeleteMarkerFromStream(markerStream, key);
+  DeleteStream(markerStream);
 }
 
-std::vector<pag::Marker*> ExportMarkers(const std::shared_ptr<PAGExportSession>& session,
+std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> session,
                                         const AEGP_LayerH& layerH) {
   if (session == nullptr || layerH == nullptr) {
     return {};
@@ -343,8 +343,8 @@ void ParseMarkers(pag::Layer* layer) {
   }
 }
 
-std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index) {
-  if (markerStreamH == nullptr) {
+std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStream, int index) {
+  if (markerStream == nullptr) {
     return std::nullopt;
   }
 
@@ -352,7 +352,7 @@ std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStreamH
   auto pluginID = GetPluginID();
   A_Err err = A_Err_NONE;
   AEGP_StreamValue2 streamValue = {};
-  err = suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStreamH, index,
+  err = suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStream, index,
                                                            &streamValue);
   if (err != A_Err_NONE) {
     return std::nullopt;
@@ -416,17 +416,17 @@ std::string GetMarkerFromComposition(const AEGP_ItemH& itemH, const std::string&
 }
 
 void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemH) {
-  AEGP_StreamRefH markerStreamH = GetItemMarkerStream(itemH);
-  if (markerStreamH == nullptr) {
+  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemH);
+  if (markerStream == nullptr) {
     return;
   }
 
   const auto& suites = GetSuites();
   A_long numKeyframes = 0;
-  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
+  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStream, &numKeyframes);
 
   for (A_long index = 0; index < numKeyframes; ++index) {
-    auto optComment = GetMarkerComment(markerStreamH, index);
+    auto optComment = GetMarkerComment(markerStream, index);
     if (!optComment.has_value()) {
       continue;
     }
@@ -437,9 +437,9 @@ void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemH) {
       json.erase("TimeStretchMode");
 
       if (json.empty()) {
-        suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStreamH, index);
+        suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStream, index);
       } else {
-        SetMarkerComment(markerStreamH, index, json.dump(), {});
+        SetMarkerComment(markerStream, index, json.dump(), {});
       }
     } else {
       if (comment.empty()) {
@@ -447,16 +447,16 @@ void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemH) {
       }
       const auto& lowerComment = ToLowerCase(comment);
       if (lowerComment.find("#timestretchmode") != std::string::npos) {
-        suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStreamH, index);
+        suites->KeyframeSuite4()->AEGP_DeleteKeyframe(markerStream, index);
       }
     }
   }
-  DeleteStream(markerStreamH);
+  DeleteStream(markerStream);
 }
 
-bool SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index, const std::string& comment,
+bool SetMarkerComment(const AEGP_StreamRefH& markerStream, int index, const std::string& comment,
                       A_Time durationTime) {
-  if (markerStreamH == nullptr) {
+  if (markerStream == nullptr) {
     return false;
   }
 
@@ -467,7 +467,7 @@ bool SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index, const std
   AEGP_StreamValue2 streamValue = {};
   AEGP_MarkerValP markerP = nullptr;
 
-  err = suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStreamH, index,
+  err = suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStream, index,
                                                            &streamValue);
   if (err != A_Err_NONE) {
     return false;
@@ -496,7 +496,7 @@ bool SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index, const std
 
   AEGP_MarkerValP oldMarkerP = streamValue.val.markerP;
   streamValue.val.markerP = markerP;
-  err = suites->KeyframeSuite4()->AEGP_SetKeyframeValue(markerStreamH, index, &streamValue);
+  err = suites->KeyframeSuite4()->AEGP_SetKeyframeValue(markerStream, index, &streamValue);
 
   if (err != A_Err_NONE) {
     suites->MarkerSuite1()->AEGP_DisposeMarker(markerP);
@@ -539,14 +539,14 @@ void SetCompositionStoragePath(const std::string& path, const AEGP_ItemH& itemH)
   AddMarkerToComposition(itemH, keyString, value);
 }
 
-bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::string& comment,
+bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string& comment,
                           A_Time time, A_Time durationTime, A_long index) {
-  if (markerStreamH == nullptr) {
+  if (markerStream == nullptr) {
     return false;
   }
 
   const auto& suites = GetSuites();
-  A_Err err = suites->KeyframeSuite4()->AEGP_InsertKeyframe(markerStreamH, AEGP_LTimeMode_CompTime,
+  A_Err err = suites->KeyframeSuite4()->AEGP_InsertKeyframe(markerStream, AEGP_LTimeMode_CompTime,
                                                             &time, &index);
 
   if (err != A_Err_NONE) {
@@ -554,7 +554,7 @@ bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::strin
   }
 
   if (!comment.empty()) {
-    return SetMarkerComment(markerStreamH, index, comment, durationTime);
+    return SetMarkerComment(markerStream, index, comment, durationTime);
   }
 
   return true;
@@ -581,8 +581,8 @@ void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemH) {
   AddMarkerToComposition(itemH, keyString, value, keyTime, durationTime);
 }
 
-void ExportTimeStretch(std::shared_ptr<pag::File>& file,
-                       const std::shared_ptr<PAGExportSession>& session, const AEGP_ItemH& itemH) {
+void ExportTimeStretch(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExportSession> session,
+                       const AEGP_ItemH& itemH) {
   if (file == nullptr || itemH == nullptr) {
     return;
   }
@@ -616,9 +616,8 @@ void ExportTimeStretch(std::shared_ptr<pag::File>& file,
   }
 }
 
-void ExportImageLayerEditable(std::shared_ptr<pag::File>& file,
-                              const std::shared_ptr<PAGExportSession>& session,
-                              const AEGP_ItemH& itemH) {
+void ExportImageLayerEditable(std::shared_ptr<pag::File> file,
+                              std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH) {
   if (!file || file->images.empty()) {
     return;
   }
@@ -658,7 +657,7 @@ void ExportImageLayerEditable(std::shared_ptr<pag::File>& file,
 }
 
 bool IsTextLayerNonReplaceable(const pag::TextLayer* layer, const AEGP_ItemH& itemH,
-                               const std::shared_ptr<PAGExportSession>& session) {
+                               std::shared_ptr<PAGExportSession> session) {
   if (!layer) {
     return false;
   }
@@ -677,7 +676,7 @@ bool IsTextLayerNonReplaceable(const pag::TextLayer* layer, const AEGP_ItemH& it
 }
 
 bool IsImageLayerNonReplaceable(const pag::ImageLayer* layer, const AEGP_ItemH& itemH,
-                                const std::shared_ptr<PAGExportSession>& session) {
+                                std::shared_ptr<PAGExportSession> session) {
   if (session->isVideoLayer(layer->id)) {
     return false;
   }
@@ -694,8 +693,8 @@ bool IsImageLayerNonReplaceable(const pag::ImageLayer* layer, const AEGP_ItemH& 
   return false;
 }
 
-void ExportTextLayerEditable(std::shared_ptr<pag::File>& file,
-                             const std::shared_ptr<PAGExportSession>& session,
+void ExportTextLayerEditable(std::shared_ptr<pag::File> file,
+                             std::shared_ptr<PAGExportSession> session,
                              const AEGP_ItemH& mainCompItemH) {
   if (!file || file->numTexts() == 0) {
     return;
@@ -723,8 +722,7 @@ void ExportTextLayerEditable(std::shared_ptr<pag::File>& file,
   }
 }
 
-void ExportLayerEditable(std::shared_ptr<pag::File>& file,
-                         const std::shared_ptr<PAGExportSession>& session,
+void ExportLayerEditable(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExportSession> session,
                          const AEGP_ItemH& itemH) {
   ExportImageLayerEditable(file, session, itemH);
   ExportTextLayerEditable(file, session, itemH);
@@ -780,18 +778,18 @@ void ExportImageFillMode(std::shared_ptr<pag::File>& file, const AEGP_ItemH& ite
   }
 }
 
-void AddMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::string& key,
+void AddMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string& key,
                        const nlohmann::json& value, A_Time time, A_Time durationTime) {
-  if (markerStreamH == nullptr || key.empty()) {
+  if (markerStream == nullptr || key.empty()) {
     return;
   }
 
   const auto& suites = GetSuites();
   A_long numKeyframes = 0;
-  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
+  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStream, &numKeyframes);
 
   for (A_long index = 0; index < numKeyframes; ++index) {
-    auto optComment = GetMarkerComment(markerStreamH, index);
+    auto optComment = GetMarkerComment(markerStream, index);
     if (!optComment.has_value()) {
       continue;
     }
@@ -801,17 +799,17 @@ void AddMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::string& 
       json[key] = value;
       if (time.value == 0 && time.scale == 1 && durationTime.value == 0 &&
           durationTime.scale == 0) {
-        SetMarkerComment(markerStreamH, index, json.dump(), {});
+        SetMarkerComment(markerStream, index, json.dump(), {});
       } else {
-        DeleteMarkerByIndex(markerStreamH, index);
-        AddNewMarkerToStream(markerStreamH, json.dump(), time, durationTime, index);
+        DeleteMarkerByIndex(markerStream, index);
+        AddNewMarkerToStream(markerStream, json.dump(), time, durationTime, index);
       }
       return;
     }
   }
 
   nlohmann::json newJson = {{key, value}};
-  AddNewMarkerToStream(markerStreamH, newJson.dump(), time, durationTime);
+  AddNewMarkerToStream(markerStream, newJson.dump(), time, durationTime);
 }
 
 void AddMarkerToComposition(const AEGP_ItemH& itemH, const std::string& key,
@@ -819,14 +817,14 @@ void AddMarkerToComposition(const AEGP_ItemH& itemH, const std::string& key,
   if (itemH == nullptr) {
     return;
   }
-  auto markerStreamH = GetItemMarkerStream(itemH);
-  if (markerStreamH == nullptr) {
+  auto markerStream = GetItemMarkerStream(itemH);
+  if (markerStream == nullptr) {
     return;
   }
 
-  DeleteMarkerFromStream(markerStreamH, key);
-  AddMarkerToStream(markerStreamH, key, value, time, durationTime);
-  DeleteStream(markerStreamH);
+  DeleteMarkerFromStream(markerStream, key);
+  AddMarkerToStream(markerStream, key, value, time, durationTime);
+  DeleteStream(markerStream);
 }
 
 void AddMarkerToLayer(const AEGP_LayerH& layerH, const std::string& key,
@@ -834,30 +832,30 @@ void AddMarkerToLayer(const AEGP_LayerH& layerH, const std::string& key,
   if (layerH == nullptr) {
     return;
   }
-  auto markerStreamH = GetLayerMarkerStream(layerH);
-  if (markerStreamH == nullptr) {
+  auto markerStream = GetLayerMarkerStream(layerH);
+  if (markerStream == nullptr) {
     return;
   }
 
-  DeleteMarkerFromStream(markerStreamH, key);
-  AddMarkerToStream(markerStreamH, key, value);
-  DeleteStream(markerStreamH);
+  DeleteMarkerFromStream(markerStream, key);
+  AddMarkerToStream(markerStream, key, value);
+  DeleteStream(markerStream);
 }
 
 std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH) {
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
 
-  AEGP_StreamRefH markerStreamH = GetItemMarkerStream(itemH);
-  if (!markerStreamH) {
+  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemH);
+  if (!markerStream) {
     return std::nullopt;
   }
 
   A_long numKeyframes = 0;
-  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStreamH, &numKeyframes);
+  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStream, &numKeyframes);
 
   for (A_long index = 0; index < numKeyframes; index++) {
-    auto optComment = GetMarkerComment(markerStreamH, index);
+    auto optComment = GetMarkerComment(markerStream, index);
     if (!optComment.has_value()) {
       continue;
     }
@@ -884,11 +882,11 @@ std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH) {
 
     if (foundMode) {
       A_Time time;
-      suites->KeyframeSuite4()->AEGP_GetKeyframeTime(markerStreamH, index, AEGP_LTimeMode_CompTime,
+      suites->KeyframeSuite4()->AEGP_GetKeyframeTime(markerStream, index, AEGP_LTimeMode_CompTime,
                                                      &time);
 
       AEGP_StreamValue2 streamValue;
-      suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStreamH, index,
+      suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStream, index,
                                                          &streamValue);
       AEGP_MarkerValP markerP = streamValue.val.markerP;
       A_Time duration;
@@ -900,12 +898,12 @@ std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH) {
       TimeStretchInfo result = {*foundMode, AEDurationToFrame(time, frameRate),
                                 AEDurationToFrame(duration, frameRate)};
 
-      DeleteStream(markerStreamH);
+      DeleteStream(markerStream);
       return result;
     }
   }
 
-  DeleteStream(markerStreamH);
+  DeleteStream(markerStream);
   return std::nullopt;
 }
 

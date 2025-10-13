@@ -41,7 +41,7 @@ std::string ReadTextFile(const std::string& filename) {
 }
 
 size_t WriteTextFile(const std::string& fileName, const char* text) {
-  auto path = Utf8StrToLocalPath(fileName);
+  auto path = Utf8ToPath(fileName);
   auto parentPath = path.parent_path();
   if (!parentPath.empty() && !fs::exists(parentPath)) {
     fs::create_directories(parentPath);
@@ -65,7 +65,7 @@ size_t GetFileSize(const std::string& fileName) {
     return 0;
   }
   std::error_code ec;
-  auto ret = fs::file_size(Utf8StrToLocalPath(fileName), ec);
+  auto ret = fs::file_size(Utf8ToPath(fileName), ec);
   return ec ? 0 : ret;
 }
 
@@ -74,16 +74,16 @@ bool FileIsExist(const std::string& fileName) {
     return false;
   }
   std::error_code ec;
-  return fs::exists(Utf8StrToLocalPath(fileName), ec);
+  return fs::exists(Utf8ToPath(fileName), ec);
 }
 
 bool CopyFile(const std::string& src, const std::string& dst) {
   try {
-    auto srcPath = Utf8StrToLocalPath(src);
+    auto srcPath = Utf8ToPath(src);
     if (!fs::exists(srcPath)) {
       return false;
     }
-    auto dstPath = Utf8StrToLocalPath(dst);
+    auto dstPath = Utf8ToPath(dst);
     auto parentPath = dstPath.parent_path();
     if (!parentPath.empty() && !fs::exists(parentPath)) {
       fs::create_directories(parentPath);
@@ -97,7 +97,7 @@ bool CopyFile(const std::string& src, const std::string& dst) {
 
 bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
                  std::ios::openmode mode) {
-  auto path = Utf8StrToLocalPath(filePath);
+  auto path = Utf8ToPath(filePath);
   auto parentPath = path.parent_path();
   if (!parentPath.empty() && !fs::exists(parentPath)) {
     fs::create_directories(parentPath);
@@ -147,11 +147,11 @@ int ReadFileData(const std::string& filePath, uint8_t* buf, size_t bufSize) {
 }
 
 std::string GetFileName(const std::string& filePath) {
-  return LocalPathToUtf8Str(Utf8StrToLocalPath(filePath).filename());
+  return PathToUtf8(Utf8ToPath(filePath).filename());
 }
 
 std::string GetDir(const std::string& filePath) {
-  return LocalPathToUtf8Str(Utf8StrToLocalPath(filePath).parent_path());
+  return PathToUtf8(Utf8ToPath(filePath).parent_path());
 }
 
 void OpenPAGFile(const std::string& filePath) {

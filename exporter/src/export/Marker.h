@@ -92,14 +92,14 @@ class StreamValueWrapper {
   const std::shared_ptr<AEGP_SuiteHandler>* suitesH = nullptr;
 };
 
-std::vector<pag::Marker*> ExportMarkers(const std::shared_ptr<PAGExportSession>& session,
+std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> session,
                                         const AEGP_LayerH& layerH);
 
 void ParseMarkers(pag::Layer* layer);
 
 std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH);
 
-std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index);
+std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStream, int index);
 
 pag::PAGScaleMode GetImageFillMode(const AEGP_ItemH& itemH, pag::ID imageID);
 
@@ -111,7 +111,7 @@ std::string GetMarkerFromComposition(const AEGP_ItemH& itemH, const std::string&
 
 void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemH);
 
-bool SetMarkerComment(const AEGP_StreamRefH& markerStreamH, int index, const std::string& comment,
+bool SetMarkerComment(const AEGP_StreamRefH& markerStream, int index, const std::string& comment,
                       A_Time durationTime);
 
 void SetImageFillMode(pag::PAGScaleMode mode, const AEGP_ItemH& itemH, pag::ID imageID);
@@ -120,32 +120,30 @@ void SetLayerEditable(bool isEditable, const AEGP_ItemH& itemH, pag::ID id);
 
 void SetCompositionStoragePath(const std::string& path, const AEGP_ItemH& itemH);
 
-bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::string& comment,
+bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string& comment,
                           A_Time time = {0, 1}, A_Time durationTime = {0, 0}, A_long index = 0);
 
 void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemH);
 
-void ExportTimeStretch(std::shared_ptr<pag::File>& file,
-                       const std::shared_ptr<PAGExportSession>& session, const AEGP_ItemH& itemH);
+void ExportTimeStretch(std::shared_ptr<pag::File>& file, std::shared_ptr<PAGExportSession> session,
+                       const AEGP_ItemH& itemH);
 
-void ExportImageLayerEditable(std::shared_ptr<pag::File>& file,
-                              const std::shared_ptr<PAGExportSession>& session,
-                              const AEGP_ItemH& itemH);
+void ExportImageLayerEditable(std::shared_ptr<pag::File> file,
+                              std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH);
 
-void ExportTextLayerEditable(std::shared_ptr<pag::File>& file,
-                             const std::shared_ptr<PAGExportSession>& session,
-                             const AEGP_ItemH& itemH);
+void ExportTextLayerEditable(std::shared_ptr<pag::File> file,
+                             std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH);
 
-void ExportLayerEditable(std::shared_ptr<pag::File>& file,
-                         const std::shared_ptr<PAGExportSession>& session, const AEGP_ItemH& itemH);
+void ExportLayerEditable(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExportSession> session,
+                         const AEGP_ItemH& itemH);
 
-void ExportImageFillMode(std::shared_ptr<pag::File>& file, const AEGP_ItemH& itemH);
+void ExportImageFillMode(std::shared_ptr<pag::File> file, const AEGP_ItemH& itemH);
 
 bool IsTextLayerNonReplaceable(const pag::TextLayer* layer, const AEGP_ItemH& itemH,
-                               const std::shared_ptr<PAGExportSession>& session);
+                               std::shared_ptr<PAGExportSession> session);
 
 bool IsImageLayerNonReplaceable(const pag::ImageLayer* layer, const AEGP_ItemH& itemH,
-                                const std::shared_ptr<PAGExportSession>& session);
+                                std::shared_ptr<PAGExportSession> session);
 
 void AddMarkerToComposition(const AEGP_ItemH& itemH, const std::string& key,
                             const nlohmann::json& value, A_Time time = {0, 1},
@@ -154,7 +152,7 @@ void AddMarkerToComposition(const AEGP_ItemH& itemH, const std::string& key,
 void AddMarkerToLayer(const AEGP_LayerH& layerH, const std::string& key,
                       const nlohmann::json& value);
 
-void AddMarkerToStream(const AEGP_StreamRefH& markerStreamH, const std::string& key,
+void AddMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string& key,
                        const nlohmann::json& value, A_Time time = {0, 1},
                        A_Time durationTime = {0, 0});
 

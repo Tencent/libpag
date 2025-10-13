@@ -23,21 +23,21 @@
 
 namespace exporter {
 
-using LayerHandler = void (*)(const std::shared_ptr<exporter::PAGExportSession>& session,
+using LayerHandler = void (*)(std::shared_ptr<exporter::PAGExportSession> session,
                               pag::Layer* layer, void* ctx);
 
-using LayerHandlerWithTime = void (*)(const std::shared_ptr<exporter::PAGExportSession>& session,
+using LayerHandlerWithTime = void (*)(std::shared_ptr<exporter::PAGExportSession> session,
                                       pag::Layer* layer, pag::Frame startTime, void* ctx);
 
-void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
+void TraversalLayers(std::shared_ptr<exporter::PAGExportSession> session,
                      pag::Composition* composition, pag::LayerType layerType, pag::Frame startTime,
                      LayerHandlerWithTime handler, void* ctx);
 
-void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
+void TraversalLayers(std::shared_ptr<exporter::PAGExportSession> session,
                      pag::Composition* composition, pag::LayerType layerType, LayerHandler handler,
                      void* ctx);
 
-void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
+void TraversalLayers(std::shared_ptr<exporter::PAGExportSession> session,
                      std::vector<pag::Composition*>& compositions, pag::LayerType layerType,
                      LayerHandler handler, void* ctx);
 

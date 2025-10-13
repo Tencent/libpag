@@ -18,7 +18,7 @@
 
 #include "AEResource.h"
 #include <QStandardPaths>
-#include <map>
+#include <unordered_map>
 #include "AEHelper.h"
 #include "StringHelper.h"
 #include "export/Marker.h"
@@ -78,7 +78,7 @@ bool HasCompositionResource() {
 
 std::vector<std::shared_ptr<AEResource>> AEResource::GetAEResourceList() {
   std::vector<std::shared_ptr<AEResource>> resources = {};
-  std::map<A_long, std::shared_ptr<AEResource>> resourceMap = {};
+  std::unordered_map<A_long, std::shared_ptr<AEResource>> resourceMap = {};
 
   const auto& suites = GetSuites();
   A_long projectsNum = 0;

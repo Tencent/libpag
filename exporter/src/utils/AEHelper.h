@@ -31,7 +31,6 @@ struct AEVersion {
   static int32_t MinorVersion;
 };
 
-/* Common Interface */
 std::shared_ptr<AEGP_SuiteHandler> GetSuites();
 
 AEGP_PluginID GetPluginID();
@@ -66,7 +65,6 @@ void setMinorVersion(int32_t minorVersion);
 
 void RegisterTextDocumentScript();
 
-/* Layer Interface */
 uint32_t GetLayerID(const AEGP_LayerH& layerH);
 
 uint32_t GetLayerItemID(const AEGP_LayerH& layerH);
@@ -95,7 +93,6 @@ A_long GetLayerEffectNum(const AEGP_LayerH& layerH);
 
 void SelectLayer(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH);
 
-/* Item Interface */
 uint32_t GetItemID(const AEGP_ItemH& itemH);
 
 uint32_t GetItemParentID(const AEGP_ItemH& item);
@@ -116,7 +113,6 @@ void SetItemName(const AEGP_ItemH& item, const std::string& name);
 
 void SelectItem(const AEGP_ItemH& itemH);
 
-/* Composition Interface  */
 std::string GetCompName(const AEGP_CompH& compH);
 
 AEGP_ItemH GetCompItemH(const AEGP_CompH& compH);
@@ -125,7 +121,6 @@ pag::Color GetCompBackgroundColor(const AEGP_CompH& compH);
 
 bool IsStaticComposition(const AEGP_CompH& compH);
 
-/* Stream Interface */
 std::string GetStreamMatchName(const AEGP_StreamRefH& streamH);
 
 bool IsStreamHidden(const AEGP_StreamRefH& streamH);

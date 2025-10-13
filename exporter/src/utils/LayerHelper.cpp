@@ -22,7 +22,7 @@
 
 namespace exporter {
 
-void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
+void TraversalLayers(std::shared_ptr<exporter::PAGExportSession> session,
                      pag::Composition* composition, pag::LayerType layerType, pag::Frame startTime,
                      LayerHandlerWithTime handler, void* ctx) {
   if (composition->type() != pag::CompositionType::Vector) {
@@ -42,7 +42,7 @@ void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
   }
 }
 
-void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
+void TraversalLayers(std::shared_ptr<exporter::PAGExportSession> session,
                      pag::Composition* composition, pag::LayerType layerType, LayerHandler handler,
                      void* ctx) {
   if (composition->type() != pag::CompositionType::Vector) {
@@ -61,7 +61,7 @@ void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
   }
 }
 
-void TraversalLayers(const std::shared_ptr<exporter::PAGExportSession>& session,
+void TraversalLayers(std::shared_ptr<exporter::PAGExportSession> session,
                      std::vector<pag::Composition*>& compositions, pag::LayerType layerType,
                      LayerHandler handler, void* ctx) {
   for (auto composition : compositions) {

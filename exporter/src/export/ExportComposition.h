@@ -23,27 +23,24 @@
 
 namespace exporter {
 
-pag::CompositionType GetCompositionType(const std::shared_ptr<PAGExportSession>& session,
+pag::CompositionType GetCompositionType(std::shared_ptr<PAGExportSession> session,
                                         const AEGP_CompH& compH);
 
-void GetCompositionAttributes(const std::shared_ptr<PAGExportSession>& session,
-                              const AEGP_CompH& compH, pag::Composition* composition);
+void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH,
+                              pag::Composition* composition);
 
-void ExportComposition(const std::shared_ptr<PAGExportSession>& session, const AEGP_ItemH& itemH);
+void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH);
 
-void ExportVideoComposition(const std::shared_ptr<PAGExportSession>& session,
-                            const AEGP_CompH& compH);
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH);
 
-void ExportBitmapComposition(const std::shared_ptr<PAGExportSession>& session,
-                             const AEGP_CompH& compH);
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH);
 
-void ExportVectorComposition(const std::shared_ptr<PAGExportSession>& session,
-                             const AEGP_CompH& compH);
+void ExportVectorComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH);
 
-void ExportBitmapCompositionActually(const std::shared_ptr<PAGExportSession>& session,
+void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession> session,
                                      pag::BitmapComposition* composition, float factor);
 
-void ExportVideoCompositionActually(const std::shared_ptr<PAGExportSession>& session,
+void ExportVideoCompositionActually(std::shared_ptr<PAGExportSession> session,
                                     std::vector<pag::Composition*>& compositions,
                                     pag::VideoComposition* composition, float factor);
 

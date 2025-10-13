@@ -32,8 +32,8 @@ class PAGExportSessionManager {
   PAGExportSessionManager(const PAGExportSessionManager&) = delete;
   PAGExportSessionManager& operator=(const PAGExportSessionManager&) = delete;
 
-  void setCurrentSession(const std::shared_ptr<PAGExportSession>& session);
-  void unsetCurrentSession(const std::shared_ptr<PAGExportSession>& session);
+  void setCurrentSession(std::shared_ptr<PAGExportSession> session);
+  void unsetCurrentSession(std::shared_ptr<PAGExportSession> session);
   void recordWarning(AlertInfoType type, const std::string& addInfo = "");
   pag::GradientColorHandle getGradientColors(const std::vector<std::string>& matchNames, int index);
 

@@ -21,12 +21,11 @@
 
 namespace exporter {
 
-void PAGExportSessionManager::setCurrentSession(const std::shared_ptr<PAGExportSession>& session) {
+void PAGExportSessionManager::setCurrentSession(std::shared_ptr<PAGExportSession> session) {
   currentSession = session;
 }
 
-void PAGExportSessionManager::unsetCurrentSession(
-    const std::shared_ptr<PAGExportSession>& session) {
+void PAGExportSessionManager::unsetCurrentSession(std::shared_ptr<PAGExportSession> session) {
   if (currentSession == session) {
     currentSession = nullptr;
   }
