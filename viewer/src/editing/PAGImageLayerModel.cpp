@@ -113,7 +113,7 @@ void PAGImageLayerModel::changeImage(int index, const QString& filePath) {
   if (pagImage == nullptr) {
     return;
   }
-  replaceImage(index, pagImage);
+  replaceImage(index, std::move(pagImage));
 
   beginResetModel();
   revertSet.insert(index);
@@ -154,8 +154,8 @@ QHash<int, QByteArray> PAGImageLayerModel::roleNames() const {
   return roles;
 }
 
-void PAGImageLayerModel::replaceImage(int index, const std::shared_ptr<PAGImage>& image) {
-  pagFile->replaceImage(convertIndex(index), image);
+void PAGImageLayerModel::replaceImage(int index, std::shared_ptr<PAGImage> image) {
+  pagFile->replaceImage(convertIndex(index), std::move(image));
   Q_EMIT imageChanged();
 }
 

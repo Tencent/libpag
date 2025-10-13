@@ -46,7 +46,7 @@ class PAGImageLayerModel : public QAbstractListModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
  private:
-  void replaceImage(int index, const std::shared_ptr<PAGImage>& image);
+  void replaceImage(int index, std::shared_ptr<PAGImage> image);
 
   QSet<int> revertSet = {};
   QMap<int, QImage> imageLayers = {};
