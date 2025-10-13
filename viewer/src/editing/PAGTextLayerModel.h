@@ -69,7 +69,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
  private:
-  void replaceText(int index, const std::shared_ptr<TextDocument>& textData);
+  void replaceText(int index, std::shared_ptr<TextDocument> textData);
   bool compareTextDocument(TextDocument* oldTextDocument, TextDocument* newTextDocument);
 
  private:
