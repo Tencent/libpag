@@ -37,6 +37,7 @@ static bool ValidatePAGFile(uint8_t* data, size_t size) {
   auto bytes = pag::Codec::Encode(pagFileDecoded);
   if (bytes->length() != size) {
     LOGI("warning: bytes->length(%zu) != data.size(%zu)", bytes->length(), size);
+    return false;
   }
 
   return true;
