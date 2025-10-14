@@ -30,7 +30,7 @@ ListView {
                 } else {
                     filePath = drag.source.text;
                 }
-                imageModel.replaceImage(index, filePath);
+                imageModel.changeImage(index, filePath);
             }
         }
 
@@ -156,7 +156,7 @@ ListView {
         nameFilters: ["Replacement files (*.jpg *.jpeg *.bmp *.png)"]
         onAccepted: {
             let file = selectImageDialog.selectedFile;
-            imageModel.replaceImage(selectIndex, file);
+            imageModel.changeImage(selectIndex, file);
         }
     }
 }
