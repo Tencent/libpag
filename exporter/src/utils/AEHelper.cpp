@@ -114,8 +114,11 @@ AEGP_ItemH GetActiveCompositionItem() {
   return activeItemH;
 }
 
-void GetRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
-                    A_long& height, AEGP_RenderOptionsH& renderOptions) {
+void GetRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_long width,
+                    A_long height, AEGP_RenderOptionsH& renderOptions) {
+  if (rgbaBytes == nullptr || width <= 0 || height <= 0 || srcStride <= 0 || dstStride <= 0) {
+    return;
+  }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   Suites->RenderOptionsSuite3()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
 
@@ -125,25 +128,35 @@ void GetRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& strid
 
   AEGP_WorldH imageWorld;
   Suites->RenderSuite5()->AEGP_GetReceiptWorld(frameReceipt, &imageWorld);
-  Suites->WorldSuite3()->AEGP_GetSize(imageWorld, &width, &height);
 
-  PF_Pixel* pixels;
+  PF_Pixel* pixels = nullptr;
   Suites->WorldSuite3()->AEGP_GetBaseAddr8(imageWorld, &pixels);
-  Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &rowBytesLength);
 
-  if (width > 0 && height > 0 && rowBytesLength > 0) {
-    if (*rgbaBytes == nullptr) {
-      stride = 4 * width;
-      *rgbaBytes = new uint8_t[stride * height + stride * 2];
-    }
-    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, *rgbaBytes,
-                                stride);
-  }
+  exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, srcStride, rgbaBytes, dstStride);
   Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
 }
 
-void GetLayerRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
-                         A_long& width, A_long& height, AEGP_LayerRenderOptionsH& renderOptions) {
+void GetRenderFrameSize(AEGP_RenderOptionsH& renderOptions, A_u_long& stride, A_long& width,
+                        A_long& height) {
+  Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
+  Suites->RenderOptionsSuite3()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
+
+  AEGP_FrameReceiptH frameReceipt;
+  Suites->RenderSuite5()->AEGP_RenderAndCheckoutFrame(renderOptions, nullptr, nullptr,
+                                                      &frameReceipt);
+  AEGP_WorldH imageWorld;
+  Suites->RenderSuite5()->AEGP_GetReceiptWorld(frameReceipt, &imageWorld);
+  Suites->WorldSuite3()->AEGP_GetSize(imageWorld, &width, &height);
+  Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &stride);
+
+  Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
+}
+
+void GetLayerRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_long width,
+                         A_long height, AEGP_LayerRenderOptionsH& renderOptions) {
+  if (rgbaBytes == nullptr || width <= 0 || height <= 0 || srcStride <= 0 || dstStride <= 0) {
+    return;
+  }
   Suites->LayerRenderOptionsSuite2()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   Suites->LayerRenderOptionsSuite2()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
 
@@ -153,20 +166,27 @@ void GetLayerRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& 
 
   AEGP_WorldH imageWorld;
   Suites->RenderSuite5()->AEGP_GetReceiptWorld(frameReceipt, &imageWorld);
-  Suites->WorldSuite3()->AEGP_GetSize(imageWorld, &width, &height);
 
-  PF_Pixel* pixels;
+  PF_Pixel* pixels = nullptr;
   Suites->WorldSuite3()->AEGP_GetBaseAddr8(imageWorld, &pixels);
-  Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &rowBytesLength);
 
-  if (width > 0 && height > 0 && rowBytesLength > 0) {
-    if (*rgbaBytes == nullptr) {
-      stride = rowBytesLength;
-      *rgbaBytes = new uint8_t[stride * height + stride * 2];
-    }
-    exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, rowBytesLength, *rgbaBytes,
-                                stride);
-  }
+  exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, srcStride, rgbaBytes, dstStride);
+  Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
+}
+
+void GetLayerRenderFrameSize(AEGP_LayerRenderOptionsH& renderOptions, A_u_long& stride,
+                             A_long& width, A_long& height) {
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
+  Suites->LayerRenderOptionsSuite2()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
+
+  AEGP_FrameReceiptH frameReceipt;
+  Suites->RenderSuite5()->AEGP_RenderAndCheckoutLayerFrame(renderOptions, nullptr, nullptr,
+                                                           &frameReceipt);
+  AEGP_WorldH imageWorld;
+  Suites->RenderSuite5()->AEGP_GetReceiptWorld(frameReceipt, &imageWorld);
+  Suites->WorldSuite3()->AEGP_GetSize(imageWorld, &width, &height);
+  Suites->WorldSuite3()->AEGP_GetRowBytes(imageWorld, &stride);
+
   Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
 }
 
@@ -523,17 +543,18 @@ QImage GetCompositionFrameImage(const AEGP_ItemH& itemH, pag::Frame frame) {
 
   uint8_t* rgbaBytes = nullptr;
   A_u_long stride = 0;
-  A_u_long rowBytesLength = 0;
   A_long width = 0;
   A_long height = 0;
-  GetRenderFrame(&rgbaBytes, rowBytesLength, stride, width, height, renderOptions);
-  if (width > 0 && height > 0 && rgbaBytes != nullptr) {
-    QImage image(rgbaBytes, width, height, stride, QImage::Format_RGBA8888);
-    QImage saveImage = image.copy();
-    delete[] rgbaBytes;
-    return saveImage;
+  GetRenderFrameSize(renderOptions, stride, width, height);
+  if (width <= 0 || height <= 0 || stride <= 0) {
+    return {};
   }
-  return {};
+  rgbaBytes = new uint8_t[stride * height];
+  GetRenderFrame(rgbaBytes, stride, stride, width, height, renderOptions);
+  QImage image(rgbaBytes, width, height, stride, QImage::Format_RGBA8888);
+  QImage saveImage = image.copy();
+  delete[] rgbaBytes;
+  return saveImage;
 }
 
 void SetItemName(const AEGP_ItemH& item, const std::string& name) {
@@ -584,7 +605,6 @@ bool IsStaticComposition(const AEGP_CompH& compH) {
 
   uint8_t* curData = nullptr;
   uint8_t* preData = nullptr;
-  A_u_long stride = 0;
   pag::Frame step = 1;
   while (true) {
     pag::Frame value = totalFrames / step;
@@ -597,13 +617,16 @@ bool IsStaticComposition(const AEGP_CompH& compH) {
     SetRenderTime(renderOptions, frameRate, frame);
     A_long width = 0;
     A_long height = 0;
-    A_u_long rowBytesLength = 0;
-    GetRenderFrame(&curData, rowBytesLength, stride, width, height, renderOptions);
-    if (curData != nullptr && preData != nullptr) {
-      if (!exporter::ImageIsStatic(curData, preData, width, height, stride)) {
-        isStatic = false;
-        break;
-      }
+    A_u_long stride = 0;
+    GetRenderFrameSize(renderOptions, stride, width, height);
+    if (curData == nullptr) {
+      curData = new uint8_t[stride * height];
+    }
+    GetRenderFrame(curData, stride, stride, width, height, renderOptions);
+    if (curData != nullptr && preData != nullptr &&
+        !exporter::ImageIsStatic(curData, preData, width, height, stride)) {
+      isStatic = false;
+      break;
     }
     std::swap(curData, preData);
   }

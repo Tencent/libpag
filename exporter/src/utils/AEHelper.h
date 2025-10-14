@@ -41,11 +41,17 @@ QString GetProjectPath();
 
 AEGP_ItemH GetActiveCompositionItem();
 
-void GetRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride, A_long& width,
-                    A_long& height, AEGP_RenderOptionsH& renderOptions);
+void GetRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_long width,
+                    A_long height, AEGP_RenderOptionsH& renderOptions);
 
-void GetLayerRenderFrame(uint8** rgbaBytes, A_u_long& rowBytesLength, A_u_long& stride,
-                         A_long& width, A_long& height, AEGP_LayerRenderOptionsH& renderOptions);
+void GetRenderFrameSize(AEGP_RenderOptionsH& renderOptions, A_u_long& stride, A_long& width,
+                        A_long& height);
+
+void GetLayerRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_long width,
+                         A_long height, AEGP_LayerRenderOptionsH& renderOptions);
+
+void GetLayerRenderFrameSize(AEGP_LayerRenderOptionsH& renderOptions, A_u_long& stride,
+                             A_long& width, A_long& height);
 
 std::vector<char> GetProjectFileBytes();
 
