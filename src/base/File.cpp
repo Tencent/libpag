@@ -22,6 +22,60 @@
 
 namespace pag {
 
+static std::mutex globalLocker = {};
+static std::unordered_map<std::string, std::weak_ptr<File>> weakFileMap =
+    std::unordered_map<std::string, std::weak_ptr<File>>();
+
+static std::shared_ptr<File> FindFileByPath(const std::string& filePath) {
+  std::lock_guard<std::mutex> autoLock(globalLocker);
+  if (filePath.empty()) {
+    return nullptr;
+  }
+  auto result = weakFileMap.find(filePath);
+  if (result != weakFileMap.end()) {
+    auto& weak = result->second;
+    auto file = weak.lock();
+    if (file) {
+      return file;
+    }
+    weakFileMap.erase(result);
+    if (weakFileMap.size() > 50) {  // do cleaning.
+      std::vector<std::string> needRemoveList = {};
+      for (auto& item : weakFileMap) {
+        if (item.second.expired()) {
+          needRemoveList.push_back(item.first);
+        }
+      }
+      for (auto& item : needRemoveList) {
+        weakFileMap.erase(item);
+      }
+    }
+  }
+  return nullptr;
+}
+
+std::shared_ptr<File> File::Load(const std::string& filePath) {
+  auto byteData = ByteData::FromPath(filePath);
+  if (byteData == nullptr) {
+    return nullptr;
+  }
+  return pag::File::Load(byteData->data(), byteData->length(), filePath);
+}
+
+std::shared_ptr<File> File::Load(const void* bytes, size_t length, const std::string& filePath) {
+  auto file = FindFileByPath(filePath);
+  if (file != nullptr) {
+    return file;
+  }
+  file = Codec::Decode(bytes, static_cast<uint32_t>(length), filePath);
+  if (file != nullptr) {
+    std::lock_guard<std::mutex> autoLock(globalLocker);
+    std::weak_ptr<File> weak = file;
+    weakFileMap.insert(std::make_pair(filePath, std::move(weak)));
+  }
+  return file;
+}
+
 uint16_t File::MaxSupportedTagLevel() {
   return Codec::MaxSupportedTagLevel();
 }
