@@ -45,11 +45,11 @@ class WebVideoSequenceDemuxer : public VideoSequenceDemuxer {
 
   std::unique_ptr<ByteData> getMp4Data();
 
-  void setExternalDecoder(bool value) {
-    isExternalDecoder = value;
+  void setForHardwareDecoder(bool value) {
+    hardwareBacked = value;
   }
 
  private:
-  bool isExternalDecoder = true;
+  bool hardwareBacked = false;
 };
 }  // namespace pag

@@ -23,42 +23,41 @@
 namespace pag {
 
 VideoSample WebVideoSequenceDemuxer::nextSample() {
-  if (isExternalDecoder) {
-    return VideoSequenceDemuxer::nextSample();
-  } else {
+  if (hardwareBacked) {
     VideoSample sample = {};
     sample.time = FrameToTime(sampleIndex, sequence->frameRate);
     sample.length = 1;
     sampleIndex++;
     return sample;
   }
+  return VideoSequenceDemuxer::nextSample();
 }
 
 void WebVideoSequenceDemuxer::seekTo(int64_t targetTime) {
-  if (isExternalDecoder) {
-    VideoSequenceDemuxer::seekTo(targetTime);
-  } else {
+  if (hardwareBacked) {
     auto targetFrame = TimeToFrame(targetTime, sequence->frameRate);
     maxPTSFrame = sampleIndex = targetFrame;
+  } else {
+    VideoSequenceDemuxer::seekTo(targetTime);
   }
 }
 
 int64_t WebVideoSequenceDemuxer::getSampleTimeAt(int64_t targetTime) {
-  if (isExternalDecoder) {
-    return VideoSequenceDemuxer::getSampleTimeAt(targetTime);
+  if (hardwareBacked) {
+    return targetTime;
   }
-  return targetTime;
+  return VideoSequenceDemuxer::getSampleTimeAt(targetTime);
 }
 
 bool WebVideoSequenceDemuxer::needSeeking(int64_t currentTime, int64_t targetTime) {
-  if (isExternalDecoder) {
-    return VideoSequenceDemuxer::needSeeking(currentTime, targetTime);
+  if (hardwareBacked) {
+    return true;
   }
-  return true;
+  return VideoSequenceDemuxer::needSeeking(currentTime, targetTime);
 }
 
 void WebVideoSequenceDemuxer::reset() {
-  if (isExternalDecoder) {
+  if (!hardwareBacked) {
     VideoSequenceDemuxer::reset();
   }
 }
