@@ -24,7 +24,7 @@
 #ifdef PAG_USE_HARFBUZZ
 #include "base/utils/USE.h"
 #endif
-
+#include "platform/web/WebVideoSequenceDemuxer.h"
 using namespace emscripten;
 
 namespace pag {
@@ -42,6 +42,8 @@ class HardwareDecoderFactory : public VideoDecoderFactory {
     if (format.demuxer == nullptr) {
       return nullptr;
     }
+    auto demuxer = static_cast<WebVideoSequenceDemuxer*>(format.demuxer);
+    demuxer->setExternalDecoder(false);
     auto decoder = new HardwareDecoder(format);
     if (decoder->imageReader == nullptr) {
       delete decoder;

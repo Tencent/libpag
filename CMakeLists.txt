@@ -530,7 +530,7 @@ if (WEB)
     add_executable(pag ${PAG_FILES})
     list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
-            -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1)
+            -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1 -sEXPORTED_FUNCTIONS=['_malloc','_free'])
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
         if (${EMSCRIPTEN_VERSION} VERSION_EQUAL ${unsupported_version})
