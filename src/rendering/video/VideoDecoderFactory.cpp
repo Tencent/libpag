@@ -27,6 +27,10 @@
 #include "ffavc.h"
 #endif
 
+#ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/WebVideoSequenceDemuxer.h"
+#endif
+
 namespace pag {
 static std::mutex factoryLocker = {};
 static SoftwareDecoderFactory* softwareDecoderFactory = {nullptr};
@@ -82,6 +86,12 @@ class SoftwareAVCDecoderFactory : public VideoDecoderFactory {
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
     std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
 #ifdef PAG_USE_LIBAVC
+
+#ifdef PAG_BUILD_FOR_WEB
+    auto demuxer = static_cast<WebVideoSequenceDemuxer*>(format.demuxer);
+    demuxer->setExternalDecoder(true);
+#endif
+
     videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_shared<SoftAVCDecoder>(), format);
     if (videoDecoder != nullptr) {
       LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");

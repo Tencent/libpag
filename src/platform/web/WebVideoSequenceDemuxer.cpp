@@ -23,16 +23,44 @@
 namespace pag {
 
 VideoSample WebVideoSequenceDemuxer::nextSample() {
-  VideoSample sample = {};
-  sample.time = FrameToTime(sampleIndex, sequence->frameRate);
-  sample.length = 1;
-  sampleIndex++;
-  return sample;
+  if (isExternalDecoder) {
+    return VideoSequenceDemuxer::nextSample();
+  } else {
+    VideoSample sample = {};
+    sample.time = FrameToTime(sampleIndex, sequence->frameRate);
+    sample.length = 1;
+    sampleIndex++;
+    return sample;
+  }
 }
 
 void WebVideoSequenceDemuxer::seekTo(int64_t targetTime) {
-  auto targetFrame = TimeToFrame(targetTime, sequence->frameRate);
-  maxPTSFrame = sampleIndex = targetFrame;
+  if (isExternalDecoder) {
+    VideoSequenceDemuxer::seekTo(targetTime);
+  } else {
+    auto targetFrame = TimeToFrame(targetTime, sequence->frameRate);
+    maxPTSFrame = sampleIndex = targetFrame;
+  }
+}
+
+int64_t WebVideoSequenceDemuxer::getSampleTimeAt(int64_t targetTime) {
+  if (isExternalDecoder) {
+    return VideoSequenceDemuxer::getSampleTimeAt(targetTime);
+  }
+  return targetTime;
+}
+
+bool WebVideoSequenceDemuxer::needSeeking(int64_t currentTime, int64_t targetTime) {
+  if (isExternalDecoder) {
+    return VideoSequenceDemuxer::needSeeking(currentTime, targetTime);
+  }
+  return true;
+}
+
+void WebVideoSequenceDemuxer::reset() {
+  if (isExternalDecoder) {
+    VideoSequenceDemuxer::reset();
+  }
 }
 
 val WebVideoSequenceDemuxer::getStaticTimeRanges() {
