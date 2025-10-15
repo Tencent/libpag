@@ -46,7 +46,7 @@ QVariant PAGTextLayerModel::data(const QModelIndex& index, int role) const {
   return {};
 }
 
-void PAGTextLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGTextLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   beginResetModel();
   textLayers.clear();
   revertSet.clear();
@@ -56,14 +56,14 @@ void PAGTextLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
     return;
   }
 
-  this->pagFile = pagFile;
-  auto editableList = pagFile->getEditableIndices(LayerType::Text);
+  this->pagFile = std::move(pagFile);
+  auto editableList = this->pagFile->getEditableIndices(LayerType::Text);
   if (editableList.empty()) {
     return;
   }
 
   for (const auto& layerIndex : editableList) {
-    textLayers.append(pagFile->getTextData(layerIndex));
+    textLayers.append(this->pagFile->getTextData(layerIndex));
   }
   beginResetModel();
   endResetModel();

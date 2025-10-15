@@ -55,7 +55,7 @@ QImage PAGImageLayerModel::requestImage(int index) {
   return imageLayers[index];
 }
 
-void PAGImageLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGImageLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   beginResetModel();
   imageLayers.clear();
   revertSet.clear();
@@ -65,13 +65,13 @@ void PAGImageLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
     return;
   }
 
-  this->pagFile = pagFile;
-  auto editableList = pagFile->getEditableIndices(LayerType::Image);
+  this->pagFile = std::move(pagFile);
+  auto editableList = this->pagFile->getEditableIndices(LayerType::Image);
   if (editableList.empty()) {
     return;
   }
 
-  auto file = pagFile->getFile();
+  auto file = this->pagFile->getFile();
 
   beginResetModel();
   for (const auto& editableIndex : editableList) {

@@ -36,7 +36,7 @@ class PAGImageLayerModel : public QAbstractListModel {
 
   Q_SIGNAL void imageChanged();
 
-  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
+  Q_SLOT void setPAGFile(std::shared_ptr<PAGFile> pagFile);
 
   Q_INVOKABLE void changeImage(int index, const QString& filePath);
   Q_INVOKABLE void revertImage(int index);

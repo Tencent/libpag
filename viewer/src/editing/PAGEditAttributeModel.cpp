@@ -111,12 +111,12 @@ bool PAGEditAttributeModel::saveAttribute(int layerId, int markerIndex,
   return false;
 }
 
-void PAGEditAttributeModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
-  this->pagFile = pagFile;
-  this->filePath = QString::fromStdString(pagFile->path());
+void PAGEditAttributeModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
+  this->pagFile = std::move(pagFile);
+  this->filePath = QString::fromStdString(this->pagFile->path());
 }
 
-Layer* PAGEditAttributeModel::getLayerFromFile(const std::shared_ptr<File>& file, int layerId) {
+Layer* PAGEditAttributeModel::getLayerFromFile(std::shared_ptr<File> file, int layerId) {
   if (file == nullptr) {
     return nullptr;
   }
@@ -148,7 +148,7 @@ Layer* PAGEditAttributeModel::getLayerFromFile(const std::shared_ptr<File>& file
   return nullptr;
 }
 
-Composition* PAGEditAttributeModel::getCompositionFromFile(const std::shared_ptr<File>& file,
+Composition* PAGEditAttributeModel::getCompositionFromFile(std::shared_ptr<File> file,
                                                            int layerId) {
   if (file == nullptr) {
     return nullptr;

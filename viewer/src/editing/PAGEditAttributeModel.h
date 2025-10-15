@@ -33,11 +33,11 @@ class PAGEditAttributeModel : public QObject {
   Q_INVOKABLE bool saveAttribute(int layerId, int markerIndex, const QString& attributeName,
                                  const QString& attributeValue, const QString& savePath = "");
 
-  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
+  Q_SLOT void setPAGFile(std::shared_ptr<PAGFile> pagFile);
 
  private:
-  Layer* getLayerFromFile(const std::shared_ptr<File>& file, int layerId);
-  Composition* getCompositionFromFile(const std::shared_ptr<File>& file, int layerId);
+  Layer* getLayerFromFile(std::shared_ptr<File> file, int layerId);
+  Composition* getCompositionFromFile(std::shared_ptr<File> file, int layerId);
   Layer* getLayerFromPreComposition(int layerId, PreComposeLayer* preComposeLayer);
   Composition* getCompositionFromPreComposition(int layerId, PreComposeLayer* preComposeLayer);
 
