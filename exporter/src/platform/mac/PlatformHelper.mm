@@ -18,6 +18,7 @@
 
 #include "platform/PlatformHelper.h"
 #import <AppKit/AppKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
 #include <string>
 #include "platform/PAGViewerCheck.h"
@@ -67,6 +68,11 @@ std::string GetTempFolderPath() {
     }
   }
   return TempFolderPath;
+}
+
+bool IsAEWindowActive() {
+  NSRunningApplication* frontApp = [[NSWorkspace sharedWorkspace] frontmostApplication];
+  return [frontApp.bundleIdentifier containsString:@"com.adobe.AfterEffects"];
 }
 
 std::string GetDownloadsPath() {
@@ -126,7 +132,6 @@ static void StartPreview(const std::string& pagFilePath) {
     NSURL* fileURL = [NSURL fileURLWithPath:nsFilePath];
     if (!fileURL) {
       QString errorMsg = QString::fromUtf8(Messages::INVALID_FILE_PATH);
-      ;
       WindowManager::GetInstance().showSimpleError(errorMsg);
       return;
     }
@@ -150,6 +155,7 @@ static void StartPreview(const std::string& pagFilePath) {
     }
   }
 }
+
 void PreviewPAGFile(std::string pagFilePath) {
   auto config = std::make_shared<AppConfig>();
   config->setAppName("PAGViewer.app");
@@ -164,4 +170,13 @@ void PreviewPAGFile(std::string pagFilePath) {
   }
   StartPreview(pagFilePath);
 }
+
+std::filesystem::path Utf8ToPath(const std::string& utf8) {
+  return {utf8};
+}
+
+std::string PathToUtf8(const std::filesystem::path& path) {
+  return path.u8string();
+}
+
 }

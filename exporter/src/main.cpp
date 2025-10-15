@@ -23,13 +23,15 @@
 #include "aecommand/AECommand.h"
 #include "utils/AEHelper.h"
 
-extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long /*majorVersion*/,
-                                          A_long /*minorVersion*/, AEGP_PluginID pluginID,
+extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long majorVersion,
+                                          A_long minorVersion, AEGP_PluginID pluginID,
                                           AEGP_GlobalRefcon* /*globalRefcon*/) {
-  AEHelper::SetSuitesAndPluginID(suite, pluginID);
+  exporter::SetMajorVersion(majorVersion);
+  exporter::setMinorVersion(minorVersion);
+  exporter::SetSuitesAndPluginID(suite, pluginID);
   A_Err err = A_Err_NONE;
   A_Err err2 = A_Err_NONE;
-  const auto& suites = AEHelper::GetSuites();
+  const auto& suites = exporter::GetSuites();
 
   // PAG Config...
   ERR(suites->CommandSuite1()->AEGP_GetUniqueCommand(&exporter::AECommand::PAGConfigCMD));
