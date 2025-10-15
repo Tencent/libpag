@@ -425,8 +425,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: third-party-openharmony-
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ohos-
 
       - name: Configure npm registry
         run: |
@@ -456,7 +456,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-mac-arm64-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}

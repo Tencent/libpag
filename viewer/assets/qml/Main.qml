@@ -318,15 +318,17 @@ PAGWindow {
 
     Connections {
         id: taskConnections
-        onProgressChanged: function (progress) {
+        target: null
+
+        function onProgressChanged(progress) {
             progressWindow.progressBar.value = progress;
         }
 
-        onVisibleChanged: function (visible) {
-            progressWindow.visible = visible;
+        function onVisibleChanged(visible) {
+            progressWindow.visible = visible
         }
 
-        onTaskFinished: function (filePath, result) {
+        function onTaskFinished(filePath, result) {
             if (result !== 0) {
                 let errStr = qsTr("Export failed, error code: ");
                 alert(errStr + result);

@@ -2391,13 +2391,12 @@ class PAG_API File {
    * file.
    */
   static std::shared_ptr<File> Load(const void* bytes, size_t length,
-                                    const std::string& filePath = "",
-                                    const std::string& password = "");
+                                    const std::string& filePath = "");
   /**
    *  Load a pag file from path, return null if the file does not exist or the data is not a pag
    * file.
    */
-  static std::shared_ptr<File> Load(const std::string& filePath, const std::string& password = "");
+  static std::shared_ptr<File> Load(const std::string& filePath);
 
   ~File();
 

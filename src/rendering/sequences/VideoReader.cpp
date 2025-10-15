@@ -20,6 +20,9 @@
 #include "base/utils/TimeUtil.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Clock.h"
+#ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/WebVideoSequenceDemuxer.h"
+#endif
 
 namespace pag {
 
@@ -161,6 +164,10 @@ bool VideoReader::checkVideoDecoder() {
   }
   videoDecoder = makeVideoDecoder().release();
   if (videoDecoder) {
+#ifdef PAG_BUILD_FOR_WEB
+    auto tmpDemuxer = static_cast<WebVideoSequenceDemuxer*>(demuxer);
+    tmpDemuxer->setForHardwareDecoder(videoDecoder->isHardwareBacked());
+#endif
     return true;
   }
   return false;

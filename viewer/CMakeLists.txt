@@ -29,7 +29,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-DDEBUG)
 endif ()
 
-add_definitions(-DQT_NO_KEYWORDS)
+add_definitions(-DQT_NO_KEYWORDS -DPAG_USE_RTTR)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
