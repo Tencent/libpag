@@ -46,10 +46,6 @@ class AEResource {
     pag::PAGScaleMode scaleMode = pag::PAGScaleMode::None;
   };
 
-  struct TextLayerFlags {
-    bool isEditable = true;
-  };
-
   struct Layer {
     A_long layerID = 0;
     std::string name = "";
@@ -58,7 +54,7 @@ class AEResource {
 
   struct CompositionRelationship {
     std::unordered_map<A_long, bool> exportAsBmpMap = {};
-    std::unordered_map<A_long, TextLayerFlags> textLayerFlagMap = {};
+    std::unordered_map<A_long, bool> textLayerFlagMap = {};
     std::unordered_map<A_long, PlaceholderImageFlags> imagesLayerFlagMap = {};
 
     // Only save the current object's own resources, not the children's resources

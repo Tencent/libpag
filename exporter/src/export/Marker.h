@@ -55,43 +55,6 @@ class StreamWrapper {
   AEGP_StreamRefH streamHandle = nullptr;
 };
 
-class MemHandleWrapper {
- public:
-  explicit MemHandleWrapper(AEGP_MemHandle handle, const AEGP_SuiteHandler* suite)
-      : memHandle(handle), suitesH(suite) {
-  }
-  ~MemHandleWrapper() {
-    if (memHandle && suitesH) {
-      suitesH->MemorySuite1()->AEGP_FreeMemHandle(memHandle);
-    }
-  }
-  MemHandleWrapper(const MemHandleWrapper&) = delete;
-  MemHandleWrapper& operator=(const MemHandleWrapper&) = delete;
-
- private:
-  AEGP_MemHandle memHandle = nullptr;
-  const AEGP_SuiteHandler* suitesH = nullptr;
-};
-
-class StreamValueWrapper {
- public:
-  explicit StreamValueWrapper(AEGP_StreamValue2* value,
-                              const std::shared_ptr<AEGP_SuiteHandler>* suites)
-      : streamValue(value), suitesH(suites) {
-  }
-  ~StreamValueWrapper() {
-    if (streamValue && suitesH) {
-      if (streamValue && suitesH && *suitesH) {
-        (*suitesH)->StreamSuite3()->AEGP_DisposeStreamValue(streamValue);
-      }
-    }
-  }
-
- private:
-  AEGP_StreamValue2* streamValue = nullptr;
-  const std::shared_ptr<AEGP_SuiteHandler>* suitesH = nullptr;
-};
-
 std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> session,
                                         const AEGP_LayerH& layerH);
 

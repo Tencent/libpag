@@ -269,7 +269,6 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
 
   for (A_long index = 0; index < numKeyframes; ++index) {
     AEGP_StreamValue2 streamValue;
-    StreamValueWrapper streamValueWrapper(&streamValue, &suites);
     suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, streamH, index, &streamValue);
     AEGP_MarkerValP markerP = streamValue.val.markerP;
     if (!markerP) {
@@ -296,6 +295,7 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
     marker->duration = session->configParam.frameRate * duration.value / duration.scale;
 
     markers.push_back(marker);
+    suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
   }
   return markers;
 }
