@@ -33,21 +33,23 @@ class WebVideoSequenceDemuxer : public VideoSequenceDemuxer {
 
   VideoSample nextSample() override;
 
-  int64_t getSampleTimeAt(int64_t targetTime) override {
-    return targetTime;
-  }
+  int64_t getSampleTimeAt(int64_t targetTime) override;
 
-  bool needSeeking(int64_t, int64_t) override {
-    return true;
-  }
+  bool needSeeking(int64_t currentTime, int64_t targetTime) override;
 
   void seekTo(int64_t) override;
 
-  void reset() override {
-  }
+  void reset() override;
 
   val getStaticTimeRanges();
 
   std::unique_ptr<ByteData> getMp4Data();
+
+  void setForHardwareDecoder(bool value) {
+    hardwareBacked = value;
+  }
+
+ private:
+  bool hardwareBacked = false;
 };
 }  // namespace pag
