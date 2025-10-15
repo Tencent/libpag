@@ -15,30 +15,32 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "ScopedHelper.h"
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include "AEHelper.h"
-namespace fs = std::filesystem;
+
+#include "UniqueID.h"
 
 namespace exporter {
-
-ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
-    : itemHandle(itemHandle) {
-  const auto& suites = GetSuites();
-  suites->ItemSuite8()->AEGP_GetItemCurrentTime(itemHandle, &orgTime);
-
-  A_Time newTime = {static_cast<A_long>(time * 100), 100};
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &newTime);
+pag::ID GetLayerUniqueID(const std::vector<pag::Composition*>& compositions) {
+  pag::ID id = 2000;
+  for (const auto& composition : compositions) {
+    if (composition->type() == pag::CompositionType::Vector) {
+      for (const auto& layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+        if (id <= layer->id) {
+          id = layer->id + 1;
+        }
+      }
+    }
+  }
+  return id;
 }
 
-ScopedTimeSetter::~ScopedTimeSetter() {
-  const auto& suites = GetSuites();
-  if (itemHandle == nullptr) {
-    return;
+pag::ID GetCompositionUniqueID(const std::vector<pag::Composition*>& compositions) {
+  pag::ID id = 1000;
+  for (const auto& composition : compositions) {
+    if (id <= composition->id) {
+      id = composition->id + 1;
+    }
   }
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &orgTime);
+  return id;
 }
 
 }  // namespace exporter

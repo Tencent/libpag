@@ -17,13 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WindowManager.h"
+#include <QApplication>
 #include <QFile>
+#include <QQuickStyle>
+#include <QTranslator>
 #include <QtGui/QFont>
+#include <QtQuick/QQuickWindow>
 #include <memory>
 #include "AlertInfoModel.h"
-#include "ConfigModel.h"
 #include "PAGViewerInstallModel.h"
+#include "config/ConfigFile.h"
+#include "platform/PlatformHelper.h"
 #include "utils/AEHelper.h"
+#include "utils/FileHelper.h"
+#include "utils/StringHelper.h"
 
 namespace exporter {
 
@@ -33,19 +40,42 @@ WindowManager& WindowManager::GetInstance() {
 }
 
 WindowManager::WindowManager() {
-  AEHelper::RunScriptPreWarm();
+  RunScriptPreWarm();
   initializeQtEnvironment();
+  translator = std::make_unique<QTranslator>();
 }
 
-void WindowManager::showPanelExporterWindow() {
+void WindowManager::showExportPanelWindow() {
+  init();
 }
 
 void WindowManager::showPAGConfigWindow() {
-  auto configModel = std::make_unique<ConfigModel>();
-  configModel->showConfig();
+  init();
 }
 
 void WindowManager::showExportPreviewWindow() {
+  init();
+}
+
+void WindowManager::showExportWindow() {
+  init();
+}
+
+bool WindowManager::showWarnings(const std::vector<AlertInfo>&) {
+  return true;
+}
+
+bool WindowManager::showErrors(const std::vector<AlertInfo>&) {
+  return true;
+}
+
+bool WindowManager::showSimpleError(const QString&) {
+  return true;
+}
+
+bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
+  PAGViewerInstallModel installModel;
+  return installModel.showInstallDialog(pagFilePath);
 }
 
 void WindowManager::initializeQtEnvironment() {
@@ -66,46 +96,26 @@ void WindowManager::initializeQtEnvironment() {
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
 #endif
+  app = std::make_unique<QApplication>(argc, argv);
+  app->setObjectName("PAG-Exporter");
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+  QQuickStyle::setStyle("Universal");
 }
 
-bool WindowManager::showWarnings(std::vector<AlertInfo>& infos) {
-  if (infos.empty()) {
-    return false;
+void WindowManager::init() {
+  ConfigParam config;
+  ReadConfigFile(&config);
+  bool result = translator->load(":/translation/Chinese.qm");
+  if (result) {
+    if (config.language == Language::Chinese) {
+      app->installTranslator(translator.get());
+    } else {
+      app->removeTranslator(translator.get());
+    }
   }
-  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
-  if (!alertModel) {
-    alertModel = std::make_unique<AlertInfoModel>();
-  }
-  alertModel->showWarnings(infos);
-  return true;
-}
 
-bool WindowManager::showErrors(std::vector<AlertInfo>& infos) {
-  if (infos.empty()) {
-    return false;
-  }
-  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
-  if (!alertModel) {
-    alertModel = std::make_unique<AlertInfoModel>();
-  }
-  alertModel->showErrors(infos);
-  return true;
-}
-
-bool WindowManager::showSimpleError(const QString& message) {
-  static std::unique_ptr<AlertInfoModel> alertModel = nullptr;
-  if (!alertModel) {
-    alertModel = std::make_unique<AlertInfoModel>();
-  }
-  alertModel->setErrorMessage(message);
-  bool result = alertModel->showErrors({});
-  return result;
-}
-
-bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
-  auto installModel = std::make_unique<PAGViewerInstallModel>();
-  return installModel->showInstallDialog(pagFilePath);
+  AlertInfoManager::GetInstance().warningList.clear();
+  AlertInfoManager::GetInstance().saveWarnings.clear();
 }
 
 }  // namespace exporter

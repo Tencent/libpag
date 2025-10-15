@@ -123,9 +123,8 @@ class AlertInfoManager {
   std::vector<AlertInfo> warningList = {};
   std::vector<AlertInfo> saveWarnings = {};
 
-  void pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
-                   const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList, AlertInfoType type,
-                   pag::ID compId, pag::ID layerId, const std::string& addInfo = "");
+  void pushWarning(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH, AlertInfoType type,
+                   const std::string& addInfo = "");
 
   AlertInfoManager(const AlertInfoManager&) = delete;
   AlertInfoManager& operator=(const AlertInfoManager&) = delete;
