@@ -70,6 +70,7 @@ std::vector<ShapedGlyph> NativePlatform::shapeText(const std::string& text,
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
-  return {VideoDecoderFactory::ExternalDecoderFactory(), &hardwareDecoderFactory};
+  return {VideoDecoderFactory::ExternalDecoderFactory(), &hardwareDecoderFactory,
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 }  // namespace pag

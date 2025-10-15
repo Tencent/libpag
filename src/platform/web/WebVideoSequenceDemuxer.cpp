@@ -23,22 +23,22 @@
 namespace pag {
 
 VideoSample WebVideoSequenceDemuxer::nextSample() {
-  if (hardwareBacked) {
-    VideoSample sample = {};
-    sample.time = FrameToTime(sampleIndex, sequence->frameRate);
-    sample.length = 1;
-    sampleIndex++;
-    return sample;
+  if (!hardwareBacked) {
+    return VideoSequenceDemuxer::nextSample();
   }
-  return VideoSequenceDemuxer::nextSample();
+  VideoSample sample = {};
+  sample.time = FrameToTime(sampleIndex, sequence->frameRate);
+  sample.length = 1;
+  sampleIndex++;
+  return sample;
 }
 
 void WebVideoSequenceDemuxer::seekTo(int64_t targetTime) {
-  if (hardwareBacked) {
+  if (!hardwareBacked) {
+    VideoSequenceDemuxer::seekTo(targetTime);
+  } else {
     auto targetFrame = TimeToFrame(targetTime, sequence->frameRate);
     maxPTSFrame = sampleIndex = targetFrame;
-  } else {
-    VideoSequenceDemuxer::seekTo(targetTime);
   }
 }
 
