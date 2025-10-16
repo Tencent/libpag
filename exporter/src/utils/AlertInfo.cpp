@@ -541,9 +541,9 @@ static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pa
 #undef FUNC_GETINFO
 #undef DEFINE_GETINFO
 
-AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH,
+AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemHandle, AEGP_LayerH layerHandle,
                      const std::string& addInfo)
-    : itemH(itemH), layerH(layerH), type(type) {
+    : itemHandle(itemHandle), layerHandle(layerHandle), type(type) {
   auto pair = GetInfoByTypeMap.find(type);
   if (pair != GetInfoByTypeMap.end()) {
     pair->second(info, suggest, addInfo);
@@ -552,8 +552,8 @@ AlertInfo::AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH,
     suggest = unknownErrorInfo.toStdString();
   }
 
-  compName = GetItemName(itemH);
-  layerName = GetLayerName(layerH);
+  compName = GetItemName(itemHandle);
+  layerName = GetLayerName(layerHandle);
 
   isError = (type > AlertInfoType::OtherWarning);
 }
@@ -563,7 +563,7 @@ std::string AlertInfo::getMessage() {
 }
 
 void AlertInfo::select() {
-  SelectLayer(itemH, layerH);
+  SelectLayer(itemHandle, layerHandle);
 }
 
 static std::vector<AlertInfo> GetInfoList(std::vector<AlertInfo>& warningList, bool bWarning,
@@ -613,12 +613,12 @@ AlertInfoManager& AlertInfoManager::GetInstance() {
   return instance;
 }
 
-void AlertInfoManager::pushWarning(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH,
+void AlertInfoManager::pushWarning(const AEGP_ItemH& itemHandle, const AEGP_LayerH& layerHandle,
                                    AlertInfoType type, const std::string& addInfo) {
-  warningList.emplace_back(AlertInfo(type, itemH, layerH, addInfo));
+  warningList.emplace_back(AlertInfo(type, itemHandle, layerHandle, addInfo));
 }
 
-std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemH*/) {
+std::vector<AlertInfo> AlertInfoManager::GetAlertList(AEGP_ItemH /*itemHandle*/) {
 
   return {};
 }

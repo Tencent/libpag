@@ -27,8 +27,9 @@
 
 namespace exporter {
 
-PAGExportSession::PAGExportSession(const AEGP_ItemH& activeItemH, const std::string& outputPath)
-    : itemH(activeItemH), outputPath(outputPath) {
+PAGExportSession::PAGExportSession(const AEGP_ItemH& activeItemHandle,
+                                   const std::string& outputPath)
+    : itemHandle(activeItemHandle), outputPath(outputPath) {
   checkParamValid();
 }
 
@@ -70,15 +71,15 @@ void PAGExportSession::checkParamValid() {
 }
 
 void PAGExportSession::pushWarning(AlertInfoType type, const std::string& addInfo) {
-  AEGP_ItemH itemH = nullptr;
-  if (itemHMap.find(compID) != itemHMap.end()) {
-    itemH = itemHMap[compID];
+  AEGP_ItemH itemHandle = nullptr;
+  if (itemHandleMap.find(compID) != itemHandleMap.end()) {
+    itemHandle = itemHandleMap[compID];
   }
-  AEGP_LayerH layerH = nullptr;
-  if (layerHMap.find(layerID) != layerHMap.end()) {
-    layerH = layerHMap[layerID];
+  AEGP_LayerH layerHandle = nullptr;
+  if (layerHandleMap.find(layerID) != layerHandleMap.end()) {
+    layerHandle = layerHandleMap[layerID];
   }
-  alertInfoManager.pushWarning(itemH, layerH, type, addInfo);
+  alertInfoManager.pushWarning(itemHandle, layerHandle, type, addInfo);
 }
 
 pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
@@ -141,13 +142,13 @@ pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
 }
 
 bool PAGExportSession::isVideoLayer(pag::ID id) {
-  if (layerHMap.find(id) == layerHMap.end()) {
+  if (layerHandleMap.find(id) == layerHandleMap.end()) {
     return false;
   }
-  AEGP_LayerH layerH = layerHMap[id];
+  AEGP_LayerH layerHandle = layerHandleMap[id];
 
-  for (const auto& pair : imageLayerHList) {
-    if (pair.second == layerH) {
+  for (const auto& pair : imageLayerHandleList) {
+    if (pair.second == layerHandle) {
       return pair.first;
     }
   }
@@ -156,10 +157,10 @@ bool PAGExportSession::isVideoLayer(pag::ID id) {
 }
 
 AEGP_LayerH PAGExportSession::getLayerHByID(pag::ID id) {
-  if (layerHMap.find(id) == layerHMap.end()) {
+  if (layerHandleMap.find(id) == layerHandleMap.end()) {
     return nullptr;
   }
-  return layerHMap[id];
+  return layerHandleMap[id];
 }
 
 }  // namespace exporter
