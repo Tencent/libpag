@@ -24,18 +24,21 @@
 namespace exporter {
 
 pag::CompositionType GetCompositionType(std::shared_ptr<PAGExportSession> session,
-                                        const AEGP_CompH& compH);
+                                        const AEGP_CompH& compositionHandle);
 
-void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH,
-                              pag::Composition* composition);
+void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
+                              const AEGP_CompH& compositionHandle, pag::Composition* composition);
 
-void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH);
+void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemHandle);
 
-void ExportVideoComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH);
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            const AEGP_CompH& compositionHandle);
 
-void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH);
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compositionHandle);
 
-void ExportVectorComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH);
+void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compositionHandle);
 
 void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession> session,
                                      pag::BitmapComposition* composition, float factor);
