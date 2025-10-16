@@ -50,7 +50,7 @@ class PAGImageLayerModel : public QAbstractListModel {
 
   QSet<int> revertSet = {};
   QMap<int, QImage> imageLayers = {};
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> _pagFile = nullptr;
 };
 
 }  // namespace pag

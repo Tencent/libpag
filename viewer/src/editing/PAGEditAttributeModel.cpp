@@ -49,7 +49,7 @@ QStringList PAGEditAttributeModel::getAttributeOptions(const QString& attributeN
 bool PAGEditAttributeModel::saveAttribute(int layerId, int markerIndex,
                                           const QString& attributeName,
                                           const QString& attributeValue, const QString& savePath) {
-  if (pagFile == nullptr) {
+  if (_pagFile == nullptr) {
     return false;
   }
 
@@ -58,7 +58,7 @@ bool PAGEditAttributeModel::saveAttribute(int layerId, int markerIndex,
   }
 
   auto path = savePath.isEmpty() ? filePath : savePath;
-  auto file = pagFile->getFile();
+  auto file = _pagFile->getFile();
 
   if (attributeName == "timeStretchMode") {
     QStringList options = getAttributeOptions(attributeName);
@@ -112,8 +112,8 @@ bool PAGEditAttributeModel::saveAttribute(int layerId, int markerIndex,
 }
 
 void PAGEditAttributeModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
-  this->pagFile = std::move(pagFile);
-  this->filePath = QString::fromStdString(this->pagFile->path());
+  _pagFile = std::move(pagFile);
+  filePath = QString::fromStdString(_pagFile->path());
 }
 
 Layer* PAGEditAttributeModel::getLayerFromFile(std::shared_ptr<File> file, int layerId) {

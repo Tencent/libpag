@@ -77,7 +77,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   QSet<int> revertSet = {};
   QStringList fontFamilyList = {};
   QList<TextDocumentHandle> textLayers = {};
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> _pagFile = nullptr;
 };
 
 }  // namespace pag

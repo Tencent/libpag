@@ -43,7 +43,7 @@ class PAGEditAttributeModel : public QObject {
 
  private:
   QString filePath = "";
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> _pagFile = nullptr;
 };
 
 }  // namespace pag
