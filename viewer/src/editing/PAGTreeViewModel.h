@@ -49,7 +49,7 @@ class PAGTreeViewModel : public QAbstractItemModel {
   int columnCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
-  Q_SLOT void setFile(const std::shared_ptr<File>& file);
+  Q_SLOT void setFile(std::shared_ptr<File> file);
 
  private:
   std::unique_ptr<PAGTree> fileTree = nullptr;

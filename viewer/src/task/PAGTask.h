@@ -61,7 +61,7 @@ class PAGTask : public QObject {
 class PAGPlayTask : public PAGTask {
   Q_OBJECT
  public:
-  explicit PAGPlayTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
+  explicit PAGPlayTask(std::shared_ptr<PAGFile> pagFile, const QString& filePath);
   ~PAGPlayTask() override;
 
   void start() override;

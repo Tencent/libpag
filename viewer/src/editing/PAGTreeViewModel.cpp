@@ -164,9 +164,9 @@ QHash<int, QByteArray> PAGTreeViewModel::roleNames() const {
   return roles;
 }
 
-void PAGTreeViewModel::setFile(const std::shared_ptr<File>& file) {
+void PAGTreeViewModel::setFile(std::shared_ptr<File> file) {
   beginResetModel();
-  fileTree->setFile(file);
+  fileTree->setFile(std::move(file));
   fileTree->buildTree();
   endResetModel();
 }

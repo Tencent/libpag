@@ -22,8 +22,8 @@
 
 namespace pag {
 
-void PAGTree::setFile(const std::shared_ptr<File>& file) {
-  this->file = file;
+void PAGTree::setFile(std::shared_ptr<File> file) {
+  this->file = std::move(file);
 }
 
 PAGTreeNode* PAGTree::getRootNode() {

@@ -35,7 +35,7 @@ class PAGTextLayerModel : public QAbstractListModel {
 
   Q_SIGNAL void textChanged();
 
-  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
+  Q_SLOT void setPAGFile(std::shared_ptr<PAGFile> pagFile);
 
   Q_INVOKABLE void revertText(int index);
   Q_INVOKABLE int convertIndex(int index);
@@ -77,7 +77,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   QSet<int> revertSet = {};
   QStringList fontFamilyList = {};
   QList<TextDocumentHandle> textLayers = {};
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> _pagFile = nullptr;
 };
 
 }  // namespace pag

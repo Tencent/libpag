@@ -25,7 +25,7 @@ namespace pag {
 
 class PAGBenchmarkTask : public PAGPlayTask {
  public:
-  PAGBenchmarkTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath);
+  PAGBenchmarkTask(std::shared_ptr<PAGFile> pagFile, const QString& filePath);
 
  protected:
   void onBegin() override;

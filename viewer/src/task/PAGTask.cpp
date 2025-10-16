@@ -33,8 +33,8 @@ double PAGTask::getProgress() const {
   return progress;
 }
 
-PAGPlayTask::PAGPlayTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
-    : filePath(filePath), pagFile(pagFile) {
+PAGPlayTask::PAGPlayTask(std::shared_ptr<PAGFile> pagFile, const QString& filePath)
+    : filePath(filePath), pagFile(std::move(pagFile)) {
   QObject::connect(&workerThread, &QThread::started, this, &PAGPlayTask::startInternal,
                    Qt::DirectConnection);
 }

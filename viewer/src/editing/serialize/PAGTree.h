@@ -25,7 +25,7 @@ namespace pag {
 
 class PAGTree {
  public:
-  void setFile(const std::shared_ptr<File>& file);
+  void setFile(std::shared_ptr<File> file);
   PAGTreeNode* getRootNode();
   void buildTree();
 

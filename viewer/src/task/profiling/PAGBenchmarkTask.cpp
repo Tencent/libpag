@@ -20,8 +20,8 @@
 
 namespace pag {
 
-PAGBenchmarkTask::PAGBenchmarkTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
-    : PAGPlayTask(pagFile, filePath) {
+PAGBenchmarkTask::PAGBenchmarkTask(std::shared_ptr<PAGFile> pagFile, const QString& filePath)
+    : PAGPlayTask(std::move(pagFile), filePath) {
   openAfterExport = false;
 }
 
