@@ -85,8 +85,8 @@ else ()
     set(UpdateChannel "beta")
 endif ()
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
-    ${CMAKE_SOURCE_DIR}/src/version.h
-    @ONLY
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
 )
 
 message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
