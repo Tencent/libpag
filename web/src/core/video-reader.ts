@@ -71,7 +71,7 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
-  private currentFrame: number=0;
+  private currentFrame= 0;
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
