@@ -24,7 +24,7 @@
 
 namespace pag::FileSerializer {
 
-void Serialize(const std::shared_ptr<File>& file, PAGTreeNode* node);
+void Serialize(std::shared_ptr<File> file, PAGTreeNode* node);
 void SerializeInstance(const rttr::instance& item, PAGTreeNode* node);
 void SerializeVariant(const rttr::variant& value, PAGTreeNode* node);
 void SerializeSequentialContainer(const rttr::variant_sequential_view& view, PAGTreeNode* node);
