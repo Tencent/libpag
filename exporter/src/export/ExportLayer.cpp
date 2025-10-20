@@ -46,7 +46,7 @@ static bool IsLayerReferencedByEffect(pag::ID id, const std::vector<pag::Layer*>
 }
 
 static bool IsLayerReferenced(pag::ID id, const std::vector<pag::Layer*>& layers,
-                                bool lastLayerHasTrackMatte) {
+                              bool lastLayerHasTrackMatte) {
   if (IsLayerReferencedByEffect(id, layers)) {
     return true;
   }
