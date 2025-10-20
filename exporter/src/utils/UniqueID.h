@@ -17,37 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
-#include "utils/AEHelper.h"
-#include "utils/AlertInfo.h"
-#include "utils/PAGExportSession.h"
-#include "utils/ScopedHelper.h"
+
+#include <pag/file.h>
 
 namespace exporter {
 
-struct PAGExportConfigParam {
-  bool exportAudio = true;
-  bool hardwareEncode = false;
-  bool exportActually = true;
-  bool showAlertInfo = false;
-  AEGP_ItemH activeItemHandle = nullptr;
-  std::string outputPath = "";
-};
+pag::ID GetLayerUniqueID(const std::vector<pag::Composition*>& compositions);
 
-class PAGExport {
- public:
-  explicit PAGExport(const PAGExportConfigParam& configParam);
+pag::ID GetCompositionUniqueID(const std::vector<pag::Composition*>& compositions);
 
-  bool exportFile();
-
-  AEGP_ItemH itemHandle = nullptr;
-  std::shared_ptr<PAGExportSession> session = nullptr;
-  ScopedTimeSetter timeSetter = {nullptr, 0};
-
- private:
-  std::shared_ptr<pag::File> exportAsFile();
-  void addRootComposition() const;
-  std::vector<pag::ImageBytes*> getRefImages(const std::vector<pag::Composition*>& compositions);
-  void exportResources(std::vector<pag::Composition*>& compositions);
-};
 }  // namespace exporter

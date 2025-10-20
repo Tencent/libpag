@@ -17,37 +17,29 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
-#include "utils/AEHelper.h"
-#include "utils/AlertInfo.h"
-#include "utils/PAGExportSession.h"
-#include "utils/ScopedHelper.h"
+
+#include "PAGExportSession.h"
 
 namespace exporter {
 
-struct PAGExportConfigParam {
-  bool exportAudio = true;
-  bool hardwareEncode = false;
-  bool exportActually = true;
-  bool showAlertInfo = false;
-  AEGP_ItemH activeItemHandle = nullptr;
-  std::string outputPath = "";
-};
-
-class PAGExport {
+class PAGExportSessionManager {
  public:
-  explicit PAGExport(const PAGExportConfigParam& configParam);
+  static PAGExportSessionManager* GetInstance() {
+    static PAGExportSessionManager instance;
+    return &instance;
+  }
 
-  bool exportFile();
+  PAGExportSessionManager(const PAGExportSessionManager&) = delete;
+  PAGExportSessionManager& operator=(const PAGExportSessionManager&) = delete;
 
-  AEGP_ItemH itemHandle = nullptr;
-  std::shared_ptr<PAGExportSession> session = nullptr;
-  ScopedTimeSetter timeSetter = {nullptr, 0};
+  void setCurrentSession(std::shared_ptr<PAGExportSession> session);
+  void unsetCurrentSession(std::shared_ptr<PAGExportSession> session);
+  void recordWarning(AlertInfoType type, const std::string& addInfo = "");
+  pag::GradientColorHandle getGradientColors(const std::vector<std::string>& matchNames, int index);
 
  private:
-  std::shared_ptr<pag::File> exportAsFile();
-  void addRootComposition() const;
-  std::vector<pag::ImageBytes*> getRefImages(const std::vector<pag::Composition*>& compositions);
-  void exportResources(std::vector<pag::Composition*>& compositions);
+  PAGExportSessionManager() = default;
+  std::shared_ptr<PAGExportSession> currentSession = nullptr;
 };
+
 }  // namespace exporter

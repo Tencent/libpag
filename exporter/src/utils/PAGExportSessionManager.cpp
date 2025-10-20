@@ -16,36 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <QQmlApplicationEngine>
-#include <QQuickWindow>
-#include <QVariantMap>
-#include "Config/ConfigParam.h"
+#include "PAGExportSessionManager.h"
+#include "AEDataTypeConverter.h"
 
 namespace exporter {
-class ConfigModel : public QObject {
-  Q_OBJECT
 
- public:
-  ConfigModel(QObject* parent = nullptr);
-  ~ConfigModel();
+void PAGExportSessionManager::setCurrentSession(std::shared_ptr<PAGExportSession> session) {
+  currentSession = session;
+}
 
-  void initConfigWindow();
-  void showConfig() const;
+void PAGExportSessionManager::unsetCurrentSession(std::shared_ptr<PAGExportSession> session) {
+  if (currentSession == session) {
+    currentSession = nullptr;
+  }
+}
 
-  Q_INVOKABLE void saveConfig();
-  Q_INVOKABLE void resetToDefault();
-  Q_INVOKABLE void setLanguage(int value);
-  Q_INVOKABLE void updateConfigFromQML(const QVariantMap& configData);
+void PAGExportSessionManager::recordWarning(AlertInfoType type, const std::string& addInfo) {
+  if (currentSession) {
+    currentSession->pushWarning(type, addInfo);
+  }
+}
 
-  Q_INVOKABLE QVariantMap getDefaultConfig() const;
-  Q_INVOKABLE QVariantMap getCurrentConfig() const;
+pag::GradientColorHandle PAGExportSessionManager::getGradientColors(
+    const std::vector<std::string>& matchNames, int index) {
+  if (currentSession) {
+    return currentSession->GetGradientColorsFromFileBytes(matchNames, index);
+  }
+  return GetDefaultGradientColors();
+}
 
- private:
-  static QVariantMap ConfigParamToVariantMap(const ConfigParam& config);
-  std::unique_ptr<QApplication> app = nullptr;
-  std::unique_ptr<QQmlApplicationEngine> configEngine = nullptr;
-  QQuickWindow* configWindow = nullptr;
-  ConfigParam currentConfig;
-};
 }  // namespace exporter
