@@ -146,7 +146,7 @@ bool PAGExportSession::isVideoLayer(pag::ID id) {
   }
   AEGP_LayerH layerH = layerHMap[id];
 
-  for (const auto& pair : imageLayerHList) {
+  for (const auto& pair : imageLayerHandleList) {
     if (pair.second == layerH) {
       return pair.first;
     }

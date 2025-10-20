@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExportComposition.h"
+#include "ExportLayer.h"
 #include "utils/AEHelper.h"
 #include "utils/ScopedHelper.h"
 #include "utils/StringHelper.h"
@@ -114,7 +115,16 @@ void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session, const AE
   session->compositions.push_back(composition);
 }
 
-void ExportVectorComposition(std::shared_ptr<PAGExportSession>, const AEGP_CompH&) {
+void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compHandle) {
+  auto* composition = new pag::VectorComposition();
+  GetCompositionAttributes(session, compHandle, composition);
+  ScopedAssign<std::vector<pag::Marker*>*> markers(session->audioMarkers,
+                                                   &composition->audioMarkers);
+  composition->layers = ExportLayers(session, compHandle);
+  session->compositions.push_back(composition);
+
+  session->progressModel.addTotalFrame(static_cast<double>(session->imageBytesList.size()));
 }
 
 void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession>, pag::BitmapComposition*,
