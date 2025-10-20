@@ -116,10 +116,10 @@ static void InitLayer(std::shared_ptr<PAGExportSession> session, const AEGP_Laye
                       pag::Layer* layer, ExportLayerType layerType) {
   layer->id = GetLayerID(layerHandle);
   layer->name = GetLayerName(layerHandle);
-  AEGP_LayerH parentLayerH = GetLayerParentLayerH(layerHandle);
-  if (parentLayerH != nullptr) {
+  AEGP_LayerH parentLayerHandle = GetLayerParentLayerH(layerHandle);
+  if (parentLayerHandle != nullptr) {
     layer->parent = new pag::Layer();
-    layer->parent->id = GetLayerID(parentLayerH);
+    layer->parent->id = GetLayerID(parentLayerHandle);
   }
   layer->stretch = GetLayerStretch(layerHandle);
   layer->startTime = GetLayerStartTime(layerHandle, session->frameRate);
@@ -146,11 +146,11 @@ static void InitLayer(std::shared_ptr<PAGExportSession> session, const AEGP_Laye
       layer->motionBlur = static_cast<bool>(layerFlags & AEGP_LayerFlag_MOTION_BLUR);
     }
     if (layer->trackMatteType != pag::TrackMatteType::None) {
-      AEGP_LayerH trackMatteLayerH = GetLayerTrackMatteLayerH(layerHandle);
-      if (trackMatteLayerH == nullptr) {
+      AEGP_LayerH trackMatteLayerHandle = GetLayerTrackMatteLayerH(layerHandle);
+      if (trackMatteLayerHandle == nullptr) {
         layer->trackMatteType = pag::TrackMatteType::None;
       } else {
-        layer->trackMatteLayer = ExportLayer(trackMatteLayerH, session);
+        layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
         layer->trackMatteLayer->isActive = false;
         layer->trackMatteLayer->trackMatteType = pag::TrackMatteType::None;
       }
@@ -186,10 +186,10 @@ static pag::SolidLayer* CreateSolidLayer(const AEGP_LayerH& layerHandle) {
   const auto& Suites = GetSuites();
   auto layer = new pag::SolidLayer();
 
-  AEGP_ItemH itemH = GetLayerItemH(layerHandle);
+  AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
   AEGP_ColorVal solidColor = {};
-  Suites->FootageSuite5()->AEGP_GetSolidFootageColor(itemH, FALSE, &solidColor);
-  Suites->ItemSuite6()->AEGP_GetItemDimensions(itemH, &layer->width, &layer->height);
+  Suites->FootageSuite5()->AEGP_GetSolidFootageColor(itemHandle, FALSE, &solidColor);
+  Suites->ItemSuite6()->AEGP_GetItemDimensions(itemHandle, &layer->width, &layer->height);
   layer->solidColor = AEColorToColor(solidColor);
   return layer;
 }
@@ -197,8 +197,8 @@ static pag::SolidLayer* CreateSolidLayer(const AEGP_LayerH& layerHandle) {
 static pag::ImageLayer* CreateImageLayer(const AEGP_LayerH& layerHandle,
                                          std::shared_ptr<PAGExportSession> session) {
   auto layer = new pag::ImageLayer();
-  AEGP_ItemH itemH = GetLayerItemH(layerHandle);
-  pag::ID imageID = GetItemID(itemH);
+  AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
+  pag::ID imageID = GetItemID(itemHandle);
   auto res = std::find_if(
       session->imageBytesList.begin(), session->imageBytesList.end(),
       [imageID](const pag::ImageBytes* image) -> bool { return image->id == imageID; });
@@ -218,8 +218,8 @@ static pag::ImageLayer* CreateImageLayer(const AEGP_LayerH& layerHandle,
 static pag::ImageLayer* CreateVideoLayer(const AEGP_LayerH& layerHandle,
                                          std::shared_ptr<PAGExportSession> session) {
   auto layer = new pag::ImageLayer();
-  AEGP_ItemH itemH = GetLayerItemH(layerHandle);
-  pag::ID imageID = GetItemID(itemH);
+  AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
+  pag::ID imageID = GetItemID(itemHandle);
   auto res = std::find_if(
       session->imageBytesList.begin(), session->imageBytesList.end(),
       [imageID](const pag::ImageBytes* image) -> bool { return image->id == imageID; });
@@ -241,9 +241,9 @@ static pag::PreComposeLayer* CreatePreComposeLayer(const AEGP_LayerH& layerHandl
   const auto& Suites = GetSuites();
   auto layer = new pag::PreComposeLayer();
 
-  AEGP_ItemH itemH = GetLayerItemH(layerHandle);
+  AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
   layer->composition = new pag::Composition();
-  layer->composition->id = GetItemID(itemH);
+  layer->composition->id = GetItemID(itemHandle);
 
   A_Time layerOffset = {};
   Suites->LayerSuite6()->AEGP_GetLayerOffset(layerHandle, &layerOffset);
@@ -255,7 +255,7 @@ static pag::PreComposeLayer* CreatePreComposeLayer(const AEGP_LayerH& layerHandl
     }
   }
 
-  ExportComposition(session, itemH);
+  ExportComposition(session, itemHandle);
 
   return layer;
 }
@@ -319,10 +319,10 @@ ExportLayerType GetLayerType(const AEGP_LayerH& layerHandle) {
       AEGP_ItemFlags itemFlags;
       GetSuites()->ItemSuite6()->AEGP_GetItemFlags(itemHandle, &itemFlags);
       if (itemFlags & AEGP_ItemFlag_STILL) {
-        AEGP_FootageH footageH = nullptr;
-        GetSuites()->FootageSuite5()->AEGP_GetMainFootageFromItem(itemHandle, &footageH);
+        AEGP_FootageH footageHandle = nullptr;
+        GetSuites()->FootageSuite5()->AEGP_GetMainFootageFromItem(itemHandle, &footageHandle);
         AEGP_FootageSignature signature;
-        GetSuites()->FootageSuite5()->AEGP_GetFootageSignature(footageH, &signature);
+        GetSuites()->FootageSuite5()->AEGP_GetFootageSignature(footageHandle, &signature);
         if (signature == AEGP_FootageSignature_SOLID) {
           return ExportLayerType::Solid;
         }
@@ -366,7 +366,7 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     }
 
     uint32_t layerID = GetLayerID(layerHandle);
-    session->layerHMap[layerID] = layerHandle;
+    session->layerHandleMap[layerID] = layerHandle;
     ExportLayerType layerType = GetLayerType(layerHandle);
     if (layerType == ExportLayerType::Audio && session->audioMarkers != nullptr &&
         session->configParam.isTagCodeSupport(pag::TagCode::MarkerList)) {
@@ -441,7 +441,7 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     bool isBeReferenced = IsLayerBeReferenced(layer->id, layers, nextLayerHasTrackMatte);
     if (isErrorType && (isBeReferenced || layer->isActive)) {
       ScopedAssign<pag::ID> layerID(session->layerID, layer->id);
-      AEGP_LayerH layerHandle = session->layerHMap[layer->id];
+      AEGP_LayerH layerHandle = session->layerHandleMap[layer->id];
       auto layerFlags = GetLayerFlags(layerHandle);
       if (layerFlags & AEGP_LayerFlag_ADJUSTMENT_LAYER) {
         session->pushWarning(AlertInfoType::AdjustmentLayer);
@@ -462,7 +462,7 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     }
 
     if (!layer->isActive && !isBeReferenced) {
-      session->layerHMap.erase(layer->id);
+      session->layerHandleMap.erase(layer->id);
       layers.erase(layers.begin() + index);
       delete layer;
     } else {
