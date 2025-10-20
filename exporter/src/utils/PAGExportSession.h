@@ -33,7 +33,7 @@ namespace exporter {
 
 class PAGExportSession {
  public:
-  PAGExportSession(const AEGP_ItemH& activeItemH, const std::string& outputPath);
+  PAGExportSession(const AEGP_ItemH& activeItemHandle, const std::string& outputPath);
   void checkParamValid();
   void pushWarning(AlertInfoType type, const std::string& addInfo = "");
   pag::GradientColorHandle GetGradientColorsFromFileBytes(
@@ -57,7 +57,7 @@ class PAGExportSession {
   pag::ID layerID = 0;
   int layerIndex = 0;
 
-  AEGP_ItemH itemH = nullptr;
+  AEGP_ItemH itemHandle = nullptr;
 
   ConfigParam configParam = {};
   ProgressModel progressModel;
@@ -67,12 +67,12 @@ class PAGExportSession {
   std::vector<char> fileBytes = {};
   std::vector<pag::Composition*> compositions = {};
   std::vector<pag::ImageBytes*> imageBytesList = {};
-  std::vector<std::pair<bool, AEGP_LayerH>> imageLayerHList = {};
+  std::vector<std::pair<bool, AEGP_LayerH>> imageLayerHandleList = {};
 
   /* key: comp item ID, value: comp item handle */
-  std::unordered_map<pag::ID, AEGP_ItemH> itemHMap = {};
+  std::unordered_map<pag::ID, AEGP_ItemH> itemHandleMap = {};
   /* key: layer ID, value: layer handle */
-  std::unordered_map<pag::ID, AEGP_LayerH> layerHMap = {};
+  std::unordered_map<pag::ID, AEGP_LayerH> layerHandleMap = {};
 
   std::string outputPath = "";
 };

@@ -24,8 +24,8 @@
 namespace exporter {
 
 pag::CompositionType GetCompositionType(std::shared_ptr<PAGExportSession> session,
-                                        const AEGP_CompH& compH) {
-  auto compName = GetCompName(compH);
+                                        const AEGP_CompH& compositionHandle) {
+  auto compName = GetCompName(compositionHandle);
   compName = ToLowerCase(compName);
 
   if (compName.length() < CompositionBmpSuffix.size()) {
@@ -38,7 +38,7 @@ pag::CompositionType GetCompositionType(std::shared_ptr<PAGExportSession> sessio
 
   if (session->configParam.sequenceType == pag::CompositionType::Video &&
       session->configParam.isTagCodeSupport(pag::TagCode::VideoSequence)) {
-    if (session->exportStaticCompAsBmp && IsStaticComposition(compH)) {
+    if (session->exportStaticCompAsBmp && IsStaticComposition(compositionHandle)) {
       return pag::CompositionType::Bitmap;
     }
     return pag::CompositionType::Video;
@@ -51,22 +51,22 @@ pag::CompositionType GetCompositionType(std::shared_ptr<PAGExportSession> sessio
   return pag::CompositionType::Vector;
 }
 
-void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH,
-                              pag::Composition* composition) {
-  AEGP_ItemH itemH = GetCompItemH(compH);
-  composition->id = GetItemID(itemH);
-  composition->duration = GetItemDuration(itemH);
-  composition->backgroundColor = GetCompBackgroundColor(compH);
+void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
+                              const AEGP_CompH& compositionHandle, pag::Composition* composition) {
+  AEGP_ItemH itemHandle = GetCompItemH(compositionHandle);
+  composition->id = GetItemID(itemHandle);
+  composition->duration = GetItemDuration(itemHandle);
+  composition->backgroundColor = GetCompBackgroundColor(compositionHandle);
   if (session->frameRate == -1) {
-    composition->frameRate = GetItemFrameRate(itemH);
+    composition->frameRate = GetItemFrameRate(itemHandle);
     session->frameRate = composition->frameRate;
   } else {
     composition->frameRate = session->frameRate;
   }
-  auto size = GetItemDimensions(itemH);
+  auto size = GetItemDimensions(itemHandle);
   composition->width = size.width();
   composition->height = size.height();
-  session->itemHMap[composition->id] = itemH;
+  session->itemHandleMap[composition->id] = itemHandle;
 
   if (composition->type() != pag::CompositionType::Vector) {
     auto frames =
@@ -75,9 +75,9 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session, const A
   }
 }
 
-void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH) {
-  auto id = GetItemID(itemH);
-  session->itemHMap[id] = itemH;
+void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemHandle) {
+  auto id = GetItemID(itemHandle);
+  session->itemHandleMap[id] = itemHandle;
 
   ScopedAssign<pag::ID> compID(session->compID, id);
 
@@ -85,32 +85,34 @@ void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_Ite
     return;
   }
 
-  auto compH = GetItemCompH(itemH);
-  auto compositionType = GetCompositionType(session, compH);
+  auto compositionHandle = GetItemCompH(itemHandle);
+  auto compositionType = GetCompositionType(session, compositionHandle);
   switch (compositionType) {
     case pag::CompositionType::Video:
-      ExportVideoComposition(session, compH);
+      ExportVideoComposition(session, compositionHandle);
       break;
     case pag::CompositionType::Bitmap:
-      ExportBitmapComposition(session, compH);
+      ExportBitmapComposition(session, compositionHandle);
       break;
     case pag::CompositionType::Vector:
-      ExportVectorComposition(session, compH);
+      ExportVectorComposition(session, compositionHandle);
       break;
     default:
       break;
   }
 }
 
-void ExportVideoComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH) {
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            const AEGP_CompH& compositionHandle) {
   auto composition = new pag::VideoComposition();
-  GetCompositionAttributes(session, compH, composition);
+  GetCompositionAttributes(session, compositionHandle, composition);
   session->compositions.push_back(composition);
 }
 
-void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compH) {
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compositionHandle) {
   auto composition = new pag::BitmapComposition();
-  GetCompositionAttributes(session, compH, composition);
+  GetCompositionAttributes(session, compositionHandle, composition);
   session->compositions.push_back(composition);
 }
 

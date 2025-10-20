@@ -44,9 +44,10 @@ static bool ValidatePAGFile(uint8_t* data, size_t size) {
 }
 
 PAGExport::PAGExport(const PAGExportConfigParam& configParam)
-    : itemH(configParam.activeItemH),
-      session(std::make_shared<PAGExportSession>(configParam.activeItemH, configParam.outputPath)),
-      timeSetter(configParam.activeItemH, -100.0f) {
+    : itemHandle(configParam.activeItemHandle),
+      session(
+          std::make_shared<PAGExportSession>(configParam.activeItemHandle, configParam.outputPath)),
+      timeSetter(configParam.activeItemHandle, -100.0f) {
   session->exportAudio = configParam.exportAudio;
   session->hardwareEncode = configParam.hardwareEncode;
   session->exportActually = configParam.exportActually;
@@ -54,7 +55,7 @@ PAGExport::PAGExport(const PAGExportConfigParam& configParam)
 }
 
 bool PAGExport::exportFile() {
-  if (itemH == nullptr || session->outputPath.empty()) {
+  if (itemHandle == nullptr || session->outputPath.empty()) {
     return false;
   }
   auto pagFile = exportAsFile();
@@ -84,12 +85,12 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 void PAGExport::addRootComposition() const {
   const auto& Suites = GetSuites();
   auto mainComposition = session->compositions[session->compositions.size() - 1];
-  AEGP_CompH compH = GetItemCompH(itemH);
+  AEGP_CompH compositionHandle = GetItemCompH(itemHandle);
 
   A_Time workAreaStart = {};
   A_Time workAreaDuration = {};
-  Suites->CompSuite6()->AEGP_GetCompWorkAreaStart(compH, &workAreaStart);
-  Suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compH, &workAreaDuration);
+  Suites->CompSuite6()->AEGP_GetCompWorkAreaStart(compositionHandle, &workAreaStart);
+  Suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compositionHandle, &workAreaDuration);
   pag::Frame start = AEDurationToFrame(workAreaStart, session->frameRate);
   pag::Frame end = start + AEDurationToFrame(workAreaDuration, session->frameRate);
   auto duration = mainComposition->duration;

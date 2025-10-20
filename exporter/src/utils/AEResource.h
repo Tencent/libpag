@@ -49,7 +49,7 @@ class AEResource {
   struct Layer {
     A_long layerID = 0;
     std::string name = "";
-    AEGP_LayerH layerH = nullptr;
+    AEGP_LayerH layerHandle = nullptr;
   };
 
   struct CompositionRelationship {
@@ -72,7 +72,7 @@ class AEResource {
   A_long ID = -1;
   std::string name = "";
   std::string savePath = "";
-  AEGP_ItemH itemH = nullptr;
+  AEGP_ItemH itemHandle = nullptr;
   FileStructureRelationship file = {};
   CompositionRelationship composition = {};
 
