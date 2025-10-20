@@ -26,10 +26,10 @@ static pag::MaskData* GetMask(const AEGP_MaskRefH& maskHandle) {
   const auto Suites = GetSuites();
   auto mask = new pag::MaskData();
 
-  A_long id;
+  A_long id = 0;
   Suites->MaskSuite6()->AEGP_GetMaskID(maskHandle, &id);
   mask->id = static_cast<pag::ID>(id);
-  A_Boolean inverted;
+  A_Boolean inverted = 0;
   Suites->MaskSuite6()->AEGP_GetMaskInvert(maskHandle, &inverted);
   mask->inverted = static_cast<bool>(inverted);
   PF_MaskMode mode;

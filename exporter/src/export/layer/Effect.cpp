@@ -381,7 +381,6 @@ static pag::Effect* GetEffect(const AEGP_EffectRefH& effectHandle) {
   const auto Suites = GetSuites();
 
   A_long numParams = 0;
-  ;
   Suites->StreamSuite4()->AEGP_GetEffectNumParamStreams(effectHandle, &numParams);
   if (numParams < 2) {
     return nullptr;

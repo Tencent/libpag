@@ -30,7 +30,7 @@
 
 namespace exporter {
 
-static bool IsLayerBeReferencedByEffect(pag::ID id, const std::vector<pag::Layer*>& layers) {
+static bool IsLayerReferencedByEffect(pag::ID id, const std::vector<pag::Layer*>& layers) {
   for (auto layer : layers) {
     for (auto effect : layer->effects) {
       if (effect->type() == pag::EffectType::DisplacementMap) {
@@ -45,9 +45,9 @@ static bool IsLayerBeReferencedByEffect(pag::ID id, const std::vector<pag::Layer
   return false;
 }
 
-static bool IsLayerBeReferenced(pag::ID id, const std::vector<pag::Layer*>& layers,
+static bool IsLayerReferenced(pag::ID id, const std::vector<pag::Layer*>& layers,
                                 bool lastLayerHasTrackMatte) {
-  if (IsLayerBeReferencedByEffect(id, layers)) {
+  if (IsLayerReferencedByEffect(id, layers)) {
     return true;
   }
 
@@ -438,8 +438,8 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
 
     bool isErrorType =
         layer->type() == pag::LayerType::Null || layer->type() == pag::LayerType::Unknown;
-    bool isBeReferenced = IsLayerBeReferenced(layer->id, layers, nextLayerHasTrackMatte);
-    if (isErrorType && (isBeReferenced || layer->isActive)) {
+    bool isReferenced = IsLayerReferenced(layer->id, layers, nextLayerHasTrackMatte);
+    if (isErrorType && (isReferenced || layer->isActive)) {
       ScopedAssign<pag::ID> layerID(session->layerID, layer->id);
       AEGP_LayerH layerHandle = session->layerHandleMap[layer->id];
       auto layerFlags = GetLayerFlags(layerHandle);
@@ -461,7 +461,7 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
       layer->isActive = false;
     }
 
-    if (!layer->isActive && !isBeReferenced) {
+    if (!layer->isActive && !isReferenced) {
       session->layerHandleMap.erase(layer->id);
       layers.erase(layers.begin() + index);
       delete layer;

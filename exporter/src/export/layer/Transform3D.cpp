@@ -22,11 +22,9 @@
 namespace exporter {
 
 static void ClipTo360(float& a) {
-  while (a < 0.0f) {
+  a = std::fmod(a, 360.0f);
+  if (a < 0.0f) {
     a += 360.0f;
-  }
-  while (a >= 360.0f) {
-    a -= 360.0f;
   }
 }
 
@@ -149,8 +147,8 @@ static pag::Property<pag::Point3D>* GetOrientationKeyframe(const AEGP_LayerH& la
   delete orientation;
   auto newOrientation = GetProperty(streamHandle, AEStreamParser::Point3DParser);
 
-  for (int i = static_cast<int>(list.size()) - 1; i >= 0; i--) {
-    Suites->KeyframeSuite3()->AEGP_DeleteKeyframe(streamHandle, list.at(i));
+  for (int index = static_cast<int>(list.size()) - 1; index >= 0; index--) {
+    Suites->KeyframeSuite3()->AEGP_DeleteKeyframe(streamHandle, list.at(index));
   }
   Suites->StreamSuite4()->AEGP_DisposeStream(streamHandle);
 
