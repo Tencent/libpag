@@ -46,7 +46,7 @@ QVariant PAGTextLayerModel::data(const QModelIndex& index, int role) const {
   return {};
 }
 
-void PAGTextLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGTextLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   beginResetModel();
   textLayers.clear();
   revertSet.clear();
@@ -56,14 +56,14 @@ void PAGTextLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
     return;
   }
 
-  this->pagFile = pagFile;
-  auto editableList = pagFile->getEditableIndices(LayerType::Text);
+  _pagFile = std::move(pagFile);
+  auto editableList = _pagFile->getEditableIndices(LayerType::Text);
   if (editableList.empty()) {
     return;
   }
 
   for (const auto& layerIndex : editableList) {
-    textLayers.append(pagFile->getTextData(layerIndex));
+    textLayers.append(_pagFile->getTextData(layerIndex));
   }
   beginResetModel();
   endResetModel();
@@ -76,13 +76,13 @@ void PAGTextLayerModel::revertText(int index) {
   replaceText(index, nullptr);
   beginResetModel();
   revertSet.remove(index);
-  auto newTextDocument = pagFile->getTextData(convertIndex(index));
+  auto newTextDocument = _pagFile->getTextData(convertIndex(index));
   textLayers[index] = newTextDocument;
   endResetModel();
 }
 
 int PAGTextLayerModel::convertIndex(int index) {
-  auto editableIndices = pagFile->getEditableIndices(LayerType::Text);
+  auto editableIndices = _pagFile->getEditableIndices(LayerType::Text);
   if ((index < 0) || (index >= static_cast<int>(editableIndices.size()))) {
     return index;
   }
@@ -190,7 +190,7 @@ void PAGTextLayerModel::changeText(int index, const QString& text) {
   if (textDocument->text == text) {
     return;
   }
-  auto textData = pagFile->getTextData(convertIndex(index))->text;
+  auto textData = _pagFile->getTextData(convertIndex(index))->text;
   if (textData != text.toStdString()) {
     revertSet.insert(index);
   }
@@ -293,7 +293,7 @@ void PAGTextLayerModel::updateTextDocument(int index) {
   if (index < 0 || index >= textLayers.size()) {
     return;
   }
-  auto textData = pagFile->getTextData(convertIndex(index));
+  auto textData = _pagFile->getTextData(convertIndex(index));
   auto textDucoument = textLayers.at(index);
   if (compareTextDocument(textDucoument.get(), &oldTextDocument)) {
     revertSet.remove(index);
@@ -313,7 +313,7 @@ void PAGTextLayerModel::revertTextDocument(int index) {
   auto textDocument = textLayers.at(index);
   *textDocument = oldTextDocument;
 
-  auto defaultTextDocument = pagFile->getTextData(convertIndex(index));
+  auto defaultTextDocument = _pagFile->getTextData(convertIndex(index));
   if (compareTextDocument(defaultTextDocument.get(), textDocument.get())) {
     revertSet.remove(index);
   } else {
@@ -332,7 +332,7 @@ QHash<int, QByteArray> PAGTextLayerModel::roleNames() const {
 }
 
 void PAGTextLayerModel::replaceText(int index, std::shared_ptr<TextDocument> textData) {
-  pagFile->replaceText(convertIndex(index), std::move(textData));
+  _pagFile->replaceText(convertIndex(index), std::move(textData));
   updateTextDocument(index);
   Q_EMIT textChanged();
 }

@@ -88,7 +88,7 @@ void PAGRunTimeDataModel::updateData(int64_t currentFrame, int64_t renderTime, i
   Q_EMIT dataChanged();
 }
 
-void PAGRunTimeDataModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
   chartDataModel.clearItems();
