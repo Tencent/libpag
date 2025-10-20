@@ -30,7 +30,7 @@ struct PAGExportConfigParam {
   bool hardwareEncode = false;
   bool exportActually = true;
   bool showAlertInfo = false;
-  AEGP_ItemH activeItemH = nullptr;
+  AEGP_ItemH activeItemHandle = nullptr;
   std::string outputPath = "";
 };
 
@@ -40,7 +40,7 @@ class PAGExport {
 
   bool exportFile();
 
-  AEGP_ItemH itemH = nullptr;
+  AEGP_ItemH itemHandle = nullptr;
   std::shared_ptr<PAGExportSession> session = nullptr;
   ScopedTimeSetter timeSetter = {nullptr, 0};
 

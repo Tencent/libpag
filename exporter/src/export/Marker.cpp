@@ -165,13 +165,13 @@ static std::optional<nlohmann::json> FindMarkerFromStream(const AEGP_StreamRefH&
   return std::nullopt;
 }
 
-static std::optional<nlohmann::json> FindMarkerFromComposition(const AEGP_ItemH& itemH,
+static std::optional<nlohmann::json> FindMarkerFromComposition(const AEGP_ItemH& itemHandle,
                                                                const std::string& key) {
-  if (itemH == nullptr) {
+  if (itemHandle == nullptr) {
     return std::nullopt;
   }
 
-  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemH);
+  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemHandle);
   if (markerStream == nullptr) {
     return std::nullopt;
   }
@@ -181,12 +181,12 @@ static std::optional<nlohmann::json> FindMarkerFromComposition(const AEGP_ItemH&
   return result;
 }
 
-static std::optional<nlohmann::json> FindMarkerFromLayer(const AEGP_LayerH& layerH,
+static std::optional<nlohmann::json> FindMarkerFromLayer(const AEGP_LayerH& layerHandle,
                                                          const std::string& key) {
-  if (layerH == nullptr) {
+  if (layerHandle == nullptr) {
     return std::nullopt;
   }
-  AEGP_StreamRefH markerStream = GetLayerMarkerStream(layerH);
+  AEGP_StreamRefH markerStream = GetLayerMarkerStream(layerHandle);
   if (markerStream == nullptr) {
     return std::nullopt;
   }
@@ -235,32 +235,31 @@ static void DeleteMarkerFromStream(const AEGP_StreamRefH markerStream, const std
   }
 }
 
-static void DeleteMarkerFromComposition(const AEGP_ItemH& itemH, const std::string& key) {
-  if (itemH == nullptr) {
+static void DeleteMarkerFromComposition(const AEGP_ItemH& itemHandle, const std::string& key) {
+  if (itemHandle == nullptr) {
     return;
   }
 
-  auto markerStream = GetItemMarkerStream(itemH);
+  auto markerStream = GetItemMarkerStream(itemHandle);
   DeleteMarkerFromStream(markerStream, key);
   DeleteStream(markerStream);
 }
 
 std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> session,
-                                        const AEGP_LayerH& layerH) {
-  if (session == nullptr || layerH == nullptr) {
+                                        const AEGP_LayerH& layerHandle) {
+  if (session == nullptr || layerHandle == nullptr) {
     return {};
   }
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
 
-  StreamWrapper streamWrapper(GetLayerMarkerStream(layerH));
-  AEGP_StreamRefH streamH = streamWrapper.get();
-  if (!streamH) {
+  auto streamHandle = GetLayerMarkerStream(layerHandle);
+  if (!streamHandle) {
     return {};
   }
 
   A_long numKeyframes = 0;
-  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(streamH, &numKeyframes);
+  suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(streamHandle, &numKeyframes);
 
   std::vector<pag::Marker*> markers;
   if (numKeyframes > 0) {
@@ -269,21 +268,21 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
 
   for (A_long index = 0; index < numKeyframes; ++index) {
     AEGP_StreamValue2 streamValue;
-    suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, streamH, index, &streamValue);
+    suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, streamHandle, index, &streamValue);
     AEGP_MarkerValP markerP = streamValue.val.markerP;
     if (!markerP) {
       continue;
     }
 
-    AEGP_MemHandle unicodeH;
+    AEGP_MemHandle memoryHandle = nullptr;
     suites->MarkerSuite2()->AEGP_GetMarkerString(pluginID, markerP, AEGP_MarkerString_COMMENT,
-                                                 &unicodeH);
+                                                 &memoryHandle);
 
-    std::string comment = AeMemoryHandleToString(unicodeH);
-    suites->MemorySuite1()->AEGP_FreeMemHandle(unicodeH);
+    std::string comment = AeMemoryHandleToString(memoryHandle);
+    suites->MemorySuite1()->AEGP_FreeMemHandle(memoryHandle);
 
     A_Time keyTime;
-    suites->KeyframeSuite4()->AEGP_GetKeyframeTime(streamH, index, AEGP_LTimeMode_CompTime,
+    suites->KeyframeSuite4()->AEGP_GetKeyframeTime(streamHandle, index, AEGP_LTimeMode_CompTime,
                                                    &keyTime);
 
     A_Time duration;
@@ -297,6 +296,7 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
     markers.push_back(marker);
     suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
   }
+  DeleteStream(streamHandle);
   return markers;
 }
 
@@ -359,53 +359,53 @@ std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStream,
   }
 
   AEGP_MarkerValP markerP = streamValue.val.markerP;
-  AEGP_MemHandle unicodeH = nullptr;
+  AEGP_MemHandle memoryHandle = nullptr;
   err = suites->MarkerSuite2()->AEGP_GetMarkerString(pluginID, markerP, AEGP_MarkerString_COMMENT,
-                                                     &unicodeH);
-  if (err != A_Err_NONE || unicodeH == nullptr) {
+                                                     &memoryHandle);
+  if (err != A_Err_NONE || memoryHandle == nullptr) {
     suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
     return std::nullopt;
   }
 
-  std::string comment = AeMemoryHandleToString(unicodeH);
-  suites->MemorySuite1()->AEGP_FreeMemHandle(unicodeH);
+  std::string comment = AeMemoryHandleToString(memoryHandle);
+  suites->MemorySuite1()->AEGP_FreeMemHandle(memoryHandle);
   suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
 
   return comment;
 }
 
-pag::PAGScaleMode GetImageFillMode(const AEGP_ItemH& itemH, pag::ID imageID) {
+pag::PAGScaleMode GetImageFillMode(const AEGP_ItemH& itemHandle, pag::ID imageID) {
   pag::PAGScaleMode mode = pag::PAGScaleMode::LetterBox;
   std::string keyString = GetKeyStringWithId("ImageFillMode", imageID);
-  auto value = FindMarkerFromComposition(itemH, keyString);
+  auto value = FindMarkerFromComposition(itemHandle, keyString);
   if (value.has_value()) {
     mode = StringToScaleMode(value->get<std::string>());
   }
   return mode;
 }
 
-bool GetLayerEditable(const AEGP_ItemH& itemH, pag::ID id) {
+bool GetLayerEditable(const AEGP_ItemH& itemHandle, pag::ID id) {
   bool isEditable = true;
   std::string keyString = GetKeyStringWithId("noReplace", id);
-  auto value = FindMarkerFromComposition(itemH, keyString);
+  auto value = FindMarkerFromComposition(itemHandle, keyString);
   if (value.has_value()) {
     isEditable = false;
   }
   return isEditable;
 }
 
-std::string GetCompositionStoragePath(const AEGP_ItemH& itemH) {
+std::string GetCompositionStoragePath(const AEGP_ItemH& itemHandle) {
   std::string storagePath = "";
   std::string keyString = "storePath";
-  auto value = FindMarkerFromComposition(itemH, keyString);
+  auto value = FindMarkerFromComposition(itemHandle, keyString);
   if (value.has_value()) {
     storagePath = value->get<std::string>();
   }
   return storagePath;
 }
 
-std::string GetMarkerFromComposition(const AEGP_ItemH& itemH, const std::string& key) {
-  auto optionalJson = FindMarkerFromComposition(itemH, key);
+std::string GetMarkerFromComposition(const AEGP_ItemH& itemHandle, const std::string& key) {
+  auto optionalJson = FindMarkerFromComposition(itemHandle, key);
 
   if (optionalJson.has_value()) {
     if (auto optionalString = ConvertJsonValueToString(*optionalJson)) {
@@ -415,8 +415,8 @@ std::string GetMarkerFromComposition(const AEGP_ItemH& itemH, const std::string&
   return "";
 }
 
-void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemH) {
-  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemH);
+void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemHandle) {
+  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemHandle);
   if (markerStream == nullptr) {
     return;
   }
@@ -508,35 +508,35 @@ bool SetMarkerComment(const AEGP_StreamRefH& markerStream, int index, const std:
   return err == A_Err_NONE;
 }
 
-void SetImageFillMode(pag::PAGScaleMode mode, const AEGP_ItemH& itemH, pag::ID imageID) {
+void SetImageFillMode(pag::PAGScaleMode mode, const AEGP_ItemH& itemHandle, pag::ID imageID) {
   std::string keyString = GetKeyStringWithId("ImageFillMode", imageID);
   if (mode == pag::PAGScaleMode::LetterBox) {
-    DeleteMarkerFromComposition(itemH, keyString);
+    DeleteMarkerFromComposition(itemHandle, keyString);
     return;
   }
   std::string modeString = modeToStringMap.at(mode);
   nlohmann::json value = modeString;
-  AddMarkerToComposition(itemH, keyString, value);
+  AddMarkerToComposition(itemHandle, keyString, value);
 }
 
-void SetLayerEditable(bool isEditable, const AEGP_ItemH& itemH, pag::ID id) {
+void SetLayerEditable(bool isEditable, const AEGP_ItemH& itemHandle, pag::ID id) {
   std::string keyString = GetKeyStringWithId("noReplace", id);
-  DeleteMarkerFromComposition(itemH, keyString);
+  DeleteMarkerFromComposition(itemHandle, keyString);
   if (isEditable) {
     return;
   }
   nlohmann::json value = 1;
-  AddMarkerToComposition(itemH, keyString, value);
+  AddMarkerToComposition(itemHandle, keyString, value);
 }
 
-void SetCompositionStoragePath(const std::string& path, const AEGP_ItemH& itemH) {
+void SetCompositionStoragePath(const std::string& path, const AEGP_ItemH& itemHandle) {
   std::string keyString = "storePath";
-  DeleteMarkerFromComposition(itemH, keyString);
+  DeleteMarkerFromComposition(itemHandle, keyString);
   if (path.empty()) {
     return;
   }
   nlohmann::json value = path;
-  AddMarkerToComposition(itemH, keyString, value);
+  AddMarkerToComposition(itemHandle, keyString, value);
 }
 
 bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string& comment,
@@ -560,40 +560,40 @@ bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string
   return true;
 }
 
-void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemH) {
-  if (itemH == nullptr) {
+void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemHandle) {
+  if (itemHandle == nullptr) {
     return;
   }
 
-  DeleteAllTimeStretchInfo(itemH);
+  DeleteAllTimeStretchInfo(itemHandle);
   std::string keyString = "TimeStretchMode";
   nlohmann::json value = TimeStretchModeToString(info.mode);
   std::string modeString = TimeStretchModeToString(info.mode);
 
   A_Time keyTime;
   A_Time durationTime;
-  float frameRate = GetItemFrameRate(itemH);
+  float frameRate = GetItemFrameRate(itemHandle);
   keyTime.scale = static_cast<A_u_long>(frameRate);
   keyTime.value = static_cast<A_long>(info.start);
   durationTime.scale = static_cast<A_u_long>(frameRate);
   durationTime.value = static_cast<A_long>(info.duration);
 
-  AddMarkerToComposition(itemH, keyString, value, keyTime, durationTime);
+  AddMarkerToComposition(itemHandle, keyString, value, keyTime, durationTime);
 }
 
 void ExportTimeStretch(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExportSession> session,
-                       const AEGP_ItemH& itemH) {
-  if (file == nullptr || itemH == nullptr) {
+                       const AEGP_ItemH& itemHandle) {
+  if (file == nullptr || itemHandle == nullptr) {
     return;
   }
 
   const auto& suites = GetSuites();
 
   A_Time durationTime = {};
-  suites->ItemSuite6()->AEGP_GetItemDuration(itemH, &durationTime);
+  suites->ItemSuite6()->AEGP_GetItemDuration(itemHandle, &durationTime);
   auto compositionDuration = AEDurationToFrame(durationTime, session->frameRate);
 
-  auto optInfo = GetTimeStretchInfo(itemH);
+  auto optInfo = GetTimeStretchInfo(itemHandle);
   if (optInfo.has_value()) {
     const auto& info = *optInfo;
     pag::Frame timeStretchStart =
@@ -617,7 +617,8 @@ void ExportTimeStretch(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExpor
 }
 
 void ExportImageLayerEditable(std::shared_ptr<pag::File> file,
-                              std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemH) {
+                              std::shared_ptr<PAGExportSession> session,
+                              const AEGP_ItemH& itemHandle) {
   if (!file || file->images.empty()) {
     return;
   }
@@ -632,7 +633,7 @@ void ExportImageLayerEditable(std::shared_ptr<pag::File> file,
       if (layer->imageBytes == nullptr) {
         continue;
       }
-      if (IsImageLayerNonReplaceable(layer, itemH, session)) {
+      if (IsImageLayerNonReplaceable(layer, itemHandle, session)) {
         hasNonEditableImage = true;
         continue;
       }
@@ -656,38 +657,38 @@ void ExportImageLayerEditable(std::shared_ptr<pag::File> file,
   }
 }
 
-bool IsTextLayerNonReplaceable(const pag::TextLayer* layer, const AEGP_ItemH& itemH,
+bool IsTextLayerNonReplaceable(const pag::TextLayer* layer, const AEGP_ItemH& itemHandle,
                                std::shared_ptr<PAGExportSession> session) {
   if (!layer) {
     return false;
   }
 
   auto keyString = GetKeyStringWithId("noReplace", layer->id);
-  if (FindMarkerFromComposition(itemH, keyString).has_value()) {
+  if (FindMarkerFromComposition(itemHandle, keyString).has_value()) {
     return true;
   }
 
-  AEGP_LayerH layerH = session->getLayerHByID(layer->id);
-  if (FindMarkerFromLayer(layerH, "noReplace").has_value()) {
+  AEGP_LayerH layerHandle = session->getLayerHByID(layer->id);
+  if (FindMarkerFromLayer(layerHandle, "noReplace").has_value()) {
     return true;
   }
 
   return false;
 }
 
-bool IsImageLayerNonReplaceable(const pag::ImageLayer* layer, const AEGP_ItemH& itemH,
+bool IsImageLayerNonReplaceable(const pag::ImageLayer* layer, const AEGP_ItemH& itemHandle,
                                 std::shared_ptr<PAGExportSession> session) {
   if (session->isVideoLayer(layer->id)) {
     return false;
   }
 
   auto keyString = GetKeyStringWithId("noReplace", layer->id);
-  if (FindMarkerFromComposition(itemH, keyString).has_value()) {
+  if (FindMarkerFromComposition(itemHandle, keyString).has_value()) {
     return true;
   }
 
-  AEGP_LayerH layerH = session->getLayerHByID(layer->id);
-  if (FindMarkerFromLayer(layerH, "noReplace").has_value()) {
+  AEGP_LayerH layerHandle = session->getLayerHByID(layer->id);
+  if (FindMarkerFromLayer(layerHandle, "noReplace").has_value()) {
     return true;
   }
   return false;
@@ -695,7 +696,7 @@ bool IsImageLayerNonReplaceable(const pag::ImageLayer* layer, const AEGP_ItemH& 
 
 void ExportTextLayerEditable(std::shared_ptr<pag::File> file,
                              std::shared_ptr<PAGExportSession> session,
-                             const AEGP_ItemH& mainCompItemH) {
+                             const AEGP_ItemH& mainCompositionItemHandle) {
   if (!file || file->numTexts() == 0) {
     return;
   }
@@ -706,7 +707,7 @@ void ExportTextLayerEditable(std::shared_ptr<pag::File> file,
 
   for (int i = 0; i < textCount; ++i) {
     auto layer = file->getTextAt(i);
-    if (IsTextLayerNonReplaceable(layer, mainCompItemH, session)) {
+    if (IsTextLayerNonReplaceable(layer, mainCompositionItemHandle, session)) {
       isEditable[i] = false;
       hasNonEditableText = true;
     }
@@ -723,9 +724,9 @@ void ExportTextLayerEditable(std::shared_ptr<pag::File> file,
 }
 
 void ExportLayerEditable(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExportSession> session,
-                         const AEGP_ItemH& itemH) {
-  ExportImageLayerEditable(file, session, itemH);
-  ExportTextLayerEditable(file, session, itemH);
+                         const AEGP_ItemH& itemHandle) {
+  ExportImageLayerEditable(file, session, itemHandle);
+  ExportTextLayerEditable(file, session, itemHandle);
 
   const bool imagesWereExplicitlySet = (file->editableImages != nullptr);
   const bool textsWereExplicitlySet = (file->editableTexts != nullptr);
@@ -741,14 +742,14 @@ void ExportLayerEditable(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExp
   }
 }
 
-void ExportImageFillMode(std::shared_ptr<pag::File>& file, const AEGP_ItemH& itemH) {
+void ExportImageFillMode(std::shared_ptr<pag::File>& file, const AEGP_ItemH& itemHandle) {
   if (!file) {
     return;
   }
 
   std::unordered_map<pag::ID, pag::PAGScaleMode> imageFillModeMap(file->images.size());
   for (const auto& image : file->images) {
-    imageFillModeMap.emplace(image->id, GetImageFillMode(itemH, image->id));
+    imageFillModeMap.emplace(image->id, GetImageFillMode(itemHandle, image->id));
   }
 
   const std::vector<int>* editableIndices = file->editableImages;
@@ -812,12 +813,12 @@ void AddMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string& k
   AddNewMarkerToStream(markerStream, newJson.dump(), time, durationTime);
 }
 
-void AddMarkerToComposition(const AEGP_ItemH& itemH, const std::string& key,
+void AddMarkerToComposition(const AEGP_ItemH& itemHandle, const std::string& key,
                             const nlohmann::json& value, A_Time time, A_Time durationTime) {
-  if (itemH == nullptr) {
+  if (itemHandle == nullptr) {
     return;
   }
-  auto markerStream = GetItemMarkerStream(itemH);
+  auto markerStream = GetItemMarkerStream(itemHandle);
   if (markerStream == nullptr) {
     return;
   }
@@ -827,12 +828,12 @@ void AddMarkerToComposition(const AEGP_ItemH& itemH, const std::string& key,
   DeleteStream(markerStream);
 }
 
-void AddMarkerToLayer(const AEGP_LayerH& layerH, const std::string& key,
+void AddMarkerToLayer(const AEGP_LayerH& layerHandle, const std::string& key,
                       const nlohmann::json& value) {
-  if (layerH == nullptr) {
+  if (layerHandle == nullptr) {
     return;
   }
-  auto markerStream = GetLayerMarkerStream(layerH);
+  auto markerStream = GetLayerMarkerStream(layerHandle);
   if (markerStream == nullptr) {
     return;
   }
@@ -842,11 +843,11 @@ void AddMarkerToLayer(const AEGP_LayerH& layerH, const std::string& key,
   DeleteStream(markerStream);
 }
 
-std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH) {
+std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemHandle) {
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
 
-  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemH);
+  AEGP_StreamRefH markerStream = GetItemMarkerStream(itemHandle);
   if (!markerStream) {
     return std::nullopt;
   }
@@ -893,7 +894,7 @@ std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemH) {
       suites->MarkerSuite2()->AEGP_GetMarkerDuration(markerP, &duration);
       suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
 
-      float frameRate = GetItemFrameRate(itemH);
+      float frameRate = GetItemFrameRate(itemHandle);
 
       TimeStretchInfo result = {*foundMode, AEDurationToFrame(time, frameRate),
                                 AEDurationToFrame(duration, frameRate)};

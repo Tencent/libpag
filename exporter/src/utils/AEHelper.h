@@ -71,74 +71,74 @@ void setMinorVersion(int32_t minorVersion);
 
 void RegisterTextDocumentScript();
 
-uint32_t GetLayerID(const AEGP_LayerH& layerH);
+uint32_t GetLayerID(const AEGP_LayerH& layerHandle);
 
-uint32_t GetLayerItemID(const AEGP_LayerH& layerH);
+uint32_t GetLayerItemID(const AEGP_LayerH& layerHandle);
 
-std::string GetLayerName(const AEGP_LayerH& layerH);
+std::string GetLayerName(const AEGP_LayerH& layerHandle);
 
-AEGP_ItemH GetLayerItemH(const AEGP_LayerH& layerH);
+AEGP_ItemH GetLayerItemH(const AEGP_LayerH& layerHandle);
 
-pag::Ratio GetLayerStretch(const AEGP_LayerH& layerH);
+pag::Ratio GetLayerStretch(const AEGP_LayerH& layerHandle);
 
-pag::Frame GetLayerStartTime(const AEGP_LayerH& layerH, float frameRate);
+pag::Frame GetLayerStartTime(const AEGP_LayerH& layerHandle, float frameRate);
 
-pag::Frame GetLayerDuration(const AEGP_LayerH& layerH, float frameRate);
+pag::Frame GetLayerDuration(const AEGP_LayerH& layerHandle, float frameRate);
 
-AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerH);
+AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerHandle);
 
-AEGP_LayerH GetLayerParentLayerH(const AEGP_LayerH& layerH);
+AEGP_LayerH GetLayerParentLayerH(const AEGP_LayerH& layerHandle);
 
-pag::BlendMode GetLayerBlendMode(const AEGP_LayerH& layerH);
+pag::BlendMode GetLayerBlendMode(const AEGP_LayerH& layerHandle);
 
-AEGP_LayerH GetLayerTrackMatteLayerH(const AEGP_LayerH& layerH);
+AEGP_LayerH GetLayerTrackMatteLayerH(const AEGP_LayerH& layerHandle);
 
-pag::TrackMatteType GetLayerTrackMatteType(const AEGP_LayerH& layerH);
+pag::TrackMatteType GetLayerTrackMatteType(const AEGP_LayerH& layerHandle);
 
-A_long GetLayerEffectNum(const AEGP_LayerH& layerH);
+A_long GetLayerEffectNum(const AEGP_LayerH& layerHandle);
 
-void SelectLayer(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH);
+void SelectLayer(const AEGP_ItemH& itemHandle, const AEGP_LayerH& layerHandle);
 
-uint32_t GetItemID(const AEGP_ItemH& itemH);
+uint32_t GetItemID(const AEGP_ItemH& itemHandle);
 
-uint32_t GetItemParentID(const AEGP_ItemH& item);
+uint32_t GetItemParentID(const AEGP_ItemH& itemHandle);
 
-std::string GetItemName(const AEGP_ItemH& item);
+std::string GetItemName(const AEGP_ItemH& itemHandle);
 
-AEGP_CompH GetItemCompH(const AEGP_ItemH& item);
+AEGP_CompH GetItemCompH(const AEGP_ItemH& itemHandle);
 
-float GetItemFrameRate(const AEGP_ItemH& item);
+float GetItemFrameRate(const AEGP_ItemH& itemHandle);
 
-pag::Frame GetItemDuration(const AEGP_ItemH& item);
+pag::Frame GetItemDuration(const AEGP_ItemH& itemHandle);
 
-QSize GetItemDimensions(const AEGP_ItemH& itemH);
+QSize GetItemDimensions(const AEGP_ItemH& itemHandle);
 
-QImage GetCompositionFrameImage(const AEGP_ItemH& itemH, pag::Frame frame);
+QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame);
 
-void SetItemName(const AEGP_ItemH& item, const std::string& name);
+void SetItemName(const AEGP_ItemH& itemHandle, const std::string& name);
 
-void SelectItem(const AEGP_ItemH& itemH);
+void SelectItem(const AEGP_ItemH& itemHandle);
 
-std::string GetCompName(const AEGP_CompH& compH);
+std::string GetCompName(const AEGP_CompH& compositionHandle);
 
-AEGP_ItemH GetCompItemH(const AEGP_CompH& compH);
+AEGP_ItemH GetCompItemH(const AEGP_CompH& compositionHandle);
 
-pag::Color GetCompBackgroundColor(const AEGP_CompH& compH);
+pag::Color GetCompBackgroundColor(const AEGP_CompH& compositionHandle);
 
-bool IsStaticComposition(const AEGP_CompH& compH);
+bool IsStaticComposition(const AEGP_CompH& compositionHandle);
 
-std::string GetStreamMatchName(const AEGP_StreamRefH& streamH);
+std::string GetStreamMatchName(const AEGP_StreamRefH& streamHandle);
 
-bool IsStreamHidden(const AEGP_StreamRefH& streamH);
+bool IsStreamHidden(const AEGP_StreamRefH& streamHandle);
 
-bool IsStreamActive(const AEGP_StreamRefH& streamH);
+bool IsStreamActive(const AEGP_StreamRefH& streamHandle);
 
-void DeleteStream(AEGP_StreamRefH streamRefH);
+void DeleteStream(AEGP_StreamRefH streamHandle);
 
-AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerH);
+AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerHandle);
 
-AEGP_StreamRefH GetItemMarkerStream(const AEGP_ItemH& litemH);
+AEGP_StreamRefH GetItemMarkerStream(const AEGP_ItemH& itemHandle);
 
-AEGP_StreamRefH GetCompositionMarkerStream(const AEGP_CompH& compH);
+AEGP_StreamRefH GetCompositionMarkerStream(const AEGP_CompH& compositionHandle);
 
 }  // namespace exporter

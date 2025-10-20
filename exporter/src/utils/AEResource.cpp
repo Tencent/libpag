@@ -40,7 +40,7 @@ AEResourceType GetAEItemResourceType(AEGP_ItemH& item) {
     AEGP_ItemFlags itemFlags;
     suites->ItemSuite6()->AEGP_GetItemFlags(item, &itemFlags);
     if (itemFlags & AEGP_ItemFlag_STILL) {
-      AEGP_FootageH footageHandle;
+      AEGP_FootageH footageHandle = nullptr;
       suites->FootageSuite5()->AEGP_GetMainFootageFromItem(item, &footageHandle);
       AEGP_FootageSignature signature;
       suites->FootageSuite5()->AEGP_GetFootageSignature(footageHandle, &signature);
@@ -58,7 +58,7 @@ bool HasCompositionResource() {
   A_long numProjects = 0;
   suites->ProjSuite6()->AEGP_GetNumProjects(&numProjects);
   for (A_long i = 0; i < numProjects; i++) {
-    AEGP_ProjectH projectHandle;
+    AEGP_ProjectH projectHandle = nullptr;
     suites->ProjSuite6()->AEGP_GetProjectByIndex(i, &projectHandle);
 
     AEGP_ItemH item;
@@ -88,22 +88,22 @@ std::vector<std::shared_ptr<AEResource>> AEResource::GetAEResourceList() {
     suites->ProjSuite6()->AEGP_GetProjectByIndex(index, &projectHandle);
     A_char projectName[AEGP_MAX_PROJ_NAME_SIZE] = {0};
     suites->ProjSuite6()->AEGP_GetProjectName(projectHandle, projectName);
-    AEGP_ItemH itemH = nullptr;
-    suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &itemH);
-    while (itemH != nullptr) {
-      A_long id = GetItemID(itemH);
+    AEGP_ItemH itemHandle = nullptr;
+    suites->ItemSuite6()->AEGP_GetFirstProjItem(projectHandle, &itemHandle);
+    while (itemHandle != nullptr) {
+      A_long id = GetItemID(itemHandle);
       if (id != 0) {
         auto resource = std::make_shared<AEResource>();
-        auto type = GetAEItemResourceType(itemH);
+        auto type = GetAEItemResourceType(itemHandle);
         if (type != AEResourceType::Unknown) {
           resource->type = type;
           resource->ID = id;
-          resource->name = GetItemName(itemH);
-          resource->itemH = itemH;
+          resource->name = GetItemName(itemHandle);
+          resource->itemHandle = itemHandle;
           resource->isExportAsBmp = IsEndWidthSuffix(resource->name, CompositionBmpSuffix);
           resources.push_back(resource);
           resourceMap[id] = resource;
-          auto parentID = GetItemParentID(itemH);
+          auto parentID = GetItemParentID(itemHandle);
           auto parentIter = resourceMap.find(parentID);
           if (parentIter != resourceMap.end()) {
             parentIter->second->file.children.push_back(resource);
@@ -113,8 +113,8 @@ std::vector<std::shared_ptr<AEResource>> AEResource::GetAEResourceList() {
       }
 
       AEGP_ItemH nextItemHandle = nullptr;
-      suites->ItemSuite6()->AEGP_GetNextProjItem(projectHandle, itemH, &nextItemHandle);
-      itemH = nextItemHandle;
+      suites->ItemSuite6()->AEGP_GetNextProjItem(projectHandle, itemHandle, &nextItemHandle);
+      itemHandle = nextItemHandle;
     }
   }
 
@@ -146,11 +146,11 @@ AEResource::AEResource() {
 
 void AEResource::setSavePath(const std::string& savePath) {
   this->savePath = savePath;
-  SetCompositionStoragePath(savePath, itemH);
+  SetCompositionStoragePath(savePath, itemHandle);
 }
 
 void AEResource::initSavePath() {
-  std::string path = GetCompositionStoragePath(itemH);
+  std::string path = GetCompositionStoragePath(itemHandle);
   if (path.empty()) {
     path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation).toStdString();
   }
