@@ -32,18 +32,16 @@ PluginInstallerModel::PluginInstallerModel(QObject* parent)
           &PluginInstallerModel::uninstallationCompleted);
 }
 
-PluginInstallerModel::~PluginInstallerModel() = default;
-
 bool PluginInstallerModel::hasUpdate() const {
   return installer->hasUpdate();
 }
 
-InstallResult PluginInstallerModel::installPlugins(bool force) {
-  return installer->installPlugins(force);
+InstallResult PluginInstallerModel::installPlugin() {
+  return installer->installPlugin();
 }
 
-InstallResult PluginInstallerModel::uninstallPlugins() {
-  return installer->uninstallPlugins();
+InstallResult PluginInstallerModel::uninstallPlugin() {
+  return installer->uninstallPlugin();
 }
 
 QString PluginInstallerModel::getInstalledVersion() const {

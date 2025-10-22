@@ -502,10 +502,10 @@ PAGWindow {
             Qt.openUrlExternally("https://pag.io/product.html#pag-enterprise-edition");
             break;
         case "install-plugin":
-            pluginInstaller.installPlugins(true);
+            pluginInstaller.installPlugin();
             break;
         case "uninstall-plugin":
-            pluginInstaller.uninstallPlugins();
+            pluginInstaller.uninstallPlugin();
             break;
         case "minimize-window":
             viewWindow.showMinimized();

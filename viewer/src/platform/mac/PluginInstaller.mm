@@ -29,6 +29,12 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <string>
+
+namespace fs = std::filesystem;
 @interface NSString (QtBridge)
 + (NSString*)fromQString:(const QString&)qstr;
 @end
@@ -54,7 +60,7 @@ bool PluginInstaller::checkAeRunning() {
     if (bundleIdentifier) {
       QString bundleId = QString::fromNSString(bundleIdentifier);
 
-      if (bundleId == "com.adobe.AfterEffects" || bundleId.startsWith("com.adobe.AfterEffects")) {
+      if (bundleId.startsWith("com.adobe.AfterEffects")) {
         return true;
       }
     }
@@ -119,9 +125,9 @@ QStringList PluginInstaller::getAeInstallPaths() {
 
 QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
   if (pluginName == "com.tencent.pagconfig") {
-    return pluginName;  // Directory, no extension
+    return pluginName;
   } else if (pluginName == "H264EncoderTools") {
-    return pluginName;  // Directory, no extension
+    return pluginName;
   } else {
     return pluginName + ".plugin";
   }
@@ -157,17 +163,13 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
 QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
   QString plistPath;
 
-  // Handle different plugin types
   if (pluginPath.endsWith(".plugin")) {
     plistPath = pluginPath + "/Contents/Info.plist";
   } else {
-    // For directory-based plugins like com.tencent.pagconfig, check if it has a .plugin
-    // subdirectory
     QString pluginDirPath = pluginPath + ".plugin";
     if (QDir(pluginDirPath).exists()) {
       plistPath = pluginDirPath + "/Contents/Info.plist";
     } else {
-      // Fallback: try to find any .plugin directory in the path
       QDir pluginDir(pluginPath);
       QStringList entries = pluginDir.entryList(QDir::Dirs);
       for (const QString& entry : entries) {
@@ -223,9 +225,10 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   process.waitForFinished(30000);
   if (process.exitCode() != 0) {
     QString error = process.readAllStandardError();
+    QString output = process.readAllStandardOutput();
 
     QString fallbackCommand = command;
-    // fallbackCommand.replace("cp -r ", "cp -r ");
+    fallbackCommand.replace("cp -r ", "cp -r ");
 
     escapedCommand = fallbackCommand;
     escapedCommand.replace("\"", "\\\"");
@@ -241,6 +244,7 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 
     if (process.exitCode() != 0) {
       error = process.readAllStandardError();
+      output = process.readAllStandardOutput();
       return false;
     }
   }
@@ -248,36 +252,27 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   return true;
 }
 
-bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) const {
-  Q_UNUSED(force);
+bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   QStringList commands;
 
   for (const QString& plugin : plugins) {
     QString source = getPluginSourcePath(plugin);
     QString target = getPluginInstallPath(plugin);
 
-    if (!QFile::exists(source)) {
+    fs::path sourcePath(source.toStdString());
+    if (!fs::exists(sourcePath)) {
       return false;
     }
 
     QString targetDir = QFileInfo(target).absolutePath();
-    QString mkdirCmd = QString("mkdir -p '%1'").arg(targetDir);
-    QString rmCmd = QString("rm -rf '%1'").arg(target);
-    QString cpCmd;
-
+    commands << QString("mkdir -p '%1'").arg(targetDir);
+    commands << QString("rm -rf '%1'").arg(target);
     if (plugin == "com.tencent.pagconfig") {
-      cpCmd = QString("cp -r '%1' '%2'").arg(source, targetDir);
+      QString destPath = targetDir + "/" + QFileInfo(source).fileName();
+      commands << QString("ditto '%1' '%2'").arg(source).arg(destPath);
     } else {
-      cpCmd = QString("cp -r '%1' '%2'").arg(source, targetDir);
+      commands << QString("ditto '%1' '%2'").arg(source).arg(target);
     }
-
-    commands << mkdirCmd;
-    commands << rmCmd;
-    commands << cpCmd;
-  }
-
-  if (commands.isEmpty()) {
-    return true;
   }
 
   char qtResourceCmd[cmdBufSize] = {0};
@@ -286,8 +281,13 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins, bool force) co
     commands << QString::fromUtf8(qtResourceCmd).trimmed();
   }
 
+  if (commands.isEmpty()) {
+    return true;
+  }
+
   QString fullCommand = commands.join(" && ");
-  return executeWithPrivileges(fullCommand);
+  bool result = executeWithPrivileges(fullCommand);
+  return result;
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
@@ -298,14 +298,14 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     commands << QString("rm -rf '%1'").arg(target);
   }
 
-  if (commands.isEmpty()) {
-    return true;
-  }
-
   char deleteQtResourceCmd[cmdBufSize] = {0};
   DeleteQtResource(deleteQtResourceCmd, sizeof(deleteQtResourceCmd));
   if (strlen(deleteQtResourceCmd) > 0) {
     commands << QString::fromUtf8(deleteQtResourceCmd).trimmed();
+  }
+
+  if (commands.isEmpty()) {
+    return true;
   }
 
   QString fullCommand = commands.join(" && ");
@@ -334,8 +334,8 @@ void PluginInstaller::setYearRange(int minYear, int maxYear) {
     return;
   }
 
-  minSupportedYear = qMax(2010, minYear);
-  maxSupportedYear = qMin(2050, maxYear);
+  minSupportedYear = qMax(2017, minYear);
+  maxSupportedYear = qMin(2030, maxYear);
 }
 
 }  // namespace pag

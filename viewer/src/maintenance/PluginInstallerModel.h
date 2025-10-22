@@ -30,13 +30,12 @@ class PluginInstallerModel : public QObject {
 
  public:
   explicit PluginInstallerModel(QObject* parent = nullptr);
-  ~PluginInstallerModel() override;
 
   Q_INVOKABLE bool hasUpdate() const;
 
-  Q_INVOKABLE InstallResult installPlugins(bool force = false);
+  Q_INVOKABLE InstallResult installPlugin();
 
-  Q_INVOKABLE InstallResult uninstallPlugins();
+  Q_INVOKABLE InstallResult uninstallPlugin();
 
   Q_INVOKABLE QString getInstalledVersion() const;
 
@@ -48,7 +47,7 @@ class PluginInstallerModel : public QObject {
   void uninstallationCompleted(InstallResult result, const QString& message);
 
  private:
-  std::unique_ptr<PluginInstaller> installer;
+  std::unique_ptr<PluginInstaller> installer = nullptr;
 };
 
 }  // namespace pag

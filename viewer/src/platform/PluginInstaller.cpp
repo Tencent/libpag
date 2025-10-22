@@ -30,37 +30,51 @@ namespace pag {
 PluginInstaller::PluginInstaller(QObject* parent) : QObject(parent) {
 }
 
-PluginInstaller::~PluginInstaller() = default;
-
 bool PluginInstaller::hasUpdate() const {
-  QString pluginName = "PAGExporter";
-  QString sourcePath = getPluginSourcePath(pluginName);
-  QString installPath = getPluginInstallPath(pluginName);
+  QStringList plugins = getPluginList();
 
-  if (!QFile::exists(sourcePath)) {
-    return false;
+  for (const QString& pluginName : plugins) {
+    QString sourcePath = getPluginSourcePath(pluginName);
+    QString installPath = getPluginInstallPath(pluginName);
+    if (!QFile::exists(sourcePath)) {
+      continue;
+    }
+
+    auto sourceVersion = getPluginVersion(sourcePath);
+    auto installedVersion = getPluginVersion(installPath);
+    if (installedVersion == 0 || sourceVersion > installedVersion) {
+      return true;
+    }
   }
 
-  int64_t sourceVersion = getPluginVersion(sourcePath);
-  int64_t installedVersion = getPluginVersion(installPath);
-
-  return sourceVersion > installedVersion;
+  return false;
 }
 
-InstallResult PluginInstaller::installPlugins(bool force) {
-  if (!force && !hasUpdate()) {
-    Q_EMIT updateChecked(false);
-    showMessage(tr("No Updates"), tr("All plugins are already up to date."));
-    return InstallResult::Success;
+InstallResult PluginInstaller::installPlugin() {
+  bool pluginInstalled = isPluginInstalled();
+  bool hasUpdateAvailable = hasUpdate();
+
+  if (!pluginInstalled) {
+    if (!requestConfirmation(tr("Install Adobe After Effects Plug-in"),
+                             tr("Do you want to install the Adobe After Effects plugins?"))) {
+      return InstallResult::UnknownError;
+    }
   }
 
-  if (!force) {
+  else if (hasUpdateAvailable) {
     if (!requestConfirmation(
             tr("Update Adobe After Effects Plug-in"),
             tr("New plugin versions are available. Do you want to install them?"))) {
       return InstallResult::UnknownError;
     }
+  } else {
+    if (!requestConfirmation(tr("Reinstall Adobe After Effects Plug-in"),
+                             tr("The plugins are already installed with the latest version. "
+                                "Do you want to reinstall them?"))) {
+      return InstallResult::UnknownError;
+    }
   }
+
   while (checkAeRunning()) {
     if (!requestConfirmation(tr("Please close Adobe After Effects"),
                              tr("Adobe After Effects is currently running. Please close it and "
@@ -79,7 +93,7 @@ InstallResult PluginInstaller::installPlugins(bool force) {
     }
   }
 
-  bool success = copyPluginFiles(plugins, force);
+  bool success = copyPluginFiles(plugins);
 
   if (success) {
     showMessage(tr("Installation Complete"),
@@ -98,7 +112,7 @@ InstallResult PluginInstaller::installPlugins(bool force) {
   }
 }
 
-InstallResult PluginInstaller::uninstallPlugins() {
+InstallResult PluginInstaller::uninstallPlugin() {
   if (!requestConfirmation(tr("Uninstall Plugins"),
                            tr("Are you sure you want to uninstall the selected plugins?"))) {
     return InstallResult::UnknownError;
@@ -160,10 +174,18 @@ int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
 
 PluginInstaller::Version::Version(const QString& versionStr) {
   QStringList parts = versionStr.split('.');
-  if (parts.size() >= 1) major = parts[0].toInt();
-  if (parts.size() >= 2) minor = parts[1].toInt();
-  if (parts.size() >= 3) patch = parts[2].toInt();
-  if (parts.size() >= 4) build = parts[3].toInt();
+  if (parts.size() >= 1) {
+    major = parts[0].toInt();
+  }
+  if (parts.size() >= 2) {
+    minor = parts[1].toInt();
+  }
+  if (parts.size() >= 3) {
+    patch = parts[2].toInt();
+  }
+  if (parts.size() >= 4) {
+    build = parts[3].toInt();
+  }
 }
 
 bool PluginInstaller::Version::operator>(const Version& other) const {

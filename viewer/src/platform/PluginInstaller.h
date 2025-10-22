@@ -34,11 +34,10 @@ class PluginInstaller : public QObject {
   static constexpr int DefaultMaxYear = 2030;
 
   explicit PluginInstaller(QObject* parent = nullptr);
-  ~PluginInstaller() override;
 
   bool hasUpdate() const;
-  InstallResult installPlugins(bool force = false);
-  InstallResult uninstallPlugins();
+  InstallResult installPlugin();
+  InstallResult uninstallPlugin();
 
   QString getInstalledVersion() const;
   bool isPluginInstalled() const;
@@ -64,7 +63,7 @@ class PluginInstaller : public QObject {
   QString getPluginVersionString(const QString& pluginPath) const;
   bool executeWithPrivileges(const QString& command) const;
 
-  bool copyPluginFiles(const QStringList& plugins, bool force) const;
+  bool copyPluginFiles(const QStringList& plugins) const;
   bool removePluginFiles(const QStringList& plugins) const;
 
   int64_t getPluginVersion(const QString& pluginPath) const;
@@ -74,9 +73,11 @@ class PluginInstaller : public QObject {
   void DeleteQtResource(char cmd[], int cmdSize) const;
 
   struct Version {
-    int major = 0, minor = 0, patch = 0, build = 0;
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+    int build = 0;
 
-    Version() = default;
     explicit Version(const QString& versionStr);
     bool operator>(const Version& other) const;
     QString toString() const;
