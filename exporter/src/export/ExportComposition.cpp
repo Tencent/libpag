@@ -72,7 +72,7 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
   if (composition->type() != pag::CompositionType::Vector) {
     auto frames =
         static_cast<double>(composition->duration * session->frameRate / composition->frameRate);
-    session->progressModel.addTotalFrame(frames);
+    session->progressModel.addTotalProgress(frames);
   }
 }
 
@@ -119,14 +119,14 @@ void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
 
 void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
                              const AEGP_CompH& compHandle) {
-  auto* composition = new pag::VectorComposition();
+  auto composition = new pag::VectorComposition();
   GetCompositionAttributes(session, compHandle, composition);
   ScopedAssign<std::vector<pag::Marker*>*> markers(session->audioMarkers,
                                                    &composition->audioMarkers);
   composition->layers = ExportLayers(session, compHandle);
   session->compositions.push_back(composition);
 
-  session->progressModel.addTotalFrame(static_cast<double>(session->imageBytesList.size()));
+  session->progressModel.addTotalProgress(static_cast<double>(session->imageBytesList.size()));
 }
 
 void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession>, pag::BitmapComposition*,

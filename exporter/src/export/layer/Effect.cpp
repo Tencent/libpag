@@ -421,8 +421,8 @@ std::vector<pag::Effect*> GetEffects(const AEGP_LayerH& layerHandle) {
   return effects;
 }
 
-void GetTextBackground(const AEGP_StreamRefH& streamHandle,
-                       pag::Property<pag::TextDocumentHandle>* textDocument) {
+static void GetTextBackground(const AEGP_StreamRefH& streamHandle,
+                              pag::Property<pag::TextDocumentHandle>* textDocument) {
   auto backgroundColor =
       GetValue(streamHandle, "ADBE Text Background-0001", AEStreamParser::ColorParser);
   auto backgroundAlpha =
@@ -443,21 +443,21 @@ void GetTextBackground(const AEGP_StreamRefH& streamHandle,
   }
 }
 
-pag::ImageFillRule* GetImageFillRuleV2(const AEGP_StreamRefH& streamHandle, float frameRate,
-                                       uint16_t tagLevel) {
+static pag::ImageFillRule* GetImageFillRule(const AEGP_StreamRefH& streamHandle, float frameRate,
+                                            uint16_t tagLevel, AEEffectType type) {
   if (tagLevel < static_cast<uint16_t>(pag::TagCode::ImageFillRule)) {
     PAGExportSessionManager::GetInstance()->recordWarning(AlertInfoType::TagLevelImageFillRule);
     return nullptr;
   }
 
   auto imageFillRule = new pag::ImageFillRule();
-  imageFillRule->scaleMode =
-      GetValue(streamHandle, "ADBE Image Fill Rule2-0001", AEStreamParser::ScaleModeParser);
   QVariantMap map = {};
   map["frameRate"] = frameRate;
-  imageFillRule->timeRemap =
-      GetProperty(streamHandle, "ADBE Image Fill Rule2-0002", AEStreamParser::TimeParser, map);
-  if (tagLevel < static_cast<uint16_t>(pag::TagCode::ImageFillRuleV2)) {
+  if (type == AEEffectType::ImageFillRule) {
+    imageFillRule->scaleMode =
+        GetValue(streamHandle, "ADBE Image Fill Rule1-0001", AEStreamParser::ScaleModeParser);
+    imageFillRule->timeRemap =
+        GetProperty(streamHandle, "ADBE Image Fill Rule1-0002", AEStreamParser::TimeParser, map);
     if (imageFillRule->timeRemap->animatable()) {
       auto timeRemap = imageFillRule->timeRemap;
       for (auto& keyFrame :
@@ -465,38 +465,29 @@ pag::ImageFillRule* GetImageFillRuleV2(const AEGP_StreamRefH& streamHandle, floa
         keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
       }
     }
-    PAGExportSessionManager::GetInstance()->recordWarning(AlertInfoType::TagLevelImageFillRuleV2);
-  }
+  } else {
+    imageFillRule->scaleMode =
+        GetValue(streamHandle, "ADBE Image Fill Rule2-0001", AEStreamParser::ScaleModeParser);
+    imageFillRule->timeRemap =
+        GetProperty(streamHandle, "ADBE Image Fill Rule2-0002", AEStreamParser::TimeParser, map);
 
-  return imageFillRule;
-}
-
-pag::ImageFillRule* GetImageFillRule(const AEGP_StreamRefH& streamHandle, float frameRate,
-                                     uint16_t tagLevel) {
-  if (tagLevel < static_cast<uint16_t>(pag::TagCode::ImageFillRule)) {
-    PAGExportSessionManager::GetInstance()->recordWarning(AlertInfoType::TagLevelImageFillRule);
-    return nullptr;
-  }
-
-  auto imageFillRule = new pag::ImageFillRule();
-  imageFillRule->scaleMode =
-      GetValue(streamHandle, "ADBE Image Fill Rule1-0001", AEStreamParser::ScaleModeParser);
-  QVariantMap map = {};
-  map["frameRate"] = frameRate;
-  imageFillRule->timeRemap =
-      GetProperty(streamHandle, "ADBE Image Fill Rule1-0002", AEStreamParser::TimeParser, map);
-  if (imageFillRule->timeRemap->animatable()) {
-    auto timeRemap = imageFillRule->timeRemap;
-    for (auto& keyFrame : static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
-      keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
+    if (tagLevel < static_cast<uint16_t>(pag::TagCode::ImageFillRuleV2)) {
+      if (imageFillRule->timeRemap->animatable()) {
+        auto timeRemap = imageFillRule->timeRemap;
+        for (auto& keyFrame :
+             static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
+          keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
+        }
+      }
+      PAGExportSessionManager::GetInstance()->recordWarning(AlertInfoType::TagLevelImageFillRuleV2);
     }
   }
 
   return imageFillRule;
 }
 
-void GetAttachment(const AEGP_EffectRefH& effectHandle, float frameRate, pag::Layer* layer,
-                   uint16_t tagLevel) {
+static void GetAttachment(const AEGP_EffectRefH& effectHandle, float frameRate, pag::Layer* layer,
+                          uint16_t tagLevel) {
   const auto PluginID = GetPluginID();
   const auto Suites = GetSuites();
 
@@ -533,9 +524,8 @@ void GetAttachment(const AEGP_EffectRefH& effectHandle, float frameRate, pag::La
     case AEEffectType::ImageFillRuleV2:
       if (layer->type() == pag::LayerType::Image) {
         if (static_cast<pag::ImageLayer*>(layer)->imageFillRule == nullptr) {
-          auto func = type == AEEffectType::ImageFillRule ? GetImageFillRule : GetImageFillRuleV2;
           static_cast<pag::ImageLayer*>(layer)->imageFillRule =
-              func(effectStreamHandle, frameRate, tagLevel);
+              GetImageFillRule(effectStreamHandle, frameRate, tagLevel, type);
         } else {
           PAGExportSessionManager::GetInstance()->recordWarning(
               AlertInfoType::ImageFillRuleOnlyOne);

@@ -31,7 +31,7 @@
 namespace exporter {
 
 static bool IsLayerReferencedByEffect(pag::ID id, const std::vector<pag::Layer*>& layers) {
-  for (auto layer : layers) {
+  for (auto& layer : layers) {
     for (auto effect : layer->effects) {
       if (effect->type() == pag::EffectType::DisplacementMap) {
         auto displacementMap = static_cast<pag::DisplacementMapEffect*>(effect);
@@ -194,8 +194,9 @@ static pag::SolidLayer* CreateSolidLayer(const AEGP_LayerH& layerHandle) {
   return layer;
 }
 
-static pag::ImageLayer* CreateImageLayer(const AEGP_LayerH& layerHandle,
-                                         std::shared_ptr<PAGExportSession> session) {
+static pag::ImageLayer* CreateImageOrVideoLayer(const AEGP_LayerH& layerHandle,
+                                                std::shared_ptr<PAGExportSession> session,
+                                                bool isVideoLayer) {
   auto layer = new pag::ImageLayer();
   AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
   pag::ID imageID = GetItemID(itemHandle);
@@ -207,28 +208,7 @@ static pag::ImageLayer* CreateImageLayer(const AEGP_LayerH& layerHandle,
     imageBytes->id = imageID;
     layer->imageBytes = imageBytes;
     session->imageBytesList.emplace_back(imageBytes);
-    session->imageLayerHandleList.emplace_back(false, layerHandle);
-  } else {
-    layer->imageBytes = *res;
-  }
-
-  return layer;
-}
-
-static pag::ImageLayer* CreateVideoLayer(const AEGP_LayerH& layerHandle,
-                                         std::shared_ptr<PAGExportSession> session) {
-  auto layer = new pag::ImageLayer();
-  AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
-  pag::ID imageID = GetItemID(itemHandle);
-  auto res = std::find_if(
-      session->imageBytesList.begin(), session->imageBytesList.end(),
-      [imageID](const pag::ImageBytes* image) -> bool { return image->id == imageID; });
-  if (res == session->imageBytesList.end()) {
-    auto imageBytes = new pag::ImageBytes();
-    imageBytes->id = imageID;
-    layer->imageBytes = imageBytes;
-    session->imageBytesList.emplace_back(imageBytes);
-    session->imageLayerHandleList.emplace_back(true, layerHandle);
+    session->imageLayerHandleList.emplace_back(isVideoLayer, layerHandle);
   } else {
     layer->imageBytes = *res;
   }
@@ -270,10 +250,10 @@ static pag::Layer* ExportLayer(const AEGP_LayerH& layerHandle,
       layer = CreateSolidLayer(layerHandle);
       break;
     case ExportLayerType::Image:
-      layer = CreateImageLayer(layerHandle, session);
+      layer = CreateImageOrVideoLayer(layerHandle, session, false);
       break;
     case ExportLayerType::Video:
-      layer = CreateVideoLayer(layerHandle, session);
+      layer = CreateImageOrVideoLayer(layerHandle, session, true);
       break;
     case ExportLayerType::PreCompose:
       layer = CreatePreComposeLayer(layerHandle, session);

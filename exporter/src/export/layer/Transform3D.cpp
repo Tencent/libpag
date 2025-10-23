@@ -21,17 +21,19 @@
 
 namespace exporter {
 
-static void ClipTo360(float& a) {
+static float ClipTo360(float a) {
   a = std::fmod(a, 360.0f);
   if (a < 0.0f) {
     a += 360.0f;
   }
+  return a;
 }
 
-static void ClipTo360(pag::Point3D& a) {
-  ClipTo360(a.x);
-  ClipTo360(a.y);
-  ClipTo360(a.z);
+static pag::Point3D ClipTo360(pag::Point3D a) {
+  a.x = ClipTo360(a.x);
+  a.y = ClipTo360(a.y);
+  a.z = ClipTo360(a.z);
+  return a;
 }
 
 static float OrientationOffset(float start, float end) {
@@ -54,10 +56,8 @@ static pag::Point3D OrientationOffset(pag::Point3D& start, pag::Point3D& end) {
 }
 
 static float OrientationDiff(float start, float end) {
-  auto a = start;
-  auto b = end;
-  ClipTo360(a);
-  ClipTo360(b);
+  auto a = ClipTo360(start);
+  auto b = ClipTo360(end);
   auto diff = abs(a - b);
   if (diff <= 180.0f) {
     return diff;
@@ -73,8 +73,8 @@ static void ModifyTransform3DOrientation(pag::Property<pag::Point3D>* orientatio
 
   for (auto& keyFrame :
        static_cast<pag::AnimatableProperty<pag::Point3D>*>(orientation)->keyframes) {
-    ClipTo360(keyFrame->startValue);
-    ClipTo360(keyFrame->endValue);
+    keyFrame->startValue = ClipTo360(keyFrame->startValue);
+    keyFrame->endValue = ClipTo360(keyFrame->endValue);
   }
 
   auto totalOffset = pag::Point3D::Zero();
