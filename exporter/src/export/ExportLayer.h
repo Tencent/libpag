@@ -15,30 +15,33 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "ScopedHelper.h"
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include "AEHelper.h"
-namespace fs = std::filesystem;
+
+#pragma once
+
+#include <pag/file.h>
+#include <pag/pag.h>
+#include <unordered_map>
+#include "src/utils/AEHelper.h"
+#include "utils/PAGExportSession.h"
 
 namespace exporter {
 
-ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
-    : address(itemHandle), itemHandle(itemHandle) {
-  const auto& suites = GetSuites();
-  suites->ItemSuite8()->AEGP_GetItemCurrentTime(itemHandle, &orgTime);
+enum class ExportLayerType {
+  Unknown,
+  Null,
+  Solid,
+  Text,
+  Shape,
+  Image,
+  PreCompose,
+  Video,
+  Audio,
+  Camera
+};
 
-  A_Time newTime = {static_cast<A_long>(time * 100), 100};
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &newTime);
-}
+ExportLayerType GetLayerType(const AEGP_LayerH& layerHandle);
 
-ScopedTimeSetter::~ScopedTimeSetter() {
-  const auto& suites = GetSuites();
-  if (itemHandle == nullptr || itemHandle != address) {
-    return;
-  }
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &orgTime);
-}
+std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
+                                      const AEGP_CompH& compHandle);
 
 }  // namespace exporter

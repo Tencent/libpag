@@ -28,21 +28,21 @@ int ProgressModel::getExportStatus() const {
   return static_cast<int>(status);
 }
 
-double ProgressModel::getTotalFrame() const {
-  if (totalFrame == 0) {
+double ProgressModel::getTotalProgress() const {
+  if (totalProgress == 0) {
     return 1.0;
   }
-  return totalFrame;
+  return totalProgress;
 }
 
-double ProgressModel::getCurrentFrame() const {
-  return currentFrame;
+double ProgressModel::getCurrentProgress() const {
+  return currentProgress;
 }
 
 void ProgressModel::setExportStatus(ExportStatus status) {
   if (status == ExportStatus::Success) {
-    currentFrame = totalFrame;
-    Q_EMIT currentFrameChanged(currentFrame);
+    currentProgress = totalProgress;
+    Q_EMIT currentProgressChanged(currentProgress);
     Q_EMIT exportFinished();
   } else if (status == ExportStatus::Error) {
     Q_EMIT exportFailed();
@@ -51,33 +51,33 @@ void ProgressModel::setExportStatus(ExportStatus status) {
   Q_EMIT exportStatusChanged(static_cast<int>(status));
 }
 
-void ProgressModel::setCurrentFrame(double currentFrame) {
-  this->currentFrame = currentFrame;
-  Q_EMIT currentFrameChanged(currentFrame);
+void ProgressModel::setCurrentProgress(double currentProgress) {
+  this->currentProgress = currentProgress;
+  Q_EMIT currentProgressChanged(currentProgress);
 }
 
-void ProgressModel::setTotalFrame(double totalFrame) {
-  this->totalFrame = totalFrame;
-  Q_EMIT totalFramesChanged(this->totalFrame);
+void ProgressModel::setTotalProgress(double totalProgress) {
+  this->totalProgress = totalProgress;
+  Q_EMIT totalProgressChanged(this->totalProgress);
 
-  if (currentFrame > totalFrame) {
-    currentFrame = totalFrame;
-    Q_EMIT currentFrameChanged(currentFrame);
+  if (currentProgress > totalProgress) {
+    currentProgress = totalProgress;
+    Q_EMIT currentProgressChanged(currentProgress);
   }
 }
 
-void ProgressModel::updateProgress(double value) {
-  currentFrame += value;
-  if (currentFrame >= totalFrame) {
-    currentFrame = totalFrame;
+void ProgressModel::addProgress(double value) {
+  currentProgress += value;
+  if (currentProgress >= totalProgress) {
+    currentProgress = totalProgress;
   }
   QApplication::processEvents();
-  Q_EMIT currentFrameChanged(currentFrame);
+  Q_EMIT currentProgressChanged(currentProgress);
 }
 
-void ProgressModel::addTotalFrame(double value) {
-  totalFrame += value;
-  Q_EMIT totalFramesChanged(totalFrame);
+void ProgressModel::addTotalProgress(double value) {
+  totalProgress += value;
+  Q_EMIT totalProgressChanged(totalProgress);
 }
 
 }  // namespace exporter

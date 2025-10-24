@@ -15,30 +15,13 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "ScopedHelper.h"
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include "AEHelper.h"
-namespace fs = std::filesystem;
+
+#pragma once
+
+#include "utils/AEHelper.h"
 
 namespace exporter {
 
-ScopedTimeSetter::ScopedTimeSetter(const AEGP_ItemH& itemHandle, float time)
-    : address(itemHandle), itemHandle(itemHandle) {
-  const auto& suites = GetSuites();
-  suites->ItemSuite8()->AEGP_GetItemCurrentTime(itemHandle, &orgTime);
-
-  A_Time newTime = {static_cast<A_long>(time * 100), 100};
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &newTime);
-}
-
-ScopedTimeSetter::~ScopedTimeSetter() {
-  const auto& suites = GetSuites();
-  if (itemHandle == nullptr || itemHandle != address) {
-    return;
-  }
-  suites->ItemSuite8()->AEGP_SetItemCurrentTime(itemHandle, &orgTime);
-}
+std::vector<pag::MaskData*> GetMasks(const AEGP_LayerH& layerHandle);
 
 }  // namespace exporter

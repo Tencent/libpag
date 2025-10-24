@@ -67,8 +67,8 @@ class PAGExportSession {
   std::vector<char> fileBytes = {};
   std::vector<pag::Composition*> compositions = {};
   std::vector<pag::ImageBytes*> imageBytesList = {};
+  /* first: is video layer, second: layer handle */
   std::vector<std::pair<bool, AEGP_LayerH>> imageLayerHandleList = {};
-
   /* key: comp item ID, value: comp item handle */
   std::unordered_map<pag::ID, AEGP_ItemH> itemHandleMap = {};
   /* key: layer ID, value: layer handle */
