@@ -62,5 +62,5 @@ void pag_image_set_scale_mode(pag_image* image, pag_scale_mode mode) {
   if (image == nullptr) {
     return;
   }
-  image->p->setScaleMode(static_cast<int>(mode));
+  image->p->setScaleMode(static_cast<pag::PAGScaleMode>(static_cast<uint8_t>(mode)));
 }
