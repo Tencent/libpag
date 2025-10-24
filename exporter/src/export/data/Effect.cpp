@@ -458,13 +458,6 @@ static pag::ImageFillRule* GetImageFillRule(const AEGP_StreamRefH& streamHandle,
         GetValue(streamHandle, "ADBE Image Fill Rule1-0001", AEStreamParser::ScaleModeParser);
     imageFillRule->timeRemap =
         GetProperty(streamHandle, "ADBE Image Fill Rule1-0002", AEStreamParser::TimeParser, map);
-    if (imageFillRule->timeRemap->animatable()) {
-      auto timeRemap = imageFillRule->timeRemap;
-      for (auto& keyFrame :
-           static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
-        keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
-      }
-    }
   } else {
     imageFillRule->scaleMode =
         GetValue(streamHandle, "ADBE Image Fill Rule2-0001", AEStreamParser::ScaleModeParser);
@@ -472,14 +465,16 @@ static pag::ImageFillRule* GetImageFillRule(const AEGP_StreamRefH& streamHandle,
         GetProperty(streamHandle, "ADBE Image Fill Rule2-0002", AEStreamParser::TimeParser, map);
 
     if (tagLevel < static_cast<uint16_t>(pag::TagCode::ImageFillRuleV2)) {
-      if (imageFillRule->timeRemap->animatable()) {
-        auto timeRemap = imageFillRule->timeRemap;
-        for (auto& keyFrame :
-             static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
-          keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
-        }
-      }
       PAGExportSessionManager::GetInstance()->recordWarning(AlertInfoType::TagLevelImageFillRuleV2);
+    }
+  }
+
+  if (!(type == AEEffectType::ImageFillRuleV2 &&
+        tagLevel >= static_cast<uint16_t>(pag::TagCode::ImageFillRuleV2)) &&
+      imageFillRule->timeRemap->animatable()) {
+    auto timeRemap = imageFillRule->timeRemap;
+    for (auto& keyFrame : static_cast<pag::AnimatableProperty<pag::Frame>*>(timeRemap)->keyframes) {
+      keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
     }
   }
 

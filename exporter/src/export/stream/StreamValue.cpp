@@ -206,6 +206,7 @@ static pag::TextDocumentHandle ParseTextDocument(const AEGP_StreamVal2&, const Q
 
   auto textDocument = std::make_shared<pag::TextDocument>();
 
+  /* 13212: Horizontal，see function 'AETextDirectionToTextDirection' for detail */
   textDocument->direction =
       AETextDirectionToTextDirection(obj.value("lineOrientation").toInt(13212));
   textDocument->applyFill = obj.value("applyFill").toBool(textDocument->applyFill);
