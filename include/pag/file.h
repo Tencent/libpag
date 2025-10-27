@@ -1202,7 +1202,7 @@ class PAG_API TextSelector {
   virtual ~TextSelector() {
   }
 
-  virtual uint8_t type() const = 0;
+  virtual TextSelectorType type() const = 0;
 
   virtual void excludeVaryingRanges(std::vector<TimeRange>*) const = 0;
 
@@ -1213,8 +1213,8 @@ class PAG_API TextRangeSelector : public TextSelector {
  public:
   ~TextRangeSelector();
 
-  uint8_t type() const override {
-    return static_cast<uint8_t>(TextSelectorType::Range);
+  TextSelectorType type() const override {
+    return TextSelectorType::Range;
   };
 
   Property<Percent>* start = nullptr;
@@ -1240,8 +1240,8 @@ class PAG_API TextWigglySelector : public TextSelector {
  public:
   ~TextWigglySelector();
 
-  uint8_t type() const override {
-    return static_cast<uint8_t>(TextSelectorType::Wiggly);
+  TextSelectorType type() const override {
+    return TextSelectorType::Wiggly;
   }
 
   Property<TextSelectorMode>* mode = nullptr;
