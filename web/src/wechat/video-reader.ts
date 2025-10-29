@@ -28,13 +28,13 @@ export interface TimeRange {
 }
 
 export class VideoReader {
-  public static async create(
+  public static create(
     mp4Data: Uint8Array,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-  ): Promise<VideoReader> {
+  ): VideoReader {
     return new VideoReader(mp4Data, width, height, frameRate, staticTimeRanges);
   }
 
@@ -100,6 +100,10 @@ export class VideoReader {
     this.arrayBufferImage.setFrameData(await this.getFrameData());
     this.currentFrame = targetFrame;
     return;
+  }
+
+  public getCurrentFrame(){
+    return this.currentFrame;
   }
 
   public getVideo() {

@@ -91,9 +91,7 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   int frameId = videoReader.call<int>("getCurrentFrame");
   if (currentFrame < 0 || currentFrame != frameId) {
     currentFrame = frameId;
-    if (targetFrame == frameId) {
-      lastDecodedBuffer = imageReader->acquireNextBuffer();
-    }
+    lastDecodedBuffer = imageReader->acquireNextBuffer();
   }
   return lastDecodedBuffer;
 }
