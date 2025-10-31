@@ -19,9 +19,12 @@
 #include "ExportLayer.h"
 #include "ExportComposition.h"
 #include "Marker.h"
+#include "data/CameraOption.h"
 #include "data/Effect.h"
 #include "data/LayerStyle.h"
 #include "data/Mask.h"
+#include "data/Shape.h"
+#include "data/TextProperty.h"
 #include "data/Transform2D.h"
 #include "data/Transform3D.h"
 #include "stream/StreamProperty.h"
@@ -240,6 +243,25 @@ static pag::PreComposeLayer* CreatePreComposeLayer(const AEGP_LayerH& layerHandl
   return layer;
 }
 
+static pag::TextLayer* CreateTextLayer(const AEGP_LayerH& layerHandle,
+                                       std::shared_ptr<PAGExportSession> session) {
+  auto layer = new pag::TextLayer();
+  GetTextProperties(session, layerHandle, layer);
+  return layer;
+}
+
+static pag::CameraLayer* CreateCameraLayer(const AEGP_LayerH& layerHandle) {
+  auto layer = new pag::CameraLayer();
+  layer->cameraOption = GetCameraOption(layerHandle);
+  return layer;
+}
+
+static pag::ShapeLayer* CreateShapeLayer(const AEGP_LayerH& layerHandle) {
+  auto layer = new pag::ShapeLayer();
+  layer->contents = GetShapes(layerHandle);
+  return layer;
+}
+
 static pag::Layer* ExportLayer(const AEGP_LayerH& layerHandle,
                                std::shared_ptr<PAGExportSession> session) {
   ExportLayerType layerType = GetLayerType(layerHandle);
@@ -257,6 +279,15 @@ static pag::Layer* ExportLayer(const AEGP_LayerH& layerHandle,
       break;
     case ExportLayerType::PreCompose:
       layer = CreatePreComposeLayer(layerHandle, session);
+      break;
+    case ExportLayerType::Text:
+      layer = CreateTextLayer(layerHandle, session);
+      break;
+    case ExportLayerType::Camera:
+      layer = CreateCameraLayer(layerHandle);
+      break;
+    case ExportLayerType::Shape:
+      layer = CreateShapeLayer(layerHandle);
       break;
     case ExportLayerType::Null:
       layer = new pag::NullLayer();
