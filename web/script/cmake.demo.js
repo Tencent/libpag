@@ -12,7 +12,6 @@ process.argv.push("pag");
 require("../../build_pag");
 
 const getArgValue = (argName, defaultValue = "wasm") => process.argv.includes(argName) ? process.argv[process.argv.indexOf(argName) + 1] : defaultValue;
-
 const arch=getArgValue("-a");
 const libPath = (arch==="wasm-mt" ? "../lib-mt" : "../lib");
 
