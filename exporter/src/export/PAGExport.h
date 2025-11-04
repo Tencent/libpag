@@ -49,5 +49,8 @@ class PAGExport {
   void addRootComposition() const;
   std::vector<pag::ImageBytes*> getRefImages(const std::vector<pag::Composition*>& compositions);
   void exportResources(std::vector<pag::Composition*>& compositions);
+  void exportRescaleImages() const;
+  void exportRescaleBitmapCompositions(std::vector<pag::Composition*>& compositions) const;
+  void exportRescaleVideoCompositions(std::vector<pag::Composition*>& compositions) const;
 };
 }  // namespace exporter

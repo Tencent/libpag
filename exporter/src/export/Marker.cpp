@@ -742,7 +742,7 @@ void ExportLayerEditable(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExp
   }
 }
 
-void ExportImageFillMode(std::shared_ptr<pag::File>& file, const AEGP_ItemH& itemHandle) {
+void ExportImageFillMode(std::shared_ptr<pag::File> file, const AEGP_ItemH& itemHandle) {
   if (!file) {
     return;
   }

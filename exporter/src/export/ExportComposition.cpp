@@ -18,6 +18,8 @@
 
 #include "ExportComposition.h"
 #include "ExportLayer.h"
+#include "sequence/BitmapSequence.h"
+#include "sequence/VideoSequence.h"
 #include "utils/AEHelper.h"
 #include "utils/ScopedHelper.h"
 #include "utils/StringHelper.h"
@@ -129,13 +131,15 @@ void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
   session->progressModel.addTotalProgress(static_cast<double>(session->imageBytesList.size()));
 }
 
-void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession>, pag::BitmapComposition*,
-                                     float) {
+void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession> session,
+                                     pag::BitmapComposition* composition, float factor) {
+  GetBitmapSequence(session, composition, factor);
 }
 
-void ExportVideoCompositionActually(std::shared_ptr<PAGExportSession>,
-                                    std::vector<pag::Composition*>&, pag::VideoComposition*,
-                                    float) {
+void ExportVideoCompositionActually(std::shared_ptr<PAGExportSession> session,
+                                    std::vector<pag::Composition*>& compositions,
+                                    pag::VideoComposition* composition, float factor) {
+  GetVideoSequence(session, compositions, composition, factor);
 }
 
 }  // namespace exporter
