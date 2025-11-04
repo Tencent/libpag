@@ -138,14 +138,13 @@ void PAGImageLayerModel::changeImage(int index, const QString& filePath) {
     if (!reader.read(&newImage)) {
       qDebug() << "Read image[" << path << "] failed: " << reader.errorString();
     }
-  } else {
-    qDebug() << "Can not read image[" << path << "]: " << reader.errorString();
   }
 
   if (newImage.data_ptr() == nullptr) {
     newImage = GetVideoFirstFrame(path);
   }
   if (newImage.data_ptr() == nullptr) {
+    qDebug() << "Can not read image[" << path << "]: " << reader.errorString();
     return;
   }
 

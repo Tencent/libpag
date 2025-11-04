@@ -320,7 +320,7 @@ PAGWindow {
         }
 
         function onVisibleChanged(visible) {
-            progressWindow.visible = visible
+            progressWindow.visible = visible;
         }
 
         function onTaskFinished(filePath, result) {
