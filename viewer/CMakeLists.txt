@@ -29,7 +29,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-DDEBUG)
 endif ()
 
-add_definitions(-DQT_NO_KEYWORDS)
+add_definitions(-DQT_NO_KEYWORDS -DPAG_USE_RTTR)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -57,7 +57,11 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Q
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
         Qt${QT_VERSION_MAJOR}::QuickControls2 Qt${QT_VERSION_MAJOR}::Multimedia)
-qt_add_resources(QT_RESOURCES res.qrc)
+find_program(LUPDATE_EXECUTABLE lupdate REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease REQUIRED)
+execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
+execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
+qt_add_resources(QT_RESOURCES assets/res.qrc)
 
 message(STATUS "Generate Version File")
 if (DEFINED ENV{MajorVersion})
@@ -117,6 +121,7 @@ endif ()
 set(PAG_USE_QT ON)
 set(PAG_USE_RTTR ON)
 set(PAG_USE_LIBAVC OFF)
+set(PAG_BUILD_TESTS OFF)
 set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_FRAMEWORK OFF)
 
@@ -124,6 +129,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 list(APPEND PAG_OPTIONS "-DPAG_USE_QT=${PAG_USE_QT}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_RTTR=${PAG_USE_RTTR}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_LIBAVC=${PAG_USE_LIBAVC}")
+list(APPEND PAG_OPTIONS "-DPAG_BUILD_TESTS=${PAG_BUILD_TESTS}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
 list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")

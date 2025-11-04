@@ -94,7 +94,8 @@ export class VideoReader {
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
       });
-      const blob = new Blob([source as Uint8Array], { type: 'video/mp4' });
+      const buffer = (source as Uint8Array).slice();
+      const blob = new Blob([buffer], { type: 'video/mp4' });
       this.videoEl.src = URL.createObjectURL(blob);
       if (IPHONE) {
         // use load() will make a bug on Chrome.
@@ -108,6 +109,7 @@ export class VideoReader {
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
     }
+    this.linkPlayer(PAGModule.currentPlayer);
   }
 
   public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
@@ -122,6 +124,7 @@ export class VideoReader {
             await waitVideoCanPlay(this.videoEl!);
           } else {
             try {
+              await waitVideoCanPlay(this.videoEl!);
               await this.play();
             } catch (e) {
               this.setError(e);

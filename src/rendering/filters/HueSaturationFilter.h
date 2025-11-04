@@ -40,7 +40,7 @@ class HueSaturationFilter : public RuntimeFilter {
  public:
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, tgfx::Point* offset);
-  DEFINE_RUNTIME_EFFECT_TYPE
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   HueSaturationFilter(float hue, float saturation, float lightness, float colorize,
                       float colorizeHue, float colorizeSaturation, float colorizeLightness);
 

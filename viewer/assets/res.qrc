@@ -1,0 +1,65 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- image -->
+        <file>images/play.png</file>
+        <file>images/next.png</file>
+        <file>images/pause.png</file>
+        <file>images/tiles.png</file>
+        <file>images/previous.png</file>
+        <file>images/panels-on.png</file>
+        <file>images/panels-off.png</file>
+        <file>images/window-icon.png</file>
+        <file>images/window-icon-32x.png</file>
+        <file>images/update-red.png</file>
+        <file>images/background-on.png</file>
+        <file>images/background-off.png</file>
+        <file>images/right-arrow.png</file>
+        <file>images/icon-collapse.png</file>
+        <file>images/icon-edit.png</file>
+        <file>images/icon-save.png</file>
+        <file>images/icon-close.png</file>
+        <file>images/revert.png</file>
+        <file>images/checked.png</file>
+        <file>images/unchecked.png</file>
+        <file>images/left-transparent-background.png</file>
+        <file>images/right-transparent-background.png</file>
+        <file>images/top-transparent-background.png</file>
+        <file>images/performance-warn.png</file>
+
+        <!-- svg -->
+        <file>images/close-dark.svg</file>
+        <file>images/restore-dark.svg</file>
+        <file>images/maximize-dark.svg</file>
+        <file>images/minimize-dark.svg</file>
+
+        <!-- qml -->
+        <file>qml/Main.qml</file>
+        <file>qml/Menu.qml</file>
+        <file>qml/MainForm.qml</file>
+        <file>qml/Profiler.qml</file>
+        <file>qml/AboutWindow.qml</file>
+        <file>qml/ControlForm.qml</file>
+        <file>qml/SettingsWindow.qml</file>
+        <file>qml/FileTreeViewDelegate.qml</file>
+        <file>qml/SaveFileDialog.qml</file>
+        <file>qml/AttributeEditDialog.qml</file>
+        <file>qml/TextListView.qml</file>
+        <file>qml/TextEditDialog.qml</file>
+        <file>qml/ImageListView.qml</file>
+        <file>qml/PerformanceWarnDialog.qml</file>
+        <file>qml/utils/qmldir</file>
+        <file>qml/utils/Utils.qml</file>
+        <file>qml/components/PAGMenu.qml</file>
+        <file>qml/components/PAGMenuBar.qml</file>
+        <file>qml/components/PAGWindow.qml</file>
+        <file>qml/components/PAGTabButton.qml</file>
+        <file>qml/components/PAGRectangle.qml</file>
+        <file>qml/components/PAGMessageBox.qml</file>
+
+        <!-- pag -->
+        <file>pag/performance-baseline.pag</file>
+
+        <!-- qm -->
+        <file>translation/Chinese.qm</file>
+    </qresource>
+</RCC>

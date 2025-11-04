@@ -28,13 +28,13 @@ uint16_t PAGFile::MaxSupportedTagLevel() {
 }
 
 std::shared_ptr<PAGFile> PAGFile::Load(const void* bytes, size_t length,
-                                       const std::string& filePath, const std::string& password) {
-  auto file = File::Load(bytes, length, filePath, password);
+                                       const std::string& filePath) {
+  auto file = File::Load(bytes, length, filePath);
   return MakeFrom(file);
 }
 
-std::shared_ptr<PAGFile> PAGFile::Load(const std::string& filePath, const std::string& password) {
-  auto file = File::Load(filePath, password);
+std::shared_ptr<PAGFile> PAGFile::Load(const std::string& filePath) {
+  auto file = File::Load(filePath);
   return MakeFrom(file);
 }
 
@@ -177,6 +177,10 @@ PAGTimeStretchMode PAGFile::timeStretchMode() const {
   return _timeStretchMode;
 }
 
+PAGTimeStretchMode PAGFile::timeStretchModeInternal() const {
+  return _timeStretchMode;
+}
+
 void PAGFile::setTimeStretchMode(PAGTimeStretchMode value) {
   LockGuard autoLock(rootLocker);
   _timeStretchMode = value;
@@ -212,30 +216,21 @@ bool PAGFile::isPAGFile() const {
 }
 
 std::vector<int> PAGFile::getEditableIndices(LayerType layerType) {
-  int maxIndex = 0;
   switch (layerType) {
     case LayerType::Image:
       if (file->editableImages != nullptr) {
         return *file->editableImages;
       }
-      maxIndex = file->numImages();
       break;
     case LayerType::Text:
       if (file->editableTexts != nullptr) {
         return *file->editableTexts;
       }
-      maxIndex = file->numTexts();
       break;
-    case LayerType::Solid:
-      return {-1};
     default:
       break;
   }
-  std::vector<int> result;
-  for (int i = 0; i < maxIndex; i++) {
-    result.emplace_back(i);
-  }
-  return result;
+  return {};
 }
 
 Frame PAGFile::stretchedFrameDuration() const {

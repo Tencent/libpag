@@ -226,7 +226,7 @@ export class PAGLayer {
    * Returns this layer as a type layer.
    */
   public asTypeLayer() {
-    return layer2typeLayer(this);
+    return layer2typeLayer(this.wasmIns);
   }
 
   public isDelete(): boolean {

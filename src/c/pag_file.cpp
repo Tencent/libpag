@@ -19,11 +19,9 @@
 #include "pag/c/pag_file.h"
 #include "pag_types_priv.h"
 
-pag_file* pag_file_load(const void* bytes, size_t length, const char* filePath,
-                        const char* password) {
+pag_file* pag_file_load(const void* bytes, size_t length, const char* filePath) {
   std::string path(filePath);
-  std::string pwd(password);
-  if (auto file = pag::PAGFile::Load(bytes, length, path, pwd)) {
+  if (auto file = pag::PAGFile::Load(bytes, length, path)) {
     return new pag_file(std::move(file));
   }
   return nullptr;

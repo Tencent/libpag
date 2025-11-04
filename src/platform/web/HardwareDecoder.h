@@ -22,7 +22,6 @@
 #include <mutex>
 #include "pag/pag.h"
 #include "rendering/video/VideoDecoderFactory.h"
-#include "tgfx/core/ImageReader.h"
 #include "tgfx/platform/web/VideoElementReader.h"
 
 namespace pag {

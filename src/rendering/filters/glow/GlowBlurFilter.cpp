@@ -64,8 +64,7 @@ GlowBlurUniforms::GlowBlurUniforms(tgfx::Context* context, unsigned program)
 
 GlowBlurRuntimeFilter::GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset,
                                              float resizeRatio)
-    : RuntimeFilter(Type()), blurDirection(blurDirection), blurOffset(blurOffset),
-      resizeRatio(resizeRatio) {
+    : blurDirection(blurDirection), blurOffset(blurOffset), resizeRatio(resizeRatio) {
 }
 
 std::string GlowBlurRuntimeFilter::onBuildVertexShader() const {

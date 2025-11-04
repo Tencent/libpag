@@ -160,6 +160,13 @@ class Canvas {
     canvas->drawImage(std::move(image), sampling, &realPaint);
   }
 
+  void drawImage(std::shared_ptr<tgfx::Image> image, float x, float y,
+                 const tgfx::Paint* paint = nullptr) {
+    auto realPaint = createPaint(paint);
+    auto samplingOptions = GetSamplingOptions(canvas->getMatrix(), image.get());
+    canvas->drawImage(std::move(image), x, y, samplingOptions, &realPaint);
+  }
+
   void drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
                       const tgfx::Paint& paint) {
     canvas->drawSimpleText(text, x, y, font, createPaint(paint));

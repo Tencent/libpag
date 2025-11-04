@@ -10,6 +10,12 @@ import { readFileSync } from 'node:fs';
 
 const fileHeaderPath = path.resolve(__dirname, '../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
+const arch = process.env.ARCH;
+const libPath = (arch === 'wasm-mt' ? "lib-mt" : "lib");
+const demoName = (arch === 'wasm-mt'? 'index': 'index-st');
+
+require("./update.pag.import");
+
 
 const plugins = [
   esbuild({ tsconfig: 'tsconfig.json', minify: false }),
@@ -41,7 +47,7 @@ const umdConfig = {
       format: 'umd',
       exports: 'named',
       sourcemap: true,
-      file: pkg.browser,
+      file: `${libPath}/libpag.umd.js`,
     },
   ],
   plugins: [...plugins],
@@ -56,7 +62,7 @@ const umdMinConfig = {
       format: 'umd',
       exports: 'named',
       sourcemap: true,
-      file: 'lib/libpag.min.js',
+      file: `${libPath}/libpag.min.js`,
     },
   ],
   plugins: [...plugins, terser()],
@@ -68,14 +74,14 @@ export default [
   {
     input: 'src/pag.ts',
     output: [
-      { banner, file: pkg.module, format: 'esm', sourcemap: true },
-      { banner, file: pkg.main, format: 'cjs', exports: 'auto', sourcemap: true },
+      { banner, file: `${libPath}/libpag.esm.js`, format: 'esm', sourcemap: true },
+      { banner, file: `${libPath}/libpag.cjs.js`, format: 'cjs', exports: 'auto', sourcemap: true },
     ],
     plugins: [...plugins],
   },
   {
-    input: 'demo/index.ts',
-    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
+    input: `demo/${demoName}.ts`,
+    output: { banner, file: `demo/${arch}/libpag.js`, format: 'esm', sourcemap: true },
     plugins: plugins,
   },
 ];

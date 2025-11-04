@@ -95,7 +95,7 @@ QImage PAGImageLayerModel::requestImage(int index) {
   return imageLayers[index];
 }
 
-void PAGImageLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
+void PAGImageLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   imageLayers.clear();
   revertSet.clear();
 
@@ -103,13 +103,13 @@ void PAGImageLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
     return;
   }
 
-  this->pagFile = pagFile;
-  auto editableList = pagFile->getEditableIndices(LayerType::Image);
+  _pagFile = std::move(pagFile);
+  auto editableList = _pagFile->getEditableIndices(LayerType::Image);
   if (editableList.empty()) {
     return;
   }
 
-  auto file = pagFile->getFile();
+  auto file = _pagFile->getFile();
 
   for (const auto& editableIndex : editableList) {
     auto* layer = file->getImageAt(editableIndex).at(0);
@@ -122,7 +122,7 @@ void PAGImageLayerModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   endResetModel();
 }
 
-void PAGImageLayerModel::replaceImage(int index, const QString& filePath) {
+void PAGImageLayerModel::changeImage(int index, const QString& filePath) {
   if (index < 0 || index >= imageLayers.count()) {
     return;
   }
@@ -156,7 +156,7 @@ void PAGImageLayerModel::replaceImage(int index, const QString& filePath) {
   if (pagImage == nullptr) {
     return;
   }
-  pagFile->replaceImage(convertIndex(index), pagImage);
+  replaceImage(index, std::move(pagImage));
 
   revertSet.insert(index);
   imageLayers[index] = newImage;
@@ -172,12 +172,12 @@ void PAGImageLayerModel::revertImage(int index) {
     return;
   }
 
-  auto file = pagFile->getFile();
-  auto editableImages = pagFile->getEditableIndices(pag::LayerType::Image);
+  auto file = _pagFile->getFile();
+  auto editableImages = _pagFile->getEditableIndices(pag::LayerType::Image);
   auto* layer = file->getImageAt(editableImages.at(index)).at(0);
   auto imageData = layer->imageBytes->fileBytes;
   auto image = QImage::fromData(imageData->data(), static_cast<int>(imageData->length()));
-  pagFile->replaceImage(convertIndex(index), nullptr);
+  replaceImage(index, nullptr);
   revertSet.remove(index);
   imageLayers[index] = image;
   beginResetModel();
@@ -185,7 +185,7 @@ void PAGImageLayerModel::revertImage(int index) {
 }
 
 int PAGImageLayerModel::convertIndex(int index) {
-  auto editableIndices = pagFile->getEditableIndices(pag::LayerType::Image);
+  auto editableIndices = _pagFile->getEditableIndices(pag::LayerType::Image);
   return editableIndices.at(index);
 }
 
@@ -195,6 +195,11 @@ QHash<int, QByteArray> PAGImageLayerModel::roleNames() const {
       {static_cast<int>(PAGImageLayerRoles::ReveryRole), "canRevert"},
   };
   return roles;
+}
+
+void PAGImageLayerModel::replaceImage(int index, std::shared_ptr<PAGImage> image) {
+  _pagFile->replaceImage(convertIndex(index), std::move(image));
+  Q_EMIT imageChanged();
 }
 
 }  // namespace pag

@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "3b4a23cd26db01b995d1a849b426523860588d7b",
+        "commit": "0f4264d14ce6c8d1185d27dc9e2e6ee758a8bbcb",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "024348cefcfdef48dcbf7ddf69fc7b03ef409f79",
+        "commit": "3d2f8e7a2a2e68606e17aa6337325173e1759bcd",
         "dir": "third_party/tgfx"
       },
       {
@@ -32,7 +32,7 @@
       },
       {
         "url": "https://github.com/lz4/lz4.git",
-        "commit": "5ff839680134437dbf4678f3d0c7b371d84f4964",
+        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
         "dir": "third_party/lz4"
       }
     ]

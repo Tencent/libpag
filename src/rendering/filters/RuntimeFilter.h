@@ -54,16 +54,14 @@ class RuntimeProgram : public tgfx::RuntimeProgram {
  protected:
   void onReleaseGPU() override;
 
- private:
   explicit RuntimeProgram(tgfx::Context* context) : tgfx::RuntimeProgram(context) {
   }
 };
 
 class RuntimeFilter : public tgfx::RuntimeEffect {
  public:
-  explicit RuntimeFilter(tgfx::UniqueType type,
-                         const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
-      : RuntimeEffect(std::move(type), extraInputs) {
+  explicit RuntimeFilter(const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
+      : RuntimeEffect(extraInputs) {
   }
 
   std::unique_ptr<tgfx::RuntimeProgram> onCreateProgram(tgfx::Context* context) const override;

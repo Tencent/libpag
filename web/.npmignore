@@ -1,2 +1,3 @@
 src/wasm
+src/wasm-mt
 src/pag_wasm_bindings.cpp

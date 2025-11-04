@@ -25,8 +25,9 @@ namespace pag {
 
 std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input,
                                             const FilterList* filterList,
-                                            const tgfx::Rect& clipBounds, tgfx::Rect* filterBounds,
-                                            tgfx::Point* offset);
+                                            const tgfx::Rect& clipBounds,
+                                            const tgfx::Point& sourceScale,
+                                            tgfx::Rect* filterBounds, tgfx::Point* offset);
 
 bool Has3DSupport();
 

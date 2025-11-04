@@ -9,7 +9,7 @@ describe('Matrix', () => {
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
   beforeEach(() => {
-    cy.visit('/index.html');
+    cy.visit('/cypress/index.html');
     cy.window().then(async (window: Cypress.AUTWindow & { libpag: typeof Libpag }) => {
       global = window;
       PAG = await window.libpag.PAGInit();
@@ -126,7 +126,9 @@ describe('Matrix', () => {
   it('Pre skew', () => {
     const matrix = PAG.Matrix.makeScale(1, 1);
     matrix.preSkew(2, 2);
-    expect([matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty]).to.be.eql([1, 2, 2, 1, 0, 0]);
+    expect([matrix.a, matrix.b, matrix.c, matrix.d, Math.abs(matrix.tx), Math.abs(matrix.ty)]).to.be.eql([
+      1, 2, 2, 1, 0, 0,
+    ]);
   });
 
   it('Pre concat', () => {
@@ -157,7 +159,9 @@ describe('Matrix', () => {
   it('Pose skew', () => {
     const matrix = PAG.Matrix.makeScale(1, 1);
     matrix.postSkew(2, 2);
-    expect([matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty]).to.be.eql([1, 2, 2, 1, 0, 0]);
+    expect([matrix.a, matrix.b, matrix.c, matrix.d, Math.abs(matrix.tx), Math.abs(matrix.ty)]).to.be.eql([
+      1, 2, 2, 1, 0, 0,
+    ]);
   });
 
   it('Post concat', () => {

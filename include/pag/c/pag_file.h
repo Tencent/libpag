@@ -26,8 +26,7 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
  * Load a pag file from byte data, return null if the bytes is empty, or it's not a valid pag
  * file. Release it by pag_release.
  */
-PAG_API pag_file* pag_file_load(const void* bytes, size_t length, const char* filePath,
-                                const char* password);
+PAG_API pag_file* pag_file_load(const void* bytes, size_t length, const char* filePath);
 
 PAG_API void pag_file_set_duration(pag_file* file, int64_t duration);
 

@@ -23,6 +23,9 @@
 namespace pag {
 
 VideoSample WebVideoSequenceDemuxer::nextSample() {
+  if (!hardwareBacked) {
+    return VideoSequenceDemuxer::nextSample();
+  }
   VideoSample sample = {};
   sample.time = FrameToTime(sampleIndex, sequence->frameRate);
   sample.length = 1;
@@ -31,8 +34,32 @@ VideoSample WebVideoSequenceDemuxer::nextSample() {
 }
 
 void WebVideoSequenceDemuxer::seekTo(int64_t targetTime) {
-  auto targetFrame = TimeToFrame(targetTime, sequence->frameRate);
-  maxPTSFrame = sampleIndex = targetFrame;
+  if (!hardwareBacked) {
+    VideoSequenceDemuxer::seekTo(targetTime);
+  } else {
+    auto targetFrame = TimeToFrame(targetTime, sequence->frameRate);
+    maxPTSFrame = sampleIndex = targetFrame;
+  }
+}
+
+int64_t WebVideoSequenceDemuxer::getSampleTimeAt(int64_t targetTime) {
+  if (hardwareBacked) {
+    return targetTime;
+  }
+  return VideoSequenceDemuxer::getSampleTimeAt(targetTime);
+}
+
+bool WebVideoSequenceDemuxer::needSeeking(int64_t currentTime, int64_t targetTime) {
+  if (hardwareBacked) {
+    return true;
+  }
+  return VideoSequenceDemuxer::needSeeking(currentTime, targetTime);
+}
+
+void WebVideoSequenceDemuxer::reset() {
+  if (!hardwareBacked) {
+    VideoSequenceDemuxer::reset();
+  }
 }
 
 val WebVideoSequenceDemuxer::getStaticTimeRanges() {

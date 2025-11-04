@@ -1031,14 +1031,12 @@ class PAG_API PAGFile : public PAGComposition {
    * file.
    */
   static std::shared_ptr<PAGFile> Load(const void* bytes, size_t length,
-                                       const std::string& filePath = "",
-                                       const std::string& password = "");
+                                       const std::string& filePath = "");
   /**
    *  Load a pag file from path, return null if the file does not exist or the data is not a pag
    * file.
    */
-  static std::shared_ptr<PAGFile> Load(const std::string& filePath,
-                                       const std::string& password = "");
+  static std::shared_ptr<PAGFile> Load(const std::string& filePath);
 
   PAGFile(std::shared_ptr<File> file, PreComposeLayer* layer);
 
@@ -1153,6 +1151,7 @@ class PAG_API PAGFile : public PAGComposition {
                            std::shared_ptr<TextDocument> textData);
   void replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
                             std::shared_ptr<PAGImage> image);
+  PAGTimeStretchMode timeStretchModeInternal() const;
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;
@@ -1163,6 +1162,8 @@ class PAG_API PAGFile : public PAGComposition {
   friend class LayerRenderer;
 
   friend class AudioClip;
+
+  friend class HardwareDecoder;
 };
 
 class Composition;

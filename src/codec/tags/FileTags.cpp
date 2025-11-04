@@ -178,7 +178,10 @@ void WriteTagsOfFile(EncodeStream* stream, const File* file, PerformanceData* pe
   if (!file->images.empty()) {
     WriteImages(stream, &(file->images));
   }
-  if (file->editableImages != nullptr || file->editableTexts != nullptr) {
+  if ((file->editableImages != nullptr &&
+       file->editableImages->size() != static_cast<size_t>(file->numImages())) ||
+      (file->editableTexts != nullptr &&
+       file->editableTexts->size() != static_cast<size_t>(file->numTexts()))) {
     WriteTag(stream, file, WriteEditableIndices);
   }
   if (file->imageScaleModes != nullptr) {

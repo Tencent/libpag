@@ -3,7 +3,7 @@ import { PAGLayer } from './pag-layer';
 import { destroyVerify } from './utils/decorators';
 import { layer2typeLayer, proxyVector } from './utils/type-utils';
 
-import type { Marker } from './types';
+import  {type Marker,VecArray } from './types';
 
 @destroyVerify
 export class PAGComposition extends PAGLayer {
@@ -148,7 +148,11 @@ export class PAGComposition extends PAGLayer {
   public getLayersByName(layerName: string) {
     const wasmIns = this.wasmIns._getLayersByName(layerName);
     if (!wasmIns) throw new Error(`Get layers by ${layerName} fail!`);
-    return proxyVector(wasmIns, layer2typeLayer);
+    const layerArray = VecArray.create();
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
+    }
+    return layerArray;
   }
   /**
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
@@ -157,6 +161,10 @@ export class PAGComposition extends PAGLayer {
   public getLayersUnderPoint(localX: number, localY: number) {
     const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
     if (!wasmIns) throw new Error(`Get layers under point ${localX},${localY} fail!`);
-    return proxyVector(wasmIns, layer2typeLayer);
+    const layerArray = VecArray.create();
+    for (const wasmIn of wasmIns) {
+      layerArray.push(layer2typeLayer(wasmIn));
+    }
+    return layerArray;
   }
 }

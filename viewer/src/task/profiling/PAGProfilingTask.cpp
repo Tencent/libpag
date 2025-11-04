@@ -21,8 +21,8 @@
 
 namespace pag {
 
-PAGProfilingTask::PAGProfilingTask(const std::shared_ptr<PAGFile>& pagFile, const QString& filePath)
-    : PAGPlayTask(pagFile, filePath) {
+PAGProfilingTask::PAGProfilingTask(std::shared_ptr<PAGFile> pagFile, const QString& filePath)
+    : PAGPlayTask(std::move(pagFile), filePath) {
   openAfterExport = false;
 }
 

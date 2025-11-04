@@ -36,5 +36,7 @@
         <file>qml/AlertError.qml</file>
         <file>qml/PAGViewerInstall.qml</file>
 
+        <!-- qm -->
+        <file>translation/Chinese.qm</file>
     </qresource>
 </RCC>

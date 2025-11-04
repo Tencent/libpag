@@ -71,9 +71,7 @@ std::string GetConfigPath() {
 
 std::string GetTempFolderPath() {
   if (TempFolderPath.empty()) {
-    const auto& suites = AEHelper::GetSuites();
-    auto pluginID = AEHelper::GetPluginID();
-    TempFolderPath = AEHelper::RunScript(suites, pluginID, "Folder.temp.fsName;");
+    TempFolderPath = RunScript("Folder.temp.fsName;");
   }
   return TempFolderPath;
 }
@@ -101,6 +99,18 @@ std::string GetDownloadsPath() {
     return fallbackPath.string();
   }
   return "";
+}
+
+bool IsAEWindowActive() {
+  HWND foreground = GetForegroundWindow();
+  if (!foreground) {
+    return false;
+  }
+
+  char className[256] = {};
+  GetClassNameA(foreground, className, sizeof(className));
+  std::string name = className;
+  return name.find_first_of("AE") == 0;
 }
 
 std::string GetPAGViewerPath() {
@@ -173,6 +183,14 @@ void PreviewPAGFile(std::string pagFilePath) {
     }
   }
   StartPreview(pagFilePath);
+}
+
+std::filesystem::path Utf8ToPath(const std::string& utf8) {
+  return {QString::fromUtf8(utf8.c_str()).toStdWString()};
+}
+
+std::string PathToUtf8(const std::filesystem::path& path) {
+  return QString::fromStdWString(path.wstring()).toUtf8().toStdString();
 }
 
 }  // namespace exporter

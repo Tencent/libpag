@@ -42,11 +42,11 @@ void Rect::join(float l, float t, float r, float b) {
 }
 
 bool Rect::intersects(float l, float t, float r, float b) const {
-  return ToTGFX(this)->intersects(l, t, r, b);
+  return intersects(MakeLTRB(l, t, r, b));
 }
 
 bool Rect::intersects(const Rect& r) const {
-  return ToTGFX(this)->intersects(ToTGFX(r));
+  return tgfx::Rect::Intersects(*ToTGFX(this), ToTGFX(r));
 }
 
 bool Rect::Intersects(const Rect& a, const Rect& b) {
