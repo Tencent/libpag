@@ -29,7 +29,7 @@ struct PAGAudioSample {
   int64_t time = 0;
   int64_t duration = 0;
   int64_t length = 0;
-  uint8_t* data = nullptr;
+  std::shared_ptr<ByteData> data = nullptr;
 };
 
 class AudioReader {
@@ -46,11 +46,13 @@ class AudioReader {
  private:
   explicit AudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig);
 
-  int64_t getNextSampleInternal();
+  std::shared_ptr<PAGAudioSample> getNextSampleInternal();
+  std::shared_ptr<PAGAudioSample> mergeSamples(
+      const std::vector<std::shared_ptr<ByteData>>& samples);
 
   int64_t currentReadTime = 0;
   int64_t currentOutputLength = 0;
-  tgfx::Buffer buffer = {};
+  int64_t sampleLength = 0;
   std::shared_ptr<AudioAsset> audio = nullptr;
   std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
   std::list<std::shared_ptr<AudioTrackReader>> readers = {};

@@ -26,18 +26,18 @@ PAGAudioPlayer::PAGAudioPlayer() {
       PAGAudioReader::Make(config.sampleRate, config.outputSamplesCount, config.channels, 1.0);
   audioRender = PAGAudioRender::Make(config.sampleRate, config.channels);
   audioReader->setAudioRender(audioRender);
-  connect(this, &PAGAudioPlayer::setVolumeInternal, audioRender.get(),
-          &PAGAudioRender::setAudioVolume);
-  connect(this, &PAGAudioPlayer::setIsPlayingInternal, audioReader.get(),
+  connect(this, &PAGAudioPlayer::volumeChanged, audioRender.get(), &PAGAudioRender::setAudioVolume);
+  connect(this, &PAGAudioPlayer::isPlayingChanged, audioReader.get(),
           &PAGAudioReader::onSetIsPlaying);
-  connect(this, &PAGAudioPlayer::setIsPlayingInternal, audioRender.get(),
+  connect(this, &PAGAudioPlayer::isPlayingChanged, audioRender.get(),
           &PAGAudioRender::onSetIsPlaying);
-  connect(this, &PAGAudioPlayer::seekInternal, audioReader.get(), &PAGAudioReader::onSeek);
+  connect(this, &PAGAudioPlayer::progressChanged, audioReader.get(),
+          &PAGAudioReader::onPAGProgressChanged);
   connect(audioReader.get(), &PAGAudioReader::sendData, audioRender.get(), &PAGAudioRender::write);
 }
 
 void PAGAudioPlayer::setVolume(float volume) {
-  Q_EMIT setVolumeInternal(volume);
+  Q_EMIT volumeChanged(volume);
 }
 
 void PAGAudioPlayer::setProgress(double percent) {
@@ -45,17 +45,16 @@ void PAGAudioPlayer::setProgress(double percent) {
     return;
   }
   auto time = static_cast<int64_t>(percent * pagFile->duration());
-  Q_EMIT seekInternal(time);
+  Q_EMIT progressChanged(time);
 }
 
 void PAGAudioPlayer::setIsPlaying(bool isPlaying) {
-  Q_EMIT setIsPlayingInternal(isPlaying);
+  Q_EMIT isPlayingChanged(isPlaying);
 }
 
 void PAGAudioPlayer::setComposition(const std::shared_ptr<PAGFile>& pagFile) {
   this->pagFile = pagFile;
   audioReader->setComposition(std::dynamic_pointer_cast<PAGComposition>(this->pagFile));
-  audioRender->flush();
 }
 
 }  // namespace pag

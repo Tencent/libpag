@@ -25,6 +25,7 @@ AudioShifting::AudioShifting(const std::shared_ptr<AudioOutputConfig>& outputCon
     : outputConfig(outputConfig) {
   stream = sonicCreateStream(outputConfig->sampleRate, outputConfig->channels);
   sonicSetChordPitch(stream, 1);
+  buffer.resize(outputConfig->outputSamplesCount * outputConfig->channels, 0);
 }
 
 AudioShifting::~AudioShifting() {
@@ -58,13 +59,11 @@ int AudioShifting::sendInputEOS() {
 }
 
 SampleData AudioShifting::readAudioBytes() {
-  buffer.resize(outputConfig->outputSamplesCount * outputConfig->channels);
-  int samplesWritten =
-      sonicReadShortFromStream(stream, buffer.data(), outputConfig->outputSamplesCount);
-  if (samplesWritten == 0) {
+  int readSize = sonicReadShortFromStream(stream, buffer.data(), outputConfig->outputSamplesCount);
+  if (readSize == 0) {
     return {};
   }
-  auto lineSize = Utils::SampleCountToLength(samplesWritten, outputConfig->channels);
-  return {reinterpret_cast<uint8_t*>(buffer.data()), static_cast<int>(lineSize)};
+  auto length = Utils::SampleCountToLength(readSize, outputConfig->channels);
+  return {reinterpret_cast<uint8_t*>(buffer.data()), static_cast<int>(length)};
 }
 }  // namespace pag

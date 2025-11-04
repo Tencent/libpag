@@ -21,7 +21,7 @@
 #include <QAudioFormat>
 #include <QAudioSink>
 #include <QThread>
-#include "reader/AudioReader.h"
+#include "audio/reader/AudioReader.h"
 
 namespace pag {
 
@@ -31,7 +31,6 @@ class PAGAudioRender : public QThread {
   static std::shared_ptr<PAGAudioRender> Make(int sampleRate, int channels);
 
   ~PAGAudioRender() override;
-  void flush();
   void setAudioVolume(float volume);
   bool write(std::shared_ptr<PAGAudioSample> data);
   int64_t getAudioLatency() const;
@@ -42,13 +41,11 @@ class PAGAudioRender : public QThread {
   explicit PAGAudioRender(const QAudioFormat& format, int sampleRate, int channels);
   void init();
 
-  Q_SIGNAL void flushSignal();
   Q_SIGNAL void volumeChangeSignal(float volume);
-  Q_SIGNAL void writeData(const uint8_t* data, int64_t length);
+  Q_SIGNAL void writeData(std::shared_ptr<ByteData> data);
 
-  Q_SLOT void onFlush();
   Q_SLOT void onVolumeChange(float volume);
-  Q_SLOT void onWriteData(const uint8_t* data, int64_t length);
+  Q_SLOT void onWriteData(std::shared_ptr<ByteData> data);
 
   int channels = 2;
   int sampleRate = 44100;

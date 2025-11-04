@@ -36,9 +36,9 @@ class PAGAudioPlayer : public QObject {
   void setComposition(const std::shared_ptr<PAGFile>& pagFile);
 
  private:
-  Q_SIGNAL void seekInternal(int64_t time);
-  Q_SIGNAL void setIsPlayingInternal(bool isPlaying);
-  Q_SIGNAL void setVolumeInternal(float volume);
+  Q_SIGNAL void progressChanged(int64_t time);
+  Q_SIGNAL void isPlayingChanged(bool isPlaying);
+  Q_SIGNAL void volumeChanged(float volume);
 
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<PAGAudioReader> audioReader = nullptr;

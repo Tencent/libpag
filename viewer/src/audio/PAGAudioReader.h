@@ -41,7 +41,7 @@ class PAGAudioReader : public QThread {
 
   Q_SIGNAL void sendData(std::shared_ptr<PAGAudioSample>);
 
-  Q_SLOT void onSeek(int64_t time);
+  Q_SLOT void onPAGProgressChanged(int64_t progress);
   Q_SLOT void onSetIsPlaying(bool isPlaying);
 
  protected:
@@ -49,6 +49,8 @@ class PAGAudioReader : public QThread {
 
  private:
   void updateAudioTrack();
+  void updateClock(bool addChangedTimeToSampleTime);
+  void syncAudio(int64_t sampleTime);
 
   Q_SIGNAL void read();
 
@@ -58,9 +60,12 @@ class PAGAudioReader : public QThread {
   std::atomic_bool isRunning = false;
   std::atomic_bool isPlaying = false;
   float volume = 1.0f;
-  uint32_t audioVersion = -1;
   int64_t lastTime = 0;
-  int64_t currentTime = 0;
+  int64_t lastSampleTime = INT64_MAX;
+  int64_t currentProgress = 0;
+  int64_t progressPerFrame = 1;
+  const int64_t timeLagNeedToUpdate = 50 * 1000;
+  const int64_t timeAheadTolerance = 5 * 1000;
   std::shared_ptr<AudioReader> audioReader = nullptr;
   std::shared_ptr<PAGAudioRender> audioRender = nullptr;
   std::shared_ptr<PAGComposition> composition = nullptr;

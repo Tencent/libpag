@@ -45,14 +45,12 @@ void AudioReader::seek(int64_t time) {
   currentReadTime = time;
   currentOutputLength =
       Utils::SampleTimeToLength(time, outputConfig->sampleRate, outputConfig->channels);
-  buffer.clear();
 }
 
 void AudioReader::clearBuffer() {
   for (const auto& reader : readers) {
     reader->clearBuffer();
   }
-  buffer.clear();
 }
 
 void AudioReader::onAudioChanged() {
@@ -79,14 +77,11 @@ void AudioReader::onAudioChanged() {
 
 std::shared_ptr<PAGAudioSample> AudioReader::getNextSample() {
   auto time = currentReadTime;
-  auto length = getNextSampleInternal();
-  auto frame = std::make_shared<PAGAudioSample>();
-  frame->time = time;
-  frame->data = buffer.bytes();
-  frame->length = length;
-  frame->duration =
-      Utils::SampleLengthToTime(length, outputConfig->sampleRate, outputConfig->channels);
-  return frame;
+  auto sample = getNextSampleInternal();
+  sample->time = time;
+  sample->duration =
+      Utils::SampleLengthToTime(sample->length, outputConfig->sampleRate, outputConfig->channels);
+  return sample;
 }
 
 std::shared_ptr<AudioOutputConfig> AudioReader::getOutputConfig() {
@@ -95,12 +90,11 @@ std::shared_ptr<AudioOutputConfig> AudioReader::getOutputConfig() {
 
 AudioReader::AudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig)
     : outputConfig(outputConfig) {
-  int64_t length =
+  sampleLength =
       Utils::SampleCountToLength(outputConfig->outputSamplesCount, outputConfig->channels);
-  buffer.alloc(length);
 }
 
-int64_t AudioReader::getNextSampleInternal() {
+std::shared_ptr<PAGAudioSample> AudioReader::getNextSampleInternal() {
   std::vector<std::shared_ptr<ByteData>> byteDataVector = {};
   for (const auto& reader : readers) {
     auto data = reader->getNextSample();
@@ -109,15 +103,60 @@ int64_t AudioReader::getNextSampleInternal() {
     }
     byteDataVector.push_back(data);
   }
-  auto length = Utils::MergeSamples(byteDataVector, buffer.bytes());
-  if (length == 0) {
-    buffer.clear();
-    length = buffer.size();
-  }
+  auto sample = mergeSamples(byteDataVector);
   currentReadTime = Utils::SampleLengthToTime(currentOutputLength, outputConfig->sampleRate,
                                               outputConfig->channels);
-  currentOutputLength += length;
-  return length;
+  currentOutputLength += sample->length;
+  return sample;
+}
+
+std::shared_ptr<PAGAudioSample> AudioReader::mergeSamples(
+    const std::vector<std::shared_ptr<ByteData>>& samples) {
+  auto mergedSample = std::make_shared<PAGAudioSample>();
+  if (samples.empty()) {
+    mergedSample->length = sampleLength;
+    mergedSample->data = ByteData::Make(sampleLength);
+    std::memset(mergedSample->data->data(), 0, sampleLength);
+    return mergedSample;
+  }
+
+  if (samples.size() == 1) {
+    mergedSample->length = samples.front()->length();
+    mergedSample->data = samples.front();
+    return mergedSample;
+  }
+
+  size_t maxLengthIndex = 0;
+  size_t maxLength = samples[maxLengthIndex]->length();
+  for (size_t index = 1; index < samples.size(); index++) {
+    if (samples[index]->length() > samples[maxLengthIndex]->length()) {
+      maxLengthIndex = index;
+      maxLength = samples[index]->length();
+    }
+  }
+
+  mergedSample->length = samples[maxLengthIndex]->length();
+  mergedSample->data = samples[maxLengthIndex];
+  auto data = mergedSample->data->data();
+  for (size_t index = 0; index < maxLength; index++) {
+    int16_t value = 0;
+    for (size_t sampleIndex = 0; sampleIndex < samples.size(); sampleIndex++) {
+      if (sampleIndex == maxLengthIndex) {
+        continue;
+      }
+      const auto& sample = samples[sampleIndex];
+      if (index < sample->length()) {
+        value += sample->data()[index];
+      }
+    }
+    if (value > SHRT_MAX) {
+      value = SHRT_MAX;
+    } else if (value < SHRT_MIN) {
+      value = SHRT_MIN;
+    }
+    data[index] = value;
+  }
+  return mergedSample;
 }
 
 }  // namespace pag

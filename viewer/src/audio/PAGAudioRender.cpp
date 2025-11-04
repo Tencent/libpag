@@ -18,6 +18,7 @@
 
 #include "PAGAudioRender.h"
 #include <QAbstractEventDispatcher>
+#include <QCoreApplication>
 #include <QDebug>
 #include <QMediaDevices>
 #include "utils/AudioUtils.h"
@@ -44,10 +45,6 @@ PAGAudioRender::~PAGAudioRender() {
   wait();
 }
 
-void PAGAudioRender::flush() {
-  Q_EMIT flushSignal();
-}
-
 void PAGAudioRender::setAudioVolume(float volume) {
   Q_EMIT volumeChangeSignal(volume);
 }
@@ -56,16 +53,12 @@ bool PAGAudioRender::write(std::shared_ptr<PAGAudioSample> data) {
   if (data == nullptr || data->data == nullptr || data->length == 0 || !isPlaying) {
     return false;
   }
-  while (isPlaying) {
-    int64_t delta = audioOutput->bytesFree() - data->length;
-    if (delta < 0) {
-      int64_t time = Utils::SampleLengthToTime(-delta, sampleRate, channels);
-      std::this_thread::sleep_for(std::chrono::microseconds(time));
-    } else {
-      break;
-    }
+  int64_t delta = audioOutput->bytesFree() - data->length;
+  if (delta < 0) {
+    int64_t waitTime = Utils::SampleLengthToTime(-delta, sampleRate, channels);
+    std::this_thread::sleep_for(std::chrono::microseconds(waitTime));
   }
-  Q_EMIT writeData(data->data, data->length);
+  Q_EMIT writeData(data->data);
   return true;
 }
 
@@ -89,17 +82,17 @@ PAGAudioRender::PAGAudioRender(const QAudioFormat& format, int sampleRate, int c
   connect(this, &PAGAudioRender::writeData, this, &PAGAudioRender::onWriteData);
   start();
   init();
-}
-
-void PAGAudioRender::init() {
-  audioOutput = std::make_shared<QAudioSink>(QMediaDevices::defaultAudioOutput(), format);
-  audioOutput->setBufferSize(DefaultBufferSize);
-  audioDevice = audioOutput->start();
   isPlaying = true;
 }
 
-void PAGAudioRender::onFlush() {
-  audioOutput->reset();
+void PAGAudioRender::init() {
+  if (audioOutput) {
+    audioOutput->stop();
+    audioOutput->reset();
+    audioOutput = nullptr;
+  }
+  audioOutput = std::make_shared<QAudioSink>(QMediaDevices::defaultAudioOutput(), format);
+  audioOutput->setBufferSize(DefaultBufferSize);
   audioDevice = audioOutput->start();
 }
 
@@ -108,12 +101,12 @@ void PAGAudioRender::onVolumeChange(float volume) {
   audioOutput->setVolume(volume);
 }
 
-void PAGAudioRender::onWriteData(const uint8_t* data, int64_t length) {
+void PAGAudioRender::onWriteData(std::shared_ptr<ByteData> data) {
   if (!isPlaying) {
     return;
   }
-  if (audioOutput->bytesFree() >= length) {
-    audioDevice->write(reinterpret_cast<const char*>(data), length);
+  if (audioOutput->bytesFree() >= static_cast<int64_t>(data->length())) {
+    audioDevice->write(reinterpret_cast<const char*>(data->data()), data->length());
   }
   usedBufferSize = audioOutput->bufferSize() - audioOutput->bytesFree();
 }
