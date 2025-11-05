@@ -40,8 +40,8 @@ std::shared_ptr<PAGMovie> PAGMovie::MakeFromFile(const std::string& filePath, in
 }
 
 PAGMovie::PAGMovie(std::shared_ptr<MovieInfo> info)
-    : PAGImage(info->width(), info->height()), movieInfo(info) {
-  info->setMovieID(uniqueID());
+    : PAGImage(info->width(), info->height()), movieInfo(std::move(info)) {
+  movieInfo->setMovieID(uniqueID());
 }
 
 int64_t PAGMovie::duration() {
