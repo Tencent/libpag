@@ -21,7 +21,7 @@
 
 namespace pag {
 
-AudioShifting::AudioShifting(const std::shared_ptr<AudioOutputConfig>& outputConfig)
+AudioShifting::AudioShifting(std::shared_ptr<AudioOutputConfig> outputConfig)
     : outputConfig(outputConfig) {
   stream = sonicCreateStream(outputConfig->sampleRate, outputConfig->channels);
   sonicSetChordPitch(stream, 1);

@@ -34,11 +34,10 @@ struct VolumeControlInfo {
 
 class AudioSmoothVolume {
  public:
-  static std::shared_ptr<AudioSmoothVolume> Make(
-      const std::shared_ptr<AudioTrack>& track,
-      const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  static std::shared_ptr<AudioSmoothVolume> Make(std::shared_ptr<AudioTrack> track,
+                                                 std::shared_ptr<AudioOutputConfig> outputConfig);
 
-  void process(int64_t time, const std::shared_ptr<ByteData>& data);
+  void process(int64_t time, std::shared_ptr<ByteData> data);
   void seek(int64_t time);
 
  private:
@@ -46,8 +45,8 @@ class AudioSmoothVolume {
                                      float currentGain, float targetGain);
   static void gainApplyProcess(float gain, uint8_t* buffer, int byteSize);
 
-  AudioSmoothVolume(const std::shared_ptr<AudioTrack>& track,
-                    const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  AudioSmoothVolume(std::shared_ptr<AudioTrack> track,
+                    std::shared_ptr<AudioOutputConfig> outputConfig);
   void calcSmoothVolumeRange(int64_t inputPts, float& currentGain, float& targetGain);
 
   bool updateGainGap = true;

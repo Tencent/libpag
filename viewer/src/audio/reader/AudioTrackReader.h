@@ -28,8 +28,8 @@ namespace pag {
 
 class AudioTrackReader {
  public:
-  AudioTrackReader(const std::shared_ptr<AudioTrack>& track,
-                   const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  AudioTrackReader(std::shared_ptr<AudioTrack> track,
+                   std::shared_ptr<AudioOutputConfig> outputConfig);
 
   void seek(int64_t time);
   void clearBuffer();

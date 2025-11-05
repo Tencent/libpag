@@ -34,8 +34,8 @@ struct PAGAudioSample {
 
 class AudioReader {
  public:
-  static std::shared_ptr<AudioReader> Make(const std::shared_ptr<AudioAsset>& audio,
-                                           const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  static std::shared_ptr<AudioReader> Make(std::shared_ptr<AudioAsset> audio,
+                                           std::shared_ptr<AudioOutputConfig> outputConfig);
 
   void seek(int64_t time);
   void clearBuffer();
@@ -44,7 +44,7 @@ class AudioReader {
   std::shared_ptr<AudioOutputConfig> getOutputConfig();
 
  private:
-  explicit AudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  explicit AudioReader(std::shared_ptr<AudioOutputConfig> outputConfig);
 
   std::shared_ptr<PAGAudioSample> getNextSampleInternal();
   std::shared_ptr<PAGAudioSample> mergeSamples(

@@ -18,6 +18,7 @@
 
 #include "AudioClip.h"
 #include <memory>
+#include <utility>
 #include "base/utils/TimeUtil.h"
 #include "rendering/editing/ImageReplacement.h"
 #include "video/PAGMovie.h"
@@ -25,7 +26,7 @@
 namespace pag {
 
 void ProcessLeftOutside(int64_t fileDuration, int64_t audioStartTime, int64_t audioDuration,
-                        std::vector<AudioClip>& clips, const std::shared_ptr<AudioSource>& source,
+                        std::vector<AudioClip>& clips, std::shared_ptr<AudioSource> source,
                         float volume) {
   //
   // {}: scaledTimeRange
@@ -54,7 +55,7 @@ void ProcessLeftOutside(int64_t fileDuration, int64_t audioStartTime, int64_t au
 
 void ProcessRightOutside(int64_t originFileDuration, int64_t fileDuration, int64_t audioStartTime,
                          int64_t audioDuration, TimeRange& scaledTimeRange,
-                         std::vector<AudioClip>& clips, const std::shared_ptr<AudioSource>& source,
+                         std::vector<AudioClip>& clips, std::shared_ptr<AudioSource> source,
                          float volume) {
   //
   // {}: scaledTimeRange
@@ -75,8 +76,8 @@ void ProcessRightOutside(int64_t originFileDuration, int64_t fileDuration, int64
     auto duration = std::min(audioDuration, fileDuration - targetStart);
     auto sourceTimeRange = TimeRange{0, duration};
     auto targetTimeRange = TimeRange{targetStart, targetStart + duration};
-    auto clip =
-        AudioClip(source, sourceTimeRange, targetTimeRange, {{targetTimeRange, volume, volume}});
+    auto clip = AudioClip(std::move(source), sourceTimeRange, targetTimeRange,
+                          {{targetTimeRange, volume, volume}});
     clips.push_back(clip);
   }
 }
@@ -84,7 +85,7 @@ void ProcessRightOutside(int64_t originFileDuration, int64_t fileDuration, int64
 void ProcessScaledContainAudio(int64_t originFileDuration, int64_t fileDuration,
                                int64_t audioStartTime, int64_t audioDuration,
                                TimeRange& scaledTimeRange, std::vector<AudioClip>& clips,
-                               const std::shared_ptr<AudioSource>& source, float volume) {
+                               std::shared_ptr<AudioSource> source, float volume) {
   //
   // {}: scaledTimeRange
   // []: audioTimeRange
@@ -135,7 +136,7 @@ void ProcessScaledContainAudio(int64_t originFileDuration, int64_t fileDuration,
 void ProcessAudioContainScaled(int64_t originFileDuration, int64_t fileDuration,
                                int64_t audioStartTime, int64_t audioDuration,
                                TimeRange& scaledTimeRange, std::vector<AudioClip>& clips,
-                               const std::shared_ptr<AudioSource>& source, float volume) {
+                               std::shared_ptr<AudioSource> source, float volume) {
   //
   // {}: scaledTimeRange
   // []: audioTimeRange
@@ -160,15 +161,15 @@ void ProcessAudioContainScaled(int64_t originFileDuration, int64_t fileDuration,
         targetStart + audioDuration * (fileDuration - minDuration) / scaledTimeRange.duration();
     auto sourceTimeRange = TimeRange{0, audioDuration};
     auto targetTimeRange = TimeRange{targetStart, targetEnd};
-    auto clip =
-        AudioClip(source, sourceTimeRange, targetTimeRange, {{targetTimeRange, volume, volume}});
+    auto clip = AudioClip(std::move(source), sourceTimeRange, targetTimeRange,
+                          {{targetTimeRange, volume, volume}});
     clips.push_back(clip);
   }
 }
 
 void ProcessLeftIntersect(int64_t originFileDuration, int64_t fileDuration, int64_t audioStartTime,
                           int64_t audioDuration, TimeRange& scaledTimeRange,
-                          std::vector<AudioClip>& clips, const std::shared_ptr<AudioSource>& source,
+                          std::vector<AudioClip>& clips, std::shared_ptr<AudioSource> source,
                           float volume) {
   //
   // {}: scaledTimeRange
@@ -207,8 +208,8 @@ void ProcessLeftIntersect(int64_t originFileDuration, int64_t fileDuration, int6
 
 void ProcessRightIntersect(int64_t originFileDuration, int64_t fileDuration, int64_t audioStartTime,
                            int64_t audioDuration, TimeRange& scaledTimeRange,
-                           std::vector<AudioClip>& clips,
-                           const std::shared_ptr<AudioSource>& source, float volume) {
+                           std::vector<AudioClip>& clips, std::shared_ptr<AudioSource> source,
+                           float volume) {
   //
   // {}: scaledTimeRange
   // []: audioTimeRange
@@ -247,17 +248,16 @@ void ProcessRightIntersect(int64_t originFileDuration, int64_t fileDuration, int
   }
 }
 
-std::vector<int> AudioClip::DumpTracks(const std::shared_ptr<PAGComposition>& composition,
-                                       const std::shared_ptr<AudioAsset>& audio, float volume) {
+std::vector<int> AudioClip::DumpTracks(std::shared_ptr<PAGComposition> composition,
+                                       std::shared_ptr<AudioAsset> audio, float volume) {
   if (composition == nullptr) {
     return {};
   }
-  auto clips = GenerateAudioClips(composition);
-  return ApplyAudioClips(audio, clips, volume);
+  auto clips = GenerateAudioClips(std::move(composition));
+  return ApplyAudioClips(std::move(audio), clips, volume);
 }
 
-std::vector<AudioClip> AudioClip::GenerateAudioClips(
-    const std::shared_ptr<PAGComposition>& composition) {
+std::vector<AudioClip> AudioClip::GenerateAudioClips(std::shared_ptr<PAGComposition> composition) {
   if (composition == nullptr) {
     return {};
   }
@@ -284,10 +284,10 @@ std::vector<AudioClip> AudioClip::GenerateAudioClips(
   return clips;
 }
 
-AudioClip::AudioClip(const std::shared_ptr<AudioSource>& audioSource, TimeRange sourceTimeRange,
+AudioClip::AudioClip(std::shared_ptr<AudioSource> audioSource, TimeRange sourceTimeRange,
                      TimeRange targetTimeRange, const std::vector<VolumeRange>& volumeRanges)
     : sourceTimeRange(sourceTimeRange), targetTimeRange(targetTimeRange),
-      volumeRanges(volumeRanges), source(audioSource) {
+      volumeRanges(volumeRanges), source(std::move(audioSource)) {
 }
 
 bool AudioClip::operator==(const AudioClip& clip) const {
@@ -299,7 +299,7 @@ bool AudioClip::operator==(const AudioClip& clip) const {
 }
 
 std::vector<AudioClip> AudioClip::GenerateAudioClipsFromAudioBytes(
-    const std::shared_ptr<PAGComposition>& composition) {
+    std::shared_ptr<PAGComposition> composition) {
   if (composition == nullptr || composition->audioBytes() == nullptr) {
     return {};
   }
@@ -334,9 +334,9 @@ std::vector<AudioClip> AudioClip::GenerateAudioClipsFromAudioBytes(
   return clips;
 }
 
-bool AudioClip::ProcessRepeatedPAGFile(const std::shared_ptr<PAGFile>& file,
-                                       const std::shared_ptr<AudioAsset>& audio,
-                                       const std::shared_ptr<AudioSource>& source,
+bool AudioClip::ProcessRepeatedPAGFile(std::shared_ptr<PAGFile> file,
+                                       std::shared_ptr<AudioAsset> audio,
+                                       std::shared_ptr<AudioSource> source,
                                        std::vector<AudioClip>& clips, float volume) {
   if (file->timeStretchMode() == PAGTimeStretchMode::Repeat) {
     return false;
@@ -362,9 +362,9 @@ bool AudioClip::ProcessRepeatedPAGFile(const std::shared_ptr<PAGFile>& file,
   return true;
 }
 
-bool AudioClip::ProcessScaledPAGFile(const std::shared_ptr<PAGFile>& file,
-                                     const std::shared_ptr<AudioAsset>& audio,
-                                     const std::shared_ptr<AudioSource>& source,
+bool AudioClip::ProcessScaledPAGFile(std::shared_ptr<PAGFile> file,
+                                     std::shared_ptr<AudioAsset> audio,
+                                     std::shared_ptr<AudioSource> source,
                                      std::vector<AudioClip>& clips, float volume) {
   if (file->timeStretchMode() == PAGTimeStretchMode::Scale) {
     return false;
@@ -378,14 +378,14 @@ bool AudioClip::ProcessScaledPAGFile(const std::shared_ptr<PAGFile>& file,
     scaledTimeRange.start = FrameToTime(scaledTimeRange.start, file->frameRate());
     scaledTimeRange.end = FrameToTime(scaledTimeRange.end, file->frameRate());
     ProcessScaledTimeRange(originalDuration, duration, audioStartTime, audioDuration,
-                           scaledTimeRange, clips, source, volume);
+                           scaledTimeRange, clips, std::move(source), volume);
   } else {
     auto targetStart = audioStartTime * duration / originalDuration;
     auto targetEnd = targetStart + audioDuration * duration / originalDuration;
     auto sourceTimeRange = TimeRange{0, audioDuration};
     auto targetTimeRange = TimeRange{targetStart, targetEnd};
-    auto clip =
-        AudioClip(source, sourceTimeRange, targetTimeRange, {{targetTimeRange, volume, volume}});
+    auto clip = AudioClip(std::move(source), sourceTimeRange, targetTimeRange,
+                          {{targetTimeRange, volume, volume}});
     clips.push_back(clip);
   }
   return true;
@@ -394,29 +394,29 @@ bool AudioClip::ProcessScaledPAGFile(const std::shared_ptr<PAGFile>& file,
 void AudioClip::ProcessScaledTimeRange(int64_t originalDuration, int64_t duration,
                                        int64_t audioStartTime, int64_t audioDuration,
                                        TimeRange& scaledTimeRange, std::vector<AudioClip>& clips,
-                                       const std::shared_ptr<AudioSource>& source, float volume) {
+                                       std::shared_ptr<AudioSource> source, float volume) {
   auto audioEndTime = audioStartTime + audioDuration;
   if (audioEndTime <= scaledTimeRange.start) {
-    ProcessLeftOutside(duration, audioStartTime, audioDuration, clips, source, volume);
+    ProcessLeftOutside(duration, audioStartTime, audioDuration, clips, std::move(source), volume);
   } else if (audioStartTime >= scaledTimeRange.end) {
     ProcessRightOutside(originalDuration, duration, audioStartTime, audioDuration, scaledTimeRange,
-                        clips, source, volume);
+                        clips, std::move(source), volume);
   } else if (audioStartTime <= scaledTimeRange.start && scaledTimeRange.end <= audioEndTime) {
     ProcessScaledContainAudio(originalDuration, duration, audioStartTime, audioDuration,
-                              scaledTimeRange, clips, source, volume);
+                              scaledTimeRange, clips, std::move(source), volume);
   } else if (scaledTimeRange.start <= audioStartTime && audioEndTime <= scaledTimeRange.end) {
     ProcessAudioContainScaled(originalDuration, duration, audioStartTime, audioDuration,
-                              scaledTimeRange, clips, source, volume);
+                              scaledTimeRange, clips, std::move(source), volume);
   } else if (audioStartTime < scaledTimeRange.start && scaledTimeRange.start <= audioEndTime) {
     ProcessLeftIntersect(originalDuration, duration, audioStartTime, audioDuration, scaledTimeRange,
-                         clips, source, volume);
+                         clips, std::move(source), volume);
   } else {
     ProcessRightIntersect(originalDuration, duration, audioStartTime, audioDuration,
-                          scaledTimeRange, clips, source, volume);
+                          scaledTimeRange, clips, std::move(source), volume);
   }
 }
 
-std::vector<AudioClip> AudioClip::ProcessImageLayer(const std::shared_ptr<PAGImageLayer>& layer) {
+std::vector<AudioClip> AudioClip::ProcessImageLayer(std::shared_ptr<PAGImageLayer> layer) {
   auto replacement = layer->replacement;
   if (replacement == nullptr) {
     return {};
@@ -451,11 +451,11 @@ std::vector<AudioClip> AudioClip::ProcessImageLayer(const std::shared_ptr<PAGIma
     }
     return result;
   }
-  return ProcessTimeRamp(layer, audioClips,
+  return ProcessTimeRamp(std::move(layer), audioClips,
                          static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap));
 }
 
-std::vector<AudioClip> AudioClip::ProcessTimeRamp(const std::shared_ptr<PAGImageLayer>& layer,
+std::vector<AudioClip> AudioClip::ProcessTimeRamp(std::shared_ptr<PAGImageLayer> layer,
                                                   std::vector<AudioClip>& clips,
                                                   AnimatableProperty<Frame>* timeRemap) {
   std::vector<AudioClip> result = {};
@@ -491,16 +491,16 @@ std::vector<AudioClip> AudioClip::ProcessTimeRamp(const std::shared_ptr<PAGImage
 }
 
 std::vector<AudioClip> AudioClip::GenerateAudioClipsFromImageLayer(
-    const std::shared_ptr<PAGImageLayer>& layer) {
+    std::shared_ptr<PAGImageLayer> layer) {
   auto clips = ProcessImageLayer(layer);
   if (!clips.empty()) {
-    ShiftClipsWithLayer(clips, layer);
+    ShiftClipsWithLayer(clips, std::move(layer));
   }
   return clips;
 }
 
 void AudioClip::ShiftClipsWithLayer(std::vector<AudioClip>& clips,
-                                    const std::shared_ptr<PAGLayer>& layer) {
+                                    std::shared_ptr<PAGLayer> layer) {
   auto startTime = layer->startTime();
   if (startTime == 0) {
     for (auto& clip : clips) {

@@ -26,15 +26,15 @@ std::shared_ptr<AudioAsset> AudioAsset::Make(const std::string& filePath) {
   return audio;
 }
 
-std::shared_ptr<AudioAsset> AudioAsset::Make(const std::shared_ptr<ByteData>& data) {
+std::shared_ptr<AudioAsset> AudioAsset::Make(std::shared_ptr<ByteData> data) {
   auto audio = std::make_shared<AudioAsset>();
-  audio->setSource(std::make_shared<AudioSource>(data));
+  audio->setSource(std::make_shared<AudioSource>(std::move(data)));
   return audio;
 }
 
-std::shared_ptr<AudioAsset> AudioAsset::Make(const std::shared_ptr<AudioSource>& source) {
+std::shared_ptr<AudioAsset> AudioAsset::Make(std::shared_ptr<AudioSource> source) {
   auto audio = std::make_shared<AudioAsset>();
-  audio->setSource(source);
+  audio->setSource(std::move(source));
   return audio;
 }
 
@@ -59,10 +59,10 @@ std::shared_ptr<AudioTrack> AudioAsset::addTrack(int preferredTrackID) {
   if (newTrackID == -1) {
     newTrackID = generateTrackID();
   } else {
-    auto iter = std::find_if(tracks.begin(), tracks.end(),
-                             [newTrackID](const std::shared_ptr<AudioTrack>& track) {
-                               return track->getTrackID() == newTrackID;
-                             });
+    auto iter =
+        std::find_if(tracks.begin(), tracks.end(), [newTrackID](std::shared_ptr<AudioTrack> track) {
+          return track->getTrackID() == newTrackID;
+        });
     if (iter != tracks.end()) {
       newTrackID = generateTrackID();
     }
@@ -72,9 +72,9 @@ std::shared_ptr<AudioTrack> AudioAsset::addTrack(int preferredTrackID) {
   return track;
 }
 
-void AudioAsset::setSource(const std::shared_ptr<AudioSource>& source) {
+void AudioAsset::setSource(std::shared_ptr<AudioSource> source) {
   tracks.clear();
-  this->source = source;
+  this->source = std::move(source);
   loadValues();
 }
 
@@ -107,10 +107,10 @@ void AudioAsset::loadValues() {
 }
 
 void AudioAsset::removeTrack(int trackID) {
-  auto iter = std::find_if(tracks.begin(), tracks.end(),
-                           [trackID](const std::shared_ptr<AudioTrack>& mediaTrack) {
-                             return mediaTrack->getTrackID() == trackID;
-                           });
+  auto iter =
+      std::find_if(tracks.begin(), tracks.end(), [trackID](std::shared_ptr<AudioTrack> mediaTrack) {
+        return mediaTrack->getTrackID() == trackID;
+      });
   if (iter == tracks.end()) {
     return;
   }

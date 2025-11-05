@@ -52,8 +52,8 @@ void PAGAudioPlayer::setIsPlaying(bool isPlaying) {
   Q_EMIT isPlayingChanged(isPlaying);
 }
 
-void PAGAudioPlayer::setComposition(const std::shared_ptr<PAGFile>& pagFile) {
-  this->pagFile = pagFile;
+void PAGAudioPlayer::setComposition(std::shared_ptr<PAGFile> pagFile) {
+  this->pagFile = std::move(pagFile);
   audioReader->setComposition(std::dynamic_pointer_cast<PAGComposition>(this->pagFile));
 }
 

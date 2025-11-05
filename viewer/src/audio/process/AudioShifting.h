@@ -29,7 +29,7 @@ using AudioOutputConfig = ffmovie::AudioOutputConfig;
 
 class AudioShifting {
  public:
-  explicit AudioShifting(const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  explicit AudioShifting(std::shared_ptr<AudioOutputConfig> outputConfig);
   ~AudioShifting();
   void setSpeed(float speed);
   void setVolume(float volume);

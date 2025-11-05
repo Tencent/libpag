@@ -26,14 +26,14 @@ namespace pag {
 class AudioAsset {
  public:
   static std::shared_ptr<AudioAsset> Make(const std::string& filePath);
-  static std::shared_ptr<AudioAsset> Make(const std::shared_ptr<ByteData>& data);
-  static std::shared_ptr<AudioAsset> Make(const std::shared_ptr<AudioSource>& source);
+  static std::shared_ptr<AudioAsset> Make(std::shared_ptr<ByteData> data);
+  static std::shared_ptr<AudioAsset> Make(std::shared_ptr<AudioSource> source);
 
   int64_t duration();
   std::vector<std::shared_ptr<AudioTrack>> getTracks();
   std::shared_ptr<AudioSource> getSource();
   std::shared_ptr<AudioTrack> addTrack(int preferredTrackID = -1);
-  void setSource(const std::shared_ptr<AudioSource>& source);
+  void setSource(std::shared_ptr<AudioSource> source);
   void loadValues();
   void removeTrack(int trackID);
   void removeAllTracks();

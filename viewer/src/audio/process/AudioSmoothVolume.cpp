@@ -29,16 +29,15 @@ bool IsGainValid(float gain) {
 }
 
 std::shared_ptr<AudioSmoothVolume> AudioSmoothVolume::Make(
-    const std::shared_ptr<AudioTrack>& track,
-    const std::shared_ptr<AudioOutputConfig>& outputConfig) {
+    std::shared_ptr<AudioTrack> track, std::shared_ptr<AudioOutputConfig> outputConfig) {
   if (track->volumeRangeList.empty()) {
     return nullptr;
   }
-  auto smoothVolume = new AudioSmoothVolume(track, outputConfig);
+  auto smoothVolume = new AudioSmoothVolume(std::move(track), std::move(outputConfig));
   return std::shared_ptr<AudioSmoothVolume>(smoothVolume);
 }
 
-void AudioSmoothVolume::process(int64_t time, const std::shared_ptr<ByteData>& data) {
+void AudioSmoothVolume::process(int64_t time, std::shared_ptr<ByteData> data) {
   if (data == nullptr || data->length() <= 0 || time < 0) {
     return;
   }
@@ -192,9 +191,9 @@ void AudioSmoothVolume::calcSmoothVolumeRange(int64_t inputPts, float& currentGa
   }
 }
 
-AudioSmoothVolume::AudioSmoothVolume(const std::shared_ptr<AudioTrack>& track,
-                                     const std::shared_ptr<AudioOutputConfig>& outputConfig)
-    : track(track), outputConfig(outputConfig) {
+AudioSmoothVolume::AudioSmoothVolume(std::shared_ptr<AudioTrack> track,
+                                     std::shared_ptr<AudioOutputConfig> outputConfig)
+    : track(std::move(track)), outputConfig(outputConfig) {
   auto frameDuration = outputConfig->outputSamplesCount * 1000000.0 / outputConfig->sampleRate;
   for (auto& iter : this->track->volumeRangeList) {
     auto volumeRange = iter;

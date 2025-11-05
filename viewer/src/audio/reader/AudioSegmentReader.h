@@ -26,11 +26,10 @@ namespace pag {
 
 class AudioSegmentReader {
  public:
-  static std::shared_ptr<AudioSegmentReader> Make(
-      AudioTrackSegment* segment, const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  static std::shared_ptr<AudioSegmentReader> Make(AudioTrackSegment* segment,
+                                                  std::shared_ptr<AudioOutputConfig> outputConfig);
 
-  AudioSegmentReader(AudioTrackSegment* segment,
-                     const std::shared_ptr<AudioOutputConfig>& outputConfig);
+  AudioSegmentReader(AudioTrackSegment* segment, std::shared_ptr<AudioOutputConfig> outputConfig);
   bool isValid();
   void seek(int64_t time);
   SampleData getNextSample();

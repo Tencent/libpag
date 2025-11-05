@@ -22,11 +22,10 @@
 
 namespace pag {
 
-std::shared_ptr<AudioReader> AudioReader::Make(
-    const std::shared_ptr<AudioAsset>& audio,
-    const std::shared_ptr<AudioOutputConfig>& outputConfig) {
+std::shared_ptr<AudioReader> AudioReader::Make(std::shared_ptr<AudioAsset> audio,
+                                               std::shared_ptr<AudioOutputConfig> outputConfig) {
 
-  auto config = outputConfig;
+  auto config = std::move(outputConfig);
   if (config == nullptr) {
     config = std::make_shared<AudioOutputConfig>();
   }
@@ -34,7 +33,7 @@ std::shared_ptr<AudioReader> AudioReader::Make(
   for (auto& track : audio->getTracks()) {
     reader->readers.push_back(std::make_shared<AudioTrackReader>(track, reader->outputConfig));
   }
-  reader->audio = audio;
+  reader->audio = std::move(audio);
   return reader;
 }
 
@@ -88,7 +87,7 @@ std::shared_ptr<AudioOutputConfig> AudioReader::getOutputConfig() {
   return outputConfig;
 }
 
-AudioReader::AudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig)
+AudioReader::AudioReader(std::shared_ptr<AudioOutputConfig> outputConfig)
     : outputConfig(outputConfig) {
   sampleLength =
       Utils::SampleCountToLength(outputConfig->outputSamplesCount, outputConfig->channels);

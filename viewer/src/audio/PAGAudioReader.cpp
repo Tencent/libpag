@@ -19,10 +19,14 @@
 #include "PAGAudioReader.h"
 #include <QCoreApplication>
 #include <QEvent>
+#include <utility>
 #include "model/AudioClip.h"
 #include "utils/AudioUtils.h"
 
 namespace pag {
+
+constexpr int64_t TimeLagNeedToUpdate = 50 * 1000;
+constexpr int64_t TimeAheadTolerance = 5 * 1000;
 
 static int64_t GetTimeNow() {
   static auto startTime = std::chrono::high_resolution_clock::now();
@@ -40,8 +44,8 @@ std::shared_ptr<PAGAudioReader> PAGAudioReader::Make(int sampleRate, int sampleC
   return std::make_shared<PAGAudioReader>(config, volume);
 }
 
-PAGAudioReader::PAGAudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig, float volume)
-    : volume(volume), outputConfig(outputConfig) {
+PAGAudioReader::PAGAudioReader(std::shared_ptr<AudioOutputConfig> outputConfig, float volume)
+    : volume(volume), outputConfig(std::move(outputConfig)) {
   this->moveToThread(this);
   isRunning = true;
   connect(this, &PAGAudioReader::read, this, &PAGAudioReader::onRead, Qt::QueuedConnection);
@@ -58,11 +62,11 @@ bool PAGAudioReader::isEmpty() const {
   return empty;
 }
 
-void PAGAudioReader::setComposition(const std::shared_ptr<PAGComposition>& newComposition) {
+void PAGAudioReader::setComposition(std::shared_ptr<PAGComposition> newComposition) {
   if (newComposition == composition) {
     return;
   }
-  composition = newComposition;
+  composition = std::move(newComposition);
   lastTime = GetTimeNow();
   lastSampleTime = 0;
   currentProgress = 0;
@@ -70,8 +74,8 @@ void PAGAudioReader::setComposition(const std::shared_ptr<PAGComposition>& newCo
   onSetIsPlaying(true);
 }
 
-void PAGAudioReader::setAudioRender(const std::shared_ptr<PAGAudioRender>& audioRender) {
-  this->audioRender = audioRender;
+void PAGAudioReader::setAudioRender(std::shared_ptr<PAGAudioRender> audioRender) {
+  this->audioRender = std::move(audioRender);
 }
 
 std::shared_ptr<PAGAudioSample> PAGAudioReader::readNextSample() {
@@ -165,11 +169,11 @@ void PAGAudioReader::syncAudio(int64_t sampleTime) {
     updateClock(true);
   }
   int64_t time = sampleTime - lastSampleTime;
-  if (time < -timeLagNeedToUpdate) {
+  if (time < -TimeLagNeedToUpdate) {
     lastTime = GetTimeNow();
     lastSampleTime = sampleTime;
-  } else if (time > timeAheadTolerance) {
-    std::this_thread::sleep_for(std::chrono::microseconds(time - timeAheadTolerance));
+  } else if (time > TimeAheadTolerance) {
+    std::this_thread::sleep_for(std::chrono::microseconds(time - TimeAheadTolerance));
   }
 }
 

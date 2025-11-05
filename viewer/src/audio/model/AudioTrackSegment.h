@@ -25,8 +25,8 @@ namespace pag {
 
 struct AudioTrackSegment {
   explicit AudioTrackSegment(const TimeRange& targetRange);
-  AudioTrackSegment(const std::shared_ptr<AudioSource>& source, int trackID,
-                    const TimeRange& sourceRange, const TimeRange& targetRange);
+  AudioTrackSegment(std::shared_ptr<AudioSource> source, int trackID, const TimeRange& sourceRange,
+                    const TimeRange& targetRange);
   bool isEmpty() const;
 
   int sourceTrackID = -1;

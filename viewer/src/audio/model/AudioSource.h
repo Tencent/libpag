@@ -26,7 +26,7 @@ namespace pag {
 class AudioSource {
  public:
   explicit AudioSource(const std::string& filePath);
-  explicit AudioSource(const std::shared_ptr<ByteData>& data);
+  explicit AudioSource(std::shared_ptr<ByteData> data);
 
   bool operator==(const AudioSource& source);
   bool isEmpty() const;

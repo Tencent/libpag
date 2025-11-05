@@ -25,7 +25,7 @@ AudioSource::AudioSource(const std::string& filePath) : filePath(filePath) {
   this->demuxer = std::move(demuxer);
 }
 
-AudioSource::AudioSource(const std::shared_ptr<ByteData>& data) : data(data) {
+AudioSource::AudioSource(std::shared_ptr<ByteData> data) : data(data) {
   auto demuxer = ffmovie::FFAudioDemuxer::Make(data->data(), data->length());
   this->demuxer = std::move(demuxer);
 }

@@ -22,11 +22,11 @@
 namespace pag {
 
 std::shared_ptr<AudioSegmentReader> AudioSegmentReader::Make(
-    AudioTrackSegment* segment, const std::shared_ptr<AudioOutputConfig>& outputConfig) {
+    AudioTrackSegment* segment, std::shared_ptr<AudioOutputConfig> outputConfig) {
   if (segment == nullptr) {
     return nullptr;
   }
-  auto reader = std::make_shared<AudioSegmentReader>(segment, outputConfig);
+  auto reader = std::make_shared<AudioSegmentReader>(segment, std::move(outputConfig));
   if (!reader->isValid()) {
     return nullptr;
   }
@@ -35,7 +35,7 @@ std::shared_ptr<AudioSegmentReader> AudioSegmentReader::Make(
 }
 
 AudioSegmentReader::AudioSegmentReader(AudioTrackSegment* segment,
-                                       const std::shared_ptr<AudioOutputConfig>& outputConfig)
+                                       std::shared_ptr<AudioOutputConfig> outputConfig)
     : segment(segment), outputConfig(outputConfig) {
   reader = AudioSourceReader::Make(segment->source, segment->sourceTrackID, outputConfig);
   if (reader != nullptr) {

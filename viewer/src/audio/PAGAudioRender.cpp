@@ -62,10 +62,6 @@ bool PAGAudioRender::write(std::shared_ptr<PAGAudioSample> data) {
   return true;
 }
 
-int64_t PAGAudioRender::getAudioLatency() const {
-  return Utils::SampleLengthToTime(usedBufferSize, sampleRate, channels);
-}
-
 void PAGAudioRender::onSetIsPlaying(bool isPlaying) {
   this->isPlaying = isPlaying;
   if (isPlaying) {
@@ -108,7 +104,6 @@ void PAGAudioRender::onWriteData(std::shared_ptr<ByteData> data) {
   if (audioOutput->bytesFree() >= static_cast<int64_t>(data->length())) {
     audioDevice->write(reinterpret_cast<const char*>(data->data()), data->length());
   }
-  usedBufferSize = audioOutput->bufferSize() - audioOutput->bytesFree();
 }
 
 }  // namespace pag

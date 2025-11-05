@@ -52,7 +52,7 @@ void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
 
 void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
   QString baseUrl = data.data();
-  qDebug() << "get update base url: " << baseUrl;
+  qDebug() << "Get update base url: " << baseUrl;
 
   availableUpdates.clear();
   availableUpdateUrls.clear();
@@ -105,7 +105,7 @@ void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
   QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
     availableUpdates.clear();
     availableUpdateUrls.clear();
-    // CheckForUpdates(keepSilent, selectedUrl.toStdString());
+    CheckForUpdates(keepSilent, selectedUrl.toStdString());
   });
 }
 

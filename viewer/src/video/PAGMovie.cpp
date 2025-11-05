@@ -42,7 +42,7 @@ std::shared_ptr<PAGMovie> PAGMovie::MakeFromFile(const std::string& filePath, in
   return std::shared_ptr<PAGMovie>(new PAGMovie(movieInfo, volume));
 }
 
-PAGMovie::PAGMovie(const std::shared_ptr<MovieInfo>& info, float volume)
+PAGMovie::PAGMovie(std::shared_ptr<MovieInfo> info, float volume)
     : PAGImage(info->width(), info->height()), volume(volume), movieInfo(info) {
   info->setMovieID(uniqueID());
 }

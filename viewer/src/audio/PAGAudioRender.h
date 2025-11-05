@@ -33,7 +33,6 @@ class PAGAudioRender : public QThread {
   ~PAGAudioRender() override;
   void setAudioVolume(float volume);
   bool write(std::shared_ptr<PAGAudioSample> data);
-  int64_t getAudioLatency() const;
 
   Q_SLOT void onSetIsPlaying(bool isPlaying);
 
@@ -51,7 +50,6 @@ class PAGAudioRender : public QThread {
   int sampleRate = 44100;
   float audioVolume = 1.0f;
   std::atomic_bool isPlaying = false;
-  int64_t usedBufferSize = 0;
   QAudioFormat format = {};
   QIODevice* audioDevice = nullptr;
   std::shared_ptr<QAudioSink> audioOutput = nullptr;

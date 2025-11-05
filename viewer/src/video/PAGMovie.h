@@ -40,7 +40,7 @@ class PAGMovie : public PAGImage {
   Frame getContentFrame(int64_t time) const override;
 
  private:
-  PAGMovie(const std::shared_ptr<MovieInfo>& movieInfo, float volume);
+  PAGMovie(std::shared_ptr<MovieInfo> movieInfo, float volume);
 
   float volume = 1.0f;
   std::shared_ptr<MovieInfo> movieInfo = nullptr;

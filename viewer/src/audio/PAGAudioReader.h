@@ -31,12 +31,12 @@ class PAGAudioReader : public QThread {
   static std::shared_ptr<PAGAudioReader> Make(int sampleRate = 44100, int sampleCount = 1024,
                                               int channels = 2, float volume = 1.0f);
 
-  PAGAudioReader(const std::shared_ptr<AudioOutputConfig>& outputConfig, float volume);
+  PAGAudioReader(std::shared_ptr<AudioOutputConfig> outputConfig, float volume);
   ~PAGAudioReader() override;
 
   bool isEmpty() const;
-  void setComposition(const std::shared_ptr<PAGComposition>& newComposition);
-  void setAudioRender(const std::shared_ptr<PAGAudioRender>& audioRender);
+  void setComposition(std::shared_ptr<PAGComposition> newComposition);
+  void setAudioRender(std::shared_ptr<PAGAudioRender> audioRender);
   std::shared_ptr<PAGAudioSample> readNextSample();
 
   Q_SIGNAL void sendData(std::shared_ptr<PAGAudioSample>);
@@ -64,8 +64,6 @@ class PAGAudioReader : public QThread {
   int64_t lastSampleTime = INT64_MAX;
   int64_t currentProgress = 0;
   int64_t progressPerFrame = 1;
-  const int64_t timeLagNeedToUpdate = 50 * 1000;
-  const int64_t timeAheadTolerance = 5 * 1000;
   std::shared_ptr<AudioReader> audioReader = nullptr;
   std::shared_ptr<PAGAudioRender> audioRender = nullptr;
   std::shared_ptr<PAGComposition> composition = nullptr;

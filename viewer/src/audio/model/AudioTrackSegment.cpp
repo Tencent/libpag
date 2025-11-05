@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AudioTrackSegment.h"
+#include <utility>
 
 namespace pag {
 
-AudioTrackSegment::AudioTrackSegment(const std::shared_ptr<AudioSource>& source, int trackID,
+AudioTrackSegment::AudioTrackSegment(std::shared_ptr<AudioSource> source, int trackID,
                                      const TimeRange& sourceRange, const TimeRange& targetRanget)
-    : sourceTrackID(trackID), source(source), sourceRange(sourceRange), targetRange(targetRanget) {
+    : sourceTrackID(trackID), source(std::move(source)), sourceRange(sourceRange),
+      targetRange(targetRanget) {
 }
 
 AudioTrackSegment::AudioTrackSegment(const TimeRange& targetRange) : targetRange(targetRange) {

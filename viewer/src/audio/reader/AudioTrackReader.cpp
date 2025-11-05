@@ -24,14 +24,14 @@ namespace pag {
 
 static constexpr int64_t MaxOutputSampleCount = 1024;
 
-AudioTrackReader::AudioTrackReader(const std::shared_ptr<AudioTrack>& track,
-                                   const std::shared_ptr<AudioOutputConfig>& outputConfig)
+AudioTrackReader::AudioTrackReader(std::shared_ptr<AudioTrack> track,
+                                   std::shared_ptr<AudioOutputConfig> outputConfig)
     : track(track), outputConfig(outputConfig) {
   outputSampleLength =
       Utils::SampleCountToLength(outputConfig->outputSamplesCount, outputConfig->channels);
   int64_t bufferSize = std::max(outputSampleLength, MaxOutputSampleCount) * 6;
   buffer.alloc(bufferSize);
-  smoothVolume = AudioSmoothVolume::Make(track, outputConfig);
+  smoothVolume = AudioSmoothVolume::Make(std::move(track), std::move(outputConfig));
 }
 
 void AudioTrackReader::seek(int64_t time) {
