@@ -105,7 +105,9 @@ void PAGCheckUpdateModel::getUpdateVersion(QString url, QString version) {
   QMetaObject::invokeMethod(qApp, [this, selectedUrl]() -> void {
     availableUpdates.clear();
     availableUpdateUrls.clear();
+#if !defined(DEBUG)
     CheckForUpdates(keepSilent, selectedUrl.toStdString());
+#endif
   });
 }
 
