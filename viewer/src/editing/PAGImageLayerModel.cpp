@@ -18,11 +18,51 @@
 
 #include "PAGImageLayerModel.h"
 #include <QImageReader>
+#include <QMediaPlayer>
+#include <QThread>
+#include <QTimer>
+#include <QVideoFrame>
+#include <QVideoFrameFormat>
+#include <QVideoSink>
 #include "codec/CodecContext.h"
 #include "pag/file.h"
 #include "pag/types.h"
+#include "video/PAGMovie.h"
 
 namespace pag {
+
+QImage PAGImageLayerModel::GetVideoFirstFrame(const QString& filePath) {
+  QMediaPlayer player;
+  QVideoSink sink;
+  QEventLoop loop;
+  QImage result = {};
+
+  connect(&sink, &QVideoSink::videoFrameChanged, [&](const QVideoFrame& frame) {
+    QVideoFrame videoFrame(frame);
+    videoFrame.map(QVideoFrame::ReadOnly);
+    QImage image = videoFrame.toImage();
+    if (!image.isNull()) {
+      result = image.copy();
+      loop.quit();
+    }
+    videoFrame.unmap();
+  });
+
+  player.setVideoSink(&sink);
+  player.setSource(filePath);
+  player.setLoops(1);
+  player.play();
+
+  QTimer timer;
+  timer.setSingleShot(true);
+  connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+  timer.start(1000);
+
+  loop.exec();
+  player.stop();
+
+  return result;
+}
 
 PAGImageLayerModel::PAGImageLayerModel(QObject* parent) : QAbstractListModel(parent) {
 }
@@ -96,20 +136,24 @@ void PAGImageLayerModel::changeImage(int index, const QString& filePath) {
 
   QImageReader reader(path);
   reader.setDecideFormatFromContent(true);
-  if (!reader.canRead()) {
-    qDebug() << "Can not read image[" << path << "]: " << reader.errorString();
-    return;
-  }
-  if (!reader.read(&newImage)) {
-    qDebug() << "Read image[" << path << "] failed: " << reader.errorString();
-    return;
+  if (reader.canRead()) {
+    if (!reader.read(&newImage)) {
+      qDebug() << "Read image[" << path << "] failed: " << reader.errorString();
+    }
   }
 
   if (newImage.data_ptr() == nullptr) {
+    newImage = GetVideoFirstFrame(path);
+  }
+  if (newImage.data_ptr() == nullptr) {
+    qDebug() << "Can not read image[" << path << "]: " << reader.errorString();
     return;
   }
 
   auto pagImage = PAGImage::FromPath(path.toStdString());
+  if (pagImage == nullptr) {
+    pagImage = PAGMovie::MakeFromFile(path.toStdString());
+  }
   if (pagImage == nullptr) {
     return;
   }
