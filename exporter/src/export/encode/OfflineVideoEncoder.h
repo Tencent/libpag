@@ -25,20 +25,20 @@
 
 namespace exporter {
 
-typedef struct FrameInfo {
-  FrameType frameType;
-  int frameSize;
-  int64_t timeStamp;
-} FrameInfo;
+struct FrameInfo {
+  FrameType frameType = FRAME_TYPE_AUTO;
+  int frameSize = 0;
+  int64_t timeStamp = 0;
+};
 
-typedef struct OfflineEncodeParam {
+struct OfflineEncodeParam {
   int width = 0;
   int height = 0;
   int hasAlpha = 0;
   int quality = 80;
   int maxKeyFrameInterval = 60;
   double frameRate = 24.0;
-} OfflineEncodeParam;
+};
 
 class OfflineVideoEncoder : public VideoEncoder {
  public:
