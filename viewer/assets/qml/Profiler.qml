@@ -27,7 +27,7 @@ Item {
         target: runTimeDataModel
 
         function onDataChanged() {
-            currentFrameText.text = runTimeDataModel.currentFrame + "/" + runTimeDataModel.totalFrame
+            currentFrameText.text = runTimeDataModel.currentFrame + "/" + runTimeDataModel.totalFrame;
         }
     }
 
