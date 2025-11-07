@@ -150,21 +150,33 @@ ExePath="${ExeDir}/PAGViewer"
 x86_64ExePath="${x86_64BuildDir}/PAGViewer"
 arm64ExePath="${arm64BuildDir}/PAGViewer"
 
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" ${x86_64ExePath}
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" ${arm64ExePath}
+
 mkdir -p ${ExeDir}
 lipo -create ${x86_64ExePath} ${arm64ExePath} -output ${ExePath}
 
 # 3.2 Obtain the dependencies of PAGViewer
 print "[ Obtain the dependencies of PAGViewer ]"
-${Deployqt} ${AppDir} -qmldir=${SourceDir}/qml
+${Deployqt} ${AppDir} -qmldir=${SourceDir}/assets/qml
 if [ $? -ne 0 ];
 then
     echo "Obtain the dependencies of PAGViewer failed"
     exit 1
 fi
 
+# 3.2.1 Copy Sparkle
+print "[ Copy Sparkle.framework ]"
 FrameworkDir="${AppDir}/Contents/Frameworks"
 SparklePath="${SourceDir}/vendor/sparkle/mac/Sparkle.framework"
 cp -f -R -P ${SparklePath} ${FrameworkDir}
+
+# 3.2.2 Merge and copy ffmovie
+print "[ Merge and copy ffmovie.dylib ]"
+x64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/x64/libffmovie.dylib"
+arm64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/arm64/libffmovie.dylib"
+FfmoviePath="${FrameworkDir}/libffmovie.dylib"
+lipo -create ${x64FfmoviePath} ${arm64FfmoviePath} -output ${FfmoviePath}
 
 # 3.3 Obtain public and private keys
 print "[ Obtain public and private keys ]"
@@ -214,8 +226,8 @@ PlistPath=${SourceDir}/package/templates/Info.plist
 cp -f ${PlistPath} ${ContentsDir}
 
 ResourcesDir="${AppDir}/Contents/Resources"
-cp -f ${SourceDir}/images/appIcon.icns ${ResourcesDir}
-cp -f ${SourceDir}/images/pagIcon.icns ${ResourcesDir}
+cp -f ${SourceDir}/assets/images/appIcon.icns ${ResourcesDir}
+cp -f ${SourceDir}/assets/images/pagIcon.icns ${ResourcesDir}
 if [ -n "${DSAPublicKey}" ] && [ -f "${DSAPublicKey}" ];
 then
     cp -f ${DSAPublicKey} ${ResourcesDir}
@@ -232,6 +244,10 @@ x86_64PluginPath="${x86_64BuildDirForPlugin}/PAGExporter.plugin"
 arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
 x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
 arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
+
+install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/x64" ${x86_64PluginExePath}
+install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${arm64PluginExePath}
+
 cp -fr ${x86_64PluginPath} ${PluginPath}
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
 
@@ -265,7 +281,10 @@ fi
 # 3.7 Set rpath
 print "[ Set rpath ]"
 # todo delete redundant paths
+install_name_tool -delete_rpath "${QtPath}/lib" ${ExePath}
 install_name_tool -delete_rpath "${SourceDir}/vendor/sparkle/mac" ${ExePath}
+install_name_tool -add_rpath "@executable_path/../Frameworks" ${ExePath}
+
 install_name_tool -delete_rpath "${QtPath}/lib" ${PluginExePath}
 install_name_tool -add_rpath "@executable_path/../Frameworks" ${PluginExePath}
 
@@ -434,7 +453,7 @@ cp -R -P "${AppDir}" "${BuildDir}/dmg_content"
 
 CreateDmgTool="${SourceDir}/tools/create-dmg/create-dmg"
 
-createDmg "${CreateDmgTool}" "${BuildDir}/dmg_content" "${BuildDir}/PAGViewer.dmg" "${SourceDir}/images/dmgIcon.icns" "${SourceDir}/images/dmg-background.png"
+createDmg "${CreateDmgTool}" "${BuildDir}/dmg_content" "${BuildDir}/PAGViewer.dmg" "${SourceDir}/assets/images/dmgIcon.icns" "${SourceDir}/assets/images/dmg-background.png"
 if [  $? -eq 0 ];
 then
     echo "create dmg success"
