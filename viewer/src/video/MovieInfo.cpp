@@ -39,6 +39,7 @@ static tgfx::Orientation RotationToOrientation(int rotation) {
       break;
     default:
       orientation = tgfx::Orientation::TopLeft;
+      break;
   }
   return orientation;
 }
@@ -131,15 +132,15 @@ bool MovieInfo::staticContent() const {
   return duration() <= 1;
 }
 
-void MovieInfo::setMovieID(ID uniqueID) {
-  movieID = uniqueID;
-}
-
 Frame MovieInfo::firstVisibleFrame(const Layer*) const {
   return TimeToFrame(startTime, frameRate);
 }
 
 MovieInfo::MovieInfo(const std::string& filePath) : SequenceInfo(nullptr), filePath(filePath) {
+}
+
+void MovieInfo::setMovieID(ID uniqueID) {
+  movieID = uniqueID;
 }
 
 }  // namespace pag

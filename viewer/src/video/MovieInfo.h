@@ -41,11 +41,11 @@ class MovieInfo : public SequenceInfo {
   Frame duration() const override;
   bool isVideo() const override;
   bool staticContent() const override;
-  void setMovieID(ID movieID);
   Frame firstVisibleFrame(const Layer* layer) const override;
 
  private:
   explicit MovieInfo(const std::string& filePath);
+  void setMovieID(ID movieID);
 
   ID movieID = 0;
   float speed = 0;
