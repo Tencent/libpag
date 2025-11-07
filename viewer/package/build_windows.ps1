@@ -59,7 +59,8 @@ if ([string]::IsNullOrEmpty($env:PAG_DeployQt_Path) -or [string]::IsNullOrEmpty(
 $Deployqt = $env:PAG_DeployQt_Path
 $OpenSSL = $env:PAG_Openssl_Path
 $QtPath = $env:PAG_Qt_Path
-$QtCMakePath = Join-Path $QtPath -ChildPath "lib" | Join-Path -ChildPath "cmake"
+$QtCMakePath = Join-Path $QtPath -ChildPath "lib" |
+               Join-Path -ChildPath "cmake"
 $AESDKPath = $env:PAG_AE_SDK_Path
 
 
@@ -70,7 +71,9 @@ $x64BuildDir = Join-Path $BuildDir "x64"
 # 2.1 Set environment variables
 Print-Text "[ Set environment variables ]"
 $VSPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-$VSDevEnv = Join-Path $VSPath -ChildPath "Common7" | Join-Path -ChildPath "IDE" | Join-Path -ChildPath "devenv.exe"
+$VSDevEnv = Join-Path $VSPath -ChildPath "Common7" |
+            Join-Path -ChildPath "IDE" |
+            Join-Path -ChildPath "devenv.exe"
 $WindowsSdkDir = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Windows Kits", "10")
 $LatestSdkVersion = (Get-ChildItem (Join-Path $WindowsSdkDir "Lib") | Sort-Object Name -Descending | Select-Object -First 1).Name
 $env:LIB = "${WindowsSdkDir}\Lib\${LatestSdkVersion}\um\x64;${WindowsSdkDir}\Lib\${LatestSdkVersion}\ucrt\x64;" + $env:LIB
@@ -91,7 +94,8 @@ if (-not $?) {
 
 # 2.3 Compile H264EncoderTools
 Print-Text "[ Compile H264EncoderTools ]"
-$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" | Join-Path -ChildPath "H264EncoderTools"
+$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
+                         Join-Path -ChildPath "H264EncoderTools"
 $EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
 & $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
 if (-not $?) {
@@ -133,18 +137,26 @@ Copy-Item -Path $GeneratedExePath -Destination $ExePath -Force
 
 # 3.2 Copy PAGExporter and tools
 Print-Text "[ Copy PAGExporter and tools ]"
-$GeneratedPluginPath = Join-Path $x64BuildDirForPlugin -ChildPath "Release" | Join-Path -ChildPath "PAGExporter.aex"
+$GeneratedPluginPath = Join-Path $x64BuildDirForPlugin -ChildPath "Release" |
+                       Join-Path -ChildPath "PAGExporter.aex"
 Copy-Item -Path $GeneratedPluginPath -Destination $ExeDir -Force
 
-$LibFfaudioPath = Join-Path $PluginSourceDir -ChildPath "vendor" | Join-Path -ChildPath "ffaudio" | Join-Path -ChildPath "win" | Join-Path -ChildPath "x64" | Join-Path -ChildPath "ffaudio.dll"
+$LibFfaudioPath = Join-Path $PluginSourceDir -ChildPath "vendor" |
+                  Join-Path -ChildPath "ffaudio" |
+                  Join-Path -ChildPath "win" |
+                  Join-Path -ChildPath "x64" |
+                  Join-Path -ChildPath "ffaudio.dll"
 Copy-Item -Path $LibFfaudioPath -Destination $ExeDir -Force
 
-$GeneratedEncorderToolsPath = Join-Path $EncoderToolsSourceDir -ChildPath "x64" | Join-Path -ChildPath "Release" | Join-Path -ChildPath "H264EncoderTools.exe"
+$GeneratedEncorderToolsPath = Join-Path $EncoderToolsSourceDir -ChildPath "x64" |
+                              Join-Path -ChildPath "Release" |
+                              Join-Path -ChildPath "H264EncoderTools.exe"
 Copy-Item -Path $GeneratedEncorderToolsPath -Destination $ExeDir -Force
 
 # 3.3 Obtain the dependencies of PAGViewer
 Print-Text "[ Obtain the dependencies of PAGViewer ]"
-$QmlDir = Join-Path $SourceDir "qml"
+$QmlDir = Join-Path $SourceDir "assets" |
+          Join-Path -ChildPath "qml"
 & $Deployqt $ExePath --qmldir=$QmlDir
 
 $WinSparklePath = Join-Path $SourceDir "vendor" | 
@@ -154,6 +166,13 @@ $WinSparklePath = Join-Path $SourceDir "vendor" |
                   Join-Path -ChildPath "Release" | 
                   Join-Path -ChildPath "WinSparkle.dll"
 Copy-Item -Path $WinSparklePath -Destination $ExeDir -Force
+
+$FfmoviePath = Join-Path $SourceDir "vendor" |
+               Join-Path -ChildPath "ffmovie" |
+               Join-Path -ChildPath "win" |
+               Join-Path -ChildPath "x64" |
+               Join-Path -ChildPath "ffmovie.dll"
+Copy-Item -Path $FfmoviePath -Destination $ExeDir -Force
 
 # 3.3 Install tool
 # 3.3.1 Install InnoSetup
@@ -219,8 +238,8 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
     $FileLength = (Get-Item $PAGViewerInstallerPath).Length
 
     $TemplateAppcastPath = Join-Path $SourceDir "package" |
-            Join-Path -ChildPath "templates" |
-            Join-Path -ChildPath "PagAppcastWindows.xml"
+                           Join-Path -ChildPath "templates" |
+                           Join-Path -ChildPath "PagAppcastWindows.xml"
     $AppcastPath = Join-Path $BuildDir "PagAppcastWindows.xml"
     Copy-Item -Path $TemplateAppcastPath -Destination $AppcastPath -Force
 

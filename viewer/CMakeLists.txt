@@ -57,8 +57,12 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Q
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
         Qt${QT_VERSION_MAJOR}::QuickControls2)
-find_program(LUPDATE_EXECUTABLE lupdate REQUIRED)
-find_program(LRELEASE_EXECUTABLE lrelease REQUIRED)
+find_program(LUPDATE_EXECUTABLE lupdate
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
 execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
 execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
 qt_add_resources(QT_RESOURCES assets/res.qrc)
@@ -167,21 +171,30 @@ elseif (WIN32)
 endif ()
 list(APPEND PAG_VIEWER_SOURCE_FILES ${PLATFORM_SOURCE_FILES})
 
-add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
-if (PAG_DEPEND_TARGETS)
-    add_dependencies(PAGViewer ${PAG_DEPEND_TARGETS})
-endif ()
+list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/include)
 if (APPLE)
+    add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
     list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/mac/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib)
 elseif (WIN32)
+    set(RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/PAGViewer.rc"
+                  "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/appIcon.ico"
+                  "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/pagIcon.ico")
+
+    add_executable(PAGViewer WIN32 ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES} ${RESOURCES})
     list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/win/${ARCH}/ffmovie.lib)
+endif ()
+
+if (PAG_DEPEND_TARGETS)
+    add_dependencies(PAGViewer ${PAG_DEPEND_TARGETS})
 endif ()
 
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})
