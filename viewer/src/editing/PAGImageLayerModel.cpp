@@ -69,7 +69,7 @@ PAGImageLayerModel::PAGImageLayerModel(QObject* parent) : QAbstractListModel(par
 
 int PAGImageLayerModel::rowCount(const QModelIndex& parent) const {
   Q_UNUSED(parent);
-  return imageLayers.count();
+  return static_cast<int>(imageLayers.count());
 }
 
 QVariant PAGImageLayerModel::data(const QModelIndex& index, int role) const {
@@ -96,10 +96,8 @@ QImage PAGImageLayerModel::requestImage(int index) {
 }
 
 void PAGImageLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
-  beginResetModel();
   imageLayers.clear();
   revertSet.clear();
-  endResetModel();
 
   if (pagFile == nullptr) {
     return;
@@ -113,14 +111,14 @@ void PAGImageLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
 
   auto file = _pagFile->getFile();
 
-  beginResetModel();
   for (const auto& editableIndex : editableList) {
     auto* layer = file->getImageAt(editableIndex).at(0);
     auto imageData = layer->imageBytes->fileBytes;
 
     QImage image = QImage::fromData(imageData->data(), static_cast<int>(imageData->length()));
-    imageLayers[imageLayers.count()] = image;
+    imageLayers[static_cast<int>(imageLayers.count())] = image;
   }
+  beginResetModel();
   endResetModel();
 }
 
@@ -159,9 +157,9 @@ void PAGImageLayerModel::changeImage(int index, const QString& filePath) {
   }
   replaceImage(index, std::move(pagImage));
 
-  beginResetModel();
   revertSet.insert(index);
   imageLayers[index] = newImage;
+  beginResetModel();
   endResetModel();
 }
 
@@ -179,9 +177,9 @@ void PAGImageLayerModel::revertImage(int index) {
   auto imageData = layer->imageBytes->fileBytes;
   auto image = QImage::fromData(imageData->data(), static_cast<int>(imageData->length()));
   replaceImage(index, nullptr);
-  beginResetModel();
   revertSet.remove(index);
   imageLayers[index] = image;
+  beginResetModel();
   endResetModel();
 }
 
