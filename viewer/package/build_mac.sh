@@ -54,12 +54,18 @@ AESDKPath="${PAG_AE_SDK_Path}"
 
 # 2 Compile
 print "[ Compile ]"
+PAGEnterprisePath=""
+if declare -F GetPAGEnterprisePath > /dev/null;
+then
+    PAGEnterprisePath=$(GetPAGEnterprisePath)
+    print "Get PAGEnterprisePath: ${PAGEnterprisePath}"
+fi
 
 # 2.1 Compile PAGViewer-x86_64
 print "[ Compile x86_64 ]"
 x86_64BuildDir="${BuildDir}/build_x86_64"
 
-cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
+cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-x86_64 failed"
@@ -77,7 +83,7 @@ fi
 print "[ Compile arm64 ]"
 arm64BuildDir="${BuildDir}/build_arm64"
 
-cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
+cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-arm64 failed"
@@ -186,15 +192,15 @@ print "[ Obtain DSA public and private keys ]"
 SignForUpdate=false
 DSAPublicKey=""
 DSAPrivateKey=""
-if [ declare -F GetDSAPublicKeyPath > /dev/null 2>&1 ];
+if declare -F GetDSAPublicKeyPath > /dev/null;
 then
-    DSAPublicKey=GetDSAPublicKeyPath
+    DSAPublicKey=$(GetDSAPublicKeyPath)
     print "Get DSAPublicKey: ${DSAPublicKey}"
 fi
 
-if [ declare -F GetDSAPrivateKeyPath > /dev/null 2>&1 ];
+if declare -F GetDSAPrivateKeyPath > /dev/null;
 then
-    DSAPrivateKey=GetDSAPrivateKeyPath
+    DSAPrivateKey=$(GetDSAPrivateKeyPath)
     print "Get DSAPrivateKey: ${DSAPrivateKey}"
 fi
 
@@ -202,15 +208,15 @@ fi
 print "[ Obtain EDDSA public and private keys ]"
 EDDSAPublicKey=""
 EDDSAPrivateKey=""
-if [ declare -F GetEDDSAPublicKeyPath > /dev/null 2>&1 ];
+if declare -F GetEDDSAPublicKeyPath > /dev/null;
 then
-    EDDSAPublicKey=GetEDDSAPublicKeyPath
+    EDDSAPublicKey=$(GetEDDSAPublicKeyPath)
     print "Get EDDSAPublicKey: ${EDDSAPublicKey}"
 fi
 
-if [ declare -F GetEDDSAPrivateKeyPath > /dev/null 2>&1 ];
+if declare -F GetEDDSAPrivateKeyPath > /dev/null;
 then
-    EDDSAPrivateKey=GetEDDSAPrivateKeyPath
+    EDDSAPrivateKey=$(GetEDDSAPrivateKeyPath)
     print "Get EDDSAPrivateKey: ${EDDSAPrivateKey}"
 fi
 
@@ -291,9 +297,10 @@ install_name_tool -add_rpath "@executable_path/../Frameworks" ${PluginExePath}
 # 4 Sign
 print "[ Sign ]"
 SignCertName=""
-if [ declare -F GetSignCertName > /dev/null 2>&1 ];
+if declare -F GetSignCertName > /dev/null;
 then
-    SignCertName=GetSignCertName
+    SignCertName=$(GetSignCertName)
+    print "Get SignCertName: ${SignCertName}"
 fi
 
 if security find-certificate -c "${SignCertName}" >/dev/null 2>&1;
