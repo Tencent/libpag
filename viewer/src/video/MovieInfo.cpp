@@ -46,23 +46,20 @@ static tgfx::Orientation RotationToOrientation(int rotation) {
 
 std::shared_ptr<MovieInfo> MovieInfo::Load(const std::string& filePath, int64_t startTime,
                                            int64_t duration, float speed) {
-  auto demuxer = MovieDemuxer::Make(filePath, Platform::Current()->naluType());
-  if (demuxer == nullptr) {
+  auto info = std::shared_ptr<MovieInfo>(new MovieInfo(filePath));
+  if (info->demuxer == nullptr) {
     return nullptr;
   }
-  auto format = demuxer->getFormat();
+  auto format = info->demuxer->getFormat();
   if (startTime > format.duration || format.width <= 0 || format.height <= 0) {
     return nullptr;
   }
-  auto info = std::shared_ptr<MovieInfo>(new MovieInfo(filePath));
   info->weakThis = info;
   info->speed = speed;
   info->startTime = std::max(static_cast<int64_t>(0), startTime);
   info->frameRate = format.frameRate;
   info->videoWidth = format.width;
   info->videoHeight = format.height;
-  info->trackID = demuxer->getTrackID();
-  info->rotation = demuxer->getRotation();
 
   auto endTime = ((startTime == -1 && duration == -1) ? format.duration : (startTime + duration));
   info->durationMs = std::min(endTime, format.duration) - info->startTime;
@@ -72,7 +69,9 @@ std::shared_ptr<MovieInfo> MovieInfo::Load(const std::string& filePath, int64_t 
 }
 
 std::shared_ptr<SequenceReader> MovieInfo::makeReader(std::shared_ptr<File>, PAGFile*, bool) {
-  auto demuxer = MovieDemuxer::Make(filePath, Platform::Current()->naluType());
+  if (demuxer == nullptr) {
+    demuxer = MovieDemuxer::Make(filePath, Platform::Current()->naluType());
+  }
   if (demuxer == nullptr) {
     return nullptr;
   }
@@ -137,6 +136,12 @@ Frame MovieInfo::firstVisibleFrame(const Layer*) const {
 }
 
 MovieInfo::MovieInfo(const std::string& filePath) : SequenceInfo(nullptr), filePath(filePath) {
+  demuxer = MovieDemuxer::Make(filePath, Platform::Current()->naluType());
+  if (demuxer == nullptr) {
+    return;
+  }
+  trackID = demuxer->getTrackID();
+  rotation = demuxer->getRotation();
 }
 
 void MovieInfo::setMovieID(ID uniqueID) {

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "MovieDemuxer.h"
 #include "pag/pag.h"
 #include "rendering/sequences/SequenceInfo.h"
 
@@ -57,6 +58,7 @@ class MovieInfo : public SequenceInfo {
   int64_t startTime = 0;
   int64_t durationMs = 0;
   std::string filePath = "";
+  std::unique_ptr<MovieDemuxer> demuxer = nullptr;
 
   friend class PAGMovie;
 };
