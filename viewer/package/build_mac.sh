@@ -61,43 +61,10 @@ then
     print "Get PAGEnterprisePath: ${PAGEnterprisePath}"
 fi
 
-# 2.1 Compile PAGViewer-x86_64
-print "[ Compile x86_64 ]"
 x86_64BuildDir="${BuildDir}/build_x86_64"
-
-cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
-if [ $? -ne 0 ];
-then
-    echo "Build PAGViewer-x86_64 failed"
-    exit 1
-fi
-
-cmake --build ${x86_64BuildDir} --target PAGViewer -j 8
-if [ $? -ne 0 ];
-then
-    echo "Compile PAGViewer-x86_64 failed"
-    exit 1
-fi
-
-# 2.2 Compile PAGViewer-arm
-print "[ Compile arm64 ]"
 arm64BuildDir="${BuildDir}/build_arm64"
 
-cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
-if [ $? -ne 0 ];
-then
-    echo "Build PAGViewer-arm64 failed"
-    exit 1
-fi
-
-cmake --build ${arm64BuildDir} --target PAGViewer -j 8
-if [ $? -ne 0 ];
-then
-    echo "Compile PAGViewer-arm64 failed"
-    exit 1
-fi
-
-# 2.3 Compile PAGExporter-x86_64
+# 2.1 Compile PAGExporter-x86_64
 print "[ Compile PAGExporter-x86_64 ]"
 PluginSourceDir="$(dirname "${SourceDir}")/exporter"
 x86_64BuildDirForPlugin="${x86_64BuildDir}/Plugin"
@@ -116,7 +83,7 @@ then
     exit 1
 fi
 
-# 2.4 Compile PAGExporter-arm64
+# 2.2 Compile PAGExporter-arm64
 print "[ Compile PAGExporter-arm64 ]"
 arm64BuildDirForPlugin="${arm64BuildDir}/Plugin"
 
@@ -131,6 +98,42 @@ cmake --build ${arm64BuildDirForPlugin} --target PAGExporter -j 8
 if [ $? -ne 0 ];
 then
     echo "Compile PAGExporter-arm64 failed"
+    exit 1
+fi
+
+# 2.3 Compile PAGViewer-x86_64
+print "[ Compile x86_64 ]"
+x86_64BuildDir="${BuildDir}/build_x86_64"
+
+cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
+if [ $? -ne 0 ];
+then
+    echo "Build PAGViewer-x86_64 failed"
+    exit 1
+fi
+
+cmake --build ${x86_64BuildDir} --target PAGViewer -j 8
+if [ $? -ne 0 ];
+then
+    echo "Compile PAGViewer-x86_64 failed"
+    exit 1
+fi
+
+# 2.4 Compile PAGViewer-arm
+print "[ Compile arm64 ]"
+arm64BuildDir="${BuildDir}/build_arm64"
+
+cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
+if [ $? -ne 0 ];
+then
+    echo "Build PAGViewer-arm64 failed"
+    exit 1
+fi
+
+cmake --build ${arm64BuildDir} --target PAGViewer -j 8
+if [ $? -ne 0 ];
+then
+    echo "Compile PAGViewer-arm64 failed"
     exit 1
 fi
 
@@ -277,7 +280,7 @@ DSAPublicKeyName=$(basename "${DSAPublicKey}")
 SUPublicEDKey=""
 if [ -n "${EDDSAPublicKey}" ] && [ -f "${EDDSAPublicKey}" ];
 then
-    SUPublicEDKey=$(cat "${EDDSAPublicKey}")
+    SUPublicEDKey=$(awk '/-----BEGIN PUBLIC KEY-----/{flag=1; next} /-----END PUBLIC KEY-----/{flag=0} flag' "${EDDSAPublicKey}")
 fi
 /usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${ContentsDir}/Info.plist"
 /usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${ContentsDir}/Info.plist"
@@ -317,7 +320,11 @@ then
         "${FrameworkDir}/Sparkle.framework/Versions/Current/Sparkle"
         "${FrameworkDir}/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc"
         "${FrameworkDir}/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc"
+        "${AppDir}"
     )
+
+    xattr -rc ${AppDir}
+    xattr -rc ${PluginPath}
 
     for NeedSignFile in ${NeedSignFiles[@]};
     do

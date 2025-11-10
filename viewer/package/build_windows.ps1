@@ -63,6 +63,12 @@ $QtCMakePath = Join-Path $QtPath -ChildPath "lib" |
                Join-Path -ChildPath "cmake"
 $AESDKPath = $env:PAG_AE_SDK_Path
 
+PAGEnterprisePath = ""
+
+
+PAGEnterprisePath = ""
+
+
 
 # 2 Compile
 Print-Text "[ Compile ]"
@@ -78,32 +84,7 @@ $WindowsSdkDir = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Windows Ki
 $LatestSdkVersion = (Get-ChildItem (Join-Path $WindowsSdkDir "Lib") | Sort-Object Name -Descending | Select-Object -First 1).Name
 $env:LIB = "${WindowsSdkDir}\Lib\${LatestSdkVersion}\um\x64;${WindowsSdkDir}\Lib\${LatestSdkVersion}\ucrt\x64;" + $env:LIB
 
-# 2.2 Compile PAGViewer
-Print-Text "[ Compile PAGViewer ]"
-cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath"
-if (-not $?) {
-    Write-Host "Build PAGViewer-x64 failed" -ForegroundColor Red
-    exit 1
-}
-
-cmake --build $x64BuildDir --config Release -j 16
-if (-not $?) {
-    Write-Host "Compile PAGViewer-x64 failed" -ForegroundColor Red
-    exit 1
-}
-
-# 2.3 Compile H264EncoderTools
-Print-Text "[ Compile H264EncoderTools ]"
-$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
-                         Join-Path -ChildPath "H264EncoderTools"
-$EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
-& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
-if (-not $?) {
-    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
-    exit 1
-}
-
-# 2.4 Compile PAGExporter
+# 2.2 Compile PAGExporter
 Print-Text "[ Compile PAGExporter ]"
 $PluginSourceDir = Join-Path $LibpagDir -ChildPath "exporter"
 $x64BuildDirForPlugin = Join-Path $x64BuildDir -ChildPath "Plugin"
@@ -116,6 +97,31 @@ if (-not $?) {
 cmake --build $x64BuildDirForPlugin --config Release -j 16
 if (-not $?) {
     Write-Host "Compile PAGExporter-x64 failed" -ForegroundColor Red
+    exit 1
+}
+
+# 2.3 Compile PAGViewer
+Print-Text "[ Compile PAGViewer ]"
+cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
+if (-not $?) {
+    Write-Host "Build PAGViewer-x64 failed" -ForegroundColor Red
+    exit 1
+}
+
+cmake --build $x64BuildDir --config Release -j 16
+if (-not $?) {
+    Write-Host "Compile PAGViewer-x64 failed" -ForegroundColor Red
+    exit 1
+}
+
+# 2.4 Compile H264EncoderTools
+Print-Text "[ Compile H264EncoderTools ]"
+$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
+                         Join-Path -ChildPath "H264EncoderTools"
+$EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
+& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
+if (-not $?) {
+    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
     exit 1
 }
 
