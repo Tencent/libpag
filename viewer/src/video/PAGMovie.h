@@ -18,41 +18,28 @@
 
 #pragma once
 
-#include <QAbstractListModel>
+#include "MovieInfo.h"
 #include "pag/pag.h"
 
 namespace pag {
 
-class PAGImageLayerModel : public QAbstractListModel {
-  Q_OBJECT
+class PAGMovie : public PAGImage {
  public:
-  enum class PAGImageLayerRoles { IndexRole = Qt::UserRole + 1, ReveryRole };
+  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
+  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
+                                                int64_t duration, float speed = 1.0f);
 
-  static QImage GetVideoFirstFrame(const QString& filePath);
-
-  explicit PAGImageLayerModel(QObject* parent = nullptr);
-
-  int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
-  QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
-  QImage requestImage(int index);
-
-  Q_SIGNAL void imageChanged();
-
-  Q_SLOT void setPAGFile(std::shared_ptr<PAGFile> pagFile);
-
-  Q_INVOKABLE void changeImage(int index, const QString& filePath);
-  Q_INVOKABLE void revertImage(int index);
-  Q_INVOKABLE int convertIndex(int index);
+  int64_t duration();
 
  protected:
-  QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
+  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
+  bool isStill() const override;
+  Frame getContentFrame(int64_t time) const override;
 
  private:
-  void replaceImage(int index, std::shared_ptr<PAGImage> image);
+  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
 
-  QSet<int> revertSet = {};
-  QMap<int, QImage> imageLayers = {};
-  std::shared_ptr<PAGFile> _pagFile = nullptr;
+  std::shared_ptr<MovieInfo> movieInfo = nullptr;
 };
 
 }  // namespace pag
