@@ -47,10 +47,8 @@ QVariant PAGTextLayerModel::data(const QModelIndex& index, int role) const {
 }
 
 void PAGTextLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
-  beginResetModel();
   textLayers.clear();
   revertSet.clear();
-  endResetModel();
 
   if (pagFile == nullptr) {
     return;
@@ -74,11 +72,11 @@ void PAGTextLayerModel::revertText(int index) {
     return;
   }
   replaceText(index, nullptr);
-  beginResetModel();
   revertSet.remove(index);
   auto newTextDocument = _pagFile->getTextData(convertIndex(index));
   textLayers[index] = newTextDocument;
-  endResetModel();
+  auto modelIndex = createIndex(index, 0);
+  dataChanged(modelIndex, modelIndex);
 }
 
 int PAGTextLayerModel::convertIndex(int index) {
@@ -195,9 +193,9 @@ void PAGTextLayerModel::changeText(int index, const QString& text) {
     revertSet.insert(index);
   }
   textDocument->text = text.toStdString();
-  beginResetModel();
-  endResetModel();
   replaceText(index, std::move(textDocument));
+  auto modelIndex = createIndex(index, 0);
+  dataChanged(modelIndex, modelIndex);
 }
 
 void PAGTextLayerModel::changeFontSize(int index, double fontSize) {
@@ -301,8 +299,8 @@ void PAGTextLayerModel::updateTextDocument(int index) {
     revertSet.insert(index);
   }
 
-  beginResetModel();
-  endResetModel();
+  auto modelIndex = createIndex(index, 0);
+  dataChanged(modelIndex, modelIndex);
 }
 
 void PAGTextLayerModel::revertTextDocument(int index) {
@@ -320,8 +318,8 @@ void PAGTextLayerModel::revertTextDocument(int index) {
     revertSet.insert(index);
   }
 
-  beginResetModel();
-  endResetModel();
+  auto modelIndex = createIndex(index, 0);
+  dataChanged(modelIndex, modelIndex);
 }
 
 QHash<int, QByteArray> PAGTextLayerModel::roleNames() const {
