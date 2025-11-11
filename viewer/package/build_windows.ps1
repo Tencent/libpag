@@ -1,3 +1,5 @@
+param($PAGEnterprisePath, $DSAPrivateKey)
+
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -63,13 +65,6 @@ $QtCMakePath = Join-Path $QtPath -ChildPath "lib" |
                Join-Path -ChildPath "cmake"
 $AESDKPath = $env:PAG_AE_SDK_Path
 
-PAGEnterprisePath = ""
-
-
-PAGEnterprisePath = ""
-
-
-
 # 2 Compile
 Print-Text "[ Compile ]"
 $x64BuildDir = Join-Path $BuildDir "x64"
@@ -80,11 +75,41 @@ $VSPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.
 $VSDevEnv = Join-Path $VSPath -ChildPath "Common7" |
             Join-Path -ChildPath "IDE" |
             Join-Path -ChildPath "devenv.exe"
+$MSVCToolsDir = Join-Path $VSPath 'VC\Tools\MSVC'
+$MSVCVersions = Get-ChildItem $MSVCToolsDir -Directory | Select-Object -ExpandProperty Name
+$MSVCToolSets = @()
+foreach($v in $MSVCVersions) {
+    if($v -match "^14\.(\d+)\.") {
+        $MajorMinor = [int]$Matches[1]
+        if($MajorMinor -ge 30) { $MSVCToolSets += "v143" }
+        elseif($MajorMinor -ge 20) { $MSVCToolSets += "v142" }
+        elseif($MajorMinor -ge 10) { $MSVCToolSets += "v141" }
+    }
+}
+$MSVCToolSets = $MSVCToolSets | Sort-Object -Unique -Descending
+if ($MSVCToolSets.Count -eq 0) {
+    Write-Host "No avaliable MSVC toolset found" -ForegroundColor Red
+    exit 1
+}
+$LatestMSVCToolSet = $MSVCToolSets | Select-Object -First 1
 $WindowsSdkDir = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Windows Kits", "10")
 $LatestSdkVersion = (Get-ChildItem (Join-Path $WindowsSdkDir "Lib") | Sort-Object Name -Descending | Select-Object -First 1).Name
 $env:LIB = "${WindowsSdkDir}\Lib\${LatestSdkVersion}\um\x64;${WindowsSdkDir}\Lib\${LatestSdkVersion}\ucrt\x64;" + $env:LIB
 
-# 2.2 Compile PAGExporter
+# 2.2 Compile H264EncoderTools
+Print-Text "[ Compile H264EncoderTools ]"
+$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
+        Join-Path -ChildPath "H264EncoderTools"
+$EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
+$EncoderToolsVcxprojPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.vcxproj"
+(Get-Content "$EncoderToolsVcxprojPath" -Raw) -replace "<PlatformToolset>v142</PlatformToolset>", "<PlatformToolset>$LatestMSVCToolSet</PlatformToolset>" | Set-Content "$EncoderToolsVcxprojPath"
+& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
+if (-not $?) {
+    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
+    exit 1
+}
+
+# 2.3 Compile PAGExporter
 Print-Text "[ Compile PAGExporter ]"
 $PluginSourceDir = Join-Path $LibpagDir -ChildPath "exporter"
 $x64BuildDirForPlugin = Join-Path $x64BuildDir -ChildPath "Plugin"
@@ -100,7 +125,7 @@ if (-not $?) {
     exit 1
 }
 
-# 2.3 Compile PAGViewer
+# 2.4 Compile PAGViewer
 Print-Text "[ Compile PAGViewer ]"
 cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
 if (-not $?) {
@@ -114,17 +139,6 @@ if (-not $?) {
     exit 1
 }
 
-# 2.4 Compile H264EncoderTools
-Print-Text "[ Compile H264EncoderTools ]"
-$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
-                         Join-Path -ChildPath "H264EncoderTools"
-$EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
-& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
-if (-not $?) {
-    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
-    exit 1
-}
-
 # 3 Organize resources
 Print-Text "[ Organize resources ]"
 # 3.1 Copy files
@@ -132,6 +146,8 @@ Print-Text "[ Copy files ]"
 $TemplatePackageDir = Join-Path $SourceDir -ChildPath "package" | 
                       Join-Path -ChildPath "templates" | 
                       Join-Path -ChildPath "windows-packages"
+New-Item -ItemType Directory -Path "$TemplatePackageDir\data\scripts" -Force
+New-Item -ItemType Directory -Path "$TemplatePackageDir\meta" -Force
 $PackageDir = Join-Path $BuildDir "com.tencent.pagplayer"
 Copy-Item -Path $TemplatePackageDir -Destination $PackageDir -Recurse -Force
 
