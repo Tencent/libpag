@@ -66,12 +66,11 @@ static void FillYUVPadding(uint8_t* data[4], int stride[4], int width, int heigh
 
 std::unique_ptr<VideoEncoder> VideoEncoder::MakeVideoEncoder(bool) {
   VideoEncoder* videoEncoder = new OfflineVideoEncoder();
-
   return std::unique_ptr<VideoEncoder>(videoEncoder);
 }
 
 PAGEncoder::PAGEncoder(bool hardwareEncode) {
-  enc = VideoEncoder::MakeVideoEncoder(hardwareEncode);
+  encoder = VideoEncoder::MakeVideoEncoder(hardwareEncode);
 }
 
 bool PAGEncoder::init(int width, int height, double frameRate, bool hasAlpha,
@@ -85,17 +84,15 @@ bool PAGEncoder::init(int width, int height, double frameRate, bool hasAlpha,
     if (internalWidth < internalHeight) {
       alphaStartX = internalWidth + paddingX;
       alphaStartY = 0;
-
       internalWidth = internalWidth * 2 + paddingX;
     } else {
       alphaStartX = 0;
       alphaStartY = internalHeight + paddingY;
-
       internalHeight = internalHeight * 2 + paddingY;
     }
   }
 
-  enc->open(internalWidth, internalHeight, frameRate, hasAlpha, maxKeyFrameInterval, quality);
+  encoder->open(internalWidth, internalHeight, frameRate, hasAlpha, maxKeyFrameInterval, quality);
   colorspace_init();
   c264_csp_init(0);
 
@@ -113,32 +110,30 @@ void PAGEncoder::encodeRGBA(uint8_t* data, int dataStride, FrameType frameType) 
   }
   uint8_t* tmpData[4] = {nullptr};
   int tmpStride[4] = {0};
-  enc->getInputFrameBuf(tmpData, tmpStride);
-
+  encoder->getInputFrameBuf(tmpData, tmpStride);
   RGBAToYUV420(data, dataStride, tmpData[0], tmpData[1], tmpData[2], tmpStride[0], tmpStride[1],
                inputWidth, inputHeight, 0);
 
   if (hasAlpha) {
     GetAlphaFromRGBA(tmpData, tmpStride, data, dataStride, SIZE_ALIGN(inputWidth),
                      SIZE_ALIGN(inputHeight), alphaStartX, alphaStartY);
-
     FillYUVPadding(tmpData, tmpStride, SIZE_ALIGN(inputWidth), SIZE_ALIGN(inputHeight), alphaStartX,
                    alphaStartY);
   }
 
-  enc->encodeFrame(tmpData, tmpStride, frameType);
+  encoder->encodeFrame(tmpData, tmpStride, frameType);
 }
 
 int PAGEncoder::encodeHeaders(uint8_t* header[], int headerSize[]) {
-  return enc->encodeHeaders(header, headerSize);
+  return encoder->encodeHeaders(header, headerSize);
 }
 
 int PAGEncoder::getEncodedData(uint8_t** outData, FrameType* outFrameType, int64_t* outFrameIndex) {
-  return enc->getEncodedFrame(true, outData, outFrameType, outFrameIndex);
+  return encoder->getEncodedFrame(true, outData, outFrameType, outFrameIndex);
 }
 
 void PAGEncoder::close() {
-  enc->close();
+  encoder->close();
 }
 
 }  // namespace exporter

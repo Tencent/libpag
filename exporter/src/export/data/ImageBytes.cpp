@@ -127,8 +127,12 @@ void GetImageBytesActaully(std::shared_ptr<PAGExportSession> session, pag::Image
     imageBytes->fileBytes = byteData;
   }
 
-  delete[] scaledRGBA;
-  delete[] rgbaBytes;
+  if (scaledRGBA != nullptr) {
+    delete[] scaledRGBA;
+  }
+  if (rgbaBytes != nullptr) {
+    delete[] rgbaBytes;
+  }
 }
 
 }  // namespace exporter

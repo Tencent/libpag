@@ -82,8 +82,8 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
 
-  int compWidth = composition->width;
-  int compHeight = composition->height;
+  auto compWidth = composition->width;
+  auto compHeight = composition->height;
   auto frameRate = composition->frameRate;
   auto duration = composition->duration;
 
@@ -143,14 +143,16 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
     bottom = compHeight;
   }
 
-  delete[] data;
+  if (data != nullptr) {
+    delete[] data;
+  }
   Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 }
 
 static int EncodeVideoHeader(PAGEncoder* pagEncoder, std::vector<pag::ByteData*>& headers) {
   uint8_t* nal[16] = {nullptr};
   int size[16] = {0};
-  int count = pagEncoder->encodeHeaders(nal, size);
+  auto count = pagEncoder->encodeHeaders(nal, size);
 
   if (count >= 2) {
     auto sps = new uint8_t[size[0]];
@@ -170,15 +172,15 @@ static int EncodeVideoHeader(PAGEncoder* pagEncoder, std::vector<pag::ByteData*>
 static FrameType GetFrameType(bool currentFrameIsStatic, bool lastFrameIsStatic,
                               bool currentFrameIsVisible, bool lastFrameIsVisible) {
   if (!currentFrameIsStatic && lastFrameIsStatic) {
-    return FRAME_TYPE_I;
+    return FrameType::FRAME_TYPE_I;
   }
   if (currentFrameIsVisible != lastFrameIsVisible) {
-    return FRAME_TYPE_I;
+    return FrameType::FRAME_TYPE_I;
   }
   if (!currentFrameIsVisible) {
-    return FRAME_TYPE_P;
+    return FrameType::FRAME_TYPE_P;
   }
-  return FRAME_TYPE_AUTO;
+  return FrameType::FRAME_TYPE_AUTO;
 }
 
 static void EncodeVideoFrame(PAGEncoder* pagEncoder, uint8_t* data, int inDataStride,
@@ -205,9 +207,9 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
   composition->sequences.clear();
 
-  bool needToScale = true;
-  float factor = compositionFactor;
-  float frameRate = std::min(session->configParam.frameRate, composition->frameRate);
+  auto needToScale = true;
+  auto factor = compositionFactor;
+  auto frameRate = std::min(session->configParam.frameRate, composition->frameRate);
   auto duration =
       static_cast<pag::Frame>(ceil(composition->duration * frameRate / composition->frameRate));
 
@@ -224,10 +226,10 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     needToScale = false;
   }
 
-  int seqWidth = static_cast<int>(ceil(static_cast<float>(right - left) * factor));
-  int seqHeight = static_cast<int>(ceil(static_cast<float>(bottom - top) * factor));
-  int seqStride = SIZE_ALIGN(seqWidth) * 4;
-  bool sizeChanged = seqWidth != composition->width || seqHeight != composition->height;
+  auto seqWidth = static_cast<int>(ceil(static_cast<float>(right - left) * factor));
+  auto seqHeight = static_cast<int>(ceil(static_cast<float>(bottom - top) * factor));
+  auto seqStride = SIZE_ALIGN(seqWidth) * 4;
+  auto sizeChanged = seqWidth != composition->width || seqHeight != composition->height;
   std::vector<uint8_t> preData(seqStride * SIZE_ALIGN(seqHeight) + seqStride * 2);
   std::vector<uint8_t> curData(seqStride * SIZE_ALIGN(seqHeight) + seqStride * 2);
 
@@ -260,7 +262,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     pag::Frame firstExportFrame = -1;
     pag::Frame exportFrameNum = 0;
 
-    bool hasAlpha = session->videoHasAlpha;
+    auto hasAlpha = session->videoHasAlpha;
     sequence->composition = composition;
     sequence->frameRate = frameRate;
     sequence->width = seqWidth;
@@ -273,8 +275,8 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     pagEncoder->getAlphaStartXY(&sequence->alphaStartX, &sequence->alphaStartY);
     EncodeVideoHeader(pagEncoder.get(), sequence->headers);
 
-    bool lastFrameIsVisible = false;
-    bool lastFrameIsStatic = true;
+    auto lastFrameIsVisible = false;
+    auto lastFrameIsStatic = true;
     pag::TimeRange staticTimeRange = {-1, -1};
     for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
       if (!IsFrameExport(maxVisibleRange, frame, mainComposition->frameRate / frameRate)) {
@@ -320,11 +322,11 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
           OddPaddingRGBA(curData.data(), seqStride, seqWidth, seqHeight);
         }
 
-        bool currentFrameIsStatic = frame > 0 ? ImageIsStatic(curData.data(), preData.data(),
+        auto currentFrameIsStatic = frame > 0 ? ImageIsStatic(curData.data(), preData.data(),
                                                               seqWidth, seqHeight, seqStride)
                                               : false;
-        FrameType frameType = GetFrameType(currentFrameIsStatic, lastFrameIsStatic,
-                                           currentFrameIsVisible, lastFrameIsVisible);
+        auto frameType = GetFrameType(currentFrameIsStatic, lastFrameIsStatic,
+                                      currentFrameIsVisible, lastFrameIsVisible);
         EncodeVideoFrame(pagEncoder.get(), curData.data(), seqStride, frameType);
         exportFrameNum++;
 
@@ -357,7 +359,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     pagEncoder->close();
 
     while (!session->stopExport && sequence->frames.size() < static_cast<size_t>(exportFrameNum)) {
-      FrameType frameType = FRAME_TYPE_AUTO;
+      auto frameType = FrameType::FRAME_TYPE_AUTO;
       int64_t index = 0;
       pag::ByteData* videoBytes = GetEncodedVideoFrame(pagEncoder.get(), &frameType, &index);
       if (videoBytes == nullptr) {
@@ -365,7 +367,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
       }
 
       auto videoFrame = new pag::VideoFrame();
-      videoFrame->isKeyframe = (frameType == FRAME_TYPE_I);
+      videoFrame->isKeyframe = (frameType == FrameType::FRAME_TYPE_I);
       videoFrame->frame = index;
       videoFrame->fileBytes = videoBytes;
       sequence->frames.push_back(videoFrame);
@@ -404,9 +406,9 @@ static void AdjustMainCompositionParam(pag::VectorComposition* newComposition,
     return;
   }
   auto sequence = composition->sequences[0];
-  double factorWidth = static_cast<double>(sequence->width) / composition->width;
-  double factorHeight = static_cast<double>(sequence->height) / composition->height;
-  double factorSize = std::max(factorWidth, factorHeight);
+  auto factorWidth = static_cast<double>(sequence->width) / composition->width;
+  auto factorHeight = static_cast<double>(sequence->height) / composition->height;
+  auto factorSize = std::max(factorWidth, factorHeight);
   newComposition->width = static_cast<int>(floor(newComposition->width * factorSize));
   newComposition->height = static_cast<int>(floor(newComposition->height * factorSize));
 

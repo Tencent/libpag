@@ -26,7 +26,7 @@
 namespace exporter {
 
 struct FrameInfo {
-  FrameType frameType = FRAME_TYPE_AUTO;
+  FrameType frameType = FrameType::FRAME_TYPE_AUTO;
   int frameSize = 0;
   int64_t timeStamp = 0;
 };

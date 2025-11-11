@@ -276,7 +276,7 @@ bool OfflineVideoEncoder::readFrameInfo(FrameInfo& frameInfo, const std::string&
 
 bool OfflineVideoEncoder::writeFrameInfo(const FrameInfo& frameInfo, const std::string& filePath) {
   std::string frameInfoData = QString(R"({ "FrameType": %1, "TimeStamp": %2, "FrameSize": %3 })")
-                                  .arg(frameInfo.frameType)
+                                  .arg(static_cast<int>(frameInfo.frameType))
                                   .arg(static_cast<float>(frameInfo.timeStamp), 0, 'f', 0)
                                   .arg(frameInfo.frameSize)
                                   .toStdString();

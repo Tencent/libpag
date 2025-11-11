@@ -24,12 +24,12 @@ namespace exporter {
 
 #define SIZE_ALIGN(x) (((x) + 1) & ~0x01)
 
-typedef enum {
+enum class FrameType {
   FRAME_TYPE_AUTO = -1,
   FRAME_TYPE_P = 0,
   FRAME_TYPE_I = 1,
   FRAME_TYPE_B = 2,
-} FrameType;
+};
 
 class VideoEncoder {
  public:
@@ -71,7 +71,7 @@ class PAGEncoder {
   bool hasAlpha = false;
   int32_t alphaStartX = 0;
   int32_t alphaStartY = 0;
-  std::unique_ptr<VideoEncoder> enc = nullptr;
+  std::unique_ptr<VideoEncoder> encoder = nullptr;
 };
 
 }  // namespace exporter
