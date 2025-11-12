@@ -52,7 +52,7 @@ void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
 
 void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
   QString baseUrl = data.data();
-  qDebug() << "get update base url: " << baseUrl;
+  qDebug() << "Get update base url: " << baseUrl;
 
   availableUpdates.clear();
   availableUpdateUrls.clear();

@@ -326,6 +326,7 @@ jobs:
           aqtversion: '==3.2.1'
           cache: 'true'
           cache-key-prefix: 'install-qt-action'
+          modules: 'qtmultimedia'
 
       - name: Build QT
         run: |
