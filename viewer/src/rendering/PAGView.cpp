@@ -81,7 +81,8 @@ QString PAGView::getTotalFrame() const {
 
 QString PAGView::getCurrentFrame() const {
   int64_t totalFrames = getTotalFrame().toLongLong();
-  int64_t currentFrame = static_cast<int64_t>(std::round(getProgress() * (totalFrames - 1)));
+  auto currentFrame =
+      static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
   return QString::number(currentFrame);
 }
 
@@ -288,7 +289,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     if (duration > 0) {
       auto progress =
           static_cast<double>(displayTime) / static_cast<double>(duration) + this->progress;
-      if (progress > 1) {
+      if (progress > 1.0) {
         progress = 0.0;
       }
       setProgress(progress);
@@ -300,4 +301,5 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
 }
+
 }  // namespace pag
