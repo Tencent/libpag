@@ -79,8 +79,8 @@ void ClipTransparentEdge(ImageRect& rect, const uint8_t* srcData, int width, int
   }
 }
 
-void ScalePixels(uint8_t* dstRGBA, int dstStride, uint8_t* srcRGBA, int srcStride, int dstWidth,
-                 int dstHeight, int srcWidth, int srcHeight) {
+void ScalePixels(uint8_t* dstRGBA, int dstStride, int dstWidth, int dstHeight, uint8_t* srcRGBA,
+                 int srcStride, int srcWidth, int srcHeight) {
   std::shared_ptr<tgfx::Data> data = tgfx::Data::MakeWithoutCopy(srcRGBA, srcStride * srcHeight);
   auto imageInfo = tgfx::ImageInfo::Make(srcWidth, srcHeight, tgfx::ColorType::RGBA_8888,
                                          tgfx::AlphaType::Premultiplied, srcStride);

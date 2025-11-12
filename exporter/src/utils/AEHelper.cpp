@@ -132,7 +132,7 @@ void GetRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_
   PF_Pixel* pixels = nullptr;
   Suites->WorldSuite3()->AEGP_GetBaseAddr8(imageWorld, &pixels);
 
-  exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, srcStride, rgbaBytes, dstStride);
+  ConvertARGBToRGBA(&(pixels->alpha), width, height, srcStride, rgbaBytes, dstStride);
   Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
 }
 
