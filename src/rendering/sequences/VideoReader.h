@@ -58,6 +58,7 @@ class VideoReader : public SequenceReader {
   int64_t currentRenderedTime = INT64_MIN;
   std::atomic_int64_t hardDecodingInitialTime = 0;
   std::atomic_int64_t softDecodingInitialTime = 0;
+  Frame startFrame = -1;
 
   void destroyVideoDecoder();
 

@@ -38,6 +38,9 @@ SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
                                        bool useDiskCache)
     : sequence(sequence), reader(std::move(reader)), firstFrame(firstFrame),
       totalFrames(sequence->duration()), useDiskCache(useDiskCache) {
+#ifdef PAG_BUILD_FOR_WEB
+  currentFrame = firstFrame - 1;
+#endif
 }
 
 void SequenceImageQueue::prepareNextImage() {

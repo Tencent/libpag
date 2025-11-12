@@ -57,7 +57,7 @@ class HardwareDecoder : public VideoDecoder {
   int currentFrame = -1;
   std::shared_ptr<tgfx::ImageBuffer> lastDecodedBuffer = nullptr;
 
-  explicit HardwareDecoder(const VideoFormat& format);
+  explicit HardwareDecoder(const VideoFormat& format, Frame startFrame);
 
   friend class HardwareDecoderFactory;
 };

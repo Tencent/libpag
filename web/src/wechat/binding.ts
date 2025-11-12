@@ -19,6 +19,7 @@ import { PAGSolidLayer } from '../pag-solid-layer';
 import { RenderCanvas } from '../core/render-canvas';
 import { setMixin } from '../utils/mixin';
 import { TGFXBind } from '@tgfx/wechat/binding';
+import {ANDROIDWECHAT} from './utils/ua';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -46,4 +47,5 @@ export const binding = (module: PAG) => {
   module.RenderCanvas = RenderCanvas;
   setMixin(module);
   module.currentPlayer = null;
+  module.isAndroidWechat = () => ANDROIDWECHAT;
 };

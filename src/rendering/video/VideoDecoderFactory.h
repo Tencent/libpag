@@ -61,8 +61,12 @@ class VideoDecoderFactory {
    */
   virtual bool isHardwareBacked() const = 0;
 
+  static void SetStartFrame(Frame frame);
+
  protected:
   virtual std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const = 0;
+
+  static Frame startFrame;
 
  private:
   static void NotifyHardwareVideoDecoderReleased();

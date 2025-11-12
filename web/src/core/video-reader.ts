@@ -52,13 +52,16 @@ export class VideoReader {
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
+    startFrame: number
   ): VideoReaderInterfaces {
-    return new VideoReader(source, width, height, frameRate, staticTimeRanges);
+    return new VideoReader(source, width, height, frameRate, staticTimeRanges,startFrame);
   }
 
   public isSought = false;
   public isPlaying = false;
   public bitmap: ImageBitmap | null = null;
+  public isStartDecode = false;
+  public isSeekAndDecode = false;
 
   private videoEl: HTMLVideoElement | null = null;
   private frameRate = 0;
@@ -79,6 +82,7 @@ export class VideoReader {
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
+    startFrame: number
   ) {
     if (isInstanceOf(source, globalThis.HTMLVideoElement)) {
       this.videoEl = source as HTMLVideoElement;
@@ -93,6 +97,7 @@ export class VideoReader {
       this.videoEl.height = height;
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
+        this.isStartDecode = true;
       });
       const buffer = (source as Uint8Array).slice();
       const blob = new Blob([buffer], { type: 'video/mp4' });

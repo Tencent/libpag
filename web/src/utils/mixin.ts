@@ -1,4 +1,4 @@
-import { IPHONE } from './ua';
+import {ANDROID, IPHONE, WECHAT} from './ua';
 
 import type { PAG } from '../types';
 
@@ -19,4 +19,5 @@ export const setMixin = (module: PAG) => {
     return module._SDKVersion();
   };
   module.isIPhone = () => IPHONE;
+  module.isAndroidWechat = () => false;
 };

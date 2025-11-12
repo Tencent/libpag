@@ -13,6 +13,7 @@ export interface wx {
     compInst?: any,
   ) => OffscreenCanvas;
   getPerformance: () => Performance;
+  getDeviceInfo: () => DeviceInfo;
 }
 
 export interface FileSystemManager {
@@ -78,4 +79,9 @@ export interface SystemInfo {
   platform: 'ios' | 'android' | 'windows' | 'mac' | 'devtools';
   /** 设备像素比 */
   pixelRatio: number;
+}
+
+export interface DeviceInfo{
+  system: string;
+  platform: string;
 }

@@ -29,7 +29,7 @@ class val;
 using namespace emscripten;
 
 namespace pag {
-HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
+HardwareDecoder::HardwareDecoder(const VideoFormat& format, Frame startFrame) {
   auto demuxer = static_cast<WebVideoSequenceDemuxer*>(format.demuxer);
   file = demuxer->file;
   rootFile = demuxer->pagFile;
@@ -42,7 +42,7 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto videoReaderClass = val::module_property("VideoReader");
   videoReader = videoReaderClass.call<val>(
       "create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width, _height,
-      sequence->frameRate, staticTimeRanges);
+      sequence->frameRate, staticTimeRanges, static_cast<int>(startFrame));
   auto video = videoReader.call<val>("getVideo");
   if (!video.isNull()) {
     imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);

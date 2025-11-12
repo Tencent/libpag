@@ -141,6 +141,11 @@ export class PAGView extends NativePAGView {
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
+    if (this.needResetStartTime() || this.needAdjustStartTime()) {
+      // The WeChat Mini Program decoder takes a long time to start decoding,
+      // so startTime needs to be reset while the first frame has not yet been decoded.
+      this.startTime = this.getNowTime() * 1000;
+    }
     this.playFrame = playFrame;
     this.repeatedTimes = count;
     return res;
@@ -174,5 +179,19 @@ export class PAGView extends NativePAGView {
     const dpr = wx.getSystemInfoSync().pixelRatio;
     this.canvasElement!.width = displaySize.width * dpr;
     this.canvasElement!.height = displaySize.height * dpr;
+  }
+
+  protected override needAdjustStartTime() {
+    for (const VideoReader of this.player.videoReaders) {
+      if (VideoReader.isSeekAndDecode != null && VideoReader.isSeekAndDecode) return true;
+    }
+    return false;
+  }
+
+  private needResetStartTime() {
+    for (const VideoReader of this.player.videoReaders) {
+      if (!VideoReader.isStartDecode) return true;
+    }
+    return false;
   }
 }

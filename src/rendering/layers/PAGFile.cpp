@@ -21,6 +21,9 @@
 #include "pag/pag.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
+#ifdef PAG_BUILD_FOR_WEB
+#include <emscripten/val.h>
+#endif
 
 namespace pag {
 uint16_t PAGFile::MaxSupportedTagLevel() {
@@ -42,6 +45,16 @@ std::shared_ptr<PAGFile> PAGFile::MakeFrom(std::shared_ptr<File> file) {
   if (file == nullptr) {
     return nullptr;
   }
+#ifdef PAG_BUILD_FOR_WEB
+  emscripten::val isAndroidWechat = emscripten::val::module_property("isAndroidWechat");
+  if (isAndroidWechat().as<bool>()) {
+    for (auto composition : file->compositions) {
+      if (composition->type() == CompositionType::Video) {
+        composition->staticTimeRanges.clear();
+      }
+    }
+  }
+#endif
   auto pagLayer = BuildPAGLayer(file, file->getRootLayer());
   auto locker = std::make_shared<std::mutex>();
   pagLayer->updateRootLocker(locker);

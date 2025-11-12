@@ -21,6 +21,7 @@
 #include "platform/Platform.h"
 #include "tgfx/core/Clock.h"
 #ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/NativePlatform.h"
 #include "platform/web/WebVideoSequenceDemuxer.h"
 #endif
 
@@ -56,6 +57,9 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
   }
   lastBuffer = nullptr;
   currentRenderedTime = INT64_MIN;
+  if (!videoDecoder) {
+    startFrame = targetFrame;
+  }
   if (!checkVideoDecoder()) {
     return nullptr;
   }
@@ -200,6 +204,13 @@ std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
       factoryIndex++;
       continue;
     }
+
+#ifdef PAG_BUILD_FOR_WEB
+    if (factory->isHardwareBacked()) {
+      factory->SetStartFrame(startFrame);
+    }
+#endif
+
     tgfx::Clock clock = {};
     auto decoder = factory->createDecoder(demuxer->getFormat());
     if (decoder != nullptr) {

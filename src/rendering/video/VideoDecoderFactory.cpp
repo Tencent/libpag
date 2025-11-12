@@ -33,6 +33,8 @@ static SoftwareDecoderFactory* softwareDecoderFactory = {nullptr};
 static std::atomic_int maxHardwareDecoderCount = {65535};
 static std::atomic_int globalHardwareDecoderCount = {0};
 
+Frame VideoDecoderFactory::startFrame = -1;
+
 void PAGVideoDecoder::RegisterSoftwareDecoderFactory(SoftwareDecoderFactory* decoderFactory) {
   std::lock_guard<std::mutex> autoLock(factoryLocker);
   softwareDecoderFactory = decoderFactory;
@@ -111,6 +113,10 @@ bool VideoDecoderFactory::HasExternalSoftwareDecoder() {
 
 void VideoDecoderFactory::NotifyHardwareVideoDecoderReleased() {
   globalHardwareDecoderCount--;
+}
+
+void VideoDecoderFactory::SetStartFrame(Frame frame) {
+  startFrame = frame;
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoderFactory::createDecoder(const VideoFormat& format) const {

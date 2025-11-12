@@ -8,6 +8,8 @@ export interface TimeRange {
 export interface VideoReader {
   isSought: boolean;
   isPlaying: boolean;
+  isStartDecode: boolean;
+  isSeekAndDecode: boolean|any;
   prepare: (targetFrame: number, playbackRate: number) => Promise<void>;
   getError: () => Promise<any>;
   onDestroy: () => void;
@@ -22,6 +24,7 @@ export type VideoDecoderConstructor = new (
   height: number,
   frameRate: number,
   staticTimeRanges: TimeRange[],
+  startFrame: number,
 ) => VideoReader;
 
 export interface FontMetrics {

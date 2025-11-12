@@ -41,7 +41,7 @@ class HardwareDecoderFactory : public VideoDecoderFactory {
     if (format.demuxer == nullptr) {
       return nullptr;
     }
-    auto decoder = new HardwareDecoder(format);
+    auto decoder = new HardwareDecoder(format, startFrame);
     if (decoder->imageReader == nullptr) {
       delete decoder;
       return nullptr;
