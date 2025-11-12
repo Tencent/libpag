@@ -131,15 +131,15 @@ void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
   session->progressModel.addTotalProgress(static_cast<double>(session->imageBytesList.size()));
 }
 
-void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession> session,
-                                     pag::BitmapComposition* composition, float factor) {
-  GetBitmapSequence(session, composition, factor);
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             pag::BitmapComposition* composition, float factor) {
+  GetBitmapSequence(std::move(session), composition, factor);
 }
 
-void ExportVideoCompositionActually(std::shared_ptr<PAGExportSession> session,
-                                    std::vector<pag::Composition*>& compositions,
-                                    pag::VideoComposition* composition, float factor) {
-  GetVideoSequence(session, compositions, composition, factor);
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            std::vector<pag::Composition*>& compositions,
+                            pag::VideoComposition* composition, float factor) {
+  GetVideoSequence(std::move(session), compositions, composition, factor);
 }
 
 }  // namespace exporter

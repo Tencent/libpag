@@ -401,7 +401,7 @@ void PAGExport::exportRescaleImages() const {
       }
     }
     if (factor > 0.0f) {
-      GetImageBytesActaully(session, image, layerHandle, isVideo, factor);
+      GetImageBytes(session, image, layerHandle, isVideo, factor);
     }
 
     session->progressModel.addProgress();
@@ -423,8 +423,7 @@ void PAGExport::exportRescaleBitmapCompositions(
         factor = 1.0;
       }
 
-      ExportBitmapCompositionActually(session, static_cast<pag::BitmapComposition*>(composition),
-                                      factor);
+      ExportBitmapComposition(session, static_cast<pag::BitmapComposition*>(composition), factor);
       AdjustCompositionFrameRate<pag::BitmapComposition*>(composition);
     }
   }
@@ -444,8 +443,8 @@ void PAGExport::exportRescaleVideoCompositions(std::vector<pag::Composition*>& c
         factor = 1.0;
       }
 
-      ExportVideoCompositionActually(session, compositions,
-                                     static_cast<pag::VideoComposition*>(composition), factor);
+      ExportVideoComposition(session, compositions,
+                             static_cast<pag::VideoComposition*>(composition), factor);
       TraversalLayers(session, mainComposition, pag::LayerType::PreCompose,
                       AdjustmentPreComposeLayerForVideoComposition, composition);
       AdjustCompositionFrameRate<pag::VideoComposition*>(composition);

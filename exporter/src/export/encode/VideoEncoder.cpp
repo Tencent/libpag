@@ -65,8 +65,7 @@ static void FillYUVPadding(uint8_t* data[4], int stride[4], int width, int heigh
 }
 
 std::unique_ptr<VideoEncoder> VideoEncoder::MakeVideoEncoder(bool) {
-  VideoEncoder* videoEncoder = new OfflineVideoEncoder();
-  return std::unique_ptr<VideoEncoder>(videoEncoder);
+  return std::make_unique<OfflineVideoEncoder>();
 }
 
 PAGEncoder::PAGEncoder(bool hardwareEncode) {

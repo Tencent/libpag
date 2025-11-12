@@ -24,7 +24,7 @@ namespace exporter {
 
 class PAGExportSession;
 
-void GetImageBytesActaully(std::shared_ptr<PAGExportSession> session, pag::ImageBytes* imageBytes,
-                           const AEGP_LayerH& layerHandle, bool isVideo, float factor);
+void GetImageBytes(std::shared_ptr<PAGExportSession> session, pag::ImageBytes* imageBytes,
+                   const AEGP_LayerH& layerHandle, bool isVideo, float factor);
 
 }  // namespace exporter

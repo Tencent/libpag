@@ -71,8 +71,8 @@ static void GetImageLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
   Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 }
 
-void GetImageBytesActaully(std::shared_ptr<PAGExportSession> session, pag::ImageBytes* imageBytes,
-                           const AEGP_LayerH& layerHandle, bool isVideo, float factor) {
+void GetImageBytes(std::shared_ptr<PAGExportSession> session, pag::ImageBytes* imageBytes,
+                   const AEGP_LayerH& layerHandle, bool isVideo, float factor) {
   A_long width = 0;
   A_long height = 0;
   A_u_long srcStride = 0;
@@ -80,18 +80,18 @@ void GetImageBytesActaully(std::shared_ptr<PAGExportSession> session, pag::Image
   uint8* rgbaBytes = nullptr;
   if (isVideo) {
     GetVideoLayerRenderImageSize(layerHandle, srcStride, width, height);
-    dstStride = width * 4;
-    rgbaBytes = new uint8[dstStride * height];
-    GetVideoLayerRenderImage(rgbaBytes, layerHandle, srcStride, dstStride, width, height);
   } else {
     GetImageLayerRenderImageSize(layerHandle, srcStride, width, height);
-    dstStride = width * 4;
-    rgbaBytes = new uint8[dstStride * height];
-    GetImageLayerRenderImage(rgbaBytes, layerHandle, srcStride, dstStride, width, height);
   }
-  if (width < 0 || height < 0 || rgbaBytes == nullptr) {
-    delete[] rgbaBytes;
+  if (width < 0 || height < 0) {
     return;
+  }
+  dstStride = width * 4;
+  rgbaBytes = new uint8[dstStride * height];
+  if (isVideo) {
+    GetVideoLayerRenderImage(rgbaBytes, layerHandle, srcStride, dstStride, width, height);
+  } else {
+    GetImageLayerRenderImage(rgbaBytes, layerHandle, srcStride, dstStride, width, height);
   }
 
   ImageRect rect = {0, 0, width, height};

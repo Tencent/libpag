@@ -40,14 +40,9 @@ static bool IsStaticVideoSequence(pag::Composition* composition) {
   return false;
 }
 
-static bool TimeCompare(const std::pair<pag::Frame, size_t> a,
-                        const std::pair<pag::Frame, size_t> b) {
-  return a.first < b.first;
-}
-
 static size_t GetMaxCountInSameTimeRange(
     std::vector<std::pair<pag::TimeRange, size_t>>& timeRangeList,
-    pag::Frame* pStartTime = nullptr) {
+    pag::Frame* startTime = nullptr) {
   if (timeRangeList.empty()) {
     return 0;
   }
@@ -60,8 +55,13 @@ static size_t GetMaxCountInSameTimeRange(
     endTimeList.emplace_back(timeRange.first.end, timeRange.second);
   }
 
-  sort(startTimeList.begin(), startTimeList.end(), TimeCompare);
-  sort(endTimeList.begin(), endTimeList.end(), TimeCompare);
+  auto timeCompareFunction = [](const std::pair<pag::Frame, size_t> a,
+                                const std::pair<pag::Frame, size_t> b) -> bool {
+    return a.first < b.first;
+  };
+
+  sort(startTimeList.begin(), startTimeList.end(), timeCompareFunction);
+  sort(endTimeList.begin(), endTimeList.end(), timeCompareFunction);
 
   size_t startTimeIndex = 0;
   size_t endTimeIndex = 0;
@@ -82,13 +82,13 @@ static size_t GetMaxCountInSameTimeRange(
     }
   }
 
-  if (pStartTime != nullptr) {
-    *pStartTime = maxCountFrame;
+  if (startTime != nullptr) {
+    *startTime = maxCountFrame;
   }
   return maxCount;
 }
 
-static void CheckBitMapAndVideoNum(std::shared_ptr<PAGExportSession> session,
+static void CheckBitmapAndVideoNum(std::shared_ptr<PAGExportSession> session,
                                    std::vector<pag::Composition*>& compositions,
                                    std::vector<pag::ImageBytes*>& images) {
   constexpr size_t maxImageNum = 30;
@@ -127,7 +127,7 @@ static void GetLayerTimeRangeAndEffectCount(std::shared_ptr<PAGExportSession>, p
   auto timeRangeList = static_cast<std::vector<std::pair<pag::TimeRange, size_t>>*>(ctx);
   pag::TimeRange timeRange = {layer->startTime + compositionStartTime,
                               layer->startTime + layer->duration + compositionStartTime};
-  timeRangeList->push_back(std::make_pair(timeRange, count));
+  timeRangeList->emplace_back(timeRange, count);
 }
 
 static void CheckEffect(std::shared_ptr<PAGExportSession> session, pag::Composition* composition) {
@@ -160,7 +160,7 @@ static void GetLayerVideoTrackTimeRangeAndCount(std::shared_ptr<PAGExportSession
   auto timeRangeList = static_cast<std::vector<std::pair<pag::TimeRange, size_t>>*>(ctx);
   pag::TimeRange timeRange = {layer->startTime + compositionStartTime,
                               layer->startTime + layer->duration + compositionStartTime};
-  timeRangeList->push_back(std::make_pair(timeRange, 1));
+  timeRangeList->emplace_back(timeRange, 1);
 }
 
 static void GetNameOfLayerWithVideoTrack(std::shared_ptr<PAGExportSession>, pag::Layer* layer,
@@ -641,7 +641,7 @@ static void CheckStaticVideoSequence(const std::shared_ptr<PAGExportSession>& se
 void CheckBeforeExport(std::shared_ptr<PAGExportSession> session,
                        std::vector<pag::Composition*>& compositions,
                        std::vector<pag::ImageBytes*>& images) {
-  CheckBitMapAndVideoNum(session, compositions, images);
+  CheckBitmapAndVideoNum(session, compositions, images);
   CheckEffect(session, compositions.back());
   CheckVideoTrack(session, compositions.back());
   CheckContinuousSequenceComposition(session, compositions.back());
