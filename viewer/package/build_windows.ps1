@@ -46,12 +46,14 @@ $minorVersion = if ($env:MinorVersion) { $env:MinorVersion } else { "0" }
 $buildNO = if ($env:BK_CI_BUILD_NO) { $env:BK_CI_BUILD_NO } else { "0" }
 
 $AppVersion = "${majorVersion}.${minorVersion}.${buildNO}"
-$CurrentTime = Get-Date -Format "yyyyMMddHHmmss"
+$CurrentTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $RFCTime = Get-Date -Format "r"
 $SourceDir = Split-Path $PSScriptRoot -Parent
 $LibpagDir = Split-Path $SourceDir -Parent
-$BuildDir = Join-Path $SourceDir "build_$CurrentTime"
+$BuildDir = Join-Path $SourceDir "build_viewer"
 $IsBetaVersion = if ($env:isBetaVersion) { $env:isBetaVersion } else { false }
+
+Write-Host "Build Time: $CurrentTime"
 
 if ([string]::IsNullOrEmpty($env:PAG_DeployQt_Path) -or [string]::IsNullOrEmpty($env:PAG_Qt_Path) -or [string]::IsNullOrEmpty($env:PAG_AE_SDK_Path) -or [string]::IsNullOrEmpty($env:PAG_Openssl_Path)) {
     Write-Host "Please set [PAG_DeployQt_Path], [PAG_Qt_Path], [PAG_AE_SDK_Path] and [PAG_Openssl_Path] before build on Windows" -ForegroundColor Red
@@ -251,7 +253,7 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
 
     # 5.3 Update Appcast
     Print-Text "[ Update Appcast ]"
-    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/server.html").Content
+    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/test/server.html").Content
     if ($IsBetaVersion -eq $true) {
         $URL = $URL + "beta/"
     }

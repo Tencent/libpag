@@ -36,10 +36,12 @@ function createDmg()
 # 1 Initialize variables
 print "[ Initialize variables ]"
 AppVersion=${MajorVersion}.${MinorVersion}.${BK_CI_BUILD_NO}
-CurrentTime=$(date +"%Y%m%d%H%M%S")
+CurrentTime=$(date +"%Y-%m-%d %H:%M:%S")
 RFCTime=$(date -R)
 SourceDir=$(dirname "$(dirname "$(realpath "$0")")")
-BuildDir="${SourceDir}/build_${CurrentTime}"
+BuildDir="${SourceDir}/build_viewer"
+
+echo "Build Time: ${CurrentTime}"
 
 if [ -z "${PAG_DeployQt_Path}" ] || [ -z "${PAG_Qt_Path}" ] || [ -z "${PAG_AE_SDK_Path}" ];
 then
@@ -438,7 +440,7 @@ then
 
         ZipLength=$(stat -f%z ${BuildDir}/${ZipFile})
 
-        URL=$(curl -s https://pag.qq.com/server.html)
+        URL=$(curl -s https://pag.qq.com/test/server.html)
         if [ "${isBetaVersion}" == true ];
         then
             URL="${URL}beta/"
@@ -473,5 +475,6 @@ then
     echo "create dmg success"
 else
     echo "create dmg failed"
+    exit 1
 fi
 
