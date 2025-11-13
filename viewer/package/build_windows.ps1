@@ -255,7 +255,7 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
 
     # 5.3 Update Appcast
     Print-Text "[ Update Appcast ]"
-    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/test/server.html").Content
+    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/test/server.html" -UseBasicParsing).Content
     if ($IsBetaVersion -eq $true) {
         $URL = $URL + "beta/"
     }
