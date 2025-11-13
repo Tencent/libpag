@@ -1,8 +1,11 @@
 import { MP4_CACHE_PATH } from './constant';
 import { removeFile, touchDirectory, writeFile } from './file-utils';
-import { ArrayBufferImage, FrameData } from '@tgfx/wechat/array-buffer-image';
+import { ArrayBufferImage, type FrameData } from '@tgfx/wechat/array-buffer-image';
 
 import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
+
+import type {PAGPlayer} from "../pag-player";
+import {PAGModule} from "../pag-module";
 
 declare const wx: wx;
 declare const setInterval: (callback: () => void, delay: number) => number;
@@ -28,18 +31,22 @@ export interface TimeRange {
 }
 
 export class VideoReader {
-  public static async create(
+  public static create(
     mp4Data: Uint8Array,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-  ): Promise<VideoReader> {
+  ): VideoReader {
     return new VideoReader(mp4Data, width, height, frameRate, staticTimeRanges);
   }
 
   public isSought = false; // Web SDK use this property to check if video is seeked
   public isPlaying = false; // Web SDK use this property to check if video is playing
+  public isStart = false;
+  public isStartDecode = false;
+  public isSeekAndDecode: boolean | any = null;
+
 
   private readonly frameRate: number;
   private currentFrame: number;
@@ -53,6 +60,9 @@ export class VideoReader {
   private getFrameDataLoopTimer: number | null = null;
   private seeking = false;
   private arrayBufferImage = new ArrayBufferImage(new ArrayBuffer(0), 0, 0);
+  private player: PAGPlayer | null = null;
+  private staticTimeRanges: StaticTimeRanges | null = null;
+  private isFirstFrame = false;
 
   public constructor(
     mp4Data: Uint8Array,
@@ -61,6 +71,7 @@ export class VideoReader {
     frameRate: number,
     staticTimeRanges: TimeRange[],
   ) {
+    this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
     this.frameRate = frameRate;
     this.currentFrame = -1;
     this.mp4Path = `${MP4_CACHE_PATH}${new Date().getTime()}.mp4`;
@@ -72,13 +83,29 @@ export class VideoReader {
         this.bufferIndex = 0;
       });
     });
-    this.videoDecoderPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 1 }).then(() => {
+    this.videoDecoderPromise = this.videoDecoder.start({source: this.mp4Path, mode: 1}).then((res) => {
+      console.log("videoDecoder start success,res:",res);
       this.startGetFrameDataLoop();
     });
+    this.linkPlayer(PAGModule.currentPlayer);
   }
 
   public async prepare(targetFrame: number) {
-    if (targetFrame === this.currentFrame) return;
+    if(this.bufferIndex === 0){
+      this.isFirstFrame = true;
+    }else {
+      this.isFirstFrame = false;
+    }
+    console.log("targetFrame:",targetFrame,",this.currentFrame:",this.currentFrame);
+    if (targetFrame === this.currentFrame){
+      return;
+    }
+    if (!this.isStartDecode) {
+      return;
+    }
+    if (this.isSeekAndDecode) {
+      return;
+    }
     // Wait for videoDecoder ready
     await this.videoDecoderPromise;
     if (this.frameDataBuffers.length > 0) {
@@ -92,14 +119,26 @@ export class VideoReader {
       this.frameDataBuffers = [];
     }
 
-    if (targetFrame !== this.bufferIndex) {
+    if (targetFrame !== this.bufferIndex && this.isStartDecode && !this.isSeekAndDecode) {
+      console.log("seek to ",Math.floor((targetFrame / this.frameRate) * 1000),",Date.now:",Date.now());
+      this.frameDataBuffers = [];
+      // if(this.isFirstFrame){
+      //   this.isStartDecode = false;
+      // }else {
+      this.isSeekAndDecode = true;
+      // }
       this.seeking = true;
       await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
       this.seeking = false;
+      this.bufferIndex = targetFrame;
     }
     this.arrayBufferImage.setFrameData(await this.getFrameData());
     this.currentFrame = targetFrame;
     return;
+  }
+
+  public getCurrentFrame() {
+    return this.currentFrame;
   }
 
   public getVideo() {
@@ -124,6 +163,9 @@ export class VideoReader {
   }
 
   public onDestroy() {
+    if (this.player) {
+      this.player.unlinkVideoReader(this);
+    }
     this.clearFrameDataLoop();
     this.videoDecoder.remove();
     if (this.mp4Path) {
@@ -176,6 +218,11 @@ export class VideoReader {
         this.frameDataBuffers.push(frameDataOptions2FrameData(this.bufferIndex, frameDataOptions));
       }
       this.bufferIndex += 1;
+      if (this.isSeekAndDecode !== null) {
+        this.isSeekAndDecode = false;
+      }
+      this.isStartDecode = true;
+      console.log("this.bufferIndex:",this.bufferIndex,",frameDataOptions:",frameDataOptions,",Date.now:",Date.now());
     }
   }
 
@@ -185,5 +232,32 @@ export class VideoReader {
       this.getFrameDataLoopTimer = null;
     }
     this.getFrameDataLooping = false;
+  }
+
+  private linkPlayer(player: PAGPlayer | null) {
+    this.player = player;
+    if (player) {
+      player.linkVideoReader(this);
+    }
+  }
+
+}
+
+
+export class StaticTimeRanges {
+  private timeRanges: TimeRange[];
+
+  public constructor(timeRanges: TimeRange[]) {
+    this.timeRanges = timeRanges;
+  }
+
+  public contains(targetFrame: number) {
+    if (this.timeRanges.length === 0) return false;
+    for (let timeRange of this.timeRanges) {
+      if (timeRange.start <= targetFrame && targetFrame < timeRange.end) {
+        return true;
+      }
+    }
+    return false;
   }
 }

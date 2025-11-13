@@ -139,6 +139,16 @@ export class PAGView extends NativePAGView {
     if (this.repeatedTimes < count) {
       this.eventManager.emit('onAnimationRepeat', this);
     }
+    if (this.needResetStartTime()) {
+      // The WeChat Mini Program decoder takes a long time to start decoding,
+      // so startTime needs to be reset while the first frame has not yet been decoded.
+      this.startTime = this.getNowTime() * 1000;
+    }else if(this.needAdjustStartTime()){
+      // Decoding BMP takes too much time and makes the video reader seek repeatedly.
+      // this.startTime = this.getNowTime() * 1000 - this.playTime;
+      this.startTime = this.getNowTime() * 1000;
+
+    }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
     this.playFrame = playFrame;
@@ -175,4 +185,20 @@ export class PAGView extends NativePAGView {
     this.canvasElement!.width = displaySize.width * dpr;
     this.canvasElement!.height = displaySize.height * dpr;
   }
+
+
+  protected override needAdjustStartTime() {
+    for (const VideoReader of this.player.videoReaders) {
+      if (VideoReader.isSeekAndDecode !== null && VideoReader.isSeekAndDecode) return true;
+    }
+    return false;
+  }
+
+  private needResetStartTime() {
+    for (const VideoReader of this.player.videoReaders) {
+      if (!VideoReader.isStartDecode) return true;
+    }
+    return false;
+  }
+
 }

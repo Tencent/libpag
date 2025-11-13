@@ -59,6 +59,8 @@ export class VideoReader {
   public isSought = false;
   public isPlaying = false;
   public bitmap: ImageBitmap | null = null;
+  public isStartDecode = false;
+  public isSeekAndDecode = false;
 
   private videoEl: HTMLVideoElement | null = null;
   private frameRate = 0;
@@ -71,7 +73,7 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
-  private currentFrame: number=0;
+  private currentFrame=0;
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
@@ -93,6 +95,7 @@ export class VideoReader {
       this.videoEl.height = height;
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
+        this.isStartDecode = true;
       });
       const buffer = (source as Uint8Array).slice();
       const blob = new Blob([buffer], { type: 'video/mp4' });
