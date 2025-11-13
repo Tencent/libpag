@@ -305,7 +305,7 @@ SignCertName=""
 if declare -F GetSignCertName > /dev/null;
 then
     SignCertName=$(GetSignCertName)
-    print "Get SignCertName: ${SignCertName}"
+    echo "Get SignCertName: ${SignCertName}"
 fi
 
 if security find-certificate -c "${SignCertName}" >/dev/null 2>&1;

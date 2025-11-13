@@ -206,7 +206,9 @@ $InnoSetupDir = Join-Path $SourceDir "tools" |
                 Join-Path -ChildPath "InnoSetup"
 $ISCCPath = Join-Path $InnoSetupDir "ISCC.exe"
 if (-not (Test-Path $ISCCPath)) {
-    winget install --id JRSoftware.InnoSetup -e -s winget -h -l $InnoSetupDir
+    $Installer = "$env:TEMP\innosetup.exe"
+    Invoke-WebRequest -Uri "https://www.jrsoftware.org/download.php/is.exe" -OutFile $Installer
+    Start-Process -Wait -FilePath $Installer -ArgumentList "/VERYSILENT /NORESTART /DIR=$InnoSetupDir"
     if (-not $?) {
         Write-Host "Install InnoSetup failed" -ForegroundColor Red
         exit 1
@@ -278,5 +280,5 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
 # 6 Uninstall InnoSetup
 if ($UninstallInnoSetup -eq $true) {
     Print-Text "[ Uninstall InnoSetup ]"
-    winget uninstall --id JRSoftware.InnoSetup
+    Start-Process -Wait -FilePath "$InnoSetupDir\unins000.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
 }
