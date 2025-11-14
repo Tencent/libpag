@@ -322,6 +322,7 @@ then
         "${FrameworkDir}/Sparkle.framework/Versions/Current/Sparkle"
         "${FrameworkDir}/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc"
         "${FrameworkDir}/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc"
+        "${FrameworkDir}/Sparkle.framework/Versions/Current/Updater.app/Contents/MacOS/Updater"
         "${AppDir}"
     )
 
