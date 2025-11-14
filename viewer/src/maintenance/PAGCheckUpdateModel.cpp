@@ -24,7 +24,7 @@
 
 namespace pag {
 
-static const QString ServerUrl = "https://pag.qq.com/server.html";
+static const QString ServerUrl = "https://pag.qq.com/test/server.html";
 
 PAGCheckUpdateModel::PAGCheckUpdateModel(QObject* parent) : QObject(parent) {
   threadPool = std::make_unique<QThreadPool>();
