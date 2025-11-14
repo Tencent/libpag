@@ -234,7 +234,7 @@ Copy-Item -Path $TemplateIslPath -Destination $IslPath -Force
 (Get-Content $IssPath -Raw -Encoding UTF8) -replace "~PAGViewerVersion~", $AppVersion | Set-Content $IssPath -Encoding UTF8
 & $ISCCPath $IssPath
 
-$PAGViewerInstallerPath = Join-Path $BuildDir "PAGViewer_installer.exe"
+$PAGViewerInstallerPath = Join-Path $BuildDir "PAGViewer_Installer.exe"
 if (-not (Test-Path $PAGViewerInstallerPath)) {
     Write-Host "Generate PAGViewer installer failed" -ForegroundColor Red
     exit 1
@@ -255,11 +255,11 @@ if ([string]::IsNullOrEmpty($DSAPrivateKey) -eq $false) {
 
     # 5.3 Update Appcast
     Print-Text "[ Update Appcast ]"
-    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/test/server.html" -UseBasicParsing).Content
+    $URL = (Invoke-WebRequest -Uri "https://pag.qq.com/server.html" -UseBasicParsing).Content
     if ($IsBetaVersion -eq $true) {
         $URL = $URL + "beta/"
     }
-    $URL = $URL + "PAGViewer_installer.exe"
+    $URL = $URL + "PAGViewer_Installer.exe"
 
     $FileLength = (Get-Item $PAGViewerInstallerPath).Length
 
