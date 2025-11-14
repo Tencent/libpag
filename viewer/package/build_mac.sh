@@ -440,7 +440,7 @@ then
 
         ZipLength=$(stat -f%z ${BuildDir}/${ZipFile})
 
-        URL=$(curl -s https://pag.qq.com/test/server.html)
+        URL=$(curl -s https://pag.qq.com/server.html)
         if [ "${isBetaVersion}" == true ];
         then
             URL="${URL}beta/"
