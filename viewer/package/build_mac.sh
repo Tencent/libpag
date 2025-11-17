@@ -56,11 +56,11 @@ AESDKPath="${PAG_AE_SDK_Path}"
 
 # 2 Compile
 print "[ Compile ]"
-PAGEnterprisePath=""
-if declare -F GetPAGEnterprisePath > /dev/null;
+PAGPath=""
+if declare -F GetPAGPath > /dev/null;
 then
-    PAGEnterprisePath=$(GetPAGEnterprisePath)
-    print "Get PAGEnterprisePath: ${PAGEnterprisePath}"
+    PAGPath=$(GetPAGPath)
+    echo "Get PAGPath: ${PAGPath}"
 fi
 
 x86_64BuildDir="${BuildDir}/build_x86_64"
@@ -107,7 +107,7 @@ fi
 print "[ Compile x86_64 ]"
 x86_64BuildDir="${BuildDir}/build_x86_64"
 
-cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
+cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-x86_64 failed"
@@ -125,7 +125,7 @@ fi
 print "[ Compile arm64 ]"
 arm64BuildDir="${BuildDir}/build_arm64"
 
-cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_ENTERPRISE_PATH="${PAGEnterprisePath}"
+cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-arm64 failed"
