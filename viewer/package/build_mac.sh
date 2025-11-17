@@ -63,6 +63,13 @@ then
     echo "Get PAGPath: ${PAGPath}"
 fi
 
+PAGOptions=""
+if declare -F GetPAGOptions > /dev/null;
+then
+    PAGOptions=$(GetPAGOptions)
+    echo "Get PAGOptions: ${PAGOptions}"
+fi
+
 x86_64BuildDir="${BuildDir}/build_x86_64"
 arm64BuildDir="${BuildDir}/build_arm64"
 
@@ -107,7 +114,7 @@ fi
 print "[ Compile x86_64 ]"
 x86_64BuildDir="${BuildDir}/build_x86_64"
 
-cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}"
+cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-x86_64 failed"
@@ -125,7 +132,7 @@ fi
 print "[ Compile arm64 ]"
 arm64BuildDir="${BuildDir}/build_arm64"
 
-cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}"
+cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
 if [ $? -ne 0 ];
 then
     echo "Build PAGViewer-arm64 failed"

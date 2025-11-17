@@ -1,4 +1,4 @@
-param($PAGPath, $DSAPrivateKey)
+param($PAGPath, $PAGOptions, $DSAPrivateKey)
 
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
@@ -129,7 +129,7 @@ if (-not $?) {
 
 # 2.4 Compile PAGViewer
 Print-Text "[ Compile PAGViewer ]"
-cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DPAG_PATH="${PAGPath}"
+cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
 if (-not $?) {
     Write-Host "Build PAGViewer-x64 failed" -ForegroundColor Red
     exit 1
