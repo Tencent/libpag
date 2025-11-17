@@ -403,7 +403,7 @@ PAGWindow {
         settings.isEditPanelOpen = willOpen;
         mainForm.isEditPanelOpen = willOpen;
         if (willOpen) {
-            let widthChange = mainForm.rightItemLoader.width;
+            let widthChange = Math.max(mainForm.rightItemLoader.width, mainForm.minPanelWidth);
             if (viewWindow.visibility === Window.FullScreen) {
                 mainForm.centerItem.width = viewWindow.width - widthChange;
             } else {
@@ -419,7 +419,7 @@ PAGWindow {
             } else if ((viewWindow.width + widthChange) < viewWindow.minimumWidth) {
                 viewWindow.width = viewWindow.minimumWidth;
             } else {
-                viewWindow.width = viewWindow.width + widthChange;
+                viewWindow.width = viewWindow.width + widthChange - mainForm.splitHandleWidth;
             }
         }
     }

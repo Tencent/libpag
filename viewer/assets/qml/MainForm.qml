@@ -21,9 +21,9 @@ SplitView {
 
     property int minPanelWidth: 300
 
-    property int splitHandleWidth: 0
+    property int splitHandleWidth: 3
 
-    property int splitHandleHeight: 0
+    property int splitHandleHeight: splitView.height
 
     property int controlFormHeight: 76
 
@@ -222,195 +222,189 @@ SplitView {
                                 }
                             }
 
-                            Column {
-                                spacing: 0
-                                width: parent.width
+                            Rectangle {
+                                height: editArea.height
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                visible: !textListContainer.visible && !imageListContainer.visible
+                                color: "#20202A"
+                                Text {
+                                    color: "#80ffffff"
+                                    text: qsTr("No layer was editable")
+                                    font.pixelSize: 12
+                                    verticalAlignment: Text.AlignVCenter
+                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.fill: parent
+                                }
+                            }
 
-                                Rectangle {
+                            Rectangle {
+                                id: textListContainer
+                                height: isTextListOpen ? (pagView.editableTextLayerCount * 40 + 44) : 32
+                                visible: pagView.editableTextLayerCount > 0
+                                color: "#20202A"
+                                anchors.left: parent.left
+                                anchors.leftMargin: 0
+                                anchors.right: parent.right
+                                anchors.rightMargin: 0
+
+                                Row {
+                                    id: textListTitle
+                                    spacing: 0
                                     width: parent.width
-                                    height: editArea.height
-                                    visible: !textListContainer.visible && !imageListContainer.visible
-                                    color: "#20202A"
+                                    height: 21
+                                    anchors.top: parent.top
+                                    anchors.topMargin: 5
+
+                                    Item {
+                                        width: 5
+                                        height: 1
+                                    }
+
+                                    CheckBox {
+                                        id: textListCheckBox
+                                        width: 20
+                                        height: 21
+                                        anchors.top: parent.top
+                                        checked: isTextListOpen
+                                        rotation: isTextListOpen ? 0 : -90
+
+                                        indicator: Image {
+                                            width: parent.width
+                                            height: parent.height
+                                            source: "qrc:/images/icon-collapse.png"
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onPressed: function (mouse) {
+                                                    mouse.accepted = false;
+                                                }
+                                            }
+                                        }
+
+                                        onClicked: {
+                                            splitView.isTextListOpen = !splitView.isTextListOpen;
+                                        }
+                                    }
+
+                                    Item {
+                                        width: 5
+                                        height: 1
+                                    }
+
                                     Text {
-                                        color: "#80ffffff"
-                                        text: qsTr("No layer was editable")
+                                        id: textListTitleText
+                                        height: 20
+                                        anchors.top: parent.top
+                                        text: qsTr("Edit Text")
                                         font.pixelSize: 12
+                                        renderType: Text.NativeRendering
+                                        color: "#9B9B9B"
                                         verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                        anchors.fill: parent
                                     }
                                 }
 
-                                Rectangle {
-                                    id: textListContainer
-                                    width: parent.width
-                                    height: isTextListOpen ? (pagView.editableTextLayerCount * 40 + 44) : 32
-                                    visible: pagView.editableTextLayerCount > 0
-                                    color: "#20202A"
+                                TextListView {
+                                    id: textListView
+                                    height: pagView.editableTextLayerCount * 40
+                                    textHeight: 40
+                                    textModel: textLayerModel
+                                    visible: isTextListOpen && height > 0
+                                    anchors.top: textListTitle.bottom
+                                    anchors.topMargin: 5
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 10
                                     anchors.left: parent.left
-                                    anchors.leftMargin: 0
+                                    anchors.leftMargin: 15
                                     anchors.right: parent.right
-                                    anchors.rightMargin: 0
+                                    anchors.rightMargin: 15
+                                    clip: true
+                                }
+                            }
 
-                                    Row {
-                                        id: textListTitle
-                                        spacing: 0
-                                        width: parent.width
+                            Rectangle {
+                                id: imageListContainer
+                                height: isImageListOpen ? (pagView.editableImageLayerCount * 60 + 44) : 32
+                                visible: pagView.editableImageLayerCount > 0
+                                color: "#20202A"
+                                anchors.left: parent.left
+                                anchors.leftMargin: 0
+                                anchors.right: parent.right
+                                anchors.rightMargin: 0
+
+                                Row {
+                                    id: imageListTitle
+                                    spacing: 0
+                                    width: parent.width
+                                    height: 21
+                                    anchors.top: parent.top
+                                    anchors.topMargin: 5
+
+                                    Item {
+                                        width: 5
+                                        height: 1
+                                    }
+
+                                    CheckBox {
+                                        id: imageListCheckBox
+                                        width: 20
                                         height: 21
                                         anchors.top: parent.top
-                                        anchors.topMargin: 5
+                                        checked: isImageListOpen
+                                        rotation: isImageListOpen ? 0 : -90
 
-                                        Item {
-                                            width: 5
-                                            height: 1
-                                        }
-
-                                        CheckBox {
-                                            id: textListCheckBox
-                                            width: 20
-                                            height: 21
-                                            anchors.top: parent.top
-                                            checked: isTextListOpen
-                                            rotation: isTextListOpen ? 0 : -90
-
-                                            indicator: Image {
-                                                width: parent.width
-                                                height: parent.height
-                                                source: "qrc:/images/icon-collapse.png"
-                                                MouseArea {
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onPressed: function (mouse) {
-                                                        mouse.accepted = false;
-                                                    }
+                                        indicator: Image {
+                                            width: parent.width
+                                            height: parent.height
+                                            source: "qrc:/images/icon-collapse.png"
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onPressed: function (mouse) {
+                                                    mouse.accepted = false;
                                                 }
                                             }
-
-                                            onClicked: {
-                                                splitView.isTextListOpen = !splitView.isTextListOpen;
-                                            }
                                         }
 
-                                        Item {
-                                            width: 5
-                                            height: 1
-                                        }
-
-                                        Text {
-                                            id: textListTitleText
-                                            height: 20
-                                            anchors.top: parent.top
-                                            text: qsTr("Edit Text")
-                                            font.pixelSize: 12
-                                            renderType: Text.NativeRendering
-                                            color: "#9B9B9B"
-                                            verticalAlignment: Text.AlignVCenter
+                                        onClicked: {
+                                            splitView.isImageListOpen = !splitView.isImageListOpen;
                                         }
                                     }
 
-                                    TextListView {
-                                        id: textListView
-                                        height: pagView.editableTextLayerCount * 40
-                                        textHeight: 40
-                                        textModel: textLayerModel
-                                        visible: isTextListOpen && height > 0
-                                        anchors.top: textListTitle.bottom
-                                        anchors.topMargin: 5
-                                        anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 10
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 15
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 15
-                                        clip: true
+                                    Item {
+                                        width: 5
+                                        height: 1
+                                    }
+
+                                    Text {
+                                        id: imageListTitleText
+                                        height: 20
+                                        anchors.top: parent.top
+                                        text: qsTr("Edit Image")
+                                        font.pixelSize: 12
+                                        renderType: Text.NativeRendering
+                                        color: "#9B9B9B"
+                                        verticalAlignment: Text.AlignVCenter
                                     }
                                 }
 
-                                Rectangle {
-                                    id: imageListContainer
-                                    width: parent.width
-                                    height: isImageListOpen ? (pagView.editableImageLayerCount * 60 + 44) : 32
-                                    visible: pagView.editableImageLayerCount > 0
-                                    color: "#20202A"
+                                ImageListView {
+                                    id: imageListView
+                                    height: pagView.editableImageLayerCount * 60
+                                    imageHeight: 60
+                                    imageModel: imageLayerModel
+                                    visible: isImageListOpen && height > 0
+                                    anchors.top: imageListTitle.bottom
+                                    anchors.topMargin: 5
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 10
                                     anchors.left: parent.left
-                                    anchors.leftMargin: 0
+                                    anchors.leftMargin: 15
                                     anchors.right: parent.right
-                                    anchors.rightMargin: 0
-
-                                    Row {
-                                        id: imageListTitle
-                                        spacing: 0
-                                        width: parent.width
-                                        height: 21
-                                        anchors.top: parent.top
-                                        anchors.topMargin: 5
-
-                                        Item {
-                                            width: 5
-                                            height: 1
-                                        }
-
-                                        CheckBox {
-                                            id: imageListCheckBox
-                                            width: 20
-                                            height: 21
-                                            anchors.top: parent.top
-                                            checked: isImageListOpen
-                                            rotation: isImageListOpen ? 0 : -90
-
-                                            indicator: Image {
-                                                width: parent.width
-                                                height: parent.height
-                                                source: "qrc:/images/icon-collapse.png"
-                                                MouseArea {
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onPressed: function (mouse) {
-                                                        mouse.accepted = false;
-                                                    }
-                                                }
-                                            }
-
-                                            onClicked: {
-                                                splitView.isImageListOpen = !splitView.isImageListOpen;
-                                            }
-                                        }
-
-                                        Item {
-                                            width: 5
-                                            height: 1
-                                        }
-
-                                        Text {
-                                            id: imageListTitleText
-                                            height: 20
-                                            anchors.top: parent.top
-                                            text: qsTr("Edit Image")
-                                            font.pixelSize: 12
-                                            renderType: Text.NativeRendering
-                                            color: "#9B9B9B"
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-                                    }
-
-                                    ImageListView {
-                                        id: imageListView
-                                        height: pagView.editableImageLayerCount * 60
-                                        imageHeight: 60
-                                        imageModel: imageLayerModel
-                                        visible: isImageListOpen && height > 0
-                                        anchors.top: imageListTitle.bottom
-                                        anchors.topMargin: 5
-                                        anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 10
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 15
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 15
-                                        clip: true
-                                    }
+                                    anchors.rightMargin: 15
+                                    clip: true
                                 }
                             }
                         }
