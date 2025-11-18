@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <QProcess>
 #include <array>
 #include <string>
 #include <vector>
@@ -66,5 +67,6 @@ class OfflineVideoEncoder : public VideoEncoder {
   std::array<uint8_t, 1024> header[2] = {{0}, {0}};
   std::vector<uint8_t> data[3] = {};
   std::vector<uint8_t> h264Buf = {};
+  std::unique_ptr<QProcess> process = nullptr;
 };
 }  // namespace exporter

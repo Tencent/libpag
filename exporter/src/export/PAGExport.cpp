@@ -55,6 +55,8 @@ static void AdjustSequenceCompositionSize(pag::Composition* mainComposition) {
   for (auto sequence : static_cast<T>(mainComposition)->sequences) {
     if (mainComposition->width < sequence->width) {
       mainComposition->width = sequence->width;
+    }
+    if (mainComposition->height < sequence->height) {
       mainComposition->height = sequence->height;
     }
   }

@@ -73,15 +73,15 @@ OfflineVideoEncoder::~OfflineVideoEncoder() {
   std::string inEndFile = JoinPaths(rootPath, "InEnd.txt");
   writeEndParam(true, true, inEndFile);
 
-  for (int i = 0; i < SleepCount; i++) {
-    bool hasEnd = false;
-    bool earlyExit = false;
-    std::string outEndFile = JoinPaths(rootPath, "OutEnd.txt");
-    bool ret = readEndParam(hasEnd, earlyExit, outEndFile);
-    if (ret && (hasEnd || earlyExit)) {
-      break;
-    }
-    std::this_thread::sleep_for(std::chrono::microseconds(SleepUS));
+  if (process && process->state() == QProcess::Running) {
+    process->waitForFinished(10000);
+  }
+  bool hasEnd = false;
+  bool earlyExit = false;
+  std::string outEndFile = JoinPaths(rootPath, "OutEnd.txt");
+  bool ret = readEndParam(hasEnd, earlyExit, outEndFile);
+  if (!ret || !(hasEnd || earlyExit)) {
+    process->kill();
   }
 }
 
@@ -122,8 +122,9 @@ bool OfflineVideoEncoder::open(int width, int height, double frameRate, bool has
           .toStdString();
   WriteTextFile(encodeParamFilePath, paramStr);
 
+  QString workingDirectory = QString::fromStdString(GetH264EncoderToolsFolder());
   QString toolExecutable =
-      QString::fromStdString(JoinPaths(GetH264EncoderToolsFolder(), "H264EncoderTools"));
+      QString::fromStdString(JoinPaths(workingDirectory.toStdString(), "H264EncoderTools"));
 #ifdef _WIN32
   if (!toolExecutable.endsWith(".exe")) {
     toolExecutable.append(".exe");
@@ -137,9 +138,11 @@ bool OfflineVideoEncoder::open(int width, int height, double frameRate, bool has
   }
   QStringList arguments;
   arguments << offlineFolderPath;
-  QProcess::startDetached(toolExecutable, arguments);
+  process = std::make_unique<QProcess>();
+  process->setWorkingDirectory(workingDirectory);
+  process->start(toolExecutable, arguments);
 
-  return true;
+  return process->waitForStarted();
 }
 
 void OfflineVideoEncoder::close() {
