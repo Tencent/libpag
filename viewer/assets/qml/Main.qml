@@ -57,6 +57,15 @@ PAGWindow {
         id: mainForm
         resizeHandleSize: resizeHandleSize
 
+        centerItem {
+            onWidthChanged: {
+                resizePAGView();
+            }
+            onHeightChanged: {
+                resizePAGView();
+            }
+        }
+
         pagView {
             showVideoFrames: settings.isShowVideoFrames
             onProgressChanged: function (progress) {
@@ -422,6 +431,27 @@ PAGWindow {
                 viewWindow.width = viewWindow.width + widthChange - mainForm.splitHandleWidth;
             }
         }
+    }
+
+    function resizePAGView() {
+        let width = mainForm.pagView.pagHeight;
+        let height = mainForm.pagView.pagWidth;
+        let windowWidth = mainForm.centerItem.width;
+        let windowHeight = mainForm.centerItem.height - mainForm.controlForm.height;
+        let finalHeight = 1;
+        let finalWidth = 1;
+        let pagIsNarrower = height / width > windowHeight / windowWidth;
+        if (pagIsNarrower) {
+            finalHeight = windowHeight;
+            finalWidth = finalHeight / height * width;
+        } else {
+            finalWidth = windowWidth;
+            finalHeight = finalWidth / width * height;
+        }
+        mainForm.pagView.width = finalWidth;
+        mainForm.pagView.height = finalHeight;
+        mainForm.pagView.x = (windowWidth - finalWidth) / 2;
+        mainForm.pagView.y = (windowHeight - finalHeight) / 2;
     }
 
     function updateAvailable(hasNewVersion) {

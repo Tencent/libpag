@@ -69,10 +69,10 @@ SplitView {
         }
         PAGView {
             id: pagView
+            x: 0
+            y: 0
+            width: parent.width
             height: splitView.height - controlFormHeight
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
             objectName: "pagView"
         }
         ControlForm {

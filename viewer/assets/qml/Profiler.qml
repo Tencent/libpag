@@ -495,4 +495,8 @@ Item {
     Component.onCompleted: {
         runTimeDataModel.chartDataSize = Math.max(60, (graphCanvas.width + 1) / 4);
     }
+
+    onWidthChanged: {
+        runTimeDataModel.chartDataSize = Math.max(60, (graphCanvas.width + 1) / 4);
+    }
 }

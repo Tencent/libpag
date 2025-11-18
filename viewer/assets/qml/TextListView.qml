@@ -16,9 +16,8 @@ ListView {
     boundsMovement: Flickable.StopAtBounds
 
     delegate: Rectangle {
+        width: listView.width
         height: textHeight
-        anchors.left: parent.left
-        anchors.right: parent.right
         color: "#20202A"
 
         Rectangle {

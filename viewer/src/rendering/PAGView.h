@@ -20,6 +20,7 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
+#include <QTimer>
 #include "pag/pag.h"
 #include "platform/qt/GPUDrawable.h"
 #include "rendering/PAGRenderThread.h"
@@ -68,6 +69,7 @@ class PAGView : public QQuickItem {
   void setIsPlaying(bool isPlaying);
   void setShowVideoFrames(bool isShow);
   void setProgress(double progress);
+  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   Q_SIGNAL void editableTextLayerCountChanged(int editableTextLayerCount);
   Q_SIGNAL void editableImageLayerCountChanged(int editableImageLayerCount);
@@ -78,6 +80,7 @@ class PAGView : public QQuickItem {
   Q_SIGNAL void pagFileChanged(std::shared_ptr<pag::PAGFile> pagFile);
 
   Q_SLOT void flush() const;
+  Q_SLOT void sizeChangedDelayHandle();
 
   Q_INVOKABLE bool setFile(const QString& filePath);
   Q_INVOKABLE void firstFrame();
@@ -93,6 +96,7 @@ class PAGView : public QQuickItem {
   int editableImageLayerCount = 0;
   int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
+  std::atomic_bool sizeChanged = false;
   qreal lastWidth = 0;
   qreal lastHeight = 0;
   qreal lastPixelRatio = 1;
@@ -102,6 +106,7 @@ class PAGView : public QQuickItem {
   std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
+  std::shared_ptr<QTimer> resizeTimer = nullptr;
 
   friend class PAGRenderThread;
 };

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <QSize>
 #include <QThread>
 
 namespace pag {
@@ -33,9 +34,15 @@ class PAGRenderThread : public QThread {
                                       int64_t imageDecodeTime);
 
   Q_SLOT void flush();
+  Q_SLOT void forceFlush();
   Q_SLOT void shutDown();
 
  private:
+  void flushInternal();
+  bool adjustBufferSize();
+
+  double progress = 0.0;
+  QSize bufferSize = {0, 0};
   PAGView* pagView = nullptr;
 };
 }  // namespace pag
