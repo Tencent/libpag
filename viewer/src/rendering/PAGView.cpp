@@ -32,12 +32,20 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   renderThread = std::make_unique<PAGRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
   drawable->moveToThread(renderThread.get());
+  resizeTimer = std::make_unique<QTimer>();
+  connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
 }
 
 void PAGView::flush() const {
   if (isPlaying_) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
+}
+
+void PAGView::sizeChangedDelayHandle() {
+  resizeTimer->stop();
+  sizeChanged = true;
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
 PAGView::~PAGView() {
@@ -191,6 +199,14 @@ void PAGView::setProgress(double progress) {
   QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
+void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
+  if (newGeometry == oldGeometry) {
+    return;
+  }
+  QQuickItem::geometryChange(newGeometry, oldGeometry);
+  resizeTimer->start(400);
+}
+
 bool PAGView::setFile(const QString& filePath) {
   auto strPath = std::string(filePath.toLocal8Bit());
   if (filePath.startsWith("file://")) {
@@ -209,6 +225,7 @@ bool PAGView::setFile(const QString& filePath) {
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
+  sizeChanged = true;
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(strPath);
@@ -256,17 +273,6 @@ void PAGView::previousFrame() {
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (!renderThread->isRunning()) {
     renderThread->start();
-  }
-
-  if (lastWidth != width() || lastHeight != height() ||
-      lastPixelRatio != window()->devicePixelRatio()) {
-    lastWidth = width();
-    lastHeight = height();
-    lastPixelRatio = window()->devicePixelRatio();
-    auto pagSurface = pagPlayer->getSurface();
-    if (pagSurface) {
-      pagSurface->updateSize();
-    }
   }
 
   auto node = static_cast<QSGImageNode*>(oldNode);
