@@ -102,11 +102,11 @@ class PAGView : public QQuickItem {
   qreal lastPixelRatio = 1;
   double progress = 0.0;
   double progressPerFrame = 0.0;
+  std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
   std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
-  std::shared_ptr<QTimer> resizeTimer = nullptr;
 
   friend class PAGRenderThread;
 };

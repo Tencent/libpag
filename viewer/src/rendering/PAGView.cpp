@@ -32,7 +32,7 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   renderThread = std::make_unique<PAGRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
   drawable->moveToThread(renderThread.get());
-  resizeTimer = std::make_shared<QTimer>();
+  resizeTimer = std::make_unique<QTimer>();
   resizeTimer->stop();
   connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
 }
