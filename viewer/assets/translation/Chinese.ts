@@ -375,8 +375,13 @@
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="19"/>
-        <source>Video sequence frame comparison consumes performance</source>
-        <translation>视频序列帧比较消耗性能</translation>
+        <source>Using too many video sequences can slow performance</source>
+        <translation>视频序列过多会导致性能下降</translation>
+    </message>
+    <message>
+        <location filename="../qml/Profiler.qml" line="23"/>
+        <source>Limit video sequences to two or fewer</source>
+        <translation>建议将视频序列帧数量控制在两个以内</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="21"/>
@@ -387,11 +392,6 @@
         <location filename="../qml/Profiler.qml" line="22"/>
         <source>Sticker scale is too large, suggest reducing sticker scale</source>
         <translation>可能和贴纸缩放大小有关，建议减少贴纸缩放程度</translation>
-    </message>
-    <message>
-        <location filename="../qml/Profiler.qml" line="23"/>
-        <source>Template material pre PAG file must be less than or equal to 2</source>
-        <translation>模板素材单个 PAG 文件必须小于等于2</translation>
     </message>
     <message>
         <location filename="../qml/Profiler.qml" line="77"/>

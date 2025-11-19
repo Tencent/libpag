@@ -16,11 +16,11 @@ Item {
     property var performanceWarn1: qsTr("Rendering time too long, suggest optimizing time cost to under %1 us")
     property var performanceWarn2: qsTr("Memory usage is too large, suggest optimizing memory cost to under 50M")
     property var performanceWarn3: qsTr("(Run performance benchmark, results will be more accurate)")
-    property var performanceWarn4: qsTr("Video sequence frame comparison consumes performance")
+    property var performanceWarn4: qsTr("Using too many video sequences can slow performance")
 
     property var performanceTip1: qsTr("Too many layers, Suggest combining same layers into composition")
     property var performanceTip2: qsTr("Sticker scale is too large, suggest reducing sticker scale")
-    property var performanceTip3: qsTr("Template material pre PAG file must be less than or equal to 2")
+    property var performanceTip3: qsTr("Limit video sequences to two or fewer")
 
     width: defaultWidth
     height: defaultHeight
