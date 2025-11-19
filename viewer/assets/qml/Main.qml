@@ -434,8 +434,8 @@ PAGWindow {
     }
 
     function resizePAGView() {
-        let width = mainForm.pagView.pagHeight;
-        let height = mainForm.pagView.pagWidth;
+        let width = mainForm.pagView.pagWidth;
+        let height = mainForm.pagView.pagHeight;
         let windowWidth = mainForm.centerItem.width;
         let windowHeight = mainForm.centerItem.height - mainForm.controlForm.height;
         let finalHeight = 1;

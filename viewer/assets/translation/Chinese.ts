@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1">
+<TS version="2.1" language="zh_CN">
 <context>
     <name>AboutWindow</name>
     <message>
@@ -65,56 +65,56 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="153"/>
+        <location filename="../qml/Main.qml" line="162"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="182"/>
+        <location filename="../qml/Main.qml" line="191"/>
         <source>About PAGViewer</source>
         <translation>关于PAGViewer</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="208"/>
+        <location filename="../qml/Main.qml" line="217"/>
         <source>Select Save Path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="305"/>
+        <location filename="../qml/Main.qml" line="314"/>
         <source>Performance Benchmark Test</source>
         <translation>性能基准测试</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="306"/>
+        <location filename="../qml/Main.qml" line="315"/>
         <source>Performance Benchmark Test Complete</source>
         <translation>性能基准测试已完成</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="326"/>
+        <location filename="../qml/Main.qml" line="337"/>
         <source>Export failed, error code: </source>
         <translation>导出错误，错误码：</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="447"/>
+        <location filename="../qml/Main.qml" line="479"/>
         <source>Open PAG File</source>
         <translation>打开PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="511"/>
-        <location filename="../qml/Main.qml" line="536"/>
-        <location filename="../qml/Main.qml" line="559"/>
+        <location filename="../qml/Main.qml" line="543"/>
+        <location filename="../qml/Main.qml" line="568"/>
+        <location filename="../qml/Main.qml" line="591"/>
         <source>Select save path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="522"/>
-        <location filename="../qml/Main.qml" line="543"/>
-        <location filename="../qml/Main.qml" line="568"/>
+        <location filename="../qml/Main.qml" line="554"/>
+        <location filename="../qml/Main.qml" line="575"/>
+        <location filename="../qml/Main.qml" line="600"/>
         <source>Exporting</source>
         <translation>正在导出</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="586"/>
+        <location filename="../qml/Main.qml" line="618"/>
         <source>Profiling</source>
         <translation>分析</translation>
     </message>
@@ -123,8 +123,8 @@
     <name>MainForm</name>
     <message>
         <location filename="../qml/MainForm.qml" line="115"/>
-        <source>点击菜单，或拖放到这里打开一个PAG文件</source>
-        <translation></translation>
+        <source>Click the menu or drag-drop here to open a PAG file</source>
+        <translation>点击菜单，或拖放到这里打开一个PAG文件</translation>
     </message>
     <message>
         <location filename="../qml/MainForm.qml" line="169"/>
@@ -137,17 +137,17 @@
         <translation>文件结构</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="236"/>
+        <location filename="../qml/MainForm.qml" line="233"/>
         <source>No layer was editable</source>
         <translation>没有可以编辑的图层</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="304"/>
+        <location filename="../qml/MainForm.qml" line="300"/>
         <source>Edit Text</source>
         <translation>文本编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="390"/>
+        <location filename="../qml/MainForm.qml" line="385"/>
         <source>Edit Image</source>
         <translation>图片编辑</translation>
     </message>
@@ -374,17 +374,27 @@
         <translation>（运行一下性能基准测试，结果会更加准确）</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="20"/>
+        <location filename="../qml/Profiler.qml" line="19"/>
+        <source>Video sequence frame comparison consumes performance</source>
+        <translation>视频序列帧比较消耗性能</translation>
+    </message>
+    <message>
+        <location filename="../qml/Profiler.qml" line="21"/>
         <source>Too many layers, Suggest combining same layers into composition</source>
         <translation>可能和 Layer 图层数量过多有关，建议使用预合成的方式合并相同图层</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="21"/>
+        <location filename="../qml/Profiler.qml" line="22"/>
         <source>Sticker scale is too large, suggest reducing sticker scale</source>
         <translation>可能和贴纸缩放大小有关，建议减少贴纸缩放程度</translation>
     </message>
     <message>
-        <location filename="../qml/Profiler.qml" line="73"/>
+        <location filename="../qml/Profiler.qml" line="23"/>
+        <source>Template material pre PAG file must be less than or equal to 2</source>
+        <translation>模板素材单个 PAG 文件必须小于等于2</translation>
+    </message>
+    <message>
+        <location filename="../qml/Profiler.qml" line="77"/>
         <source>File Info</source>
         <translation>文件信息</translation>
     </message>
@@ -438,52 +448,52 @@
         <translation>字体</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="240"/>
+        <location filename="../qml/TextEditDialog.qml" line="241"/>
         <source>Style</source>
         <translation>风格</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="362"/>
+        <location filename="../qml/TextEditDialog.qml" line="364"/>
         <source>Size</source>
         <translation>大小</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="411"/>
+        <location filename="../qml/TextEditDialog.qml" line="413"/>
         <source>Bold</source>
         <translation>粗体</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="451"/>
+        <location filename="../qml/TextEditDialog.qml" line="453"/>
         <source>Italic</source>
         <translation>斜体</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="501"/>
+        <location filename="../qml/TextEditDialog.qml" line="503"/>
         <source>Color</source>
         <translation>颜色</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="565"/>
+        <location filename="../qml/TextEditDialog.qml" line="567"/>
         <source>Stroke</source>
         <translation>描边</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="648"/>
+        <location filename="../qml/TextEditDialog.qml" line="650"/>
         <source>Width</source>
         <translation>宽</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="676"/>
+        <location filename="../qml/TextEditDialog.qml" line="678"/>
         <source>Text</source>
         <translation>文本</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="751"/>
+        <location filename="../qml/TextEditDialog.qml" line="753"/>
         <source>Confirm</source>
         <translation>确认</translation>
     </message>
     <message>
-        <location filename="../qml/TextEditDialog.qml" line="771"/>
+        <location filename="../qml/TextEditDialog.qml" line="773"/>
         <source>Select Color</source>
         <translation>选择颜色</translation>
     </message>
@@ -491,7 +501,7 @@
 <context>
     <name>TextListView</name>
     <message>
-        <location filename="../qml/TextListView.qml" line="110"/>
+        <location filename="../qml/TextListView.qml" line="109"/>
         <source>Edit</source>
         <translation>编辑</translation>
     </message>
