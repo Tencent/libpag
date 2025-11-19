@@ -70,19 +70,7 @@ static bool WriteYUVData(uint8_t* data[4], int stride[4], int width, int height,
 }
 
 OfflineVideoEncoder::~OfflineVideoEncoder() {
-  std::string inEndFile = JoinPaths(rootPath, "InEnd.txt");
-  writeEndParam(true, true, inEndFile);
-
-  if (process && process->state() == QProcess::Running) {
-    process->waitForFinished(10000);
-  }
-  bool hasEnd = false;
-  bool earlyExit = false;
-  std::string outEndFile = JoinPaths(rootPath, "OutEnd.txt");
-  bool ret = readEndParam(hasEnd, earlyExit, outEndFile);
-  if (!ret || !(hasEnd || earlyExit)) {
-    process->kill();
-  }
+  close();
 }
 
 bool OfflineVideoEncoder::open(int width, int height, double frameRate, bool hasAlpha,
@@ -146,8 +134,23 @@ bool OfflineVideoEncoder::open(int width, int height, double frameRate, bool has
 }
 
 void OfflineVideoEncoder::close() {
+  if (process == nullptr) {
+    return;
+  }
   std::string endFile = JoinPaths(rootPath, "InEnd.txt");
   writeEndParam(true, false, endFile);
+
+  if (process->state() == QProcess::Running) {
+    process->waitForFinished(10000);
+  }
+  bool hasEnd = false;
+  bool earlyExit = false;
+  std::string outEndFile = JoinPaths(rootPath, "OutEnd.txt");
+  bool ret = readEndParam(hasEnd, earlyExit, outEndFile);
+  if (!ret || !(hasEnd || earlyExit)) {
+    process->kill();
+  }
+  process = nullptr;
 }
 
 void OfflineVideoEncoder::getInputFrameBuf(uint8_t* data[], int stride[]) {
