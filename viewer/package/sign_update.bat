@@ -1,4 +1,4 @@
-@echo on
+@echo off
 
 set argC=0
 for %%i in (%*) do set /A argC+=1
@@ -8,6 +8,5 @@ if not "%argC%"=="3" (
   exit /b 1
 )
 
-set Base64Code="%~1" dgst -sha1 -binary < "%~2" | "%~1" dgst -sha1 -sign "%~3" | "%~1" enc -base64
-echo %Base64Code%
-echo %Base64Code% > base64code.txt
+"%~1" dgst -sha1 -binary < "%~2" | "%~1" dgst -sha1 -sign "%~3" | "%~1" enc -base64 > base64code.txt
+type base64code.txt
