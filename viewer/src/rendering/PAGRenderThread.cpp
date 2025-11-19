@@ -45,13 +45,6 @@ void PAGRenderThread::flush() {
   QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
 }
 
-void PAGRenderThread::forceFlush() {
-  if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
-    return;
-  }
-  flushInternal();
-}
-
 void PAGRenderThread::shutDown() {
   if (QGuiApplication::instance()) {
     auto mainThread = QGuiApplication::instance()->thread();

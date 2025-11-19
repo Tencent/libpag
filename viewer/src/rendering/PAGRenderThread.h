@@ -34,7 +34,6 @@ class PAGRenderThread : public QThread {
                                       int64_t imageDecodeTime);
 
   Q_SLOT void flush();
-  Q_SLOT void forceFlush();
   Q_SLOT void shutDown();
 
  private:
