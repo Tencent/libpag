@@ -153,7 +153,7 @@ ListView {
         visible: false
         title: "Please select a file"
         fileMode: FileDialog.OpenFile
-        nameFilters: ["Replacement files (*.jpg *.jpeg *.bmp *.png)"]
+        nameFilters: ["Replacement files (*.jpg *.jpeg *.bmp *.png *.mp4 *.mov)"]
         onAccepted: {
             let file = selectImageDialog.selectedFile;
             imageModel.changeImage(selectIndex, file);

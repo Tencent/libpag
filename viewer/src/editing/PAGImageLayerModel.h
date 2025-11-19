@@ -28,6 +28,8 @@ class PAGImageLayerModel : public QAbstractListModel {
  public:
   enum class PAGImageLayerRoles { IndexRole = Qt::UserRole + 1, ReveryRole };
 
+  static QImage GetVideoFirstFrame(const QString& filePath);
+
   explicit PAGImageLayerModel(QObject* parent = nullptr);
 
   int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
