@@ -103,11 +103,11 @@ void PAGWindow::open() {
           &PAGRunTimeDataModel::setPAGFile);
   connect(pagView, &PAGView::pagFileChanged, textLayerModel.get(), &PAGTextLayerModel::setPAGFile);
   connect(textLayerModel.get(), &PAGTextLayerModel::textChanged, renderThread,
-          &PAGRenderThread::forceFlush);
+          &PAGRenderThread::flush);
   connect(pagView, &PAGView::pagFileChanged, imageLayerModel.get(),
           &PAGImageLayerModel::setPAGFile);
   connect(imageLayerModel.get(), &PAGImageLayerModel::imageChanged, renderThread,
-          &PAGRenderThread::forceFlush);
+          &PAGRenderThread::flush);
   connect(renderThread, &PAGRenderThread::frameTimeMetricsReady, runTimeDataModel.get(),
           &PAGRunTimeDataModel::updateData);
 }

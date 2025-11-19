@@ -29,17 +29,26 @@ void PAGRenderThread::flush() {
   if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
     return;
   }
-  auto needRender = adjustBufferSize();
-  if (needRender) {
-    flushInternal();
+  if (pagView->sizeChanged) {
+    pagView->sizeChanged = false;
+    auto pagSurface = pagView->pagPlayer->getSurface();
+    pagSurface->updateSize();
   }
+  pagView->pagPlayer->flush();
+  double progress = pagView->pagFile->getProgress();
+  int64_t currentFrame =
+      static_cast<int64_t>(std::round((pagView->getTotalFrame().toDouble() - 1) * progress));
+  int64_t renderingTime = pagView->pagPlayer->renderingTime();
+  int64_t presentingTime = pagView->pagPlayer->presentingTime();
+  int64_t imageDecodingTime = pagView->pagPlayer->imageDecodingTime();
+  Q_EMIT frameTimeMetricsReady(currentFrame, renderingTime, presentingTime, imageDecodingTime);
+  QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
 }
 
 void PAGRenderThread::forceFlush() {
   if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
     return;
   }
-  adjustBufferSize();
   flushInternal();
 }
 
@@ -52,41 +61,6 @@ void PAGRenderThread::shutDown() {
     moveToThread(mainThread);
   }
   exit();
-}
-
-void PAGRenderThread::flushInternal() {
-  pagView->pagPlayer->flush();
-  double progress = pagView->pagFile->getProgress();
-  int64_t currentFrame =
-      static_cast<int64_t>(std::round((pagView->getTotalFrame().toDouble() - 1) * progress));
-  int64_t renderingTime = pagView->pagPlayer->renderingTime();
-  int64_t presentingTime = pagView->pagPlayer->presentingTime();
-  int64_t imageDecodingTime = pagView->pagPlayer->imageDecodingTime();
-  Q_EMIT frameTimeMetricsReady(currentFrame, renderingTime, presentingTime, imageDecodingTime);
-  QMetaObject::invokeMethod(pagView, "update", Qt::QueuedConnection);
-}
-
-bool PAGRenderThread::adjustBufferSize() {
-  auto pagSurface = pagView->pagPlayer->getSurface();
-  auto needRender = pagView->isPlaying();
-  if (pagView->sizeChanged) {
-    needRender = true;
-    auto newBufferSize = (pagView->size() * pagView->window()->devicePixelRatio()).toSize();
-    if (newBufferSize.width() <= 0) {
-      newBufferSize.setWidth(100);
-    }
-    if (newBufferSize.height() <= 0) {
-      newBufferSize.setHeight(100);
-    }
-    pagView->sizeChanged = false;
-    pagSurface->updateSize();
-    bufferSize = newBufferSize;
-  }
-  if (progress != pagView->getProgress()) {
-    needRender = true;
-    progress = pagView->getProgress();
-  }
-  return needRender;
 }
 
 }  // namespace pag

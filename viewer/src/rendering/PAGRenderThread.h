@@ -38,11 +38,6 @@ class PAGRenderThread : public QThread {
   Q_SLOT void shutDown();
 
  private:
-  void flushInternal();
-  bool adjustBufferSize();
-
-  double progress = 0.0;
-  QSize bufferSize = {0, 0};
   PAGView* pagView = nullptr;
 };
 }  // namespace pag
