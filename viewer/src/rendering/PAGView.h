@@ -20,6 +20,7 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
+#include "audio/PAGAudioPlayer.h"
 #include "pag/pag.h"
 #include "platform/qt/GPUDrawable.h"
 #include "rendering/PAGRenderThread.h"
@@ -102,6 +103,7 @@ class PAGView : public QQuickItem {
   std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
+  std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
 
   friend class PAGRenderThread;
 };

@@ -1,0 +1,193 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2025 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "PAGAudioReader.h"
+#include <QCoreApplication>
+#include <QEvent>
+#include <utility>
+#include "model/AudioClip.h"
+#include "utils/AudioUtils.h"
+
+namespace pag {
+
+constexpr int64_t TimeLagNeedToUpdate = 50 * 1000;
+constexpr int64_t TimeAheadTolerance = 5 * 1000;
+
+static int64_t GetTimeNow() {
+  static auto startTime = std::chrono::high_resolution_clock::now();
+  auto now = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - startTime);
+  return duration.count();
+}
+
+std::shared_ptr<PAGAudioReader> PAGAudioReader::Make(int sampleRate, int sampleCount, int channels,
+                                                     float volume) {
+  auto config = std::make_shared<AudioOutputConfig>();
+  config->sampleRate = sampleRate;
+  config->channels = channels;
+  config->outputSamplesCount = sampleCount;
+  return std::make_shared<PAGAudioReader>(config, volume);
+}
+
+PAGAudioReader::PAGAudioReader(std::shared_ptr<AudioOutputConfig> outputConfig, float volume)
+    : volume(volume), outputConfig(std::move(outputConfig)) {
+  this->moveToThread(this);
+  isRunning = true;
+  connect(this, &PAGAudioReader::read, this, &PAGAudioReader::onRead, Qt::QueuedConnection);
+  start();
+}
+
+PAGAudioReader::~PAGAudioReader() {
+  isRunning = false;
+  quit();
+  wait();
+}
+
+bool PAGAudioReader::isEmpty() const {
+  return empty;
+}
+
+void PAGAudioReader::setComposition(std::shared_ptr<PAGComposition> newComposition) {
+  if (newComposition == composition) {
+    return;
+  }
+  composition = std::move(newComposition);
+  lastTime = GetTimeNow();
+  lastSampleTime = 0;
+  currentProgress = 0;
+  updateAudioTrack();
+  onSetIsPlaying(true);
+}
+
+void PAGAudioReader::setAudioRender(std::shared_ptr<PAGAudioRender> audioRender) {
+  this->audioRender = std::move(audioRender);
+}
+
+std::shared_ptr<PAGAudioSample> PAGAudioReader::readNextSample() {
+  if (audioReader == nullptr) {
+    return nullptr;
+  }
+  auto sample = audioReader->getNextSample();
+  currentProgress = sample->time;
+  return sample;
+}
+
+void PAGAudioReader::onPAGProgressChanged(int64_t progress) {
+  if (empty || composition == nullptr) {
+    return;
+  }
+  if (progress == 0) {
+    currentProgress = 0;
+    lastSampleTime = 0;
+    audioReader->seek(progress);
+    return;
+  }
+  if (std::abs(currentProgress - progress) > progressPerFrame * 5) {
+    auto wantedProgress = progress;
+    if (currentProgress > progress) {
+      audioReader->seek(0);
+      wantedProgress = 0;
+    }
+    while (true) {
+      auto sample = readNextSample();
+      if (sample == nullptr) {
+        break;
+      }
+      if ((progress - sample->time) <= sample->duration) {
+        wantedProgress = sample->time;
+        break;
+      }
+    }
+    lastSampleTime = wantedProgress;
+    currentProgress = wantedProgress;
+  }
+}
+
+void PAGAudioReader::onSetIsPlaying(bool isPlaying) {
+  this->isPlaying = isPlaying;
+  if (audioReader != nullptr) {
+    audioReader->clearBuffer();
+  }
+  if (isPlaying) {
+    updateClock(false);
+    Q_EMIT read();
+  } else {
+    updateClock(true);
+  }
+}
+
+void PAGAudioReader::run() {
+  QThread::exec();
+}
+
+void PAGAudioReader::updateAudioTrack() {
+  if (composition == nullptr) {
+    return;
+  }
+  auto audio = std::make_shared<AudioAsset>();
+  auto trackIDs = AudioClip::DumpTracks(composition, audio, volume);
+  audioReader = AudioReader::Make(audio, outputConfig);
+  audioReader->seek(currentProgress);
+  empty = trackIDs.empty();
+  progressPerFrame = static_cast<int64_t>(1000000.0 / composition->frameRate());
+}
+
+void PAGAudioReader::updateClock(bool addChangedTimeToSampleTime) {
+  if (lastTime == 0) {
+    lastSampleTime = 0;
+    lastTime = GetTimeNow();
+  }
+  int64_t sysTime = GetTimeNow();
+  if (sysTime > lastTime && addChangedTimeToSampleTime) {
+    lastSampleTime += (sysTime - lastTime);
+  } else {
+    lastSampleTime = INT64_MAX;
+  }
+  lastTime = sysTime;
+}
+
+void PAGAudioReader::syncAudio(int64_t sampleTime) {
+  if (lastSampleTime == INT64_MAX) {
+    lastSampleTime = sampleTime;
+    lastTime = GetTimeNow();
+  } else {
+    updateClock(true);
+  }
+  int64_t time = sampleTime - lastSampleTime;
+  if (time < -TimeLagNeedToUpdate) {
+    lastTime = GetTimeNow();
+    lastSampleTime = sampleTime;
+  } else if (time > TimeAheadTolerance) {
+    std::this_thread::sleep_for(std::chrono::microseconds(time - TimeAheadTolerance));
+  }
+}
+
+void PAGAudioReader::onRead() {
+  if (empty || !isRunning || !isPlaying) {
+    return;
+  }
+  auto sample = readNextSample();
+  if (sample != nullptr) {
+    syncAudio(sample->time);
+    currentProgress = sample->time;
+    sendData(std::move(sample));
+  }
+  Q_EMIT read();
+}
+
+}  // namespace pag

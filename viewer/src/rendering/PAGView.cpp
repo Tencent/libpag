@@ -32,6 +32,7 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   renderThread = std::make_unique<PAGRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
   drawable->moveToThread(renderThread.get());
+  audioPlayer = std::make_unique<PAGAudioPlayer>();
 }
 
 void PAGView::flush() const {
@@ -81,7 +82,8 @@ QString PAGView::getTotalFrame() const {
 
 QString PAGView::getCurrentFrame() const {
   int64_t totalFrames = getTotalFrame().toLongLong();
-  int64_t currentFrame = static_cast<int64_t>(std::round(getProgress() * (totalFrames - 1)));
+  auto currentFrame =
+      static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
   return QString::number(currentFrame);
 }
 
@@ -165,6 +167,7 @@ void PAGView::setIsPlaying(bool isPlaying) {
   if (this->isPlaying_ == isPlaying) {
     return;
   }
+  audioPlayer->setIsPlaying(isPlaying);
   this->isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
   if (isPlaying) {
@@ -185,6 +188,7 @@ void PAGView::setProgress(double progress) {
     return;
   }
   pagPlayer->setProgress(progress);
+  audioPlayer->setProgress(progress);
   this->progress = progress;
   Q_EMIT progressChanged(progress);
   QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
@@ -207,12 +211,15 @@ bool PAGView::setFile(const QString& filePath) {
   pagFile = newPagFile;
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
+  audioPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(strPath);
   Q_EMIT pagFileChanged(pagFile);
+  audioPlayer->setVolume(1.0f);
   pagPlayer->setProgress(0);
+  audioPlayer->setProgress(0);
   setProgress(0);
   setIsPlaying(true);
 
@@ -300,4 +307,5 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
 }
+
 }  // namespace pag
