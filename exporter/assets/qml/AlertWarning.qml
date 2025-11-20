@@ -35,7 +35,7 @@ PAGWindow {
 
     property QtObject model: QtObject {
         function viewAllRules() {
-            if(alertDataModel){
+            if (alertDataModel) {
                 alertDataModel.JumpToUrl();
             }
         }
