@@ -33,12 +33,20 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   renderThread->moveToThread(renderThread.get());
   drawable->moveToThread(renderThread.get());
   audioPlayer = std::make_unique<PAGAudioPlayer>();
+  resizeTimer = std::make_unique<QTimer>();
+  connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
 }
 
 void PAGView::flush() const {
   if (isPlaying_) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
+}
+
+void PAGView::sizeChangedDelayHandle() {
+  resizeTimer->stop();
+  sizeChanged = true;
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
 PAGView::~PAGView() {
@@ -194,6 +202,14 @@ void PAGView::setProgress(double progress) {
   QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
 }
 
+void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
+  if (newGeometry == oldGeometry) {
+    return;
+  }
+  QQuickItem::geometryChange(newGeometry, oldGeometry);
+  resizeTimer->start(400);
+}
+
 bool PAGView::setFile(const QString& filePath) {
   auto strPath = std::string(filePath.toLocal8Bit());
   if (filePath.startsWith("file://")) {
@@ -213,6 +229,7 @@ bool PAGView::setFile(const QString& filePath) {
   pagPlayer->setComposition(pagFile);
   audioPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
+  sizeChanged = true;
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(strPath);
@@ -264,17 +281,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     renderThread->start();
   }
 
-  if (lastWidth != width() || lastHeight != height() ||
-      lastPixelRatio != window()->devicePixelRatio()) {
-    lastWidth = width();
-    lastHeight = height();
-    lastPixelRatio = window()->devicePixelRatio();
-    auto pagSurface = pagPlayer->getSurface();
-    if (pagSurface) {
-      pagSurface->updateSize();
-    }
-  }
-
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = drawable->getTexture();
   if (texture) {
@@ -295,7 +301,7 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     if (duration > 0) {
       auto progress =
           static_cast<double>(displayTime) / static_cast<double>(duration) + this->progress;
-      if (progress > 1) {
+      if (progress > 1.0) {
         progress = 0.0;
       }
       setProgress(progress);

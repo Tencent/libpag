@@ -18,18 +18,58 @@
 
 #include "PAGImageLayerModel.h"
 #include <QImageReader>
+#include <QMediaPlayer>
+#include <QThread>
+#include <QTimer>
+#include <QVideoFrame>
+#include <QVideoFrameFormat>
+#include <QVideoSink>
 #include "codec/CodecContext.h"
 #include "pag/file.h"
 #include "pag/types.h"
+#include "video/PAGMovie.h"
 
 namespace pag {
+
+QImage PAGImageLayerModel::GetVideoFirstFrame(const QString& filePath) {
+  QMediaPlayer player;
+  QVideoSink sink;
+  QEventLoop loop;
+  QImage result = {};
+
+  connect(&sink, &QVideoSink::videoFrameChanged, [&](const QVideoFrame& frame) {
+    QVideoFrame videoFrame(frame);
+    videoFrame.map(QVideoFrame::ReadOnly);
+    QImage image = videoFrame.toImage();
+    if (!image.isNull()) {
+      result = image.copy();
+      loop.quit();
+    }
+    videoFrame.unmap();
+  });
+
+  player.setVideoSink(&sink);
+  player.setSource(filePath);
+  player.setLoops(1);
+  player.play();
+
+  QTimer timer;
+  timer.setSingleShot(true);
+  connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+  timer.start(1000);
+
+  loop.exec();
+  player.stop();
+
+  return result;
+}
 
 PAGImageLayerModel::PAGImageLayerModel(QObject* parent) : QAbstractListModel(parent) {
 }
 
 int PAGImageLayerModel::rowCount(const QModelIndex& parent) const {
   Q_UNUSED(parent);
-  return imageLayers.count();
+  return static_cast<int>(imageLayers.count());
 }
 
 QVariant PAGImageLayerModel::data(const QModelIndex& index, int role) const {
@@ -56,10 +96,8 @@ QImage PAGImageLayerModel::requestImage(int index) {
 }
 
 void PAGImageLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
-  beginResetModel();
   imageLayers.clear();
   revertSet.clear();
-  endResetModel();
 
   if (pagFile == nullptr) {
     return;
@@ -73,14 +111,14 @@ void PAGImageLayerModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
 
   auto file = _pagFile->getFile();
 
-  beginResetModel();
   for (const auto& editableIndex : editableList) {
     auto* layer = file->getImageAt(editableIndex).at(0);
     auto imageData = layer->imageBytes->fileBytes;
 
     QImage image = QImage::fromData(imageData->data(), static_cast<int>(imageData->length()));
-    imageLayers[imageLayers.count()] = image;
+    imageLayers[static_cast<int>(imageLayers.count())] = image;
   }
+  beginResetModel();
   endResetModel();
 }
 
@@ -96,28 +134,32 @@ void PAGImageLayerModel::changeImage(int index, const QString& filePath) {
 
   QImageReader reader(path);
   reader.setDecideFormatFromContent(true);
-  if (!reader.canRead()) {
-    qDebug() << "Can not read image[" << path << "]: " << reader.errorString();
-    return;
-  }
-  if (!reader.read(&newImage)) {
-    qDebug() << "Read image[" << path << "] failed: " << reader.errorString();
-    return;
+  if (reader.canRead()) {
+    if (!reader.read(&newImage)) {
+      qDebug() << "Read image[" << path << "] failed: " << reader.errorString();
+    }
   }
 
   if (newImage.data_ptr() == nullptr) {
+    newImage = GetVideoFirstFrame(path);
+  }
+  if (newImage.data_ptr() == nullptr) {
+    qDebug() << "Can not read image[" << path << "]: " << reader.errorString();
     return;
   }
 
   auto pagImage = PAGImage::FromPath(path.toStdString());
   if (pagImage == nullptr) {
+    pagImage = PAGMovie::MakeFromFile(path.toStdString());
+  }
+  if (pagImage == nullptr) {
     return;
   }
   replaceImage(index, std::move(pagImage));
 
-  beginResetModel();
   revertSet.insert(index);
   imageLayers[index] = newImage;
+  beginResetModel();
   endResetModel();
 }
 
@@ -135,9 +177,9 @@ void PAGImageLayerModel::revertImage(int index) {
   auto imageData = layer->imageBytes->fileBytes;
   auto image = QImage::fromData(imageData->data(), static_cast<int>(imageData->length()));
   replaceImage(index, nullptr);
-  beginResetModel();
   revertSet.remove(index);
   imageLayers[index] = image;
+  beginResetModel();
   endResetModel();
 }
 

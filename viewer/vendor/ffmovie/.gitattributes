@@ -1,0 +1,4 @@
+mac/arm64/libffmovie.dylib filter=lfs diff=lfs merge=lfs -text
+mac/x64/libffmovie.dylib filter=lfs diff=lfs merge=lfs -text
+win/x64/ffmovie.dll filter=lfs diff=lfs merge=lfs -text
+win/x64/ffmovie.lib filter=lfs diff=lfs merge=lfs -text

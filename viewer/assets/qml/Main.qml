@@ -57,6 +57,15 @@ PAGWindow {
         id: mainForm
         resizeHandleSize: resizeHandleSize
 
+        centerItem {
+            onWidthChanged: {
+                resizePAGView();
+            }
+            onHeightChanged: {
+                resizePAGView();
+            }
+        }
+
         pagView {
             showVideoFrames: settings.isShowVideoFrames
             onProgressChanged: function (progress) {
@@ -79,7 +88,7 @@ PAGWindow {
                 let oldHeight = viewWindow.height;
                 let preferredSize = pagView.preferredSize;
                 let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
-                let height = Math.max(viewWindow.minimumHeight, preferredSize.height);
+                let height = Math.max(viewWindow.minimumHeight, preferredSize.height + controlForm.height);
                 if (mainForm.rightItemLoader.status === Loader.Ready) {
                     width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
                 }
@@ -320,7 +329,7 @@ PAGWindow {
         }
 
         function onVisibleChanged(visible) {
-            progressWindow.visible = visible
+            progressWindow.visible = visible;
         }
 
         function onTaskFinished(filePath, result) {
@@ -403,7 +412,7 @@ PAGWindow {
         settings.isEditPanelOpen = willOpen;
         mainForm.isEditPanelOpen = willOpen;
         if (willOpen) {
-            let widthChange = mainForm.rightItemLoader.width;
+            let widthChange = Math.max(mainForm.rightItemLoader.width, mainForm.minPanelWidth);
             if (viewWindow.visibility === Window.FullScreen) {
                 mainForm.centerItem.width = viewWindow.width - widthChange;
             } else {
@@ -419,9 +428,30 @@ PAGWindow {
             } else if ((viewWindow.width + widthChange) < viewWindow.minimumWidth) {
                 viewWindow.width = viewWindow.minimumWidth;
             } else {
-                viewWindow.width = viewWindow.width + widthChange;
+                viewWindow.width = viewWindow.width + widthChange - mainForm.splitHandleWidth;
             }
         }
+    }
+
+    function resizePAGView() {
+        let width = mainForm.pagView.pagWidth;
+        let height = mainForm.pagView.pagHeight;
+        let windowWidth = mainForm.centerItem.width;
+        let windowHeight = mainForm.centerItem.height - mainForm.controlForm.height;
+        let finalHeight = 1;
+        let finalWidth = 1;
+        let pagIsNarrower = height / width > windowHeight / windowWidth;
+        if (pagIsNarrower) {
+            finalHeight = windowHeight;
+            finalWidth = finalHeight / height * width;
+        } else {
+            finalWidth = windowWidth;
+            finalHeight = finalWidth / width * height;
+        }
+        mainForm.pagView.width = finalWidth;
+        mainForm.pagView.height = finalHeight;
+        mainForm.pagView.x = (windowWidth - finalWidth) / 2;
+        mainForm.pagView.y = (windowHeight - finalHeight) / 2;
     }
 
     function updateAvailable(hasNewVersion) {

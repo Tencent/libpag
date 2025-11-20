@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   QFont defaultFonts("Helvetica Neue,PingFang SC");
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
-  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji"};
+  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji", "Microsoft YaHei"};
   pag::PAGFont::SetFallbackFontNames(fallbackList);
 
   pag::PAGViewer app(argc, argv);
