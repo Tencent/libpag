@@ -6,7 +6,7 @@ PAGWindow {
     id: root
     width: 450
     height: 320
-    title: qsTr("PAGViewer安装")
+    title: qsTr("Install PAGViewer")
     modality: Qt.ApplicationModal
     isWindows: true
     canResize: false
@@ -91,7 +91,7 @@ PAGWindow {
 
                     Text {
                         id: cancelButtonText
-                        text: qsTr("取消")
+                        text: qsTr("Cancel")
                         color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"

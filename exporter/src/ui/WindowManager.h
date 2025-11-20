@@ -23,6 +23,7 @@
 #include <QTranslator>
 #include <string>
 #include <vector>
+#include "config/ConfigWindow.h"
 #include "utils/AlertInfo.h"
 
 namespace exporter {
@@ -58,13 +59,14 @@ class WindowManager {
  private:
   void init();
 
-  std::unique_ptr<QTranslator> translator = nullptr;
-  std::unique_ptr<QApplication> app = nullptr;
   WindowManager();
   ~WindowManager() = default;
 
   int argc = 0;
   char** argv = nullptr;
+  std::unique_ptr<QApplication> app = nullptr;
+  std::unique_ptr<QTranslator> translator = nullptr;
+  std::unique_ptr<ConfigWindow> configWindow = nullptr;
 };
 
 }  // namespace exporter

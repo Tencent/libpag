@@ -8,7 +8,7 @@ PAGWindow {
     property int windowWidth: 500
     property int windowHeight: 300
 
-    title: "Export Error"
+    title: qsTr("Export Error")
     width: windowWidth
     height: windowHeight
     minimumWidth: windowWidth
@@ -25,6 +25,11 @@ PAGWindow {
     titlebarBackgroundColor: "#14141E"
     titleFontSize: 14
     modality: Qt.ApplicationModal
+
+    onClosing: function (closeEvent) {
+        closeEvent.accepted = true;
+        alertWindow.onWindowClosing();
+    }
 
     property QtObject model: QtObject {
         function cancelAndModify() {
@@ -71,7 +76,7 @@ PAGWindow {
                 }
 
                 Text {
-                    text: "Export failed due to error:"
+                    text: qsTr("Export failed due to error:")
                     color: "#cccccc"
                     font.pixelSize: 16
                     font.family: "PingFang SC"
@@ -91,7 +96,7 @@ PAGWindow {
                 anchors.fill: parent
                 anchors.margins: 15
                 text: errorMessage
-                property var targetListView: null
+                targetListView: null
             }
         }
 
@@ -116,7 +121,7 @@ PAGWindow {
 
                     Text {
                         id: cancelButtonText
-                        text: "Cancel and Modify"
+                        text: qsTr("Cancel and Modify")
                         color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"
@@ -132,7 +137,8 @@ PAGWindow {
 
                         onClicked: {
                             if (mainWindow.model) {
-                                mainWindow.model.cancelAndModify();
+                                alertWindow.cancelAndModify();
+                                mainWindow.close();
                             }
                         }
                     }
