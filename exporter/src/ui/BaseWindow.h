@@ -39,7 +39,7 @@ class BaseWindow : public QObject {
   QQuickWindow* window = nullptr;
   std::unique_ptr<QQmlApplicationEngine> engine = nullptr;
 
-private:
+ private:
   bool waitToDestory = false;
 };
 

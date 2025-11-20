@@ -35,7 +35,7 @@ class AlertWindow : public BaseWindow {
   Q_INVOKABLE void continueExport();
   Q_INVOKABLE void cancelAndModify();
 
-private:
+ private:
   void init(const std::vector<AlertInfo>& infos);
   void wait() const;
 

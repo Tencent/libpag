@@ -37,7 +37,7 @@ class ConfigWindow : public BaseWindow {
   Q_INVOKABLE QVariantMap getDefaultConfig() const;
   Q_INVOKABLE QVariantMap getCurrentConfig() const;
 
-private:
+ private:
   ConfigParam currentConfig = {};
 };
 

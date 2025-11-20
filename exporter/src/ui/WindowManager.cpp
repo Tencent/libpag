@@ -24,9 +24,9 @@
 #include <QtGui/QFont>
 #include <QtQuick/QQuickWindow>
 #include <memory>
-#include "alert/AlertWindow.h"
 #include "AlertInfoModel.h"
 #include "PAGViewerInstallModel.h"
+#include "alert/AlertWindow.h"
 #include "config/ConfigFile.h"
 #include "platform/PlatformHelper.h"
 #include "utils/AEHelper.h"
