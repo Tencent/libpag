@@ -89,8 +89,8 @@ else ()
     set(UpdateChannel "beta")
 endif ()
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
-    ${CMAKE_SOURCE_DIR}/src/version.h
-    @ONLY
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
 )
 
 message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
@@ -120,6 +120,8 @@ elseif (WIN32)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${Bcrypt_LIB})
     find_library(ws2_32_LIB ws2_32)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${ws2_32_LIB})
+    find_library(version_LIB version)
+    list(APPEND PAG_VIEWER_PLATFORM_LIBS ${version_LIB})
 endif ()
 
 set(PAG_USE_QT ON)
