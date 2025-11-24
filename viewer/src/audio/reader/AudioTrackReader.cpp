@@ -35,11 +35,7 @@ AudioTrackReader::AudioTrackReader(std::shared_ptr<AudioTrack> track,
 }
 
 void AudioTrackReader::seek(int64_t time) {
-  if (segmentReader != nullptr && segmentReader->segment->targetRange.contains(time)) {
-    segmentReader->seek(time);
-  } else {
-    segmentReader = nullptr;
-  }
+  segmentReader = nullptr;
   currentReadTime = time;
   outputLength = Utils::SampleTimeToLength(time, outputConfig->sampleRate, outputConfig->channels);
   buffer.clear();
@@ -101,6 +97,7 @@ std::shared_ptr<ByteData> AudioTrackReader::getNextSampleInternal() {
     if (data.empty()) {
       auto time = segmentReader->segment->targetRange.end - currentReadTime;
       if (time <= 0) {
+        currentReadTime = std::max(currentReadTime, segmentReader->segment->targetRange.end + 1);
         return nullptr;
       }
       auto length =
@@ -114,13 +111,12 @@ std::shared_ptr<ByteData> AudioTrackReader::getNextSampleInternal() {
       std::memcpy(buffer.bytes() + cacheSize, data.data, tmpSize);
       cacheSize += tmpSize;
     }
-    currentReadTime = Utils::SampleLengthToTime(outputLength + buffer.size(),
+    currentReadTime = Utils::SampleLengthToTime(outputLength + cacheSize,
                                                 outputConfig->sampleRate, outputConfig->channels);
   }
-
   auto theData = ByteData::MakeCopy(buffer.data(), outputSampleLength);
   std::shared_ptr<ByteData> data = std::move(theData);
-  std::memcpy(buffer.bytes() + outputSampleLength, buffer.bytes(), cacheSize - outputSampleLength);
+  std::memcpy(buffer.bytes(), buffer.bytes() + outputSampleLength, cacheSize - outputSampleLength);
   cacheSize -= outputSampleLength;
   outputLength += outputSampleLength;
   return data;

@@ -91,30 +91,18 @@ void PAGAudioReader::onPAGProgressChanged(int64_t progress) {
   if (empty || composition == nullptr) {
     return;
   }
-  if (progress == 0) {
-    currentProgress = 0;
-    lastSampleTime = 0;
+  if (progress == 0 || std::abs(currentProgress - progress) > progressPerFrame * 5) {
     audioReader->seek(progress);
-    return;
-  }
-  if (std::abs(currentProgress - progress) > progressPerFrame * 5) {
-    auto wantedProgress = progress;
-    if (currentProgress > progress) {
-      audioReader->seek(0);
-      wantedProgress = 0;
+    audioReader->clearBuffer();
+    
+    auto sample = audioReader->getNextSample();
+    if (sample != nullptr) {
+      currentProgress = sample->time;
+      lastSampleTime = sample->time;
+    } else {
+      currentProgress = progress;
+      lastSampleTime = progress;
     }
-    while (true) {
-      auto sample = readNextSample();
-      if (sample == nullptr) {
-        break;
-      }
-      if ((progress - sample->time) <= sample->duration) {
-        wantedProgress = sample->time;
-        break;
-      }
-    }
-    lastSampleTime = wantedProgress;
-    currentProgress = wantedProgress;
   }
 }
 
@@ -186,6 +174,8 @@ void PAGAudioReader::onRead() {
     syncAudio(sample->time);
     currentProgress = sample->time;
     sendData(std::move(sample));
+  } else {
+    qDebug() << "Data is empty";
   }
   Q_EMIT read();
 }

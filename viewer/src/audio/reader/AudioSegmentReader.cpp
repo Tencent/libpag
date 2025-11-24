@@ -37,8 +37,8 @@ std::shared_ptr<AudioSegmentReader> AudioSegmentReader::Make(
 AudioSegmentReader::AudioSegmentReader(AudioTrackSegment* segment,
                                        std::shared_ptr<AudioOutputConfig> outputConfig)
     : segment(segment), outputConfig(outputConfig) {
-  reader = AudioSourceReader::Make(segment->source, segment->sourceTrackID, outputConfig);
-  if (reader != nullptr) {
+  reader = std::make_shared<AudioSourceReader>(segment->source, segment->sourceTrackID, outputConfig);
+  if (reader->isValid()) {
     reader->seek(segment->sourceRange.start);
   }
   speed = static_cast<float>(segment->sourceRange.duration()) /
@@ -51,7 +51,7 @@ AudioSegmentReader::AudioSegmentReader(AudioTrackSegment* segment,
 }
 
 bool AudioSegmentReader::isValid() {
-  return reader != nullptr && reader->isValid();
+  return reader != nullptr;
 }
 
 void AudioSegmentReader::seek(int64_t time) {
@@ -64,7 +64,9 @@ void AudioSegmentReader::seek(int64_t time) {
       sourceRange.start);
   inputEOS = false;
   shifting = nullptr;
-  reader->seek(sourceTime);
+  if (reader->isValid()) {
+    reader->seek(sourceTime);
+  }
 }
 
 SampleData AudioSegmentReader::getNextSample() {
@@ -86,6 +88,9 @@ SampleData AudioSegmentReader::getNextSample() {
 }
 
 SampleData AudioSegmentReader::getNextSampleInternal() {
+  if (!reader->isValid()) {
+    return {};
+  }
   if (speed == 1.0) {
     return reader->getNextFrame();
   }

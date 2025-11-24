@@ -24,16 +24,6 @@ namespace pag {
 constexpr int64_t MaxTryDecodeCount = 100;
 constexpr int64_t SeekForwardTimeUs = 60000;
 
-std::shared_ptr<AudioSourceReader> AudioSourceReader::Make(
-    std::shared_ptr<AudioSource> source, int trackID,
-    std::shared_ptr<AudioOutputConfig> outputConfig) {
-  auto reader =
-      std::make_shared<AudioSourceReader>(std::move(source), trackID, std::move(outputConfig));
-  if (!reader->isValid()) {
-    return nullptr;
-  }
-  return reader;
-}
 AudioSourceReader::AudioSourceReader(std::shared_ptr<AudioSource> source, int trackID,
                                      std::shared_ptr<AudioOutputConfig> outputConfig)
     : trackID(trackID), source(source), outputConfig(outputConfig) {

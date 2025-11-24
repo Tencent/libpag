@@ -28,9 +28,6 @@ using AudioOutputConfig = ffmovie::AudioOutputConfig;
 
 class AudioSourceReader {
  public:
-  static std::shared_ptr<AudioSourceReader> Make(std::shared_ptr<AudioSource> source, int trackID,
-                                                 std::shared_ptr<AudioOutputConfig> outputConfig);
-
   explicit AudioSourceReader(std::shared_ptr<AudioSource> source, int trackID,
                              std::shared_ptr<AudioOutputConfig> outputConfig);
 
