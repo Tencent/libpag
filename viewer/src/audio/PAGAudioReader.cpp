@@ -94,7 +94,7 @@ void PAGAudioReader::onPAGProgressChanged(int64_t progress) {
   if (progress == 0 || std::abs(currentProgress - progress) > progressPerFrame * 5) {
     audioReader->seek(progress);
     audioReader->clearBuffer();
-    
+
     auto sample = audioReader->getNextSample();
     if (sample != nullptr) {
       currentProgress = sample->time;
@@ -128,10 +128,10 @@ void PAGAudioReader::updateAudioTrack() {
     return;
   }
   auto audio = std::make_shared<AudioAsset>();
-  auto trackIDs = AudioClip::DumpTracks(composition, audio, volume);
+  AudioClip::ApplyClipsToAudio(composition, audio);
   audioReader = AudioReader::Make(audio, outputConfig);
   audioReader->seek(currentProgress);
-  empty = trackIDs.empty();
+  empty = audio->getTracks().empty();
   progressPerFrame = static_cast<int64_t>(1000000.0 / composition->frameRate());
 }
 

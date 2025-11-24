@@ -58,10 +58,8 @@ std::vector<AudioClip> PAGMovie::generateAudioClips() {
   auto duration = movieInfo->durationMs;
   auto sourceTimeRange = TimeRange{startTime, startTime + static_cast<int64_t>(duration * speed)};
   auto targetTimeRange = TimeRange{0, duration};
-  AudioClip clip = {std::make_shared<AudioSource>(movieInfo->filePath),
-                    sourceTimeRange,
-                    targetTimeRange,
-                    {{targetTimeRange, 1.0, 1.0}}};
+  AudioClip clip = {std::make_shared<AudioSource>(movieInfo->filePath), sourceTimeRange,
+                    targetTimeRange};
   return {clip};
 }
 

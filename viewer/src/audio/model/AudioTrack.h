@@ -24,17 +24,6 @@
 
 namespace pag {
 
-struct VolumeRange {
-  VolumeRange() = default;
-  VolumeRange(const TimeRange timeRange, float startVolume, float endVolume)
-      : timeRange(timeRange), startVolume(startVolume), endVolume(endVolume) {
-  }
-
-  TimeRange timeRange{-1, -1};
-  float startVolume = 1.0f;
-  float endVolume = 1.0f;
-};
-
 class AudioTrack {
  public:
   explicit AudioTrack(int trackID);
@@ -47,7 +36,6 @@ class AudioTrack {
   void insetTimeRange(const TimeRange& timeRange, const AudioTrack& track, int64_t time);
   void removeTimeRange(const TimeRange& timeRange);
   void scaleTimeRange(const TimeRange& timeRange, int64_t duration);
-  void addVolumeRange(float startVolume, float endVolume, const TimeRange& timeRange);
 
  protected:
   void insertSegments(const std::list<AudioTrackSegment>& segments, int64_t time);
@@ -62,10 +50,8 @@ class AudioTrack {
 
   int trackID = -1;
   std::list<AudioTrackSegment> segments = {};
-  std::list<VolumeRange> volumeRangeList = {};
 
   friend class AudioTrackReader;
-  friend class AudioSmoothVolume;
 };
 
 }  // namespace pag

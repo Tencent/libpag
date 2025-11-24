@@ -37,7 +37,8 @@ std::shared_ptr<AudioSegmentReader> AudioSegmentReader::Make(
 AudioSegmentReader::AudioSegmentReader(AudioTrackSegment* segment,
                                        std::shared_ptr<AudioOutputConfig> outputConfig)
     : segment(segment), outputConfig(outputConfig) {
-  reader = std::make_shared<AudioSourceReader>(segment->source, segment->sourceTrackID, outputConfig);
+  reader =
+      std::make_shared<AudioSourceReader>(segment->source, segment->sourceTrackID, outputConfig);
   if (reader->isValid()) {
     reader->seek(segment->sourceRange.start);
   }

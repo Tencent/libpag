@@ -27,12 +27,12 @@ namespace pag {
 
 class AudioClip {
  public:
-  static std::vector<int> DumpTracks(std::shared_ptr<PAGComposition> composition,
-                                     std::shared_ptr<AudioAsset> audio, float volume);
+  static std::vector<int> ApplyClipsToAudio(std::shared_ptr<PAGComposition> composition,
+                                            std::shared_ptr<AudioAsset> audio);
   static std::vector<AudioClip> GenerateAudioClips(std::shared_ptr<PAGComposition> composition);
 
   AudioClip(std::shared_ptr<AudioSource> audioSource, TimeRange sourceTimeRange,
-            TimeRange targetTimeRange, const std::vector<VolumeRange>& volumeRanges);
+            TimeRange targetTimeRange);
   bool operator==(const AudioClip& clip) const;
 
  private:
@@ -41,14 +41,14 @@ class AudioClip {
   static bool ProcessRepeatedPAGFile(std::shared_ptr<PAGFile> file,
                                      std::shared_ptr<AudioAsset> audio,
                                      std::shared_ptr<AudioSource> source,
-                                     std::vector<AudioClip>& clips, float volume);
+                                     std::vector<AudioClip>& clips);
   static bool ProcessScaledPAGFile(std::shared_ptr<PAGFile> file, std::shared_ptr<AudioAsset> audio,
                                    std::shared_ptr<AudioSource> source,
-                                   std::vector<AudioClip>& clips, float volume);
+                                   std::vector<AudioClip>& clips);
   static void ProcessScaledTimeRange(int64_t originalDuration, int64_t duration,
                                      int64_t audioStartTime, int64_t audioDuration,
                                      TimeRange& scaledTimeRange, std::vector<AudioClip>& clips,
-                                     std::shared_ptr<AudioSource> source, float volume);
+                                     std::shared_ptr<AudioSource> source);
   static std::vector<AudioClip> ProcessImageLayer(std::shared_ptr<PAGImageLayer> layer);
   static std::vector<AudioClip> ProcessTimeRamp(std::shared_ptr<PAGImageLayer> layer,
                                                 std::vector<AudioClip>& clips,
@@ -60,16 +60,14 @@ class AudioClip {
   static void ClipWithTime(AudioClip& clip, int64_t time);
   static void ShiftClipWithTime(AudioClip& clip, int64_t time);
   static std::vector<int> ApplyAudioClips(std::shared_ptr<AudioAsset> audio,
-                                          const std::vector<AudioClip>& clips, float volume);
+                                          const std::vector<AudioClip>& clips);
 
-  void adjustVolumeRange();
   bool clearRootFile(PAGLayer* layer);
   bool applyTimeRamp(const TimeRange& source, const TimeRange& target);
 
   TimeRange sourceTimeRange = {};
   TimeRange targetTimeRange = {};
   PAGFile* rootFile = nullptr;
-  std::vector<VolumeRange> volumeRanges = {};
   std::shared_ptr<AudioSource> source = nullptr;
 };
 }  // namespace pag

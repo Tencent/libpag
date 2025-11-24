@@ -124,40 +124,6 @@ void AudioTrack::scaleTimeRange(const TimeRange& timeRange, int64_t duration) {
   scaleTimeRangeInternal(timeRange, duration);
 }
 
-void AudioTrack::addVolumeRange(float startVolume, float endVolume, const TimeRange& timeRange) {
-  if (!timeRange.isValid()) {
-    return;
-  }
-
-  VolumeRange range{timeRange, startVolume, endVolume};
-  for (auto iter = volumeRangeList.begin(); iter != volumeRangeList.end(); ++iter) {
-    auto& oldRange = *iter;
-    if (timeRange.end <= oldRange.timeRange.start || oldRange.timeRange.end <= timeRange.start) {
-      continue;
-    }
-    if (timeRange.start <= oldRange.timeRange.start && oldRange.timeRange.end <= timeRange.end) {
-      volumeRangeList.erase(iter--);
-      continue;
-    }
-    if (oldRange.timeRange.start < timeRange.start && timeRange.end < oldRange.timeRange.end) {
-      VolumeRange newVolume = {{timeRange.end, oldRange.timeRange.end},
-                               oldRange.startVolume,
-                               oldRange.startVolume};
-      oldRange.timeRange.end = timeRange.start;
-      iter = volumeRangeList.insert(++iter, newVolume);
-    } else if (oldRange.timeRange.start < timeRange.start &&
-               timeRange.start < oldRange.timeRange.end) {
-      range.timeRange.end = timeRange.start;
-    } else {
-      range.timeRange.start = timeRange.end;
-    }
-  }
-  volumeRangeList.push_back(range);
-  volumeRangeList.sort([](const VolumeRange& a, const VolumeRange& b) {
-    return a.timeRange.start < b.timeRange.start;
-  });
-}
-
 void AudioTrack::insertSegments(const std::list<AudioTrackSegment>& segments, int64_t time) {
   if (this->segments.empty()) {
     if (time > 0) {

@@ -21,7 +21,6 @@
 #include <tgfx/core/Buffer.h>
 #include "AudioSegmentReader.h"
 #include "audio/model/AudioTrack.h"
-#include "audio/process/AudioSmoothVolume.h"
 #include "pag/pag.h"
 
 namespace pag {
@@ -45,7 +44,6 @@ class AudioTrackReader {
   int64_t outputSampleLength = 0;  // The length of the output sample
   tgfx::Buffer buffer = {};
   std::shared_ptr<AudioTrack> track = nullptr;
-  std::shared_ptr<AudioSmoothVolume> smoothVolume = nullptr;
   std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
   std::shared_ptr<AudioSegmentReader> segmentReader = nullptr;
 

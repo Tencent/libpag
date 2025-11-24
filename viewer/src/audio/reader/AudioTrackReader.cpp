@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AudioTrackReader.h"
-#include "audio/process/AudioSmoothVolume.h"
 #include "utils/AudioUtils.h"
 
 namespace pag {
@@ -31,7 +30,6 @@ AudioTrackReader::AudioTrackReader(std::shared_ptr<AudioTrack> track,
       Utils::SampleCountToLength(outputConfig->outputSamplesCount, outputConfig->channels);
   int64_t bufferSize = std::max(outputSampleLength, MaxOutputSampleCount) * 6;
   buffer.alloc(bufferSize);
-  smoothVolume = AudioSmoothVolume::Make(std::move(track), std::move(outputConfig));
 }
 
 void AudioTrackReader::seek(int64_t time) {
@@ -40,7 +38,6 @@ void AudioTrackReader::seek(int64_t time) {
   outputLength = Utils::SampleTimeToLength(time, outputConfig->sampleRate, outputConfig->channels);
   buffer.clear();
   cacheSize = 0;
-  smoothVolume->seek(time);
 }
 
 void AudioTrackReader::clearBuffer() {
@@ -70,14 +67,7 @@ void AudioTrackReader::checkReader() {
 }
 
 std::shared_ptr<ByteData> AudioTrackReader::getNextSample() {
-  auto data = getNextSampleInternal();
-  if (data == nullptr) {
-    return nullptr;
-  }
-  int64_t time =
-      Utils::SampleLengthToTime(outputLength, outputConfig->sampleRate, outputConfig->channels);
-  smoothVolume->process(time, data);
-  return data;
+  return getNextSampleInternal();
 }
 
 std::shared_ptr<ByteData> AudioTrackReader::getNextSampleInternal() {
@@ -111,8 +101,8 @@ std::shared_ptr<ByteData> AudioTrackReader::getNextSampleInternal() {
       std::memcpy(buffer.bytes() + cacheSize, data.data, tmpSize);
       cacheSize += tmpSize;
     }
-    currentReadTime = Utils::SampleLengthToTime(outputLength + cacheSize,
-                                                outputConfig->sampleRate, outputConfig->channels);
+    currentReadTime = Utils::SampleLengthToTime(outputLength + cacheSize, outputConfig->sampleRate,
+                                                outputConfig->channels);
   }
   auto theData = ByteData::MakeCopy(buffer.data(), outputSampleLength);
   std::shared_ptr<ByteData> data = std::move(theData);
