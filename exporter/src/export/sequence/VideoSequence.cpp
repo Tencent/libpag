@@ -280,6 +280,9 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     pag::TimeRange staticTimeRange = {-1, -1};
     for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
       if (!IsFrameExport(maxVisibleRange, frame, mainComposition->frameRate / frameRate)) {
+        if (firstExportFrame != -1) {
+          session->progressModel.addProgress(1.0);
+        }
         continue;
       }
       if (firstExportFrame == -1) {
@@ -344,6 +347,10 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
         lastFrameIsVisible = currentFrameIsVisible;
       } else {
         session->pushWarning(AlertInfoType::ExportRenderError);
+      }
+
+      if (firstExportFrame == frame) {
+        session->progressModel.addProgress(static_cast<double>(frame));
       }
 
       session->progressModel.addProgress(0.5);
