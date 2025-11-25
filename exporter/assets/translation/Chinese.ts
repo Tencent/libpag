@@ -46,22 +46,22 @@
         <translation>优化建议</translation>
     </message>
     <message>
-        <location filename="../qml/AlertWarning.qml" line="74"/>
+        <location filename="../qml/AlertWarning.qml" line="72"/>
         <source>Total of %1 items, please refer below optimization suggestion and re-export:</source>
         <translation>总共%1项，请参考下方优化建议并重新导出：</translation>
     </message>
     <message>
-        <location filename="../qml/AlertWarning.qml" line="95"/>
+        <location filename="../qml/AlertWarning.qml" line="93"/>
         <source>Click to View All Validation Rules</source>
         <translation>点击查看所有校验规则</translation>
     </message>
     <message>
-        <location filename="../qml/AlertWarning.qml" line="166"/>
+        <location filename="../qml/AlertWarning.qml" line="163"/>
         <source>Continue Exporting</source>
         <translation>继续导出</translation>
     </message>
     <message>
-        <location filename="../qml/AlertWarning.qml" line="199"/>
+        <location filename="../qml/AlertWarning.qml" line="196"/>
         <source>Cancel and Modify</source>
         <translation>取消并修改</translation>
     </message>
@@ -159,8 +159,8 @@
     </message>
     <message>
         <location filename="../qml/ConfigWindow.qml" line="389"/>
-        <source>Bitmap Pixel Density:</source>
-        <translation>位图像素密度：</translation>
+        <source>Image Scale Ratio:</source>
+        <translation>图像缩放比例：</translation>
     </message>
     <message>
         <location filename="../qml/ConfigWindow.qml" line="415"/>

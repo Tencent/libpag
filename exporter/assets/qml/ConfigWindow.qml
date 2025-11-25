@@ -56,8 +56,8 @@ PAGWindow {
             tagLevelInput.displayText = config.tagLevel.toString();
         if (config.bitmapCompressionQuality !== undefined)
             bitMapInput.displayText = config.bitmapCompressionQuality.toString();
-        if (config.bitmapPixelDensity !== undefined)
-            bitMapPixelInput.displayText = parseFloat(config.bitmapPixelDensity).toFixed(1);
+        if (config.imageScaleRatio !== undefined)
+            bitMapPixelInput.displayText = parseFloat(config.imageScaleRatio).toFixed(1);
         if (config.exportLayerName !== undefined)
             layerNameComboBox.currentIndex = config.exportLayerName ? 0 : 1;
         if (config.exportFonts !== undefined)
@@ -145,7 +145,7 @@ PAGWindow {
             "exportVersionControl": exportVersionComboBox.currentIndex,
             "tagLevel": parseInt(tagLevelInput.displayText),
             "bitmapCompressionQuality": parseInt(bitMapInput.displayText),
-            "bitmapPixelDensity": parseFloat(bitMapPixelInput.displayText),
+            "imageScaleRatio": parseFloat(bitMapPixelInput.displayText),
             "exportLayerName": layerNameComboBox.currentIndex === 0,
             "exportFonts": exportFontComboBox.currentIndex === 0,
             "bitmapQuality": bitmapQualityValue,
@@ -386,7 +386,7 @@ PAGWindow {
                                         }
 
                                         Text {
-                                            text: qsTr("Bitmap Pixel Density:")
+                                            text: qsTr("Image Scale Ratio:")
                                             color: "#cccccc"
                                             font.pixelSize: 14
                                             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter

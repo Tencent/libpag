@@ -32,7 +32,7 @@ static QVariantMap ConfigParamToVariantMap(const ConfigParam& config) {
   map["exportVersionControl"] = static_cast<int>(config.tagMode);
   map["tagLevel"] = config.exportTagLevel;
   map["bitmapCompressionQuality"] = config.sequenceQuality;
-  map["bitmapPixelDensity"] = config.imagePixelRatio;
+  map["imageScaleRatio"] = config.imagePixelRatio;
   map["exportLayerName"] = config.exportLayerName;
   map["exportFonts"] = config.exportFontFile;
   map["bitmapQuality"] = static_cast<int>(config.sequenceType);
@@ -99,8 +99,8 @@ void ConfigWindow::updateConfigFromQML(const QVariantMap& configData) {
     currentConfig.sequenceQuality = configData["bitmapCompressionQuality"].toInt();
   }
 
-  if (configData.contains("bitmapPixelDensity")) {
-    currentConfig.imagePixelRatio = configData["bitmapPixelDensity"].toFloat();
+  if (configData.contains("imageScaleRatio")) {
+    currentConfig.imagePixelRatio = configData["imageScaleRatio"].toFloat();
   }
 
   if (configData.contains("exportLayerName")) {
