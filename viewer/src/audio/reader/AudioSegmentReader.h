@@ -20,7 +20,7 @@
 #include <memory>
 #include "AudioSourceReader.h"
 #include "audio/model/AudioTrackSegment.h"
-#include "audio/process/AudioShifting.h"
+#include "audio/process/AudioTransform.h"
 
 namespace pag {
 
@@ -44,7 +44,7 @@ class AudioSegmentReader {
   int64_t currentOffset = 0;
   AudioTrackSegment* segment = nullptr;
   std::vector<uint8_t> emptyBuffer = {};
-  std::shared_ptr<AudioShifting> shifting = nullptr;
+  std::shared_ptr<AudioTransform> audioTransform = nullptr;
   std::shared_ptr<AudioSourceReader> reader = nullptr;
   std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
 

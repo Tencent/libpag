@@ -27,17 +27,21 @@ namespace pag {
 
 class AudioClip {
  public:
-  static std::vector<int> ApplyClipsToAudio(std::shared_ptr<PAGComposition> composition,
-                                            std::shared_ptr<AudioAsset> audio);
-  static std::vector<AudioClip> GenerateAudioClips(std::shared_ptr<PAGComposition> composition);
+  static void ApplyClipsToAudio(std::shared_ptr<PAGComposition> composition,
+                                std::shared_ptr<AudioAsset> audio);
 
   AudioClip(std::shared_ptr<AudioSource> audioSource, TimeRange sourceTimeRange,
             TimeRange targetTimeRange);
   bool operator==(const AudioClip& clip) const;
+  bool clearRootFile(PAGLayer* layer);
+  bool applyTimeRamp(const TimeRange& source, const TimeRange& target);
+
+  PAGFile* rootFile = nullptr;
+  TimeRange sourceTimeRange = {};
+  TimeRange targetTimeRange = {};
+  std::shared_ptr<AudioSource> source = nullptr;
 
  private:
-  static std::vector<AudioClip> GenerateAudioClipsFromAudioBytes(
-      std::shared_ptr<PAGComposition> composition);
   static bool ProcessRepeatedPAGFile(std::shared_ptr<PAGFile> file,
                                      std::shared_ptr<AudioAsset> audio,
                                      std::shared_ptr<AudioSource> source,
@@ -49,25 +53,17 @@ class AudioClip {
                                      int64_t audioStartTime, int64_t audioDuration,
                                      TimeRange& scaledTimeRange, std::vector<AudioClip>& clips,
                                      std::shared_ptr<AudioSource> source);
-  static std::vector<AudioClip> ProcessImageLayer(std::shared_ptr<PAGImageLayer> layer);
-  static std::vector<AudioClip> ProcessTimeRamp(std::shared_ptr<PAGImageLayer> layer,
-                                                std::vector<AudioClip>& clips,
-                                                AnimatableProperty<Frame>* timeRemap);
-  static std::vector<AudioClip> GenerateAudioClipsFromImageLayer(
-      std::shared_ptr<PAGImageLayer> layer);
 
-  static void ShiftClipsWithLayer(std::vector<AudioClip>& clips, std::shared_ptr<PAGLayer> layer);
-  static void ClipWithTime(AudioClip& clip, int64_t time);
-  static void ShiftClipWithTime(AudioClip& clip, int64_t time);
-  static std::vector<int> ApplyAudioClips(std::shared_ptr<AudioAsset> audio,
-                                          const std::vector<AudioClip>& clips);
-
-  bool clearRootFile(PAGLayer* layer);
-  bool applyTimeRamp(const TimeRange& source, const TimeRange& target);
-
-  TimeRange sourceTimeRange = {};
-  TimeRange targetTimeRange = {};
-  PAGFile* rootFile = nullptr;
-  std::shared_ptr<AudioSource> source = nullptr;
+  static std::vector<AudioClip> GenerateClipsFromComposition(
+      std::shared_ptr<PAGComposition> composition);
+  static std::vector<AudioClip> GenerateClipsFromAudioBytes(
+      std::shared_ptr<PAGComposition> composition);
+  static std::vector<AudioClip> GenerateClipsFromImageLayer(std::shared_ptr<PAGImageLayer> layer);
+  static std::vector<AudioClip> ExtractClipsFromImageLayer(std::shared_ptr<PAGImageLayer> layer);
+  static std::vector<AudioClip> ApplyTimeRemapToClips(std::shared_ptr<PAGImageLayer> layer,
+                                                      std::vector<AudioClip>& clips,
+                                                      AnimatableProperty<Frame>* timeRemap);
+  static void ApplyClipsToAudio(std::shared_ptr<AudioAsset> audio,
+                                const std::vector<AudioClip>& clips);
 };
 }  // namespace pag

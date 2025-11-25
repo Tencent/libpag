@@ -21,7 +21,7 @@
 
 namespace pag {
 
-void SortSegments(std::list<AudioTrackSegment>& segments) {
+static void SortSegments(std::list<AudioTrackSegment>& segments) {
   int64_t start = 0;
   for (auto& segment : segments) {
     auto target = segment.targetRange;
@@ -30,7 +30,7 @@ void SortSegments(std::list<AudioTrackSegment>& segments) {
   }
 }
 
-void ScaleSegment(AudioTrackSegment* segment, double ratio) {
+static void ScaleSegment(AudioTrackSegment* segment, double ratio) {
   if (segment == nullptr) {
     return;
   }

@@ -64,7 +64,7 @@ void AudioSegmentReader::seek(int64_t time) {
           static_cast<double>(targetRange.duration()) +
       sourceRange.start);
   inputEOS = false;
-  shifting = nullptr;
+  audioTransform = nullptr;
   if (reader->isValid()) {
     reader->seek(sourceTime);
   }
@@ -95,21 +95,21 @@ SampleData AudioSegmentReader::getNextSampleInternal() {
   if (speed == 1.0) {
     return reader->getNextFrame();
   }
-  if (shifting == nullptr) {
-    shifting = std::make_shared<AudioShifting>(outputConfig);
-    shifting->setSpeed(speed);
+  if (audioTransform == nullptr) {
+    audioTransform = std::make_shared<AudioTransform>(outputConfig);
+    audioTransform->setSpeed(speed);
   }
   int ret = 0;
   while (!inputEOS && ret <= 0) {
     auto data = reader->getNextFrame();
     if (data.empty()) {
-      ret = shifting->sendInputEOS();
+      ret = audioTransform->sendInputEOS();
       inputEOS = true;
     } else {
-      ret = shifting->sendAudioBytes(data);
+      ret = audioTransform->sendAudioBytes(data);
     }
   }
-  return shifting->readAudioBytes();
+  return audioTransform->readAudioBytes();
 }
 
 }  // namespace pag

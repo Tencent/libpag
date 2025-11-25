@@ -24,40 +24,61 @@
 
 namespace pag {
 
-std::vector<int> AudioClip::ApplyClipsToAudio(std::shared_ptr<PAGComposition> composition,
-                                              std::shared_ptr<AudioAsset> audio) {
-  if (composition == nullptr) {
-    return {};
-  }
-  auto clips = GenerateAudioClips(std::move(composition));
-  return ApplyAudioClips(std::move(audio), clips);
+static void TrimClipFromStart(AudioClip& clip, int64_t time) {
+  auto delta = time - clip.targetTimeRange.start;
+  clip.sourceTimeRange.start +=
+      clip.sourceTimeRange.duration() * delta / clip.targetTimeRange.duration();
+  clip.targetTimeRange.start = 0;
+  clip.targetTimeRange.end -= time;
 }
 
-std::vector<AudioClip> AudioClip::GenerateAudioClips(std::shared_ptr<PAGComposition> composition) {
-  if (composition == nullptr) {
-    return {};
+static void OffsetClipTime(AudioClip& clip, int64_t time) {
+  clip.targetTimeRange.start += time;
+  clip.targetTimeRange.end += time;
+}
+
+static void AdjustClipsByLayer(std::vector<AudioClip>& clips, std::shared_ptr<PAGLayer> layer) {
+  auto startTime = layer->startTime();
+  if (startTime == 0) {
+    for (auto& clip : clips) {
+      clip.clearRootFile(layer.get());
+    }
+    return;
   }
-  std::vector<AudioClip> clips = GenerateAudioClipsFromAudioBytes(composition);
-  for (auto& layer : composition->layers) {
-    std::vector<AudioClip> layerClips = {};
-    if (layer->layerType() == LayerType::PreCompose) {
-      layerClips = GenerateAudioClips(std::static_pointer_cast<PAGComposition>(layer));
-    } else if (layer->layerType() == LayerType::Image) {
-      layerClips = GenerateAudioClipsFromImageLayer(std::static_pointer_cast<PAGImageLayer>(layer));
+  if (startTime > 0) {
+    for (auto& clip : clips) {
+      OffsetClipTime(clip, startTime);
+      clip.clearRootFile(layer.get());
     }
-    if (layerClips.empty()) {
-      continue;
-    }
-    ShiftClipsWithLayer(layerClips, composition);
-    for (const auto& layerClip : layerClips) {
-      auto iter = std::find_if(clips.begin(), clips.end(),
-                               [&](const AudioClip& clip) { return clip == layerClip; });
-      if (iter == clips.end()) {
-        clips.push_back(layerClip);
+    return;
+  }
+  auto time = startTime;
+  for (auto iter = clips.begin(); iter != clips.end(); ++iter) {
+    auto& clip = *iter;
+    if (clip.rootFile != nullptr) {
+      if (!clip.clearRootFile(layer.get())) {
+        continue;
+      }
+      OffsetClipTime(clip, time);
+    } else {
+      if (clip.targetTimeRange.end <= time) {
+        clips.erase(iter--);
+      } else if (clip.targetTimeRange.start < time) {
+        TrimClipFromStart(clip, time);
+      } else {
+        OffsetClipTime(clip, -time);
       }
     }
   }
-  return clips;
+}
+
+void AudioClip::ApplyClipsToAudio(std::shared_ptr<PAGComposition> composition,
+                                  std::shared_ptr<AudioAsset> audio) {
+  if (composition == nullptr) {
+    return;
+  }
+  auto clips = GenerateClipsFromComposition(std::move(composition));
+  ApplyClipsToAudio(std::move(audio), clips);
 }
 
 AudioClip::AudioClip(std::shared_ptr<AudioSource> audioSource, TimeRange sourceTimeRange,
@@ -74,40 +95,55 @@ bool AudioClip::operator==(const AudioClip& clip) const {
           targetTimeRange.end == clip.targetTimeRange.end);
 }
 
-std::vector<AudioClip> AudioClip::GenerateAudioClipsFromAudioBytes(
-    std::shared_ptr<PAGComposition> composition) {
-  if (composition == nullptr || composition->audioBytes() == nullptr) {
-    return {};
+bool AudioClip::clearRootFile(PAGLayer* layer) {
+  if (rootFile == layer) {
+    rootFile = nullptr;
+    return true;
   }
-  auto uniqueByteData =
-      ByteData::MakeCopy(composition->audioBytes()->data(), composition->audioBytes()->length());
-  auto byteData = std::shared_ptr<ByteData>(std::move(uniqueByteData));
-  auto audio = AudioAsset::Make(byteData);
-  auto source = audio->getSource();
-  if (audio == nullptr || audio->getTracks().empty()) {
-    return {};
-  }
+  return false;
+}
 
-  std::vector<AudioClip> clips = {};
-  if (composition->isPAGFile()) {
-    auto file = std::static_pointer_cast<PAGFile>(composition);
-    if (file == nullptr) {
-      return {};
-    }
-    if (ProcessRepeatedPAGFile(file, audio, source, clips)) {
-      return clips;
-    }
-    if (ProcessScaledPAGFile(file, audio, source, clips)) {
-      return clips;
-    }
+bool AudioClip::applyTimeRamp(const TimeRange& source, const TimeRange& target) {
+  if (targetTimeRange.end <= source.start || source.end <= targetTimeRange.start) {
+    return false;
   }
-  auto duration = std::min(audio->duration(), composition->duration() + composition->startTime() -
-                                                  composition->audioStartTime());
-  auto sourceTimeRange = TimeRange{0, duration};
-  auto targetTimeRange = TimeRange{composition->startTime(), composition->startTime() + duration};
-  auto clip = AudioClip(source, sourceTimeRange, targetTimeRange);
-  clips.push_back(clip);
-  return clips;
+  if (targetTimeRange.start <= source.start && source.end <= targetTimeRange.end) {
+    AudioClip clip(*this);
+    targetTimeRange = target;
+    sourceTimeRange.start = (source.start - clip.targetTimeRange.start) *
+                                clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
+                            clip.sourceTimeRange.start;
+    sourceTimeRange.end = (source.end - clip.targetTimeRange.start) *
+                              clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
+                          clip.sourceTimeRange.start;
+  } else if (source.start <= targetTimeRange.start && targetTimeRange.end <= source.end) {
+    AudioClip clip(*this);
+    targetTimeRange.start =
+        (clip.targetTimeRange.start - source.start) * target.duration() / source.duration() +
+        target.start;
+    targetTimeRange.end =
+        (clip.targetTimeRange.end - source.start) * target.duration() / source.duration() +
+        target.start;
+  } else if (source.start < targetTimeRange.start && targetTimeRange.start < source.end) {
+    AudioClip clip(*this);
+    targetTimeRange.end = target.end;
+    targetTimeRange.start =
+        (clip.targetTimeRange.start - source.start) * target.duration() / source.duration() +
+        target.start;
+    sourceTimeRange.end = (source.end - clip.targetTimeRange.start) *
+                              clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
+                          clip.sourceTimeRange.start;
+  } else {
+    AudioClip clip(*this);
+    targetTimeRange.start = target.start;
+    targetTimeRange.end =
+        (clip.targetTimeRange.end - source.start) * target.duration() / source.duration() +
+        target.start;
+    sourceTimeRange.start = (source.start - clip.targetTimeRange.start) *
+                                clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
+                            clip.sourceTimeRange.start;
+  }
+  return true;
 }
 
 bool AudioClip::ProcessRepeatedPAGFile(std::shared_ptr<PAGFile> file,
@@ -191,7 +227,80 @@ void AudioClip::ProcessScaledTimeRange(int64_t originalDuration, int64_t duratio
   }
 }
 
-std::vector<AudioClip> AudioClip::ProcessImageLayer(std::shared_ptr<PAGImageLayer> layer) {
+std::vector<AudioClip> AudioClip::GenerateClipsFromComposition(
+    std::shared_ptr<PAGComposition> composition) {
+  if (composition == nullptr) {
+    return {};
+  }
+  std::vector<AudioClip> clips = GenerateClipsFromAudioBytes(composition);
+  for (auto& layer : composition->layers) {
+    std::vector<AudioClip> layerClips = {};
+    if (layer->layerType() == LayerType::PreCompose) {
+      layerClips = GenerateClipsFromComposition(std::static_pointer_cast<PAGComposition>(layer));
+    } else if (layer->layerType() == LayerType::Image) {
+      layerClips = GenerateClipsFromImageLayer(std::static_pointer_cast<PAGImageLayer>(layer));
+    }
+    if (layerClips.empty()) {
+      continue;
+    }
+    AdjustClipsByLayer(layerClips, composition);
+    for (const auto& layerClip : layerClips) {
+      auto iter = std::find_if(clips.begin(), clips.end(),
+                               [&](const AudioClip& clip) { return clip == layerClip; });
+      if (iter == clips.end()) {
+        clips.push_back(layerClip);
+      }
+    }
+  }
+  return clips;
+}
+
+std::vector<AudioClip> AudioClip::GenerateClipsFromAudioBytes(
+    std::shared_ptr<PAGComposition> composition) {
+  if (composition == nullptr || composition->audioBytes() == nullptr) {
+    return {};
+  }
+  auto uniqueByteData =
+      ByteData::MakeCopy(composition->audioBytes()->data(), composition->audioBytes()->length());
+  auto byteData = std::shared_ptr<ByteData>(std::move(uniqueByteData));
+  auto audio = AudioAsset::Make(byteData);
+  auto source = audio->getSource();
+  if (audio == nullptr || audio->getTracks().empty()) {
+    return {};
+  }
+
+  std::vector<AudioClip> clips = {};
+  if (composition->isPAGFile()) {
+    auto file = std::static_pointer_cast<PAGFile>(composition);
+    if (file == nullptr) {
+      return {};
+    }
+    if (ProcessRepeatedPAGFile(file, audio, source, clips)) {
+      return clips;
+    }
+    if (ProcessScaledPAGFile(file, audio, source, clips)) {
+      return clips;
+    }
+  }
+  auto duration = std::min(audio->duration(), composition->duration() + composition->startTime() -
+                                                  composition->audioStartTime());
+  auto sourceTimeRange = TimeRange{0, duration};
+  auto targetTimeRange = TimeRange{composition->startTime(), composition->startTime() + duration};
+  auto clip = AudioClip(source, sourceTimeRange, targetTimeRange);
+  clips.push_back(clip);
+  return clips;
+}
+
+std::vector<AudioClip> AudioClip::GenerateClipsFromImageLayer(
+    std::shared_ptr<PAGImageLayer> layer) {
+  auto clips = ExtractClipsFromImageLayer(layer);
+  if (!clips.empty()) {
+    AdjustClipsByLayer(clips, std::move(layer));
+  }
+  return clips;
+}
+
+std::vector<AudioClip> AudioClip::ExtractClipsFromImageLayer(std::shared_ptr<PAGImageLayer> layer) {
   auto replacement = layer->replacement;
   if (replacement == nullptr) {
     return {};
@@ -226,13 +335,13 @@ std::vector<AudioClip> AudioClip::ProcessImageLayer(std::shared_ptr<PAGImageLaye
     }
     return result;
   }
-  return ProcessTimeRamp(std::move(layer), audioClips,
-                         static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap));
+  return ApplyTimeRemapToClips(std::move(layer), audioClips,
+                               static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap));
 }
 
-std::vector<AudioClip> AudioClip::ProcessTimeRamp(std::shared_ptr<PAGImageLayer> layer,
-                                                  std::vector<AudioClip>& clips,
-                                                  AnimatableProperty<Frame>* timeRemap) {
+std::vector<AudioClip> AudioClip::ApplyTimeRemapToClips(std::shared_ptr<PAGImageLayer> layer,
+                                                        std::vector<AudioClip>& clips,
+                                                        AnimatableProperty<Frame>* timeRemap) {
   std::vector<AudioClip> result = {};
   auto imageLayerDuration = layer->contentDurationInternal();
   for (auto& keyframe : timeRemap->keyframes) {
@@ -265,71 +374,11 @@ std::vector<AudioClip> AudioClip::ProcessTimeRamp(std::shared_ptr<PAGImageLayer>
   return result;
 }
 
-std::vector<AudioClip> AudioClip::GenerateAudioClipsFromImageLayer(
-    std::shared_ptr<PAGImageLayer> layer) {
-  auto clips = ProcessImageLayer(layer);
-  if (!clips.empty()) {
-    ShiftClipsWithLayer(clips, std::move(layer));
-  }
-  return clips;
-}
-
-void AudioClip::ShiftClipsWithLayer(std::vector<AudioClip>& clips,
-                                    std::shared_ptr<PAGLayer> layer) {
-  auto startTime = layer->startTime();
-  if (startTime == 0) {
-    for (auto& clip : clips) {
-      clip.clearRootFile(layer.get());
-    }
-    return;
-  }
-  if (startTime > 0) {
-    for (auto& clip : clips) {
-      ShiftClipWithTime(clip, startTime);
-      clip.clearRootFile(layer.get());
-    }
-    return;
-  }
-  auto time = startTime;
-  for (auto iter = clips.begin(); iter != clips.end(); ++iter) {
-    auto& clip = *iter;
-    if (clip.rootFile != nullptr) {
-      if (!clip.clearRootFile(layer.get())) {
-        continue;
-      }
-      ShiftClipWithTime(clip, time);
-    } else {
-      if (clip.targetTimeRange.end <= time) {
-        clips.erase(iter--);
-      } else if (clip.targetTimeRange.start < time) {
-        ClipWithTime(clip, time);
-      } else {
-        ShiftClipWithTime(clip, -time);
-      }
-    }
-  }
-}
-
-void AudioClip::ClipWithTime(AudioClip& clip, int64_t time) {
-  auto delta = time - clip.targetTimeRange.start;
-  clip.sourceTimeRange.start +=
-      clip.sourceTimeRange.duration() * delta / clip.targetTimeRange.duration();
-  clip.targetTimeRange.start = time;
-  clip.targetTimeRange.start -= time;
-  clip.targetTimeRange.end -= time;
-}
-
-void AudioClip::ShiftClipWithTime(AudioClip& clip, int64_t time) {
-  clip.targetTimeRange.start += time;
-  clip.targetTimeRange.end += time;
-}
-
-std::vector<int> AudioClip::ApplyAudioClips(std::shared_ptr<AudioAsset> audio,
-                                            const std::vector<AudioClip>& clips) {
+void AudioClip::ApplyClipsToAudio(std::shared_ptr<AudioAsset> audio,
+                                  const std::vector<AudioClip>& clips) {
   if (clips.empty()) {
-    return {};
+    return;
   }
-  std::vector<int> trackIDs = {};
   for (auto& clip : clips) {
     auto theAudio = AudioAsset::Make(clip.source);
     if (theAudio == nullptr || theAudio->getTracks().empty()) {
@@ -343,81 +392,8 @@ std::vector<int> AudioClip::ApplyAudioClips(std::shared_ptr<AudioAsset> audio,
                                    clip.targetTimeRange.start + clip.sourceTimeRange.duration()};
         newTrack->scaleTimeRange(timeRange, clip.targetTimeRange.duration());
       }
-      trackIDs.push_back(newTrack->getTrackID());
     }
   }
-  return trackIDs;
-}
-
-bool AudioClip::clearRootFile(PAGLayer* layer) {
-  if (rootFile == layer) {
-    rootFile = nullptr;
-    return true;
-  }
-  return false;
-}
-
-bool AudioClip::applyTimeRamp(const TimeRange& source, const TimeRange& target) {
-  if (targetTimeRange.end <= source.start || source.end <= targetTimeRange.start) {
-    return false;
-  }
-  if (targetTimeRange.start <= source.start && source.end <= targetTimeRange.end) {
-    // inside
-    // |--------|           audioClip.sourceTimeRange
-    // |--------------|     audioClip.targetTimeRange
-    //    |--------|        source
-    //    |-----|           target
-    AudioClip clip(*this);
-    targetTimeRange = target;
-    sourceTimeRange.start = (source.start - clip.targetTimeRange.start) *
-                                clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
-                            clip.sourceTimeRange.start;
-    sourceTimeRange.end = (source.end - clip.targetTimeRange.start) *
-                              clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
-                          clip.sourceTimeRange.start;
-  } else if (source.start <= targetTimeRange.start && targetTimeRange.end <= source.end) {
-    // contain
-    //    |-----|           audioClip.sourceTimeRange
-    //    |--------|        audioClip.targetTimeRange
-    // |--------------|     source
-    // |-----|              target
-    AudioClip clip(*this);
-    targetTimeRange.start =
-        (clip.targetTimeRange.start - source.start) * target.duration() / source.duration() +
-        target.start;
-    targetTimeRange.end =
-        (clip.targetTimeRange.end - source.start) * target.duration() / source.duration() +
-        target.start;
-  } else if (source.start < targetTimeRange.start && targetTimeRange.start < source.end) {
-    // left intersect
-    //    |-----|       audioClip.sourceTimeRange
-    //    |--------|    audioClip.targetTimeRange
-    // |------|         source
-    // |----|           target
-    AudioClip clip(*this);
-    targetTimeRange.end = target.end;
-    targetTimeRange.start =
-        (clip.targetTimeRange.start - source.start) * target.duration() / source.duration() +
-        target.start;
-    sourceTimeRange.end = (source.end - clip.targetTimeRange.start) *
-                              clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
-                          clip.sourceTimeRange.start;
-  } else {
-    // right intersect
-    // |-----|          audioClip.sourceTimeRange
-    // |--------|       audioClip.targetTimeRange
-    //      |------|    source
-    //      |----|      target
-    AudioClip clip(*this);
-    targetTimeRange.start = target.start;
-    targetTimeRange.end =
-        (clip.targetTimeRange.end - source.start) * target.duration() / source.duration() +
-        target.start;
-    sourceTimeRange.start = (source.start - clip.targetTimeRange.start) *
-                                clip.sourceTimeRange.duration() / clip.targetTimeRange.duration() +
-                            clip.sourceTimeRange.start;
-  }
-  return true;
 }
 
 }  // namespace pag

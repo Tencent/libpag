@@ -27,10 +27,10 @@ namespace pag {
 using SmapleData = ffmovie::SampleData;
 using AudioOutputConfig = ffmovie::AudioOutputConfig;
 
-class AudioShifting {
+class AudioTransform {
  public:
-  explicit AudioShifting(std::shared_ptr<AudioOutputConfig> outputConfig);
-  ~AudioShifting();
+  explicit AudioTransform(std::shared_ptr<AudioOutputConfig> outputConfig);
+  ~AudioTransform();
   void setSpeed(float speed);
   void setVolume(float volume);
   void setPitch(float pitch);
