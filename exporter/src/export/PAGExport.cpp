@@ -360,13 +360,20 @@ std::vector<pag::ImageBytes*> PAGExport::getRefImages(
   }
 
   std::vector<pag::ImageBytes*> images = {};
-  for (auto image : session->imageBytesList) {
+  std::vector<pag::ImageBytes*> newImages = {};
+  std::vector<std::pair<bool, AEGP_LayerH>> newImageLayerHandleList = {};
+  for (size_t i = 0; i < session->imageBytesList.size(); ++i) {
+    auto image = session->imageBytesList[i];
     if (refImages.count(image)) {
       images.push_back(image);
+      newImages.push_back(image);
+      newImageLayerHandleList.push_back(session->imageLayerHandleList[i]);
     } else {
       delete image;
     }
   }
+  session->imageBytesList = std::move(newImages);
+  session->imageLayerHandleList = std::move(newImageLayerHandleList);
   return images;
 }
 
@@ -413,7 +420,8 @@ void PAGExport::exportRescaleImages() const {
 void PAGExport::exportRescaleBitmapCompositions(
     std::vector<pag::Composition*>& compositions) const {
   auto mainComposition = compositions[compositions.size() - 1];
-  for (auto composition : compositions) {
+  for (size_t i = 0; i < compositions.size(); i++) {
+    auto composition = compositions[i];
     if (session->stopExport) {
       break;
     }
@@ -433,7 +441,8 @@ void PAGExport::exportRescaleBitmapCompositions(
 
 void PAGExport::exportRescaleVideoCompositions(std::vector<pag::Composition*>& compositions) const {
   auto mainComposition = compositions[compositions.size() - 1];
-  for (auto composition : compositions) {
+  for (size_t i = 0; i < compositions.size(); i++) {
+    auto composition = compositions[i];
     if (session->stopExport) {
       break;
     }

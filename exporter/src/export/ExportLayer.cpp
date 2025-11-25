@@ -153,7 +153,32 @@ static void InitLayer(std::shared_ptr<PAGExportSession> session, const AEGP_Laye
       if (trackMatteLayerHandle == nullptr) {
         layer->trackMatteType = pag::TrackMatteType::None;
       } else {
-        layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
+        int trackMatteIndex = -1;
+        AEGP_CompH compHandle = nullptr;
+        if (GetSuites()->LayerSuite6()->AEGP_GetLayerParentComp(trackMatteLayerHandle,
+                                                                &compHandle) == A_Err_NONE) {
+          A_long numLayers = 0;
+          if (GetSuites()->LayerSuite6()->AEGP_GetCompNumLayers(compHandle, &numLayers) ==
+              A_Err_NONE) {
+            for (int i = 0; i < numLayers; i++) {
+              AEGP_LayerH tempLayerHandle = nullptr;
+              if (GetSuites()->LayerSuite6()->AEGP_GetCompLayerByIndex(
+                      compHandle, i, &tempLayerHandle) == A_Err_NONE) {
+                if (tempLayerHandle == trackMatteLayerHandle) {
+                  trackMatteIndex = i;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (trackMatteIndex >= 0) {
+          ScopedAssign<int> tempLayerIndex(session->layerIndex, trackMatteIndex);
+          layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
+        } else {
+          layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
+        }
         layer->trackMatteLayer->isActive = false;
         layer->trackMatteLayer->trackMatteType = pag::TrackMatteType::None;
       }
@@ -361,6 +386,8 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
   bool hasSoloLayer = false;
   std::vector<bool> soloFlags = {};
   std::vector<pag::Layer*> layers = {};
+  std::unordered_set<pag::Layer*> trackMatteCopies = {};
+  std::unordered_map<pag::Layer*, pag::Layer*> trackMatteOwners = {};
 
   A_long numLayers = 0;
   if (GetSuites()->LayerSuite6()->AEGP_GetCompNumLayers(compHandle, &numLayers) != A_Err_NONE) {
@@ -392,6 +419,8 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     if (layer->trackMatteLayer != nullptr) {
       soloFlags.push_back(false);
       layers.push_back(layer->trackMatteLayer);
+      trackMatteCopies.insert(layer->trackMatteLayer);
+      trackMatteOwners[layer->trackMatteLayer] = layer;
     }
     layers.push_back(layer);
 
@@ -414,12 +443,15 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     auto layerIter = layers.begin();
     auto soloFlagIter = soloFlags.begin();
     while (layerIter != layers.end() && soloFlagIter != soloFlags.end()) {
-      pag::Layer* layer = *layerIter;
-      if (sets.find(layer->id) != sets.end()) {
+      auto layer = *layerIter;
+      bool isTrackMatteCopy = trackMatteCopies.find(layer) != trackMatteCopies.end();
+      if (!isTrackMatteCopy && sets.find(layer->id) != sets.end()) {
         layerIter = layers.erase(layerIter);
         soloFlagIter = soloFlags.erase(soloFlagIter);
       } else {
-        sets.insert(layer->id);
+        if (!isTrackMatteCopy) {
+          sets.insert(layer->id);
+        }
         ++layerIter;
         ++soloFlagIter;
       }
@@ -473,6 +505,9 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     }
 
     if (!layer->isActive && !isReferenced) {
+      if (layer->trackMatteLayer != nullptr) {
+        layer->trackMatteLayer->isActive = false;
+      }
       session->layerHandleMap.erase(layer->id);
       layers.erase(layers.begin() + index);
       delete layer;

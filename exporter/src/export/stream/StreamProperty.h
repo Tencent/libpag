@@ -24,6 +24,7 @@
 #include "utils/AEDataTypeConverter.h"
 #include "utils/AEHelper.h"
 #include "utils/PAGExportSession.h"
+#include "utils/PAGExportSessionManager.h"
 
 namespace exporter {
 
@@ -36,15 +37,16 @@ pag::Keyframe<T>* GetKeyframe(AEGP_StreamRefH streamHandle, StreamParser<T> pars
                               const QVariantMap& map, int dimensionality) {
   const auto& PluginID = GetPluginID();
   const auto& Suites = GetSuites();
+  float frameRate = PAGExportSessionManager::GetInstance()->getFrameRate();
 
   auto keyframe = new pag::Keyframe<T>();
   A_Time time = {};
   Suites->KeyframeSuite4()->AEGP_GetKeyframeTime(streamHandle, index - 1, AEGP_LTimeMode_CompTime,
                                                  &time);
-  keyframe->startTime = AEDurationToFrame(time, map.value("frameRate", 24.0f).toFloat());
+  keyframe->startTime = AEDurationToFrame(time, frameRate);
   Suites->KeyframeSuite4()->AEGP_GetKeyframeTime(streamHandle, index, AEGP_LTimeMode_CompTime,
                                                  &time);
-  keyframe->endTime = AEDurationToFrame(time, map.value("frameRate", 24.0f).toFloat());
+  keyframe->endTime = AEDurationToFrame(time, frameRate);
   AEGP_StreamType streamType;
   Suites->StreamSuite4()->AEGP_GetStreamType(streamHandle, &streamType);
   bool hasSpatial =
@@ -54,12 +56,15 @@ pag::Keyframe<T>* GetKeyframe(AEGP_StreamRefH streamHandle, StreamParser<T> pars
     Suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(PluginID, streamHandle, index - 1,
                                                        &streamValue);
   }
-  keyframe->startValue = parser(streamValue.val, map);
+  QVariantMap newMap = map;
+  newMap["keyFrameIndex"] = index - 1;
+  keyframe->startValue = parser(streamValue.val, newMap);
   if (streamType != AEGP_StreamType_NO_DATA) {
     Suites->StreamSuite4()->AEGP_DisposeStreamValue(&streamValue);
     Suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(PluginID, streamHandle, index, &streamValue);
   }
-  keyframe->endValue = parser(streamValue.val, map);
+  newMap["keyFrameIndex"] = index;
+  keyframe->endValue = parser(streamValue.val, newMap);
   if (streamType != AEGP_StreamType_NO_DATA) {
     Suites->StreamSuite4()->AEGP_DisposeStreamValue(&streamValue);
   }

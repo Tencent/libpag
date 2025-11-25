@@ -524,7 +524,7 @@ static void ModififyAnimatorKeyFrames(std::vector<pag::TextAnimator*>* animators
 }
 
 static void AdjustFirstBaseLine(pag::TextDocumentHandle textDocument, bool hasBias) {
-  if (textDocument->boxTextPos.x <= 0.001f || textDocument->boxTextPos.y <= 0.001f) {
+  if (textDocument->boxTextSize.x <= 0.001f || textDocument->boxTextSize.y <= 0.001f) {
     textDocument->firstBaseLine = 0.0f;
     return;
   }
