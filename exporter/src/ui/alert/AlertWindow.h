@@ -18,55 +18,30 @@
 
 #pragma once
 
-#include <QApplication>
-#include <QString>
-#include <QTranslator>
-#include <string>
-#include <vector>
-#include "config/ConfigWindow.h"
-#include "utils/AlertInfo.h"
+#include "ui/AlertInfoModel.h"
+#include "ui/BaseWindow.h"
 
 namespace exporter {
 
-class WindowManager {
+class AlertWindow : public BaseWindow {
+  Q_OBJECT
  public:
-  static WindowManager& GetInstance();
-
-  void initializeQtEnvironment();
-
-  void showExportPanelWindow();
-
-  void showPAGConfigWindow();
-
-  void showExportPreviewWindow();
-
-  void showExportWindow();
+  explicit AlertWindow(QApplication* app, QObject* parent = nullptr);
 
   bool showWarnings(const std::vector<AlertInfo>& infos);
+  bool showErrors(const std::vector<AlertInfo>& infos, const QString& errorMessage = "");
+  void onWindowClosing() override;
 
-  bool showErrors(const std::vector<AlertInfo>& infos);
-
-  bool showSimpleError(const QString& message);
-
-  bool showPAGViewerInstallDialog(const std::string& pagFilePath);
-
-  WindowManager(const WindowManager&) = delete;
-  WindowManager& operator=(const WindowManager&) = delete;
-
-  WindowManager(WindowManager&&) = delete;
-  WindowManager& operator=(WindowManager&&) = delete;
+  Q_INVOKABLE void continueExport();
+  Q_INVOKABLE void cancelAndModify();
 
  private:
-  void init();
+  void init(const std::vector<AlertInfo>& infos);
+  void wait() const;
 
-  WindowManager();
-  ~WindowManager() = default;
-
-  int argc = 0;
-  char** argv = nullptr;
-  std::unique_ptr<QApplication> app = nullptr;
-  std::unique_ptr<QTranslator> translator = nullptr;
-  std::unique_ptr<ConfigWindow> configWindow = nullptr;
+  bool continue_ = false;
+  bool cancel = false;
+  std::unique_ptr<AlertInfoModel> alertInfoModel = nullptr;
 };
 
 }  // namespace exporter
