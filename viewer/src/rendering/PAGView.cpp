@@ -122,7 +122,7 @@ QString PAGView::getFilePath() const {
     return "";
   }
 
-  return QString::fromLocal8Bit(pagFile->path().data());
+  return QString::fromStdString(pagFile->path());
 }
 
 QString PAGView::getDisplayedTime() const {

@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
   QApplication::setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
-  app.openFile(QString::fromLocal8Bit(filePath.data()));
+  app.openFile(filePath.data());
 
   pag::InitUpdater();
 
