@@ -46,12 +46,16 @@ static pag::ShapeType GetShapeType(const AEGP_StreamRefH& streamHandle) {
   return result->second;
 }
 
-static pag::ShapeElement* GetShape(const AEGP_StreamRefH& streamHandle, int& gradientIndex);
+static pag::ShapeElement* GetShape(const AEGP_StreamRefH& streamHandle, int& gradientIndex,
+                                   float frameRate);
 
-static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle, float frameRate) {
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
   auto element = new pag::ShapeGroupElement();
+
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->blendMode =
       GetValue(streamHandle, "ADBE Vector Blend Mode", AEStreamParser::ShapeBlendModeParser);
@@ -61,19 +65,19 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
       PluginID, streamHandle, "ADBE Vector Transform Group", &transformStreamHandle);
   auto transform = new pag::ShapeTransform();
   transform->anchorPoint =
-      GetProperty(transformStreamHandle, "ADBE Vector Anchor", AEStreamParser::PointParser);
+      GetProperty(transformStreamHandle, "ADBE Vector Anchor", AEStreamParser::PointParser, map);
   transform->position =
-      GetProperty(transformStreamHandle, "ADBE Vector Position", AEStreamParser::PointParser);
+      GetProperty(transformStreamHandle, "ADBE Vector Position", AEStreamParser::PointParser, map);
   transform->scale =
-      GetProperty(transformStreamHandle, "ADBE Vector Scale", AEStreamParser::ScaleParser);
+      GetProperty(transformStreamHandle, "ADBE Vector Scale", AEStreamParser::ScaleParser, map);
   transform->skew =
-      GetProperty(transformStreamHandle, "ADBE Vector Skew", AEStreamParser::FloatParser);
+      GetProperty(transformStreamHandle, "ADBE Vector Skew", AEStreamParser::FloatParser, map);
   transform->skewAxis =
-      GetProperty(transformStreamHandle, "ADBE Vector Skew Axis", AEStreamParser::FloatParser);
+      GetProperty(transformStreamHandle, "ADBE Vector Skew Axis", AEStreamParser::FloatParser, map);
   transform->rotation =
-      GetProperty(transformStreamHandle, "ADBE Vector Rotation", AEStreamParser::FloatParser);
+      GetProperty(transformStreamHandle, "ADBE Vector Rotation", AEStreamParser::FloatParser, map);
   transform->opacity = GetProperty(transformStreamHandle, "ADBE Vector Group Opacity",
-                                   AEStreamParser::Opacity0_100Parser);
+                                   AEStreamParser::Opacity0_100Parser, map);
   element->transform = transform;
   Suites->StreamSuite4()->AEGP_DisposeStream(transformStreamHandle);
 
@@ -87,7 +91,7 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, contents, index,
                                                                &childStreamHandle);
-    auto shape = GetShape(childStreamHandle, gradientIndex);
+    auto shape = GetShape(childStreamHandle, gradientIndex, frameRate);
     if (shape != nullptr) {
       element->elements.push_back(shape);
     }
@@ -97,62 +101,71 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
   return element;
 }
 
-static pag::ShapeElement* GetRectangle(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetRectangle(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::RectangleElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->size =
-      GetProperty(streamHandle, "ADBE Vector Rect Size", AEStreamParser::PointParser, {}, 2);
+      GetProperty(streamHandle, "ADBE Vector Rect Size", AEStreamParser::PointParser, map, 2);
   element->position =
-      GetProperty(streamHandle, "ADBE Vector Rect Position", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Rect Position", AEStreamParser::PointParser, map);
   element->roundness =
-      GetProperty(streamHandle, "ADBE Vector Rect Roundness", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Rect Roundness", AEStreamParser::FloatParser, map);
   return element;
 }
 
-static pag::ShapeElement* GetEllipse(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetEllipse(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::EllipseElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->size =
-      GetProperty(streamHandle, "ADBE Vector Ellipse Size", AEStreamParser::PointParser, {}, 2);
+      GetProperty(streamHandle, "ADBE Vector Ellipse Size", AEStreamParser::PointParser, map, 2);
   element->position =
-      GetProperty(streamHandle, "ADBE Vector Ellipse Position", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Ellipse Position", AEStreamParser::PointParser, map);
   return element;
 }
 
-static pag::ShapeElement* GetPolyStar(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetPolyStar(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::PolyStarElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->polyType =
       GetValue(streamHandle, "ADBE Vector Star Type", AEStreamParser::PolyStarTypeParser);
   element->points =
-      GetProperty(streamHandle, "ADBE Vector Star Points", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Star Points", AEStreamParser::FloatParser, map);
   element->position =
-      GetProperty(streamHandle, "ADBE Vector Star Position", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Star Position", AEStreamParser::PointParser, map);
   element->rotation =
-      GetProperty(streamHandle, "ADBE Vector Star Rotation", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Star Rotation", AEStreamParser::FloatParser, map);
   element->innerRadius =
-      GetProperty(streamHandle, "ADBE Vector Star Inner Radius", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Star Inner Radius", AEStreamParser::FloatParser, map);
   element->outerRadius =
-      GetProperty(streamHandle, "ADBE Vector Star Outer Radius", AEStreamParser::FloatParser);
-  element->innerRoundness =
-      GetProperty(streamHandle, "ADBE Vector Star Inner Roundess", AEStreamParser::PercentParser);
-  element->outerRoundness =
-      GetProperty(streamHandle, "ADBE Vector Star Outer Roundess", AEStreamParser::PercentParser);
+      GetProperty(streamHandle, "ADBE Vector Star Outer Radius", AEStreamParser::FloatParser, map);
+  element->innerRoundness = GetProperty(streamHandle, "ADBE Vector Star Inner Roundess",
+                                        AEStreamParser::PercentParser, map);
+  element->outerRoundness = GetProperty(streamHandle, "ADBE Vector Star Outer Roundess",
+                                        AEStreamParser::PercentParser, map);
   return element;
 }
 
-static pag::ShapeElement* GetShapePath(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetShapePath(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::ShapePathElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
-  auto reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
-  element->shapePath = GetProperty(streamHandle, "ADBE Vector Shape", AEStreamParser::PathParser);
+  auto reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                           AEStreamParser::ShapeDirectionReversedParser);
+  element->shapePath =
+      GetProperty(streamHandle, "ADBE Vector Shape", AEStreamParser::PathParser, map);
   if (reversed) {
     if (element->shapePath->animatable()) {
       auto property = static_cast<pag::AnimatableProperty<pag::PathHandle>*>(element->shapePath);
@@ -167,8 +180,10 @@ static pag::ShapeElement* GetShapePath(const AEGP_StreamRefH& streamHandle) {
   return element;
 }
 
-static pag::ShapeElement* GetFill(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetFill(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::FillElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->blendMode =
       GetValue(streamHandle, "ADBE Vector Blend Mode", AEStreamParser::ShapeBlendModeParser);
@@ -176,9 +191,10 @@ static pag::ShapeElement* GetFill(const AEGP_StreamRefH& streamHandle) {
       GetValue(streamHandle, "ADBE Vector Composite Order", AEStreamParser::CompositeOrderParser);
   element->fillRule =
       GetValue(streamHandle, "ADBE Vector Fill Rule", AEStreamParser::FillRuleParser);
-  element->color = GetProperty(streamHandle, "ADBE Vector Fill Color", AEStreamParser::ColorParser);
-  element->opacity =
-      GetProperty(streamHandle, "ADBE Vector Fill Opacity", AEStreamParser::Opacity0_100Parser);
+  element->color =
+      GetProperty(streamHandle, "ADBE Vector Fill Color", AEStreamParser::ColorParser, map);
+  element->opacity = GetProperty(streamHandle, "ADBE Vector Fill Opacity",
+                                 AEStreamParser::Opacity0_100Parser, map);
   return element;
 }
 
@@ -219,31 +235,37 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
   Suites->StreamSuite4()->AEGP_DisposeStream(dashStreamHandle);
 }
 
-static pag::ShapeElement* GetStroke(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetStroke(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::StrokeElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->blendMode =
       GetValue(streamHandle, "ADBE Vector Blend Mode", AEStreamParser::ShapeBlendModeParser);
   element->composite =
       GetValue(streamHandle, "ADBE Vector Composite Order", AEStreamParser::CompositeOrderParser);
   element->color =
-      GetProperty(streamHandle, "ADBE Vector Stroke Color", AEStreamParser::ColorParser);
-  element->opacity =
-      GetProperty(streamHandle, "ADBE Vector Stroke Opacity", AEStreamParser::Opacity0_100Parser);
+      GetProperty(streamHandle, "ADBE Vector Stroke Color", AEStreamParser::ColorParser, map);
+  element->opacity = GetProperty(streamHandle, "ADBE Vector Stroke Opacity",
+                                 AEStreamParser::Opacity0_100Parser, map);
   element->strokeWidth =
-      GetProperty(streamHandle, "ADBE Vector Stroke Width", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Stroke Width", AEStreamParser::FloatParser, map);
   element->lineCap =
       GetValue(streamHandle, "ADBE Vector Stroke Line Cap", AEStreamParser::LineCapParser);
   element->lineJoin =
       GetValue(streamHandle, "ADBE Vector Stroke Line Join", AEStreamParser::LineJoinParser);
   element->miterLimit =
-      GetProperty(streamHandle, "ADBE Vector Stroke Miter Limit", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Stroke Miter Limit", AEStreamParser::FloatParser, map);
   GetDashes(streamHandle, element);
   return element;
 }
 
-static pag::ShapeElement* GetGradientFill(const AEGP_StreamRefH& streamHandle, int& gradientIndex) {
+static pag::ShapeElement* GetGradientFill(const AEGP_StreamRefH& streamHandle, int& gradientIndex,
+                                          float frameRate) {
   auto element = new pag::GradientFillElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
+  map["index"] = gradientIndex;
 
   element->blendMode =
       GetValue(streamHandle, "ADBE Vector Blend Mode", AEStreamParser::ShapeBlendModeParser);
@@ -254,23 +276,23 @@ static pag::ShapeElement* GetGradientFill(const AEGP_StreamRefH& streamHandle, i
   element->fillType =
       GetValue(streamHandle, "ADBE Vector Grad Type", AEStreamParser::GradientFillTypeParser);
   element->startPoint =
-      GetProperty(streamHandle, "ADBE Vector Grad Start Pt", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Grad Start Pt", AEStreamParser::PointParser, map);
   element->endPoint =
-      GetProperty(streamHandle, "ADBE Vector Grad End Pt", AEStreamParser::PointParser);
-  QVariantMap map = {};
-  map["index"] = gradientIndex;
+      GetProperty(streamHandle, "ADBE Vector Grad End Pt", AEStreamParser::PointParser, map);
   element->colors = GetProperty(streamHandle, "ADBE Vector Grad Colors",
                                 AEStreamParser::GradientColorParser, map);
 
-  element->opacity =
-      GetProperty(streamHandle, "ADBE Vector Fill Opacity", AEStreamParser::Opacity0_100Parser);
+  element->opacity = GetProperty(streamHandle, "ADBE Vector Fill Opacity",
+                                 AEStreamParser::Opacity0_100Parser, map);
   gradientIndex++;
   return element;
 }
 
-static pag::ShapeElement* GetGradientStroke(const AEGP_StreamRefH& streamHandle,
-                                            int& gradientIndex) {
+static pag::ShapeElement* GetGradientStroke(const AEGP_StreamRefH& streamHandle, int& gradientIndex,
+                                            float frameRate) {
   auto element = new pag::GradientStrokeElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->blendMode =
       GetValue(streamHandle, "ADBE Vector Blend Mode", AEStreamParser::ShapeBlendModeParser);
@@ -279,21 +301,21 @@ static pag::ShapeElement* GetGradientStroke(const AEGP_StreamRefH& streamHandle,
   element->fillType =
       GetValue(streamHandle, "ADBE Vector Grad Type", AEStreamParser::GradientFillTypeParser);
   element->startPoint =
-      GetProperty(streamHandle, "ADBE Vector Grad Start Pt", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Grad Start Pt", AEStreamParser::PointParser, map);
   element->endPoint =
-      GetProperty(streamHandle, "ADBE Vector Grad End Pt", AEStreamParser::PointParser);
-  element->colors =
-      GetProperty(streamHandle, "ADBE Vector Grad Colors", AEStreamParser::GradientColorParser);
-  element->opacity =
-      GetProperty(streamHandle, "ADBE Vector Stroke Opacity", AEStreamParser::Opacity0_100Parser);
+      GetProperty(streamHandle, "ADBE Vector Grad End Pt", AEStreamParser::PointParser, map);
+  element->colors = GetProperty(streamHandle, "ADBE Vector Grad Colors",
+                                AEStreamParser::GradientColorParser, map);
+  element->opacity = GetProperty(streamHandle, "ADBE Vector Stroke Opacity",
+                                 AEStreamParser::Opacity0_100Parser, map);
   element->strokeWidth =
-      GetProperty(streamHandle, "ADBE Vector Stroke Width", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Stroke Width", AEStreamParser::FloatParser, map);
   element->lineCap =
       GetValue(streamHandle, "ADBE Vector Stroke Line Cap", AEStreamParser::LineCapParser);
   element->lineJoin =
       GetValue(streamHandle, "ADBE Vector Stroke Line Join", AEStreamParser::LineJoinParser);
   element->miterLimit =
-      GetProperty(streamHandle, "ADBE Vector Stroke Miter Limit", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Stroke Miter Limit", AEStreamParser::FloatParser, map);
   GetDashes(streamHandle, element);
   gradientIndex++;
   return element;
@@ -306,65 +328,76 @@ static pag::ShapeElement* GetMergePaths(const AEGP_StreamRefH& streamHandle) {
   return element;
 }
 
-static pag::ShapeElement* GetTrimPaths(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetTrimPaths(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::TrimPathsElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->start =
-      GetProperty(streamHandle, "ADBE Vector Trim Start", AEStreamParser::PercentParser);
-  element->end = GetProperty(streamHandle, "ADBE Vector Trim End", AEStreamParser::PercentParser);
+      GetProperty(streamHandle, "ADBE Vector Trim Start", AEStreamParser::PercentParser, map);
+  element->end =
+      GetProperty(streamHandle, "ADBE Vector Trim End", AEStreamParser::PercentParser, map);
   element->offset =
-      GetProperty(streamHandle, "ADBE Vector Trim Offset", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Trim Offset", AEStreamParser::FloatParser, map);
   element->trimType =
       GetValue(streamHandle, "ADBE Vector Trim Type", AEStreamParser::TrimPathsTypeParser);
   return element;
 }
 
-static pag::RepeaterTransform* GetRepeaterTransform(const AEGP_StreamRefH& streamHandle) {
+static pag::RepeaterTransform* GetRepeaterTransform(const AEGP_StreamRefH& streamHandle,
+                                                    float frameRate) {
   auto transform = new pag::RepeaterTransform();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   transform->anchorPoint =
-      GetProperty(streamHandle, "ADBE Vector Repeater Anchor", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Repeater Anchor", AEStreamParser::PointParser, map);
   transform->position =
-      GetProperty(streamHandle, "ADBE Vector Repeater Position", AEStreamParser::PointParser);
+      GetProperty(streamHandle, "ADBE Vector Repeater Position", AEStreamParser::PointParser, map);
   transform->scale =
-      GetProperty(streamHandle, "ADBE Vector Repeater Scale", AEStreamParser::ScaleParser, {}, 2);
+      GetProperty(streamHandle, "ADBE Vector Repeater Scale", AEStreamParser::ScaleParser, map, 2);
   transform->rotation =
-      GetProperty(streamHandle, "ADBE Vector Repeater Rotation", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Repeater Rotation", AEStreamParser::FloatParser, map);
   transform->startOpacity = GetProperty(streamHandle, "ADBE Vector Repeater Opacity 1",
-                                        AEStreamParser::Opacity0_100Parser);
+                                        AEStreamParser::Opacity0_100Parser, map);
   transform->endOpacity = GetProperty(streamHandle, "ADBE Vector Repeater Opacity 2",
-                                      AEStreamParser::Opacity0_100Parser);
+                                      AEStreamParser::Opacity0_100Parser, map);
   return transform;
 }
 
-static pag::ShapeElement* GetRepeater(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetRepeater(const AEGP_StreamRefH& streamHandle, float frameRate) {
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
   auto element = new pag::RepeaterElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->copies =
-      GetProperty(streamHandle, "ADBE Vector Repeater Copies", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Repeater Copies", AEStreamParser::FloatParser, map);
   element->offset =
-      GetProperty(streamHandle, "ADBE Vector Repeater Offset", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector Repeater Offset", AEStreamParser::FloatParser, map);
   element->composite =
       GetValue(streamHandle, "ADBE Vector Repeater Order", AEStreamParser::RepeaterOrderParser);
   AEGP_StreamRefH transform = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, streamHandle, "ADBE Vector Repeater Transform", &transform);
-  element->transform = GetRepeaterTransform(transform);
+  element->transform = GetRepeaterTransform(transform, frameRate);
   Suites->StreamSuite4()->AEGP_DisposeStream(transform);
   return element;
 }
 
-static pag::ShapeElement* GetRoundCorners(const AEGP_StreamRefH& streamHandle) {
+static pag::ShapeElement* GetRoundCorners(const AEGP_StreamRefH& streamHandle, float frameRate) {
   auto element = new pag::RoundCornersElement();
+  QVariantMap map = {};
+  map["frameRate"] = frameRate;
 
   element->radius =
-      GetProperty(streamHandle, "ADBE Vector RoundCorner Radius", AEStreamParser::FloatParser);
+      GetProperty(streamHandle, "ADBE Vector RoundCorner Radius", AEStreamParser::FloatParser, map);
   return element;
 }
 
-static pag::ShapeElement* GetShape(const AEGP_StreamRefH& streamHandle, int& gradientIndex) {
+static pag::ShapeElement* GetShape(const AEGP_StreamRefH& streamHandle, int& gradientIndex,
+                                   float frameRate) {
   if (!IsStreamActive(streamHandle)) {
     return nullptr;
   }
@@ -373,43 +406,43 @@ static pag::ShapeElement* GetShape(const AEGP_StreamRefH& streamHandle, int& gra
   auto type = GetShapeType(streamHandle);
   switch (type) {
     case pag::ShapeType::ShapeGroup:
-      element = GetShapeGroup(streamHandle);
+      element = GetShapeGroup(streamHandle, frameRate);
       break;
     case pag::ShapeType::Rectangle:
-      element = GetRectangle(streamHandle);
+      element = GetRectangle(streamHandle, frameRate);
       break;
     case pag::ShapeType::Ellipse:
-      element = GetEllipse(streamHandle);
+      element = GetEllipse(streamHandle, frameRate);
       break;
     case pag::ShapeType::PolyStar:
-      element = GetPolyStar(streamHandle);
+      element = GetPolyStar(streamHandle, frameRate);
       break;
     case pag::ShapeType::ShapePath:
-      element = GetShapePath(streamHandle);
+      element = GetShapePath(streamHandle, frameRate);
       break;
     case pag::ShapeType::Fill:
-      element = GetFill(streamHandle);
+      element = GetFill(streamHandle, frameRate);
       break;
     case pag::ShapeType::Stroke:
-      element = GetStroke(streamHandle);
+      element = GetStroke(streamHandle, frameRate);
       break;
     case pag::ShapeType::GradientFill:
-      element = GetGradientFill(streamHandle, gradientIndex);
+      element = GetGradientFill(streamHandle, gradientIndex, frameRate);
       break;
     case pag::ShapeType::GradientStroke:
-      element = GetGradientStroke(streamHandle, gradientIndex);
+      element = GetGradientStroke(streamHandle, gradientIndex, frameRate);
       break;
     case pag::ShapeType::MergePaths:
       element = GetMergePaths(streamHandle);
       break;
     case pag::ShapeType::TrimPaths:
-      element = GetTrimPaths(streamHandle);
+      element = GetTrimPaths(streamHandle, frameRate);
       break;
     case pag::ShapeType::Repeater:
-      element = GetRepeater(streamHandle);
+      element = GetRepeater(streamHandle, frameRate);
       break;
     case pag::ShapeType::RoundCorners:
-      element = GetRoundCorners(streamHandle);
+      element = GetRoundCorners(streamHandle, frameRate);
       break;
     default:
       break;
@@ -417,7 +450,8 @@ static pag::ShapeElement* GetShape(const AEGP_StreamRefH& streamHandle, int& gra
   return element;
 }
 
-std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle) {
+std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle,
+                                          std::shared_ptr<PAGExportSession> session) {
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
   std::vector<pag::ShapeElement*> contents = {};
@@ -436,7 +470,7 @@ std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle) {
     AEGP_StreamRefH streamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, rootStreamHandle, index,
                                                                &streamHandle);
-    auto element = GetShape(streamHandle, gradientIndex);
+    auto element = GetShape(streamHandle, gradientIndex, session->frameRate);
     if (element != nullptr) {
       contents.push_back(element);
     }

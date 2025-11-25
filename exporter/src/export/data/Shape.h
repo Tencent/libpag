@@ -19,9 +19,11 @@
 #pragma once
 
 #include "utils/AEHelper.h"
+#include "utils/PAGExportSession.h"
 
 namespace exporter {
 
-std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle);
+std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle,
+                                          std::shared_ptr<PAGExportSession> session);
 
 }  // namespace exporter
