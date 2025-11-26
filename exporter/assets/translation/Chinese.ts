@@ -69,7 +69,7 @@
 <context>
     <name>CompositionListView</name>
     <message>
-        <location filename="../qml/CompositionListView.qml" line="272"/>
+        <location filename="../qml/CompositionListView.qml" line="270"/>
         <source>Select Save Path</source>
         <translation>选择存储路径</translation>
     </message>

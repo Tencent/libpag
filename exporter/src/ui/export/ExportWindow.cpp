@@ -44,7 +44,7 @@ void ExportWindow::show() {
   } else {
     pagExport->session->progressModel.setExportStatus(ProgressModel::ExportStatus::Error);
   }
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("progressModel", nullptr);
   pagExport.reset();
   if (result) {
@@ -107,7 +107,7 @@ void ExportWindow::init() {
   configParam.showAlertInfo = showAlertInfo;
   pagExport = std::make_unique<PAGExport>(configParam);
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
   context->setContextProperty("exportWindow", this);
   QQmlEngine::setObjectOwnership(&pagExport->session->progressModel, QQmlEngine::CppOwnership);

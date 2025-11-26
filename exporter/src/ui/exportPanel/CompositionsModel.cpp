@@ -52,7 +52,7 @@ void CompositionsModel::setAEResources(const std::vector<std::shared_ptr<AEResou
 void CompositionsModel::setQmlEngine(QQmlEngine* engine) {
   this->engine = engine;
   if (engine != nullptr) {
-    QQmlContext* context = engine->rootContext();
+    auto context = engine->rootContext();
     context->setContextProperty("progressListModel", progressListModel.get());
     context->setContextProperty("alertInfoModel", alertInfoModel.get());
   }
@@ -177,15 +177,9 @@ void CompositionsModel::setExportAudio(bool exportAudio) {
 void CompositionsModel::exportSelectedCompositions() {
   progressListModel->clearSessions();
 
-  auto* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("exportCompositionsWindow", this);
 
-  std::vector<std::shared_ptr<AEResource>> exportResources = {};
-  for (const auto& resource : resources) {
-    if (resource->isExport) {
-      exportResources.push_back(resource);
-    }
-  }
   for (const auto& resource : resources) {
     if (!resource->isExport) {
       continue;
@@ -201,12 +195,9 @@ void CompositionsModel::exportSelectedCompositions() {
   }
 
   for (auto& pagExport : pagExports) {
-    bool result = pagExport->exportFile();
-    if (result) {
-      pagExport->session->progressModel.setExportStatus(ProgressModel::ExportStatus::Success);
-    } else {
-      pagExport->session->progressModel.setExportStatus(ProgressModel::ExportStatus::Error);
-    }
+    pagExport->session->progressModel.setExportStatus(pagExport->exportFile()
+                                                          ? ProgressModel::ExportStatus::Success
+                                                          : ProgressModel::ExportStatus::Error);
   }
   pagExports.clear();
   context->setContextProperty("exportCompositionsWindow", nullptr);
@@ -224,7 +215,7 @@ void CompositionsModel::prepareForPreview(int row) {
   configParam.activeItemHandle = resource->itemHandle;
   configParam.outputPath = outputPath;
   pagExport = std::make_unique<PAGExport>(configParam);
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("progressModel", &pagExport->session->progressModel);
   context->setContextProperty("exportWindow", this);
 }
@@ -242,7 +233,7 @@ void CompositionsModel::previewComposition(int row) {
   } else {
     pagExport->session->progressModel.setExportStatus(ProgressModel::ExportStatus::Error);
   }
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("progressModel", nullptr);
   if (result) {
     OpenPAGFile(pagExport->session->outputPath);
@@ -272,11 +263,12 @@ int CompositionsModel::columnCount(const QModelIndex&) const {
 }
 
 QVariant CompositionsModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid()) {
+  if (!index.isValid() || index.row() < 0 ||
+      static_cast<size_t>(index.row()) >= compositions.size()) {
     return {};
   }
 
-  const std::shared_ptr<ExportCompositionData>& data = compositions[index.row()];
+  const auto& data = compositions[index.row()];
   switch (role) {
     case static_cast<int>(ExportCompositionModelRoles::NameRole): {
       return data->resource->name.c_str();
@@ -305,7 +297,7 @@ QVariant CompositionsModel::data(const QModelIndex& index, int role) const {
 void CompositionsModel::updateCompositionLevel() {
   for (const auto& composition : compositions) {
     int level = 0;
-    auto* parent = composition->resource->file.parent;
+    auto parent = composition->resource->file.parent;
     while (parent != nullptr && parent->ID != 0) {
       ++level;
       parent = parent->file.parent;

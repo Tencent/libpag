@@ -46,7 +46,7 @@ void ExportPanelWindow::init() {
 
   compositionsModel = std::make_unique<CompositionsModel>(engine.get());
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
   context->setContextProperty("exportingPanelWindow", this);
   QQmlEngine::setObjectOwnership(compositionsModel.get(), QQmlEngine::CppOwnership);

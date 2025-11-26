@@ -54,7 +54,7 @@ void ConfigWindow::initConfigWindow() {
     return;
   }
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("configWindow", this);
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/ConfigWindow.qml")));
