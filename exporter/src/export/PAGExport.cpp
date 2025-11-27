@@ -172,6 +172,28 @@ static void AdjustmentPreComposeLayerForVideoComposition(std::shared_ptr<PAGExpo
   }
 }
 
+static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {
+  pag::ID maxID = 0;
+  std::vector<pag::Layer*> trackMatteLayers = {};
+  for (auto& composition : session->compositions) {
+    if (composition->type() == pag::CompositionType::Vector) {
+      auto vectorComposition = static_cast<pag::VectorComposition*>(composition);
+      for (int i = 0; i < vectorComposition->layers.size(); i++) {
+        auto layer = vectorComposition->layers[i];
+        maxID = std::max(maxID, layer->id);
+        if (layer->trackMatteLayer != nullptr && i > 0) {
+          trackMatteLayers.push_back(layer->trackMatteLayer);
+        }
+      }
+    }
+  }
+  for (auto layer : trackMatteLayers) {
+    maxID += 1;
+    session->itemHandleMap[maxID] = session->itemHandleMap[layer->id];
+    layer->id = maxID;
+  }
+}
+
 PAGExport::PAGExport(const PAGExportConfigParam& configParam)
     : itemHandle(configParam.activeItemHandle),
       session(
@@ -214,6 +236,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
   ScopedAssign<pag::ID> arCI(session->compID, id);
 
   ExportComposition(session, itemHandle);
+  AdjustTrackMatteLayer(session);
   if (session->stopExport) {
     return nullptr;
   }

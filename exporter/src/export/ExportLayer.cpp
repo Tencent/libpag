@@ -384,7 +384,6 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
   bool hasSoloLayer = false;
   std::vector<bool> soloFlags = {};
   std::vector<pag::Layer*> layers = {};
-  std::unordered_set<pag::Layer*> trackMatteCopies = {};
 
   A_long numLayers = 0;
   if (GetSuites()->LayerSuite6()->AEGP_GetCompNumLayers(compHandle, &numLayers) != A_Err_NONE) {
@@ -416,7 +415,6 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     if (layer->trackMatteLayer != nullptr) {
       soloFlags.push_back(false);
       layers.push_back(layer->trackMatteLayer);
-      trackMatteCopies.insert(layer->trackMatteLayer);
     }
     layers.push_back(layer);
 
@@ -433,36 +431,6 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     }
     soloFlags.push_back(soloFlag);
   }
-
-  {
-    std::unordered_set<pag::ID> sets = {};
-    auto layerIter = layers.begin();
-    auto soloFlagIter = soloFlags.begin();
-    while (layerIter != layers.end() && soloFlagIter != soloFlags.end()) {
-      auto layer = *layerIter;
-      bool isTrackMatteCopy = trackMatteCopies.find(layer) != trackMatteCopies.end();
-      if (!isTrackMatteCopy && sets.find(layer->id) != sets.end()) {
-        layerIter = layers.erase(layerIter);
-        delete layer;
-        soloFlagIter = soloFlags.erase(soloFlagIter);
-      } else {
-        if (!isTrackMatteCopy) {
-          sets.insert(layer->id);
-        }
-        ++layerIter;
-        ++soloFlagIter;
-      }
-    }
-  }
-
-  for (auto trackMattelayer : trackMatteCopies) {
-    pag::ID maxID = 0;
-    std::for_each(layers.begin(), layers.end(),
-                  [&](pag::Layer* layer) { maxID = std::max(maxID, layer->id); });
-    session->layerHandleMap[maxID + 1] = session->layerHandleMap[trackMattelayer->id];
-    trackMattelayer->id = maxID + 1;
-  }
-
   if (session->stopExport) {
     return layers;
   }
