@@ -455,6 +455,14 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
     }
   }
 
+  for (auto trackMattelayer : trackMatteCopies) {
+    pag::ID maxID = 0;
+    std::for_each(layers.begin(), layers.end(),
+                  [&](pag::Layer* layer) { maxID = std::max(maxID, layer->id); });
+    session->layerHandleMap[maxID + 1] = session->layerHandleMap[trackMattelayer->id];
+    trackMattelayer->id = maxID + 1;
+  }
+
   if (session->stopExport) {
     return layers;
   }
