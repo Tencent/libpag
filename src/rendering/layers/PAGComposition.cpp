@@ -679,4 +679,50 @@ void PAGComposition::updateDurationAndFrameRate() {
     _parent->updateDurationAndFrameRate();
   }
 }
+
+bool PAGComposition::hasVideo() const {
+  // Check if current composition is a PAGFile with video
+  if (isPAGFile() && file) {
+    for (const auto& composition : file->compositions) {
+      if (composition->type() == CompositionType::Video) {
+        return true;
+      }
+    }
+  }
+
+  // Check if any child layer is a PAGFile with video
+  for (const auto& childLayer : layers) {
+    if (childLayer->isPAGFile() && childLayer->file) {
+      for (const auto& composition : childLayer->file->compositions) {
+        if (composition->type() == CompositionType::Video) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+Frame PAGComposition::getTargetFrame(PreComposeLayer* preLayer) {
+  Frame targetFrame = -1;
+  if (preLayer == nullptr) {
+    return targetFrame;
+  }
+  auto composition = preLayer->composition;
+  if (composition->type() == CompositionType::Bitmap ||
+      composition->type() == CompositionType::Video) {
+    auto layerFrame = preLayer->startTime + contentFrame;
+    targetFrame = preLayer->getCompositionFrame(layerFrame);
+  }
+
+  auto sequence = Sequence::Get(composition);
+  if (sequence == nullptr) {
+    return targetFrame;
+  }
+  targetFrame = sequence->toSequenceFrame(targetFrame);
+
+  return targetFrame;
+}
+
 }  // namespace pag

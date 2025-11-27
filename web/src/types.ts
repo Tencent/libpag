@@ -16,7 +16,7 @@ import { PAGImageLayer } from './pag-image-layer';
 import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
-
+import {VideoReader, VideoReaderManage} from "./interfaces";
 import type { ScalerContextConstructor, VideoDecoderConstructor } from './interfaces';
 
 import type { ArrayBufferImage } from '@tgfx/wechat/array-buffer-image';
@@ -114,6 +114,10 @@ export interface PAG extends EmscriptenModule {
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   SDKVersion: () => string;
   currentPlayer: PAGPlayer | null;
+  videoReaderManage: VideoReaderManage | null;
+  _videoInfoManage: {
+    _Make: (pagFile:any) => any;
+  };
   [key: string]: any;
 }
 

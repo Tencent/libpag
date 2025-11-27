@@ -167,4 +167,8 @@ export class PAGComposition extends PAGLayer {
     }
     return layerArray;
   }
+
+  public hasVideo(){
+    return this.wasmIns._hasVideo()  as boolean;
+  }
 }

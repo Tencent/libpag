@@ -18,6 +18,7 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
+#include "VideoInfoManage.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "pag/types.h"
@@ -298,7 +299,8 @@ bool PAGBindInit() {
                     jsArray.call<void>("push", PAGLayerToJsObject(layerVector[i]));
                   }
                   return jsArray;
-                }));
+                }))
+      .function("_hasVideo", &PAGComposition::hasVideo);
 
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
@@ -581,6 +583,20 @@ bool PAGBindInit() {
                 }))
       .function("_postConcat", &Matrix::postConcat);
 
+  class_<VideoInfoManage>("_videoInfoManage")
+      .smart_ptr<std::shared_ptr<VideoInfoManage>>("_videoInfoManage")
+      .class_function("_Make",
+                      optional_override([](std::shared_ptr<PAGComposition> pagComposition) {
+                        return std::make_shared<VideoInfoManage>(pagComposition);
+                      }))
+      .function("_getMp4DataById", &VideoInfoManage::getMp4DataById)
+      .function("_getWidthById", &VideoInfoManage::getWidthById)
+      .function("_getHeightById", &VideoInfoManage::getHeightById)
+      .function("_getFrameRateById", &VideoInfoManage::getFrameRateById)
+      .function("_getStaticTimeRangesById", &VideoInfoManage::getStaticTimeRangesById)
+      .function("_getVideoIds", &VideoInfoManage::getVideoIds)
+      .function("_getTargetFrameById", &VideoInfoManage::getTargetFrameById)
+      .function("_getPlaybackRateById", &VideoInfoManage::getPlaybackRateById);
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
       .property("applyFill", &TextDocument::applyFill)
