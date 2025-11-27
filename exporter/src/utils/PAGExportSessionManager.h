@@ -35,7 +35,7 @@ class PAGExportSessionManager {
   void setCurrentSession(std::shared_ptr<PAGExportSession> session);
   void unsetCurrentSession(std::shared_ptr<PAGExportSession> session);
   void recordWarning(AlertInfoType type, const std::string& addInfo = "");
-  float getFrameRate();
+  float getCurrentCompositionFrameRate();
   pag::GradientColorHandle getGradientColors(const std::vector<std::string>& matchNames, int index,
                                              int keyFrameIndex = 0);
 

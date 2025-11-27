@@ -100,8 +100,8 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetRectangle(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::RectangleElement();
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->size =
       GetProperty(streamHandle, "ADBE Vector Rect Size", AEStreamParser::PointParser, {}, 2);
   element->position =
@@ -114,8 +114,8 @@ static pag::ShapeElement* GetRectangle(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetEllipse(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::EllipseElement();
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->size =
       GetProperty(streamHandle, "ADBE Vector Ellipse Size", AEStreamParser::PointParser, {}, 2);
   element->position =
@@ -126,8 +126,8 @@ static pag::ShapeElement* GetEllipse(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetPolyStar(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::PolyStarElement();
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->polyType =
       GetValue(streamHandle, "ADBE Vector Star Type", AEStreamParser::PolyStarTypeParser);
   element->points =
@@ -150,8 +150,8 @@ static pag::ShapeElement* GetPolyStar(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetShapePath(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::ShapePathElement();
 
-  auto reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  auto reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                           AEStreamParser::ShapeDirectionReversedParser);
   element->shapePath = GetProperty(streamHandle, "ADBE Vector Shape", AEStreamParser::PathParser);
   if (reversed) {
     if (element->shapePath->animatable()) {

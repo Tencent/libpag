@@ -37,7 +37,7 @@ pag::Keyframe<T>* GetKeyframe(AEGP_StreamRefH streamHandle, StreamParser<T> pars
                               const QVariantMap& map, int dimensionality) {
   const auto& PluginID = GetPluginID();
   const auto& Suites = GetSuites();
-  float frameRate = PAGExportSessionManager::GetInstance()->getFrameRate();
+  float frameRate = PAGExportSessionManager::GetInstance()->getCurrentCompositionFrameRate();
 
   auto keyframe = new pag::Keyframe<T>();
   A_Time time = {};

@@ -18,6 +18,7 @@
 
 #include "PAGExportSessionManager.h"
 #include "AEDataTypeConverter.h"
+#include "AEHelper.h"
 
 namespace exporter {
 
@@ -37,9 +38,12 @@ void PAGExportSessionManager::recordWarning(AlertInfoType type, const std::strin
   }
 }
 
-float PAGExportSessionManager::getFrameRate() {
+float PAGExportSessionManager::getCurrentCompositionFrameRate() {
   if (currentSession) {
-    return currentSession->frameRate;
+    auto iter = currentSession->itemHandleMap.find(currentSession->compID);
+    if (iter != currentSession->itemHandleMap.end()) {
+      return GetItemFrameRate(iter->second);
+    }
   }
   return 24.0f;
 }

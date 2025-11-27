@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExportLayer.h"
+#include <base/utils/Log.h>
 #include "ExportComposition.h"
 #include "Marker.h"
 #include "data/CameraOption.h"
@@ -173,12 +174,9 @@ static void InitLayer(std::shared_ptr<PAGExportSession> session, const AEGP_Laye
           }
         }
 
-        if (trackMatteIndex >= 0) {
-          ScopedAssign<int> tempLayerIndex(session->layerIndex, trackMatteIndex);
-          layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
-        } else {
-          layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
-        }
+        DEBUG_ASSERT(trackMatteIndex >= 0)
+        ScopedAssign<int> tempLayerIndex(session->layerIndex, trackMatteIndex);
+        layer->trackMatteLayer = ExportLayer(trackMatteLayerHandle, session);
         layer->trackMatteLayer->isActive = false;
         layer->trackMatteLayer->trackMatteType = pag::TrackMatteType::None;
       }
@@ -387,7 +385,6 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
   std::vector<bool> soloFlags = {};
   std::vector<pag::Layer*> layers = {};
   std::unordered_set<pag::Layer*> trackMatteCopies = {};
-  std::unordered_map<pag::Layer*, pag::Layer*> trackMatteOwners = {};
 
   A_long numLayers = 0;
   if (GetSuites()->LayerSuite6()->AEGP_GetCompNumLayers(compHandle, &numLayers) != A_Err_NONE) {
@@ -420,7 +417,6 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
       soloFlags.push_back(false);
       layers.push_back(layer->trackMatteLayer);
       trackMatteCopies.insert(layer->trackMatteLayer);
-      trackMatteOwners[layer->trackMatteLayer] = layer;
     }
     layers.push_back(layer);
 
@@ -447,6 +443,7 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
       bool isTrackMatteCopy = trackMatteCopies.find(layer) != trackMatteCopies.end();
       if (!isTrackMatteCopy && sets.find(layer->id) != sets.end()) {
         layerIter = layers.erase(layerIter);
+        delete layer;
         soloFlagIter = soloFlags.erase(soloFlagIter);
       } else {
         if (!isTrackMatteCopy) {
