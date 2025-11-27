@@ -178,7 +178,7 @@ static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {
   for (auto& composition : session->compositions) {
     if (composition->type() == pag::CompositionType::Vector) {
       auto vectorComposition = static_cast<pag::VectorComposition*>(composition);
-      for (int i = 0; i < vectorComposition->layers.size(); i++) {
+      for (size_t i = 0; i < vectorComposition->layers.size(); i++) {
         auto layer = vectorComposition->layers[i];
         maxID = std::max(maxID, layer->id);
         if (layer->trackMatteLayer != nullptr && i > 0) {
