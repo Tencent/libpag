@@ -439,6 +439,7 @@ export class PAGView {
       if (e.message !== 'The play() request was interrupted because the document was hidden!') {
         this.clearTimer();
       }
+      console.error(e.stack);
       throw e;
     }
   }
@@ -464,9 +465,10 @@ export class PAGView {
     if (this.repeatedTimes < count) {
       this.eventManager.emit('onAnimationRepeat', this);
     }
+    console.log("playFrame:",playFrame);
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
-    if (this.needResetStartTime()) {
+    if (this.needAdjustStartTime()) {
       // Decoding BMP takes too much time and makes the video reader seek repeatedly.
       this.startTime = this.getNowTime() * 1000 - this.playTime;
     }
@@ -478,7 +480,7 @@ export class PAGView {
   protected getNowTime() {
     try {
       return performance.now();
-    } catch (e) {
+    } catch {
       return Date.now();
     }
   }
@@ -515,11 +517,18 @@ export class PAGView {
     canvas.height = this.rawHeight;
   }
 
+  protected needAdjustStartTime() {
+    for (const VideoReader of this.player.videoReaders) {
+      if (VideoReader.isSought) return true;
+    }
+    return false;
+  }
+
   private updateFPS() {
     let now: number;
     try {
       now = performance.now();
-    } catch (e) {
+    } catch {
       now = Date.now();
     }
     this.fpsBuffer = this.fpsBuffer.filter((value) => now - value <= 1000);
@@ -527,10 +536,5 @@ export class PAGView {
     this.setDebugData({ FPS: this.fpsBuffer.length });
   }
 
-  private needResetStartTime() {
-    for (const VideoReader of this.player.videoReaders) {
-      if (VideoReader.isSought) return true;
-    }
-    return false;
-  }
+
 }

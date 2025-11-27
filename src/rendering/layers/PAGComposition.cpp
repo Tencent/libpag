@@ -679,4 +679,27 @@ void PAGComposition::updateDurationAndFrameRate() {
     _parent->updateDurationAndFrameRate();
   }
 }
+
+Frame PAGComposition::getTargetFrame(PreComposeLayer* preLayer) {
+  printf("PAGComposition::getTargetFrame:%p\n", static_cast<void*>(this));
+  Frame targetFrame = -1;
+  if (preLayer == nullptr) {
+    return targetFrame;
+  }
+  auto composition = preLayer->composition;
+  if (composition->type() == CompositionType::Bitmap ||
+      composition->type() == CompositionType::Video) {
+    auto layerFrame = preLayer->startTime + contentFrame;
+    targetFrame = preLayer->getCompositionFrame(layerFrame);
+  }
+
+  auto sequence = Sequence::Get(composition);
+  if (sequence == nullptr) {
+    return targetFrame;
+  }
+  targetFrame = sequence->toSequenceFrame(targetFrame);
+
+  return targetFrame;
+}
+
 }  // namespace pag

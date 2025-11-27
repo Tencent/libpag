@@ -18,6 +18,7 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
+#include "VideoInfoManage.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "pag/types.h"
@@ -155,7 +156,8 @@ bool PAGBindInit() {
       .function("_trackMatteLayer", &PAGLayer::trackMatteLayer)
       .function("_excludedFromTimeline", &PAGLayer::excludedFromTimeline)
       .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
-      .function("_isPAGFile", &PAGLayer::isPAGFile);
+      .function("_isPAGFile", &PAGLayer::isPAGFile)
+      .function("_hasVideo", &PAGLayer::hasVideo);
 
   class_<PAGSolidLayer, base<PAGLayer>>("_PAGSolidLayer")
       .smart_ptr<std::shared_ptr<PAGSolidLayer>>("_PAGSolidLayer")
@@ -581,6 +583,19 @@ bool PAGBindInit() {
                 }))
       .function("_postConcat", &Matrix::postConcat);
 
+  class_<VideoInfoManage>("_videoInfoManage")
+      .smart_ptr<std::shared_ptr<VideoInfoManage>>("_videoInfoManage")
+      .class_function("_Make", optional_override([](std::shared_ptr<PAGFile> pagFile) {
+                        return std::make_shared<VideoInfoManage>(pagFile);
+                      }))
+      .function("_getMp4DataById", &VideoInfoManage::getMp4DataById)
+      .function("_getWidthById", &VideoInfoManage::getWidthById)
+      .function("_getHeightById", &VideoInfoManage::getHeightById)
+      .function("_getFrameRateById", &VideoInfoManage::getFrameRateById)
+      .function("_getStaticTimeRangesById", &VideoInfoManage::getStaticTimeRangesById)
+      .function("_getVideoIds", &VideoInfoManage::getVideoIds)
+      .function("_getTargetFrameById", &VideoInfoManage::getTargetFrameById)
+      .function("_getPlaybackRate", &VideoInfoManage::getPlaybackRate);
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
       .property("applyFill", &TextDocument::applyFill)

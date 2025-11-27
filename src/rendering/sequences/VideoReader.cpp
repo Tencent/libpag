@@ -48,6 +48,7 @@ VideoReader::~VideoReader() {
 
 std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) {
   // Need a locker here in case there are other threads are decoding at the same time.
+  printf("VideoReader::onMakeBuffer -> targetFrame:%d\n", static_cast<int>(targetFrame));
   std::lock_guard<std::mutex> autoLock(locker);
   auto targetTime = FrameToTime(targetFrame, frameRate);
   auto sampleTime = demuxer->getSampleTimeAt(targetTime);

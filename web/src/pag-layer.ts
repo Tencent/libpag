@@ -229,6 +229,11 @@ export class PAGLayer {
     return layer2typeLayer(this.wasmIns);
   }
 
+
+  public hasVideo(){
+    return this.wasmIns._hasVideo()  as boolean;
+  }
+
   public isDelete(): boolean {
     return this.wasmIns.isDelete();
   }

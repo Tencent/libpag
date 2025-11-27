@@ -7,8 +7,9 @@ import { Matrix } from './core/matrix';
 
 import { PAGComposition } from './pag-composition';
 import type { PAGLayer } from './pag-layer';
-import {PAGScaleMode, Rect, VecArray} from './types';
+import {type PAGScaleMode,type Rect, VecArray} from './types';
 import type { VideoReader } from './interfaces';
+import {VideoReaderManage} from "./video-reader-manage";
 
 @destroyVerify
 export class PAGPlayer {
@@ -21,6 +22,9 @@ export class PAGPlayer {
   public wasmIns;
   public isDestroyed = false;
   public videoReaders: VideoReader[] = [];
+
+  protected pagComposition: PAGComposition | null = null;
+  protected videoReaderManage:VideoReaderManage | any = null;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -43,8 +47,24 @@ export class PAGPlayer {
    * changed.
    */
   public async flushInternal(callback: (res: boolean) => void) {
+    PAGModule.currentPlayer = this;
+    if(this.pagComposition?.hasVideo()){
+      if(this.videoReaderManage === null){
+        this.videoReaderManage = await VideoReaderManage.make(this.pagComposition?.wasmIns);
+        PAGModule.videoReaderManage = this.videoReaderManage;
+        // const mp4Data = this.videoDecodeParam.getMp4Data();
+        // if(mp4Data !== null){
+        //   PAGModule.currentVideoReader = await PAGModule.VideoReader.create(mp4Data,this.videoDecodeParam.getWidth(),this.videoDecodeParam.getHeight(),
+        //       this.videoDecodeParam.getFrameRate(),this.videoDecodeParam.getStaticTimeRanges());
+        // }
+      }
+    }
+    if(this.videoReaderManage !== null && PAGModule.currentVideoReader !== null){
+      // await PAGModule.currentVideoReader.prepare(this.videoDecodeParam.getTargetFrame(),this.videoDecodeParam.getPlaybackRate());
+      // console.log("this.videoReaderManage.getTargetFrame:",this.videoReaderManage.getTargetFrame());
+      await this.videoReaderManage.getTargetFrame();
+    }
     const res = await PAGModule.webAssemblyQueue.exec<boolean>(async () => {
-      PAGModule.currentPlayer = this;
       const res = await this.wasmIns._flush();
       PAGModule.currentPlayer = null;
       callback(res);
@@ -169,6 +189,12 @@ export class PAGPlayer {
    */
 
   public setComposition(pagComposition: PAGComposition | null) {
+    if(this.videoReaderManage !== null){
+      this.videoReaderManage.destroy();
+      this.videoReaderManage = null;
+      PAGModule.videoReaderManage = null;
+    }
+    this.pagComposition = pagComposition;
     this.wasmIns._setComposition(getWasmIns(pagComposition));
   }
   /**
@@ -292,6 +318,11 @@ export class PAGPlayer {
   }
 
   public destroy() {
+    if(this.videoReaderManage !== null){
+      this.videoReaderManage.destroy();
+      this.videoReaderManage = null;
+      PAGModule.videoReaderManage = null;
+    }
     this.wasmIns.delete();
     this.isDestroyed = true;
   }

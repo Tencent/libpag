@@ -438,8 +438,11 @@ bool PAGLayer::gotoTime(int64_t layerTime) {
     changed = _trackMatteLayer->gotoTime(layerTime);
   }
   auto layerFrame = TimeToFrame(layerTime, frameRateInternal());
+  printf("layerTime:%d,layerFrame:%d\n", static_cast<int>(layerTime), static_cast<int>(layerFrame));
   auto oldContentFrame = contentFrame;
   contentFrame = layerFrame - startFrame;
+  printf("contentFrame:%d\n", static_cast<int>(contentFrame));
+  printf("PAGLayer::gotoTime: PAGLayer:%p\n", static_cast<void*>(this));
   if (!changed) {
     changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame);
   }
@@ -568,6 +571,22 @@ std::shared_ptr<File> PAGLayer::getFile() const {
 
 bool PAGLayer::frameVisible() const {
   return contentFrame >= 0 && contentFrame < frameDuration();
+}
+
+bool PAGLayer::hasVideo() const {
+  if (!file) {
+    return false;
+  }
+  for (const auto composition : file->compositions) {
+    if (composition->type() == CompositionType::Video) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Frame PAGLayer::getContentFrame() const {
+  return contentFrame;
 }
 
 }  // namespace pag
