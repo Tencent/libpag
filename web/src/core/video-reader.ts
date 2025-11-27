@@ -11,6 +11,7 @@ import { PAGModule } from '../pag-module';
 import type { TimeRange, VideoReader as VideoReaderInterfaces } from '../interfaces';
 import type { PAGPlayer } from '../pag-player';
 import { isInstanceOf } from '../utils/type-utils';
+import {destroyVerify} from "../utils/decorators";
 
 const UHD_RESOLUTION = 3840;
 
@@ -45,20 +46,25 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
   });
 };
 
+@destroyVerify
 export class VideoReader {
-  public static create(
+  public static async create(
     source: Uint8Array | HTMLVideoElement,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-  ): VideoReaderInterfaces {
+  ): Promise<VideoReaderInterfaces> {
     return new VideoReader(source, width, height, frameRate, staticTimeRanges);
   }
 
   public isSought = false;
   public isPlaying = false;
   public bitmap: ImageBitmap | null = null;
+  public isStartDecode = false;
+  public isSeekAndDecode = false;
+  public isDestroyed = false;
+
 
   private videoEl: HTMLVideoElement | null = null;
   private frameRate = 0;
@@ -71,7 +77,9 @@ export class VideoReader {
   private height = 0;
   private bitmapCanvas: OffscreenCanvas | null = null;
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
-  private currentFrame: number=0;
+  private currentFrame =-1;
+  private targetFrame =-1;
+  private playbackRate =1;
 
   public constructor(
     source: Uint8Array | HTMLVideoElement,
@@ -93,6 +101,7 @@ export class VideoReader {
       this.videoEl.height = height;
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
+        this.isStartDecode = true;
       });
       const buffer = (source as Uint8Array).slice();
       const blob = new Blob([buffer], { type: 'video/mp4' });
@@ -113,6 +122,9 @@ export class VideoReader {
   }
 
   public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
+    if(targetFrame === this.currentFrame){
+      return;
+    }
     const promise =new Promise<void>(async (resolve, reject) => {
         this.setError(null); // reset error
         this.isSought = false; // reset seek status
@@ -218,7 +230,6 @@ export class VideoReader {
     if (!this.videoEl!.paused) {
       this.videoEl?.pause();
     }
-    this.videoEl!.currentTime = 0;
   }
 
   public getError() {
@@ -228,12 +239,14 @@ export class VideoReader {
   public onDestroy() {
     if (this.player) {
       this.player.unlinkVideoReader(this);
+      this.player = null;
     }
     removeAllListeners(this.videoEl!, 'playing');
     removeAllListeners(this.videoEl!, 'timeupdate');
     this.videoEl = null;
     this.bitmapCanvas = null;
     this.bitmapCtx = null;
+    this.isDestroyed = true;
   }
 
   private seek(targetTime: number, play = true) {

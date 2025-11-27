@@ -124,6 +124,7 @@ bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {
   }
   contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
   lastContentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, lastContentFrame);
+
   return contentFrame != lastContentFrame;
 }
 

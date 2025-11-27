@@ -33,6 +33,7 @@ class ImageInfo;
 }  // namespace tgfx
 
 namespace pag {
+class Composition;
 class Recorder;
 
 class RenderCache;
@@ -427,6 +428,7 @@ class PAG_API PAGLayer : public Content {
   void* externalHandle = nullptr;
   std::shared_ptr<File> getFile() const;
   void notifyAudioModified();
+  Frame getContentFrame() const;
 
  protected:
   std::shared_ptr<std::mutex> rootLocker = nullptr;
@@ -948,6 +950,10 @@ class PAG_API PAGComposition : public PAGLayer {
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
+  // internal use only.
+  bool hasVideo() const;
+  Frame getTargetFrame(PreComposeLayer* preLayer);
+
  protected:
   int _width = 0;
   int _height = 0;
@@ -1128,6 +1134,12 @@ class PAG_API PAGFile : public PAGComposition {
 
   bool isPAGFile() const override;
 
+  // internal use only.
+  PreComposeLayer* getPreLayerByComposition(PreComposeLayer* preLayer, Composition* composition);
+  PAGTimeStretchMode timeStretchModeInternal() const;
+  std::shared_ptr<PAGComposition> findCompositionByPreComposeLayer(
+      std::shared_ptr<PAGComposition> composition, PreComposeLayer* targetPreLayer);
+
  protected:
   bool gotoTime(int64_t layerTime) override;
   Frame childFrameToLocal(Frame childFrame, float childFrameRate) const override;
@@ -1151,7 +1163,6 @@ class PAG_API PAGFile : public PAGComposition {
                            std::shared_ptr<TextDocument> textData);
   void replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
                             std::shared_ptr<PAGImage> image);
-  PAGTimeStretchMode timeStretchModeInternal() const;
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;
