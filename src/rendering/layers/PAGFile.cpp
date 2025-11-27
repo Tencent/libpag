@@ -429,4 +429,57 @@ void PAGFile::replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>&
     }
   }
 }
+
+PreComposeLayer* PAGFile::getPreLayerByComposition(PreComposeLayer* preLayer, Composition* com) {
+  if (preLayer == nullptr || com == nullptr) {
+    return nullptr;
+  }
+
+  if (preLayer->composition == com) {
+    return preLayer;
+  }
+
+  if (preLayer->composition != nullptr &&
+      preLayer->composition->type() == CompositionType::Vector) {
+    auto* vectorCom = static_cast<VectorComposition*>(preLayer->composition);
+    for (Layer* layer : vectorCom->layers) {
+      if (layer == nullptr) continue;
+      if (layer->type() == LayerType::PreCompose) {
+        auto* childPre = static_cast<PreComposeLayer*>(layer);
+        PreComposeLayer* result = getPreLayerByComposition(childPre, com);
+        if (result != nullptr) {
+          return result;
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+std::shared_ptr<PAGComposition> PAGFile::findCompositionByPreComposeLayer(
+    std::shared_ptr<PAGComposition> composition, PreComposeLayer* targetPreLayer) {
+  if (composition == nullptr || targetPreLayer == nullptr) {
+    return nullptr;
+  }
+
+  if (composition->layer == targetPreLayer) {
+    return composition;
+  }
+
+  for (const auto& childLayer : composition->layers) {
+    if (childLayer->layerType() == LayerType::PreCompose) {
+      if (childLayer->layer == targetPreLayer) {
+        return std::static_pointer_cast<PAGComposition>(childLayer);
+      }
+      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+      auto result = findCompositionByPreComposeLayer(childComposition, targetPreLayer);
+      if (result != nullptr) {
+        return result;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 }  // namespace pag
