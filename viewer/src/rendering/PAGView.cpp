@@ -38,8 +38,8 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   audioPlayer = std::make_unique<PAGAudioPlayer>();
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
-  connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this,
-          &PAGView::onAudioTimeChanged, Qt::QueuedConnection);
+  connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this, &PAGView::onAudioTimeChanged,
+          Qt::QueuedConnection);
 }
 
 void PAGView::flush() const {
