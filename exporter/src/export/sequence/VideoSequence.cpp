@@ -128,8 +128,8 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
       session->pushWarning(AlertInfoType::ExportRenderError);
     }
 
-    session->progressModel.addTotalProgress(1.0);
-    session->progressModel.addProgress();
+    session->progressModel.addTotalSteps(1);
+    session->progressModel.addFinishedSteps();
   }
 
   if (right - left <= 0 || bottom - top <= 0) {
@@ -249,7 +249,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
           videoFrame->frame = index;
           videoFrame->fileBytes = data.release();
           sequence->frames.push_back(videoFrame);
-          session->progressModel.addProgress();
+          session->progressModel.addFinishedSteps();
         });
     pagEncodeThread->setEncodeHeaderCallback([&](std::vector<pag::ByteData*> headers) {
       for (auto header : headers) {
@@ -265,7 +265,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
       if (!IsFrameExport(maxVisibleRange, frame, mainComposition->frameRate / frameRate)) {
         if (firstExportFrame != -1) {
-          session->progressModel.addProgress();
+          session->progressModel.addFinishedSteps();
         }
         continue;
       }
@@ -335,7 +335,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
       // Compensate progress for skipped frames before the first exported frame
       if (firstExportFrame == frame) {
-        session->progressModel.addProgress(static_cast<double>(frame));
+        session->progressModel.addFinishedSteps(frame);
       }
       std::swap(curData, preData);
     }
