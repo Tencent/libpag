@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGAudioReader.h"
+#include <tgfx/core/Clock.h>
 #include <QCoreApplication>
 #include <QEvent>
 #include <utility>
@@ -27,13 +28,6 @@ namespace pag {
 
 constexpr int64_t TimeLagNeedToUpdate = 50 * 1000;
 constexpr int64_t TimeAheadTolerance = 5 * 1000;
-
-static int64_t GetTimeNow() {
-  static auto startTime = std::chrono::high_resolution_clock::now();
-  auto now = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - startTime);
-  return duration.count();
-}
 
 std::shared_ptr<PAGAudioReader> PAGAudioReader::Make(int sampleRate, int sampleCount, int channels,
                                                      float volume) {
@@ -67,7 +61,7 @@ void PAGAudioReader::setComposition(std::shared_ptr<PAGComposition> newCompositi
     return;
   }
   composition = std::move(newComposition);
-  lastTime = GetTimeNow();
+  lastTime = tgfx::Clock::Now();
   lastSampleTime = 0;
   currentProgress = 0;
   updateAudioTrack();
@@ -135,9 +129,9 @@ void PAGAudioReader::updateAudioTrack() {
 void PAGAudioReader::updateClock(bool addChangedTimeToSampleTime) {
   if (lastTime == 0) {
     lastSampleTime = 0;
-    lastTime = GetTimeNow();
+    lastTime = tgfx::Clock::Now();
   }
-  int64_t sysTime = GetTimeNow();
+  int64_t sysTime = tgfx::Clock::Now();
   if (sysTime > lastTime && addChangedTimeToSampleTime) {
     lastSampleTime += (sysTime - lastTime);
   } else {
@@ -149,13 +143,13 @@ void PAGAudioReader::updateClock(bool addChangedTimeToSampleTime) {
 void PAGAudioReader::syncAudio(int64_t sampleTime) {
   if (lastSampleTime == INT64_MAX) {
     lastSampleTime = sampleTime;
-    lastTime = GetTimeNow();
+    lastTime = tgfx::Clock::Now();
   } else {
     updateClock(true);
   }
   int64_t time = sampleTime - lastSampleTime;
   if (time < -TimeLagNeedToUpdate) {
-    lastTime = GetTimeNow();
+    lastTime = tgfx::Clock::Now();
     lastSampleTime = sampleTime;
   } else if (time > TimeAheadTolerance) {
     std::this_thread::sleep_for(std::chrono::microseconds(time - TimeAheadTolerance));
