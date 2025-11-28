@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VideoSequence.h"
+#include <QApplication>
 #include "codec/mp4/MP4BoxHelper.h"
+#include "export/encode/PAGEncodeThread.h"
 #include "export/encode/VideoEncoder.h"
 #include "utils/AEHelper.h"
 #include "utils/ImageData.h"
@@ -126,8 +128,8 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
       session->pushWarning(AlertInfoType::ExportRenderError);
     }
 
-    session->progressModel.addTotalProgress(0.25);
-    session->progressModel.addProgress(0.25);
+    session->progressModel.addTotalProgress(1.0);
+    session->progressModel.addProgress();
   }
 
   if (right - left <= 0 || bottom - top <= 0) {
@@ -149,26 +151,6 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
   Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 }
 
-static int EncodeVideoHeader(PAGEncoder* pagEncoder, std::vector<pag::ByteData*>& headers) {
-  uint8_t* nal[16] = {nullptr};
-  int size[16] = {0};
-  auto count = pagEncoder->encodeHeaders(nal, size);
-
-  if (count >= 2) {
-    auto sps = new uint8_t[size[0]];
-    auto pps = new uint8_t[size[1]];
-    memcpy(sps, nal[0], size[0]);
-    memcpy(pps, nal[1], size[1]);
-    auto spsBytes = pag::ByteData::MakeAdopted(sps, size[0]).release();
-    auto ppsBytes = pag::ByteData::MakeAdopted(pps, size[1]).release();
-
-    headers.push_back(spsBytes);
-    headers.push_back(ppsBytes);
-  }
-
-  return count;
-}
-
 static FrameType GetFrameType(bool currentFrameIsStatic, bool lastFrameIsStatic,
                               bool currentFrameIsVisible, bool lastFrameIsVisible) {
   if (!currentFrameIsStatic && lastFrameIsStatic) {
@@ -181,22 +163,6 @@ static FrameType GetFrameType(bool currentFrameIsStatic, bool lastFrameIsStatic,
     return FrameType::FRAME_TYPE_P;
   }
   return FrameType::FRAME_TYPE_AUTO;
-}
-
-static void EncodeVideoFrame(PAGEncoder* pagEncoder, uint8_t* data, int inDataStride,
-                             FrameType frameType) {
-  pagEncoder->encodeRGBA(data, inDataStride, frameType);
-}
-
-static pag::ByteData* GetEncodedVideoFrame(PAGEncoder* pagEncoder, FrameType* outFrameType,
-                                           int64_t* outFrameIndex) {
-  pag::ByteData* encodedData = nullptr;
-  uint8_t* outData = nullptr;
-  auto size = pagEncoder->getEncodedData(&outData, outFrameType, outFrameIndex);
-  if (size > 0 && outData != nullptr) {
-    encodedData = pag::ByteData::MakeCopy(outData, size).release();
-  }
-  return encodedData;
 }
 
 static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
@@ -230,12 +196,14 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
   auto seqHeight = static_cast<int>(ceil(static_cast<float>(bottom - top) * factor));
   auto seqStride = SIZE_ALIGN(seqWidth) * 4;
   auto sizeChanged = seqWidth != composition->width || seqHeight != composition->height;
-  std::vector<uint8_t> preData(seqStride * SIZE_ALIGN(seqHeight) + seqStride * 2);
-  std::vector<uint8_t> curData(seqStride * SIZE_ALIGN(seqHeight) + seqStride * 2);
+  auto preData = pag::ByteData::Make(seqStride * SIZE_ALIGN(seqHeight) + seqStride * 2);
+  auto curData = pag::ByteData::Make(seqStride * SIZE_ALIGN(seqHeight) + seqStride * 2);
 
   A_u_long renderStride = SIZE_ALIGN(composition->width) * 4;
   A_u_long renderOffset = top * renderStride + left * 4;
-  std::vector<uint8_t> rgbaData(renderStride * SIZE_ALIGN(composition->height) + renderStride * 2);
+
+  auto rgbaData =
+      pag::ByteData::Make(renderStride * SIZE_ALIGN(composition->height) + renderStride * 2);
 
   std::vector<pag::TimeRange> visibleRanges = {};
   auto mainComposition = session->compositions[session->compositions.size() - 1];
@@ -272,8 +240,24 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     pagEncoder->init(seqWidth, seqHeight, frameRate, hasAlpha,
                      session->configParam.bitmapKeyFrameInterval,
                      session->configParam.sequenceQuality);
-    pagEncoder->getAlphaStartXY(&sequence->alphaStartX, &sequence->alphaStartY);
-    EncodeVideoHeader(pagEncoder.get(), sequence->headers);
+    std::unique_ptr<PAGEncodeThread> pagEncodeThread = std::make_unique<PAGEncodeThread>();
+    pagEncodeThread->setPAGEncoder(std::move(pagEncoder));
+    pagEncodeThread->setEncodeFrameCallback(
+        [&](std::unique_ptr<pag::ByteData> data, FrameType frameType, int64_t index) {
+          auto videoFrame = new pag::VideoFrame();
+          videoFrame->isKeyframe = (frameType == FrameType::FRAME_TYPE_I);
+          videoFrame->frame = index;
+          videoFrame->fileBytes = data.release();
+          sequence->frames.push_back(videoFrame);
+          session->progressModel.addProgress();
+        });
+    pagEncodeThread->setEncodeHeaderCallback([&](std::vector<pag::ByteData*> headers) {
+      for (auto header : headers) {
+        sequence->headers.push_back(header);
+      }
+    });
+
+    pagEncodeThread->encodeHeaders();
 
     auto lastFrameIsVisible = false;
     auto lastFrameIsStatic = true;
@@ -281,7 +265,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
       if (!IsFrameExport(maxVisibleRange, frame, mainComposition->frameRate / frameRate)) {
         if (firstExportFrame != -1) {
-          session->progressModel.addProgress(1.0);
+          session->progressModel.addProgress();
         }
         continue;
       }
@@ -289,7 +273,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
         firstExportFrame = frame;
         session->videoCompositionStartTime[composition->uniqueID] = frame;
       }
-      uint8_t* renderRgbaBytes = sizeChanged ? rgbaData.data() : curData.data();
+      uint8_t* renderRgbaBytes = sizeChanged ? rgbaData->data() : curData->data();
       SetRenderTime(renderOptions, frameRate, frame);
 
       A_long compWidth = 0;
@@ -302,35 +286,35 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
         bool currentFrameIsVisible =
             IsFrameVisible(visibleRanges, frame, mainComposition->frameRate / frameRate);
         if (!currentFrameIsVisible) {
-          std::fill(curData.begin(), curData.end(), 128);
+          std::memset(curData->data(), 128, curData->length());
         } else {
           if (sizeChanged) {
             if (needToScale) {
-              ScalePixels(curData.data(), seqStride, seqWidth, seqHeight,
+              ScalePixels(curData->data(), seqStride, seqWidth, seqHeight,
                           renderRgbaBytes + renderOffset, renderStride, right - left, bottom - top);
             } else {
-              CopyRGBA(curData.data(), seqStride, renderRgbaBytes + renderOffset, renderStride,
+              CopyRGBA(curData->data(), seqStride, renderRgbaBytes + renderOffset, renderStride,
                        seqWidth, seqHeight);
             }
           }
 
           if (!session->videoAlphaDetected) {
-            if (hasAlpha != ImageHasAlpha(curData.data(), seqStride, seqWidth, seqHeight)) {
+            if (hasAlpha != ImageHasAlpha(curData->data(), seqStride, seqWidth, seqHeight)) {
               hasAlpha = !hasAlpha;
               session->videoAlphaDetected = true;
               break;
             }
           }
 
-          OddPaddingRGBA(curData.data(), seqStride, seqWidth, seqHeight);
+          OddPaddingRGBA(curData->data(), seqStride, seqWidth, seqHeight);
         }
 
-        auto currentFrameIsStatic = frame > 0 ? ImageIsStatic(curData.data(), preData.data(),
+        auto currentFrameIsStatic = frame > 0 ? ImageIsStatic(curData->data(), preData->data(),
                                                               seqWidth, seqHeight, seqStride)
                                               : false;
         auto frameType = GetFrameType(currentFrameIsStatic, lastFrameIsStatic,
                                       currentFrameIsVisible, lastFrameIsVisible);
-        EncodeVideoFrame(pagEncoder.get(), curData.data(), seqStride, frameType);
+        pagEncodeThread->encodeFrame(curData, frameType, seqStride);
         exportFrameNum++;
 
         if (!currentFrameIsStatic) {
@@ -349,11 +333,10 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
         session->pushWarning(AlertInfoType::ExportRenderError);
       }
 
+      // Compensate progress for skipped frames before the first exported frame
       if (firstExportFrame == frame) {
         session->progressModel.addProgress(static_cast<double>(frame));
       }
-
-      session->progressModel.addProgress(0.5);
       std::swap(curData, preData);
     }
 
@@ -363,23 +346,12 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
       continue;
     }
 
-    pagEncoder->close();
+    pagEncodeThread->close();
 
     while (!session->stopExport && sequence->frames.size() < static_cast<size_t>(exportFrameNum)) {
-      auto frameType = FrameType::FRAME_TYPE_AUTO;
-      int64_t index = 0;
-      pag::ByteData* videoBytes = GetEncodedVideoFrame(pagEncoder.get(), &frameType, &index);
-      if (videoBytes == nullptr) {
-        break;
-      }
-
-      auto videoFrame = new pag::VideoFrame();
-      videoFrame->isKeyframe = (frameType == FrameType::FRAME_TYPE_I);
-      videoFrame->frame = index;
-      videoFrame->fileBytes = videoBytes;
-      sequence->frames.push_back(videoFrame);
-      session->progressModel.addProgress(0.5);
+      QApplication::processEvents();
     }
+    pagEncodeThread->getAlphaStartXY(&sequence->alphaStartX, &sequence->alphaStartY);
 
     pag::MP4BoxHelper::WriteMP4Header(sequence);
     composition->sequences.push_back(sequence);
