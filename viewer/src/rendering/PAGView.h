@@ -82,6 +82,7 @@ class PAGView : public QQuickItem {
 
   Q_SLOT void flush() const;
   Q_SLOT void sizeChangedDelayHandle();
+  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
 
   Q_INVOKABLE bool setFile(const QString& filePath);
   Q_INVOKABLE void firstFrame();
@@ -93,6 +94,8 @@ class PAGView : public QQuickItem {
   PAGRenderThread* getRenderThread() const;
 
  private:
+  void setProgressInternal(double progress, bool isAudioSeek);
+
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
   int64_t lastPlayTime = 0;

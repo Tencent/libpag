@@ -34,6 +34,8 @@ PAGAudioPlayer::PAGAudioPlayer() {
   connect(this, &PAGAudioPlayer::progressChanged, audioReader.get(),
           &PAGAudioReader::onPAGProgressChanged);
   connect(audioReader.get(), &PAGAudioReader::sendData, audioRender.get(), &PAGAudioRender::write);
+  connect(audioReader.get(), &PAGAudioReader::audioTimeChanged, this,
+          &PAGAudioPlayer::onAudioTimeChanged, Qt::QueuedConnection);
 }
 
 void PAGAudioPlayer::setVolume(float volume) {
@@ -55,6 +57,18 @@ void PAGAudioPlayer::setIsPlaying(bool isPlaying) {
 void PAGAudioPlayer::setComposition(std::shared_ptr<PAGFile> pagFile) {
   this->pagFile = std::move(pagFile);
   audioReader->setComposition(std::dynamic_pointer_cast<PAGComposition>(this->pagFile));
+}
+
+bool PAGAudioPlayer::isEmpty() const {
+  return audioReader == nullptr || audioReader->isEmpty();
+}
+
+void PAGAudioPlayer::onAudioTimeChanged(int64_t audioTime) {
+  if (pagFile != nullptr && audioTime > pagFile->duration()) {
+    audioTime = 0;
+    setProgress(0);
+  }
+  Q_EMIT audioTimeChanged(audioTime);
 }
 
 }  // namespace pag

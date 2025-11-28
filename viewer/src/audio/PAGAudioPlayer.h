@@ -34,6 +34,11 @@ class PAGAudioPlayer : public QObject {
   void setProgress(double percent);
   void setIsPlaying(bool isPlaying);
   void setComposition(std::shared_ptr<PAGFile> pagFile);
+  bool isEmpty() const;
+
+  Q_SIGNAL void audioTimeChanged(int64_t audioTime);
+
+  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
 
  private:
   Q_SIGNAL void progressChanged(int64_t time);
