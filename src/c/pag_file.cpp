@@ -142,7 +142,7 @@ pag_layer** pag_file_get_layers_by_editable_index(pag_file* file, int editableIn
   return layers;
 }
 
-PAG_API int* pag_file_get_editable_indices(pag_file* file, pag_layer_type layerType,
+int* pag_file_get_editable_indices(pag_file* file, pag_layer_type layerType,
                                            size_t* numIndexes) {
   auto pagFile = ToPAGFile(file);
   if (pagFile == nullptr) {
