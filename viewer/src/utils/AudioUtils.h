@@ -17,31 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <cstdint>
+#include "pag/types.h"
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+namespace pag::Utils {
 
-namespace pag {
+int64_t SampleLengthToCount(int64_t length, int channels);
 
-class PAGMovie : public PAGImage {
- public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+int64_t SampleLengthToTime(int64_t length, int sampleRate, int channels);
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
+int64_t SampleCountToLength(int64_t count, int channels);
 
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+int64_t SampleTimeToLength(int64_t time, int sampleRate, int channels);
 
- private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+int64_t MergeSamples(const std::vector<std::shared_ptr<ByteData>>& audioSamples, uint8_t* buffer);
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
-};
-
-}  // namespace pag
+}  // namespace pag::Utils

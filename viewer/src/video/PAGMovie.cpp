@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGMovie.h"
+#include "audio/model/AudioSource.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/sequences/SequenceImageProxy.h"
@@ -46,6 +47,20 @@ PAGMovie::PAGMovie(std::shared_ptr<MovieInfo> info)
 
 int64_t PAGMovie::duration() {
   return movieInfo->durationMs;
+}
+
+std::vector<AudioClip> PAGMovie::generateAudioClips() {
+  auto speed = movieInfo->speed;
+  if (speed <= 0 || movieInfo->duration() <= 1) {
+    return {};
+  }
+  auto startTime = movieInfo->startTime;
+  auto duration = movieInfo->durationMs;
+  auto sourceTimeRange = TimeRange{startTime, startTime + static_cast<int64_t>(duration * speed)};
+  auto targetTimeRange = TimeRange{0, duration};
+  AudioClip clip = {std::make_shared<AudioSource>(movieInfo->filePath), sourceTimeRange,
+                    targetTimeRange};
+  return {clip};
 }
 
 Frame PAGMovie::getContentFrame(int64_t time) const {

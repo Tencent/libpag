@@ -18,30 +18,36 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
+#include <tgfx/core/Buffer.h>
+#include "AudioSegmentReader.h"
+#include "audio/model/AudioTrack.h"
 #include "pag/pag.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+class AudioTrackReader {
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+  AudioTrackReader(std::shared_ptr<AudioTrack> track,
+                   std::shared_ptr<AudioOutputConfig> outputConfig);
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
-
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  void seek(int64_t time);
+  void clearBuffer();
+  std::shared_ptr<ByteData> getNextSample();
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+  void checkReader();
+  std::shared_ptr<ByteData> getNextSampleInternal();
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  int64_t cacheSize = 0;           // The size of the buffer that has been used
+  int64_t outputLength = 0;        // The size of the buffer that has been output
+  int64_t currentReadTime = 0;     // The current read position in the audio track
+  int64_t outputSampleLength = 0;  // The length of the output sample
+  tgfx::Buffer buffer = {};
+  std::shared_ptr<AudioTrack> track = nullptr;
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
+  std::shared_ptr<AudioSegmentReader> segmentReader = nullptr;
+
+  friend class AudioReader;
 };
 
 }  // namespace pag

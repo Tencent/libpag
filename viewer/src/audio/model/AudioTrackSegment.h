@@ -18,30 +18,21 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include "audio/model/AudioSource.h"
+#include "pag/types.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
- public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+struct AudioTrackSegment {
+  explicit AudioTrackSegment(const TimeRange& targetRange);
+  AudioTrackSegment(std::shared_ptr<AudioSource> source, int trackID, const TimeRange& sourceRange,
+                    const TimeRange& targetRange);
+  bool isEmpty() const;
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
-
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
-
- private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
-
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  int sourceTrackID = -1;
+  std::shared_ptr<AudioSource> source = nullptr;
+  TimeRange sourceRange = {-1, -1};
+  TimeRange targetRange = {-1, -1};
 };
 
 }  // namespace pag

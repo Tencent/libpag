@@ -18,30 +18,41 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include <QAudioFormat>
+#include <QAudioSink>
+#include <QThread>
+#include "audio/reader/AudioReader.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+class PAGAudioRender : public QThread {
+  Q_OBJECT
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+  static std::shared_ptr<PAGAudioRender> Make(int sampleRate, int channels);
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
+  ~PAGAudioRender() override;
+  void setAudioVolume(float volume);
+  bool write(std::shared_ptr<PAGAudioSample> data);
 
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  Q_SLOT void onSetIsPlaying(bool isPlaying);
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+  explicit PAGAudioRender(const QAudioFormat& format, int sampleRate, int channels);
+  void init();
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  Q_SIGNAL void volumeChangeSignal(float volume);
+  Q_SIGNAL void writeData(std::shared_ptr<ByteData> data);
+
+  Q_SLOT void onVolumeChange(float volume);
+  Q_SLOT void onWriteData(std::shared_ptr<ByteData> data);
+
+  int channels = 2;
+  int sampleRate = 44100;
+  float audioVolume = 1.0f;
+  std::atomic_bool isPlaying = false;
+  QAudioFormat format = {};
+  QIODevice* audioDevice = nullptr;
+  std::shared_ptr<QAudioSink> audioOutput = nullptr;
 };
 
 }  // namespace pag

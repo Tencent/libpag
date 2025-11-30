@@ -16,32 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include "AudioSource.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
- public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+AudioSource::AudioSource(const std::string& filePath) : filePath(filePath) {
+  auto demuxer = ffmovie::FFAudioDemuxer::Make(filePath);
+  this->demuxer = std::move(demuxer);
+}
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
+AudioSource::AudioSource(std::shared_ptr<ByteData> data) : data(data) {
+  auto demuxer = ffmovie::FFAudioDemuxer::Make(data->data(), data->length());
+  this->demuxer = std::move(demuxer);
+}
 
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+bool AudioSource::operator==(const AudioSource& source) {
+  return !isEmpty() && (filePath == source.filePath || data == source.data);
+}
 
- private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+bool AudioSource::isEmpty() const {
+  return filePath.empty() && data == nullptr;
+}
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
-};
+std::shared_ptr<ffmovie::FFAudioDemuxer> AudioSource::getDemuxer() const {
+  return demuxer;
+}
 
 }  // namespace pag
