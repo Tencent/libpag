@@ -83,7 +83,7 @@ void PAGExportSession::pushWarning(AlertInfoType type, const std::string& addInf
 }
 
 pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
-    const std::vector<std::string>& matchNames, int index) {
+    const std::vector<std::string>& matchNames, int index, int keyFrameIndex) {
   if (fileBytes.empty()) {
     fileBytes = GetProjectFileBytes();
   }
@@ -126,13 +126,21 @@ pag::GradientColorHandle PAGExportSession::GetGradientColorsFromFileBytes(
         break;
       }
 
+      int frameIndex = 0;
       while (tag.bytes.bytesAvailable()) {
         auto stringTag = ReadTag(&tag.bytes);
         if (stringTag.bytes.empty()) {
           break;
         }
-        gradientText = stringTag.bytes.readUTF8String();
-        break;
+        if (frameIndex == keyFrameIndex) {
+          if (!stringTag.bytes.empty() && stringTag.bytes.bytesAvailable() > 0) {
+            if (stringTag.bytes.position() < stringTag.bytes.length()) {
+              gradientText = stringTag.bytes.readUTF8String();
+            }
+          }
+          break;
+        }
+        frameIndex++;
       }
       break;
     }

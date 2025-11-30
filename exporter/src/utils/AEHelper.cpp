@@ -21,6 +21,7 @@
 #include <QFileInfo>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include "AEDataTypeConverter.h"
 #include "ImageData.h"
 #include "StringHelper.h"
@@ -212,13 +213,38 @@ std::vector<char> GetProjectFileBytes() {
     isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
-  exporter::TempFileDelete tempFile;
-  if (isDirty || isAEPX) {
-    filePath = exporter::GetTempFolderPath() + u8"/.PAGAutoSave.aep";
+  TempFileDelete tempFile;
+  if (isDirty || filePath.empty() || isAEPX) {
+    auto tempFolder = exporter::GetTempFolderPath();
+    if (!tempFolder.empty() && tempFolder.back() == '/') {
+      tempFolder.pop_back();
+    }
+    filePath = tempFolder + u8"/.PAGAutoSave.aep";
     tempFile.setFilePath(filePath);
     auto path = Utf8ToUtf16(filePath);
-    Suites->ProjSuite6()->AEGP_SaveProjectToPath(
+    auto saveResult = Suites->ProjSuite6()->AEGP_SaveProjectToPath(
         projectHandle, reinterpret_cast<const A_UTF16Char*>(path.c_str()));
+    if (saveResult != 0) {
+      return fileBytes;
+    }
+
+    int maxRetries = 50;
+    int retryCount = 0;
+    std::ifstream testFile(filePath, std::ios::binary);
+    while (!testFile.is_open() && retryCount < maxRetries) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      retryCount++;
+      testFile.open(filePath, std::ios::binary);
+    }
+    testFile.close();
+
+    if (retryCount >= maxRetries) {
+      return fileBytes;
+    }
+  }
+
+  if (filePath.empty()) {
+    return fileBytes;
   }
 
   filePath = ConvertStringEncoding(filePath);
@@ -387,7 +413,8 @@ pag::Frame GetLayerStartTime(const AEGP_LayerH& layerHandle, float frameRate) {
 pag::Frame GetLayerDuration(const AEGP_LayerH& layerHandle, float frameRate) {
   A_Time duration = {};
   Suites->LayerSuite6()->AEGP_GetLayerDuration(layerHandle, AEGP_LTimeMode_CompTime, &duration);
-  return static_cast<pag::Frame>(std::round(duration.value * frameRate / duration.scale));
+  auto frames = static_cast<pag::Frame>(std::round(duration.value * frameRate / duration.scale));
+  return std::abs(frames);
 }
 
 AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerHandle) {
@@ -640,6 +667,7 @@ bool IsStaticComposition(const AEGP_CompH& compositionHandle) {
   if (preData != nullptr) {
     delete[] preData;
   }
+  Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 
   return isStatic;
 }
