@@ -54,6 +54,7 @@ class OfflineVideoEncoder : public VideoEncoder {
                       int64_t* outFrameIndex) override;
 
  private:
+  void exit();
   static bool readEndParam(bool& hasEnd, bool& earlyExit, const std::string& filePath);
   static bool writeEndParam(bool hasEnd, bool earlyExit, const std::string& filePath);
   static bool readFrameInfo(FrameInfo& frameInfo, const std::string& filePath);

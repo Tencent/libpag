@@ -69,8 +69,9 @@
 <context>
     <name>CompositionListView</name>
     <message>
+        <location filename="../qml/CompositionListView.qml" line="270"/>
         <source>Select Save Path</source>
-        <translation type="vanished">选择存储路径</translation>
+        <translation>选择存储路径</translation>
     </message>
 </context>
 <context>
@@ -229,66 +230,80 @@
 <context>
     <name>ExportCompositionProgress</name>
     <message>
+        <location filename="../qml/ExportCompositionProgress.qml" line="11"/>
         <source>PAG Export Progress</source>
-        <translation type="vanished">PAG导出进度</translation>
+        <translation>PAG导出进度</translation>
     </message>
     <message>
+        <location filename="../qml/ExportCompositionProgress.qml" line="13"/>
         <source>Exporting PAG</source>
-        <translation type="vanished">正在导出PAG</translation>
+        <translation>正在导出PAG</translation>
     </message>
 </context>
 <context>
     <name>ExportCompositionsProgress</name>
     <message>
+        <location filename="../qml/ExportCompositionsProgress.qml" line="11"/>
         <source>Creating PAG</source>
-        <translation type="vanished">PAG生成中</translation>
+        <translation>PAG生成中</translation>
     </message>
     <message>
+        <location filename="../qml/ExportCompositionsProgress.qml" line="57"/>
         <source>%1/%2 Complete</source>
-        <translation type="vanished">%1/%2已完成</translation>
+        <translation>%1/%2已完成</translation>
     </message>
     <message>
+        <location filename="../qml/ExportCompositionsProgress.qml" line="110"/>
         <source>Finish</source>
-        <translation type="vanished">完成</translation>
+        <translation>完成</translation>
     </message>
 </context>
 <context>
-    <name>ExportingPanel</name>
+    <name>ExportPanel</name>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="12"/>
         <source>Export PAG</source>
-        <translation type="vanished">导出PAG</translation>
+        <translation>导出PAG</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="106"/>
         <source>Search Composition</source>
-        <translation type="vanished">查找合成</translation>
+        <translation>查找合成</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="182"/>
         <source>Storage Path</source>
-        <translation type="vanished">存储路径</translation>
+        <translation>存储路径</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="202"/>
         <source>Setting</source>
-        <translation type="vanished">设置</translation>
+        <translation>设置</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="222"/>
         <source>Preview</source>
-        <translation type="vanished">预览</translation>
+        <translation>预览</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="274"/>
         <source>No Error Message Found</source>
-        <translation type="vanished">暂未发现错误信息</translation>
+        <translation>暂未发现错误信息</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="336"/>
         <source>Also Export Audio</source>
-        <translation type="vanished">同时导出音频</translation>
+        <translation>同时导出音频</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="374"/>
         <source>Cancel</source>
-        <translation type="vanished">取消</translation>
+        <translation>取消</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="404"/>
         <source>Export</source>
-        <translation type="vanished">导出</translation>
+        <translation>导出</translation>
     </message>
 </context>
 <context>
@@ -341,15 +356,17 @@
 <context>
     <name>ProgressListView</name>
     <message>
+        <location filename="../qml/ProgressListView.qml" line="181"/>
         <source>View</source>
-        <translation type="vanished">查看</translation>
+        <translation>查看</translation>
     </message>
 </context>
 <context>
     <name>QObject</name>
     <message>
+        <location filename="../../src/ui/export/ExportWindow.cpp" line="70"/>
         <source>Select Storage Path</source>
-        <translation type="vanished">选择存储路径</translation>
+        <translation>选择存储路径</translation>
     </message>
     <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="38"/>

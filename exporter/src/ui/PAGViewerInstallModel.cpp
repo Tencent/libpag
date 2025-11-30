@@ -48,7 +48,7 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   app->setObjectName("PAGViewer-Install");
   engine = std::make_unique<QQmlApplicationEngine>(app.get());
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("installModel", this);
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/PAGViewerInstall.qml")));

@@ -48,6 +48,11 @@ WindowManager::WindowManager() {
 
 void WindowManager::showExportPanelWindow() {
   init();
+  if (exportPanelWindow == nullptr) {
+    exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
+  }
+  exportPanelWindow->show();
+  app->exec();
 }
 
 void WindowManager::showPAGConfigWindow() {
@@ -61,10 +66,21 @@ void WindowManager::showPAGConfigWindow() {
 
 void WindowManager::showExportPreviewWindow() {
   init();
+  if (previewWindow == nullptr) {
+    std::string outputPath = JoinPaths(GetTempFolderPath(), ".previewTmp.pag");
+    previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
+  }
+  previewWindow->show();
+  app->exec();
 }
 
 void WindowManager::showExportWindow() {
   init();
+  if (exportWindow == nullptr) {
+    exportWindow = std::make_unique<ExportWindow>(app.get());
+  }
+  exportWindow->show();
+  app->exec();
 }
 
 bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {
@@ -137,6 +153,15 @@ void WindowManager::init() {
 
   if (configWindow != nullptr && configWindow->isWaitToDestory()) {
     configWindow.reset();
+  }
+  if (exportWindow != nullptr && exportWindow->isWaitToDestory()) {
+    exportWindow.reset();
+  }
+  if (previewWindow != nullptr && previewWindow->isWaitToDestory()) {
+    previewWindow.reset();
+  }
+  if (exportPanelWindow != nullptr && exportPanelWindow->isWaitToDestory()) {
+    exportPanelWindow.reset();
   }
 
   AlertInfoManager::GetInstance().warningList.clear();

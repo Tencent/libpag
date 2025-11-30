@@ -406,7 +406,7 @@ void PAGExport::exportRescaleImages() const {
       GetImageBytes(session, image, layerHandle, isVideo, factor);
     }
 
-    session->progressModel.addProgress();
+    session->progressModel.addFinishedSteps();
   }
 }
 

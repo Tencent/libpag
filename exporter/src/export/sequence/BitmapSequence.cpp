@@ -148,7 +148,7 @@ void GetBitmapSequence(std::shared_ptr<PAGExportSession> session,
       session->pushWarning(AlertInfoType::ExportRenderError);
     }
 
-    session->progressModel.addProgress();
+    session->progressModel.addFinishedSteps();
     std::swap(curData, preData);
   }
 
