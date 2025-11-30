@@ -51,12 +51,12 @@ void ProgressModel::setExportStatus(ExportStatus status) {
   Q_EMIT exportStatusChanged(static_cast<int>(status));
 }
 
-void ProgressModel::setFinishedSteps(int64_t value) {
+void ProgressModel::setFinishedSteps(uint64_t value) {
   finishedSteps = value;
   Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
-void ProgressModel::setTotalSteps(int64_t value) {
+void ProgressModel::setTotalSteps(uint64_t value) {
   totalSteps = value;
   Q_EMIT totalProgressChanged(static_cast<double>(totalSteps));
 
@@ -66,7 +66,7 @@ void ProgressModel::setTotalSteps(int64_t value) {
   }
 }
 
-void ProgressModel::addFinishedSteps(int64_t value) {
+void ProgressModel::addFinishedSteps(uint64_t value) {
   finishedSteps += value;
   if (finishedSteps >= totalSteps) {
     finishedSteps = totalSteps;
@@ -75,7 +75,7 @@ void ProgressModel::addFinishedSteps(int64_t value) {
   Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
-void ProgressModel::addTotalSteps(int64_t value) {
+void ProgressModel::addTotalSteps(uint64_t value) {
   totalSteps += value;
   Q_EMIT totalProgressChanged(static_cast<double>(totalSteps));
 }

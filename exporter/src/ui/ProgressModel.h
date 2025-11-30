@@ -41,10 +41,10 @@ class ProgressModel : public QObject {
   Q_INVOKABLE double getCurrentProgress() const;
   void setExportStatus(ExportStatus status);
 
-  void setFinishedSteps(int64_t value);
-  void setTotalSteps(int64_t value);
-  void addFinishedSteps(int64_t value = 1);
-  void addTotalSteps(int64_t value);
+  void setFinishedSteps(uint64_t value);
+  void setTotalSteps(uint64_t value);
+  void addFinishedSteps(uint64_t value = 1);
+  void addTotalSteps(uint64_t value);
 
   Q_SIGNAL void exportStatusChanged(int exportStatus);
   Q_SIGNAL void totalProgressChanged(double totalProgress);
@@ -54,7 +54,7 @@ class ProgressModel : public QObject {
 
  private:
   ExportStatus status = ExportStatus::Waiting;
-  int64_t totalSteps = 0;
-  int64_t finishedSteps = 0;
+  uint64_t totalSteps = 0;
+  uint64_t finishedSteps = 0;
 };
 }  // namespace exporter

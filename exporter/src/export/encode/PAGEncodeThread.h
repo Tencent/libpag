@@ -32,7 +32,7 @@ using EncodeFrameCallback =
 class PAGEncodeThread : public QThread {
   Q_OBJECT
  public:
-  PAGEncodeThread(QObject* parent = nullptr);
+  explicit PAGEncodeThread(QObject* parent = nullptr);
   ~PAGEncodeThread() override;
 
   void close();
@@ -52,7 +52,7 @@ class PAGEncodeThread : public QThread {
   Q_SIGNAL void encodeFrameSignal(std::shared_ptr<pag::ByteData> data, FrameType frameType,
                                   int stride);
 
-  Q_SLOT void getEncodFrame();
+  Q_SLOT void getEncodeFrame();
   Q_SLOT void encodeHeadersInternal();
   Q_SLOT void encodeFrameInternal(std::shared_ptr<pag::ByteData> data, FrameType frameType,
                                   int stride);

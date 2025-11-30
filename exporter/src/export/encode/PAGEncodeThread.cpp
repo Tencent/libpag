@@ -22,7 +22,7 @@
 namespace exporter {
 PAGEncodeThread::PAGEncodeThread(QObject* parent) : QThread(parent) {
   this->moveToThread(this);
-  connect(this, &PAGEncodeThread::getEncodeFrameSignal, this, &PAGEncodeThread::getEncodFrame,
+  connect(this, &PAGEncodeThread::getEncodeFrameSignal, this, &PAGEncodeThread::getEncodeFrame,
           Qt::QueuedConnection);
   connect(this, &PAGEncodeThread::encodeHeadersSignal, this,
           &PAGEncodeThread::encodeHeadersInternal, Qt::QueuedConnection);
@@ -75,7 +75,7 @@ void PAGEncodeThread::run() {
   QThread::exec();
 }
 
-void PAGEncodeThread::getEncodFrame() {
+void PAGEncodeThread::getEncodeFrame() {
   if (encoder == nullptr) {
     return;
   }
@@ -101,16 +101,16 @@ void PAGEncodeThread::encodeHeadersInternal() {
     return;
   }
   encoder->getAlphaStartXY(&alphaStartX, &alphaStartY);
-  uint8_t* nal[16] = {nullptr};
+  uint8_t* networkAbstractionLayerUnits[16] = {nullptr};
   int size[16] = {0};
-  auto count = encoder->encodeHeaders(nal, size);
+  auto count = encoder->encodeHeaders(networkAbstractionLayerUnits, size);
   if (count >= 2) {
-    auto sps = new uint8_t[size[0]];
-    auto pps = new uint8_t[size[1]];
-    memcpy(sps, nal[0], size[0]);
-    memcpy(pps, nal[1], size[1]);
-    auto spsBytes = pag::ByteData::MakeAdopted(sps, size[0]).release();
-    auto ppsBytes = pag::ByteData::MakeAdopted(pps, size[1]).release();
+    auto sequenceParameterSet = new uint8_t[size[0]];
+    auto pictureParameterSet = new uint8_t[size[1]];
+    memcpy(sequenceParameterSet, networkAbstractionLayerUnits[0], size[0]);
+    memcpy(pictureParameterSet, networkAbstractionLayerUnits[1], size[1]);
+    auto spsBytes = pag::ByteData::MakeAdopted(sequenceParameterSet, size[0]).release();
+    auto ppsBytes = pag::ByteData::MakeAdopted(pictureParameterSet, size[1]).release();
 
     std::vector<pag::ByteData*> headers = {spsBytes, ppsBytes};
     if (encodeHeaderCallback != nullptr) {

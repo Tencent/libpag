@@ -73,7 +73,7 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
 
   if (composition->type() != pag::CompositionType::Vector) {
     auto frames =
-        static_cast<int64_t>(composition->duration * session->frameRate / composition->frameRate);
+        static_cast<uint64_t>(composition->duration * session->frameRate / composition->frameRate);
     session->progressModel.addTotalSteps(frames);
   }
 }
