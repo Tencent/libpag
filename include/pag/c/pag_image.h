@@ -26,19 +26,19 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
  * Creates a pag_image object from an array of pixel data, return null if it's not valid pixels.
  * Release it by pag_release.
  */
-PAG_API pag_image* pag_image_from_pixels(const void* pixels, int width, int height, size_t rowBytes,
+PAG_EXPORT pag_image* pag_image_from_pixels(const void* pixels, int width, int height, size_t rowBytes,
                                          pag_color_type colorType, pag_alpha_type alphaType);
 /**
  * Creates a pag_image object from a hardware buffer. Release it by pag_release.
  */
-PAG_API pag_image* pag_image_from_hardware_buffer(void* buffer);
+PAG_EXPORT pag_image* pag_image_from_hardware_buffer(void* buffer);
 
 /**
  * Creates a pag_image object from the specified backend texture, return null if the texture is
  * invalid. Release it by pag_release.
  */
-PAG_API pag_image* pag_image_from_backend_texture(pag_backend_texture* texture);
+PAG_EXPORT pag_image* pag_image_from_backend_texture(pag_backend_texture* texture);
 
-PAG_API void pag_image_set_scale_mode(pag_image* image, pag_scale_mode mode);
+PAG_EXPORT void pag_image_set_scale_mode(pag_image* image, pag_scale_mode mode);
 
 PAG_C_PLUS_PLUS_END_GUARD
