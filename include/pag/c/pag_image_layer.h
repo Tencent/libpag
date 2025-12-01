@@ -22,7 +22,7 @@
 
 PAG_C_PLUS_PLUS_BEGIN_GUARD
 
-PAG_API uint8_t* pag_image_layer_get_image_rgba_data(pag_layer* imageLayer, size_t* count,
+PAG_EXPORT uint8_t* pag_image_layer_get_image_rgba_data(pag_layer* imageLayer, size_t* count,
                                                      size_t* width, size_t* height);
 
 PAG_C_PLUS_PLUS_END_GUARD

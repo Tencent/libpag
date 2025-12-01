@@ -26,9 +26,9 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
  * Creates a new pag_surface for off-screen rendering with the specified size.
  * Release it by pag_release.
  */
-PAG_API pag_surface* pag_surface_make_offscreen(int width, int height);
+PAG_EXPORT pag_surface* pag_surface_make_offscreen(int width, int height);
 
-PAG_API bool pag_surface_read_pixels(pag_surface* surface, pag_color_type colorType,
+PAG_EXPORT bool pag_surface_read_pixels(pag_surface* surface, pag_color_type colorType,
                                      pag_alpha_type alphaType, void* dstPixels, size_t dstRowBytes);
 
 PAG_C_PLUS_PLUS_END_GUARD

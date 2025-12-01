@@ -22,98 +22,98 @@
 
 PAG_C_PLUS_PLUS_BEGIN_GUARD
 
-PAG_API bool pag_text_document_get_apply_fill(pag_text_document* document);
+PAG_EXPORT bool pag_text_document_get_apply_fill(pag_text_document* document);
 
-PAG_API void pag_text_document_set_apply_fill(pag_text_document* document, bool applyFill);
+PAG_EXPORT void pag_text_document_set_apply_fill(pag_text_document* document, bool applyFill);
 
-PAG_API bool pag_text_document_get_apply_stroke(pag_text_document* document);
+PAG_EXPORT bool pag_text_document_get_apply_stroke(pag_text_document* document);
 
-PAG_API void pag_text_document_set_apply_stroke(pag_text_document* document, bool applyStroke);
+PAG_EXPORT void pag_text_document_set_apply_stroke(pag_text_document* document, bool applyStroke);
 
-PAG_API float pag_text_document_get_baseline_shift(pag_text_document* document);
+PAG_EXPORT float pag_text_document_get_baseline_shift(pag_text_document* document);
 
-PAG_API void pag_text_document_set_baseline_shift(pag_text_document* document, float baselineShift);
+PAG_EXPORT void pag_text_document_set_baseline_shift(pag_text_document* document, float baselineShift);
 
-PAG_API bool pag_text_document_get_box_text(pag_text_document* document);
+PAG_EXPORT bool pag_text_document_get_box_text(pag_text_document* document);
 
-PAG_API void pag_text_document_set_box_text(pag_text_document* document, bool boxText);
+PAG_EXPORT void pag_text_document_set_box_text(pag_text_document* document, bool boxText);
 
-PAG_API pag_point pag_text_document_get_box_text_pos(pag_text_document* document);
+PAG_EXPORT pag_point pag_text_document_get_box_text_pos(pag_text_document* document);
 
-PAG_API void pag_text_document_set_box_text_pos(pag_text_document* document, pag_point boxTextPos);
+PAG_EXPORT void pag_text_document_set_box_text_pos(pag_text_document* document, pag_point boxTextPos);
 
-PAG_API pag_point pag_text_document_get_box_text_size(pag_text_document* document);
+PAG_EXPORT pag_point pag_text_document_get_box_text_size(pag_text_document* document);
 
-PAG_API void pag_text_document_set_box_text_size(pag_text_document* document,
+PAG_EXPORT void pag_text_document_set_box_text_size(pag_text_document* document,
                                                  pag_point boxTextSize);
 
-PAG_API float pag_text_document_get_first_baseline(pag_text_document* document);
+PAG_EXPORT float pag_text_document_get_first_baseline(pag_text_document* document);
 
-PAG_API void pag_text_document_set_first_baseline(pag_text_document* document, float firstBaseline);
+PAG_EXPORT void pag_text_document_set_first_baseline(pag_text_document* document, float firstBaseline);
 
-PAG_API bool pag_text_document_get_faux_bold(pag_text_document* document);
+PAG_EXPORT bool pag_text_document_get_faux_bold(pag_text_document* document);
 
-PAG_API void pag_text_document_set_faux_bold(pag_text_document* document, bool fauxBold);
+PAG_EXPORT void pag_text_document_set_faux_bold(pag_text_document* document, bool fauxBold);
 
-PAG_API bool pag_text_document_get_faux_italic(pag_text_document* document);
+PAG_EXPORT bool pag_text_document_get_faux_italic(pag_text_document* document);
 
-PAG_API void pag_text_document_set_faux_italic(pag_text_document* document, bool fauxItalic);
+PAG_EXPORT void pag_text_document_set_faux_italic(pag_text_document* document, bool fauxItalic);
 
-PAG_API pag_color pag_text_document_get_fill_color(pag_text_document* document);
+PAG_EXPORT pag_color pag_text_document_get_fill_color(pag_text_document* document);
 
-PAG_API void pag_text_document_set_fill_color(pag_text_document* document, pag_color fillColor);
+PAG_EXPORT void pag_text_document_set_fill_color(pag_text_document* document, pag_color fillColor);
 
-PAG_API const char* pag_text_document_get_font_family(pag_text_document* document);
+PAG_EXPORT const char* pag_text_document_get_font_family(pag_text_document* document);
 
-PAG_API void pag_text_document_set_font_family(pag_text_document* document, const char* fontFamily);
+PAG_EXPORT void pag_text_document_set_font_family(pag_text_document* document, const char* fontFamily);
 
-PAG_API const char* pag_text_document_get_font_style(pag_text_document* document);
+PAG_EXPORT const char* pag_text_document_get_font_style(pag_text_document* document);
 
-PAG_API void pag_text_document_set_font_style(pag_text_document* document, const char* fontStyle);
+PAG_EXPORT void pag_text_document_set_font_style(pag_text_document* document, const char* fontStyle);
 
-PAG_API float pag_text_document_get_font_size(pag_text_document* document);
+PAG_EXPORT float pag_text_document_get_font_size(pag_text_document* document);
 
-PAG_API void pag_text_document_set_font_size(pag_text_document* document, float fontSize);
+PAG_EXPORT void pag_text_document_set_font_size(pag_text_document* document, float fontSize);
 
-PAG_API pag_color pag_text_document_get_stroke_color(pag_text_document* document);
+PAG_EXPORT pag_color pag_text_document_get_stroke_color(pag_text_document* document);
 
-PAG_API void pag_text_document_set_stroke_color(pag_text_document* document, pag_color strokeColor);
+PAG_EXPORT void pag_text_document_set_stroke_color(pag_text_document* document, pag_color strokeColor);
 
-PAG_API bool pag_text_document_get_stroke_over_fill(pag_text_document* document);
+PAG_EXPORT bool pag_text_document_get_stroke_over_fill(pag_text_document* document);
 
-PAG_API void pag_text_document_set_stroke_over_fill(pag_text_document* document,
+PAG_EXPORT void pag_text_document_set_stroke_over_fill(pag_text_document* document,
                                                     bool strokeOverFill);
 
-PAG_API float pag_text_document_get_stroke_width(pag_text_document* document);
+PAG_EXPORT float pag_text_document_get_stroke_width(pag_text_document* document);
 
-PAG_API void pag_text_document_set_stroke_width(pag_text_document* document, float strokeWidth);
+PAG_EXPORT void pag_text_document_set_stroke_width(pag_text_document* document, float strokeWidth);
 
-PAG_API const char* pag_text_document_get_text(pag_text_document* document);
+PAG_EXPORT const char* pag_text_document_get_text(pag_text_document* document);
 
-PAG_API void pag_text_document_set_text(pag_text_document* document, const char* text);
+PAG_EXPORT void pag_text_document_set_text(pag_text_document* document, const char* text);
 
-PAG_API pag_paragraph_justification
+PAG_EXPORT pag_paragraph_justification
 pag_text_document_get_justification(pag_text_document* document);
 
-PAG_API void pag_text_document_set_justification(pag_text_document* document,
+PAG_EXPORT void pag_text_document_set_justification(pag_text_document* document,
                                                  pag_paragraph_justification justification);
 
-PAG_API float pag_text_document_get_leading(pag_text_document* document);
+PAG_EXPORT float pag_text_document_get_leading(pag_text_document* document);
 
-PAG_API void pag_text_document_set_leading(pag_text_document* document, float leading);
+PAG_EXPORT void pag_text_document_set_leading(pag_text_document* document, float leading);
 
-PAG_API float pag_text_document_get_tracking(pag_text_document* document);
+PAG_EXPORT float pag_text_document_get_tracking(pag_text_document* document);
 
-PAG_API void pag_text_document_set_tracking(pag_text_document* document, float tracking);
+PAG_EXPORT void pag_text_document_set_tracking(pag_text_document* document, float tracking);
 
-PAG_API pag_color pag_text_document_get_background_color(pag_text_document* document);
+PAG_EXPORT pag_color pag_text_document_get_background_color(pag_text_document* document);
 
-PAG_API void pag_text_document_set_background_color(pag_text_document* document,
+PAG_EXPORT void pag_text_document_set_background_color(pag_text_document* document,
                                                     pag_color backgroundColor);
 
-PAG_API uint8_t pag_text_document_get_background_alpha(pag_text_document* document);
+PAG_EXPORT uint8_t pag_text_document_get_background_alpha(pag_text_document* document);
 
-PAG_API void pag_text_document_set_background_alpha(pag_text_document* document,
+PAG_EXPORT void pag_text_document_set_background_alpha(pag_text_document* document,
                                                     uint8_t backgroundAlpha);
 
 PAG_C_PLUS_PLUS_END_GUARD
