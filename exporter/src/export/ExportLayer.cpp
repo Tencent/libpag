@@ -399,6 +399,10 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
       continue;
     }
 
+    if (layerHandle == nullptr) {
+      continue;
+    }
+
     uint32_t layerID = GetLayerID(layerHandle);
     session->layerHandleMap[layerID] = layerHandle;
     ExportLayerType layerType = GetLayerType(layerHandle);

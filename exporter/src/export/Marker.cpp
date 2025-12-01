@@ -590,7 +590,8 @@ void ExportTimeStretch(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExpor
   const auto& suites = GetSuites();
 
   A_Time durationTime = {};
-  suites->ItemSuite6()->AEGP_GetItemDuration(itemHandle, &durationTime);
+  AEGP_CompH compHandle = GetItemCompH(itemHandle);
+  suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compHandle, &durationTime);
   auto compositionDuration = AEDurationToFrame(durationTime, session->frameRate);
 
   auto optInfo = GetTimeStretchInfo(itemHandle);
