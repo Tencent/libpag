@@ -71,6 +71,7 @@ static bool WriteYUVData(uint8_t* data[4], int stride[4], int width, int height,
 
 OfflineVideoEncoder::~OfflineVideoEncoder() {
   close();
+  exit();
 }
 
 bool OfflineVideoEncoder::open(int width, int height, double frameRate, bool hasAlpha,
@@ -139,7 +140,9 @@ void OfflineVideoEncoder::close() {
   }
   std::string endFile = JoinPaths(rootPath, "InEnd.txt");
   writeEndParam(true, false, endFile);
+}
 
+void OfflineVideoEncoder::exit() {
   if (process->state() == QProcess::Running) {
     process->waitForFinished(10000);
   }
@@ -184,6 +187,7 @@ void OfflineVideoEncoder::encodeFrame(uint8_t* data[], int stride[], FrameType f
   if (data[0] == nullptr) {
     return;
   }
+
   std::string yuvFile = JoinPaths(rootPath, "YUV-" + std::to_string(frames) + ".yuv");
   WriteYUVData(data, stride, width, height, yuvFile);
 
