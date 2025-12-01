@@ -213,7 +213,7 @@ std::vector<char> GetProjectFileBytes() {
     isAEPX = ToLowerCase(extension) == ".aepx";
   }
 
-  TempFileDelete tempFile;
+  exporter::TempFileDelete tempFile;
   if (isDirty || filePath.empty() || isAEPX) {
     auto tempFolder = exporter::GetTempFolderPath();
     if (!tempFolder.empty() && tempFolder.back() == '/') {
@@ -228,9 +228,15 @@ std::vector<char> GetProjectFileBytes() {
       return fileBytes;
     }
 
+    // AEGP_SaveProjectToPath can complete asynchronously, and there might be a delay
+    // before the file is fully written to disk by the file system.
+    // Therefore, we need a retry loop to wait for the file to become accessible
+    // before attempting to read it.
     int maxRetries = 50;
     int retryCount = 0;
     std::ifstream testFile(filePath, std::ios::binary);
+
+    // Loop to check if the file has been created and can be opened.
     while (!testFile.is_open() && retryCount < maxRetries) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       retryCount++;
@@ -239,6 +245,10 @@ std::vector<char> GetProjectFileBytes() {
     testFile.close();
 
     if (retryCount >= maxRetries) {
+      auto errorMsg = QObject::tr(
+          "Failed to save project file. The file could not be written to disk after multiple "
+          "attempts. Please check disk space and file permissions, then try again.");
+      exporter::WindowManager::GetInstance().showSimpleError(errorMsg);
       return fileBytes;
     }
   }
@@ -249,18 +259,24 @@ std::vector<char> GetProjectFileBytes() {
 
   filePath = ConvertStringEncoding(filePath);
 
-  std::ifstream fileStream(filePath, std::ios::binary);
-  if (!fileStream.is_open()) {
+  std::ifstream t(filePath, std::ios::binary);
+  if (!t.is_open()) {
+    return fileBytes;
+
+  }
+
+  t.seekg(0, std::ios::end);
+  auto fileLength = t.tellg();
+  t.seekg(0, std::ios::beg);
+
+  if (fileLength == 0) {
+    t.close();
     return fileBytes;
   }
 
-  fileStream.seekg(0, std::ios::end);
-  auto fileLength = fileStream.tellg();
-  fileStream.seekg(0, std::ios::beg);
-
   fileBytes.resize(fileLength);
-  fileStream.read(fileBytes.data(), fileLength);
-  fileStream.close();
+  t.read(fileBytes.data(), fileLength);
+  t.close();
 
   return fileBytes;
 }
