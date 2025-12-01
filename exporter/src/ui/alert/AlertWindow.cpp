@@ -72,7 +72,7 @@ void AlertWindow::init(const std::vector<AlertInfo>& infos) {
   alertInfoModel = std::make_unique<AlertInfoModel>();
   alertInfoModel->setAlertInfos(infos);
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("alertWindow", this);
   context->setContextProperty("alertInfoModel", alertInfoModel.get());
 }
