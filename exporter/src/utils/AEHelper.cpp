@@ -262,7 +262,6 @@ std::vector<char> GetProjectFileBytes() {
   std::ifstream t(filePath, std::ios::binary);
   if (!t.is_open()) {
     return fileBytes;
-
   }
 
   t.seekg(0, std::ios::end);
