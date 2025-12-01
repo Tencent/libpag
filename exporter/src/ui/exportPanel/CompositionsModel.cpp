@@ -93,7 +93,7 @@ void CompositionsModel::setIsUnfold(int index, bool isUnfold) {
   if (index < 0 || static_cast<size_t>(index) >= compositions.size()) {
     return;
   }
-  const std::shared_ptr<ExportCompositionData>& composition = compositions[index];
+  const auto& composition = compositions[index];
   composition->isUnfold = isUnfold;
   std::unordered_set<A_long> idSet = {};
   idSet.emplace(composition->resource->ID);

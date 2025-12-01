@@ -66,7 +66,7 @@ void ExportImageLayerModel::setAEResource(std::shared_ptr<AEResource> newResourc
   }
 }
 
-void ExportImageLayerModel::refreshData(const std::shared_ptr<AEResource>& resource) {
+void ExportImageLayerModel::refreshData(std::shared_ptr<AEResource> resource) {
   if (resource->isExportAsBmp) {
     return;
   }

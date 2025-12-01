@@ -31,6 +31,9 @@ void ExportFrameImageProvider::setAEResource(std::shared_ptr<AEResource> newReso
 }
 
 void ExportFrameImageProvider::updateFrameImage(pag::Frame frame) {
+  if (frameImages.find(frame) != frameImages.end()) {
+    return;
+  }
   QImage image = GetCompositionFrameImage(resource->itemHandle, frame);
   if (frameImages.size() >= 5) {
     frameImages.erase(frameImages.begin());

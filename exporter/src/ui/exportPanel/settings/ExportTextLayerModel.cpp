@@ -38,7 +38,7 @@ void ExportTextLayerModel::setAEResource(std::shared_ptr<AEResource> newResource
   }
 }
 
-void ExportTextLayerModel::refreshData(const std::shared_ptr<AEResource>& resource) {
+void ExportTextLayerModel::refreshData(std::shared_ptr<AEResource> resource) {
   if (resource->isExportAsBmp) {
     return;
   }

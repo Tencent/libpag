@@ -58,7 +58,7 @@ class ExportCompositionInfoModel : public QAbstractListModel {
                                       UpdateSessionHandler updateSessionHandler,
                                       QObject* parent = nullptr);
   void setAEResource(std::shared_ptr<AEResource> resource);
-  void refreshData(int parentIndex, const std::shared_ptr<AEResource>& resource);
+  void refreshData(int parentIndex, std::shared_ptr<AEResource> resource);
 
   Q_INVOKABLE int getWidth() const;
   Q_INVOKABLE int getHeight() const;
@@ -69,7 +69,7 @@ class ExportCompositionInfoModel : public QAbstractListModel {
   Q_INVOKABLE void setCurrentFrame(const QString& currentFrame);
   Q_INVOKABLE void setExportAsBmp(int row, bool exportAsBmp);
   Q_INVOKABLE bool isCompositionHasEditableLayer(int row);
-  bool isCompositionHasEditableLayer(const std::shared_ptr<AEResource>& resource);
+  bool isCompositionHasEditableLayer(std::shared_ptr<AEResource> resource);
 
   int rowCount(const QModelIndex& parent) const override;
   QVariant data(const QModelIndex& index, int role) const override;

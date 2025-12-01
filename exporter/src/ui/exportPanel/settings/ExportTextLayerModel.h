@@ -34,7 +34,7 @@ class ExportTextLayerModel : public QAbstractListModel {
   Q_PROPERTY(bool isAllEditable READ getAllEditable NOTIFY allEditableChanged WRITE setAllEditable)
 
   void setAEResource(std::shared_ptr<AEResource> resource);
-  void refreshData(const std::shared_ptr<AEResource>& resource);
+  void refreshData(std::shared_ptr<AEResource> resource);
 
   Q_INVOKABLE void setIsEditable(int row, bool isEditable);
   Q_INVOKABLE void setAllEditable(bool allEditable);

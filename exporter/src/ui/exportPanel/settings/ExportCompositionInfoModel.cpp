@@ -47,7 +47,7 @@ void ExportCompositionInfoModel::setAEResource(std::shared_ptr<AEResource> newRe
 }
 
 void ExportCompositionInfoModel::refreshData(int parentIndex,
-                                             const std::shared_ptr<AEResource>& resource) {
+                                             std::shared_ptr<AEResource> resource) {
   auto session = getSessionHandler(this->resource->ID);
   if (session == nullptr ||
       session->itemHandleMap.find(resource->ID) == session->itemHandleMap.end()) {
@@ -189,7 +189,7 @@ bool ExportCompositionInfoModel::isCompositionHasEditableLayer(int row) {
 }
 
 bool ExportCompositionInfoModel::isCompositionHasEditableLayer(
-    const std::shared_ptr<AEResource>& resource) {
+    std::shared_ptr<AEResource> resource) {
   if (!resource->composition.imageLayers.empty() || !resource->composition.textLayers.empty()) {
     return true;
   }

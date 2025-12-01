@@ -75,7 +75,7 @@ Q_INVOKABLE bool ExportPanelWindow::isAEWindowActive() {
   return IsAEWindowActive();
 }
 
-void ExportPanelWindow::viewLayers(const std::shared_ptr<AEResource>& resource) {
+void ExportPanelWindow::viewLayers(std::shared_ptr<AEResource> resource) {
   if (!resource->composition.children.empty() || !resource->composition.textLayers.empty() ||
       !resource->composition.imageLayers.empty()) {
     return;

@@ -36,7 +36,7 @@ class ExportPanelWindow : public BaseWindow {
  public:
   explicit ExportPanelWindow(QApplication* app, QObject* parent = nullptr);
 
-  void viewLayers(const std::shared_ptr<AEResource>& resource);
+  void viewLayers(std::shared_ptr<AEResource> resource);
   std::shared_ptr<PAGExportSession> getSession(int row);
   void updateSession(int row);
 
