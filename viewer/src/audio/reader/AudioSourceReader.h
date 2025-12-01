@@ -18,30 +18,34 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include "audio/model/AudioSource.h"
+#include "ffmovie/movie.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+using SampleData = ffmovie::SampleData;
+using AudioOutputConfig = ffmovie::AudioOutputConfig;
+
+class AudioSourceReader {
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+  explicit AudioSourceReader(std::shared_ptr<AudioSource> source, int trackID,
+                             std::shared_ptr<AudioOutputConfig> outputConfig);
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
-
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  bool isValid();
+  void seek(int64_t time);
+  SampleData getNextFrame();
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+  bool sendData();
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  bool advance = false;
+  int trackID = 0;
+  int64_t startTime = 0;
+  int64_t startOffset = 0;
+  std::shared_ptr<AudioSource> source = nullptr;
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
+  std::shared_ptr<ffmovie::FFAudioDemuxer> demuxer = nullptr;
+  std::shared_ptr<ffmovie::FFAudioDecoder> decoder = nullptr;
 };
 
 }  // namespace pag

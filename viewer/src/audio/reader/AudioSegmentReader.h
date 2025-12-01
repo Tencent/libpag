@@ -17,31 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include <memory>
+#include "AudioSourceReader.h"
+#include "audio/model/AudioTrackSegment.h"
+#include "audio/process/AudioTransform.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+class AudioSegmentReader {
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+  static std::shared_ptr<AudioSegmentReader> Make(AudioTrackSegment* segment,
+                                                  std::shared_ptr<AudioOutputConfig> outputConfig);
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
-
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  AudioSegmentReader(AudioTrackSegment* segment, std::shared_ptr<AudioOutputConfig> outputConfig);
+  bool isValid();
+  void seek(int64_t time);
+  SampleData getNextSample();
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+  SampleData getNextSampleInternal();
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  bool inputEOS = false;
+  float speed = 1.0f;
+  int64_t startOffset = 0;
+  int64_t endOffset = 0;
+  int64_t currentOffset = 0;
+  AudioTrackSegment* segment = nullptr;
+  std::vector<uint8_t> emptyBuffer = {};
+  std::shared_ptr<AudioTransform> audioTransform = nullptr;
+  std::shared_ptr<AudioSourceReader> reader = nullptr;
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
+
+  friend class AudioTrackReader;
 };
 
 }  // namespace pag
