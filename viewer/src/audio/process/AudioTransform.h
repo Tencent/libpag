@@ -18,30 +18,30 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include "audio/reader/AudioSourceReader.h"
+#include "ffmovie/movie.h"
+#include "sonic.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+using SmapleData = ffmovie::SampleData;
+using AudioOutputConfig = ffmovie::AudioOutputConfig;
+
+class AudioTransform {
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
-
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
-
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  explicit AudioTransform(std::shared_ptr<AudioOutputConfig> outputConfig);
+  ~AudioTransform();
+  void setSpeed(float speed);
+  void setVolume(float volume);
+  void setPitch(float pitch);
+  int sendAudioBytes(const SmapleData& audioData);
+  int sendInputEOS();
+  SampleData readAudioBytes();
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
-
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  sonicStream stream = nullptr;
+  std::vector<int16_t> buffer = {};
+  std::shared_ptr<AudioOutputConfig> outputConfig = nullptr;
 };
 
 }  // namespace pag

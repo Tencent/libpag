@@ -18,30 +18,36 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
+#include <QThread>
+#include "PAGAudioReader.h"
+#include "PAGAudioRender.h"
 #include "pag/pag.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+class PAGAudioPlayer : public QObject {
+  Q_OBJECT
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+  explicit PAGAudioPlayer();
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
+  void setVolume(float volume);
+  void setProgress(double percent);
+  void setIsPlaying(bool isPlaying);
+  void setComposition(std::shared_ptr<PAGFile> pagFile);
+  bool isEmpty() const;
 
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  Q_SIGNAL void audioTimeChanged(int64_t audioTime);
+
+  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+  Q_SIGNAL void progressChanged(int64_t time);
+  Q_SIGNAL void isPlayingChanged(bool isPlaying);
+  Q_SIGNAL void volumeChanged(float volume);
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGAudioReader> audioReader = nullptr;
+  std::shared_ptr<PAGAudioRender> audioRender = nullptr;
 };
 
 }  // namespace pag

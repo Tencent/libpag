@@ -18,30 +18,31 @@
 
 #pragma once
 
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include "AudioTrack.h"
+#include "pag/types.h"
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
+class AudioAsset {
  public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+  static std::shared_ptr<AudioAsset> Make(const std::string& filePath);
+  static std::shared_ptr<AudioAsset> Make(std::shared_ptr<ByteData> data);
+  static std::shared_ptr<AudioAsset> Make(std::shared_ptr<AudioSource> source);
 
   int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
-
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
+  std::vector<std::shared_ptr<AudioTrack>> getTracks();
+  std::shared_ptr<AudioSource> getSource();
+  std::shared_ptr<AudioTrack> addTrack(int preferredTrackID = -1);
+  void setSource(std::shared_ptr<AudioSource> source);
+  void loadValues();
+  void removeTrack(int trackID);
+  void removeAllTracks();
 
  private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
+  int generateTrackID();
 
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
+  std::shared_ptr<AudioSource> source = nullptr;
+  std::vector<std::shared_ptr<AudioTrack>> tracks = {};
 };
 
 }  // namespace pag

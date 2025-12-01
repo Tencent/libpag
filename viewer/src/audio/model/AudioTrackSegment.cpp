@@ -16,32 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "MovieInfo.h"
-#include "audio/model/AudioClip.h"
-#include "pag/pag.h"
+#include "AudioTrackSegment.h"
+#include <utility>
 
 namespace pag {
 
-class PAGMovie : public PAGImage {
- public:
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath);
-  static std::shared_ptr<PAGMovie> MakeFromFile(const std::string& filePath, int64_t startTime,
-                                                int64_t duration, float speed = 1.0f);
+AudioTrackSegment::AudioTrackSegment(std::shared_ptr<AudioSource> source, int trackID,
+                                     const TimeRange& sourceRange, const TimeRange& targetRanget)
+    : sourceTrackID(trackID), source(std::move(source)), sourceRange(sourceRange),
+      targetRange(targetRanget) {
+}
 
-  int64_t duration();
-  std::vector<AudioClip> generateAudioClips();
+AudioTrackSegment::AudioTrackSegment(const TimeRange& targetRange) : targetRange(targetRange) {
+}
 
- protected:
-  std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;
-  bool isStill() const override;
-  Frame getContentFrame(int64_t time) const override;
-
- private:
-  PAGMovie(std::shared_ptr<MovieInfo> movieInfo);
-
-  std::shared_ptr<MovieInfo> movieInfo = nullptr;
-};
+bool AudioTrackSegment::isEmpty() const {
+  return sourceRange.start == sourceRange.end && targetRange.start == targetRange.end;
+}
 
 }  // namespace pag
