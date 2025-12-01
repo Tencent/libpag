@@ -19,42 +19,42 @@
 #pragma once
 
 #include <QAbstractListModel>
-#include "utils/PAGExportSession.h"
+#include "ExportCompositionInfoModel.h"
+#include "utils/AEResource.h"
 
 namespace exporter {
 
-class ProgressListModel : public QAbstractListModel {
+class ExportTextLayerModel : public QAbstractListModel {
   Q_OBJECT
  public:
-  enum class ProgressListModelRoles {
-    NameRole = Qt::UserRole + 1,
-    StatusRole,
-    CurrentProgressRole,
-    TotalProgressRole
-  };
+  enum class ExportTextLayerModelRoles { NumberRole = Qt::UserRole + 1, NameRole, IsEditableRole };
 
-  Q_PROPERTY(int exportNum READ getExportNum NOTIFY exportNumChanged)
-  Q_PROPERTY(int totalExportNum READ getTotalExportNum NOTIFY totalExportNumChanged)
+  explicit ExportTextLayerModel(GetSessionHandler getSessionHandler, QObject* parent = nullptr);
 
-  explicit ProgressListModel(QObject* parent = nullptr);
-  void addSession(std::shared_ptr<PAGExportSession> session);
-  void clearSessions();
+  Q_PROPERTY(bool isAllEditable READ getAllEditable NOTIFY allEditableChanged WRITE setAllEditable)
 
-  Q_INVOKABLE void viewPAGFile(int row) const;
-  Q_INVOKABLE int getExportNum() const;
-  Q_INVOKABLE int getTotalExportNum() const;
+  void setAEResource(std::shared_ptr<AEResource> resource);
+  void refreshData(const std::shared_ptr<AEResource>& resource);
+
+  Q_INVOKABLE void setIsEditable(int row, bool isEditable);
+  Q_INVOKABLE void setAllEditable(bool allEditable);
+  Q_INVOKABLE bool getAllEditable() const;
 
   int rowCount(const QModelIndex& parent) const override;
   QVariant data(const QModelIndex& index, int role) const override;
 
-  Q_SIGNAL void exportNumChanged(int exportNum);
-  Q_SIGNAL void totalExportNumChanged(int totalExportNum);
+  Q_SIGNAL void allEditableChanged(bool allEditable);
+
+  Q_SLOT void onCompositionExportAsBmpChanged();
 
  protected:
   QHash<int, QByteArray> roleNames() const override;
 
  private:
-  std::vector<std::shared_ptr<PAGExportSession>> sessionList = {};
+  size_t editableItemNum = 0;
+  std::shared_ptr<AEResource> resource = nullptr;
+  std::vector<AEResource::Layer> items = {};
+  GetSessionHandler getSessionHandler = nullptr;
 };
 
 }  // namespace exporter

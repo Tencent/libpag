@@ -150,4 +150,101 @@ void ExportPanelWindow::updateSession(A_long ID) {
   PAGExportSessionManager::GetInstance()->unsetCurrentSession(session);
 }
 
+exporter::ExportTextLayerModel* ExportPanelWindow::getTextLayerModel(int row) {
+  const auto& resource = resources[row];
+  A_long id = resource->ID;
+  auto iter = textLayerModelMap.find(id);
+  if (iter != textLayerModelMap.end()) {
+    QQmlEngine::setObjectOwnership(iter->second.get(), QQmlEngine::CppOwnership);
+    return iter->second.get();
+  }
+
+  return nullptr;
+}
+
+exporter::ExportImageLayerModel* ExportPanelWindow::getImageLayerModel(int row) {
+  const auto& resource = resources[row];
+  A_long id = resource->ID;
+  auto iter = imageLayerModelMap.find(id);
+  if (iter != imageLayerModelMap.end()) {
+    QQmlEngine::setObjectOwnership(iter->second.get(), QQmlEngine::CppOwnership);
+    return iter->second.get();
+  }
+
+  return nullptr;
+}
+
+exporter::ExportTimeStretchModel* ExportPanelWindow::getTimeStretchModel(int row) {
+  const auto& resource = resources[row];
+  A_long id = resource->ID;
+  auto iter = timeStretchModelMap.find(id);
+  if (iter != timeStretchModelMap.end()) {
+    QQmlEngine::setObjectOwnership(iter->second.get(), QQmlEngine::CppOwnership);
+    return iter->second.get();
+  }
+
+  return nullptr;
+}
+
+exporter::ExportCompositionInfoModel* ExportPanelWindow::getCompositionInfoModel(int row) {
+  const auto& resource = resources[row];
+  A_long id = resource->ID;
+  auto iter = compositionInfoModelMap.find(id);
+  if (iter != compositionInfoModelMap.end()) {
+    QQmlEngine::setObjectOwnership(iter->second.get(), QQmlEngine::CppOwnership);
+    return iter->second.get();
+  }
+
+  return nullptr;
+}
+
+exporter::ExportFrameImageProvider* ExportPanelWindow::getImageProvider(A_long ID) {
+  if (frameImageProviderMap.find(ID) == frameImageProviderMap.end()) {
+    return nullptr;
+  }
+  return frameImageProviderMap[ID];
+}
+
+void ExportPanelWindow::updateCompositionSetting(int row) {
+  if (window == nullptr) {
+    return;
+  }
+  const auto& resource = resources[row];
+  updateSession(resource->ID);
+  viewLayers(resource);
+  auto getSessionHandler = std::function<std::shared_ptr<PAGExportSession>(A_long ID)>(
+      [this](A_long ID) -> std::shared_ptr<PAGExportSession> { return this->getSession(ID); });
+  auto updateSessionHandler =
+      std::function<void(A_long ID)>([this](A_long ID) -> void { this->updateSession(ID); });
+
+  auto frameImageProvider = new ExportFrameImageProvider();
+  frameImageProvider->setAEResource(resource);
+  auto compositionInfoModel = std::make_unique<ExportCompositionInfoModel>(
+      frameImageProvider, getSessionHandler, updateSessionHandler);
+  compositionInfoModel->setAEResource(resource);
+  auto textLayerModel = std::make_unique<ExportTextLayerModel>(getSessionHandler);
+  textLayerModel->setAEResource(resource);
+  auto imageLayerModel = std::make_unique<ExportImageLayerModel>(getSessionHandler);
+  imageLayerModel->setAEResource(resource);
+  auto timeStretchModel = std::make_unique<ExportTimeStretchModel>();
+  timeStretchModel->setAEResource(resource);
+  textLayerModelMap[resource->ID] = std::move(textLayerModel);
+  imageLayerModelMap[resource->ID] = std::move(imageLayerModel);
+  timeStretchModelMap[resource->ID] = std::move(timeStretchModel);
+  compositionInfoModelMap[resource->ID] = std::move(compositionInfoModel);
+  if (frameImageProviderMap.find(resource->ID) != frameImageProviderMap.end()) {
+    engine->removeImageProvider(frameImageProviderMap[resource->ID]->getName());
+  }
+  frameImageProviderMap[resource->ID] = frameImageProvider;
+  engine->addImageProvider(frameImageProvider->getName(), frameImageProvider);
+  connect(compositionInfoModelMap[resource->ID].get(),
+          &ExportCompositionInfoModel::compositionExportAsBmpChanged,
+          imageLayerModelMap[resource->ID].get(),
+          &ExportImageLayerModel::onCompositionExportAsBmpChanged);
+  connect(compositionInfoModelMap[resource->ID].get(),
+          &ExportCompositionInfoModel::compositionExportAsBmpChanged,
+          textLayerModelMap[resource->ID].get(),
+          &ExportTextLayerModel::onCompositionExportAsBmpChanged);
+}
+
 }  // namespace exporter

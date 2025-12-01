@@ -25,12 +25,11 @@ namespace exporter {
 ProgressListModel::ProgressListModel(QObject* parent) : QAbstractListModel(parent) {
 }
 
-void ProgressListModel::addSession(const std::shared_ptr<PAGExportSession>& session) {
+void ProgressListModel::addSession(std::shared_ptr<PAGExportSession> session) {
   auto iter = std::find(sessionList.begin(), sessionList.end(), session);
   if (iter != sessionList.end()) {
     return;
   }
-  sessionList.push_back(session);
   int index = static_cast<int>(sessionList.size() - 1);
   connect(&session->progressModel, &ProgressModel::exportStatusChanged, this, [this, index]() {
     QModelIndex modelIndex = createIndex(index, 0);
@@ -48,6 +47,7 @@ void ProgressListModel::addSession(const std::shared_ptr<PAGExportSession>& sess
     Q_EMIT dataChanged(modelIndex, modelIndex,
                        {static_cast<int>(ProgressListModelRoles::TotalProgressRole)});
   });
+  sessionList.push_back(std::move(session));
   Q_EMIT totalExportNumChanged(index + 1);
   beginInsertRows(QModelIndex(), index, index);
   endInsertRows();

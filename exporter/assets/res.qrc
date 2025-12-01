@@ -41,6 +41,11 @@
         <file>qml/CompositionListView.qml</file>
         <file>qml/ExportCompositionProgress.qml</file>
         <file>qml/ExportCompositionsProgress.qml</file>
+        <file>qml/TextLayerItem.qml</file>
+        <file>qml/TimeStretchItem.qml</file>
+        <file>qml/PreCompositionItem.qml</file>
+        <file>qml/PlaceholderImageItem.qml</file>
+        <file>qml/CompositionSettingPage.qml</file>
 
         <!-- JavaScript -->
         <file>scripts/GetTextDocument.js</file>
