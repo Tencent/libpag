@@ -189,6 +189,7 @@ void CompositionsModel::exportSelectedCompositions() {
     configParam.exportAudio = exportAudio;
     configParam.activeItemHandle = resource->itemHandle;
     configParam.outputPath = outputPath;
+    configParam.showAlertInfo = true;
     auto pagExport = std::make_unique<PAGExport>(configParam);
     progressListModel->addSession(pagExport->session);
     pagExports.push_back(std::move(pagExport));
@@ -214,6 +215,7 @@ void CompositionsModel::prepareForPreview(int row) {
   configParam.exportAudio = exportAudio;
   configParam.activeItemHandle = resource->itemHandle;
   configParam.outputPath = outputPath;
+  configParam.showAlertInfo = true;
   pagExport = std::make_unique<PAGExport>(configParam);
   auto context = engine->rootContext();
   context->setContextProperty("progressModel", &pagExport->session->progressModel);
