@@ -34,7 +34,7 @@ ExportCompositionInfoModel::ExportCompositionInfoModel(ExportFrameImageProvider*
 }
 
 void ExportCompositionInfoModel::setAEResource(std::shared_ptr<AEResource> newResource) {
-  this->resource = std::move(newResource);
+  resource = std::move(newResource);
   refreshData(-1, resource);
   size = GetItemDimensions(resource->itemHandle);
   duration = GetItemDuration(resource->itemHandle);

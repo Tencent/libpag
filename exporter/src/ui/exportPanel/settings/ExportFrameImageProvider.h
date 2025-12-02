@@ -36,7 +36,7 @@ class ExportFrameImageProvider : public QQuickImageProvider {
  private:
   pag::Frame currentFrame = 0;
   std::shared_ptr<AEResource> resource = nullptr;
-  std::map<pag::Frame, QImage> frameImages = {};
+  std::list<std::pair<pag::Frame, QImage>> frameImageList = {};
 };
 
 }  // namespace exporter

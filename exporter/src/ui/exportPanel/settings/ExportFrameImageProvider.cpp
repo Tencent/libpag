@@ -31,14 +31,16 @@ void ExportFrameImageProvider::setAEResource(std::shared_ptr<AEResource> newReso
 }
 
 void ExportFrameImageProvider::updateFrameImage(pag::Frame frame) {
-  if (frameImages.find(frame) != frameImages.end()) {
+  auto iter = std::find_if(frameImageList.begin(), frameImageList.end(),
+                           [frame](auto& pair) { return pair.first == frame; });
+  if (iter != frameImageList.end()) {
     return;
   }
   QImage image = GetCompositionFrameImage(resource->itemHandle, frame);
-  if (frameImages.size() >= 5) {
-    frameImages.erase(frameImages.begin());
+  frameImageList.emplace_back(frame, image);
+  if (frameImageList.size() > 5) {
+    frameImageList.pop_front();
   }
-  frameImages[frame] = image;
 }
 
 QString ExportFrameImageProvider::getName() {
@@ -48,8 +50,10 @@ QString ExportFrameImageProvider::getName() {
 
 QImage ExportFrameImageProvider::requestImage(const QString& id, QSize*, const QSize&) {
   pag::Frame theID = id.toLongLong();
-  if (frameImages.find(theID) != frameImages.end()) {
-    QImage image = frameImages[theID];
+  auto iter = std::find_if(frameImageList.begin(), frameImageList.end(),
+                           [theID](auto& pair) { return pair.first == theID; });
+  if (iter != frameImageList.end()) {
+    QImage image = iter->second;
     return image;
   }
   return {};

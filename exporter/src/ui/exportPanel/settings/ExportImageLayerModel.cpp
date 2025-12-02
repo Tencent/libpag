@@ -28,7 +28,7 @@ static pag::PAGScaleMode QStringToScaleMode(const QString& str) {
     return pag::PAGScaleMode::None;
   } else if (lowerStr == "stretch") {
     return pag::PAGScaleMode::Stretch;
-  } else if (lowerStr == "letterBox") {
+  } else if (lowerStr == "letterbox") {
     return pag::PAGScaleMode::LetterBox;
   } else if (lowerStr == "zoom") {
     return pag::PAGScaleMode::Zoom;
