@@ -92,6 +92,9 @@ void GetBitmapSequence(std::shared_ptr<PAGExportSession> session,
   pag::Frame lastKeyFrame = 0;
   AEGP_RenderOptionsH renderOptions = nullptr;
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
     A_long frameWidth = 0;

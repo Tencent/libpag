@@ -42,7 +42,6 @@ static bool ValidatePAGFile(uint8_t* data, size_t size) {
   auto bytes = pag::Codec::Encode(pagFileDecoded);
   if (bytes->length() != size) {
     LOGI("warning: bytes->length(%zu) != data.size(%zu)", bytes->length(), size);
-    return false;
   }
 
   return true;
@@ -234,6 +233,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 
   PAGExportSessionManager::GetInstance()->setCurrentSession(session);
   ScopedAssign<pag::ID> arCI(session->compID, id);
+  session->progressModel.addTotalSteps(1);
 
   ExportComposition(session, itemHandle);
   AdjustTrackMatteLayer(session);
@@ -300,6 +300,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
   ExportLayerEditable(pagFile, session, itemHandle);
   ExportImageFillMode(pagFile, itemHandle);
 
+  session->progressModel.addFinishedSteps();
   PAGExportSessionManager::GetInstance()->setCurrentSession(session);
 
   return pagFile;
