@@ -87,6 +87,9 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, contents, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     auto shape = GetShape(childStreamHandle, gradientIndex);
     if (shape != nullptr) {
       element->elements.push_back(shape);
@@ -189,6 +192,9 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
   AEGP_StreamRefH dashStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, streamHandle, "ADBE Vector Stroke Dashes", &dashStreamHandle);
+  if (dashStreamHandle == nullptr) {
+    return;
+  }
   A_long numStreams = 0;
   Suites->DynamicStreamSuite4()->AEGP_GetNumStreamsInGroup(dashStreamHandle, &numStreams);
   if (numStreams > 0 && IsStreamActive(dashStreamHandle)) {
@@ -206,6 +212,9 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
       AEGP_StreamRefH childStreamHandle = nullptr;
       Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, dashStreamHandle, index,
                                                                  &childStreamHandle);
+      if (IsStreamHidden(childStreamHandle)) {
+        continue;
+      }
       if (!IsStreamHidden(childStreamHandle)) {
         auto dash = GetProperty(childStreamHandle, index, AEStreamParser::FloatParser);
         dashes.push_back(dash);
@@ -436,6 +445,9 @@ std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle) {
     AEGP_StreamRefH streamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, rootStreamHandle, index,
                                                                &streamHandle);
+    if (streamHandle == nullptr) {
+      continue;
+    }
     auto element = GetShape(streamHandle, gradientIndex);
     if (element != nullptr) {
       contents.push_back(element);

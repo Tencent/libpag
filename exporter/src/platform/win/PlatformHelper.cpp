@@ -136,6 +136,10 @@ std::string GetPAGViewerPath() {
   return "";
 }
 
+std::string GetQmlPath() {
+  return "";
+}
+
 static void StartPreview(const std::string& pagFilePath) {
   if (!FileIsExist(pagFilePath)) {
     QString errorMsg =

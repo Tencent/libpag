@@ -92,6 +92,9 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
   AEGP_ItemH itemHandle = session->itemHandleMap[composition->id];
   AEGP_RenderOptionsH renderOptions = nullptr;
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
 
   std::vector<pag::TimeRange> visibleRanges = {};
@@ -224,6 +227,9 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
   auto itemHandle = session->itemHandleMap[composition->id];
   AEGP_RenderOptionsH renderOptions = nullptr;
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   while (!session->stopExport) {
     auto sequence = new pag::VideoSequence();

@@ -190,9 +190,16 @@ std::vector<pag::LayerStyle*> GetLayerStyles(const AEGP_LayerH& layerHandle) {
   std::vector<pag::LayerStyle*> layerStyles = {};
   AEGP_StreamRefH layerStream = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(PluginID, layerHandle, &layerStream);
+  if (layerStream == nullptr) {
+    return layerStyles;
+  }
   AEGP_StreamRefH rootStream = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(PluginID, layerStream,
                                                                  "ADBE Layer Styles", &rootStream);
+  if (rootStream == nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(layerStream);
+    return layerStyles;
+  }
   Suites->StreamSuite4()->AEGP_DisposeStream(layerStream);
   if (IsStreamHidden(rootStream) || !IsStreamActive(rootStream)) {
     Suites->StreamSuite4()->AEGP_DisposeStream(rootStream);
@@ -205,6 +212,9 @@ std::vector<pag::LayerStyle*> GetLayerStyles(const AEGP_LayerH& layerHandle) {
     AEGP_StreamRefH styleStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, rootStream, index,
                                                                &styleStreamHandle);
+    if (styleStreamHandle == nullptr) {
+      continue;
+    }
     if (IsStreamHidden(styleStreamHandle) || !IsStreamActive(styleStreamHandle)) {
       Suites->StreamSuite4()->AEGP_DisposeStream(styleStreamHandle);
       continue;
