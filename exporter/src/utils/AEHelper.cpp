@@ -28,6 +28,7 @@
 #include "TempFileDelete.h"
 #include "platform/PlatformHelper.h"
 #include "src/base/utils/Log.h"
+#include "ui/WindowManager.h"
 
 namespace exporter {
 
@@ -248,7 +249,7 @@ std::vector<char> GetProjectFileBytes() {
       auto errorMsg = QObject::tr(
           "Failed to save project file. The file could not be written to disk after multiple "
           "attempts. Please check disk space and file permissions, then try again.");
-      exporter::WindowManager::GetInstance().showSimpleError(errorMsg);
+      WindowManager::GetInstance().showSimpleError(errorMsg);
       return fileBytes;
     }
   }
@@ -579,7 +580,6 @@ QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame) 
 
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
   if (renderOptions == nullptr) {
-    LOGE("GetCompositionFrameImage: NewFromItem failed.");
     return {};
   }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
@@ -706,9 +706,6 @@ bool IsStreamActive(const AEGP_StreamRefH& streamHandle) {
 }
 
 AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return nullptr;
-  }
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
   AEGP_StreamRefH streamHandle = nullptr;

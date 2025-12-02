@@ -189,6 +189,7 @@ void CompositionsModel::exportSelectedCompositions() {
     configParam.exportAudio = exportAudio;
     configParam.activeItemHandle = resource->itemHandle;
     configParam.outputPath = outputPath;
+    configParam.showAlertInfo = true;
     auto pagExport = std::make_unique<PAGExport>(configParam);
     progressListModel->addSession(pagExport->session);
     pagExports.push_back(std::move(pagExport));

@@ -30,6 +30,9 @@ static void GetVideoLayerRenderImageSize(const AEGP_LayerH& layerHandle, A_u_lon
 
   AEGP_LayerRenderOptionsH renderOptions = nullptr;
   Suites->LayerRenderOptionsSuite2()->AEGP_NewFromLayer(PluginID, layerHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   GetLayerRenderFrameSize(renderOptions, srcStride, width, height);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -42,6 +45,9 @@ static void GetVideoLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
 
   AEGP_LayerRenderOptionsH renderOptions = nullptr;
   Suites->LayerRenderOptionsSuite2()->AEGP_NewFromLayer(PluginID, layerHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   GetLayerRenderFrame(rgbaBytes, srcStride, dstStride, width, height, renderOptions);
   Suites->LayerRenderOptionsSuite2()->AEGP_Dispose(renderOptions);
 }
@@ -54,6 +60,9 @@ static void GetImageLayerRenderImageSize(const AEGP_LayerH& layerHandle, A_u_lon
   AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
   AEGP_RenderOptionsH renderOptions = nullptr;
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   GetRenderFrameSize(renderOptions, srcStride, width, height);
   Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 }
@@ -67,6 +76,9 @@ static void GetImageLayerRenderImage(uint8* rgbaBytes, const AEGP_LayerH& layerH
   AEGP_ItemH itemHandle = GetLayerItemH(layerHandle);
   AEGP_RenderOptionsH renderOptions = nullptr;
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  if (renderOptions == nullptr) {
+    return;
+  }
   GetRenderFrame(rgbaBytes, srcStride, dstStride, width, height, renderOptions);
   Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 }
