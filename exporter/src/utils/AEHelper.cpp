@@ -140,9 +140,6 @@ void GetRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_
 
 void GetRenderFrameSize(AEGP_RenderOptionsH& renderOptions, A_u_long& stride, A_long& width,
                         A_long& height) {
-  if (renderOptions == nullptr) {
-    return;
-  }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   Suites->RenderOptionsSuite3()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
 
@@ -181,9 +178,6 @@ void GetLayerRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStrid
 
 void GetLayerRenderFrameSize(AEGP_LayerRenderOptionsH& renderOptions, A_u_long& stride,
                              A_long& width, A_long& height) {
-  if (renderOptions == nullptr) {
-    return;
-  }
   Suites->LayerRenderOptionsSuite2()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
   Suites->LayerRenderOptionsSuite2()->AEGP_SetDownsampleFactor(renderOptions, 1, 1);
 
@@ -288,9 +282,6 @@ std::vector<char> GetProjectFileBytes() {
 }
 
 void SetRenderTime(const AEGP_RenderOptionsH& renderOptions, float frameRate, pag::Frame frame) {
-  if (renderOptions == nullptr) {
-    return;
-  }
   A_Time time = {};
   time.value = static_cast<A_long>(1000 * frame);
   time.scale = static_cast<A_u_long>(std::lround(1000 * frameRate));
@@ -386,9 +377,6 @@ uint32_t GetLayerID(const AEGP_LayerH& layerHandle) {
 }
 
 uint32_t GetLayerItemID(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return 0;
-  }
   auto itemHandle = GetLayerItemH(layerHandle);
   auto id = GetItemID(itemHandle);
   return id;
@@ -418,27 +406,18 @@ std::string GetLayerName(const AEGP_LayerH& layerHandle) {
 }
 
 AEGP_ItemH GetLayerItemH(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return nullptr;
-  }
   AEGP_ItemH itemHandle = nullptr;
   Suites->LayerSuite6()->AEGP_GetLayerSourceItem(layerHandle, &itemHandle);
   return itemHandle;
 }
 
 pag::Ratio GetLayerStretch(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return {};
-  }
   A_Ratio ratio = {};
   Suites->LayerSuite6()->AEGP_GetLayerStretch(layerHandle, &ratio);
   return {ratio.num, ratio.den};
 }
 
 pag::Frame GetLayerStartTime(const AEGP_LayerH& layerHandle, float frameRate) {
-  if (layerHandle == nullptr) {
-    return 0;
-  }
   A_Time inPoint = {};
   Suites->LayerSuite6()->AEGP_GetLayerInPoint(layerHandle, AEGP_LTimeMode_CompTime, &inPoint);
   if (inPoint.scale == 0) {
@@ -448,9 +427,6 @@ pag::Frame GetLayerStartTime(const AEGP_LayerH& layerHandle, float frameRate) {
 }
 
 pag::Frame GetLayerDuration(const AEGP_LayerH& layerHandle, float frameRate) {
-  if (layerHandle == nullptr) {
-    return 0;
-  }
   A_Time duration = {};
   Suites->LayerSuite6()->AEGP_GetLayerDuration(layerHandle, AEGP_LTimeMode_CompTime, &duration);
   auto frames = static_cast<pag::Frame>(std::round(duration.value * frameRate / duration.scale));
@@ -458,45 +434,30 @@ pag::Frame GetLayerDuration(const AEGP_LayerH& layerHandle, float frameRate) {
 }
 
 AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return 0;
-  }
   AEGP_LayerFlags flags;
   Suites->LayerSuite6()->AEGP_GetLayerFlags(layerHandle, &flags);
   return flags;
 }
 
 AEGP_LayerH GetLayerParentLayerH(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return nullptr;
-  }
   AEGP_LayerH parentLayerHandle = nullptr;
   Suites->LayerSuite6()->AEGP_GetLayerParent(layerHandle, &parentLayerHandle);
   return parentLayerHandle;
 }
 
 pag::BlendMode GetLayerBlendMode(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return pag::BlendMode::Normal;
-  }
   AEGP_LayerTransferMode transferMode = {};
   Suites->LayerSuite6()->AEGP_GetLayerTransferMode(layerHandle, &transferMode);
   return AEXferToBlendMode(transferMode.mode);
 }
 
 AEGP_LayerH GetLayerTrackMatteLayerH(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return nullptr;
-  }
   AEGP_LayerH trackMatteLayerHandle = nullptr;
   Suites->LayerSuite9()->AEGP_GetTrackMatteLayer(layerHandle, &trackMatteLayerHandle);
   return trackMatteLayerHandle;
 }
 
 pag::TrackMatteType GetLayerTrackMatteType(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return pag::TrackMatteType::None;
-  }
   A_Boolean hasTrackMatte = false;
   Suites->LayerSuite6()->AEGP_DoesLayerHaveTrackMatte(layerHandle, &hasTrackMatte);
   if (!hasTrackMatte) {
@@ -509,9 +470,6 @@ pag::TrackMatteType GetLayerTrackMatteType(const AEGP_LayerH& layerHandle) {
 }
 
 A_long GetLayerEffectNum(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return 0;
-  }
   AEGP_LayerFlags layerFlags;
   Suites->LayerSuite6()->AEGP_GetLayerFlags(layerHandle, &layerFlags);
   if ((layerFlags & AEGP_LayerFlag_EFFECTS_ACTIVE) == 0) {
@@ -563,9 +521,6 @@ uint32_t GetItemID(const AEGP_ItemH& itemHandle) {
 }
 
 uint32_t GetItemParentID(const AEGP_ItemH& itemHandle) {
-  if (itemHandle == nullptr) {
-    return 0;
-  }
   uint32_t id = 0;
   AEGP_ItemH parentItemHandle = nullptr;
   Suites->ItemSuite6()->AEGP_GetItemParentFolder(itemHandle, &parentItemHandle);
@@ -593,18 +548,12 @@ std::string GetItemName(const AEGP_ItemH& itemHandle) {
 }
 
 AEGP_CompH GetItemCompH(const AEGP_ItemH& itemHandle) {
-  if (itemHandle == nullptr) {
-    return nullptr;
-  }
   AEGP_CompH compositionHandle = nullptr;
   Suites->CompSuite6()->AEGP_GetCompFromItem(itemHandle, &compositionHandle);
   return compositionHandle;
 }
 
 float GetItemFrameRate(const AEGP_ItemH& itemHandle) {
-  if (itemHandle == nullptr) {
-    return 24.0f;
-  }
   auto compositionHandle = GetItemCompH(itemHandle);
   A_FpLong frameRate = 0;
   Suites->CompSuite6()->AEGP_GetCompFramerate(compositionHandle, &frameRate);
@@ -612,9 +561,6 @@ float GetItemFrameRate(const AEGP_ItemH& itemHandle) {
 }
 
 pag::Frame GetItemDuration(const AEGP_ItemH& itemHandle) {
-  if (itemHandle == nullptr) {
-    return 0;
-  }
   A_Time time = {};
   Suites->ItemSuite6()->AEGP_GetItemDuration(itemHandle, &time);
   A_FpLong frameRate = GetItemFrameRate(itemHandle);
@@ -622,9 +568,6 @@ pag::Frame GetItemDuration(const AEGP_ItemH& itemHandle) {
 }
 
 QSize GetItemDimensions(const AEGP_ItemH& itemHandle) {
-  if (itemHandle == nullptr) {
-    return {};
-  }
   A_long width = 0;
   A_long height = 0;
   Suites->ItemSuite8()->AEGP_GetItemDimensions(itemHandle, &width, &height);
@@ -632,15 +575,11 @@ QSize GetItemDimensions(const AEGP_ItemH& itemHandle) {
 }
 
 QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame) {
-  if (itemHandle == nullptr) {
-    return {};
-  }
   AEGP_RenderOptionsH renderOptions = nullptr;
   float frameRate = GetItemFrameRate(itemHandle);
 
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
   if (renderOptions == nullptr) {
-    LOGE("GetCompositionFrameImage: NewFromItem failed.");
     return {};
   }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
@@ -663,9 +602,6 @@ QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame) 
 }
 
 void SetItemName(const AEGP_ItemH& itemHandle, const std::string& name) {
-  if (itemHandle == nullptr) {
-    return;
-  }
   std::u16string u16str = Utf8ToUtf16(name);
   Suites->ItemSuite8()->AEGP_SetItemName(itemHandle,
                                          reinterpret_cast<const A_UTF16Char*>(u16str.data()));
@@ -680,17 +616,11 @@ void SelectItem(const AEGP_ItemH& itemHandle) {
 }
 
 std::string GetCompName(const AEGP_CompH& compositionHandle) {
-  if (compositionHandle == nullptr) {
-    return "";
-  }
   auto itemHandle = GetCompItemH(compositionHandle);
   return GetItemName(itemHandle);
 }
 
 AEGP_ItemH GetCompItemH(const AEGP_CompH& compositionHandle) {
-  if (compositionHandle == nullptr) {
-    return nullptr;
-  }
   AEGP_ItemH itemHandle = nullptr;
   Suites->CompSuite6()->AEGP_GetItemFromComp(compositionHandle, &itemHandle);
   return itemHandle;
@@ -703,9 +633,6 @@ pag::Color GetCompBackgroundColor(const AEGP_CompH& compositionHandle) {
 }
 
 bool IsStaticComposition(const AEGP_CompH& compositionHandle) {
-  if (compositionHandle == nullptr) {
-    return true;
-  }
   bool isStatic = true;
   AEGP_ItemH itemHandle = GetCompItemH(compositionHandle);
   pag::Frame totalFrames = GetItemDuration(itemHandle);
@@ -761,36 +688,24 @@ bool IsStaticComposition(const AEGP_CompH& compositionHandle) {
 }
 
 std::string GetStreamMatchName(const AEGP_StreamRefH& streamHandle) {
-  if (streamHandle == nullptr) {
-    return "";
-  }
   char matchName[200] = {0};
   Suites->DynamicStreamSuite4()->AEGP_GetMatchName(streamHandle, matchName);
   return matchName;
 }
 
 bool IsStreamHidden(const AEGP_StreamRefH& streamHandle) {
-  if (streamHandle == nullptr) {
-    return false;
-  }
   AEGP_DynStreamFlags flags;
   Suites->DynamicStreamSuite4()->AEGP_GetDynamicStreamFlags(streamHandle, &flags);
   return static_cast<bool>(flags & AEGP_DynStreamFlag_HIDDEN);
 }
 
 bool IsStreamActive(const AEGP_StreamRefH& streamHandle) {
-  if (streamHandle == nullptr) {
-    return false;
-  }
   AEGP_DynStreamFlags flags;
   Suites->DynamicStreamSuite4()->AEGP_GetDynamicStreamFlags(streamHandle, &flags);
   return (flags & AEGP_DynStreamFlag_ACTIVE_EYEBALL) > 0;
 }
 
 AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerHandle) {
-  if (layerHandle == nullptr) {
-    return nullptr;
-  }
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
   AEGP_StreamRefH streamHandle = nullptr;
@@ -800,9 +715,6 @@ AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerHandle) {
 }
 
 AEGP_StreamRefH GetItemMarkerStream(const AEGP_ItemH& itemHandle) {
-  if (itemHandle == nullptr) {
-    return nullptr;
-  }
   auto compositionHandle = GetItemCompH(itemHandle);
   return GetCompositionMarkerStream(compositionHandle);
 }

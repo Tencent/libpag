@@ -89,6 +89,9 @@ void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_Ite
   }
 
   auto compositionHandle = GetItemCompH(itemHandle);
+  if (compositionHandle == nullptr) {
+    return;
+  }
   auto compositionType = GetCompositionType(session, compositionHandle);
   switch (compositionType) {
     case pag::CompositionType::Video:

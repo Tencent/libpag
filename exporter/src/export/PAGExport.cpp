@@ -233,6 +233,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 
   PAGExportSessionManager::GetInstance()->setCurrentSession(session);
   ScopedAssign<pag::ID> arCI(session->compID, id);
+  session->progressModel.addTotalSteps(1);
 
   ExportComposition(session, itemHandle);
   AdjustTrackMatteLayer(session);
@@ -299,6 +300,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
   ExportLayerEditable(pagFile, session, itemHandle);
   ExportImageFillMode(pagFile, itemHandle);
 
+  session->progressModel.addFinishedSteps();
   PAGExportSessionManager::GetInstance()->setCurrentSession(session);
 
   return pagFile;

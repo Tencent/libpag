@@ -441,6 +441,9 @@ std::vector<pag::Layer*> ExportLayers(std::shared_ptr<PAGExportSession> session,
 
   pag::Codec::InstallReferences(layers);
   AEGP_ItemH itemHandle = GetCompItemH(compHandle);
+  if (itemHandle == nullptr) {
+    return layers;
+  }
   A_Time duration = {};
   GetSuites()->ItemSuite6()->AEGP_GetItemDuration(itemHandle, &duration);
   pag::Frame totalDuration = AEDurationToFrame(duration, session->frameRate);
