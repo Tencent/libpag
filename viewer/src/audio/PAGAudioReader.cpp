@@ -21,6 +21,8 @@
 #include <QCoreApplication>
 #include <QEvent>
 #include <utility>
+#include <QDebug>
+
 #include "model/AudioClip.h"
 #include "utils/AudioUtils.h"
 
