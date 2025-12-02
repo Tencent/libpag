@@ -28,6 +28,7 @@
 #include "TempFileDelete.h"
 #include "platform/PlatformHelper.h"
 #include "src/base/utils/Log.h"
+#include "ui/WindowManager.h"
 
 namespace exporter {
 
@@ -248,7 +249,7 @@ std::vector<char> GetProjectFileBytes() {
       auto errorMsg = QObject::tr(
           "Failed to save project file. The file could not be written to disk after multiple "
           "attempts. Please check disk space and file permissions, then try again.");
-      exporter::WindowManager::GetInstance().showSimpleError(errorMsg);
+      WindowManager::GetInstance().showSimpleError(errorMsg);
       return fileBytes;
     }
   }

@@ -20,12 +20,14 @@
 #include <QApplication>
 #include <QTranslator>
 #include "config/ConfigFile.h"
+#include "platform/PlatformHelper.h"
 
 namespace exporter {
 
 BaseWindow::BaseWindow(QApplication* app, QObject* parent) : QObject(parent), app(app) {
   engine = std::make_unique<QQmlApplicationEngine>(app);
   switchLanguage();
+  engine->addImportPath(GetQmlPath().data());
 }
 
 void BaseWindow::show() {
