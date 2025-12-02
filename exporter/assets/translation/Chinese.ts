@@ -896,11 +896,6 @@
         <source>PAG file verification error.</source>
         <translation>PAG文件校验错误。</translation>
     </message>
-    <message>
-        <location filename="../../src/utils/AEHelper.cpp" line="248"/>
-        <source>Failed to save project file. The file could not be written to disk after multiple attempts. Please check disk space and file permissions, then try again.</source>
-        <translation type="unfinished">保存项目文件失败。多次尝试后，文件无法写入磁盘。请检查磁盘空间和文件权限，然后再试。</translation>
-    </message>
 </context>
 <context>
     <name>TextLayerItem</name>
