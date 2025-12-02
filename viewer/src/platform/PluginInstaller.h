@@ -44,7 +44,6 @@ class PluginInstaller : public QObject {
 
   void setYearRange(int minYear, int maxYear);
 
-
   static QString GetH264EncoderToolsExePath();
 
  Q_SIGNALS:
