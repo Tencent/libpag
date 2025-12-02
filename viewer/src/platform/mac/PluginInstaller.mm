@@ -124,9 +124,7 @@ QStringList PluginInstaller::getAeInstallPaths() {
 }
 
 QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
-  if (pluginName == "com.tencent.pagconfig") {
-    return pluginName;
-  } else if (pluginName == "H264EncoderTools") {
+  if (pluginName == "H264EncoderTools") {
     return pluginName;
   } else {
     return pluginName + ".plugin";
@@ -150,9 +148,7 @@ QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
 QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   QString fullName = getPluginFullName(pluginName);
 
-  if (pluginName == "com.tencent.pagconfig") {
-    return "/Library/Application Support/Adobe/CEP/extensions/" + fullName;
-  } else if (pluginName == "H264EncoderTools") {
+  if (pluginName == "H264EncoderTools") {
     QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return roaming + "/H264EncoderTools/" + fullName;
   } else {
@@ -222,7 +218,7 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
   args << "-e" << appleScriptCommand;
 
   process.start("osascript", args);
-  process.waitForFinished(30000);
+  process.waitForFinished(300000);
   if (process.exitCode() != 0) {
     QString error = process.readAllStandardError();
     QString output = process.readAllStandardOutput();
@@ -241,6 +237,7 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
     args << "-e" << fallbackAppleScript;
 
     process.start("osascript", args);
+    process.waitForFinished(300000);  // 5 分钟超时
 
     if (process.exitCode() != 0) {
       error = process.readAllStandardError();
@@ -267,12 +264,7 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
     QString targetDir = QFileInfo(target).absolutePath();
     commands << QString("mkdir -p '%1'").arg(targetDir);
     commands << QString("rm -rf '%1'").arg(target);
-    if (plugin == "com.tencent.pagconfig") {
-      QString destPath = targetDir + "/" + QFileInfo(source).fileName();
-      commands << QString("ditto '%1' '%2'").arg(source).arg(destPath);
-    } else {
-      commands << QString("ditto '%1' '%2'").arg(source).arg(target);
-    }
+    commands << QString("ditto '%1' '%2'").arg(source).arg(target);
   }
 
   char qtResourceCmd[cmdBufSize] = {0};

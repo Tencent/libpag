@@ -155,9 +155,7 @@ QStringList PluginInstaller::getAeInstallPaths() {
 }
 
 QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
-  if (pluginName == "com.tencent.pagconfig") {
-    return pluginName;
-  } else if (pluginName == "H264EncoderTools") {
+  if (pluginName == "H264EncoderTools") {
     return pluginName + ".exe";
   } else {
     return pluginName + ".aex";
@@ -167,21 +165,13 @@ QString PluginInstaller::getPluginFullName(const QString& pluginName) const {
 QString PluginInstaller::getPluginSourcePath(const QString& pluginName) const {
   QString appDir = QCoreApplication::applicationDirPath();
   QString fullName = getPluginFullName(pluginName);
-
-  if (pluginName == "com.tencent.pagconfig") {
-    return appDir + "/" + fullName;
-  } else {
-    return appDir + "/" + fullName;
-  }
+  return appDir + "/" + fullName;
 }
 
 QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   QString fullName = getPluginFullName(pluginName);
 
-  if (pluginName == "com.tencent.pagconfig") {
-    QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return roaming + "/Adobe/CEP/extensions/" + fullName;
-  } else if (pluginName == "H264EncoderTools") {
+  if (pluginName == "H264EncoderTools") {
     QString roaming = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return roaming + "/H264EncoderTools/" + fullName;
   } else {
@@ -354,15 +344,9 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
     commands
         << QString("if not exist \"%1\" mkdir \"%1\"").arg(QDir::toNativeSeparators(targetDir));
 
-    if (plugin == "com.tencent.pagconfig") {
-      commands << QString("xcopy /Y /E /I \"%1\" \"%2\"")
-                      .arg(QDir::toNativeSeparators(source))
-                      .arg(QDir::toNativeSeparators(target));
-    } else {
-      commands << QString("copy /Y \"%1\" \"%2\"")
-                      .arg(QDir::toNativeSeparators(source))
-                      .arg(QDir::toNativeSeparators(target));
-    }
+    commands << QString("copy /Y \"%1\" \"%2\"")
+                    .arg(QDir::toNativeSeparators(source))
+                    .arg(QDir::toNativeSeparators(target));
   }
 
   if (commands.isEmpty()) {
@@ -378,13 +362,7 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
 
   for (const QString& plugin : plugins) {
     QString target = getPluginInstallPath(plugin);
-
-    if (plugin == "com.tencent.pagconfig") {
-      commands
-          << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(QDir::toNativeSeparators(target));
-    } else {
-      commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(target));
-    }
+    commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(target));
   }
 
   if (commands.isEmpty()) {

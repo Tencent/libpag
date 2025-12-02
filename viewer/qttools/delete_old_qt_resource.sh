@@ -9,13 +9,9 @@ function doDeleteFileInApps() {
     if [ -d "$aeAppPath" ]; then
       deletePath="$aeAppPath/Contents/$parentDir/$deleteFile"
       if [ -d "$deletePath" ]; then
-        echo "delete dir:$deletePath"
         rm -fr "$deletePath"
       elif [ -f "$deletePath" ]; then
-        echo "delete file:$deletePath"
         rm -f "$deletePath"
-      else
-        echo "$deletePath not exist"
       fi
     fi
 }
@@ -46,29 +42,22 @@ function deleteFileInMEApps() {
   done
 }
 
-# 遍历文件夹和删除对应 AE APP 里面文件
+# Traverse directory and delete corresponding files in AE apps
 function traversalAndDeleteFiles() {
     cd "$1"
     for file in *
     do
       deleteFileInAEApps $file "$2"
-#       deleteFileInMEApps $file "$2"
     done
 }
 
 function deleteOldQtResources() {
   if [ ! -d "$AE_EXPORTER_PATH" ]; then
-      echo "$AE_EXPORTER_PATH not exist"
       return
   fi
-  echo "deleteOldFrameWorks"
   traversalAndDeleteFiles "$QT_FRAMEWORK_DRI" "Frameworks"
-  echo "deleteOldPlugins"
   traversalAndDeleteFiles "$QT_PLUGINS_DRI" "PlugIns"
-  echo "deleteOldResources"
   traversalAndDeleteFiles "$QT_RESOURCE_DRI" "Resources"
-#  echo "deletePAGExporter"
-#  rm -fr "$AE_EXPORTER_PATH"
 }
 
 deleteOldQtResources
