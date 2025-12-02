@@ -44,6 +44,9 @@ class PluginInstaller : public QObject {
 
   void setYearRange(int minYear, int maxYear);
 
+
+  static QString GetH264EncoderToolsExePath();
+
  Q_SIGNALS:
   void updateChecked(bool hasUpdate);
   void installCompleted(InstallResult result, const QString& message);
@@ -69,8 +72,21 @@ class PluginInstaller : public QObject {
   int64_t getPluginVersion(const QString& pluginPath) const;
   QStringList getPluginList() const;
 
-  void CopyQtResource(char cmd[], int cmdSize) const;
-  void DeleteQtResource(char cmd[], int cmdSize) const;
+  // Qt resource management for AE plugin dependencies
+  void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
+  void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
+  QString getQtResourceDir() const;
+
+  // PAGExporter plugin installation to multiple AE versions
+  void appendExporterCopyCommands(QStringList& commands, const QStringList& aePaths) const;
+  void appendExporterDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
+
+  // Store PAGViewer path for plugin callback
+  void storeViewerPathForPlugin() const;
+
+  // H264EncoderTools installation with retry mechanism
+  bool copyH264EncoderToolsWithRetry(int maxRetries = 5) const;
+  QString getH264EncoderToolsInstallDir() const;
 
   struct Version {
     int major = 0;

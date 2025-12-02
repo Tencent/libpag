@@ -157,8 +157,7 @@ bool PluginInstaller::isPluginInstalled() const {
 }
 
 QStringList PluginInstaller::getPluginList() const {
-  return {"PAGExporter", "ImageFillRule", "TextBackground", "com.tencent.pagconfig",
-          "H264EncoderTools"};
+  return {"PAGExporter", "H264EncoderTools"};
 }
 
 int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
