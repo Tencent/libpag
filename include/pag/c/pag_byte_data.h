@@ -25,6 +25,6 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
 /**
  * Creates a new pag_byte_data and copy the bytes and length. Release it by pag_release.
  */
-PAG_API pag_byte_data* pag_byte_data_copy(const void* bytes, size_t length);
+PAG_EXPORT pag_byte_data* pag_byte_data_copy(const void* bytes, size_t length);
 
 PAG_C_PLUS_PLUS_END_GUARD

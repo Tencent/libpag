@@ -28,21 +28,21 @@ int ProgressModel::getExportStatus() const {
   return static_cast<int>(status);
 }
 
-double ProgressModel::getTotalFrame() const {
-  if (totalFrame == 0) {
+double ProgressModel::getTotalProgress() const {
+  if (totalSteps == 0) {
     return 1.0;
   }
-  return totalFrame;
+  return static_cast<double>(totalSteps);
 }
 
-double ProgressModel::getCurrentFrame() const {
-  return currentFrame;
+double ProgressModel::getCurrentProgress() const {
+  return static_cast<double>(finishedSteps);
 }
 
 void ProgressModel::setExportStatus(ExportStatus status) {
   if (status == ExportStatus::Success) {
-    currentFrame = totalFrame;
-    Q_EMIT currentFrameChanged(currentFrame);
+    finishedSteps = totalSteps;
+    Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
     Q_EMIT exportFinished();
   } else if (status == ExportStatus::Error) {
     Q_EMIT exportFailed();
@@ -51,33 +51,33 @@ void ProgressModel::setExportStatus(ExportStatus status) {
   Q_EMIT exportStatusChanged(static_cast<int>(status));
 }
 
-void ProgressModel::setCurrentFrame(double currentFrame) {
-  this->currentFrame = currentFrame;
-  Q_EMIT currentFrameChanged(currentFrame);
+void ProgressModel::setFinishedSteps(uint64_t value) {
+  finishedSteps = value;
+  Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
-void ProgressModel::setTotalFrame(double totalFrame) {
-  this->totalFrame = totalFrame;
-  Q_EMIT totalFramesChanged(this->totalFrame);
+void ProgressModel::setTotalSteps(uint64_t value) {
+  totalSteps = value;
+  Q_EMIT totalProgressChanged(static_cast<double>(totalSteps));
 
-  if (currentFrame > totalFrame) {
-    currentFrame = totalFrame;
-    Q_EMIT currentFrameChanged(currentFrame);
+  if (finishedSteps > totalSteps) {
+    finishedSteps = totalSteps;
+    Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
   }
 }
 
-void ProgressModel::updateProgress(double value) {
-  currentFrame += value;
-  if (currentFrame >= totalFrame) {
-    currentFrame = totalFrame;
+void ProgressModel::addFinishedSteps(uint64_t value) {
+  finishedSteps += value;
+  if (finishedSteps >= totalSteps) {
+    finishedSteps = totalSteps;
   }
   QApplication::processEvents();
-  Q_EMIT currentFrameChanged(currentFrame);
+  Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
-void ProgressModel::addTotalFrame(double value) {
-  totalFrame += value;
-  Q_EMIT totalFramesChanged(totalFrame);
+void ProgressModel::addTotalSteps(uint64_t value) {
+  totalSteps += value;
+  Q_EMIT totalProgressChanged(static_cast<double>(totalSteps));
 }
 
 }  // namespace exporter

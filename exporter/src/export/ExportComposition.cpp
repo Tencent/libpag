@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExportComposition.h"
+#include "ExportLayer.h"
+#include "sequence/BitmapSequence.h"
+#include "sequence/VideoSequence.h"
 #include "utils/AEHelper.h"
 #include "utils/ScopedHelper.h"
 #include "utils/StringHelper.h"
@@ -70,8 +73,8 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
 
   if (composition->type() != pag::CompositionType::Vector) {
     auto frames =
-        static_cast<double>(composition->duration * session->frameRate / composition->frameRate);
-    session->progressModel.addTotalFrame(frames);
+        static_cast<uint64_t>(composition->duration * session->frameRate / composition->frameRate);
+    session->progressModel.addTotalSteps(frames);
   }
 }
 
@@ -116,16 +119,27 @@ void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
   session->compositions.push_back(composition);
 }
 
-void ExportVectorComposition(std::shared_ptr<PAGExportSession>, const AEGP_CompH&) {
+void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compHandle) {
+  auto composition = new pag::VectorComposition();
+  GetCompositionAttributes(session, compHandle, composition);
+  ScopedAssign<std::vector<pag::Marker*>*> markers(session->audioMarkers,
+                                                   &composition->audioMarkers);
+  composition->layers = ExportLayers(session, compHandle);
+  session->compositions.push_back(composition);
+
+  session->progressModel.addTotalSteps(session->imageBytesList.size());
 }
 
-void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession>, pag::BitmapComposition*,
-                                     float) {
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             pag::BitmapComposition* composition, float factor) {
+  GetBitmapSequence(std::move(session), composition, factor);
 }
 
-void ExportVideoCompositionActually(std::shared_ptr<PAGExportSession>,
-                                    std::vector<pag::Composition*>&, pag::VideoComposition*,
-                                    float) {
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            std::vector<pag::Composition*>& compositions,
+                            pag::VideoComposition* composition, float factor) {
+  GetVideoSequence(std::move(session), compositions, composition, factor);
 }
 
 }  // namespace exporter

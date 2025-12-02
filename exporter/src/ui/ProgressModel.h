@@ -33,27 +33,28 @@ class ProgressModel : public QObject {
   explicit ProgressModel(QObject* parent = nullptr);
 
   Q_PROPERTY(int exportStatus READ getExportStatus NOTIFY exportStatusChanged)
-  Q_PROPERTY(double totalFrame READ getTotalFrame NOTIFY totalFramesChanged)
-  Q_PROPERTY(double currentFrame READ getCurrentFrame NOTIFY currentFrameChanged)
+  Q_PROPERTY(double totalProgress READ getTotalProgress NOTIFY totalProgressChanged)
+  Q_PROPERTY(double currentProgress READ getCurrentProgress NOTIFY currentProgressChanged)
 
   Q_INVOKABLE int getExportStatus() const;
-  Q_INVOKABLE double getTotalFrame() const;
-  Q_INVOKABLE double getCurrentFrame() const;
+  Q_INVOKABLE double getTotalProgress() const;
+  Q_INVOKABLE double getCurrentProgress() const;
   void setExportStatus(ExportStatus status);
-  void setCurrentFrame(double currentFrame);
-  void setTotalFrame(double totalFrame);
-  void updateProgress(double value = 1.0);
-  void addTotalFrame(double value);
+
+  void setFinishedSteps(uint64_t value);
+  void setTotalSteps(uint64_t value);
+  void addFinishedSteps(uint64_t value = 1);
+  void addTotalSteps(uint64_t value);
 
   Q_SIGNAL void exportStatusChanged(int exportStatus);
-  Q_SIGNAL void totalFramesChanged(double totalFrames);
-  Q_SIGNAL void currentFrameChanged(double currentFrame);
+  Q_SIGNAL void totalProgressChanged(double totalProgress);
+  Q_SIGNAL void currentProgressChanged(double currentProgress);
   Q_SIGNAL void exportFinished();
   Q_SIGNAL void exportFailed();
 
  private:
   ExportStatus status = ExportStatus::Waiting;
-  double totalFrame = 0;
-  double currentFrame = 0;
+  uint64_t totalSteps = 0;
+  uint64_t finishedSteps = 0;
 };
 }  // namespace exporter

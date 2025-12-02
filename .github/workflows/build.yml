@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -67,8 +65,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -118,8 +114,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
@@ -211,8 +205,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -254,8 +246,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -307,8 +297,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -338,6 +326,7 @@ jobs:
           aqtversion: '==3.2.1'
           cache: 'true'
           cache-key-prefix: 'install-qt-action'
+          modules: 'qtmultimedia'
 
       - name: Build QT
         run: |
@@ -364,8 +353,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get CLI Tools Cache
         id: cli-tools-cache

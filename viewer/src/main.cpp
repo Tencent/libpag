@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
   QFont defaultFonts("Helvetica Neue,PingFang SC");
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
-  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji"};
+  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji", "Microsoft YaHei"};
   pag::PAGFont::SetFallbackFontNames(fallbackList);
 
   pag::PAGViewer app(argc, argv);
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   qmlRegisterType<pag::PAGTaskFactory>("PAG", 1, 0, "PAGTaskFactory");
   qmlRegisterType<pag::PluginInstallerModel>("PAG", 1, 0, "PluginInstallerModel");
-  app.openFile(filePath.data());
+  app.openFile(QString::fromLocal8Bit(filePath.data()));
 
   pag::InitUpdater();
 

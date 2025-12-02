@@ -53,12 +53,16 @@ if (QT_VERSION)
 endif ()
 
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick QuickControls2)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick QuickControls2 Multimedia)
 list(APPEND PAG_VIEWER_PLATFORM_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
-        Qt${QT_VERSION_MAJOR}::QuickControls2)
-find_program(LUPDATE_EXECUTABLE lupdate REQUIRED)
-find_program(LRELEASE_EXECUTABLE lrelease REQUIRED)
+        Qt${QT_VERSION_MAJOR}::QuickControls2 Qt${QT_VERSION_MAJOR}::Multimedia)
+find_program(LUPDATE_EXECUTABLE lupdate
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
 execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
 execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
 qt_add_resources(QT_RESOURCES assets/res.qrc)
@@ -135,6 +139,10 @@ list(APPEND PAG_OPTIONS "-DPAG_BUILD_TESTS=${PAG_BUILD_TESTS}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
 list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
+if (NOT DEFINED PAG_PATH OR "${PAG_PATH}" STREQUAL "")
+    set(PAG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/..")
+    get_filename_component(PAG_PATH "${PAG_PATH}" ABSOLUTE)
+endif ()
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     list(APPEND PAG_OPTIONS "-d")
     string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
@@ -143,8 +151,8 @@ set(PAG_OUTPUT_DIR ${CMAKE_BINARY_DIR}/libpag)
 set(PAG_OUTPUT_LIB ${PAG_OUTPUT_DIR}/${ARCH}/libpag${CMAKE_STATIC_LIBRARY_SUFFIX})
 set(PAG_OUTPUT_MD5 ${PAG_OUTPUT_DIR}/.pag.${ARCH}.md5)
 add_custom_target(pag
-        COMMAND node ${CMAKE_SOURCE_DIR}/../build_pag ${PAG_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${PAG_OUTPUT_DIR}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMAND node "${PAG_PATH}/build_pag" ${PAG_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${PAG_OUTPUT_DIR}
+        WORKING_DIRECTORY ${PAG_PATH}
         BYPRODUCTS ${PAG_OUTPUT_LIB} ${PAG_OUTPUT_MD5}
         VERBATIM USES_TERMINAL)
 list(APPEND PAG_VIEWER_PLATFORM_LIBS ${PAG_OUTPUT_LIB})
@@ -169,21 +177,33 @@ elseif (WIN32)
 endif ()
 list(APPEND PAG_VIEWER_SOURCE_FILES ${PLATFORM_SOURCE_FILES})
 
-add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
-if (PAG_DEPEND_TARGETS)
-    add_dependencies(PAGViewer ${PAG_DEPEND_TARGETS})
-endif ()
+list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/sonic/include)
+list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/include)
 if (APPLE)
+    add_executable(PAGViewer ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES})
     list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/mac/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/mac/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sonic/mac/${ARCH}/libsonic.a)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib)
 elseif (WIN32)
+    set(RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/PAGViewer.rc"
+                  "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/appIcon.ico"
+                  "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/pagIcon.ico")
+
+    add_executable(PAGViewer WIN32 ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES} ${RESOURCES})
     list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/zlib/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ../third_party/tgfx/third_party/out/libpng/win/include)
     list(APPEND PAG_VIEWER_INCLUDES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/include)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/winsparkle/win/x64/${CMAKE_BUILD_TYPE}/WinSparkle.lib)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sonic/win/${ARCH}/sonic.lib)
+    list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/win/${ARCH}/ffmovie.lib)
+endif ()
+
+if (PAG_DEPEND_TARGETS)
+    add_dependencies(PAGViewer ${PAG_DEPEND_TARGETS})
 endif ()
 
 target_include_directories(PAGViewer PUBLIC ${PAG_VIEWER_INCLUDES})

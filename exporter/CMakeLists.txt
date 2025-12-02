@@ -60,8 +60,12 @@ set(CMAKE_AUTORCC ON)
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets OpenGL QuickControls2 LinguistTools)
 list(APPEND libs Qt6::Core Qt6::Qml Qt6::Quick Qt::Widgets Qt6::OpenGL Qt6::QuickControls2)
-find_program(LUPDATE_EXECUTABLE lupdate REQUIRED)
-find_program(LRELEASE_EXECUTABLE lrelease REQUIRED)
+find_program(LUPDATE_EXECUTABLE lupdate
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
 execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
 execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
 qt_add_resources(QT_RESOURCES assets/res.qrc)

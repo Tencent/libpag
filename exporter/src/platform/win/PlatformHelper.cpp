@@ -46,7 +46,7 @@ std::string GetRoamingPath() {
 }
 
 bool CreateFolder(const std::string& path) {
-  if (!FileHelper::FileIsExist(path)) {
+  if (!FileIsExist(path)) {
     std::error_code errorCode;
     if (!fs::create_directories(path, errorCode)) {
       LOGE("Create %s failed: %s", path.c_str(), errorCode.message().c_str());
@@ -115,8 +115,8 @@ bool IsAEWindowActive() {
 
 std::string GetPAGViewerPath() {
   auto configPath = GetRoamingPath() + "PAGViewerPath.txt";
-  auto pagViewerPath = FileHelper::ReadTextFile(configPath.c_str());
-  if (!pagViewerPath.empty() && FileHelper::FileIsExist(pagViewerPath)) {
+  auto pagViewerPath = ReadTextFile(configPath.c_str());
+  if (!pagViewerPath.empty() && FileIsExist(pagViewerPath)) {
     return pagViewerPath;
   }
 
@@ -128,7 +128,7 @@ std::string GetPAGViewerPath() {
   if (!info.installLocation.empty()) {
     std::filesystem::path viewerPath =
         std::filesystem::path(info.installLocation) / "PAGViewer.exe";
-    if (FileHelper::FileIsExist(viewerPath.string())) {
+    if (FileIsExist(viewerPath.string())) {
       return viewerPath.string();
     }
   }
@@ -137,7 +137,7 @@ std::string GetPAGViewerPath() {
 }
 
 static void StartPreview(const std::string& pagFilePath) {
-  if (!FileHelper::FileIsExist(pagFilePath)) {
+  if (!FileIsExist(pagFilePath)) {
     QString errorMsg =
         QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
     WindowManager::GetInstance().showSimpleError(errorMsg);

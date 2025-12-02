@@ -31,7 +31,6 @@ PAGFileInfoModel::PAGFileInfoModel() : QAbstractListModel(nullptr) {
 }
 
 PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent) {
-  beginResetModel();
   fileInfos.emplace_back("Duration", "", "s");
   fileInfos.emplace_back("FrameRate", "", "FPS");
   fileInfos.emplace_back("Width");
@@ -40,6 +39,7 @@ PAGFileInfoModel::PAGFileInfoModel(QObject* parent) : QAbstractListModel(parent)
   fileInfos.emplace_back("Videos");
   fileInfos.emplace_back("Layers");
   fileInfos.emplace_back("SDK Version");
+  beginResetModel();
   endResetModel();
 }
 
@@ -68,8 +68,7 @@ int PAGFileInfoModel::rowCount(const QModelIndex& parent) const {
   return static_cast<int>(fileInfos.size());
 }
 
-void PAGFileInfoModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
-  beginResetModel();
+void PAGFileInfoModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   fileInfos.clear();
   fileInfos.emplace_back("Duration", Utils::ToQString(pagFile->duration() / 1000000.0), "s");
   fileInfos.emplace_back("FrameRate", Utils::ToQString(pagFile->frameRate()), "FPS");
@@ -82,6 +81,7 @@ void PAGFileInfoModel::setPAGFile(const std::shared_ptr<PAGFile>& pagFile) {
   fileInfos.emplace_back("Layers", Utils::ToQString(pagFile->getFile()->numLayers()));
   auto version = Utils::TagCodeToVersion(pagFile->tagLevel());
   fileInfos.emplace_back("SDK Version", version.c_str());
+  beginResetModel();
   endResetModel();
 }
 

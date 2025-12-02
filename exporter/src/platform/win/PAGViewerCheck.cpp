@@ -246,10 +246,10 @@ PackageInfo PAGViewerCheck::getPackageInfo() {
 std::vector<PackageInfo> PAGViewerCheck::findPackageinfoByName(const std::string& namePattern) {
   std::vector<PackageInfo> results = {};
   auto allSoftware = ScanUninstallRegistry();
-  std::string lowerPattern = StringHelper::ToLowerCase(namePattern);
+  std::string lowerPattern = ToLowerCase(namePattern);
 
   for (const auto& software : allSoftware) {
-    std::string lowerName = StringHelper::ToLowerCase(software.displayName);
+    std::string lowerName = ToLowerCase(software.displayName);
 
     if (lowerName.find(lowerPattern) != std::string::npos) {
       results.push_back(software);
@@ -266,7 +266,7 @@ InstallStatus PAGViewerCheck::installPAGViewer() {
   }
 
   std::wstring installerPathW = stringToWstring(installerPath);
-  if (!FileHelper::FileIsExist(installerPath)) {
+  if (!FileIsExist(installerPath)) {
     return InstallStatus(InstallResult::FileNotFound, "Installer file not found: " + installerPath);
   }
 

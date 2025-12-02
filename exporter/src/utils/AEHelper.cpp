@@ -21,6 +21,7 @@
 #include <QFileInfo>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include "AEDataTypeConverter.h"
 #include "ImageData.h"
 #include "StringHelper.h"
@@ -132,7 +133,7 @@ void GetRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_
   PF_Pixel* pixels = nullptr;
   Suites->WorldSuite3()->AEGP_GetBaseAddr8(imageWorld, &pixels);
 
-  exporter::ConvertARGBToRGBA(&(pixels->alpha), width, height, srcStride, rgbaBytes, dstStride);
+  ConvertARGBToRGBA(&(pixels->alpha), width, height, srcStride, rgbaBytes, dstStride);
   Suites->RenderSuite5()->AEGP_CheckinFrame(frameReceipt);
 }
 
@@ -213,28 +214,68 @@ std::vector<char> GetProjectFileBytes() {
   }
 
   exporter::TempFileDelete tempFile;
-  if (isDirty || isAEPX) {
-    filePath = exporter::GetTempFolderPath() + u8"/.PAGAutoSave.aep";
+  if (isDirty || filePath.empty() || isAEPX) {
+    auto tempFolder = exporter::GetTempFolderPath();
+    if (!tempFolder.empty() && tempFolder.back() == '/') {
+      tempFolder.pop_back();
+    }
+    filePath = tempFolder + u8"/.PAGAutoSave.aep";
     tempFile.setFilePath(filePath);
     auto path = Utf8ToUtf16(filePath);
-    Suites->ProjSuite6()->AEGP_SaveProjectToPath(
+    auto saveResult = Suites->ProjSuite6()->AEGP_SaveProjectToPath(
         projectHandle, reinterpret_cast<const A_UTF16Char*>(path.c_str()));
+    if (saveResult != 0) {
+      return fileBytes;
+    }
+
+    // AEGP_SaveProjectToPath can complete asynchronously, and there might be a delay
+    // before the file is fully written to disk by the file system.
+    // Therefore, we need a retry loop to wait for the file to become accessible
+    // before attempting to read it.
+    int maxRetries = 50;
+    int retryCount = 0;
+    std::ifstream testFile(filePath, std::ios::binary);
+
+    // Loop to check if the file has been created and can be opened.
+    while (!testFile.is_open() && retryCount < maxRetries) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      retryCount++;
+      testFile.open(filePath, std::ios::binary);
+    }
+    testFile.close();
+
+    if (retryCount >= maxRetries) {
+      auto errorMsg = QObject::tr(
+          "Failed to save project file. The file could not be written to disk after multiple "
+          "attempts. Please check disk space and file permissions, then try again.");
+      exporter::WindowManager::GetInstance().showSimpleError(errorMsg);
+      return fileBytes;
+    }
+  }
+
+  if (filePath.empty()) {
+    return fileBytes;
   }
 
   filePath = ConvertStringEncoding(filePath);
 
-  std::ifstream fileStream(filePath, std::ios::binary);
-  if (!fileStream.is_open()) {
+  std::ifstream t(filePath, std::ios::binary);
+  if (!t.is_open()) {
     return fileBytes;
   }
 
-  fileStream.seekg(0, std::ios::end);
-  auto fileLength = fileStream.tellg();
-  fileStream.seekg(0, std::ios::beg);
+  t.seekg(0, std::ios::end);
+  auto fileLength = t.tellg();
+  t.seekg(0, std::ios::beg);
+
+  if (fileLength == 0) {
+    t.close();
+    return fileBytes;
+  }
 
   fileBytes.resize(fileLength);
-  fileStream.read(fileBytes.data(), fileLength);
-  fileStream.close();
+  t.read(fileBytes.data(), fileLength);
+  t.close();
 
   return fileBytes;
 }
@@ -387,7 +428,8 @@ pag::Frame GetLayerStartTime(const AEGP_LayerH& layerHandle, float frameRate) {
 pag::Frame GetLayerDuration(const AEGP_LayerH& layerHandle, float frameRate) {
   A_Time duration = {};
   Suites->LayerSuite6()->AEGP_GetLayerDuration(layerHandle, AEGP_LTimeMode_CompTime, &duration);
-  return static_cast<pag::Frame>(std::round(duration.value * frameRate / duration.scale));
+  auto frames = static_cast<pag::Frame>(std::round(duration.value * frameRate / duration.scale));
+  return std::abs(frames);
 }
 
 AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerHandle) {
@@ -640,6 +682,7 @@ bool IsStaticComposition(const AEGP_CompH& compositionHandle) {
   if (preData != nullptr) {
     delete[] preData;
   }
+  Suites->RenderOptionsSuite3()->AEGP_Dispose(renderOptions);
 
   return isStatic;
 }
