@@ -127,27 +127,27 @@
         <translation>点击菜单，或拖放到这里打开一个PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="169"/>
+        <location filename="../qml/MainForm.qml" line="168"/>
         <source>Edit Layer</source>
         <translation>图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="174"/>
+        <location filename="../qml/MainForm.qml" line="173"/>
         <source>File Structure</source>
         <translation>文件结构</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="233"/>
+        <location filename="../qml/MainForm.qml" line="235"/>
         <source>No layer was editable</source>
         <translation>没有可以编辑的图层</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="300"/>
+        <location filename="../qml/MainForm.qml" line="299"/>
         <source>Edit Text</source>
         <translation>文本编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="385"/>
+        <location filename="../qml/MainForm.qml" line="381"/>
         <source>Edit Image</source>
         <translation>图片编辑</translation>
     </message>
