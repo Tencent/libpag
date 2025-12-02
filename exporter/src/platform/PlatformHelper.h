@@ -44,6 +44,8 @@ std::string GetDownloadsPath();
 
 std::string GetPAGViewerPath();
 
+std::string GetQmlPath();
+
 void PreviewPAGFile(std::string pagFilePath);
 
 std::filesystem::path Utf8ToPath(const std::string& utf8);

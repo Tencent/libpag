@@ -177,6 +177,7 @@ lipo -create ${x86_64ExePath} ${arm64ExePath} -output ${ExePath}
 # 3.2 Obtain the dependencies of PAGViewer
 print "[ Obtain the dependencies of PAGViewer ]"
 ${Deployqt} ${AppDir} -qmldir=${SourceDir}/assets/qml
+${Deployqt} ${AppDir} -qmldir=${PluginSourceDir}/assets/qml
 if [ $? -ne 0 ];
 then
     echo "Obtain the dependencies of PAGViewer failed"
@@ -267,7 +268,22 @@ install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/x64" ${x8
 install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${arm64PluginExePath}
 
 cp -fr ${x86_64PluginPath} ${PluginPath}
+cp "${SourceDir}/package/templates/PAGExporter.rsrc" "${PluginPath}/Contents/Resources/"
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
+
+# 3.5.2 Obtain the dependencies of PAGExporter
+print "[ Obtain the dependencies of PAGExporter ]"
+${Deployqt} ${PluginPath} -qmldir=${PluginSourceDir}/assets/qml
+if [ $? -ne 0 ];
+then
+    echo "Obtain the dependencies of PAGExporter failed"
+    exit 1
+fi
+cp -fRP "${PluginPath}/Contents/Frameworks/*" "${AppDir}/Contents/Frameworks/"
+cp -fRP "${PluginPath}/Contents/Plugins/*" "${AppDir}/Contents/Plugins/"
+rm -rf "${PluginPath}/Contents/Frameworks"
+rm -rf "${PluginPath}/Contents/Plugins"
+rm -rf "${PluginPath}/Contents/Resources/qml"
 
 # 3.5.2 Merge and copy ffaudio
 print "[ Merge and copy ffaudio ]"
@@ -296,6 +312,10 @@ fi
 /usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist"
 /usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist"
 
+/usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleIdentifier im.pag.exporter" "${PluginPath}/Contents/Info.plist"
+
 # 3.7 Set rpath
 print "[ Set rpath ]"
 # todo delete redundant paths
@@ -305,6 +325,7 @@ install_name_tool -add_rpath "@executable_path/../Frameworks" ${ExePath}
 
 install_name_tool -delete_rpath "${QtPath}/lib" ${PluginExePath}
 install_name_tool -add_rpath "@executable_path/../Frameworks" ${PluginExePath}
+install_name_tool -add_rpath "@loader_path/../Frameworks" ${PluginExePath}
 
 # 4 Sign
 print "[ Sign ]"
