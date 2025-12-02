@@ -445,10 +445,10 @@ else ()
 endif ()
 
 if (PAG_USE_C)
-    if (ANDROID OR WIN32)
+    if (ANDROID OR (WIN32 AND PAG_USE_ANGLE))
         file(GLOB PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
-    endif ()
+    endif()
 endif ()
 
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
