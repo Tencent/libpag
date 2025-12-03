@@ -628,7 +628,7 @@ static void CheckLayerProperty(std::shared_ptr<PAGExportSession> session,
   TraversalLayers(session, compositions, pag::LayerType::Unknown, &CheckLayerProperty, nullptr);
 }
 
-static void CheckStaticVideoSequence(const std::shared_ptr<PAGExportSession>& session,
+static void CheckStaticVideoSequence(std::shared_ptr<PAGExportSession> session,
                                      std::vector<pag::Composition*>& compositions) {
   for (auto composition : compositions) {
     if (IsStaticVideoSequence(composition)) {

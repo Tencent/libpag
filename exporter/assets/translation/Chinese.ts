@@ -69,7 +69,7 @@
 <context>
     <name>CompositionListView</name>
     <message>
-        <location filename="../qml/CompositionListView.qml" line="270"/>
+        <location filename="../qml/CompositionListView.qml" line="303"/>
         <source>Select Save Path</source>
         <translation>选择存储路径</translation>
     </message>
@@ -77,28 +77,34 @@
 <context>
     <name>CompositionSettingPage</name>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="26"/>
         <source>Setting Panel</source>
-        <translation type="vanished">设置面板</translation>
+        <translation>设置面板</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="66"/>
         <source>PreComposition</source>
-        <translation type="vanished">预合成</translation>
+        <translation>预合成</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="72"/>
         <source>Text Layer</source>
-        <translation type="vanished">文本图层</translation>
+        <translation>文本图层</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="78"/>
         <source>Placeholder Images</source>
-        <translation type="vanished">占位图</translation>
+        <translation>占位图</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="84"/>
         <source>Time Stretch</source>
-        <translation type="vanished">时间伸缩</translation>
+        <translation>时间伸缩</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="164"/>
         <source>Confirm</source>
-        <translation type="vanished">确认</translation>
+        <translation>确认</translation>
     </message>
 </context>
 <context>
@@ -330,27 +336,32 @@
 <context>
     <name>PlaceholderImageItem</name>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="22"/>
         <source>Number</source>
-        <translation type="vanished">序号</translation>
+        <translation>序号</translation>
     </message>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="35"/>
         <source>Image Name</source>
-        <translation type="vanished">图片名称</translation>
+        <translation>图片名称</translation>
     </message>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="72"/>
         <source>Fill Mode</source>
-        <translation type="vanished">填充模式</translation>
+        <translation>填充模式</translation>
     </message>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="110"/>
         <source>Editable</source>
-        <translation type="vanished">可编辑</translation>
+        <translation>可编辑</translation>
     </message>
 </context>
 <context>
     <name>PreCompositionItem</name>
     <message>
+        <location filename="../qml/PreCompositionItem.qml" line="33"/>
         <source>Name</source>
-        <translation type="vanished">名称</translation>
+        <translation>名称</translation>
     </message>
 </context>
 <context>
@@ -905,47 +916,57 @@
 <context>
     <name>TextLayerItem</name>
     <message>
+        <location filename="../qml/TextLayerItem.qml" line="22"/>
         <source>Number</source>
-        <translation type="vanished">序号</translation>
+        <translation>序号</translation>
     </message>
     <message>
+        <location filename="../qml/TextLayerItem.qml" line="35"/>
         <source>Layer Name</source>
-        <translation type="vanished">图层名称</translation>
+        <translation>图层名称</translation>
     </message>
     <message>
+        <location filename="../qml/TextLayerItem.qml" line="72"/>
         <source>Editable</source>
-        <translation type="vanished">可编辑</translation>
+        <translation>可编辑</translation>
     </message>
 </context>
 <context>
     <name>TimeStretchItem</name>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="23"/>
         <source>Time Stretch Mode</source>
-        <translation type="vanished">时间伸缩模式</translation>
+        <translation>时间伸缩模式</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="61"/>
         <source>Starting Time</source>
-        <translation type="vanished">起始时间</translation>
+        <translation>起始时间</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="109"/>
         <source>Starting Time Out of Range</source>
-        <translation type="vanished">起始时间超出范围</translation>
+        <translation>起始时间超出范围</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="133"/>
         <source>Duration</source>
-        <translation type="vanished">持续时间</translation>
+        <translation>持续时间</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="181"/>
         <source>Duration Out of Range</source>
-        <translation type="vanished">持续时间超出范围</translation>
+        <translation>持续时间超出范围</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="216"/>
         <source>FPS: </source>
-        <translation type="vanished">帧率：</translation>
+        <translation>帧率：</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="226"/>
         <source>Duration: </source>
-        <translation type="vanished">持续时间：</translation>
+        <translation>持续时间：</translation>
     </message>
 </context>
 <context>
