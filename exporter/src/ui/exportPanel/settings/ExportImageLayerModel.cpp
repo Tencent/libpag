@@ -23,15 +23,14 @@
 namespace exporter {
 
 static pag::PAGScaleMode QStringToScaleMode(const QString& str) {
-  QString lowerStr = str.toLower();
-  if (lowerStr == "none") {
+  if (QString::compare(str, "none", Qt::CaseInsensitive) == 0) {
     return pag::PAGScaleMode::None;
-  } else if (lowerStr == "stretch") {
+  } else if (QString::compare(str, "stretch", Qt::CaseInsensitive) == 0) {
     return pag::PAGScaleMode::Stretch;
-  } else if (lowerStr == "letterbox") {
-    return pag::PAGScaleMode::LetterBox;
-  } else if (lowerStr == "zoom") {
+  } else if (QString::compare(str, "zoom", Qt::CaseInsensitive) == 0) {
     return pag::PAGScaleMode::Zoom;
+  } else if (QString::compare(str, "letterbox", Qt::CaseInsensitive) == 0) {
+    return pag::PAGScaleMode::LetterBox;
   }
   return pag::PAGScaleMode::LetterBox;
 }
