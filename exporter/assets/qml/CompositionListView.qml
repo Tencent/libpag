@@ -211,7 +211,40 @@ ListView {
                             acceptedButtons: Qt.LeftButton
                             cursorShape: Qt.PointingHandCursor
 
-                            onClicked: {}
+                            onClicked: {
+                                let component = Qt.createComponent("qrc:/qml/CompositionSettingPage.qml");
+                                if (component.status === Component.Ready) {
+                                    exportingPanelWindow.updateCompositionSetting(row);
+                                    let backgroundColor = exportingPanelWindow.getBackgroundColor(row);
+                                    let textLayerModel = exportingPanelWindow.getTextLayerModel(row);
+                                    let imageLayerModel = exportingPanelWindow.getImageLayerModel(row);
+                                    let timeStretchModel = exportingPanelWindow.getTimeStretchModel(row);
+                                    let compositionInfoModel = exportingPanelWindow.getCompositionInfoModel(row);
+                                    settingColumn.subWindow = component.createObject(parentWindow, {
+                                        "backgroundColor": backgroundColor,
+                                        "compositionName": name,
+                                        "textLayerModel": textLayerModel,
+                                        "imageLayerModel": imageLayerModel,
+                                        "timeStretchModel": timeStretchModel,
+                                        "compositionInfoModel": compositionInfoModel
+                                    });
+                                    if (settingColumn.subWindow) {
+                                        settingColumn.subWindow.closing.connect(function () {
+                                            Qt.callLater(function() {
+                                                if (settingColumn.subWindow && !settingColumn.subWindow.destroyed) {
+                                                    if(settingColumn.subWindow.close){
+                                                        settingColumn.subWindow.close();
+                                                    }
+                                                    settingColumn.subWindow.destroy();
+                                                    settingColumn.subWindow = null;
+                                                    compositionsModel.updateNames();
+                                                }
+                                            });
+                                        });
+                                        settingColumn.subWindow.show();
+                                    }
+                                }
+                            }
                         }
                     }
                 }

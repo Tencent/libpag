@@ -20,6 +20,11 @@
 
 #include <QApplication>
 #include "CompositionsModel.h"
+#include "settings/ExportCompositionInfoModel.h"
+#include "settings/ExportFrameImageProvider.h"
+#include "settings/ExportImageLayerModel.h"
+#include "settings/ExportTextLayerModel.h"
+#include "settings/ExportTimeStretchModel.h"
 #include "ui/BaseWindow.h"
 #include "utils/AEResource.h"
 #include "utils/PAGExportSession.h"
@@ -31,10 +36,16 @@ class ExportPanelWindow : public BaseWindow {
  public:
   explicit ExportPanelWindow(QApplication* app, QObject* parent = nullptr);
 
-  void viewLayers(const std::shared_ptr<AEResource>& resource);
+  void viewLayers(std::shared_ptr<AEResource> resource);
   std::shared_ptr<PAGExportSession> getSession(int row);
   void updateSession(int row);
 
+  Q_INVOKABLE exporter::ExportTextLayerModel* getTextLayerModel(int row);
+  Q_INVOKABLE exporter::ExportImageLayerModel* getImageLayerModel(int row);
+  Q_INVOKABLE exporter::ExportTimeStretchModel* getTimeStretchModel(int row);
+  Q_INVOKABLE exporter::ExportCompositionInfoModel* getCompositionInfoModel(int row);
+  Q_INVOKABLE exporter::ExportFrameImageProvider* getImageProvider(A_long ID);
+  Q_INVOKABLE void updateCompositionSetting(int row);
   Q_INVOKABLE QString getBackgroundColor(int row) const;
   Q_INVOKABLE bool isAEWindowActive();
 
@@ -43,7 +54,13 @@ class ExportPanelWindow : public BaseWindow {
 
   std::unique_ptr<CompositionsModel> compositionsModel = nullptr;
   std::vector<std::shared_ptr<AEResource>> resources = {};
-  std::map<A_long, std::shared_ptr<PAGExportSession>> sessionMap = {};
+  std::unordered_map<A_long, std::shared_ptr<PAGExportSession>> sessionMap = {};
+  std::unordered_map<A_long, ExportFrameImageProvider*> frameImageProviderMap = {};
+  std::unordered_map<A_long, std::unique_ptr<ExportTextLayerModel>> textLayerModelMap = {};
+  std::unordered_map<A_long, std::unique_ptr<ExportImageLayerModel>> imageLayerModelMap = {};
+  std::unordered_map<A_long, std::unique_ptr<ExportTimeStretchModel>> timeStretchModelMap = {};
+  std::unordered_map<A_long, std::unique_ptr<ExportCompositionInfoModel>> compositionInfoModelMap =
+      {};
 };
 
 }  // namespace exporter
