@@ -75,62 +75,74 @@ void PluginInstaller::showMessage(const QString& title, const QString& message, 
 QStringList PluginInstaller::getAeInstallPaths() {
   QStringList paths;
 
-  const QStringList registryPaths = {"HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe",
-                                     "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe",
-                                     "HKEY_CURRENT_USER\\SOFTWARE\\Adobe"};
+  const QStringList adobeRegPaths = {
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\After Effects",
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Adobe\\After Effects",
+      "HKEY_CURRENT_USER\\SOFTWARE\\Adobe\\After Effects"};
 
-  for (const QString& regPath : registryPaths) {
+  for (const QString& regPath : adobeRegPaths) {
     QSettings registry(regPath, QSettings::NativeFormat);
-    const QStringList adobeKeys = registry.childGroups();
+    const QStringList versionKeys = registry.childGroups();
 
-    for (const QString& key : adobeKeys) {
-      if (key.contains("After Effects", Qt::CaseInsensitive)) {
-        QSettings aeRegistry(regPath + "\\" + key, QSettings::NativeFormat);
-        QString installPath = aeRegistry.value("InstallPath").toString();
-        if (!installPath.isEmpty()) {
-          QString supportFilesPath = QDir::cleanPath(installPath + "/Support Files");
-          if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
-            QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
-            QRegularExpressionMatch match = versionRegex.match(key);
-            if (match.hasMatch()) {
-              int version = match.captured(1).toInt();
-              paths << QString("%1|%2").arg(supportFilesPath).arg(version);
-            } else {
-              paths << supportFilesPath;
-            }
+    for (const QString& versionKey : versionKeys) {
+      QSettings aeRegistry(regPath + "\\" + versionKey, QSettings::NativeFormat);
+
+      QString installPath = aeRegistry.value("InstallPath").toString();
+      if (installPath.isEmpty()) {
+        installPath = aeRegistry.value("ApplicationPath").toString();
+      }
+
+      if (!installPath.isEmpty()) {
+        QString supportFilesPath = QDir::cleanPath(installPath + "/Support Files");
+        if (!QDir(supportFilesPath).exists()) {
+          supportFilesPath = QDir::cleanPath(installPath);
+        }
+
+        if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
+          int version = static_cast<int>(versionKey.split('.').first().toDouble());
+          QString pathWithVersion = QString("%1|%2").arg(supportFilesPath).arg(version);
+          if (!paths.contains(pathWithVersion)) {
+            paths << pathWithVersion;
           }
         }
       }
     }
   }
 
-  QSettings ccRegistry(
+  const QStringList uninstallRegPaths = {
       "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-      QSettings::NativeFormat);
-  const QStringList uninstallKeys = ccRegistry.childGroups();
+      "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"};
 
-  for (const QString& key : uninstallKeys) {
-    QSettings appRegistry(
-        "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + key,
-        QSettings::NativeFormat);
-    QString displayName = appRegistry.value("DisplayName").toString();
-    if (displayName.contains("Adobe After Effects", Qt::CaseInsensitive)) {
-      QString installLocation = appRegistry.value("InstallLocation").toString();
-      if (!installLocation.isEmpty()) {
-        QString supportFilesPath = QDir::cleanPath(installLocation + "/Support Files");
-        if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
-          QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
-          QRegularExpressionMatch match = versionRegex.match(displayName);
-          QString pathWithVersion;
-          if (match.hasMatch()) {
-            int version = match.captured(1).toInt();
-            pathWithVersion = QString("%1|%2").arg(supportFilesPath).arg(version);
-          } else {
-            pathWithVersion = supportFilesPath;
+  for (const QString& uninstallPath : uninstallRegPaths) {
+    QSettings uninstallRegistry(uninstallPath, QSettings::NativeFormat);
+    const QStringList uninstallKeys = uninstallRegistry.childGroups();
+
+    for (const QString& key : uninstallKeys) {
+      QSettings appRegistry(uninstallPath + "\\" + key, QSettings::NativeFormat);
+      QString displayName = appRegistry.value("DisplayName").toString();
+
+      if (displayName.contains("Adobe After Effects", Qt::CaseInsensitive)) {
+        QString installLocation = appRegistry.value("InstallLocation").toString();
+        if (!installLocation.isEmpty()) {
+          QString supportFilesPath = QDir::cleanPath(installLocation + "/Support Files");
+          if (!QDir(supportFilesPath).exists()) {
+            supportFilesPath = QDir::cleanPath(installLocation);
           }
 
-          if (!paths.contains(pathWithVersion)) {
-            paths << pathWithVersion;
+          if (QDir(supportFilesPath).exists() && QFile::exists(supportFilesPath + "/AfterFX.exe")) {
+            QRegularExpression versionRegex("After Effects(?: CC)? (\\d+)");
+            QRegularExpressionMatch match = versionRegex.match(displayName);
+            QString pathWithVersion;
+            if (match.hasMatch()) {
+              int version = match.captured(1).toInt();
+              pathWithVersion = QString("%1|%2").arg(supportFilesPath).arg(version);
+            } else {
+              pathWithVersion = supportFilesPath;
+            }
+
+            if (!paths.contains(pathWithVersion)) {
+              paths << pathWithVersion;
+            }
           }
         }
       }
