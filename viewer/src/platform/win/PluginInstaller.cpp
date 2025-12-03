@@ -435,51 +435,93 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
 }
 
 QString PluginInstaller::getQtResourceDir() const {
-  QString appDir = QCoreApplication::applicationDirPath();
-  QString qtdllUpper = appDir + "/QTDLL";
-  QString qtdllLower = appDir + "/QTdll";
+  return QCoreApplication::applicationDirPath();
+}
 
-  if (QDir(qtdllUpper).exists()) {
-    return qtdllUpper;
-  } else if (QDir(qtdllLower).exists()) {
-    return qtdllLower;
-  }
-  return QString();
+bool PluginInstaller::shouldExcludeFile(const QString& fileName) const {
+  // Files that should NOT be copied to AE directory
+  static const QStringList excludedFiles = {
+      "PAGViewer.exe",
+      "PAGExporter.aex",
+      "H264EncoderTools.exe",
+      "ffmovie.dll",       // Only needed by PAGViewer
+      "WinSparkle.dll",    // Only needed by PAGViewer
+  };
+  return excludedFiles.contains(fileName, Qt::CaseInsensitive);
+}
+
+bool PluginInstaller::shouldExcludeDir(const QString& dirName) const {
+  // Directories that should NOT be copied to AE directory
+  static const QStringList excludedDirs = {
+      "scripts",  // PAGViewer specific scripts
+  };
+  return excludedDirs.contains(dirName, Qt::CaseInsensitive);
 }
 
 void PluginInstaller::appendQtResourceCopyCommands(QStringList& commands,
                                                    const QStringList& aePaths) const {
-  QString qtResourceDir = getQtResourceDir();
-  if (qtResourceDir.isEmpty()) {
-    return;
-  }
+  QString appDir = getQtResourceDir();
+  QDir dir(appDir);
+
+  // Get all DLL files (excluding specific ones)
+  QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
+
+  // Get all subdirectories (excluding specific ones)
+  QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
   for (const QString& aePath : aePaths) {
-    commands << QString("xcopy /Y /E /R \"%1\\*\" \"%2\\\"")
-                    .arg(QDir::toNativeSeparators(qtResourceDir))
-                    .arg(QDir::toNativeSeparators(aePath));
+    // Copy DLL files
+    for (const QString& dllFile : dllFiles) {
+      if (shouldExcludeFile(dllFile)) {
+        continue;
+      }
+      QString sourcePath = appDir + "/" + dllFile;
+      commands << QString("copy /Y \"%1\" \"%2\\\"")
+                      .arg(QDir::toNativeSeparators(sourcePath))
+                      .arg(QDir::toNativeSeparators(aePath));
+    }
+
+    // Copy subdirectories
+    for (const QString& subDir : subDirs) {
+      if (shouldExcludeDir(subDir)) {
+        continue;
+      }
+      QString sourcePath = appDir + "/" + subDir;
+      commands << QString("xcopy /Y /E /I /R \"%1\" \"%2\\%3\\\"")
+                      .arg(QDir::toNativeSeparators(sourcePath))
+                      .arg(QDir::toNativeSeparators(aePath))
+                      .arg(subDir);
+    }
   }
 }
 
 void PluginInstaller::appendQtResourceDeleteCommands(QStringList& commands,
                                                      const QStringList& aePaths) const {
-  QString qtResourceDir = getQtResourceDir();
-  if (qtResourceDir.isEmpty()) {
-    return;
-  }
+  QString appDir = getQtResourceDir();
+  QDir dir(appDir);
 
-  QDir qtDir(qtResourceDir);
-  QStringList dllFiles = qtDir.entryList(QStringList() << "*.dll", QDir::Files);
-  QStringList subDirs = qtDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+  // Get all DLL files (excluding specific ones)
+  QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
+
+  // Get all subdirectories (excluding specific ones)
+  QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
   for (const QString& aePath : aePaths) {
+    // Delete DLL files
     for (const QString& dllFile : dllFiles) {
+      if (shouldExcludeFile(dllFile)) {
+        continue;
+      }
       QString dllPath = aePath + "/" + dllFile;
       commands
           << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(dllPath));
     }
 
+    // Delete subdirectories
     for (const QString& subDir : subDirs) {
+      if (shouldExcludeDir(subDir)) {
+        continue;
+      }
       commands << QString("if exist \"%1\\%2\" rmdir /S /Q \"%1\\%2\"")
                       .arg(QDir::toNativeSeparators(aePath))
                       .arg(subDir);
