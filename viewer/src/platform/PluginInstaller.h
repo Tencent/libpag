@@ -75,6 +75,8 @@ class PluginInstaller : public QObject {
   void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
   void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
   QString getQtResourceDir() const;
+  bool shouldExcludeFile(const QString& fileName) const;
+  bool shouldExcludeDir(const QString& dirName) const;
 
   // PAGExporter plugin installation to multiple AE versions
   void appendExporterCopyCommands(QStringList& commands, const QStringList& aePaths) const;

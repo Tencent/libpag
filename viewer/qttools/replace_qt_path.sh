@@ -1,6 +1,6 @@
 AE_PLUGIN_PATH='/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore'
 AE_EXPORTER_PATH="$AE_PLUGIN_PATH/PAGExporter.plugin"
-QT_FRAMEWORK_DRI="$AE_EXPORTER_PATH/Contents/Frameworks"
+QT_FRAMEWORK_DIR="$AE_EXPORTER_PATH/Contents/Frameworks"
 TARGET_QML_DIR="$AE_EXPORTER_PATH/Contents/Resources/qml"
 
 # Replace paths in executable/library files
@@ -40,8 +40,9 @@ function startReplacePathInExecuteFile(){
       install_name_tool -id "$newIdName" $executeName
     fi
 
-    # Remove old rpath
-    install_name_tool -delete_rpath "@executable_path/../Frameworks" $executeName
+    # [CODE REVIEW - 健壮性] delete_rpath 可能失败，应该捕获错误或先检查是否存在
+    # 使用 2>/dev/null 忽略错误输出是一种方法
+    install_name_tool -delete_rpath "@executable_path/../Frameworks" $executeName 2>/dev/null || true
 
     # Add new rpath
     if [ "$isQML" == "true" ]; then

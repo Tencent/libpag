@@ -1,8 +1,8 @@
 AE_PLUGIN_PATH='/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore'
 AE_EXPORTER_PATH="$AE_PLUGIN_PATH/PAGExporter.plugin"
-QT_FRAMEWORK_DRI="$AE_EXPORTER_PATH/Contents/Frameworks"
-QT_PLUGINS_DRI="$AE_EXPORTER_PATH/Contents/PlugIns"
-QT_RESOURCE_DRI="$AE_EXPORTER_PATH/Contents/Resources"
+QT_FRAMEWORK_DIR="$AE_EXPORTER_PATH/Contents/Frameworks"
+QT_PLUGINS_DIR="$AE_EXPORTER_PATH/Contents/PlugIns"
+QT_RESOURCE_DIR="$AE_EXPORTER_PATH/Contents/Resources"
 
 function doDeleteFileInApps() {
     aeAppPath="$1"
@@ -47,7 +47,8 @@ function traversalAndDeleteFiles() {
     cd "$1"
     for file in *
     do
-      deleteFileInAEApps $file "$2"
+
+      deleteFileInAEApps "$file" "$2"
     done
 }
 

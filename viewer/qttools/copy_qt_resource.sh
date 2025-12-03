@@ -105,7 +105,7 @@ function doCopyFileToAEApp() {
   fi
 }
 
-function copyResouceToAEApp() {
+function copyResourceToAEApp() {
   dirName="$2"
   dirPath="$1/Contents/$2"
   if [ -d "$dirPath" ]; then
