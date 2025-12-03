@@ -41,6 +41,13 @@ struct Index {
     }
   }
 
+  aboutToDisappear(): void {
+    this.viewController.pause();
+    this.imageViewControllers.forEach((item: pag.PAGImageViewController) => {
+      item.pause();
+    })
+  }
+
   build() {
     Column() {
       Row() {
@@ -94,7 +101,8 @@ struct Index {
             this.viewController.pause();
           })
       }
-
     }
+    .width('100%')
+    .height('100%')
   }
 }
