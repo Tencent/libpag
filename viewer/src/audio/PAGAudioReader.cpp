@@ -19,10 +19,9 @@
 #include "PAGAudioReader.h"
 #include <tgfx/core/Clock.h>
 #include <QCoreApplication>
+#include <QDebug>
 #include <QEvent>
 #include <utility>
-#include <QDebug>
-
 #include "model/AudioClip.h"
 #include "utils/AudioUtils.h"
 
