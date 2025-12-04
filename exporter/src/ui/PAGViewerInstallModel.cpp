@@ -67,7 +67,11 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
   window->show();
 
-  app->exec();
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
   return dialogResult;
 }
 

@@ -37,7 +37,7 @@ std::string AeMemoryHandleToString(const AEGP_MemHandle& handle) {
   suites->MemorySuite1()->AEGP_LockMemHandle(handle, reinterpret_cast<void**>(&str));
   std::string u8Str = Utf16ToUtf8(str);
   suites->MemorySuite1()->AEGP_UnlockMemHandle(handle);
-  if (u8Str.empty()) {
+  if (u8Str.empty() && str != nullptr && str[0] != u'\0') {
     LOGE("AeMemoryHandleToString failed to convert UTF-16 content to UTF-8.");
   }
 
