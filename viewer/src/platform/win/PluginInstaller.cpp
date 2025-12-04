@@ -441,19 +441,14 @@ QString PluginInstaller::getQtResourceDir() const {
 bool PluginInstaller::shouldExcludeFile(const QString& fileName) const {
   // Files that should NOT be copied to AE directory
   static const QStringList excludedFiles = {
-      "PAGViewer.exe",
-      "PAGExporter.aex",
-      "H264EncoderTools.exe",
-      "ffmovie.dll",       // Only needed by PAGViewer
-      "WinSparkle.dll",    // Only needed by PAGViewer
+      "PAGViewer.exe", "PAGExporter.aex", "H264EncoderTools.exe", "ffmovie.dll", "WinSparkle.dll",
   };
   return excludedFiles.contains(fileName, Qt::CaseInsensitive);
 }
 
 bool PluginInstaller::shouldExcludeDir(const QString& dirName) const {
-  // Directories that should NOT be copied to AE directory
   static const QStringList excludedDirs = {
-      "scripts",  // PAGViewer specific scripts
+      "scripts",
   };
   return excludedDirs.contains(dirName, Qt::CaseInsensitive);
 }
@@ -462,15 +457,10 @@ void PluginInstaller::appendQtResourceCopyCommands(QStringList& commands,
                                                    const QStringList& aePaths) const {
   QString appDir = getQtResourceDir();
   QDir dir(appDir);
-
-  // Get all DLL files (excluding specific ones)
   QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-
-  // Get all subdirectories (excluding specific ones)
   QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
   for (const QString& aePath : aePaths) {
-    // Copy DLL files
     for (const QString& dllFile : dllFiles) {
       if (shouldExcludeFile(dllFile)) {
         continue;
@@ -481,7 +471,6 @@ void PluginInstaller::appendQtResourceCopyCommands(QStringList& commands,
                       .arg(QDir::toNativeSeparators(aePath));
     }
 
-    // Copy subdirectories
     for (const QString& subDir : subDirs) {
       if (shouldExcludeDir(subDir)) {
         continue;
@@ -500,14 +489,11 @@ void PluginInstaller::appendQtResourceDeleteCommands(QStringList& commands,
   QString appDir = getQtResourceDir();
   QDir dir(appDir);
 
-  // Get all DLL files (excluding specific ones)
   QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
 
-  // Get all subdirectories (excluding specific ones)
   QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
   for (const QString& aePath : aePaths) {
-    // Delete DLL files
     for (const QString& dllFile : dllFiles) {
       if (shouldExcludeFile(dllFile)) {
         continue;
@@ -517,7 +503,6 @@ void PluginInstaller::appendQtResourceDeleteCommands(QStringList& commands,
           << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(dllPath));
     }
 
-    // Delete subdirectories
     for (const QString& subDir : subDirs) {
       if (shouldExcludeDir(subDir)) {
         continue;
