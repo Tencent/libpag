@@ -18,9 +18,9 @@
 
 import { PAGImageViewController } from './PAGImageViewController'
 
-@Component
-export struct PAGImageView {
-  controller!: PAGImageViewController;
+@ComponentV2
+export struct PAGImageViewV2 {
+  @Param @Require controller!: PAGImageViewController;
 
   build() {
     XComponent({
@@ -32,14 +32,14 @@ export struct PAGImageView {
   }
 
   onPageShow(): void {
-    this.controller?.update();
+    this.controller.update();
   }
 
   aboutToAppear(): void {
-    this.controller?.attachToView(new WeakRef(this));
+    this.controller.attachToView(new WeakRef(this));
   }
 
   aboutToDisappear(): void {
-    this.controller?.detachFromView();
+    this.controller.detachFromView();
   }
 }

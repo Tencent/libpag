@@ -16,30 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { PAGImageViewController } from './PAGImageViewController'
+import { PAGViewController } from './PAGViewController';
 
-@Component
-export struct PAGImageView {
-  controller!: PAGImageViewController;
+@ComponentV2
+export struct PAGViewV2 {
+  @Param @Require controller: PAGViewController;
 
   build() {
     XComponent({
-      id: this.controller?.uniqueID(),
+      id: this.controller.uniqueID(),
       type: XComponentType.SURFACE,
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
+      .onLoad(() => {
+        this.controller.update();
+      })
   }
 
   onPageShow(): void {
-    this.controller?.update();
+    this.controller.update();
   }
 
   aboutToAppear(): void {
-    this.controller?.attachToView(new WeakRef(this));
+    this.controller.attachToView(new WeakRef(this));
   }
 
   aboutToDisappear(): void {
-    this.controller?.detachFromView();
+    this.controller.detachFromView();
   }
 }
