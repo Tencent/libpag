@@ -235,10 +235,13 @@ Rectangle {
     }
 
     function frameToTime(frame) {
-        let part1 = Math.floor(frame / (60 * 60 * 60)) % 60;
-        let part2 = Math.floor(frame / (60 * 60)) % 60;
-        let part3 = Math.floor(frame / 60) % 60;
-        let part4 = frame % 60;
+        let frameRate = model.frameRate;
+        let part4 = frame % frameRate;
+        let totalSeconds = Math.floor(frame / frameRate);
+        let part3 = totalSeconds % 60;
+        let totalMinutes = Math.floor(totalSeconds / 60);
+        let part2 = totalMinutes % 60;
+        let part1 = Math.floor(totalMinutes / 60) % 60;
 
         function pad(num) {
             return num < 10 ? "0" + num : num.toString();
@@ -248,17 +251,23 @@ Rectangle {
 
     function timeToFrame(time) {
         let parts = time.split(":");
-        if (parts.length !== 4) {
-            return 0;
+        while (parts.length < 4) {
+            parts.unshift("0");
         }
 
+        if (parts.length > 4) {
+            parts = parts.slice(parts.length - 4);
+        }
+
+        let frameRate = model.frameRate;
         let part1 = parseInt(parts[0]) || 0;
         let part2 = parseInt(parts[1]) || 0;
         let part3 = parseInt(parts[2]) || 0;
         let part4 = parseInt(parts[3]) || 0;
-        if (part4 > 59) {
-            part3 = part3 + Math.floor(part4 / 60);
-            part4 = part4 % 60;
+
+        if (part4 >= frameRate) {
+            part3 = part3 + Math.floor(part4 / frameRate);
+            part4 = part4 % frameRate;
         }
         if (part3 > 59) {
             part2 = part2 + Math.floor(part3 / 60);
@@ -269,9 +278,9 @@ Rectangle {
             part2 = part2 % 60;
         }
         if (part1 > 59) {
-            part1 = Math.floor(part1 % 60);
+            part1 = part1 % 60;
         }
 
-        return (60 * 60 * 60 * part1) + (60 * 60 * part2) + (60 * part3) + part4;
+        return (60 * 60 * frameRate * part1) + (60 * frameRate * part2) + (frameRate * part3) + part4;
     }
 }

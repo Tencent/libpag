@@ -24,6 +24,7 @@
 #include <QtGui/QFont>
 #include <QtQuick/QQuickWindow>
 #include <memory>
+#include <QEventLoop>
 #include "AlertInfoModel.h"
 #include "PAGViewerInstallModel.h"
 #include "alert/AlertWindow.h"
@@ -52,7 +53,12 @@ void WindowManager::showExportPanelWindow() {
     exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
   }
   exportPanelWindow->show();
-  app->exec();
+
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
 }
 
 void WindowManager::showPAGConfigWindow() {
@@ -61,7 +67,11 @@ void WindowManager::showPAGConfigWindow() {
     configWindow = std::make_unique<ConfigWindow>(app.get());
   }
   configWindow->show();
-  app->exec();
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
 }
 
 void WindowManager::showExportPreviewWindow() {
@@ -71,7 +81,11 @@ void WindowManager::showExportPreviewWindow() {
     previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
   }
   previewWindow->show();
-  app->exec();
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
 }
 
 void WindowManager::showExportWindow() {
@@ -80,7 +94,11 @@ void WindowManager::showExportWindow() {
     exportWindow = std::make_unique<ExportWindow>(app.get());
   }
   exportWindow->show();
-  app->exec();
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
 }
 
 bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {
