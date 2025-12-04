@@ -18,9 +18,9 @@
 
 import { PAGViewController } from './PAGViewController';
 
-@Component
-export struct PAGView {
-  @ObjectLink controller: PAGViewController;
+@ComponentV2
+export struct PAGViewV2 {
+  @Require @Param controller: PAGViewController;
 
   build() {
     XComponent({

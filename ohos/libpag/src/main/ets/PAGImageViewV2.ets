@@ -16,22 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { PAGViewController } from './PAGViewController';
+import { PAGImageViewController } from './PAGImageViewController'
 
-@Component
-export struct PAGView {
-  @ObjectLink controller: PAGViewController;
+@ComponentV2
+export struct PAGImageViewV2 {
+  @Require @Param controller!: PAGImageViewController;
 
   build() {
     XComponent({
-      id: this.controller.uniqueID(),
+      id: this.controller?.uniqueID(),
       type: XComponentType.SURFACE,
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
-      .onLoad(() => {
-        this.controller.update();
-      })
   }
 
   onPageShow(): void {
