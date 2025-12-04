@@ -209,7 +209,7 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
 }
 
 VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
-                                                       QString& version) const {
+                                                      QString& version) const {
   version.clear();
   QString targetPath = pluginPath;
   if (!targetPath.endsWith(".aex") && !targetPath.endsWith(".exe")) {
