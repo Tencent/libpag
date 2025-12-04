@@ -357,7 +357,7 @@ std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStream,
 
   A_Time keyTime = {};
   err = suites->KeyframeSuite4()->AEGP_GetKeyframeTime(markerStream, index, AEGP_LTimeMode_CompTime,
-                                                        &keyTime);
+                                                       &keyTime);
   if (err != A_Err_NONE || keyTime.scale == 0) {
     return std::nullopt;
   }
@@ -476,7 +476,7 @@ bool SetMarkerComment(const AEGP_StreamRefH& markerStream, int index, const std:
   A_Err err = A_Err_NONE;
   A_Time keyTime = {};
   err = suites->KeyframeSuite4()->AEGP_GetKeyframeTime(markerStream, index, AEGP_LTimeMode_CompTime,
-                                                        &keyTime);
+                                                       &keyTime);
   if (err != A_Err_NONE || keyTime.scale == 0) {
     return false;
   }

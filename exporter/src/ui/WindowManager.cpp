@@ -18,13 +18,13 @@
 
 #include "WindowManager.h"
 #include <QApplication>
+#include <QEventLoop>
 #include <QFile>
 #include <QQuickStyle>
 #include <QTranslator>
 #include <QtGui/QFont>
 #include <QtQuick/QQuickWindow>
 #include <memory>
-#include <QEventLoop>
 #include "AlertInfoModel.h"
 #include "PAGViewerInstallModel.h"
 #include "alert/AlertWindow.h"
