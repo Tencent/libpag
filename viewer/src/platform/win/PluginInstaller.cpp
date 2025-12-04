@@ -32,6 +32,7 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 #include <QThread>
+#include "utils/FileUtils.h"
 
 namespace pag {
 
@@ -207,7 +208,9 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   }
 }
 
-QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
+VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
+                                                       QString& version) const {
+  version.clear();
   QString targetPath = pluginPath;
   if (!targetPath.endsWith(".aex") && !targetPath.endsWith(".exe")) {
     if (QFile::exists(targetPath + ".aex")) {
@@ -223,16 +226,16 @@ QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const
         if (!entries.isEmpty()) {
           targetPath = pluginPath + "/" + entries.first();
         } else {
-          return QString();
+          return VersionResult::FileNotFound;
         }
       } else {
-        return QString();
+        return VersionResult::FileNotFound;
       }
     }
   }
 
   if (!QFile::exists(targetPath)) {
-    return QString();
+    return VersionResult::FileNotFound;
   }
 
   std::wstring filePathW = targetPath.toStdWString();
@@ -240,22 +243,22 @@ QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const
   DWORD size = GetFileVersionInfoSizeW(filePathW.c_str(), &handle);
 
   if (size == 0) {
-    return QString();
+    return VersionResult::NoVersionInfo;
   }
 
   std::vector<BYTE> buffer(size);
   if (!GetFileVersionInfoW(filePathW.c_str(), handle, size, buffer.data())) {
-    return QString();
+    return VersionResult::QueryFailed;
   }
 
   VS_FIXEDFILEINFO* fileInfo = nullptr;
   UINT fileInfoSize = 0;
   if (!VerQueryValueW(buffer.data(), L"\\", reinterpret_cast<LPVOID*>(&fileInfo), &fileInfoSize)) {
-    return QString();
+    return VersionResult::QueryFailed;
   }
 
   if (fileInfo == nullptr || fileInfoSize == 0) {
-    return QString();
+    return VersionResult::InvalidFormat;
   }
 
   int major = HIWORD(fileInfo->dwFileVersionMS);
@@ -274,7 +277,8 @@ QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const
     versionStr += "." + QString::number(build);
   }
 
-  return versionStr;
+  version = versionStr;
+  return VersionResult::Success;
 }
 
 int PluginInstaller::getAeVersionForPath(const QString& aePath) const {
@@ -358,7 +362,6 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 }
 
 bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
-  QStringList commands;
   QStringList aePaths = const_cast<PluginInstaller*>(this)->getAeInstallPaths();
 
   storeViewerPathForPlugin();
@@ -368,8 +371,8 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   }
 
   if (plugins.contains("PAGExporter") && !aePaths.isEmpty()) {
-    appendExporterCopyCommands(commands, aePaths);
-    appendQtResourceCopyCommands(commands, aePaths);
+    copyExporterFiles(aePaths);
+    copyQtResourceFiles(aePaths);
   }
 
   for (const QString& plugin : plugins) {
@@ -384,37 +387,23 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
       continue;
     }
 
-    QString targetDir = QFileInfo(target).absolutePath();
-    commands
-        << QString("if not exist \"%1\" mkdir \"%1\"").arg(QDir::toNativeSeparators(targetDir));
-
-    commands << QString("copy /Y \"%1\" \"%2\"")
-                    .arg(QDir::toNativeSeparators(source))
-                    .arg(QDir::toNativeSeparators(target));
+    Utils::CopyFile(source, target);
   }
 
-  if (commands.isEmpty()) {
-    return true;
-  }
-
-  QString fullCommand = commands.join("\n");
-  return executeWithPrivileges(fullCommand);
+  return true;
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
-  QStringList commands;
   QStringList aePaths = const_cast<PluginInstaller*>(this)->getAeInstallPaths();
 
   if (plugins.contains("PAGExporter") && !aePaths.isEmpty()) {
-    appendExporterDeleteCommands(commands, aePaths);
-    appendQtResourceDeleteCommands(commands, aePaths);
+    deleteExporterFiles(aePaths);
+    deleteQtResourceFiles(aePaths);
   }
 
   if (plugins.contains("H264EncoderTools")) {
     QString h264Path = getPluginInstallPath("H264EncoderTools");
-    if (QFile::exists(h264Path)) {
-      QFile::remove(h264Path);
-    }
+    Utils::DeleteFile(h264Path);
   }
 
   for (const QString& plugin : plugins) {
@@ -423,15 +412,10 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     }
 
     QString target = getPluginInstallPath(plugin);
-    commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(target));
+    Utils::DeleteFile(target);
   }
 
-  if (commands.isEmpty()) {
-    return true;
-  }
-
-  QString fullCommand = commands.join("\n");
-  return executeWithPrivileges(fullCommand);
+  return true;
 }
 
 QString PluginInstaller::getQtResourceDir() const {
@@ -453,69 +437,54 @@ bool PluginInstaller::shouldExcludeDir(const QString& dirName) const {
   return excludedDirs.contains(dirName, Qt::CaseInsensitive);
 }
 
-void PluginInstaller::appendQtResourceCopyCommands(QStringList& commands,
-                                                   const QStringList& aePaths) const {
+void PluginInstaller::copyQtResourceFiles(const QStringList& aePaths) const {
   QString appDir = getQtResourceDir();
-  QDir dir(appDir);
-  QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-  QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+  QDir sourceDir(appDir);
 
   for (const QString& aePath : aePaths) {
-    for (const QString& dllFile : dllFiles) {
-      if (shouldExcludeFile(dllFile)) {
+    QStringList dllFiles = sourceDir.entryList(QStringList() << "*.dll", QDir::Files);
+    for (const QString& file : dllFiles) {
+      if (shouldExcludeFile(file)) {
         continue;
       }
-      QString sourcePath = appDir + "/" + dllFile;
-      commands << QString("copy /Y \"%1\" \"%2\\\"")
-                      .arg(QDir::toNativeSeparators(sourcePath))
-                      .arg(QDir::toNativeSeparators(aePath));
+      Utils::CopyFile(appDir + "/" + file, aePath + "/" + file);
     }
 
-    for (const QString& subDir : subDirs) {
-      if (shouldExcludeDir(subDir)) {
+    // Copy subdirectories (excluding specified directories)
+    QStringList subDirs = sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& dir : subDirs) {
+      if (shouldExcludeDir(dir)) {
         continue;
       }
-      QString sourcePath = appDir + "/" + subDir;
-      commands << QString("xcopy /Y /E /I /R \"%1\" \"%2\\%3\\\"")
-                      .arg(QDir::toNativeSeparators(sourcePath))
-                      .arg(QDir::toNativeSeparators(aePath))
-                      .arg(subDir);
+      Utils::CopyDir(appDir + "/" + dir, aePath + "/" + dir);
     }
   }
 }
 
-void PluginInstaller::appendQtResourceDeleteCommands(QStringList& commands,
-                                                     const QStringList& aePaths) const {
-  QString appDir = getQtResourceDir();
-  QDir dir(appDir);
-
-  QStringList dllFiles = dir.entryList(QStringList() << "*.dll", QDir::Files);
-
-  QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-
+void PluginInstaller::deleteQtResourceFiles(const QStringList& aePaths) const {
   for (const QString& aePath : aePaths) {
-    for (const QString& dllFile : dllFiles) {
-      if (shouldExcludeFile(dllFile)) {
+    QDir targetDir(aePath);
+
+    QStringList dllFiles = targetDir.entryList(QStringList() << "*.dll", QDir::Files);
+    for (const QString& file : dllFiles) {
+      if (shouldExcludeFile(file)) {
         continue;
       }
-      QString dllPath = aePath + "/" + dllFile;
-      commands
-          << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(dllPath));
+      Utils::DeleteFile(aePath + "/" + file);
     }
 
-    for (const QString& subDir : subDirs) {
-      if (shouldExcludeDir(subDir)) {
+    // Delete subdirectories (excluding specified directories)
+    QStringList subDirs = targetDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& dir : subDirs) {
+      if (shouldExcludeDir(dir)) {
         continue;
       }
-      commands << QString("if exist \"%1\\%2\" rmdir /S /Q \"%1\\%2\"")
-                      .arg(QDir::toNativeSeparators(aePath))
-                      .arg(subDir);
+      Utils::DeleteDir(aePath + "/" + dir);
     }
   }
 }
 
-void PluginInstaller::appendExporterCopyCommands(QStringList& commands,
-                                                 const QStringList& aePaths) const {
+void PluginInstaller::copyExporterFiles(const QStringList& aePaths) const {
   QString sourcePath = getPluginSourcePath("PAGExporter");
   if (!QFile::exists(sourcePath)) {
     return;
@@ -523,20 +492,15 @@ void PluginInstaller::appendExporterCopyCommands(QStringList& commands,
 
   for (const QString& aePath : aePaths) {
     QString pluginsDir = aePath + "/Plug-ins";
-    commands
-        << QString("if not exist \"%1\" mkdir \"%1\"").arg(QDir::toNativeSeparators(pluginsDir));
-    commands << QString("copy /Y \"%1\" \"%2\\PAGExporter.aex\"")
-                    .arg(QDir::toNativeSeparators(sourcePath))
-                    .arg(QDir::toNativeSeparators(pluginsDir));
+    QString targetPath = pluginsDir + "/PAGExporter.aex";
+    Utils::CopyFile(sourcePath, targetPath);
   }
 }
 
-void PluginInstaller::appendExporterDeleteCommands(QStringList& commands,
-                                                   const QStringList& aePaths) const {
+void PluginInstaller::deleteExporterFiles(const QStringList& aePaths) const {
   for (const QString& aePath : aePaths) {
     QString pluginPath = aePath + "/Plug-ins/PAGExporter.aex";
-    commands
-        << QString("if exist \"%1\" del /F /Q \"%1\"").arg(QDir::toNativeSeparators(pluginPath));
+    Utils::DeleteFile(pluginPath);
   }
 }
 

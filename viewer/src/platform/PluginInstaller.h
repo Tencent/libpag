@@ -26,6 +26,14 @@ namespace pag {
 
 enum class InstallResult { Success, SourceNotFound, PermissionDenied, AeRunning, UnknownError };
 
+enum class VersionResult {
+  Success,
+  FileNotFound,
+  InvalidFormat,
+  NoVersionInfo,
+  QueryFailed,
+};
+
 class PluginInstaller : public QObject {
   Q_OBJECT
 
@@ -62,7 +70,7 @@ class PluginInstaller : public QObject {
   QString getPluginFullName(const QString& pluginName) const;
   int getAeVersionForPath(const QString& aePath) const;
 
-  QString getPluginVersionString(const QString& pluginPath) const;
+  VersionResult getPluginVersionString(const QString& pluginPath, QString& version) const;
   bool executeWithPrivileges(const QString& command) const;
 
   bool copyPluginFiles(const QStringList& plugins) const;
@@ -71,22 +79,24 @@ class PluginInstaller : public QObject {
   int64_t getPluginVersion(const QString& pluginPath) const;
   QStringList getPluginList() const;
 
-  void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
-  void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
+#ifdef _WIN32
+  void copyQtResourceFiles(const QStringList& aePaths) const;
+  void deleteQtResourceFiles(const QStringList& aePaths) const;
   QString getQtResourceDir() const;
   bool shouldExcludeFile(const QString& fileName) const;
   bool shouldExcludeDir(const QString& dirName) const;
 
-  void appendExporterCopyCommands(QStringList& commands, const QStringList& aePaths) const;
-  void appendExporterDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
+  void copyExporterFiles(const QStringList& aePaths) const;
+  void deleteExporterFiles(const QStringList& aePaths) const;
 
   void storeViewerPathForPlugin() const;
 
   bool copyH264EncoderToolsWithRetry(int maxRetries = 5) const;
   QString getH264EncoderToolsInstallDir() const;
-
+#else
   void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;
+#endif
 
   struct Version {
     int major = 0;

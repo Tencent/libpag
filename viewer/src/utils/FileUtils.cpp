@@ -111,4 +111,64 @@ bool WriteDataToDisk(const QString& filePath, const void* data, size_t length) {
   return true;
 }
 
+bool CopyFile(const QString& sourcePath, const QString& targetPath, bool overwrite) {
+  if (sourcePath.isEmpty() || targetPath.isEmpty()) {
+    return false;
+  }
+
+  QFile sourceFile(sourcePath);
+  if (!sourceFile.exists()) {
+    return false;
+  }
+
+  QString targetDir = QFileInfo(targetPath).absolutePath();
+  if (!MakeDir(targetDir)) {
+    return false;
+  }
+
+  if (QFile::exists(targetPath)) {
+    if (!overwrite) {
+      return false;
+    }
+    QFile::remove(targetPath);
+  }
+
+  return sourceFile.copy(targetPath);
+}
+
+bool CopyDir(const QString& sourceDir, const QString& targetDir, bool overwrite) {
+  if (sourceDir.isEmpty() || targetDir.isEmpty()) {
+    return false;
+  }
+
+  QDir source(sourceDir);
+  if (!source.exists()) {
+    return false;
+  }
+
+  if (!MakeDir(targetDir)) {
+    return false;
+  }
+
+  QStringList files = source.entryList(QDir::Files);
+  for (const QString& file : files) {
+    QString srcPath = sourceDir + "/" + file;
+    QString dstPath = targetDir + "/" + file;
+    if (!CopyFile(srcPath, dstPath, overwrite)) {
+      return false;
+    }
+  }
+
+  QStringList dirs = source.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+  for (const QString& dir : dirs) {
+    QString srcPath = sourceDir + "/" + dir;
+    QString dstPath = targetDir + "/" + dir;
+    if (!CopyDir(srcPath, dstPath, overwrite)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 }  // namespace pag::Utils

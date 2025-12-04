@@ -156,7 +156,9 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
   }
 }
 
-QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const {
+VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
+                                                       QString& version) const {
+  version.clear();
   QString plistPath;
 
   if (pluginPath.endsWith(".plugin")) {
@@ -177,12 +179,22 @@ QString PluginInstaller::getPluginVersionString(const QString& pluginPath) const
     }
   }
 
+  if (plistPath.isEmpty()) {
+    return VersionResult::FileNotFound;
+  }
+
   if (!QFile::exists(plistPath)) {
-    return QString();
+    return VersionResult::FileNotFound;
   }
 
   QSettings plist(plistPath, QSettings::NativeFormat);
-  return plist.value("CFBundleVersion").toString();
+  QString versionStr = plist.value("CFBundleVersion").toString();
+  if (versionStr.isEmpty()) {
+    return VersionResult::NoVersionInfo;
+  }
+
+  version = versionStr;
+  return VersionResult::Success;
 }
 
 bool PluginInstaller::executeWithPrivileges(const QString& command) const {

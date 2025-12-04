@@ -40,16 +40,15 @@ function startReplacePathInExecuteFile(){
       install_name_tool -id "$newIdName" $executeName
     fi
 
-    # [CODE REVIEW - 健壮性] delete_rpath 可能失败，应该捕获错误或先检查是否存在
-    # 使用 2>/dev/null 忽略错误输出是一种方法
+    # Delete old rpath (may fail if not exists, ignore error)
     install_name_tool -delete_rpath "@executable_path/../Frameworks" $executeName 2>/dev/null || true
 
-    # Add new rpath
+    # Add new rpath (may fail if already exists, ignore error)
     if [ "$isQML" == "true" ]; then
-      install_name_tool -add_rpath "$TARGET_QML_DIR" $executeName
-      install_name_tool -add_rpath "$QT_FRAMEWORK_DRI" $executeName
+      install_name_tool -add_rpath "$TARGET_QML_DIR" $executeName 2>/dev/null || true
+      install_name_tool -add_rpath "$QT_FRAMEWORK_DIR" $executeName 2>/dev/null || true
     else
-      install_name_tool -add_rpath "$QT_FRAMEWORK_DRI" $executeName
+      install_name_tool -add_rpath "$QT_FRAMEWORK_DIR" $executeName 2>/dev/null || true
     fi
 }
 

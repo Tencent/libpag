@@ -35,4 +35,8 @@ bool WriteFileToDisk(std::shared_ptr<File> file, const QString& filePath);
 
 bool WriteDataToDisk(const QString& filePath, const void* data, size_t length);
 
+bool CopyFile(const QString& sourcePath, const QString& targetPath, bool overwrite = true);
+
+bool CopyDir(const QString& sourceDir, const QString& targetDir, bool overwrite = true);
+
 }  // namespace pag::Utils
