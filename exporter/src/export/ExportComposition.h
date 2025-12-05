@@ -40,11 +40,11 @@ void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
 void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
                              const AEGP_CompH& compositionHandle);
 
-void ExportBitmapCompositionActually(std::shared_ptr<PAGExportSession> session,
-                                     pag::BitmapComposition* composition, float factor);
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             pag::BitmapComposition* composition, float factor);
 
-void ExportVideoCompositionActually(std::shared_ptr<PAGExportSession> session,
-                                    std::vector<pag::Composition*>& compositions,
-                                    pag::VideoComposition* composition, float factor);
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            std::vector<pag::Composition*>& compositions,
+                            pag::VideoComposition* composition, float factor);
 
 }  // namespace exporter

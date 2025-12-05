@@ -22,8 +22,8 @@
 
 PAG_C_PLUS_PLUS_BEGIN_GUARD
 
-PAG_API pag_color pag_solid_layer_get_solid_color(pag_solid_layer* layer);
+PAG_EXPORT pag_color pag_solid_layer_get_solid_color(pag_solid_layer* layer);
 
-PAG_API void pag_solid_layer_set_solid_color(pag_solid_layer* layer, pag_color color);
+PAG_EXPORT void pag_solid_layer_set_solid_color(pag_solid_layer* layer, pag_color color);
 
 PAG_C_PLUS_PLUS_END_GUARD

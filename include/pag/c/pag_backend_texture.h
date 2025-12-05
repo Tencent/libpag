@@ -26,16 +26,16 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
  * Creates a new pag_backend_texture with texture info, width and height.
  * Release it by pag_release.
  */
-PAG_API pag_backend_texture* pag_backend_texture_create_from_gl_texture_info(
+PAG_EXPORT pag_backend_texture* pag_backend_texture_create_from_gl_texture_info(
     pag_gl_texture_info textureInfo, int width, int height);
 
-PAG_API bool pag_backend_texture_get_gl_texture_info(pag_backend_texture* texture,
+PAG_EXPORT bool pag_backend_texture_get_gl_texture_info(pag_backend_texture* texture,
                                                      pag_gl_texture_info* textureInfo);
 
-PAG_API bool pag_backend_texture_get_vk_image_info(pag_backend_texture* texture,
+PAG_EXPORT bool pag_backend_texture_get_vk_image_info(pag_backend_texture* texture,
                                                    pag_vk_image_info* imageInfo);
 
-PAG_API bool pag_backend_texture_get_mtl_texture_info(pag_backend_texture* texture,
+PAG_EXPORT bool pag_backend_texture_get_mtl_texture_info(pag_backend_texture* texture,
                                                       pag_mtl_texture_info* mtl_texture_info);
 
 PAG_C_PLUS_PLUS_END_GUARD
