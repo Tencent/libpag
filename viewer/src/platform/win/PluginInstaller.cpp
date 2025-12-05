@@ -409,15 +409,25 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
   QStringList aePaths = const_cast<PluginInstaller*>(this)->getAeInstallPaths();
+  bool allSuccess = true;
 
   if (plugins.contains("PAGExporter") && !aePaths.isEmpty()) {
-    deleteExporterFiles(aePaths);
-    deleteQtResourceFiles(aePaths);
+    if (!deleteExporterFilesWithPrivileges(aePaths)) {
+      qWarning() << "removePluginFiles: Failed to delete PAGExporter files";
+      allSuccess = false;
+    }
+    if (!deleteQtResourceFilesWithPrivileges(aePaths)) {
+      qWarning() << "removePluginFiles: Failed to delete Qt resource files";
+      allSuccess = false;
+    }
   }
 
   if (plugins.contains("H264EncoderTools")) {
     QString h264Path = getPluginInstallPath("H264EncoderTools");
-    pag::Utils::RemoveFile(h264Path);
+    if (!pag::Utils::RemoveFile(h264Path)) {
+      qWarning() << "removePluginFiles: Failed to delete H264EncoderTools:" << h264Path;
+      allSuccess = false;
+    }
   }
 
   for (const QString& plugin : plugins) {
@@ -426,10 +436,13 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     }
 
     QString target = getPluginInstallPath(plugin);
-    pag::Utils::RemoveFile(target);
+    if (!pag::Utils::RemoveFile(target)) {
+      qWarning() << "removePluginFiles: Failed to delete plugin:" << plugin;
+      allSuccess = false;
+    }
   }
 
-  return true;
+  return allSuccess;
 }
 
 QString PluginInstaller::getQtResourceDir() const {
@@ -480,6 +493,9 @@ void PluginInstaller::copyQtResourceFiles(const QStringList& aePaths) const {
 }
 
 void PluginInstaller::deleteQtResourceFiles(const QStringList& aePaths) const {
+  QString appDir = getQtResourceDir();
+  QDir sourceDir(appDir);
+
   for (const QString& aePath : aePaths) {
     QDir targetDir(aePath);
 
@@ -488,16 +504,21 @@ void PluginInstaller::deleteQtResourceFiles(const QStringList& aePaths) const {
       if (shouldExcludeFile(file)) {
         continue;
       }
-      Utils::RemoveFile(aePath + "/" + file);
+      if (!Utils::RemoveFile(aePath + "/" + file)) {
+        qWarning() << "deleteQtResourceFiles: Failed to delete DLL:" << file << "from:" << aePath;
+      }
     }
 
     // Delete subdirectories (excluding specified directories)
-    QStringList subDirs = targetDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    QStringList subDirs = sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const QString& dir : subDirs) {
       if (shouldExcludeDir(dir)) {
         continue;
       }
-      Utils::DeleteDir(aePath + "/" + dir);
+      if (!Utils::DeleteDir(aePath + "/" + dir)) {
+        qWarning() << "deleteQtResourceFiles: Failed to delete directory:" << dir << "from:"
+                   << aePath;
+      }
     }
   }
 }
@@ -645,8 +666,119 @@ bool PluginInstaller::copyQtResourceFilesWithPrivileges(const QStringList& aePat
 void PluginInstaller::deleteExporterFiles(const QStringList& aePaths) const {
   for (const QString& aePath : aePaths) {
     QString pluginPath = aePath + "/Plug-ins/PAGExporter.aex";
-    Utils::RemoveFile(pluginPath);
+    if (!Utils::RemoveFile(pluginPath)) {
+      qWarning() << "deleteExporterFiles: Failed to delete:" << pluginPath;
+    }
   }
+}
+
+bool PluginInstaller::deleteExporterFilesWithPrivileges(const QStringList& aePaths) const {
+  // First try normal delete
+  bool needsElevation = false;
+  for (const QString& aePath : aePaths) {
+    QString pluginPath = aePath + "/Plug-ins/PAGExporter.aex";
+    if (QFile::exists(pluginPath) && !Utils::RemoveFile(pluginPath)) {
+      needsElevation = true;
+      break;
+    }
+  }
+
+  if (!needsElevation) {
+    return true;
+  }
+
+  // Build batch command for elevated delete
+  QStringList commands;
+  commands << "@echo off";
+  commands << "chcp 65001 > nul";
+
+  for (const QString& aePath : aePaths) {
+    QString pluginPath = aePath + "/Plug-ins/PAGExporter.aex";
+    QString nativePath = QDir::toNativeSeparators(pluginPath);
+    commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(nativePath);
+  }
+
+  QString batchContent = commands.join("\n");
+  return executeWithPrivileges(batchContent);
+}
+
+bool PluginInstaller::deleteQtResourceFilesWithPrivileges(const QStringList& aePaths) const {
+  QString appDir = getQtResourceDir();
+  QDir sourceDir(appDir);
+
+  // First try normal delete
+  bool needsElevation = false;
+  for (const QString& aePath : aePaths) {
+    QDir targetDir(aePath);
+
+    // Try to delete DLL files
+    QStringList dllFiles = targetDir.entryList(QStringList() << "*.dll", QDir::Files);
+    for (const QString& file : dllFiles) {
+      if (shouldExcludeFile(file)) {
+        continue;
+      }
+      QString filePath = aePath + "/" + file;
+      if (QFile::exists(filePath) && !Utils::RemoveFile(filePath)) {
+        needsElevation = true;
+        break;
+      }
+    }
+    if (needsElevation) {
+      break;
+    }
+
+    // Try to delete subdirectories
+    QStringList subDirs = sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& dir : subDirs) {
+      if (shouldExcludeDir(dir)) {
+        continue;
+      }
+      QString dirPath = aePath + "/" + dir;
+      if (QDir(dirPath).exists() && !Utils::DeleteDir(dirPath)) {
+        needsElevation = true;
+        break;
+      }
+    }
+    if (needsElevation) {
+      break;
+    }
+  }
+
+  if (!needsElevation) {
+    return true;
+  }
+
+  // Build batch command for elevated delete
+  QStringList commands;
+  commands << "@echo off";
+  commands << "chcp 65001 > nul";
+
+  for (const QString& aePath : aePaths) {
+    QDir targetDir(aePath);
+
+    // Delete DLL files
+    QStringList dllFiles = targetDir.entryList(QStringList() << "*.dll", QDir::Files);
+    for (const QString& file : dllFiles) {
+      if (shouldExcludeFile(file)) {
+        continue;
+      }
+      QString nativePath = QDir::toNativeSeparators(aePath + "/" + file);
+      commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(nativePath);
+    }
+
+    // Delete subdirectories
+    QStringList subDirs = sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& dir : subDirs) {
+      if (shouldExcludeDir(dir)) {
+        continue;
+      }
+      QString nativePath = QDir::toNativeSeparators(aePath + "/" + dir);
+      commands << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(nativePath);
+    }
+  }
+
+  QString batchContent = commands.join("\n");
+  return executeWithPrivileges(batchContent);
 }
 
 QString PluginInstaller::getH264EncoderToolsInstallDir() const {

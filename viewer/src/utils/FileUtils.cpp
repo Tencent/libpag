@@ -43,7 +43,11 @@ bool RemoveFile(const QString& path) {
   if (!file.exists()) {
     return true;
   }
-  return file.remove();
+  bool success = file.remove();
+  if (!success) {
+    qWarning() << "RemoveFile: Failed to delete file:" << path << "- Error:" << file.errorString();
+  }
+  return success;
 }
 
 bool DeleteDir(const QString& path) {
@@ -57,6 +61,7 @@ bool DeleteDir(const QString& path) {
   for (auto& fileInfo : fileList) {
     if (fileInfo.isFile()) {
       if (!fileInfo.dir().remove(fileInfo.fileName())) {
+        qWarning() << "DeleteDir: Failed to delete file:" << fileInfo.absoluteFilePath();
         return false;
       }
     } else {
@@ -66,7 +71,11 @@ bool DeleteDir(const QString& path) {
     }
   }
 
-  return dir.rmdir(path);
+  bool success = dir.rmdir(path);
+  if (!success) {
+    qWarning() << "DeleteDir: Failed to remove directory:" << path;
+  }
+  return success;
 }
 
 bool MakeDir(const QString& path, bool isDir) {
