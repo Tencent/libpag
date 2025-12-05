@@ -37,7 +37,7 @@ void OpenInFinder(const QString& path, bool select) {
   }
 }
 
-bool DeleteFile(const QString& path) {
+bool RemoveFile(const QString& path) {
   QFile file(path);
   if (!file.exists()) {
     return true;
@@ -111,7 +111,7 @@ bool WriteDataToDisk(const QString& filePath, const void* data, size_t length) {
   return true;
 }
 
-bool CopyFile(const QString& sourcePath, const QString& targetPath, bool overwrite) {
+bool DuplicateFile(const QString& sourcePath, const QString& targetPath, bool overwrite) {
   if (sourcePath.isEmpty() || targetPath.isEmpty()) {
     return false;
   }
@@ -154,7 +154,7 @@ bool CopyDir(const QString& sourceDir, const QString& targetDir, bool overwrite)
   for (const QString& file : files) {
     QString srcPath = sourceDir + "/" + file;
     QString dstPath = targetDir + "/" + file;
-    if (!CopyFile(srcPath, dstPath, overwrite)) {
+    if (!DuplicateFile(srcPath, dstPath, overwrite)) {
       return false;
     }
   }

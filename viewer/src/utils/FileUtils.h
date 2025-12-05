@@ -25,7 +25,7 @@ namespace pag::Utils {
 
 void OpenInFinder(const QString& path, bool select = true);
 
-bool DeleteFile(const QString& path);
+bool RemoveFile(const QString& path);
 
 bool DeleteDir(const QString& path);
 
@@ -35,7 +35,7 @@ bool WriteFileToDisk(std::shared_ptr<File> file, const QString& filePath);
 
 bool WriteDataToDisk(const QString& filePath, const void* data, size_t length);
 
-bool CopyFile(const QString& sourcePath, const QString& targetPath, bool overwrite = true);
+bool DuplicateFile(const QString& sourcePath, const QString& targetPath, bool overwrite = true);
 
 bool CopyDir(const QString& sourceDir, const QString& targetDir, bool overwrite = true);
 

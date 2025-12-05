@@ -387,7 +387,7 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
       continue;
     }
 
-    Utils::CopyFile(source, target);
+    pag::Utils::DuplicateFile(source, target);
   }
 
   return true;
@@ -403,7 +403,7 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
 
   if (plugins.contains("H264EncoderTools")) {
     QString h264Path = getPluginInstallPath("H264EncoderTools");
-    Utils::DeleteFile(h264Path);
+    pag::Utils::RemoveFile(h264Path);
   }
 
   for (const QString& plugin : plugins) {
@@ -412,7 +412,7 @@ bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
     }
 
     QString target = getPluginInstallPath(plugin);
-    Utils::DeleteFile(target);
+    pag::Utils::RemoveFile(target);
   }
 
   return true;
@@ -447,7 +447,7 @@ void PluginInstaller::copyQtResourceFiles(const QStringList& aePaths) const {
       if (shouldExcludeFile(file)) {
         continue;
       }
-      Utils::CopyFile(appDir + "/" + file, aePath + "/" + file);
+      Utils::DuplicateFile(appDir + "/" + file, aePath + "/" + file);
     }
 
     // Copy subdirectories (excluding specified directories)
@@ -470,7 +470,7 @@ void PluginInstaller::deleteQtResourceFiles(const QStringList& aePaths) const {
       if (shouldExcludeFile(file)) {
         continue;
       }
-      Utils::DeleteFile(aePath + "/" + file);
+      Utils::RemoveFile(aePath + "/" + file);
     }
 
     // Delete subdirectories (excluding specified directories)
@@ -493,14 +493,14 @@ void PluginInstaller::copyExporterFiles(const QStringList& aePaths) const {
   for (const QString& aePath : aePaths) {
     QString pluginsDir = aePath + "/Plug-ins";
     QString targetPath = pluginsDir + "/PAGExporter.aex";
-    Utils::CopyFile(sourcePath, targetPath);
+    Utils::DuplicateFile(sourcePath, targetPath);
   }
 }
 
 void PluginInstaller::deleteExporterFiles(const QStringList& aePaths) const {
   for (const QString& aePath : aePaths) {
     QString pluginPath = aePath + "/Plug-ins/PAGExporter.aex";
-    Utils::DeleteFile(pluginPath);
+    Utils::RemoveFile(pluginPath);
   }
 }
 
