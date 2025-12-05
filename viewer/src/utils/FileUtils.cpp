@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FileUtils.h"
+#include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
 #include <QUrl>
@@ -113,27 +114,40 @@ bool WriteDataToDisk(const QString& filePath, const void* data, size_t length) {
 
 bool DuplicateFile(const QString& sourcePath, const QString& targetPath, bool overwrite) {
   if (sourcePath.isEmpty() || targetPath.isEmpty()) {
+    qWarning() << "DuplicateFile: Empty path provided - source:" << sourcePath
+               << "target:" << targetPath;
     return false;
   }
 
   QFile sourceFile(sourcePath);
   if (!sourceFile.exists()) {
+    qWarning() << "DuplicateFile: Source file not found:" << sourcePath;
     return false;
   }
 
   QString targetDir = QFileInfo(targetPath).absolutePath();
   if (!MakeDir(targetDir)) {
+    qWarning() << "DuplicateFile: Failed to create target directory:" << targetDir;
     return false;
   }
 
   if (QFile::exists(targetPath)) {
     if (!overwrite) {
+      qWarning() << "DuplicateFile: Target exists and overwrite=false:" << targetPath;
       return false;
     }
-    QFile::remove(targetPath);
+    if (!QFile::remove(targetPath)) {
+      qWarning() << "DuplicateFile: Failed to remove existing file:" << targetPath;
+      return false;
+    }
   }
 
-  return sourceFile.copy(targetPath);
+  bool success = sourceFile.copy(targetPath);
+  if (!success) {
+    qWarning() << "DuplicateFile: QFile::copy failed from" << sourcePath << "to" << targetPath
+               << "- Error:" << sourceFile.errorString();
+  }
+  return success;
 }
 
 bool CopyDir(const QString& sourceDir, const QString& targetDir, bool overwrite) {

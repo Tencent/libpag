@@ -363,16 +363,26 @@ bool PluginInstaller::executeWithPrivileges(const QString& command) const {
 
 bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
   QStringList aePaths = const_cast<PluginInstaller*>(this)->getAeInstallPaths();
+  bool allSuccess = true;
 
   storeViewerPathForPlugin();
 
   if (plugins.contains("H264EncoderTools")) {
-    copyH264EncoderToolsWithRetry(MaxCopyRetries);
+    if (!copyH264EncoderToolsWithRetry(MaxCopyRetries)) {
+      qWarning() << "copyPluginFiles: Failed to copy H264EncoderTools";
+      allSuccess = false;
+    }
   }
 
   if (plugins.contains("PAGExporter") && !aePaths.isEmpty()) {
-    copyExporterFiles(aePaths);
-    copyQtResourceFiles(aePaths);
+    if (!copyExporterFilesWithPrivileges(aePaths)) {
+      qWarning() << "copyPluginFiles: Failed to copy PAGExporter files";
+      allSuccess = false;
+    }
+    if (!copyQtResourceFilesWithPrivileges(aePaths)) {
+      qWarning() << "copyPluginFiles: Failed to copy Qt resource files";
+      allSuccess = false;
+    }
   }
 
   for (const QString& plugin : plugins) {
@@ -384,13 +394,17 @@ bool PluginInstaller::copyPluginFiles(const QStringList& plugins) const {
     QString target = getPluginInstallPath(plugin);
 
     if (!QFile::exists(source)) {
+      qWarning() << "copyPluginFiles: Source not found for plugin:" << plugin << "path:" << source;
       continue;
     }
 
-    pag::Utils::DuplicateFile(source, target);
+    if (!pag::Utils::DuplicateFile(source, target)) {
+      qWarning() << "copyPluginFiles: Failed to copy plugin:" << plugin;
+      allSuccess = false;
+    }
   }
 
-  return true;
+  return allSuccess;
 }
 
 bool PluginInstaller::removePluginFiles(const QStringList& plugins) const {
@@ -447,7 +461,9 @@ void PluginInstaller::copyQtResourceFiles(const QStringList& aePaths) const {
       if (shouldExcludeFile(file)) {
         continue;
       }
-      Utils::DuplicateFile(appDir + "/" + file, aePath + "/" + file);
+      if (!Utils::DuplicateFile(appDir + "/" + file, aePath + "/" + file)) {
+        qWarning() << "copyQtResourceFiles: Failed to copy DLL:" << file << "to:" << aePath;
+      }
     }
 
     // Copy subdirectories (excluding specified directories)
@@ -456,7 +472,9 @@ void PluginInstaller::copyQtResourceFiles(const QStringList& aePaths) const {
       if (shouldExcludeDir(dir)) {
         continue;
       }
-      Utils::CopyDir(appDir + "/" + dir, aePath + "/" + dir);
+      if (!Utils::CopyDir(appDir + "/" + dir, aePath + "/" + dir)) {
+        qWarning() << "copyQtResourceFiles: Failed to copy directory:" << dir << "to:" << aePath;
+      }
     }
   }
 }
@@ -487,14 +505,141 @@ void PluginInstaller::deleteQtResourceFiles(const QStringList& aePaths) const {
 void PluginInstaller::copyExporterFiles(const QStringList& aePaths) const {
   QString sourcePath = getPluginSourcePath("PAGExporter");
   if (!QFile::exists(sourcePath)) {
+    qWarning() << "copyExporterFiles: Source file not found:" << sourcePath;
     return;
   }
 
   for (const QString& aePath : aePaths) {
     QString pluginsDir = aePath + "/Plug-ins";
     QString targetPath = pluginsDir + "/PAGExporter.aex";
-    Utils::DuplicateFile(sourcePath, targetPath);
+    if (!Utils::DuplicateFile(sourcePath, targetPath)) {
+      qWarning() << "copyExporterFiles: Failed to copy to:" << targetPath;
+    }
   }
+}
+
+bool PluginInstaller::copyExporterFilesWithPrivileges(const QStringList& aePaths) const {
+  QString sourcePath = getPluginSourcePath("PAGExporter");
+  if (!QFile::exists(sourcePath)) {
+    qWarning() << "copyExporterFilesWithPrivileges: Source file not found:" << sourcePath;
+    return false;
+  }
+
+  // First try normal copy (might work if we have permissions)
+  bool needsElevation = false;
+  for (const QString& aePath : aePaths) {
+    QString pluginsDir = aePath + "/Plug-ins";
+    QString targetPath = pluginsDir + "/PAGExporter.aex";
+    if (!Utils::DuplicateFile(sourcePath, targetPath)) {
+      needsElevation = true;
+      break;
+    }
+  }
+
+  if (!needsElevation) {
+    return true;
+  }
+
+  // Build batch command for elevated copy
+  QStringList commands;
+  commands << "@echo off";
+  commands << "chcp 65001 > nul";
+
+  for (const QString& aePath : aePaths) {
+    QString pluginsDir = aePath + "/Plug-ins";
+    QString targetPath = pluginsDir + "/PAGExporter.aex";
+
+    QString nativeSource = QDir::toNativeSeparators(sourcePath);
+    QString nativePluginsDir = QDir::toNativeSeparators(pluginsDir);
+    QString nativeTarget = QDir::toNativeSeparators(targetPath);
+
+    // Create directory if needed and copy file
+    commands << QString("if not exist \"%1\" mkdir \"%1\"").arg(nativePluginsDir);
+    commands << QString("copy /Y \"%1\" \"%2\"").arg(nativeSource).arg(nativeTarget);
+  }
+
+  QString batchContent = commands.join("\n");
+  return executeWithPrivileges(batchContent);
+}
+
+bool PluginInstaller::copyQtResourceFilesWithPrivileges(const QStringList& aePaths) const {
+  QString appDir = getQtResourceDir();
+  QDir sourceDir(appDir);
+
+  // First try normal copy
+  bool needsElevation = false;
+  for (const QString& aePath : aePaths) {
+    QStringList dllFiles = sourceDir.entryList(QStringList() << "*.dll", QDir::Files);
+    for (const QString& file : dllFiles) {
+      if (shouldExcludeFile(file)) {
+        continue;
+      }
+      if (!Utils::DuplicateFile(appDir + "/" + file, aePath + "/" + file)) {
+        needsElevation = true;
+        break;
+      }
+    }
+    if (needsElevation) {
+      break;
+    }
+  }
+
+  if (!needsElevation) {
+    // Continue with directories using normal copy
+    for (const QString& aePath : aePaths) {
+      QStringList subDirs = sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+      for (const QString& dir : subDirs) {
+        if (shouldExcludeDir(dir)) {
+          continue;
+        }
+        if (!Utils::CopyDir(appDir + "/" + dir, aePath + "/" + dir)) {
+          needsElevation = true;
+          break;
+        }
+      }
+      if (needsElevation) {
+        break;
+      }
+    }
+  }
+
+  if (!needsElevation) {
+    return true;
+  }
+
+  // Build batch command for elevated copy
+  QStringList commands;
+  commands << "@echo off";
+  commands << "chcp 65001 > nul";
+
+  for (const QString& aePath : aePaths) {
+    QString nativeAePath = QDir::toNativeSeparators(aePath);
+
+    // Copy DLL files
+    QStringList dllFiles = sourceDir.entryList(QStringList() << "*.dll", QDir::Files);
+    for (const QString& file : dllFiles) {
+      if (shouldExcludeFile(file)) {
+        continue;
+      }
+      QString nativeSource = QDir::toNativeSeparators(appDir + "/" + file);
+      QString nativeTarget = QDir::toNativeSeparators(aePath + "/" + file);
+      commands << QString("copy /Y \"%1\" \"%2\"").arg(nativeSource).arg(nativeTarget);
+    }
+
+    // Copy subdirectories
+    QStringList subDirs = sourceDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString& dir : subDirs) {
+      if (shouldExcludeDir(dir)) {
+        continue;
+      }
+      QString nativeSourceDir = QDir::toNativeSeparators(appDir + "/" + dir);
+      QString nativeTargetDir = QDir::toNativeSeparators(aePath + "/" + dir);
+      commands << QString("xcopy /E /I /Y \"%1\" \"%2\"").arg(nativeSourceDir).arg(nativeTargetDir);
+    }
+  }
+
+  QString batchContent = commands.join("\n");
+  return executeWithPrivileges(batchContent);
 }
 
 void PluginInstaller::deleteExporterFiles(const QStringList& aePaths) const {

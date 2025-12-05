@@ -89,6 +89,10 @@ class PluginInstaller : public QObject {
   void copyExporterFiles(const QStringList& aePaths) const;
   void deleteExporterFiles(const QStringList& aePaths) const;
 
+  // Elevated privilege versions for copying to protected directories
+  bool copyExporterFilesWithPrivileges(const QStringList& aePaths) const;
+  bool copyQtResourceFilesWithPrivileges(const QStringList& aePaths) const;
+
   void storeViewerPathForPlugin() const;
 
   bool copyH264EncoderToolsWithRetry(int maxRetries = 5) const;
