@@ -26,17 +26,17 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
  * Registers a font required by the text layers in pag files, so that they can be rendered as
  * designed. Release it by pag_release.
  */
-PAG_API pag_font* pag_font_register_from_path(const char* filePath, int ttcIndex,
+PAG_EXPORT pag_font* pag_font_register_from_path(const char* filePath, int ttcIndex,
                                               const char* fontFamily, const char* fontStyle);
 /**
  * Registers a font required by the text layers in pag files, so that they can be rendered as
  * designed. Release it by pag_release.
  */
-PAG_API pag_font* pag_font_register_from_data(const void* data, size_t length, int ttcIndex,
+PAG_EXPORT pag_font* pag_font_register_from_data(const void* data, size_t length, int ttcIndex,
                                               const char* fontFamily, const char* fontStyle);
 
-PAG_API const char* pag_font_get_family(pag_font* font);
+PAG_EXPORT const char* pag_font_get_family(pag_font* font);
 
-PAG_API const char* pag_font_get_style(pag_font* font);
+PAG_EXPORT const char* pag_font_get_style(pag_font* font);
 
 PAG_C_PLUS_PLUS_END_GUARD

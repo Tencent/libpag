@@ -1,0 +1,18 @@
+{
+  "bundleName": "xxx",
+  "signingConfigs": [
+    {
+      "name": "default",
+      "type": "HarmonyOS",
+      "material": {
+        "certpath": "xxxxx.cer",
+        "keyAlias": "xxxxx",
+        "keyPassword": "xxxxx",
+        "profile": "xxxxx.p7b",
+        "signAlg": "SHA256withECDSA",
+        "storeFile": "xxxxx.p12",
+        "storePassword": "xxxxx"
+      }
+    }
+  ]
+}

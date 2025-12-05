@@ -53,7 +53,7 @@ class AEStreamParser {
   static StreamParser<pag::TextDocumentHandle> TextDocumentParser;
   static StreamParser<pag::GradientColorHandle> GradientColorParser;
   static StreamParser<pag::GradientColorHandle> GradientOverlayColorParser;
-  static StreamParser<int> ShapeDirectionParser;
+  static StreamParser<bool> ShapeDirectionReversedParser;
   static StreamParser<pag::BlendMode> ShapeBlendModeParser;
   static StreamParser<pag::BlendMode> StyleBlendModeParser;
   static StreamParser<pag::GradientFillType> GradientOverlayTypeParser;

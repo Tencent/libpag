@@ -22,16 +22,16 @@
 
 PAG_C_PLUS_PLUS_BEGIN_GUARD
 
-PAG_API pag_layer_type pag_layer_get_layer_type(pag_layer* layer);
+PAG_EXPORT pag_layer_type pag_layer_get_layer_type(pag_layer* layer);
 
-PAG_API const char* pag_layer_get_layer_name(pag_layer* layer);
+PAG_EXPORT const char* pag_layer_get_layer_name(pag_layer* layer);
 
-PAG_API int64_t pag_layer_get_duration(pag_layer* layer);
+PAG_EXPORT int64_t pag_layer_get_duration(pag_layer* layer);
 
-PAG_API float pag_layer_get_frame_rate(pag_layer* layer);
+PAG_EXPORT float pag_layer_get_frame_rate(pag_layer* layer);
 
-PAG_API float pag_layer_get_alpha(pag_layer* layer);
+PAG_EXPORT float pag_layer_get_alpha(pag_layer* layer);
 
-PAG_API void pag_layer_set_alpha(pag_layer* layer, float alpha);
+PAG_EXPORT void pag_layer_set_alpha(pag_layer* layer, float alpha);
 
 PAG_C_PLUS_PLUS_END_GUARD

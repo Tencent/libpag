@@ -154,7 +154,7 @@ Rectangle {
                     font.pixelSize: 12
                     font.family: fontFamily
                     anchors.centerIn: parent
-                    text: qsTr("定位")
+                    text: qsTr("Locate")
                     font.bold: true
                     color: "#FFFFFF"
                 }

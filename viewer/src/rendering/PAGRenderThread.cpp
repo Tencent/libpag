@@ -29,6 +29,11 @@ void PAGRenderThread::flush() {
   if (pagView->pagPlayer == nullptr || pagView->pagFile == nullptr) {
     return;
   }
+  if (pagView->sizeChanged) {
+    pagView->sizeChanged = false;
+    auto pagSurface = pagView->pagPlayer->getSurface();
+    pagSurface->updateSize();
+  }
   pagView->pagPlayer->flush();
   double progress = pagView->pagFile->getProgress();
   int64_t currentFrame =

@@ -861,6 +861,11 @@ napi_value JPAGImageView::getCurrentPixelMap(napi_env env) {
 }
 
 void JPAGImageView::release() {
+  // A memory leak may occur if the timer is not cancelled upon release.
+  if (_animator) {
+    _animator->cancel();
+  }
+
   std::lock_guard lock_guard(locker);
   if (progressCallback != nullptr) {
     napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);

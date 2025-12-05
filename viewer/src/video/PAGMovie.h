@@ -19,6 +19,7 @@
 #pragma once
 
 #include "MovieInfo.h"
+#include "audio/model/AudioClip.h"
 #include "pag/pag.h"
 
 namespace pag {
@@ -30,6 +31,7 @@ class PAGMovie : public PAGImage {
                                                 int64_t duration, float speed = 1.0f);
 
   int64_t duration();
+  std::vector<AudioClip> generateAudioClips();
 
  protected:
   std::shared_ptr<Graphic> getGraphic(Frame contentFrame) const override;

@@ -37,7 +37,7 @@ class PAGExportSession {
   void checkParamValid();
   void pushWarning(AlertInfoType type, const std::string& addInfo = "");
   pag::GradientColorHandle GetGradientColorsFromFileBytes(
-      const std::vector<std::string>& matchNames, int index);
+      const std::vector<std::string>& matchNames, int index, int keyFrameIndex = 0);
   bool isVideoLayer(pag::ID id);
   AEGP_LayerH getLayerHByID(pag::ID id);
 
@@ -73,6 +73,8 @@ class PAGExportSession {
   std::unordered_map<pag::ID, AEGP_ItemH> itemHandleMap = {};
   /* key: layer ID, value: layer handle */
   std::unordered_map<pag::ID, AEGP_LayerH> layerHandleMap = {};
+
+  std::unordered_map<pag::ID, pag::Frame> videoCompositionStartTime = {};
 
   std::string outputPath = "";
 };

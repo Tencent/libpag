@@ -19,7 +19,7 @@
 #include "pag/c/pag_layer.h"
 #include "pag_types_priv.h"
 
-PAG_API pag_layer_type pag_layer_get_layer_type(pag_layer* layer) {
+pag_layer_type pag_layer_get_layer_type(pag_layer* layer) {
   if (layer == nullptr) {
     return pag_layer_type_unknown;
   }

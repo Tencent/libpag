@@ -18,6 +18,7 @@
 
 #include "PAGExportSessionManager.h"
 #include "AEDataTypeConverter.h"
+#include "AEHelper.h"
 
 namespace exporter {
 
@@ -37,10 +38,20 @@ void PAGExportSessionManager::recordWarning(AlertInfoType type, const std::strin
   }
 }
 
-pag::GradientColorHandle PAGExportSessionManager::getGradientColors(
-    const std::vector<std::string>& matchNames, int index) {
+float PAGExportSessionManager::getCurrentCompositionFrameRate() {
   if (currentSession) {
-    return currentSession->GetGradientColorsFromFileBytes(matchNames, index);
+    auto iter = currentSession->itemHandleMap.find(currentSession->compID);
+    if (iter != currentSession->itemHandleMap.end()) {
+      return GetItemFrameRate(iter->second);
+    }
+  }
+  return 24.0f;
+}
+
+pag::GradientColorHandle PAGExportSessionManager::getGradientColors(
+    const std::vector<std::string>& matchNames, int index, int keyFrameIndex) {
+  if (currentSession) {
+    return currentSession->GetGradientColorsFromFileBytes(matchNames, index, keyFrameIndex);
   }
   return GetDefaultGradientColors();
 }

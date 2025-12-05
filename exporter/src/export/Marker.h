@@ -64,7 +64,7 @@ bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string
 
 void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemHandle);
 
-void ExportTimeStretch(std::shared_ptr<pag::File>& file, std::shared_ptr<PAGExportSession> session,
+void ExportTimeStretch(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExportSession> session,
                        const AEGP_ItemH& itemHandle);
 
 void ExportImageLayerEditable(std::shared_ptr<pag::File> file,

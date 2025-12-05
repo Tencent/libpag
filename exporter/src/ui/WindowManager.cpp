@@ -26,6 +26,7 @@
 #include <memory>
 #include "AlertInfoModel.h"
 #include "PAGViewerInstallModel.h"
+#include "alert/AlertWindow.h"
 #include "config/ConfigFile.h"
 #include "platform/PlatformHelper.h"
 #include "utils/AEHelper.h"
@@ -47,30 +48,66 @@ WindowManager::WindowManager() {
 
 void WindowManager::showExportPanelWindow() {
   init();
+  if (exportPanelWindow == nullptr) {
+    exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
+  }
+  exportPanelWindow->show();
+  app->exec();
 }
 
 void WindowManager::showPAGConfigWindow() {
   init();
+  if (configWindow == nullptr) {
+    configWindow = std::make_unique<ConfigWindow>(app.get());
+  }
+  configWindow->show();
+  app->exec();
 }
 
 void WindowManager::showExportPreviewWindow() {
   init();
+  if (previewWindow == nullptr) {
+    std::string outputPath = JoinPaths(GetTempFolderPath(), ".previewTmp.pag");
+    previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
+  }
+  previewWindow->show();
+  app->exec();
 }
 
 void WindowManager::showExportWindow() {
   init();
+  if (exportWindow == nullptr) {
+    exportWindow = std::make_unique<ExportWindow>(app.get());
+  }
+  exportWindow->show();
+  app->exec();
 }
 
-bool WindowManager::showWarnings(const std::vector<AlertInfo>&) {
-  return true;
+bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return true;
+  }
+  init();
+  auto alertWindow = AlertWindow(app.get());
+  return alertWindow.showWarnings(infos);
 }
 
-bool WindowManager::showErrors(const std::vector<AlertInfo>&) {
-  return true;
+bool WindowManager::showErrors(const std::vector<AlertInfo>& infos) {
+  if (infos.empty()) {
+    return true;
+  }
+  init();
+  auto alertWindow = AlertWindow(app.get());
+  return alertWindow.showErrors(infos);
 }
 
-bool WindowManager::showSimpleError(const QString&) {
-  return true;
+bool WindowManager::showSimpleError(const QString& errorMessage) {
+  if (errorMessage.isEmpty()) {
+    return false;
+  }
+  init();
+  auto alertWindow = AlertWindow(app.get());
+  return alertWindow.showErrors({}, errorMessage);
 }
 
 bool WindowManager::showPAGViewerInstallDialog(const std::string& pagFilePath) {
@@ -112,6 +149,19 @@ void WindowManager::init() {
     } else {
       app->removeTranslator(translator.get());
     }
+  }
+
+  if (configWindow != nullptr && configWindow->isWaitToDestory()) {
+    configWindow.reset();
+  }
+  if (exportWindow != nullptr && exportWindow->isWaitToDestory()) {
+    exportWindow.reset();
+  }
+  if (previewWindow != nullptr && previewWindow->isWaitToDestory()) {
+    previewWindow.reset();
+  }
+  if (exportPanelWindow != nullptr && exportPanelWindow->isWaitToDestory()) {
+    exportPanelWindow.reset();
   }
 
   AlertInfoManager::GetInstance().warningList.clear();

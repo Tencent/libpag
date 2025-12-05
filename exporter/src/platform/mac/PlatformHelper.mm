@@ -20,6 +20,9 @@
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
+#include <dlfcn.h>
+#include <QDir>
+#include <QFileInfo>
 #include <string>
 #include "platform/PAGViewerCheck.h"
 #include "platform/PAGViewerInstaller.h"
@@ -73,6 +76,17 @@ std::string GetTempFolderPath() {
 bool IsAEWindowActive() {
   NSRunningApplication* frontApp = [[NSWorkspace sharedWorkspace] frontmostApplication];
   return [frontApp.bundleIdentifier containsString:@"com.adobe.AfterEffects"];
+}
+
+std::string GetQmlPath() {
+  Dl_info info;
+  if (dladdr((void*)&GetQmlPath, &info)) {
+    QString dylibPath = QString::fromUtf8(info.dli_fname);
+    QFileInfo file(dylibPath);
+    QString qmlPath = QDir(file.absolutePath() + "/../Resources/qml").absolutePath();
+    return qmlPath.toStdString();
+  }
+  return "";
 }
 
 std::string GetDownloadsPath() {

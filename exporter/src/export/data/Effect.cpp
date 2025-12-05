@@ -393,9 +393,16 @@ static pag::Effect* GetEffect(const AEGP_EffectRefH& effectHandle) {
   AEGP_StreamRefH firstStreamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewEffectStreamByIndex(PluginID, effectHandle, 1,
                                                          &firstStreamHandle);
+  if (firstStreamHandle == nullptr) {
+    return nullptr;
+  }
   AEGP_StreamRefH effectStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewParentStreamRef(PluginID, firstStreamHandle,
                                                             &effectStreamHandle);
+  if (effectStreamHandle == nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(firstStreamHandle);
+    return nullptr;
+  }
   Suites->StreamSuite4()->AEGP_DisposeStream(firstStreamHandle);
   auto type = GetEffectType(effectStreamHandle);
   pag::Effect* effect = GetEffectByType(effectStreamHandle, type);
@@ -412,6 +419,9 @@ std::vector<pag::Effect*> GetEffects(const AEGP_LayerH& layerHandle) {
   for (int i = 0; i < numEffects; i++) {
     AEGP_EffectRefH effectHandle = nullptr;
     Suites->EffectSuite4()->AEGP_GetLayerEffectByIndex(PluginID, layerHandle, i, &effectHandle);
+    if (effectHandle == nullptr) {
+      continue;
+    }
     auto effect = GetEffect(effectHandle);
     if (effect != nullptr) {
       effects.push_back(effect);
@@ -501,9 +511,16 @@ static void GetAttachment(const AEGP_EffectRefH& effectHandle, float frameRate, 
   AEGP_StreamRefH firstStreamHandle = nullptr;
   Suites->StreamSuite4()->AEGP_GetNewEffectStreamByIndex(PluginID, effectHandle, 1,
                                                          &firstStreamHandle);
+  if (firstStreamHandle == nullptr) {
+    return;
+  }
   AEGP_StreamRefH effectStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewParentStreamRef(PluginID, firstStreamHandle,
                                                             &effectStreamHandle);
+  if (effectStreamHandle == nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(firstStreamHandle);
+    return;
+  }
   Suites->StreamSuite4()->AEGP_DisposeStream(firstStreamHandle);
   auto type = GetEffectType(effectStreamHandle);
   switch (type) {
@@ -545,6 +562,9 @@ void GetAttachments(const AEGP_LayerH& layerHandle, float frameRate, pag::Layer*
   for (int index = 0; index < numEffects; index++) {
     AEGP_EffectRefH effectHandle = nullptr;
     Suites->EffectSuite4()->AEGP_GetLayerEffectByIndex(PluginID, layerHandle, index, &effectHandle);
+    if (effectHandle == nullptr) {
+      continue;
+    }
     GetAttachment(effectHandle, frameRate, layer, tagLevel);
     Suites->EffectSuite4()->AEGP_DisposeEffect(effectHandle);
   }

@@ -898,6 +898,11 @@ void JPAGView::onSurfaceDestroyed() {
 }
 
 void JPAGView::release() {
+  // A memory leak may occur if the timer is not cancelled upon release.
+  if (animator) {
+    animator->cancel();
+  }
+
   std::lock_guard lock_guard(locker);
   if (progressCallback != nullptr) {
     napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);

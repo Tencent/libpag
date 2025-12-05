@@ -23,6 +23,9 @@
 #include <QTranslator>
 #include <string>
 #include <vector>
+#include "config/ConfigWindow.h"
+#include "export/ExportWindow.h"
+#include "exportPanel/ExportPanelWindow.h"
 #include "utils/AlertInfo.h"
 
 namespace exporter {
@@ -58,13 +61,17 @@ class WindowManager {
  private:
   void init();
 
-  std::unique_ptr<QTranslator> translator = nullptr;
-  std::unique_ptr<QApplication> app = nullptr;
   WindowManager();
   ~WindowManager() = default;
 
   int argc = 0;
   char** argv = nullptr;
+  std::unique_ptr<QApplication> app = nullptr;
+  std::unique_ptr<QTranslator> translator = nullptr;
+  std::unique_ptr<ConfigWindow> configWindow = nullptr;
+  std::unique_ptr<ExportWindow> exportWindow = nullptr;
+  std::unique_ptr<ExportWindow> previewWindow = nullptr;
+  std::unique_ptr<ExportPanelWindow> exportPanelWindow = nullptr;
 };
 
 }  // namespace exporter

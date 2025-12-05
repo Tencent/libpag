@@ -43,6 +43,8 @@ NS_ASSUME_NONNULL_BEGIN
 
  If you need more control over what bundle you want to update, or you want to provide a custom user
  interface (via `SPUUserDriver`), please use `SPUUpdater` directly instead.
+
+ This class must be used on the main thread.
   */
 SU_EXPORT @interface SPUStandardUpdaterController : NSObject {
 #pragma clang diagnostic push

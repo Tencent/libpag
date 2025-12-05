@@ -32,7 +32,7 @@ TextArea {
         acceptedButtons: Qt.LeftButton
         hoverEnabled: false
 
-        onPressed: function(pressed) {
+        onPressed: function (pressed) {
             hasMoved = false;
             targetListView.interactive = false;
             clearSelect();
@@ -48,7 +48,7 @@ TextArea {
             }
         }
 
-        onPositionChanged: function(mouse) {
+        onPositionChanged: function (mouse) {
             var position = targetTextArea.positionAt(mouse.x, mouse.y);
             if (!isInit) {
                 headPosition = position;
@@ -73,7 +73,7 @@ TextArea {
         }
     }
 
-    onFocusChanged: function(focus) {
+    onFocusChanged: function (focus) {
         if (!focus) {
             suggestMouseArea.clearSelect();
         }

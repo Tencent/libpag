@@ -15,8 +15,8 @@ ListView {
     boundsMovement: Flickable.StopAtBounds
 
     delegate: Rectangle {
-        height: imageHeight
         width: listView.width
+        height: imageHeight
         color: "#20202A"
 
         DropArea {

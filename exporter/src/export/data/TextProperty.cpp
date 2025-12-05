@@ -239,6 +239,9 @@ static std::vector<pag::TextSelector*> GetTextSelectors(const AEGP_StreamRefH& s
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, streamHandle, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     if (!IsStreamHidden(childStreamHandle) && IsStreamActive(childStreamHandle)) {
       auto type = GetTextSelectorType(childStreamHandle);
       pag::TextSelector* selector = nullptr;
@@ -274,6 +277,9 @@ static pag::TextAnimatorColorProperties* GetTextAnimatorColorProperties(
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, streamHandle, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     if (!IsStreamHidden(childStreamHandle) || IsStreamActive(childStreamHandle)) {
       auto type = GetTextAnimatorPropertiesType(childStreamHandle);
       switch (type) {
@@ -365,6 +371,9 @@ static pag::TextAnimatorTypographyProperties* GetTextAnimatorTypographyPropertie
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, streamHandle, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     auto type = GetTextAnimatorPropertiesType(childStreamHandle);
     switch (type) {
       case TextAnimatorPropertiesType::TrackingType:
@@ -415,6 +424,9 @@ static pag::TextAnimator* GetTextAnimator(const AEGP_StreamRefH& streamHandle) {
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, streamHandle, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     if (!IsStreamHidden(childStreamHandle) && IsStreamActive(childStreamHandle)) {
       auto type = GetTextAnimatorType(childStreamHandle);
       if (type == TextAnimatorType::Selectors) {
@@ -444,6 +456,9 @@ static std::vector<pag::TextAnimator*> GetTextAnimators(const AEGP_StreamRefH& s
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(GetPluginID(), streamHandle, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     if (!IsStreamHidden(childStreamHandle) && IsStreamActive(childStreamHandle)) {
       auto type = GetTextAnimatorsType(childStreamHandle);
       if (type == TextAnimatorsType::Animator) {
@@ -524,7 +539,7 @@ static void ModififyAnimatorKeyFrames(std::vector<pag::TextAnimator*>* animators
 }
 
 static void AdjustFirstBaseLine(pag::TextDocumentHandle textDocument, bool hasBias) {
-  if (textDocument->boxTextPos.x <= 0.001f || textDocument->boxTextPos.y <= 0.001f) {
+  if (textDocument->boxTextSize.x <= 0.001f || textDocument->boxTextSize.y <= 0.001f) {
     textDocument->firstBaseLine = 0.0f;
     return;
   }
@@ -593,9 +608,16 @@ void GetTextProperties(std::shared_ptr<PAGExportSession> session, const AEGP_Lay
   AEGP_StreamRefH layerStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefForLayer(PluginID, layerHandle,
                                                               &layerStreamHandle);
+  if (layerStreamHandle == nullptr) {
+    return;
+  }
   AEGP_StreamRefH rootStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, layerStreamHandle, "ADBE Text Properties", &rootStreamHandle);
+  if (rootStreamHandle == nullptr) {
+    Suites->StreamSuite4()->AEGP_DisposeStream(layerStreamHandle);
+    return;
+  }
   Suites->StreamSuite4()->AEGP_DisposeStream(layerStreamHandle);
   if (IsStreamHidden(rootStreamHandle) || !IsStreamActive(rootStreamHandle)) {
     Suites->StreamSuite4()->AEGP_DisposeStream(rootStreamHandle);
@@ -608,6 +630,9 @@ void GetTextProperties(std::shared_ptr<PAGExportSession> session, const AEGP_Lay
     AEGP_StreamRefH streamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, rootStreamHandle, index,
                                                                &streamHandle);
+    if (streamHandle == nullptr) {
+      continue;
+    }
     if (!IsStreamHidden(rootStreamHandle) || IsStreamActive(rootStreamHandle)) {
       auto type = GetTextPropertyType(streamHandle);
       switch (type) {

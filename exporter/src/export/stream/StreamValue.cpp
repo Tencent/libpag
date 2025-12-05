@@ -265,18 +265,20 @@ static pag::TextDocumentHandle ParseTextDocument(const AEGP_StreamVal2&, const Q
 
 pag::GradientColorHandle ParseGradientColor(const AEGP_StreamVal2&, const QVariantMap& map) {
   int index = map.value("index", 0).toInt();
+  int keyFrameIndex = map.value("keyFrameIndex", 0).toInt();
   return PAGExportSessionManager::GetInstance()->getGradientColors(
-      {"ADBE Vector Graphic - G-Fill", "ADBE Vector Graphic - G-Stroke"}, index);
+      {"ADBE Vector Graphic - G-Fill", "ADBE Vector Graphic - G-Stroke"}, index, keyFrameIndex);
 }
 
 pag::GradientColorHandle ParseGradientOverlayColor(const AEGP_StreamVal2&, const QVariantMap& map) {
   int index = map.value("index", 0).toInt();
-  return PAGExportSessionManager::GetInstance()->getGradientColors({"gradientFill/gradient"},
-                                                                   index);
+  int keyFrameIndex = map.value("keyFrameIndex", 0).toInt();
+  return PAGExportSessionManager::GetInstance()->getGradientColors({"gradientFill/gradient"}, index,
+                                                                   keyFrameIndex);
 }
 
-int ParseShapeDirection(const AEGP_StreamVal2& streamValue, const QVariantMap&) {
-  return static_cast<int>(streamValue.one_d);
+bool ParseShapeDirectionReversed(const AEGP_StreamVal2& streamValue, const QVariantMap&) {
+  return static_cast<int>(streamValue.one_d) == 2;
 }
 
 pag::BlendMode ParseShapeBlendMode(const AEGP_StreamVal2& streamValue, const QVariantMap&) {
@@ -295,7 +297,9 @@ pag::GradientFillType ParseGradientOverlayType(const AEGP_StreamVal2& streamValu
 pag::GradientColorHandle ParseOuterGlowGradientColor(const AEGP_StreamVal2&,
                                                      const QVariantMap& map) {
   int index = map.value("index", 0).toInt();
-  return PAGExportSessionManager::GetInstance()->getGradientColors({"outerGlow/gradient"}, index);
+  int keyFrameIndex = map.value("keyFrameIndex", 0).toInt();
+  return PAGExportSessionManager::GetInstance()->getGradientColors({"outerGlow/gradient"}, index,
+                                                                   keyFrameIndex);
 }
 
 pag::StrokePosition ParseStrokePosition(const AEGP_StreamVal2& streamValue, const QVariantMap&) {
@@ -439,7 +443,7 @@ StreamParser<pag::TextDocumentHandle> AEStreamParser::TextDocumentParser = Parse
 StreamParser<pag::GradientColorHandle> AEStreamParser::GradientColorParser = ParseGradientColor;
 StreamParser<pag::GradientColorHandle> AEStreamParser::GradientOverlayColorParser =
     ParseGradientOverlayColor;
-StreamParser<int> AEStreamParser::ShapeDirectionParser = ParseShapeDirection;
+StreamParser<bool> AEStreamParser::ShapeDirectionReversedParser = ParseShapeDirectionReversed;
 StreamParser<pag::BlendMode> AEStreamParser::ShapeBlendModeParser = ParseShapeBlendMode;
 StreamParser<pag::BlendMode> AEStreamParser::StyleBlendModeParser = ParseStyleBlendMode;
 StreamParser<pag::GradientFillType> AEStreamParser::GradientOverlayTypeParser =
