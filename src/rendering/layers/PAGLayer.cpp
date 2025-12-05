@@ -570,4 +570,8 @@ bool PAGLayer::frameVisible() const {
   return contentFrame >= 0 && contentFrame < frameDuration();
 }
 
+Frame PAGLayer::getContentFrame() const {
+  return contentFrame;
+}
+
 }  // namespace pag
