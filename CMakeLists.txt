@@ -397,6 +397,7 @@ elseif (OHOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ohos/libpag/export.def")
     endif ()
 endif ()
 
