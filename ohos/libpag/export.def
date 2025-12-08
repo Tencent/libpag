@@ -1,0 +1,6 @@
+{
+    global:
+        *pag*;
+    local:
+        *;
+};

@@ -10,3 +10,5 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+/**/BuildProfile.ets
+/local.signingconfig.json

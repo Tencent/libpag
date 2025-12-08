@@ -10,7 +10,7 @@ Popup {
 
     property bool fauxBold: false
     property bool fauxItalic: false
-    property int layerIndex: 0
+    property int layerIndex: -1
     property double fontSize: 120.0
     property double strokeWidth: 1.0
     property string fillColor: ""
@@ -194,6 +194,7 @@ Popup {
                                 }
                                 fontFamilyComboBox.currentIndex = fontFamilyComboBox.model.indexOf(modelData);
                                 textModel.changeFontFamily(layerIndex, modelData);
+                                dialog.fontFamily = modelData;
                                 fontFamilyComboBox.popup.close();
                             }
                         }
@@ -309,6 +310,7 @@ Popup {
                                 fontStyleName.text = modelData;
                                 fontStyleComboBox.currentIndex = fontStyleComboBox.model.indexOf(modelData);
                                 textModel.changeFontStyle(layerIndex, modelData);
+                                dialog.fontStyle = modelData;
                                 fontStyleComboBox.popup.close();
                             }
                         }
@@ -394,8 +396,8 @@ Popup {
                             regularExpression: /[0-9]+\.[0-9]+/
                         }
                         onTextChanged: {
-                            let fontSize = fontSizeTextInput.text;
-                            textModel.changeFontSize(layerIndex, fontSize);
+                            dialog.fontSize = fontSizeTextInput.text;
+                            textModel.changeFontSize(layerIndex, dialog.fontSize);
                         }
                     }
                 }

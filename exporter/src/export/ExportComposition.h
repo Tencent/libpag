@@ -20,23 +20,31 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "utils/PAGExportSession.h"
+
 namespace exporter {
 
-pag::CompositionType GetCompositionType(const std::shared_ptr<PAGExportSession>& session,
-                                        AEGP_CompH const& compHandle);
+pag::CompositionType GetCompositionType(std::shared_ptr<PAGExportSession> session,
+                                        const AEGP_CompH& compositionHandle);
 
-bool IsStaticComposition(std::shared_ptr<PAGExportSession> session, AEGP_CompH const& compHandle);
+void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
+                              const AEGP_CompH& compositionHandle, pag::Composition* composition);
 
-std::shared_ptr<pag::Composition> ExportComposition(std::shared_ptr<PAGExportSession> session,
-                                                    const AEGP_ItemH& itemH);
+void ExportComposition(std::shared_ptr<PAGExportSession> session, const AEGP_ItemH& itemHandle);
 
-std::shared_ptr<pag::VideoComposition> ExportVideoComposition(
-    std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compHandle);
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            const AEGP_CompH& compositionHandle);
 
-std::shared_ptr<pag::BitmapComposition> ExportBitmapComposition(
-    std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compHandle);
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compositionHandle);
 
-std::shared_ptr<pag::VectorComposition> ExportVectorComposition(
-    std::shared_ptr<PAGExportSession> session, const AEGP_CompH& compHandle);
+void ExportVectorComposition(std::shared_ptr<PAGExportSession> session,
+                             const AEGP_CompH& compositionHandle);
+
+void ExportBitmapComposition(std::shared_ptr<PAGExportSession> session,
+                             pag::BitmapComposition* composition, float factor);
+
+void ExportVideoComposition(std::shared_ptr<PAGExportSession> session,
+                            std::vector<pag::Composition*>& compositions,
+                            pag::VideoComposition* composition, float factor);
 
 }  // namespace exporter

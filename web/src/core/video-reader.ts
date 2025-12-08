@@ -109,6 +109,7 @@ export class VideoReader {
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
     }
+    this.linkPlayer(PAGModule.currentPlayer);
   }
 
   public async prepare(targetFrame: number, playbackRate: number): Promise<void> {
@@ -123,6 +124,7 @@ export class VideoReader {
             await waitVideoCanPlay(this.videoEl!);
           } else {
             try {
+              await waitVideoCanPlay(this.videoEl!);
               await this.play();
             } catch (e) {
               this.setError(e);

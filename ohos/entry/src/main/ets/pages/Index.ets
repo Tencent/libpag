@@ -19,11 +19,11 @@
 import * as pag from 'libpag';
 
 @Entry
-@Component
+@ComponentV2
 struct Index {
-  @State imageViewControllers: Array<pag.PAGImageViewController> = new Array<pag.PAGImageViewController>();
-  @State viewController: pag.PAGViewController = new pag.PAGViewController();
-  @State pageIndex: number = 0;
+  @Local imageViewControllers: Array<pag.PAGImageViewController> = new Array<pag.PAGImageViewController>();
+  @Local viewController: pag.PAGViewController = new pag.PAGViewController();
+  @Local pageIndex: number = 0;
 
   aboutToAppear(): void {
     let manager = getContext(this).resourceManager;
@@ -41,6 +41,13 @@ struct Index {
     }
   }
 
+  aboutToDisappear(): void {
+    this.viewController.pause();
+    this.imageViewControllers.forEach((item: pag.PAGImageViewController) => {
+      item.pause();
+    })
+  }
+
   build() {
     Column() {
       Row() {
@@ -48,7 +55,7 @@ struct Index {
           Grid() {
             ForEach(this.imageViewControllers, (item: pag.PAGImageViewController) => {
               GridItem() {
-                pag.PAGImageView({
+                pag.PAGImageViewV2({
                   controller: item
                 })
                   .onClick(() => {
@@ -62,7 +69,7 @@ struct Index {
             })
           }.width("100%")
         } else {
-          pag.PAGView({
+          pag.PAGViewV2({
             controller: this.viewController
           }).onClick(() => {
             if (this.viewController.isPlaying()) {
@@ -94,7 +101,8 @@ struct Index {
             this.viewController.pause();
           })
       }
-
     }
+    .width('100%')
+    .height('100%')
   }
 }

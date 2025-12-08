@@ -18,7 +18,7 @@
   ./install_tools.sh
   depsync
 
-  if [[ $1 == "1" ]]; then
+  if [[ "$1" == "USE_SWIFTSHADER" ]]; then
     BUILD_DIR=build
   else
     BUILD_DIR=cmake-build-debug
@@ -42,7 +42,7 @@
   fi
   echo $CMAKE_COMMAND
 
-  if [[ $1 == "1" ]]; then
+  if [[ "$1" == "USE_SWIFTSHADER" ]]; then
     $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
   else
     $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../

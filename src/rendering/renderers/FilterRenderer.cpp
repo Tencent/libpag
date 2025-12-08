@@ -302,7 +302,7 @@ std::shared_ptr<tgfx::Image> FilterRenderer::ApplyFilters(
   }
   *outputOffset += offset;
 
-  output = Apply3DEffects(output, filterList, clipBounds, &filterBounds, &offset);
+  output = Apply3DEffects(output, filterList, clipBounds, contentScale, &filterBounds, &offset);
   if (!output) {
     return input;
   }

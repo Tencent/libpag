@@ -24,20 +24,33 @@
 #include "utils/ScopedHelper.h"
 
 namespace exporter {
+
+struct PAGExportConfigParam {
+  bool exportAudio = true;
+  bool hardwareEncode = false;
+  bool exportActually = true;
+  bool showAlertInfo = false;
+  AEGP_ItemH activeItemHandle = nullptr;
+  std::string outputPath = "";
+};
+
 class PAGExport {
  public:
-  static bool ExportFile(const AEGP_ItemH& activeItemH, const std::string& outputPath,
-                         bool enableAudio = true);
+  explicit PAGExport(const PAGExportConfigParam& configParam);
 
-  static bool ValidatePAGFile(uint8_t* data, size_t size);
+  bool exportFile();
 
-  PAGExport(const AEGP_ItemH& activeItemH, const std::string& outputPath);
-  ~PAGExport() = default;
-
- private:
-  std::shared_ptr<pag::File> exportPAG(const AEGP_ItemH& activeItemH);
-
+  AEGP_ItemH itemHandle = nullptr;
   std::shared_ptr<PAGExportSession> session = nullptr;
   ScopedTimeSetter timeSetter = {nullptr, 0};
+
+ private:
+  std::shared_ptr<pag::File> exportAsFile();
+  void addRootComposition() const;
+  std::vector<pag::ImageBytes*> getRefImages(const std::vector<pag::Composition*>& compositions);
+  void exportResources(std::vector<pag::Composition*>& compositions);
+  void exportRescaleImages() const;
+  void exportRescaleBitmapCompositions(std::vector<pag::Composition*>& compositions) const;
+  void exportRescaleVideoCompositions(std::vector<pag::Composition*>& compositions) const;
 };
 }  // namespace exporter

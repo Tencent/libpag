@@ -25,12 +25,12 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
 /**
  * Creates a new pag_backend_semaphore. Release it by pag_release.
  */
-PAG_API pag_backend_semaphore* pag_backend_semaphore_create();
+PAG_EXPORT pag_backend_semaphore* pag_backend_semaphore_create();
 
-PAG_API bool pag_backend_semaphore_is_initialized(pag_backend_semaphore* semaphore);
+PAG_EXPORT bool pag_backend_semaphore_is_initialized(pag_backend_semaphore* semaphore);
 
-PAG_API void pag_backend_semaphore_init_gl(pag_backend_semaphore* semaphore, void* glSync);
+PAG_EXPORT void pag_backend_semaphore_init_gl(pag_backend_semaphore* semaphore, void* glSync);
 
-PAG_API void* pag_backend_semaphore_get_gl_sync(pag_backend_semaphore* semaphore);
+PAG_EXPORT void* pag_backend_semaphore_get_gl_sync(pag_backend_semaphore* semaphore);
 
 PAG_C_PLUS_PLUS_END_GUARD
