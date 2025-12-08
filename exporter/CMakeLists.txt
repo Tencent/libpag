@@ -93,8 +93,8 @@ configure_file(${CMAKE_SOURCE_DIR}/templates/version.h.in
         @ONLY
 )
 
-list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
-file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
+list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../reporter/ ../src ../third_party/tgfx/include)
+file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.* ../reporter/*.*)
 file(GLOB_RECURSE PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES
         ${AE_SDK_PATH}/Util/*.cpp
         vendor/TinyXML2/*.cpp)

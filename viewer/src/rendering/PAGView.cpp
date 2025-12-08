@@ -18,8 +18,8 @@
 
 #include "PAGView.h"
 #include <QSGImageNode>
+#include "PAGReporter.h"
 #include "pag/file.h"
-#include "report/PAGReporter.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {

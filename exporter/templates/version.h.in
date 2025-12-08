@@ -20,10 +20,6 @@
 
 #include <string>
 
-namespace exporter {
-
 const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
 const std::string AppKey = "@PAGExporterAppKey@";
 const std::string ReportUrl = "@ReportUrl@";
-
-} // namespace exporter

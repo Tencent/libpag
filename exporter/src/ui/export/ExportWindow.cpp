@@ -20,9 +20,9 @@
 #include <QFileDialog>
 #include <QQmlContext>
 #include <QThread>
+#include "PAGReporter.h"
 #include "export/PAGExport.h"
 #include "platform//PlatformHelper.h"
-#include "report/PAGReporter.h"
 #include "ui/ProgressModel.h"
 #include "utils/FileHelper.h"
 
@@ -99,8 +99,8 @@ void ExportWindow::init() {
     if (outputPath.empty()) {
       return;
     }
-    PAGReporter::GetInstance()->setPAGCount("1");
-    PAGReporter::GetInstance()->setPAGExportEntry("DirectExport");
+    pag::PAGReporter::GetInstance()->setPAGCount("1");
+    pag::PAGReporter::GetInstance()->setPAGExportEntry("DirectExport");
   }
 
   PAGExportConfigParam configParam = {};

@@ -53,6 +53,8 @@ class PAGReporter {
   void setAppName(const std::string& appName);
   void setAppVersion(const std::string& appVersion);
   void setAppBundleId(const std::string& appBundleId);
+  void setPAGCount(const std::string& pagCount);
+  void setPAGExportEntry(const std::string& pagExportEntry);
 
   PAGReporter(const PAGReporter& s) = delete;
   PAGReporter(const PAGReporter&& s) = delete;
@@ -67,10 +69,12 @@ class PAGReporter {
   std::string event = "";
   std::string appKey = "";
   std::string appName = "";
+  std::string pagCount = "";
   std::string reportUrl = "";
   std::string appVersion = "";
   std::string appBundleId = "";
   std::string appPlatform = "";
+  std::string pagExportEntry = "";
   std::unique_ptr<HttpClient> httpClient = nullptr;
   std::vector<std::pair<std::string, std::string> > extraParams = {};
 };

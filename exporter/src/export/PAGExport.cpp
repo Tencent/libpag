@@ -22,8 +22,8 @@
 #include "ExportComposition.h"
 #include "ExportVerify.h"
 #include "Marker.h"
+#include "PAGReporter.h"
 #include "data/ImageBytes.h"
-#include "report/PAGReporter.h"
 #include "sequence/AudioSequence.h"
 #include "src/base/utils/Log.h"
 #include "utils/AEDataTypeConverter.h"
@@ -37,8 +37,8 @@
 namespace exporter {
 
 static void ReportExportFailed() {
-  PAGReporter::GetInstance()->addParam("ExportStatus", "fail");
-  PAGReporter::GetInstance()->report();
+  pag::PAGReporter::GetInstance()->addParam("ExportStatus", "fail");
+  pag::PAGReporter::GetInstance()->report();
 }
 
 static bool ValidatePAGFile(uint8_t* data, size_t size) {
@@ -216,17 +216,19 @@ bool PAGExport::exportFile() {
     return false;
   }
   auto pagFile = exportAsFile();
-  PAGReporter::GetInstance()->setEvent("EXPORT_PAG");
-  PAGReporter::GetInstance()->addParam("AEVersion", AEPluginVersion);
+  pag::PAGReporter::GetInstance()->setEvent("EXPORT_PAG");
+  pag::PAGReporter::GetInstance()->addParam("AEVersion", AEPluginVersion);
   if (pagFile == nullptr) {
     ReportExportFailed();
     return false;
   }
-  PAGReporter::GetInstance()->addParam("PAGLayerCount", std::to_string(pagFile->numLayers()));
-  PAGReporter::GetInstance()->addParam("VideoCompositionCount",
-                                       std::to_string(pagFile->numVideos()));
-  PAGReporter::GetInstance()->addParam("PAGTextLayerCount", std::to_string(pagFile->numTexts()));
-  PAGReporter::GetInstance()->addParam("PAGImageLayerCount", std::to_string(pagFile->numImages()));
+  pag::PAGReporter::GetInstance()->addParam("PAGLayerCount", std::to_string(pagFile->numLayers()));
+  pag::PAGReporter::GetInstance()->addParam("VideoCompositionCount",
+                                            std::to_string(pagFile->numVideos()));
+  pag::PAGReporter::GetInstance()->addParam("PAGTextLayerCount",
+                                            std::to_string(pagFile->numTexts()));
+  pag::PAGReporter::GetInstance()->addParam("PAGImageLayerCount",
+                                            std::to_string(pagFile->numImages()));
 
   const auto bytes = pag::Codec::Encode(pagFile);
   if (bytes->length() == 0) {
@@ -242,8 +244,8 @@ bool PAGExport::exportFile() {
     ReportExportFailed();
     return false;
   }
-  PAGReporter::GetInstance()->addParam("ExportStatus", "success");
-  PAGReporter::GetInstance()->report();
+  pag::PAGReporter::GetInstance()->addParam("ExportStatus", "success");
+  pag::PAGReporter::GetInstance()->report();
   return true;
 }
 

@@ -20,16 +20,16 @@
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
 #include "AE_Macros.h"
+#include "PAGReporter.h"
 #include "aecommand/AECommand.h"
-#include "report/PAGReporter.h"
 #include "utils/AEHelper.h"
 #include "version.h"
 
 static void InitReportConfig() {
-  exporter::PAGReporter::GetInstance()->setAppKey(exporter::AppKey);
-  exporter::PAGReporter::GetInstance()->setAppName("PAGExporter");
-  exporter::PAGReporter::GetInstance()->setAppVersion(exporter::AEPluginVersion);
-  exporter::PAGReporter::GetInstance()->setAppBundleId("PAGExporter");
+  pag::PAGReporter::GetInstance()->setAppKey(AppKey);
+  pag::PAGReporter::GetInstance()->setAppName("PAGExporter");
+  pag::PAGReporter::GetInstance()->setAppVersion(AEPluginVersion);
+  pag::PAGReporter::GetInstance()->setAppBundleId("PAGExporter");
 }
 
 extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long majorVersion,

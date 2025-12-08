@@ -20,18 +20,18 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
+#include "PAGReporter.h"
 #include "PAGUpdater.h"
 #include "PAGViewer.h"
 #include "rendering/PAGView.h"
-#include "report/PAGReporter.h"
 #include "task/PAGTaskFactory.h"
 #include "version.h"
 
 static void InitReportConfig() {
-  pag::PAGReporter::GetInstance()->setAppKey(pag::AppKey);
+  pag::PAGReporter::GetInstance()->setAppKey(AppKey);
   pag::PAGReporter::GetInstance()->setAppName("PAGViewer");
-  pag::PAGReporter::GetInstance()->setAppVersion(
-      pag::UpdateChannel == "beta" ? pag::AppVersion + "-beta" : pag::AppVersion);
+  pag::PAGReporter::GetInstance()->setAppVersion(UpdateChannel == "beta" ? AppVersion + "-beta"
+                                                                         : AppVersion);
   pag::PAGReporter::GetInstance()->setAppBundleId("com.tencent.pagviewer");
 }
 

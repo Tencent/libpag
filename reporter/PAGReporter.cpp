@@ -111,6 +111,14 @@ void PAGReporter::setAppBundleId(const std::string& appBundleId) {
   this->appBundleId = appBundleId;
 }
 
+void PAGReporter::setPAGCount(const std::string& pagCount) {
+  this->pagCount = pagCount;
+}
+
+void PAGReporter::setPAGExportEntry(const std::string& pagExportEntry) {
+  this->pagExportEntry = pagExportEntry;
+}
+
 std::string PAGReporter::generateReportData() {
   QJsonObject root;
   root["appVersion"] = "";
@@ -128,7 +136,17 @@ std::string PAGReporter::generateReportData() {
   mapValue["appID"] = QString::fromStdString(appBundleId);
   mapValue["appPlatform"] = QString::fromStdString(appPlatform);
   mapValue["previousSDKVersion"] = QString::fromStdString(appVersion);
-  mapValue["PAGViewerVersion"] = QString::fromStdString(appVersion);
+  if (QString::compare(QString::fromStdString(appName), "PAGViewer", Qt::CaseInsensitive) == 0) {
+    mapValue["PAGViewerVersion"] = QString::fromStdString(appVersion);
+  } else if (QString::compare(QString::fromStdString(appName), "PAGExporter", Qt::CaseInsensitive) == 0) {
+    mapValue["PAGExportVersion"] = QString::fromStdString(appVersion);
+  }
+  if (!pagCount.empty()) {
+    mapValue["PAGCount"] = QString::fromStdString(pagCount);
+  }
+  if (!pagExportEntry.empty()) {
+    mapValue["PAGExportEntry"] = QString::fromStdString(pagExportEntry);
+  }
   for (const auto& pair : extraParams) {
     mapValue[QString::fromStdString(pair.first)] = QString::fromStdString(pair.second);
   }
