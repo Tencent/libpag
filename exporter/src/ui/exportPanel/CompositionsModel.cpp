@@ -196,6 +196,7 @@ void CompositionsModel::exportSelectedCompositions() {
     pagExports.push_back(std::move(pagExport));
   }
 
+  PAGReporter::GetInstance()->setPAGExportEntry("PanelExport");
   PAGReporter::GetInstance()->setPAGCount(std::to_string(pagExports.size()));
   for (auto& pagExport : pagExports) {
     pagExport->session->progressModel.setExportStatus(pagExport->exportFile()

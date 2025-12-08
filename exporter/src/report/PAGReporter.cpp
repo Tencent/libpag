@@ -31,6 +31,8 @@
 
 namespace exporter {
 
+static const int ReportTimeout = 5000;
+
 HttpClient::HttpClient(QObject* parent) : QObject(parent) {
   manager = std::make_unique<QNetworkAccessManager>();
   connect(manager.get(), &QNetworkAccessManager::finished, this, &HttpClient::onFinished);
@@ -39,8 +41,9 @@ HttpClient::HttpClient(QObject* parent) : QObject(parent) {
 void HttpClient::post(const std::string& url, const std::string& data) {
   QUrl request_url = QString::fromStdString(url);
   QNetworkRequest request(request_url);
+  request.setTransferTimeout(ReportTimeout);
   request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json;charset=UTF-8");
-  QByteArray jsonData = data.c_str();
+  QByteArray jsonData = QString::fromStdString(data).toUtf8();
   manager->post(request, jsonData);
 }
 
