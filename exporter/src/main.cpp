@@ -21,7 +21,16 @@
 #include "AE_GeneralPlug.h"
 #include "AE_Macros.h"
 #include "aecommand/AECommand.h"
+#include "report/PAGReporter.h"
 #include "utils/AEHelper.h"
+#include "version.h"
+
+static void InitReportConfig() {
+  exporter::PAGReporter::GetInstance()->setAppKey(exporter::AppKey);
+  exporter::PAGReporter::GetInstance()->setAppName("PAGExporter");
+  exporter::PAGReporter::GetInstance()->setAppVersion(exporter::AEPluginVersion);
+  exporter::PAGReporter::GetInstance()->setAppBundleId("PAGExporter");
+}
 
 extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long majorVersion,
                                           A_long minorVersion, AEGP_PluginID pluginID,
@@ -70,5 +79,6 @@ extern "C" DllExport A_Err EntryPointFunc(struct SPBasicSuite* suite, A_long maj
     ERR2(suites->UtilitySuite3()->AEGP_ReportInfo(
         pluginID, "PAGExporter : Could not register command hook."));
   }
+  InitReportConfig();
   return err;
 }

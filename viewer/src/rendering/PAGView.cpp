@@ -19,6 +19,7 @@
 #include "PAGView.h"
 #include <QSGImageNode>
 #include "pag/file.h"
+#include "report/PAGReporter.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
@@ -257,6 +258,8 @@ bool PAGView::setFile(const QString& filePath) {
   Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
   Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
 
+  reportForOpenPAGFile(byteData->length());
+
   return true;
 }
 
@@ -324,6 +327,17 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
+}
+
+void PAGView::reportForOpenPAGFile(size_t length) {
+  PAGReporter::GetInstance()->setEvent("OPEN_PAG");
+  PAGReporter::GetInstance()->addParam("FileSize", std::to_string(length));
+  PAGReporter::GetInstance()->addParam("PAGLayerCount", std::to_string(pagFile->numChildren()));
+  PAGReporter::GetInstance()->addParam("VideoCompositionCount",
+                                       std::to_string(pagFile->numVideos()));
+  PAGReporter::GetInstance()->addParam("PAGTextLayerCount", std::to_string(pagFile->numTexts()));
+  PAGReporter::GetInstance()->addParam("PAGImageLayerCount", std::to_string(pagFile->numImages()));
+  PAGReporter::GetInstance()->report();
 }
 
 void PAGView::setProgressInternal(double progress, bool isAudioSeek) {

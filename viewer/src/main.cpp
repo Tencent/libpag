@@ -23,8 +23,17 @@
 #include "PAGUpdater.h"
 #include "PAGViewer.h"
 #include "rendering/PAGView.h"
+#include "report/PAGReporter.h"
 #include "task/PAGTaskFactory.h"
 #include "version.h"
+
+static void InitReportConfig() {
+  pag::PAGReporter::GetInstance()->setAppKey(pag::AppKey);
+  pag::PAGReporter::GetInstance()->setAppName("PAGViewer");
+  pag::PAGReporter::GetInstance()->setAppVersion(
+      pag::UpdateChannel == "beta" ? pag::AppVersion + "-beta" : pag::AppVersion);
+  pag::PAGReporter::GetInstance()->setAppBundleId("com.tencent.pagviewer");
+}
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;
@@ -67,6 +76,7 @@ int main(int argc, char* argv[]) {
   app.openFile(QString::fromLocal8Bit(filePath.data()));
 
   pag::InitUpdater();
+  InitReportConfig();
 
   return QApplication::exec();
 }

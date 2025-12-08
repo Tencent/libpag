@@ -24,6 +24,7 @@
 #include "ExportPanelWindow.h"
 #include "export/PAGExport.h"
 #include "platform/PlatformHelper.h"
+#include "report/PAGReporter.h"
 #include "utils/FileHelper.h"
 
 namespace exporter {
@@ -195,6 +196,7 @@ void CompositionsModel::exportSelectedCompositions() {
     pagExports.push_back(std::move(pagExport));
   }
 
+  PAGReporter::GetInstance()->setPAGCount(std::to_string(pagExports.size()));
   for (auto& pagExport : pagExports) {
     pagExport->session->progressModel.setExportStatus(pagExport->exportFile()
                                                           ? ProgressModel::ExportStatus::Success

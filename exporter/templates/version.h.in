@@ -20,11 +20,10 @@
 
 #include <string>
 
-namespace pag {
+namespace exporter {
 
-const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
-const std::string UpdateChannel = "@UpdateChannel@";
-const std::string AppKey = "@PAGViewerAppKey@";
+const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
+const std::string AppKey = "@PAGExporterAppKey@";
 const std::string ReportUrl = "@ReportUrl@";
 
-} // namespace pag
+} // namespace exporter

@@ -23,6 +23,7 @@
 #include "ExportVerify.h"
 #include "Marker.h"
 #include "data/ImageBytes.h"
+#include "report/PAGReporter.h"
 #include "sequence/AudioSequence.h"
 #include "src/base/utils/Log.h"
 #include "utils/AEDataTypeConverter.h"
@@ -31,8 +32,14 @@
 #include "utils/LayerHelper.h"
 #include "utils/PAGExportSessionManager.h"
 #include "utils/UniqueID.h"
+#include "version.h"
 
 namespace exporter {
+
+static void ReportExportFailed() {
+  PAGReporter::GetInstance()->addParam("ExportStatus", "fail");
+  PAGReporter::GetInstance()->report();
+}
 
 static bool ValidatePAGFile(uint8_t* data, size_t size) {
   auto pagFileDecoded = pag::File::Load(data, size);
@@ -209,22 +216,34 @@ bool PAGExport::exportFile() {
     return false;
   }
   auto pagFile = exportAsFile();
+  PAGReporter::GetInstance()->setEvent("EXPORT_PAG");
+  PAGReporter::GetInstance()->addParam("AEVersion", AEPluginVersion);
   if (pagFile == nullptr) {
+    ReportExportFailed();
     return false;
   }
+  PAGReporter::GetInstance()->addParam("PAGLayerCount", std::to_string(pagFile->numLayers()));
+  PAGReporter::GetInstance()->addParam("VideoCompositionCount",
+                                       std::to_string(pagFile->numVideos()));
+  PAGReporter::GetInstance()->addParam("PAGTextLayerCount", std::to_string(pagFile->numTexts()));
+  PAGReporter::GetInstance()->addParam("PAGImageLayerCount", std::to_string(pagFile->numImages()));
 
   const auto bytes = pag::Codec::Encode(pagFile);
   if (bytes->length() == 0) {
+    ReportExportFailed();
     return false;
   }
   if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+    ReportExportFailed();
     return false;
   }
   if (!WriteToFile(session->outputPath, reinterpret_cast<char*>(bytes->data()),
                    static_cast<std::streamsize>(bytes->length()))) {
+    ReportExportFailed();
     return false;
   }
-
+  PAGReporter::GetInstance()->addParam("ExportStatus", "success");
+  PAGReporter::GetInstance()->report();
   return true;
 }
 
