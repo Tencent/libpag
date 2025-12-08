@@ -173,9 +173,8 @@ int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
   Version version(versionString);
 
   static constexpr int MaxVersionField = 0xFFFF;
-  if (version.major < 0 || version.major > MaxVersionField ||
-      version.minor < 0 || version.minor > MaxVersionField ||
-      version.patch < 0 || version.patch > MaxVersionField ||
+  if (version.major < 0 || version.major > MaxVersionField || version.minor < 0 ||
+      version.minor > MaxVersionField || version.patch < 0 || version.patch > MaxVersionField ||
       version.build < 0 || version.build > MaxVersionField) {
     return 0;
   }

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/PluginInstaller.h"
-#include "FileOperations.h"
 #include <shlobj.h>
 #include <windows.h>
 #include <QApplication>
@@ -33,6 +32,7 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 #include <QThread>
+#include "FileOperations.h"
 
 namespace pag {
 
@@ -209,7 +209,7 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
 }
 
 VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
-                                                       QString& version) const {
+                                                      QString& version) const {
   version.clear();
   QString targetPath = pluginPath;
   if (!targetPath.endsWith(".aex") && !targetPath.endsWith(".exe")) {
