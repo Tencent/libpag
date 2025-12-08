@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FileUtils.h"
-#include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
 #include <QUrl>
@@ -38,16 +37,12 @@ void OpenInFinder(const QString& path, bool select) {
   }
 }
 
-bool RemoveFile(const QString& path) {
+bool DeleteFile(const QString& path) {
   QFile file(path);
   if (!file.exists()) {
     return true;
   }
-  bool success = file.remove();
-  if (!success) {
-    qWarning() << "RemoveFile: Failed to delete file:" << path << "- Error:" << file.errorString();
-  }
-  return success;
+  return file.remove();
 }
 
 bool DeleteDir(const QString& path) {
@@ -61,7 +56,6 @@ bool DeleteDir(const QString& path) {
   for (auto& fileInfo : fileList) {
     if (fileInfo.isFile()) {
       if (!fileInfo.dir().remove(fileInfo.fileName())) {
-        qWarning() << "DeleteDir: Failed to delete file:" << fileInfo.absoluteFilePath();
         return false;
       }
     } else {
@@ -71,11 +65,7 @@ bool DeleteDir(const QString& path) {
     }
   }
 
-  bool success = dir.rmdir(path);
-  if (!success) {
-    qWarning() << "DeleteDir: Failed to remove directory:" << path;
-  }
-  return success;
+  return dir.rmdir(path);
 }
 
 bool MakeDir(const QString& path, bool isDir) {
@@ -93,8 +83,8 @@ bool MakeDir(const QString& path, bool isDir) {
   return dir.mkpath(dirPath);
 }
 
-bool WriteFileToDisk(std::shared_ptr<File> file, const QString& filePath) {
-  auto encodeByteData = pag::Codec::Encode(std::move(file));
+bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath) {
+  auto encodeByteData = pag::Codec::Encode(file);
   if (encodeByteData == nullptr) {
     return false;
   }
@@ -118,79 +108,6 @@ bool WriteDataToDisk(const QString& filePath, const void* data, size_t length) {
   if (result != 0) {
     return false;
   }
-  return true;
-}
-
-bool DuplicateFile(const QString& sourcePath, const QString& targetPath, bool overwrite) {
-  if (sourcePath.isEmpty() || targetPath.isEmpty()) {
-    qWarning() << "DuplicateFile: Empty path provided - source:" << sourcePath
-               << "target:" << targetPath;
-    return false;
-  }
-
-  QFile sourceFile(sourcePath);
-  if (!sourceFile.exists()) {
-    qWarning() << "DuplicateFile: Source file not found:" << sourcePath;
-    return false;
-  }
-
-  QString targetDir = QFileInfo(targetPath).absolutePath();
-  if (!MakeDir(targetDir)) {
-    qWarning() << "DuplicateFile: Failed to create target directory:" << targetDir;
-    return false;
-  }
-
-  if (QFile::exists(targetPath)) {
-    if (!overwrite) {
-      qWarning() << "DuplicateFile: Target exists and overwrite=false:" << targetPath;
-      return false;
-    }
-    if (!QFile::remove(targetPath)) {
-      qWarning() << "DuplicateFile: Failed to remove existing file:" << targetPath;
-      return false;
-    }
-  }
-
-  bool success = sourceFile.copy(targetPath);
-  if (!success) {
-    qWarning() << "DuplicateFile: QFile::copy failed from" << sourcePath << "to" << targetPath
-               << "- Error:" << sourceFile.errorString();
-  }
-  return success;
-}
-
-bool CopyDir(const QString& sourceDir, const QString& targetDir, bool overwrite) {
-  if (sourceDir.isEmpty() || targetDir.isEmpty()) {
-    return false;
-  }
-
-  QDir source(sourceDir);
-  if (!source.exists()) {
-    return false;
-  }
-
-  if (!MakeDir(targetDir)) {
-    return false;
-  }
-
-  QStringList files = source.entryList(QDir::Files);
-  for (const QString& file : files) {
-    QString srcPath = sourceDir + "/" + file;
-    QString dstPath = targetDir + "/" + file;
-    if (!DuplicateFile(srcPath, dstPath, overwrite)) {
-      return false;
-    }
-  }
-
-  QStringList dirs = source.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-  for (const QString& dir : dirs) {
-    QString srcPath = sourceDir + "/" + dir;
-    QString dstPath = targetDir + "/" + dir;
-    if (!CopyDir(srcPath, dstPath, overwrite)) {
-      return false;
-    }
-  }
-
   return true;
 }
 
