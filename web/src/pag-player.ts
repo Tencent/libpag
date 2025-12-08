@@ -9,7 +9,7 @@ import { PAGComposition } from './pag-composition';
 import type { PAGLayer } from './pag-layer';
 import {type PAGScaleMode,type Rect, VecArray} from './types';
 import type { VideoReader } from './interfaces';
-import {VideoReaderManage} from "./video-reader-manage";
+import {VideoReaderManager} from "./video-reader-manager";
 
 @destroyVerify
 export class PAGPlayer {
@@ -24,7 +24,7 @@ export class PAGPlayer {
   public videoReaders: VideoReader[] = [];
 
   protected pagComposition: PAGComposition | null = null;
-  protected videoReaderManage:VideoReaderManage | any = null;
+  protected videoReaderManager:VideoReaderManager | null = null;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -180,11 +180,7 @@ export class PAGPlayer {
    */
 
   public setComposition(pagComposition: PAGComposition | null) {
-    if(this.videoReaderManage !== null){
-      this.videoReaderManage.destroy();
-      this.videoReaderManage = null;
-      PAGModule.videoReaderManage = null;
-    }
+    this.destroyVideoReaderManager();
     this.pagComposition = pagComposition;
     this.wasmIns._setComposition(getWasmIns(pagComposition));
   }
@@ -309,11 +305,7 @@ export class PAGPlayer {
   }
 
   public destroy() {
-    if(this.videoReaderManage !== null){
-      this.videoReaderManage.destroy();
-      this.videoReaderManage = null;
-      PAGModule.videoReaderManage = null;
-    }
+    this.destroyVideoReaderManager();
     this.wasmIns.delete();
     this.isDestroyed = true;
   }
@@ -335,13 +327,21 @@ export class PAGPlayer {
 
   private async prepareVideoFrame(){
     if(this.pagComposition?.hasVideo()){
-      if(this.videoReaderManage === null){
-        this.videoReaderManage = await VideoReaderManage.make(this.pagComposition?.wasmIns);
-        PAGModule.videoReaderManage = this.videoReaderManage;
+      if(this.videoReaderManager === null){
+        this.videoReaderManager = await VideoReaderManager.make(this.pagComposition?.wasmIns);
+        PAGModule.videoReaderManager = this.videoReaderManager;
       }
     }
-    if(this.videoReaderManage !== null){
-      await this.videoReaderManage.getTargetFrame();
+    if(this.videoReaderManager !== null){
+      await this.videoReaderManager.getTargetFrame();
+    }
+  }
+
+  public destroyVideoReaderManager(){
+    if(this.videoReaderManager !== null){
+      this.videoReaderManager.destroy();
+      this.videoReaderManager = null;
+      PAGModule.videoReaderManage = null;
     }
   }
 

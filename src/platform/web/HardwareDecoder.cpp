@@ -37,12 +37,14 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   _width = sequence->getVideoWidth();
   _height = sequence->getVideoHeight();
   frameRate = sequence->frameRate;
-  emscripten::val videoReaderManage = val::module_property("videoReaderManage");
-  videoReader = videoReaderManage.call<val>("getVideoReaderById",
+  emscripten::val videoReaderManage = val::module_property("videoReaderManager");
+  videoReader = videoReaderManage.call<val>("getVideoReaderByID",
                                             static_cast<int>(sequence->composition->uniqueID));
-  auto video = videoReader.call<val>("getVideo");
-  if (!video.isNull()) {
-    imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
+  if (!videoReader.isUndefined()) {
+    auto video = videoReader.call<val>("getVideo");
+    if (!video.isNull()) {
+      imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
+    }
   }
 }
 
@@ -73,10 +75,12 @@ int64_t HardwareDecoder::presentationTime() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-  int frameId = videoReader.call<int>("getCurrentFrame");
-  if (currentFrame < 0 || currentFrame != frameId) {
-    currentFrame = frameId;
-    lastDecodedBuffer = imageReader->acquireNextBuffer();
+  if (!videoReader.isUndefined()) {
+    int frameId = videoReader.call<int>("getCurrentFrame");
+    if (currentFrame < 0 || currentFrame != frameId) {
+      currentFrame = frameId;
+      lastDecodedBuffer = imageReader->acquireNextBuffer();
+    }
   }
   return lastDecodedBuffer;
 }

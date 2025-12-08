@@ -18,7 +18,7 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
-#include "VideoInfoManage.h"
+#include "VideoInfoManager.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "pag/types.h"
@@ -583,20 +583,20 @@ bool PAGBindInit() {
                 }))
       .function("_postConcat", &Matrix::postConcat);
 
-  class_<VideoInfoManage>("_videoInfoManage")
-      .smart_ptr<std::shared_ptr<VideoInfoManage>>("_videoInfoManage")
+  class_<VideoInfoManager>("_videoInfoManager")
+      .smart_ptr<std::shared_ptr<VideoInfoManager>>("_videoInfoManager")
       .class_function("_Make",
                       optional_override([](std::shared_ptr<PAGComposition> pagComposition) {
-                        return std::make_shared<VideoInfoManage>(pagComposition);
+                        return std::make_shared<VideoInfoManager>(pagComposition);
                       }))
-      .function("_getMp4DataById", &VideoInfoManage::getMp4DataById)
-      .function("_getWidthById", &VideoInfoManage::getWidthById)
-      .function("_getHeightById", &VideoInfoManage::getHeightById)
-      .function("_getFrameRateById", &VideoInfoManage::getFrameRateById)
-      .function("_getStaticTimeRangesById", &VideoInfoManage::getStaticTimeRangesById)
-      .function("_getVideoIds", &VideoInfoManage::getVideoIds)
-      .function("_getTargetFrameById", &VideoInfoManage::getTargetFrameById)
-      .function("_getPlaybackRateById", &VideoInfoManage::getPlaybackRateById);
+      .function("_getMp4DataByID", &VideoInfoManager::getMp4DataByID)
+      .function("_getWidthByID", &VideoInfoManager::getWidthByID)
+      .function("_getHeightByID", &VideoInfoManager::getHeightByID)
+      .function("_getFrameRateByID", &VideoInfoManager::getFrameRateByID)
+      .function("_getStaticTimeRangesByID", &VideoInfoManager::getStaticTimeRangesByID)
+      .function("_getVideoIDs", &VideoInfoManager::getVideoIDs)
+      .function("_getTargetFrameByID", &VideoInfoManager::getTargetFrameByID)
+      .function("_getPlaybackRateByID", &VideoInfoManager::getPlaybackRateByID);
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
       .property("applyFill", &TextDocument::applyFill)

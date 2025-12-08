@@ -1,23 +1,23 @@
 import {PAGModule} from "./pag-module";
 import type {VideoReader} from "./interfaces";
 import {transferToArrayBuffer} from "./utils/common";
-import type {VideoReaderManage as VideoReaderManageInterfaces} from './interfaces';
+import type {VideoReaderManager as VideoReaderManageInterfaces} from './interfaces';
 import {destroyVerify} from "./utils/decorators";
 
 /**
- * VideoReaderManage is responsible for managing multiple VideoReader instances.
+ * VideoReaderManager is responsible for managing multiple VideoReader instances.
  * It handles video decoder initialization, frame preparation, and lifecycle management.
  */
 @destroyVerify
-export class VideoReaderManage {
+export class VideoReaderManager {
 
     /**
-     * Factory method to create and initialize a VideoReaderManage instance.
+     * Factory method to create and initialize a VideoReaderManager instance.
      * @param wasmIns - The WebAssembly instance containing video information
-     * @returns A promise that resolves to a fully initialized VideoReaderManage instance
+     * @returns A promise that resolves to a fully initialized VideoReaderManager instance
      */
-    public static async make(wasmIns: any): Promise<VideoReaderManageInterfaces> {
-        const videoManage = new VideoReaderManage(wasmIns);
+    public static async make(wasmIns: any): Promise<VideoReaderManager> {
+        const videoManage = new VideoReaderManager(wasmIns);
         await videoManage.createVideoReader();
         return videoManage;
     }
@@ -25,7 +25,7 @@ export class VideoReaderManage {
     /** WebAssembly instance for video information management */
     public wasmIns: any;
     /** Array of video IDs managed by this instance */
-    public videoIds: Array<number> = [];
+    public videoIDs: Array<number> = [];
     /** Flag indicating whether this instance has been destroyed */
     public isDestroyed = false;
 
@@ -35,19 +35,19 @@ export class VideoReaderManage {
     private softWareDecodeEnableMap: Map<number, boolean> = new Map<number, boolean>();
 
     /**
-     * Constructor for VideoReaderManage.
+     * Constructor for VideoReaderManager.
      * Initializes the WASM instance and retrieves all video IDs.
      * @param wasmIns - The WebAssembly instance
-     * @throws Error if VideoReaderManage creation fails
+     * @throws Error if VideoReaderManager creation fails
      */
     public constructor(
         wasmIns: any
     ) {
-        this.wasmIns = PAGModule._videoInfoManage._Make(wasmIns);
+        this.wasmIns = PAGModule._videoInfoManager._Make(wasmIns);
         if (!this.wasmIns) {
-            throw new Error('create VideoReaderManage fail!');
+            throw new Error('create VideoReaderManager fail!');
         }
-        this.videoIds = this.wasmIns._getVideoIds() as Array<number>;
+        this.videoIDs = this.wasmIns._getVideoIDs() as Array<number>;
     }
 
     /**
@@ -56,15 +56,15 @@ export class VideoReaderManage {
      * Also prepares the first frame with the initial playback rate.
      */
     public async createVideoReader() {
-        for (const id of this.videoIds) {
+        for (const id of this.videoIDs) {
             // Retrieve MP4 data for the current video ID
-            const mp4Data = this.wasmIns._getMp4DataById(id);
+            const mp4Data = this.wasmIns._getMp4DataByID(id);
             if (mp4Data !== null) {
                 // Create VideoReader with video metadata (width, height, frame rate, static time ranges)
-                this.videoReaderMap.set(id, await PAGModule.VideoReader.create(mp4Data, this.wasmIns._getWidthById(id), this.wasmIns._getHeightById(id),
-                    this.wasmIns._getFrameRateById(id), this.wasmIns._getStaticTimeRangesById(id)));
+                this.videoReaderMap.set(id, await PAGModule.VideoReader.create(mp4Data, this.wasmIns._getWidthByID(id), this.wasmIns._getHeightByID(id),
+                    this.wasmIns._getFrameRateByID(id), this.wasmIns._getStaticTimeRangesByID(id)));
                 // Prepare the first frame (frame 0) with the current playback rate
-                await this.videoReaderMap.get(id)?.prepare(0, this.wasmIns._getPlaybackRateById(id));
+                await this.videoReaderMap.get(id)?.prepare(0, this.wasmIns._getPlaybackRateByID(id));
             }
 
         }
@@ -77,9 +77,10 @@ export class VideoReaderManage {
      * @returns The VideoReader instance or undefined if not found
      * @throws Error if VideoReader is not found for the given ID
      */
-    public getVideoReaderById(id: number): VideoReader | undefined {
+    public getVideoReaderByID(id: number): VideoReader | undefined {
         if (this.videoReaderMap.get(id) === undefined) {
-            throw new Error(`get VideoReader fail!,id:${id}`);
+            console.error(`get VideoReader fail!,id:${id}`);
+            return undefined;
         }
         // Mark as hardware decoding (software decode disabled)
         this.softWareDecodeEnableMap.set(id, false);
@@ -92,20 +93,20 @@ export class VideoReaderManage {
      * It handles both hardware and software decoding modes.
      */
     public async getTargetFrame() {
-        for (const id of this.videoIds) {
+        for (const id of this.videoIDs) {
             // Skip videos that are already using software decoding
             if (this.softWareDecodeEnableMap.get(id) !== undefined && this.softWareDecodeEnableMap.get(id)) {
                 continue;
             }
             // Get the target frame index from WASM
-            const targetFrame = this.wasmIns._getTargetFrameById(id) as number;
+            const targetFrame = this.wasmIns._getTargetFrameByID(id) as number;
             if (targetFrame < 0) {
                 continue;
             }
             if (this.videoReaderMap.get(id) !== undefined) {
-                // Prepare the target frame with current playback rate
-                await this.videoReaderMap.get(id)?.prepare(targetFrame, this.wasmIns._getPlaybackRateById(id));
-                // If this is the first time preparing a frame, enable software decoding and stop the decode loop
+                // Prepare the target frame with current playback rate.
+                await this.videoReaderMap.get(id)?.prepare(targetFrame, this.wasmIns._getPlaybackRateByID(id));
+                // If this is the first time preparing a frame, enable software decoding and stop the decode loop.
                 if (this.softWareDecodeEnableMap.get(id) === undefined) {
                     this.softWareDecodeEnableMap.set(id, true);
                     this.videoReaderMap.get(id)?.stop();
@@ -118,7 +119,7 @@ export class VideoReaderManage {
     }
 
     /**
-     * Destroys the VideoReaderManage instance and cleans up all resources.
+     * Destroys the VideoReaderManager instance and cleans up all resources.
      * This includes destroying the WASM instance, all VideoReader instances,
      * and clearing internal maps.
      */

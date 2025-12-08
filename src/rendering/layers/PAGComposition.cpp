@@ -690,13 +690,13 @@ bool PAGComposition::hasVideo() const {
     }
   }
 
-  // Check if any child layer is a PAGFile with video
+  // Recursively check all child layers
   for (const auto& childLayer : layers) {
-    if (childLayer->isPAGFile() && childLayer->file) {
-      for (const auto& composition : childLayer->file->compositions) {
-        if (composition->type() == CompositionType::Video) {
-          return true;
-        }
+    if (childLayer->layerType() == LayerType::PreCompose) {
+      // Recursively check nested PAGComposition
+      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+      if (childComposition->hasVideo()) {
+        return true;
       }
     }
   }

@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef VIDEO_INFO_MANAGE_H
-#define VIDEO_INFO_MANAGE_H
+#ifndef VIDEO_INFO_MANAGER_H
+#define VIDEO_INFO_MANAGER_H
 #include <emscripten.h>
 #include <emscripten/val.h>
 #include "codec/tags/VideoSequence.h"
@@ -38,32 +38,32 @@ struct VideoInfo {
   std::unique_ptr<ByteData> mp4Data = nullptr;
 };
 
-class VideoInfoManage {
+class VideoInfoManager {
  public:
-  explicit VideoInfoManage(std::shared_ptr<PAGComposition> pagComposition);
+  explicit VideoInfoManager(std::shared_ptr<PAGComposition> pagComposition);
 
-  emscripten::val getMp4DataById(ID id);
+  emscripten::val getMp4DataByID(ID id);
 
-  int32_t getWidthById(ID id);
+  int32_t getWidthByID(ID id);
 
-  int32_t getHeightById(ID id);
+  int32_t getHeightByID(ID id);
 
-  float getFrameRateById(ID id);
+  float getFrameRateByID(ID id);
 
-  emscripten::val getStaticTimeRangesById(ID id);
+  emscripten::val getStaticTimeRangesByID(ID id);
 
-  int getTargetFrameById(ID id);
+  int getTargetFrameByID(ID id);
 
-  float getPlaybackRateById(ID id);
+  float getPlaybackRateByID(ID id);
 
-  emscripten::val getVideoIds();
+  emscripten::val getVideoIDs();
 
  private:
   std::shared_ptr<PAGComposition> pagComposition = nullptr;
   std::vector<std::shared_ptr<PAGFile>> pagFiles = {};
-  std::vector<ID> videoIds = {};
+  std::vector<ID> videoIDs = {};
   std::unordered_map<ID, VideoInfo> videoInfoMap = {};
 };
 
 }  // namespace pag
-#endif  //VIDEO_INFO_MANAGE_H
+#endif  //VIDEO_INFO_MANAGER_H

@@ -16,8 +16,8 @@ export interface VideoReader {
   stop: () => void;
 }
 
-export interface VideoReaderManage{
-  getVideoReaderById: (id: number) => VideoReader | undefined;
+export interface VideoReaderManager{
+  getVideoReaderByID: (id: number) => VideoReader | undefined;
   destroy: () => void;
 }
 

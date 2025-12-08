@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "VideoInfoManage.h"
+#include "VideoInfoManager.h"
 #include "WebVideoSequenceDemuxer.h"
 #include "pag/file.h"
 
@@ -23,24 +23,29 @@ namespace pag {
 
 void getPAGFileFromPAGComposition(std::shared_ptr<PAGComposition>& pagComposition,
                                   std::vector<std::shared_ptr<PAGFile>>& pagFiles) {
-  if (pagComposition != nullptr) {
-    if (pagComposition->isPAGFile() && pagComposition->hasVideo()) {
-      pagFiles.push_back(std::static_pointer_cast<PAGFile>(pagComposition));
-    }
-    auto layerSize = pagComposition->numChildren();
-    for (int i = 0; i < layerSize; ++i) {
-      auto childLayer = pagComposition->getLayerAt(i);
-      if (childLayer->isPAGFile()) {
-        auto pagFile = std::static_pointer_cast<PAGFile>(childLayer);
-        if (pagFile->hasVideo()) {
-          pagFiles.push_back(pagFile);
-        }
-      }
+  if (pagComposition == nullptr) {
+    return;
+  }
+
+  // Check if current composition is a PAGFile with video
+  if (pagComposition->isPAGFile() && pagComposition->hasVideo()) {
+    pagFiles.push_back(std::static_pointer_cast<PAGFile>(pagComposition));
+  }
+
+  // Recursively check all child layers
+  auto layerSize = pagComposition->numChildren();
+  for (int i = 0; i < layerSize; ++i) {
+    auto childLayer = pagComposition->getLayerAt(i);
+
+    // Only process if child layer is a PAGComposition (check type first)
+    if (childLayer->layerType() == LayerType::PreCompose) {
+      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+      getPAGFileFromPAGComposition(childComposition, pagFiles);
     }
   }
 }
 
-VideoInfoManage::VideoInfoManage(std::shared_ptr<PAGComposition> pagComposition)
+VideoInfoManager::VideoInfoManager(std::shared_ptr<PAGComposition> pagComposition)
     : pagComposition(pagComposition) {
   getPAGFileFromPAGComposition(pagComposition, pagFiles);
   for (auto pagFile : pagFiles) {
@@ -55,7 +60,7 @@ VideoInfoManage::VideoInfoManage(std::shared_ptr<PAGComposition> pagComposition)
         videoInfo.frameRate = videoInfo.videoSequence->frameRate;
         videoInfo.preLayer =
             pagFile->getPreLayerByComposition(pagFile->getFile()->getRootLayer(), composition);
-        videoIds.push_back(composition->uniqueID);
+        videoIDs.push_back(composition->uniqueID);
         videoInfo.pagComposition =
             pagFile->findCompositionByPreComposeLayer(pagFile, videoInfo.preLayer);
         videoInfoMap.emplace(composition->uniqueID, std::move(videoInfo));
@@ -64,7 +69,7 @@ VideoInfoManage::VideoInfoManage(std::shared_ptr<PAGComposition> pagComposition)
   }
 }
 
-emscripten::val VideoInfoManage::getMp4DataById(const ID id) {
+emscripten::val VideoInfoManager::getMp4DataByID(const ID id) {
 
   auto iter = videoInfoMap.find(id);
 
@@ -87,7 +92,7 @@ emscripten::val VideoInfoManage::getMp4DataById(const ID id) {
   return emscripten::val::null();
 }
 
-int32_t VideoInfoManage::getWidthById(ID id) {
+int32_t VideoInfoManager::getWidthByID(ID id) {
   auto iter = videoInfoMap.find(id);
 
   if (iter != videoInfoMap.end()) {
@@ -97,7 +102,7 @@ int32_t VideoInfoManage::getWidthById(ID id) {
   return 0;
 }
 
-int32_t VideoInfoManage::getHeightById(ID id) {
+int32_t VideoInfoManager::getHeightByID(ID id) {
   auto iter = videoInfoMap.find(id);
 
   if (iter != videoInfoMap.end()) {
@@ -107,7 +112,7 @@ int32_t VideoInfoManage::getHeightById(ID id) {
   return 0;
 }
 
-float VideoInfoManage::getFrameRateById(ID id) {
+float VideoInfoManager::getFrameRateByID(ID id) {
   auto iter = videoInfoMap.find(id);
 
   if (iter != videoInfoMap.end()) {
@@ -117,7 +122,7 @@ float VideoInfoManage::getFrameRateById(ID id) {
   return 0;
 }
 
-emscripten::val VideoInfoManage::getStaticTimeRangesById(ID id) {
+emscripten::val VideoInfoManager::getStaticTimeRangesByID(ID id) {
   auto iter = videoInfoMap.find(id);
 
   if (iter != videoInfoMap.end()) {
@@ -132,7 +137,7 @@ emscripten::val VideoInfoManage::getStaticTimeRangesById(ID id) {
   return emscripten::val::null();
 }
 
-int VideoInfoManage::getTargetFrameById(ID id) {
+int VideoInfoManager::getTargetFrameByID(ID id) {
   auto iter = videoInfoMap.find(id);
 
   if (iter != videoInfoMap.end()) {
@@ -150,7 +155,7 @@ int VideoInfoManage::getTargetFrameById(ID id) {
   return -1;
 }
 
-float VideoInfoManage::getPlaybackRateById(ID id) {
+float VideoInfoManager::getPlaybackRateByID(ID id) {
   float playbackRate = 1;
   auto iter = videoInfoMap.find(id);
 
@@ -166,11 +171,11 @@ float VideoInfoManage::getPlaybackRateById(ID id) {
   return playbackRate;
 }
 
-emscripten::val VideoInfoManage::getVideoIds() {
-  int size = videoIds.size();
+emscripten::val VideoInfoManager::getVideoIDs() {
+  int size = videoIDs.size();
   emscripten::val jsArray = emscripten::val::array();
   for (int i = 0; i < size; ++i) {
-    jsArray.call<void>("push", videoIds[i]);
+    jsArray.call<void>("push", videoIDs[i]);
   }
   return jsArray;
 }
