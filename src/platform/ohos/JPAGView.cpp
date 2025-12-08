@@ -246,6 +246,9 @@ static napi_value UniqueID(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
   napi_value result;
   napi_create_string_utf8(env, view->id.c_str(), view->id.length(), &result);
   return result;

@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { PAGImageViewController } from '../PAGImageView'
-import { PAGViewController } from '../PAGView'
+import { PAGImageViewController } from '../PAGImageViewController'
+import { PAGViewController } from '../PAGViewController'
 
 export class PAGViewCallbackHandler {
   constructor(viewController: PAGViewController | PAGImageViewController) {
@@ -30,7 +30,6 @@ export class PAGViewCallbackHandler {
       viewController.onAnimatorProgressUpdate();
     }
   }
-
   onStateChange = (state: number) => {
     let viewController = this.weakViewController.deref();
     if (viewController) {
