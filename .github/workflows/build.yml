@@ -12,21 +12,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - name: Get Environment Cache
-        id: environment-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-          key: libpag-environment-ios-20231129
-          restore-keys: libpag-environment-ios-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -36,6 +21,10 @@ jobs:
             third_party
           key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ios-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
 
       - name: Install Build Tools
         run: |
@@ -56,18 +45,6 @@ jobs:
           node gen_ios
           xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
-      - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-          key: libpag-environment-ios-20231129
-
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
@@ -78,7 +55,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ios_build
           path: ios
@@ -88,8 +65,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -106,13 +81,6 @@ jobs:
           depsync
 
       - uses: seanmiddleditch/gha-setup-ninja@master
-
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r19c
-          link-to-sdk: true
-          local-cache: true
 
       - uses: actions/setup-java@v4
         with:
@@ -136,7 +104,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android_build
           path: android
@@ -146,8 +114,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
@@ -156,7 +122,8 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: libpag-environment-web-20231130
+            web/package-lock.json
+          key: libpag-environment-web-20241106
           restore-keys: libpag-environment-web-
 
       - name: Get Third-Party Cache
@@ -173,10 +140,16 @@ jobs:
         run: |
           cd web
           npm install
-          git clone https://github.com/emscripten-core/emsdk.git
+          if [ ! -d "emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git
+          else
+            cd emsdk
+            git pull
+            cd ..
+          fi
           cd emsdk
-          ./emsdk install 3.1.20
-          ./emsdk activate 3.1.20
+          ./emsdk install 3.1.71
+          ./emsdk activate 3.1.71
         shell: bash
 
       - name: Run depsync
@@ -189,7 +162,15 @@ jobs:
         run: |
           cd web
           emsdk/emsdk_env
-          npm run build
+          npm run build:st
+
+      - name: Cypress run:st
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: web
+          start: npm run server:cypress
+          wait-on: 'http://localhost:8080'
+          command: npm run cypress
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -198,7 +179,8 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: libpag-environment-web-20231130
+            web/package-lock.json
+          key: libpag-environment-web-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -210,7 +192,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web_build
           path: |
@@ -223,8 +205,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -256,7 +236,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: win_build
           path: out
@@ -266,8 +246,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -285,6 +263,11 @@ jobs:
           npm install depsync -g
           depsync
         shell: bash
+
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libx11-dev
+          version: 1.0
 
       - name: Build Linux
         run: |
@@ -304,18 +287,16 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_build
           path: linux
 
   qt:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -335,20 +316,22 @@ jobs:
         shell: bash
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
-          host: 'linux'
+          host: 'mac'
           target: 'desktop'
-          version: '6.6.1'
+          version: '6.8.3'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
+          aqtversion: '==3.2.1'
           cache: 'true'
           cache-key-prefix: 'install-qt-action'
+          modules: 'qtmultimedia'
 
       - name: Build QT
         run: |
           mkdir -p third_party/tgfx/out/cache
-          node build_pag -s ./qt PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
+          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -360,7 +343,111 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: qt_build
           path: out
+
+  ohos:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get CLI Tools Cache
+        id: cli-tools-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /opt/ohos-cmd-tools
+          key: ohos-cli-6.0.0.868-mac-arm64-x64
+          restore-keys: ohos-cli-
+
+      - name: Install CLI Tools
+        if: steps.cli-tools-cache.outputs.cache-hit != 'true'
+        run: |
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/6.0.0.868/commandline-tools-mac-arm64-6.0.0.868.zip"
+          curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
+          unzip -q /tmp/cmdtools.zip -d /tmp
+          sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
+
+      - name: Save CLI Tools Cache
+        if: ${{ (github.event_name == 'push') && (steps.cli-tools-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: /opt/ohos-cmd-tools
+          key: ohos-cli-6.0.0.868-mac-arm64-x64
+
+      - name: Configure Environment
+        run: |
+          CLI_DIR=/opt/ohos-cmd-tools
+          echo "$CLI_DIR/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
+          echo "$CLI_DIR/ohpm/bin"                       >> $GITHUB_PATH
+          echo "$CLI_DIR/hvigor/bin"                     >> $GITHUB_PATH
+          echo "DEVECO_SDK_HOME=$CLI_DIR/sdk"            >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME"                    >> $GITHUB_ENV
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup pnpm
+        run: |
+          npm install -g pnpm@8.13.1
+          echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
+
+      - name: Cache hvigor & ohpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hvigor
+            ~/.ohpm
+          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          restore-keys: |
+            hvigor-${{ runner.os }}-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ohos-
+
+      - name: Configure npm registry
+        run: |
+          npm config set registry https://repo.huaweicloud.com/repository/npm/
+          npm config set "@ohos:registry" https://repo.harmonyos.com/npm/      
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Install ohpm dependencies
+        run: |
+          cd ohos
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+          ohpm install --all
+          pnpm add @ohos/hvigor@3.2.4
+
+      - name: Build Harmony
+        run: |
+          cd ohos
+          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
+          hvigorw assembleHar --mode module -p module=libpag@default -p product=default --no-daemon
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ohos_build
+          path: ohos/out
