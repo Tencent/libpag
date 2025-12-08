@@ -29,9 +29,9 @@ enum class InstallResult { Success, SourceNotFound, PermissionDenied, AeRunning,
 enum class VersionResult {
   Success,
   FileNotFound,
-  InvalidFormat,
-  NoVersionInfo,
-  QueryFailed,
+  DirectoryNotFound,
+  NoPluginFiles,
+  VersionInfoUnavailable
 };
 
 class PluginInstaller : public QObject {
@@ -79,32 +79,22 @@ class PluginInstaller : public QObject {
   int64_t getPluginVersion(const QString& pluginPath) const;
   QStringList getPluginList() const;
 
-#ifdef _WIN32
-  void copyQtResourceFiles(const QStringList& aePaths) const;
-  void deleteQtResourceFiles(const QStringList& aePaths) const;
+  void appendQtResourceCopyCommands(QStringList& commands, const QStringList& aePaths) const;
+  void appendQtResourceDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
   QString getQtResourceDir() const;
   bool shouldExcludeFile(const QString& fileName) const;
   bool shouldExcludeDir(const QString& dirName) const;
 
-  void copyExporterFiles(const QStringList& aePaths) const;
-  void deleteExporterFiles(const QStringList& aePaths) const;
-
-  // Elevated privilege versions for copying to protected directories
-  bool copyExporterFilesWithPrivileges(const QStringList& aePaths) const;
-  bool copyQtResourceFilesWithPrivileges(const QStringList& aePaths) const;
-
-  // Elevated privilege versions for deleting from protected directories
-  bool deleteExporterFilesWithPrivileges(const QStringList& aePaths) const;
-  bool deleteQtResourceFilesWithPrivileges(const QStringList& aePaths) const;
+  void appendExporterCopyCommands(QStringList& commands, const QStringList& aePaths) const;
+  void appendExporterDeleteCommands(QStringList& commands, const QStringList& aePaths) const;
 
   void storeViewerPathForPlugin() const;
 
   bool copyH264EncoderToolsWithRetry(int maxRetries = 5) const;
   QString getH264EncoderToolsInstallDir() const;
-#else
+
   void CopyQtResource(char cmd[], int cmdSize) const;
   void DeleteQtResource(char cmd[], int cmdSize) const;
-#endif
 
   struct Version {
     int major = 0;

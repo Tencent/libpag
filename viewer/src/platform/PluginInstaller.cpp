@@ -164,8 +164,6 @@ QStringList PluginInstaller::getPluginList() const {
   return {"PAGExporter", "H264EncoderTools"};
 }
 
-static constexpr int MaxVersionField = 0xFFFF;
-
 int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
   QString versionString;
   if (getPluginVersionString(pluginPath, versionString) != VersionResult::Success) {
@@ -174,13 +172,16 @@ int64_t PluginInstaller::getPluginVersion(const QString& pluginPath) const {
 
   Version version(versionString);
 
-  int major = qMin(version.major, MaxVersionField);
-  int minor = qMin(version.minor, MaxVersionField);
-  int patch = qMin(version.patch, MaxVersionField);
-  int build = qMin(version.build, MaxVersionField);
+  static constexpr int MaxVersionField = 0xFFFF;
+  if (version.major < 0 || version.major > MaxVersionField ||
+      version.minor < 0 || version.minor > MaxVersionField ||
+      version.patch < 0 || version.patch > MaxVersionField ||
+      version.build < 0 || version.build > MaxVersionField) {
+    return 0;
+  }
 
-  return (static_cast<int64_t>(major) << 48) | (static_cast<int64_t>(minor) << 32) |
-         (static_cast<int64_t>(patch) << 16) | (static_cast<int64_t>(build) << 0);
+  return (static_cast<int64_t>(version.major) << 48) | (static_cast<int64_t>(version.minor) << 32) |
+         (static_cast<int64_t>(version.patch) << 16) | (static_cast<int64_t>(version.build) << 0);
 }
 
 PluginInstaller::Version::Version(const QString& versionStr) {

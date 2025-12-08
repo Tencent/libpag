@@ -40,15 +40,15 @@ function startReplacePathInExecuteFile(){
       install_name_tool -id "$newIdName" $executeName
     fi
 
-    # Delete old rpath (may fail if not exists, ignore error)
+    # Remove old rpath
     install_name_tool -delete_rpath "@executable_path/../Frameworks" $executeName 2>/dev/null || true
 
-    # Add new rpath (may fail if already exists, ignore error)
+    # Add new rpath
     if [ "$isQML" == "true" ]; then
-      install_name_tool -add_rpath "$TARGET_QML_DIR" $executeName 2>/dev/null || true
-      install_name_tool -add_rpath "$QT_FRAMEWORK_DIR" $executeName 2>/dev/null || true
+      install_name_tool -add_rpath "$TARGET_QML_DIR" $executeName
+      install_name_tool -add_rpath "$QT_FRAMEWORK_DRI" $executeName
     else
-      install_name_tool -add_rpath "$QT_FRAMEWORK_DIR" $executeName 2>/dev/null || true
+      install_name_tool -add_rpath "$QT_FRAMEWORK_DRI" $executeName
     fi
 }
 

@@ -157,7 +157,7 @@ QString PluginInstaller::getPluginInstallPath(const QString& pluginName) const {
 }
 
 VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
-                                                      QString& version) const {
+                                                       QString& version) const {
   version.clear();
   QString plistPath;
 
@@ -169,18 +169,22 @@ VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
       plistPath = pluginDirPath + "/Contents/Info.plist";
     } else {
       QDir pluginDir(pluginPath);
+      if (!pluginDir.exists()) {
+        return VersionResult::DirectoryNotFound;
+      }
       QStringList entries = pluginDir.entryList(QDir::Dirs);
+      bool foundPlugin = false;
       for (const QString& entry : entries) {
         if (entry.endsWith(".plugin")) {
           plistPath = pluginPath + "/" + entry + "/Contents/Info.plist";
+          foundPlugin = true;
           break;
         }
       }
+      if (!foundPlugin) {
+        return VersionResult::NoPluginFiles;
+      }
     }
-  }
-
-  if (plistPath.isEmpty()) {
-    return VersionResult::FileNotFound;
   }
 
   if (!QFile::exists(plistPath)) {
@@ -190,7 +194,7 @@ VersionResult PluginInstaller::getPluginVersionString(const QString& pluginPath,
   QSettings plist(plistPath, QSettings::NativeFormat);
   QString versionStr = plist.value("CFBundleVersion").toString();
   if (versionStr.isEmpty()) {
-    return VersionResult::NoVersionInfo;
+    return VersionResult::VersionInfoUnavailable;
   }
 
   version = versionStr;
