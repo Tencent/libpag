@@ -273,7 +273,6 @@ bool FileOperations::executeBatchWithPrivileges(const QList<FileOperation>& oper
 
   QString batPath = tempFile.fileName();
   QString script = generateBatchScript(operations);
-  script += "\necho.\necho Press any key to continue...\npause > nul\n";
 
   tempFile.write(script.toUtf8());
   tempFile.close();
