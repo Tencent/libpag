@@ -22,7 +22,6 @@
 #include <QUrl>
 #include <unordered_set>
 #include "ExportPanelWindow.h"
-#include "PAGReporter.h"
 #include "export/PAGExport.h"
 #include "platform/PlatformHelper.h"
 #include "utils/FileHelper.h"
@@ -196,8 +195,8 @@ void CompositionsModel::exportSelectedCompositions() {
     pagExports.push_back(std::move(pagExport));
   }
 
-  pag::PAGReporter::GetInstance()->setPAGExportEntry("PanelExport");
-  pag::PAGReporter::GetInstance()->setPAGCount(std::to_string(pagExports.size()));
+  qDebug() << "Selected compositions: " << pagExports.size();
+  
   for (auto& pagExport : pagExports) {
     pagExport->session->progressModel.setExportStatus(pagExport->exportFile()
                                                           ? ProgressModel::ExportStatus::Success

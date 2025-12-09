@@ -20,6 +20,4 @@
 
 #include <string>
 
-const std::string AEPluginVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
-const std::string AppKey = "@PAGExporterAppKey@";
-const std::string ReportUrl = "@ReportUrl@";
+const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";

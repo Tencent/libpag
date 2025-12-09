@@ -18,9 +18,9 @@
 
 #include "PAGView.h"
 #include <QSGImageNode>
-#include "PAGReporter.h"
 #include "pag/file.h"
 #include "tgfx/core/Clock.h"
+#include "version.h"
 
 namespace pag {
 
@@ -258,7 +258,7 @@ bool PAGView::setFile(const QString& filePath) {
   Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
   Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
 
-  reportForOpenPAGFile(byteData->length());
+  printForOpenPAGFile(byteData->length());
 
   return true;
 }
@@ -329,15 +329,19 @@ PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
 }
 
-void PAGView::reportForOpenPAGFile(size_t length) {
-  PAGReporter::GetInstance()->setEvent("OPEN_PAG");
-  PAGReporter::GetInstance()->addParam("FileSize", std::to_string(length));
-  PAGReporter::GetInstance()->addParam("PAGLayerCount", std::to_string(pagFile->numChildren()));
-  PAGReporter::GetInstance()->addParam("VideoCompositionCount",
-                                       std::to_string(pagFile->numVideos()));
-  PAGReporter::GetInstance()->addParam("PAGTextLayerCount", std::to_string(pagFile->numTexts()));
-  PAGReporter::GetInstance()->addParam("PAGImageLayerCount", std::to_string(pagFile->numImages()));
-  PAGReporter::GetInstance()->report();
+void PAGView::printForOpenPAGFile(size_t length) {
+  QVariantMap map;
+  map["AppName"] = "PAGViewer";
+  map["AppVersion"] = QString::fromStdString(UpdateChannel == "beta" ? AppVersion + "-beta"
+                                                                         : AppVersion);
+  map["AppBundleId"] = "com.tencent.pagviewer";
+  map["Event"] = "OPEN_PAG";
+  map["FileSize"] = QString::number(length);
+  map["PAGLayerCount"] = QString::number(pagFile->numChildren());
+  map["VideoCompositionCount"] = QString::number(pagFile->numVideos());
+  map["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
+  map["PAGImageLayerCount"] = QString::number(pagFile->numImages());
+  qDebug() << map;
 }
 
 void PAGView::setProgressInternal(double progress, bool isAudioSeek) {

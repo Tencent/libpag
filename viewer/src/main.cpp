@@ -20,20 +20,10 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
-#include "PAGReporter.h"
 #include "PAGUpdater.h"
 #include "PAGViewer.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
-#include "version.h"
-
-static void InitReportConfig() {
-  pag::PAGReporter::GetInstance()->setAppKey(AppKey);
-  pag::PAGReporter::GetInstance()->setAppName("PAGViewer");
-  pag::PAGReporter::GetInstance()->setAppVersion(UpdateChannel == "beta" ? AppVersion + "-beta"
-                                                                         : AppVersion);
-  pag::PAGReporter::GetInstance()->setAppBundleId("com.tencent.pagviewer");
-}
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;
@@ -76,7 +66,6 @@ int main(int argc, char* argv[]) {
   app.openFile(QString::fromLocal8Bit(filePath.data()));
 
   pag::InitUpdater();
-  InitReportConfig();
 
   return QApplication::exec();
 }

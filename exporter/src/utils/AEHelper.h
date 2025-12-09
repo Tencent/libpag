@@ -33,6 +33,8 @@ struct AEVersion {
 
 std::shared_ptr<AEGP_SuiteHandler> GetSuites();
 
+std::string GetAeVersion();
+
 AEGP_PluginID GetPluginID();
 
 QString GetProjectName();

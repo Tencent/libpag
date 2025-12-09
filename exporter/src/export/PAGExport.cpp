@@ -22,7 +22,6 @@
 #include "ExportComposition.h"
 #include "ExportVerify.h"
 #include "Marker.h"
-#include "PAGReporter.h"
 #include "data/ImageBytes.h"
 #include "sequence/AudioSequence.h"
 #include "src/base/utils/Log.h"
@@ -36,9 +35,9 @@
 
 namespace exporter {
 
-static void ReportExportFailed() {
-  pag::PAGReporter::GetInstance()->addParam("ExportStatus", "fail");
-  pag::PAGReporter::GetInstance()->report();
+static void ReportExportInfo(const QVariantMap& map) {
+  qDebug() << "Export Info:";
+  qDebug() << map;
 }
 
 static bool ValidatePAGFile(uint8_t* data, size_t size) {
@@ -216,36 +215,41 @@ bool PAGExport::exportFile() {
     return false;
   }
   auto pagFile = exportAsFile();
-  pag::PAGReporter::GetInstance()->setEvent("EXPORT_PAG");
-  pag::PAGReporter::GetInstance()->addParam("AEVersion", AEPluginVersion);
+  QVariantMap exportInfo;
+  exportInfo["AppName"] = "PAGExporter";
+  exportInfo["AppVersion"] = QString::fromStdString(AppVersion);
+  exportInfo["AEVersion"] = QString::fromStdString(GetAeVersion());
+  exportInfo["AppBundleId"] = "PAGExporter";
+  exportInfo["Event"] = "EXPORT_PAG";
   if (pagFile == nullptr) {
-    ReportExportFailed();
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
-  pag::PAGReporter::GetInstance()->addParam("PAGLayerCount", std::to_string(pagFile->numLayers()));
-  pag::PAGReporter::GetInstance()->addParam("VideoCompositionCount",
-                                            std::to_string(pagFile->numVideos()));
-  pag::PAGReporter::GetInstance()->addParam("PAGTextLayerCount",
-                                            std::to_string(pagFile->numTexts()));
-  pag::PAGReporter::GetInstance()->addParam("PAGImageLayerCount",
-                                            std::to_string(pagFile->numImages()));
+  exportInfo["PAGLayerCount"] = QString::number(pagFile->numLayers());
+  exportInfo["VideoCompositionCount"] = QString::number(pagFile->numVideos());
+  exportInfo["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
+  exportInfo["PAGImageLayerCount"] = QString::number(pagFile->numImages());
 
   const auto bytes = pag::Codec::Encode(pagFile);
   if (bytes->length() == 0) {
-    ReportExportFailed();
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
   if (!ValidatePAGFile(bytes->data(), bytes->length())) {
-    ReportExportFailed();
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
   if (!WriteToFile(session->outputPath, reinterpret_cast<char*>(bytes->data()),
                    static_cast<std::streamsize>(bytes->length()))) {
-    ReportExportFailed();
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
-  pag::PAGReporter::GetInstance()->addParam("ExportStatus", "success");
-  pag::PAGReporter::GetInstance()->report();
+  exportInfo["ExportStatus"] = "success";
+  ReportExportInfo(exportInfo);
   return true;
 }
 
