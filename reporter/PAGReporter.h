@@ -18,25 +18,11 @@
 
 #pragma once
 
-#include <QNetworkReply>
-#include <QObject>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace pag {
-
-class HttpClient : public QObject {
-  Q_OBJECT
- public:
-  explicit HttpClient(QObject* parent = nullptr);
-  void post(const std::string& url, const std::string& data);
-
- private:
-  Q_SLOT void onFinished(QNetworkReply* reply);
-
-  std::unique_ptr<QNetworkAccessManager> manager = nullptr;
-};
 
 class PAGReporter {
  public:
@@ -62,21 +48,8 @@ class PAGReporter {
 
  private:
   PAGReporter();
-  std::string generateReportData();
 
   static PAGReporter* instance;
-
-  std::string event = "";
-  std::string appKey = "";
-  std::string appName = "";
-  std::string pagCount = "";
-  std::string reportUrl = "";
-  std::string appVersion = "";
-  std::string appBundleId = "";
-  std::string appPlatform = "";
-  std::string pagExportEntry = "";
-  std::unique_ptr<HttpClient> httpClient = nullptr;
-  std::vector<std::pair<std::string, std::string> > extraParams = {};
 };
 
 }  // namespace pag

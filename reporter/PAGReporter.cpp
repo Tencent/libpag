@@ -17,151 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGReporter.h"
-#include <QDebug>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QUrl>
-#include <chrono>
-#include <string>
-#include "version.h"
 
 namespace pag {
-
-static const int ReportTimeout = 5000;
-
-HttpClient::HttpClient(QObject* parent) : QObject(parent) {
-  manager = std::make_unique<QNetworkAccessManager>();
-  connect(manager.get(), &QNetworkAccessManager::finished, this, &HttpClient::onFinished);
-}
-
-void HttpClient::post(const std::string& url, const std::string& data) {
-  QUrl request_url = QString::fromStdString(url);
-  QNetworkRequest request(request_url);
-  request.setTransferTimeout(ReportTimeout);
-  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json;charset=UTF-8");
-  QByteArray jsonData = QString::fromStdString(data).toUtf8();
-  manager->post(request, jsonData);
-}
-
-void HttpClient::onFinished(QNetworkReply* reply) {
-  if (reply->error() == QNetworkReply::NoError) {
-    QByteArray responseData = reply->readAll();
-    qDebug() << "Http Response: \n" << responseData;
-  } else {
-    qDebug() << "Http Error: \n" << reply->errorString();
-  }
-  reply->deleteLater();
-}
-
-std::string GetCurrentTimeInMilliseconds() {
-  auto now = std::chrono::system_clock::now();
-  auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-  auto value = now_ms.time_since_epoch();
-  return std::to_string(value.count());
-}
 
 PAGReporter* PAGReporter::instance = nullptr;
 
 PAGReporter::PAGReporter() {
-#if defined(WIN32)
-  appPlatform = "Windows";
-#elif defined(Q_OS_MACOS)
-  appPlatform = "macOS";
-#else
-  appPlatform = "Unknown";
-#endif
-  event = "pag_sdk_report";
-  reportUrl = ReportUrl;
-  httpClient = std::make_unique<HttpClient>();
 }
 
 void PAGReporter::report() {
-  std::string reportData = generateReportData();
-  if (httpClient != nullptr) {
-    httpClient->post(reportUrl, reportData);
-  }
-  extraParams.clear();
 }
 
-void PAGReporter::setEvent(const std::string& event) {
-  this->event = event;
+void PAGReporter::setEvent(const std::string&) {
 }
 
-void PAGReporter::addParam(const std::string& key, const std::string& value) {
-  extraParams.emplace_back(key, value);
+void PAGReporter::addParam(const std::string&, const std::string&) {
 }
 
-void PAGReporter::setAppKey(const std::string& appKey) {
-  this->appKey = appKey;
+void PAGReporter::setAppKey(const std::string&) {
 }
 
-void PAGReporter::setAppName(const std::string& appName) {
-  this->appName = appName;
+void PAGReporter::setAppName(const std::string&) {
 }
 
-void PAGReporter::setAppVersion(const std::string& appVersion) {
-  this->appVersion = appVersion;
+void PAGReporter::setAppVersion(const std::string&) {
 }
 
-void PAGReporter::setAppBundleId(const std::string& appBundleId) {
-  this->appBundleId = appBundleId;
+void PAGReporter::setAppBundleId(const std::string&) {
 }
 
-void PAGReporter::setPAGCount(const std::string& pagCount) {
-  this->pagCount = pagCount;
+void PAGReporter::setPAGCount(const std::string&) {
 }
 
-void PAGReporter::setPAGExportEntry(const std::string& pagExportEntry) {
-  this->pagExportEntry = pagExportEntry;
-}
-
-std::string PAGReporter::generateReportData() {
-  QJsonObject root;
-  root["appVersion"] = "";
-  root["sdkId"] = "js";
-  root["sdkVersion"] = "4.3.4-web";
-  root["mainAppKey"] = QString::fromStdString(appKey);
-  root["platformId"] = "3";
-
-  QJsonObject common;
-  common["A2"] = QString::fromStdString(this->event);
-  root["common"] = common;
-
-  QJsonObject mapValue;
-  mapValue["appName"] = QString::fromStdString(appName);
-  mapValue["appID"] = QString::fromStdString(appBundleId);
-  mapValue["appPlatform"] = QString::fromStdString(appPlatform);
-  mapValue["previousSDKVersion"] = QString::fromStdString(appVersion);
-  if (QString::compare(QString::fromStdString(appName), "PAGViewer", Qt::CaseInsensitive) == 0) {
-    mapValue["PAGViewerVersion"] = QString::fromStdString(appVersion);
-  } else if (QString::compare(QString::fromStdString(appName), "PAGExporter", Qt::CaseInsensitive) == 0) {
-    mapValue["PAGExportVersion"] = QString::fromStdString(appVersion);
-  }
-  if (!pagCount.empty()) {
-    mapValue["PAGCount"] = QString::fromStdString(pagCount);
-  }
-  if (!pagExportEntry.empty()) {
-    mapValue["PAGExportEntry"] = QString::fromStdString(pagExportEntry);
-  }
-  for (const auto& pair : extraParams) {
-    mapValue[QString::fromStdString(pair.first)] = QString::fromStdString(pair.second);
-  }
-
-  QJsonObject eventObj;
-  eventObj["eventCode"] = QString::fromStdString(this->event);
-  eventObj["eventTime"] = QString::fromStdString(GetCurrentTimeInMilliseconds());
-  eventObj["mapValue"] = mapValue;
-
-  QJsonArray events;
-  events.append(eventObj);
-  root["events"] = events;
-
-  QJsonDocument doc(root);
-  return doc.toJson(QJsonDocument::Indented).toStdString();
+void PAGReporter::setPAGExportEntry(const std::string&) {
 }
 
 }  // namespace pag
