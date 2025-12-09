@@ -88,8 +88,6 @@ if ($ENV{isStableVersion} MATCHES "true")
 else ()
     set(UpdateChannel "beta")
 endif ()
-set(PAGViewerAppKey $ENV{PAGViewerAppKey})
-set(ReportUrl $ENV{ReportUrl})
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
     ${CMAKE_SOURCE_DIR}/src/version.h
     @ONLY

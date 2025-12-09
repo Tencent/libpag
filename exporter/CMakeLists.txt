@@ -86,8 +86,6 @@ if (DEFINED ENV{BK_CI_BUILD_NO})
 else()
     set(BuildNumber "0")
 endif ()
-set(PAGExporterAppKey $ENV{PAGExporterAppKey})
-set(ReportUrl $ENV{ReportUrl})
 configure_file(${CMAKE_SOURCE_DIR}/templates/version.h.in
         ${CMAKE_SOURCE_DIR}/src/version.h
         @ONLY
