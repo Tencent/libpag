@@ -16,7 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-export { PAGView, PAGViewListener, PAGViewController } from './src/main/ets/PAGView'
+export { PAGViewListener, PAGViewController } from './src/main/ets/PAGViewController'
+
+export { PAGView } from './src/main/ets/PAGView'
+
+export { PAGViewV2 } from './src/main/ets/PAGViewV2'
 
 export { PAGPlayer } from './src/main/ets/PAGPlayer'
 
@@ -48,4 +52,8 @@ export { PAG } from './src/main/ets/PAG'
 
 export { PAGDiskCache } from './src/main/ets/PAGDiskCache'
 
-export { PAGImageView, PAGImageViewController, PAGImageViewListener } from './src/main/ets/PAGImageView'
+export { PAGImageViewController, PAGImageViewListener } from './src/main/ets/PAGImageViewController'
+
+export { PAGImageView } from './src/main/ets/PAGImageView'
+
+export { PAGImageViewV2 } from './src/main/ets/PAGImageViewV2'
