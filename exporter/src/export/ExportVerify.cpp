@@ -368,8 +368,13 @@ static bool CompareVideoComposition(std::shared_ptr<PAGExportSession> session,
   }
 
   for (pag::Frame frame = 0; frame < composition1->duration && !session->stopExport; frame++) {
-    auto image1 = GetCompositionFrameImage(session->itemHandleMap[composition1->id], frame);
-    auto image2 = GetCompositionFrameImage(session->itemHandleMap[composition2->id], frame);
+    auto itemIter1 = session->itemHandleMap.find(composition1->id);
+    auto itemIter2 = session->itemHandleMap.find(composition2->id);
+    if (itemIter1 == session->itemHandleMap.end() || itemIter2 == session->itemHandleMap.end()) {
+      return false;
+    }
+    auto image1 = GetCompositionFrameImage(itemIter1->second, frame);
+    auto image2 = GetCompositionFrameImage(itemIter2->second, frame);
     if (image1 != image2) {
       return false;
     }

@@ -89,10 +89,16 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
   auto frameRate = composition->frameRate;
   auto duration = composition->duration;
 
-  AEGP_ItemH itemHandle = session->itemHandleMap[composition->id];
+  auto itemIter = session->itemHandleMap.find(composition->id);
+  if (itemIter == session->itemHandleMap.end()) {
+    session->pushWarning(AlertInfoType::ExportRenderError);
+    return;
+  }
+  AEGP_ItemH itemH = itemIter->second;
   AEGP_RenderOptionsH renderOptions = nullptr;
-  Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemH, &renderOptions);
   if (renderOptions == nullptr) {
+    session->pushWarning(AlertInfoType::ExportRenderError);
     return;
   }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);
@@ -107,6 +113,8 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
   bottom = -1;
   uint8_t* data = nullptr;
   for (pag::Frame frame = 0; frame < duration && !session->stopExport; frame++) {
+    SetRenderTime(renderOptions, frameRate, frame);
+
     A_long width = 0;
     A_long height = 0;
     A_u_long srcStride = 0;
@@ -224,10 +232,16 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     }
   }
 
-  auto itemHandle = session->itemHandleMap[composition->id];
+  auto itemIter = session->itemHandleMap.find(composition->id);
+  if (itemIter == session->itemHandleMap.end()) {
+    session->pushWarning(AlertInfoType::ExportRenderError);
+    return;
+  }
+  AEGP_ItemH itemH = itemIter->second;
   AEGP_RenderOptionsH renderOptions = nullptr;
-  Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemHandle, &renderOptions);
+  Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemH, &renderOptions);
   if (renderOptions == nullptr) {
+    session->pushWarning(AlertInfoType::ExportRenderError);
     return;
   }
   Suites->RenderOptionsSuite3()->AEGP_SetWorldType(renderOptions, AEGP_WorldType_8);

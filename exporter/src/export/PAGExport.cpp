@@ -188,7 +188,10 @@ static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {
   }
   for (auto layer : trackMatteLayers) {
     maxID += 1;
-    session->itemHandleMap[maxID] = session->itemHandleMap[layer->id];
+    auto itemIter = session->itemHandleMap.find(layer->id);
+    if (itemIter != session->itemHandleMap.end()) {
+      session->itemHandleMap[maxID] = itemIter->second;
+    }
     layer->id = maxID;
   }
 }

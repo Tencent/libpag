@@ -299,6 +299,12 @@ print "[ Copy related tools ]"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
 cp -f ${EncoderToolsPath} ${ResourcesDir}
 
+# 3.5.4 Copy Qt deployment scripts
+print "[ Copy Qt deployment scripts ]"
+cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
+cp -f "${SourceDir}/qttools/delete_old_qt_resource.sh" "${ResourcesDir}/"
+cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
+
 # 3.6 Update plist
 print "[ Update plist ]"
 DSAPublicKeyName=$(basename "${DSAPublicKey}")
