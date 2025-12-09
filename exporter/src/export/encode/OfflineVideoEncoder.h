@@ -47,6 +47,7 @@ class OfflineVideoEncoder : public VideoEncoder {
   bool open(int width, int height, double frameRate, bool hasAlpha, int maxKeyFrameInterval,
             int quality) override;
   void close() override;
+  bool isRunning() override;
   void getInputFrameBuf(uint8_t* data[], int stride[]) override;
   int encodeHeaders(uint8_t* header[], int headerSize[]) override;
   void encodeFrame(uint8_t* data[], int stride[], FrameType frameType) override;

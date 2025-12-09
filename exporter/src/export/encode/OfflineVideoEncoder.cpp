@@ -142,6 +142,10 @@ void OfflineVideoEncoder::close() {
   writeEndParam(true, false, endFile);
 }
 
+bool OfflineVideoEncoder::isRunning() {
+  return process->state() == QProcess::Running;
+}
+
 void OfflineVideoEncoder::exit() {
   if (process->state() == QProcess::Running) {
     process->waitForFinished(10000);

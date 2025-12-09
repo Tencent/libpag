@@ -354,7 +354,8 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
     pagEncodeThread->close();
 
-    while (!session->stopExport && sequence->frames.size() < static_cast<size_t>(exportFrameNum)) {
+    while (!session->stopExport && sequence->frames.size() < static_cast<size_t>(exportFrameNum) &&
+           pagEncodeThread->isRunning()) {
       QApplication::processEvents();
     }
     pagEncodeThread->getAlphaStartXY(&sequence->alphaStartX, &sequence->alphaStartY);

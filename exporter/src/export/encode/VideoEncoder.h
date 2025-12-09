@@ -38,6 +38,7 @@ class VideoEncoder {
   virtual bool open(int width, int height, double frameRate, bool hasAlpha, int maxKeyFrameInterval,
                     int quality) = 0;
   virtual void close() = 0;
+  virtual bool isRunning() = 0;
   virtual void encodeFrame(uint8_t* data[], int stride[], FrameType frameType) = 0;
   virtual int encodeHeaders(uint8_t* header[], int headerSize[]) = 0;
   virtual void getInputFrameBuf(uint8_t* data[], int stride[]) = 0;
@@ -53,6 +54,7 @@ class VideoEncoder {
 class PAGEncoder {
  public:
   explicit PAGEncoder(bool hardwareEncode = false);
+  bool isRunning();
   bool init(int width, int height, double frameRate, bool hasAlpha, int maxKeyFrameInterval = 0,
             int quality = 0);
   void getAlphaStartXY(int32_t* pAlphaStartX, int32_t* pAlphaStartY);

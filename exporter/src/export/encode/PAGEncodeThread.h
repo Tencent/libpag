@@ -35,6 +35,7 @@ class PAGEncodeThread : public QThread {
   explicit PAGEncodeThread(QObject* parent = nullptr);
   ~PAGEncodeThread() override;
 
+  bool isRunning() const;
   void close();
   void setPAGEncoder(std::unique_ptr<PAGEncoder> encoder);
   void setEncodeFrameCallback(const EncodeFrameCallback& callback);

@@ -72,6 +72,10 @@ PAGEncoder::PAGEncoder(bool hardwareEncode) {
   encoder = VideoEncoder::MakeVideoEncoder(hardwareEncode);
 }
 
+bool PAGEncoder::isRunning() {
+  return encoder->isRunning();
+}
+
 bool PAGEncoder::init(int width, int height, double frameRate, bool hasAlpha,
                       int maxKeyFrameInterval, int quality) {
   inputWidth = width;
