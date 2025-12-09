@@ -121,6 +121,11 @@ PAGWindow {
                     }
                 }
             }
+            updateButton {
+                onClicked: {
+                    checkForUpdates(false);
+                }
+            }
             backgroundButton {
                 checked: mainForm.isBackgroundOn
                 onClicked: {
