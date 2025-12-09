@@ -37,6 +37,10 @@ PAGEncodeThread::~PAGEncodeThread() {
   wait();
 }
 
+bool PAGEncodeThread::isRunning() const {
+  return encoder != nullptr && encoder->isRunning();
+}
+
 void PAGEncodeThread::close() {
   inputFinished = true;
   if (encoder != nullptr) {
