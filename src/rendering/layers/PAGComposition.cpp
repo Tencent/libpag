@@ -680,49 +680,4 @@ void PAGComposition::updateDurationAndFrameRate() {
   }
 }
 
-bool PAGComposition::hasVideo() const {
-  // Check if current composition is a PAGFile with video
-  if (isPAGFile() && file) {
-    for (const auto& composition : file->compositions) {
-      if (composition->type() == CompositionType::Video) {
-        return true;
-      }
-    }
-  }
-
-  // Recursively check all child layers
-  for (const auto& childLayer : layers) {
-    if (childLayer->layerType() == LayerType::PreCompose) {
-      // Recursively check nested PAGComposition
-      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
-      if (childComposition->hasVideo()) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-Frame PAGComposition::getTargetFrame(PreComposeLayer* preLayer) {
-  Frame targetFrame = -1;
-  if (preLayer == nullptr) {
-    return targetFrame;
-  }
-  auto composition = preLayer->composition;
-  if (composition->type() == CompositionType::Bitmap ||
-      composition->type() == CompositionType::Video) {
-    auto layerFrame = preLayer->startTime + contentFrame;
-    targetFrame = preLayer->getCompositionFrame(layerFrame);
-  }
-
-  auto sequence = Sequence::Get(composition);
-  if (sequence == nullptr) {
-    return targetFrame;
-  }
-  targetFrame = sequence->toSequenceFrame(targetFrame);
-
-  return targetFrame;
-}
-
 }  // namespace pag

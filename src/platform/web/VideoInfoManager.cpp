@@ -20,29 +20,13 @@
 #include "pag/file.h"
 
 namespace pag {
-
-void getPAGFileFromPAGComposition(std::shared_ptr<PAGComposition>& pagComposition,
-                                  std::vector<std::shared_ptr<PAGFile>>& pagFiles) {
-  if (pagComposition == nullptr) {
-    return;
-  }
-
-  // Check if current composition is a PAGFile with video
-  if (pagComposition->isPAGFile() && pagComposition->hasVideo()) {
-    pagFiles.push_back(std::static_pointer_cast<PAGFile>(pagComposition));
-  }
-
-  // Recursively check all child layers
-  auto layerSize = pagComposition->numChildren();
-  for (int i = 0; i < layerSize; ++i) {
-    auto childLayer = pagComposition->getLayerAt(i);
-
-    // Only process if child layer is a PAGComposition (check type first)
-    if (childLayer->layerType() == LayerType::PreCompose) {
-      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
-      getPAGFileFromPAGComposition(childComposition, pagFiles);
+bool IsFrameInStaticRange(Frame targetFrame, std::vector<TimeRange>& staticTimeRanges) {
+  for (const auto& timeRange : staticTimeRanges) {
+    if (timeRange.contains(targetFrame)) {
+      return true;
     }
   }
+  return false;
 }
 
 VideoInfoManager::VideoInfoManager(std::shared_ptr<PAGComposition> pagComposition)
@@ -59,11 +43,10 @@ VideoInfoManager::VideoInfoManager(std::shared_ptr<PAGComposition> pagCompositio
         videoInfo.height = videoInfo.videoSequence->getVideoHeight();
         videoInfo.frameRate = videoInfo.videoSequence->frameRate;
         videoInfo.preLayer =
-            pagFile->getPreLayerByComposition(pagFile->getFile()->getRootLayer(), composition);
-        videoIDs.push_back(composition->uniqueID);
-        videoInfo.pagComposition =
-            pagFile->findCompositionByPreComposeLayer(pagFile, videoInfo.preLayer);
+            getPreLayerByComposition(pagFile->getFile()->getRootLayer(), composition);
+        videoInfo.pagCompositions = findCompositionByPreComposeLayer(pagFile, videoInfo.preLayer);
         videoInfoMap.emplace(composition->uniqueID, std::move(videoInfo));
+        videoIDs.push_back(composition->uniqueID);
       }
     }
   }
@@ -141,16 +124,20 @@ int VideoInfoManager::getTargetFrameByID(ID id) {
   auto iter = videoInfoMap.find(id);
 
   if (iter != videoInfoMap.end()) {
-    auto pagComposition = iter->second.pagComposition;
-    if (pagComposition == nullptr || pagComposition->parent() == nullptr ||
-        iter->second.preLayer == nullptr) {
-      return -1;
+    for (auto pagComposition : iter->second.pagCompositions) {
+      if (pagComposition == nullptr || pagComposition->parent() == nullptr ||
+          iter->second.preLayer == nullptr) {
+        continue;
+      }
+      if (pagComposition->parent()->contentFrame < 0) {
+        continue;
+      }
+      Frame targetFrame = getTargetFrame(pagComposition, iter->second.preLayer);
+      if (IsFrameInStaticRange(targetFrame, iter->second.videoSequence->staticTimeRanges)) {
+        continue;
+      }
+      return static_cast<int>(targetFrame);
     }
-    if (pagComposition->parent()->getContentFrame() < 0) {
-      return -1;
-    }
-    Frame targetFrame = pagComposition->getTargetFrame(iter->second.preLayer);
-    return static_cast<int>(targetFrame);
   }
   return -1;
 }
@@ -178,6 +165,166 @@ emscripten::val VideoInfoManager::getVideoIDs() {
     jsArray.call<void>("push", videoIDs[i]);
   }
   return jsArray;
+}
+
+bool VideoInfoManager::hasTimeRangeOverlap() const {
+  // Iterate through each VideoInfo in videoInfoMap
+  for (const auto& videoPair : videoInfoMap) {
+    const auto& pagCompositions = videoPair.second.pagCompositions;
+
+    if (pagCompositions.size() <= 1) {
+      continue;
+    }
+
+    // Check each pair of pagCompositions for time range overlap
+    for (size_t i = 0; i < pagCompositions.size() - 1; ++i) {
+      const auto& comp1 = pagCompositions[i];
+      if (comp1 == nullptr || comp1->parent() == nullptr) {
+        continue;
+      }
+
+      Frame startFrame1 = comp1->parent()->startFrame;
+      Frame endFrame1 = startFrame1 + comp1->parent()->frameDuration();
+
+      for (size_t j = i + 1; j < pagCompositions.size(); ++j) {
+        const auto& comp2 = pagCompositions[j];
+        if (comp2 == nullptr || comp2->parent() == nullptr) {
+          continue;
+        }
+
+        Frame startFrame2 = comp2->parent()->startFrame;
+        Frame endFrame2 = startFrame2 + comp2->parent()->frameDuration();
+
+        // Check if time ranges [startFrame1, endFrame1) and [startFrame2, endFrame2) overlap
+        if (startFrame1 < endFrame2 && startFrame2 < endFrame1) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+bool VideoInfoManager::HasVideo(std::shared_ptr<PAGComposition>& pagComposition) {
+  // Check if current composition is a PAGFile with video
+  if (pagComposition->isPAGFile() && pagComposition->file) {
+    for (const auto& composition : pagComposition->file->compositions) {
+      if (composition->type() == CompositionType::Video) {
+        return true;
+      }
+    }
+  }
+
+  // Recursively check all child layers
+  for (const auto& childLayer : pagComposition->layers) {
+    if (childLayer->layerType() == LayerType::PreCompose) {
+      // Recursively check nested PAGComposition
+      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+      if (HasVideo(childComposition)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+void VideoInfoManager::getPAGFileFromPAGComposition(
+    std::shared_ptr<PAGComposition>& pagComposition,
+    std::vector<std::shared_ptr<PAGFile>>& pagFiles) {
+  if (pagComposition == nullptr) {
+    return;
+  }
+
+  // Check if current composition is a PAGFile with video
+  if (pagComposition->isPAGFile() && HasVideo(pagComposition)) {
+    pagFiles.push_back(std::static_pointer_cast<PAGFile>(pagComposition));
+  }
+
+  // Recursively check all child layers
+  auto layerSize = pagComposition->numChildren();
+  for (int i = 0; i < layerSize; ++i) {
+    auto childLayer = pagComposition->getLayerAt(i);
+
+    // Only process if child layer is a PAGComposition (check type first)
+    if (childLayer->layerType() == LayerType::PreCompose) {
+      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+      getPAGFileFromPAGComposition(childComposition, pagFiles);
+    }
+  }
+}
+
+PreComposeLayer* VideoInfoManager::getPreLayerByComposition(PreComposeLayer* preLayer,
+                                                            Composition* com) {
+  if (preLayer == nullptr || com == nullptr) {
+    return nullptr;
+  }
+
+  if (preLayer->composition == com) {
+    return preLayer;
+  }
+
+  if (preLayer->composition != nullptr &&
+      preLayer->composition->type() == CompositionType::Vector) {
+    auto* vectorCom = static_cast<VectorComposition*>(preLayer->composition);
+    for (Layer* layer : vectorCom->layers) {
+      if (layer == nullptr) continue;
+      if (layer->type() == LayerType::PreCompose) {
+        auto* childPre = static_cast<PreComposeLayer*>(layer);
+        PreComposeLayer* result = getPreLayerByComposition(childPre, com);
+        if (result != nullptr) {
+          return result;
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+std::vector<std::shared_ptr<PAGComposition>> VideoInfoManager::findCompositionByPreComposeLayer(
+    std::shared_ptr<PAGComposition> composition, PreComposeLayer* targetPreLayer) {
+  std::vector<std::shared_ptr<PAGComposition>> results;
+
+  if (composition == nullptr || targetPreLayer == nullptr) {
+    return results;
+  }
+
+  if (composition->layer == targetPreLayer) {
+    results.push_back(composition);
+  }
+
+  for (const auto& childLayer : composition->layers) {
+    if (childLayer->layerType() == LayerType::PreCompose) {
+      auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+      auto childResults = findCompositionByPreComposeLayer(childComposition, targetPreLayer);
+      results.insert(results.end(), childResults.begin(), childResults.end());
+    }
+  }
+
+  return results;
+}
+
+Frame VideoInfoManager::getTargetFrame(std::shared_ptr<PAGComposition>& pagComposition,
+                                       PreComposeLayer* preLayer) {
+  Frame targetFrame = -1;
+  if (preLayer == nullptr) {
+    return targetFrame;
+  }
+  auto composition = preLayer->composition;
+  if (composition->type() == CompositionType::Bitmap ||
+      composition->type() == CompositionType::Video) {
+    auto layerFrame = preLayer->startTime + pagComposition->contentFrame;
+    targetFrame = preLayer->getCompositionFrame(layerFrame);
+  }
+
+  auto sequence = Sequence::Get(composition);
+  if (sequence == nullptr) {
+    return targetFrame;
+  }
+  targetFrame = sequence->toSequenceFrame(targetFrame);
+
+  return targetFrame;
 }
 
 }  // namespace pag

@@ -117,6 +117,7 @@ export interface PAG extends EmscriptenModule {
   videoReaderManager: VideoReaderManager | null;
   _videoInfoManager: {
     _Make: (pagFile:any) => any;
+    _HasVideo:(pagFile:any) => any;
   };
   [key: string]: any;
 }

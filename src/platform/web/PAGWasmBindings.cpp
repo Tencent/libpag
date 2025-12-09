@@ -299,8 +299,7 @@ bool PAGBindInit() {
                     jsArray.call<void>("push", PAGLayerToJsObject(layerVector[i]));
                   }
                   return jsArray;
-                }))
-      .function("_hasVideo", &PAGComposition::hasVideo);
+                }));
 
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
@@ -589,6 +588,10 @@ bool PAGBindInit() {
                       optional_override([](std::shared_ptr<PAGComposition> pagComposition) {
                         return std::make_shared<VideoInfoManager>(pagComposition);
                       }))
+      .class_function("_HasVideo",
+                      optional_override([](std::shared_ptr<PAGComposition> pagComposition) {
+                        return VideoInfoManager::HasVideo(pagComposition);
+                      }))
       .function("_getMp4DataByID", &VideoInfoManager::getMp4DataByID)
       .function("_getWidthByID", &VideoInfoManager::getWidthByID)
       .function("_getHeightByID", &VideoInfoManager::getHeightByID)
@@ -596,7 +599,8 @@ bool PAGBindInit() {
       .function("_getStaticTimeRangesByID", &VideoInfoManager::getStaticTimeRangesByID)
       .function("_getVideoIDs", &VideoInfoManager::getVideoIDs)
       .function("_getTargetFrameByID", &VideoInfoManager::getTargetFrameByID)
-      .function("_getPlaybackRateByID", &VideoInfoManager::getPlaybackRateByID);
+      .function("_getPlaybackRateByID", &VideoInfoManager::getPlaybackRateByID)
+      .function("_hasTimeRangeOverlap", &VideoInfoManager::hasTimeRangeOverlap);
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
       .property("applyFill", &TextDocument::applyFill)

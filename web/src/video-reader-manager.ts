@@ -12,6 +12,16 @@ import {destroyVerify} from "./utils/decorators";
 export class VideoReaderManager {
 
     /**
+     * Checks whether the given PAG composition contains any video content.
+     * @param wasmIns - The WebAssembly instance to check
+     * @returns True if the composition contains video, false otherwise
+     */
+    public static HasVideo(wasmIns: any){
+        return PAGModule._videoInfoManager._HasVideo(wasmIns) as boolean;
+    }
+
+
+    /**
      * Factory method to create and initialize a VideoReaderManager instance.
      * @param wasmIns - The WebAssembly instance containing video information
      * @returns A promise that resolves to a fully initialized VideoReaderManager instance
@@ -48,6 +58,10 @@ export class VideoReaderManager {
             throw new Error('create VideoReaderManager fail!');
         }
         this.videoIDs = this.wasmIns._getVideoIDs() as Array<number>;
+        if (this.wasmIns._hasTimeRangeOverlap() as boolean) {
+            console.error("The current file contains multiple layers referencing the same video with overlapping timelines. " +
+                "This scenario is not supported, and the rendered result may not match expectations. It is recommended to offset the timelines of these layers.");
+        }
     }
 
     /**
@@ -92,7 +106,7 @@ export class VideoReaderManager {
      * This method is called during rendering to ensure the correct frames are decoded.
      * It handles both hardware and software decoding modes.
      */
-    public async getTargetFrame() {
+    public async prepareTargetFrame() {
         for (const id of this.videoIDs) {
             // Skip videos that are already using software decoding
             if (this.softWareDecodeEnableMap.get(id) !== undefined && this.softWareDecodeEnableMap.get(id)) {

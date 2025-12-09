@@ -440,7 +440,6 @@ export class PAGView {
         this.clearTimer();
       }
       console.error(e.stack);
-      throw e;
     }
   }
 

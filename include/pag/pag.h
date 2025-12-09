@@ -507,7 +507,6 @@ class PAG_API PAGLayer : public Content {
   PAGLayer* getParentOrOwner() const;
   bool getTransform(Transform* transform);
   bool gotoTimeAndNotifyChanged(int64_t targetTime);
-  Frame getContentFrame() const;
 
   friend class PAGComposition;
 
@@ -952,9 +951,6 @@ class PAG_API PAGComposition : public PAGLayer {
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
-  // internal use only.
-  bool hasVideo() const;
-
  protected:
   int _width = 0;
   int _height = 0;
@@ -1007,7 +1003,6 @@ class PAG_API PAGComposition : public PAGLayer {
   void doSetLayerIndex(std::shared_ptr<PAGLayer> pagLayer, int index);
   bool doContains(PAGLayer* layer) const;
   void updateDurationAndFrameRate();
-  Frame getTargetFrame(PreComposeLayer* preLayer);
 
   friend class PAGLayer;
 
@@ -1162,9 +1157,6 @@ class PAG_API PAGFile : public PAGComposition {
   void replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
                             std::shared_ptr<PAGImage> image);
   PAGTimeStretchMode timeStretchModeInternal() const;
-  PreComposeLayer* getPreLayerByComposition(PreComposeLayer* preLayer, Composition* composition);
-  std::shared_ptr<PAGComposition> findCompositionByPreComposeLayer(
-      std::shared_ptr<PAGComposition> composition, PreComposeLayer* targetPreLayer);
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;

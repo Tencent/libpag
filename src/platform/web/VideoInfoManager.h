@@ -34,12 +34,14 @@ struct VideoInfo {
   Frame targetFrame = -1;
   VideoSequence* videoSequence = nullptr;
   PreComposeLayer* preLayer = nullptr;
-  std::shared_ptr<PAGComposition> pagComposition = nullptr;
+  std::vector<std::shared_ptr<PAGComposition>> pagCompositions = {};
   std::unique_ptr<ByteData> mp4Data = nullptr;
 };
 
 class VideoInfoManager {
  public:
+  static bool HasVideo(std::shared_ptr<PAGComposition>& pagComposition);
+
   explicit VideoInfoManager(std::shared_ptr<PAGComposition> pagComposition);
 
   emscripten::val getMp4DataByID(ID id);
@@ -57,6 +59,18 @@ class VideoInfoManager {
   float getPlaybackRateByID(ID id);
 
   emscripten::val getVideoIDs();
+
+  bool hasTimeRangeOverlap() const;
+
+  void getPAGFileFromPAGComposition(std::shared_ptr<PAGComposition>& pagComposition,
+                                    std::vector<std::shared_ptr<PAGFile>>& pagFiles);
+
+  PreComposeLayer* getPreLayerByComposition(PreComposeLayer* preLayer, Composition* composition);
+
+  std::vector<std::shared_ptr<PAGComposition>> findCompositionByPreComposeLayer(
+      std::shared_ptr<PAGComposition> composition, PreComposeLayer* targetPreLayer);
+
+  Frame getTargetFrame(std::shared_ptr<PAGComposition>& pagComposition, PreComposeLayer* preLayer);
 
  private:
   std::shared_ptr<PAGComposition> pagComposition = nullptr;
