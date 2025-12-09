@@ -163,7 +163,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/RttrAutoRegister${CMAKE_EXECUTABLE
 endif()
 
 # collects pag include directories.
-set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include ../third_party/tgfx/third_party/json/include)
+set(PAG_VIEWER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 set(PAG_VIEWER_SYSTEM_INCLUDES ./src/editing/rttr)
 file(GLOB_RECURSE PAG_VIEWER_SOURCE_FILES src/*.*)
 list(FILTER PAG_VIEWER_SOURCE_FILES EXCLUDE REGEX src/platform/*.*)
