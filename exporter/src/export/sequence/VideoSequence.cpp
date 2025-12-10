@@ -91,8 +91,7 @@ static void ClipVideoComposition(std::shared_ptr<PAGExportSession> session,
 
   auto itemIter = session->itemHandleMap.find(composition->id);
   if (itemIter == session->itemHandleMap.end()) {
-    session->pushWarning(AlertInfoType::CompositionHandleNotFound,
-                         std::to_string(composition->id));
+    session->pushWarning(AlertInfoType::CompositionHandleNotFound, std::to_string(composition->id));
     return;
   }
   AEGP_ItemH itemH = itemIter->second;
@@ -235,8 +234,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
   auto itemIter = session->itemHandleMap.find(composition->id);
   if (itemIter == session->itemHandleMap.end()) {
-    session->pushWarning(AlertInfoType::CompositionHandleNotFound,
-                         std::to_string(composition->id));
+    session->pushWarning(AlertInfoType::CompositionHandleNotFound, std::to_string(composition->id));
     return;
   }
   AEGP_ItemH itemH = itemIter->second;
