@@ -888,32 +888,32 @@
         <translation>导出渲染错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="449"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
         <source>Composition handle not found: The AE project handle for this composition (ID: %1) is not registered. This may occur if the composition was added after export initialization or if the project structure changed.</source>
         <translation>找不到合成句柄：此合成(ID: %1)的AE项目句柄未注册。这可能发生在导出初始化后添加了合成，或项目结构发生了变化。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="453"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="454"/>
         <source>Try re-exporting the project. If the issue persists, restart After Effects and try again.</source>
         <translation>请尝试重新导出项目。如果问题持续存在，请重启 After Effects 后重试。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="461"/>
         <source>DisplacementMap does not support referencing its own layer.</source>
         <translation>置换图DisplacementMap暂不支持指向自身图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="451"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="462"/>
         <source>Recommend removing this effect or redirecting the displacement layer to another layer.</source>
         <translation>建议去掉该效果，或修改该置换图层指向其它图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="458"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="469"/>
         <source>[Text Animation - Selector] export error.</source>
         <translation>[文本动画-选择器]导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="463"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="474"/>
         <source>PAG file verification error.</source>
         <translation>PAG文件校验错误。</translation>
     </message>
