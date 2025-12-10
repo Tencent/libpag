@@ -50,7 +50,7 @@ std::string GetDocumentsFolderPath() {
   return DocumentsFolderPath;
 }
 
-std::string GetAeVersion() {
+std::string GetAEVersion() {
   if (AeVersion.empty()) {
     AeVersion = RunScript("app.version");
   }

@@ -218,7 +218,7 @@ bool PAGExport::exportFile() {
   QVariantMap exportInfo;
   exportInfo["AppName"] = "PAGExporter";
   exportInfo["AppVersion"] = QString::fromStdString(AppVersion);
-  exportInfo["AEVersion"] = QString::fromStdString(GetAeVersion());
+  exportInfo["AEVersion"] = QString::fromStdString(GetAEVersion());
   exportInfo["AppBundleId"] = "PAGExporter";
   exportInfo["Event"] = "EXPORT_PAG";
   if (pagFile == nullptr) {
