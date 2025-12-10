@@ -69,7 +69,7 @@
 <context>
     <name>CompositionListView</name>
     <message>
-        <location filename="../qml/CompositionListView.qml" line="303"/>
+        <location filename="../qml/CompositionListView.qml" line="309"/>
         <source>Select Save Path</source>
         <translation>选择存储路径</translation>
     </message>
@@ -272,42 +272,42 @@
         <translation>导出PAG</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="106"/>
+        <location filename="../qml/ExportPanel.qml" line="108"/>
         <source>Search Composition</source>
         <translation>查找合成</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="182"/>
+        <location filename="../qml/ExportPanel.qml" line="186"/>
         <source>Storage Path</source>
         <translation>存储路径</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="202"/>
+        <location filename="../qml/ExportPanel.qml" line="206"/>
         <source>Setting</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="222"/>
+        <location filename="../qml/ExportPanel.qml" line="226"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="274"/>
+        <location filename="../qml/ExportPanel.qml" line="278"/>
         <source>No Error Message Found</source>
         <translation>暂未发现错误信息</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="336"/>
+        <location filename="../qml/ExportPanel.qml" line="342"/>
         <source>Also Export Audio</source>
         <translation>同时导出音频</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="374"/>
+        <location filename="../qml/ExportPanel.qml" line="380"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../qml/ExportPanel.qml" line="404"/>
+        <location filename="../qml/ExportPanel.qml" line="410"/>
         <source>Export</source>
         <translation>导出</translation>
     </message>
@@ -889,21 +889,31 @@
     </message>
     <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
+        <source>Composition handle not found: The AE project handle for this composition (ID: %1) is not registered. This may occur if the composition was added after export initialization or if the project structure changed.</source>
+        <translation>找不到合成句柄：此合成(ID: %1)的AE项目句柄未注册。这可能发生在导出初始化后添加了合成，或项目结构发生了变化。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="454"/>
+        <source>Try re-exporting the project. If the issue persists, restart After Effects and try again.</source>
+        <translation>请尝试重新导出项目。如果问题持续存在，请重启 After Effects 后重试。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="461"/>
         <source>DisplacementMap does not support referencing its own layer.</source>
         <translation>置换图DisplacementMap暂不支持指向自身图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="451"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="462"/>
         <source>Recommend removing this effect or redirecting the displacement layer to another layer.</source>
         <translation>建议去掉该效果，或修改该置换图层指向其它图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="458"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="469"/>
         <source>[Text Animation - Selector] export error.</source>
         <translation>[文本动画-选择器]导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="463"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="474"/>
         <source>PAG file verification error.</source>
         <translation>PAG文件校验错误。</translation>
     </message>
@@ -972,78 +982,78 @@
 <context>
     <name>exporter::PAGViewerInstallModel</name>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="104"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="108"/>
         <source>PAGViewer is not installed</source>
         <translation>PAGViewer尚未安装</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="106"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="110"/>
         <source>PAGViewer is used to preview PAG files.
 Would you like to download and install it now?</source>
         <translation>PAGViewer可以预览PAG文件。
 是否立即下载并安装？</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="108"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="112"/>
         <source>Confirm</source>
         <translation>确认</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="113"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="117"/>
         <source>Installing PAGViewer</source>
         <translation>正在安装PAGViewer</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="114"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="118"/>
         <source>Please wait, downloading and installing PAGViewer...</source>
         <translation>请稍候，正在下载并安装PAGViewer...</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="120"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="124"/>
         <source>Installation Complete</source>
         <translation>安装完成</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="121"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="125"/>
         <source>PAGViewer installed successfully!
 Previewing your PAG file now.</source>
         <translation>安装PAGViewer成功！
 现在将预览您的PAG文件。</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="122"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="126"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="127"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="131"/>
         <source>Installation Failed</source>
         <translation>安装失败</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="129"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="133"/>
         <source>PAGViewer installation failed
 Please check your network connection or install manually.</source>
         <translation>安装PAGViewer失败
 请检查网络连接或手动安装。</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="131"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="135"/>
         <source>Retry</source>
         <translation>重试</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="154"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="158"/>
         <source>Installing PAGViewer... </source>
         <translation>正在安装PAGViewer...</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="169"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="173"/>
         <source>PAGViewer installation failed</source>
         <translation>PAGViewer安装失败</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="184"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="188"/>
         <source>An error occurred during installation: </source>
         <translation>安装过程中发生异常：</translation>
     </message>

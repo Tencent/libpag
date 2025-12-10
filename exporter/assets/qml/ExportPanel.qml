@@ -76,7 +76,9 @@ PAGWindow {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                compositionsModel.setAllSelected(!compositionsModel.allSelected);
+                                if (compositionsModel !== null) {
+                                    compositionsModel.setAllSelected(!compositionsModel.allSelected);
+                                }
                             }
                         }
                     }
@@ -141,7 +143,9 @@ PAGWindow {
                             }
 
                             onEditingFinished: {
-                                compositionsModel.setSerachText(searchText.text);
+                                if (compositionsModel !== null) {
+                                    compositionsModel.setSerachText(searchText.text);
+                                }
                             }
 
                             onFocusChanged: function (focus) {
@@ -326,7 +330,9 @@ PAGWindow {
                 acceptedButtons: Qt.LeftButton
                 cursorShape: Qt.PointingHandCursor
                 onPressed: {
-                    compositionsModel.exportAudio = !compositionsModel.exportAudio;
+                    if (compositionsModel !== null) {
+                        compositionsModel.exportAudio = !compositionsModel.exportAudio;
+                    }
                 }
             }
         }
@@ -394,7 +400,7 @@ PAGWindow {
 
             width: 120
             height: parent.height
-            enabled: compositionsModel.canExport
+            enabled: compositionsModel !== null && compositionsModel.canExport
             color: "#1982EB"
             radius: 2
             anchors.right: parent.right
@@ -426,7 +432,9 @@ PAGWindow {
                             progressListWindow.show();
                         }
                     }
-                    compositionsModel.exportSelectedCompositions();
+                    if (compositionsModel !== null) {
+                        compositionsModel.exportSelectedCompositions();
+                    }
                 }
             }
         }

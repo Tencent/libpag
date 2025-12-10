@@ -17,22 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <QObject>
+#include <memory>
+#include "platform/PluginInstaller.h"
 
-#include <QString>
-#include "pag/file.h"
+namespace pag {
 
-namespace pag::Utils {
+class PluginInstaller;
 
-void OpenInFinder(const QString& path, bool select = true);
+class PluginInstallerModel : public QObject {
+  Q_OBJECT
 
-bool DeleteFile(const QString& path);
+ public:
+  explicit PluginInstallerModel(QObject* parent = nullptr);
 
-bool DeleteDir(const QString& path);
+  Q_INVOKABLE bool hasUpdate() const;
 
-bool MakeDir(const QString& path, bool isDir = true);
+  Q_INVOKABLE InstallResult installPlugin();
 
-bool WriteFileToDisk(const std::shared_ptr<File>& file, const QString& filePath);
+  Q_INVOKABLE InstallResult uninstallPlugin();
 
-bool WriteDataToDisk(const QString& filePath, const void* data, size_t length);
+  Q_INVOKABLE QString getInstalledVersion() const;
 
-}  // namespace pag::Utils
+  Q_INVOKABLE bool isPluginInstalled() const;
+
+ Q_SIGNALS:
+  void updateCheckCompleted(bool hasUpdate);
+  void installationCompleted(InstallResult result, const QString& message);
+  void uninstallationCompleted(InstallResult result, const QString& message);
+
+ private:
+  std::unique_ptr<PluginInstaller> installer = nullptr;
+};
+
+}  // namespace pag

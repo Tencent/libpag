@@ -35,6 +35,7 @@ class PAGEncodeThread : public QThread {
   explicit PAGEncodeThread(QObject* parent = nullptr);
   ~PAGEncodeThread() override;
 
+  bool isValid() const;
   void close();
   void setPAGEncoder(std::unique_ptr<PAGEncoder> encoder);
   void setEncodeFrameCallback(const EncodeFrameCallback& callback);
@@ -57,6 +58,7 @@ class PAGEncodeThread : public QThread {
   Q_SLOT void encodeFrameInternal(std::shared_ptr<pag::ByteData> data, FrameType frameType,
                                   int stride);
 
+  bool valid = true;
   bool inputFinished = false;
   int64_t needEncodeNum = 0;
   int64_t hasEncodedNum = 0;

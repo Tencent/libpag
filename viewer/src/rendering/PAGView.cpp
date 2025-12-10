@@ -332,6 +332,8 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       }
       setProgressInternal(progress, false);
     }
+  } else {
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
 }

@@ -37,6 +37,10 @@ PAGEncodeThread::~PAGEncodeThread() {
   wait();
 }
 
+bool PAGEncodeThread::isValid() const {
+  return valid;
+}
+
 void PAGEncodeThread::close() {
   inputFinished = true;
   if (encoder != nullptr) {
@@ -89,6 +93,8 @@ void PAGEncodeThread::getEncodeFrame() {
     if (encodeFrameCallback != nullptr) {
       encodeFrameCallback(std::move(newData), frameType, index);
     }
+  } else if (size < 0) {
+    valid = false;
   }
   if ((hasEncodedNum < needEncodeNum) || !inputFinished) {
     std::this_thread::sleep_for(std::chrono::microseconds(1000));
