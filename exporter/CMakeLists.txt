@@ -86,6 +86,11 @@ if (DEFINED ENV{BuildNumber})
 else()
     set(BuildNumber "0")
 endif ()
+if ($ENV{isStableVersion} MATCHES "true")
+    set(UpdateChannel "stable")
+else ()
+    set(UpdateChannel "beta")
+endif ()
 configure_file(${CMAKE_SOURCE_DIR}/templates/version.h.in
         ${CMAKE_SOURCE_DIR}/src/version.h
         @ONLY

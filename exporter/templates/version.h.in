@@ -21,3 +21,4 @@
 #include <string>
 
 const std::string AppVersion = "@MajorVersion@.@MinorVersion@.@BuildNumber@";
+const std::string UpdateChannel = "@UpdateChannel@";
