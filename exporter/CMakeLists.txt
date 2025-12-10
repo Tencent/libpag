@@ -70,6 +70,32 @@ execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/s
 execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
 qt_add_resources(QT_RESOURCES assets/res.qrc)
 
+message(STATUS "Generate Version File")
+if (DEFINED ENV{MajorVersion})
+    set(MajorVersion "$ENV{MajorVersion}")
+else ()
+    set(MajorVersion "1")
+endif()
+if (DEFINED ENV{MinorVersion})
+    set(MinorVersion "$ENV{MinorVersion}")
+else ()
+    set(MinorVersion "0")
+endif ()
+if (DEFINED ENV{BuildNumber})
+    set(BuildNumber "$ENV{BuildNumber}")
+else()
+    set(BuildNumber "0")
+endif ()
+if ($ENV{isBetaVersion} MATCHES false)
+    set(UpdateChannel "stable")
+else ()
+    set(UpdateChannel "beta")
+endif ()
+configure_file(${CMAKE_SOURCE_DIR}/templates/version.h.in
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
+)
+
 list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
 file(GLOB_RECURSE PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES
