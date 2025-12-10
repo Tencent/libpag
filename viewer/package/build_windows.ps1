@@ -43,7 +43,7 @@ Print-Text "[ Initialize variables ]"
 
 $majorVersion = if ($env:MajorVersion) { $env:MajorVersion } else { "1" }
 $minorVersion = if ($env:MinorVersion) { $env:MinorVersion } else { "0" }
-$buildNO = if ($env:BK_CI_BUILD_NO) { $env:BK_CI_BUILD_NO } else { "0" }
+$buildNO = if ($env:BuildNumber) { $env:BuildNumber } else { "0" }
 
 $AppVersion = "${majorVersion}.${minorVersion}.${buildNO}"
 $CurrentTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"

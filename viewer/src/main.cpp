@@ -24,7 +24,6 @@
 #include "PAGViewer.h"
 #include "rendering/PAGView.h"
 #include "task/PAGTaskFactory.h"
-#include "version.h"
 
 int main(int argc, char* argv[]) {
   bool cpuMode = false;
