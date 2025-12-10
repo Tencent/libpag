@@ -219,6 +219,7 @@ bool PAGExport::exportFile() {
   exportInfo["AEVersion"] = QString::fromStdString(GetAEVersion());
   exportInfo["Event"] = "EXPORT_PAG";
   if (pagFile == nullptr) {
+    exportInfo["FailReason"] = "ExportFail";
     exportInfo["ExportStatus"] = "fail";
     ReportExportInfo(exportInfo);
     return false;
