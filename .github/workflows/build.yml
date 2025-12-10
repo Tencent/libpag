@@ -150,6 +150,18 @@ jobs:
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
+      - name: Get Build Cache
+        id: build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            out
+            web/src/wasm
+          key: web-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
+          restore-keys: web-build-${{ runner.os }}-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
       - name: Install Build Tools
         if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
         run: |
@@ -176,6 +188,15 @@ jobs:
           cd web
           source emsdk/emsdk_env.sh
           npm run build:st
+
+      - name: Save Build Cache
+        if: ${{ (github.event_name == 'push') && (steps.build-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            out
+            web/src/wasm
+          key: web-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
