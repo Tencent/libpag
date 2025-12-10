@@ -33,6 +33,7 @@ class ImageInfo;
 }  // namespace tgfx
 
 namespace pag {
+class Composition;
 class Recorder;
 
 class RenderCache;
@@ -534,6 +535,8 @@ class PAG_API PAGLayer : public Content {
   friend class ContentVersion;
 
   friend class PAGDecoder;
+
+  friend class VideoInfoManager;
 };
 
 class SolidLayer;
@@ -1018,6 +1021,8 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class AudioClip;
 
   friend class PAGDecoder;
+
+  friend class VideoInfoManager;
 };
 
 class PAG_API PAGFile : public PAGComposition {
@@ -1164,6 +1169,8 @@ class PAG_API PAGFile : public PAGComposition {
   friend class AudioClip;
 
   friend class HardwareDecoder;
+
+  friend class VideoInfoManager;
 };
 
 class Composition;
