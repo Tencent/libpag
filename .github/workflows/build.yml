@@ -5,6 +5,22 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (leave empty for all)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - ohos
 
 jobs:
   ios:
@@ -110,7 +126,7 @@ jobs:
           path: android
 
   web:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -123,8 +139,8 @@ jobs:
             web/emsdk
             web/node_modules
             web/package-lock.json
-          key: libpag-environment-web-20241106
-          restore-keys: libpag-environment-web-
+          key: libpag-environment-web-linux-20241106
+          restore-keys: libpag-environment-web-linux-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -180,7 +196,7 @@ jobs:
             web/emsdk
             web/node_modules
             web/package-lock.json
-          key: libpag-environment-web-20241106
+          key: libpag-environment-web-linux-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -407,6 +423,18 @@ jobs:
           restore-keys: |
             hvigor-${{ runner.os }}-
 
+      - name: Cache OHOS Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ohos/libpag/.cxx
+            ohos/libpag/build
+            ohos/entry/build
+            ohos/.hvigor
+          key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'ohos/libpag/src/**', 'CMakeLists.txt') }}
+          restore-keys: |
+            ohos-build-${{ runner.os }}-
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -414,11 +442,6 @@ jobs:
           path: third_party
           key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ohos-
-
-      - name: Configure npm registry
-        run: |
-          npm config set registry https://repo.huaweicloud.com/repository/npm/
-          npm config set "@ohos:registry" https://repo.harmonyos.com/npm/      
 
       - name: Run depsync
         run: |
@@ -430,12 +453,10 @@ jobs:
           cd ohos
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
-          pnpm add @ohos/hvigor@3.2.4
 
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
           hvigorw assembleHar --mode module -p module=libpag@default -p product=default --no-daemon
 
       - name: Save Third-Party Cache
