@@ -320,7 +320,7 @@ void RunScriptPreWarm() {
   if (!hasInit) {
     RegisterTextDocumentScript();
     GetDocumentsFolderPath();
-    GetAeVersion();
+    GetAEVersion();
     hasInit = true;
   }
 }
