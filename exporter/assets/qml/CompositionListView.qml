@@ -237,7 +237,9 @@ ListView {
                                                     }
                                                     settingColumn.subWindow.destroy();
                                                     settingColumn.subWindow = null;
-                                                    compositionsModel.updateNames();
+                                                    if (compositionsModel !== null) {
+                                                        compositionsModel.updateNames();
+                                                    }
                                                 }
                                             });
                                         });
@@ -268,7 +270,9 @@ ListView {
                             acceptedButtons: Qt.LeftButton
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                compositionsModel.prepareForPreview(row);
+                                if (compositionsModel !== null) {
+                                    compositionsModel.prepareForPreview(row);
+                                }
                                 let component = Qt.createComponent("qrc:/qml/ExportCompositionProgress.qml");
                                 if (component.status === Component.Ready) {
                                     let progressWindow = component.createObject(parentWindow, {});
@@ -285,7 +289,9 @@ ListView {
                                         parentWindow.hide();
                                     }
                                 }
-                                compositionsModel.previewComposition(row);
+                                if (compositionsModel !== null) {
+                                    compositionsModel.previewComposition(row);
+                                }
                             }
                         }
                     }

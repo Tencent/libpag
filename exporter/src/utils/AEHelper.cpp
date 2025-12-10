@@ -575,6 +575,9 @@ QSize GetItemDimensions(const AEGP_ItemH& itemHandle) {
 }
 
 QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame) {
+  if (itemHandle == nullptr) {
+    return {};
+  }
   AEGP_RenderOptionsH renderOptions = nullptr;
   float frameRate = GetItemFrameRate(itemHandle);
 

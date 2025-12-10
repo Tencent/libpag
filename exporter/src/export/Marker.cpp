@@ -267,6 +267,13 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
   }
 
   for (A_long index = 0; index < numKeyframes; ++index) {
+    A_Time keyTime;
+    A_Err err = suites->KeyframeSuite4()->AEGP_GetKeyframeTime(streamHandle, index,
+                                                               AEGP_LTimeMode_CompTime, &keyTime);
+    if (err != A_Err_NONE || keyTime.scale == 0) {
+      continue;
+    }
+
     AEGP_StreamValue2 streamValue;
     suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, streamHandle, index, &streamValue);
     AEGP_MarkerValP markerP = streamValue.val.markerP;
@@ -280,10 +287,6 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
 
     std::string comment = AeMemoryHandleToString(memoryHandle);
     suites->MemorySuite1()->AEGP_FreeMemHandle(memoryHandle);
-
-    A_Time keyTime;
-    suites->KeyframeSuite4()->AEGP_GetKeyframeTime(streamHandle, index, AEGP_LTimeMode_CompTime,
-                                                   &keyTime);
 
     A_Time duration;
     suites->MarkerSuite2()->AEGP_GetMarkerDuration(markerP, &duration);
@@ -351,6 +354,14 @@ std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStream,
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
   A_Err err = A_Err_NONE;
+
+  A_Time keyTime = {};
+  err = suites->KeyframeSuite4()->AEGP_GetKeyframeTime(markerStream, index, AEGP_LTimeMode_CompTime,
+                                                       &keyTime);
+  if (err != A_Err_NONE || keyTime.scale == 0) {
+    return std::nullopt;
+  }
+
   AEGP_StreamValue2 streamValue = {};
   err = suites->KeyframeSuite4()->AEGP_GetNewKeyframeValue(pluginID, markerStream, index,
                                                            &streamValue);
@@ -425,7 +436,7 @@ void DeleteAllTimeStretchInfo(const AEGP_ItemH& itemHandle) {
   A_long numKeyframes = 0;
   suites->KeyframeSuite4()->AEGP_GetStreamNumKFs(markerStream, &numKeyframes);
 
-  for (A_long index = 0; index < numKeyframes; ++index) {
+  for (A_long index = numKeyframes - 1; index >= 0; --index) {
     auto optComment = GetMarkerComment(markerStream, index);
     if (!optComment.has_value()) {
       continue;
@@ -463,6 +474,12 @@ bool SetMarkerComment(const AEGP_StreamRefH& markerStream, int index, const std:
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
   A_Err err = A_Err_NONE;
+  A_Time keyTime = {};
+  err = suites->KeyframeSuite4()->AEGP_GetKeyframeTime(markerStream, index, AEGP_LTimeMode_CompTime,
+                                                       &keyTime);
+  if (err != A_Err_NONE || keyTime.scale == 0) {
+    return false;
+  }
 
   AEGP_StreamValue2 streamValue = {};
   AEGP_MarkerValP markerP = nullptr;
@@ -545,6 +562,10 @@ bool AddNewMarkerToStream(const AEGP_StreamRefH& markerStream, const std::string
     return false;
   }
 
+  if (time.scale == 0) {
+    time.scale = 1;
+  }
+
   const auto& suites = GetSuites();
   A_Err err = suites->KeyframeSuite4()->AEGP_InsertKeyframe(markerStream, AEGP_LTimeMode_CompTime,
                                                             &time, &index);
@@ -565,6 +586,11 @@ void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemHandl
     return;
   }
 
+  float frameRate = GetItemFrameRate(itemHandle);
+  if (frameRate <= 0) {
+    return;
+  }
+
   DeleteAllTimeStretchInfo(itemHandle);
   std::string keyString = "TimeStretchMode";
   nlohmann::json value = TimeStretchModeToString(info.mode);
@@ -572,7 +598,6 @@ void SetTimeStretchInfo(const TimeStretchInfo& info, const AEGP_ItemH& itemHandl
 
   A_Time keyTime;
   A_Time durationTime;
-  float frameRate = GetItemFrameRate(itemHandle);
   keyTime.scale = static_cast<A_u_long>(frameRate);
   keyTime.value = static_cast<A_long>(info.start);
   durationTime.scale = static_cast<A_u_long>(frameRate);
