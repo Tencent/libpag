@@ -92,7 +92,6 @@ class PAGView : public QQuickItem {
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
   PAGRenderThread* getRenderThread() const;
-  void printForOpenPAGFile(size_t length);
 
  private:
   void setProgressInternal(double progress, bool isAudioSeek);

@@ -27,6 +27,17 @@ namespace pag {
 constexpr int64_t MaxAudioLeadThreshold = 25000;
 constexpr int64_t MinAudioLagThreshold = -100000;
 
+static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t length) {
+  QVariantMap map;
+  map["Event"] = "OPEN_PAG";
+  map["FileSize"] = QString::number(length);
+  map["PAGLayerCount"] = QString::number(pagFile->numChildren());
+  map["VideoCompositionCount"] = QString::number(pagFile->numVideos());
+  map["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
+  map["PAGImageLayerCount"] = QString::number(pagFile->numImages());
+  qDebug() << map;
+}
+
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   drawable = GPUDrawable::MakeFrom(this);
@@ -258,7 +269,7 @@ bool PAGView::setFile(const QString& filePath) {
   Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
   Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
 
-  printForOpenPAGFile(byteData->length());
+  reportPAGFIleInfo(pagFile, byteData->length());
 
   return true;
 }
@@ -327,21 +338,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
-}
-
-void PAGView::printForOpenPAGFile(size_t length) {
-  QVariantMap map;
-  map["AppName"] = "PAGViewer";
-  map["AppVersion"] = QString::fromStdString(UpdateChannel == "beta" ? AppVersion + "-beta"
-                                                                         : AppVersion);
-  map["AppBundleId"] = "com.tencent.pagviewer";
-  map["Event"] = "OPEN_PAG";
-  map["FileSize"] = QString::number(length);
-  map["PAGLayerCount"] = QString::number(pagFile->numChildren());
-  map["VideoCompositionCount"] = QString::number(pagFile->numVideos());
-  map["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
-  map["PAGImageLayerCount"] = QString::number(pagFile->numImages());
-  qDebug() << map;
 }
 
 void PAGView::setProgressInternal(double progress, bool isAudioSeek) {

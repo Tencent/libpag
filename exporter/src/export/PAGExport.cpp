@@ -216,10 +216,7 @@ bool PAGExport::exportFile() {
   }
   auto pagFile = exportAsFile();
   QVariantMap exportInfo;
-  exportInfo["AppName"] = "PAGExporter";
-  exportInfo["AppVersion"] = QString::fromStdString(AppVersion);
   exportInfo["AEVersion"] = QString::fromStdString(GetAEVersion());
-  exportInfo["AppBundleId"] = "PAGExporter";
   exportInfo["Event"] = "EXPORT_PAG";
   if (pagFile == nullptr) {
     exportInfo["ExportStatus"] = "fail";
@@ -233,17 +230,20 @@ bool PAGExport::exportFile() {
 
   const auto bytes = pag::Codec::Encode(pagFile);
   if (bytes->length() == 0) {
+    exportInfo["FailReason"] = "EncodeFail";
     exportInfo["ExportStatus"] = "fail";
     ReportExportInfo(exportInfo);
     return false;
   }
   if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+    exportInfo["FailReason"] = "ValidateFail";
     exportInfo["ExportStatus"] = "fail";
     ReportExportInfo(exportInfo);
     return false;
   }
   if (!WriteToFile(session->outputPath, reinterpret_cast<char*>(bytes->data()),
                    static_cast<std::streamsize>(bytes->length()))) {
+    exportInfo["FailReason"] = "WriteFileFail";
     exportInfo["ExportStatus"] = "fail";
     ReportExportInfo(exportInfo);
     return false;

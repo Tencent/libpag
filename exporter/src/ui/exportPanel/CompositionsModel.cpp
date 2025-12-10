@@ -196,7 +196,7 @@ void CompositionsModel::exportSelectedCompositions() {
   }
 
   qDebug() << "Selected compositions: " << pagExports.size();
-  
+
   for (auto& pagExport : pagExports) {
     pagExport->session->progressModel.setExportStatus(pagExport->exportFile()
                                                           ? ProgressModel::ExportStatus::Success
