@@ -98,6 +98,7 @@ void ExportWindow::init() {
     if (outputPath.empty()) {
       return;
     }
+    qDebug() << "Select outputPath: " << outputPath.data();
   }
 
   PAGExportConfigParam configParam = {};
