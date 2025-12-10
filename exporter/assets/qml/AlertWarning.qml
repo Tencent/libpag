@@ -175,10 +175,8 @@ PAGWindow {
                         cursorShape: Qt.PointingHandCursor
 
                         onClicked: {
-                            if (mainWindow.model) {
-                                alertWindow.continueExport();
-                                mainWindow.close();
-                            }
+                            alertWindow.continueExport();
+                            mainWindow.close();
                         }
                     }
                 }
@@ -208,10 +206,8 @@ PAGWindow {
                         cursorShape: Qt.PointingHandCursor
 
                         onClicked: {
-                            if (mainWindow.model) {
-                                alertWindow.cancelAndModify();
-                                mainWindow.close();
-                            }
+                            alertWindow.cancelAndModify();
+                            mainWindow.close();
                         }
                     }
                 }
