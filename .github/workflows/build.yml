@@ -5,6 +5,22 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (leave empty for all)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - ohos
 
 jobs:
   ios:
@@ -324,6 +340,15 @@ jobs:
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-qt-
 
+      - name: Get Build Cache
+        id: build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            out
+          key: qt-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'viewer/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
+          restore-keys: qt-build-${{ runner.os }}-
+
       - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Run depsync
@@ -349,6 +374,14 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
+
+      - name: Save Build Cache
+        if: ${{ (github.event_name == 'push') && (steps.build-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            out
+          key: qt-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'viewer/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
