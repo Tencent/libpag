@@ -27,7 +27,7 @@
 namespace pag {
 
 FileOperation FileOperation::copyFile(const QString& src, const QString& dst) {
-  return {Type::CopyFile, src, dst};
+  return {Type::CopyFiles, src, dst};
 }
 
 FileOperation FileOperation::copyDirectory(const QString& src, const QString& dst) {
@@ -35,7 +35,7 @@ FileOperation FileOperation::copyDirectory(const QString& src, const QString& ds
 }
 
 FileOperation FileOperation::deleteFile(const QString& path) {
-  return {Type::DeleteFile, path, QString()};
+  return {Type::DeleteFiles, path, QString()};
 }
 
 FileOperation FileOperation::deleteDirectory(const QString& path) {
@@ -43,7 +43,7 @@ FileOperation FileOperation::deleteDirectory(const QString& path) {
 }
 
 FileOperation FileOperation::createDirectory(const QString& path) {
-  return {Type::CreateDirectory, QString(), path};
+  return {Type::CreateDir, QString(), path};
 }
 
 FileOpResult FileOperations::fromWindowsError(unsigned long errorCode) {
@@ -202,19 +202,19 @@ FileOpResult FileOperations::executeBatch(const QList<FileOperation>& operations
     FileOpResult result = FileOpResult::Success;
 
     switch (op.type) {
-      case FileOperation::Type::CopyFile:
+      case FileOperation::Type::CopyFiles:
         result = copyFile(op.source, op.destination);
         break;
       case FileOperation::Type::CopyDirectory:
         result = copyDirectory(op.source, op.destination);
         break;
-      case FileOperation::Type::DeleteFile:
+      case FileOperation::Type::DeleteFiles:
         result = deleteFile(op.source);
         break;
       case FileOperation::Type::DeleteDirectory:
         result = deleteDirectory(op.source);
         break;
-      case FileOperation::Type::CreateDirectory:
+      case FileOperation::Type::CreateDir:
         result = createDirectory(op.destination);
         break;
     }
@@ -237,19 +237,19 @@ QString FileOperations::generateBatchScript(const QList<FileOperation>& operatio
     QString dst = QDir::toNativeSeparators(op.destination);
 
     switch (op.type) {
-      case FileOperation::Type::CopyFile:
+      case FileOperation::Type::CopyFiles:
         commands << QString("copy /Y \"%1\" \"%2\"").arg(src).arg(dst);
         break;
       case FileOperation::Type::CopyDirectory:
         commands << QString("xcopy /Y /E /I /R \"%1\" \"%2\"").arg(src).arg(dst);
         break;
-      case FileOperation::Type::DeleteFile:
+      case FileOperation::Type::DeleteFiles:
         commands << QString("if exist \"%1\" del /F /Q \"%1\"").arg(src);
         break;
       case FileOperation::Type::DeleteDirectory:
         commands << QString("if exist \"%1\" rmdir /S /Q \"%1\"").arg(src);
         break;
-      case FileOperation::Type::CreateDirectory:
+      case FileOperation::Type::CreateDir:
         commands << QString("if not exist \"%1\" mkdir \"%1\"").arg(dst);
         break;
     }
