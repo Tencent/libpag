@@ -86,6 +86,7 @@ enum class AlertInfoType {
   ExportVideoSequenceError,   // Video sequence frame export error
   WebpEncodeError,            // Webp encoding error
   ExportRenderError,          // Export render error
+  CompositionHandleNotFound,  // Composition handle not found in itemHandleMap
   DisplacementMapRefSelf,     // DisplacementMap references itself
   ExportRangeSlectorError,    // Range selector export error
   PAGVerifyError,             // PAG file verification error

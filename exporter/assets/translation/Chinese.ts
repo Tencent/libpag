@@ -888,6 +888,16 @@
         <translation>导出渲染错误。</translation>
     </message>
     <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="449"/>
+        <source>Composition handle not found: The AE project handle for this composition (ID: %1) is not registered. This may occur if the composition was added after export initialization or if the project structure changed.</source>
+        <translation>找不到合成句柄：此合成(ID: %1)的AE项目句柄未注册。这可能发生在导出初始化后添加了合成，或项目结构发生了变化。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="453"/>
+        <source>Try re-exporting the project. If the issue persists, restart After Effects and try again.</source>
+        <translation>请尝试重新导出项目。如果问题持续存在，请重启 After Effects 后重试。</translation>
+    </message>
+    <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
         <source>DisplacementMap does not support referencing its own layer.</source>
         <translation>置换图DisplacementMap暂不支持指向自身图层。</translation>
