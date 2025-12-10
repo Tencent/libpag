@@ -17,13 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FileHelper.h"
+#include <QDesktopServices>
+#include <QDir>
+#include <QUrl>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include "src/base/utils/Log.h"
+
 namespace fs = std::filesystem;
 
-namespace FileHelper {
+namespace exporter {
 
 std::string ReadTextFile(const std::string& filename) {
   std::ifstream inputStream(filename);
@@ -37,13 +41,19 @@ std::string ReadTextFile(const std::string& filename) {
 }
 
 size_t WriteTextFile(const std::string& fileName, const char* text) {
-  std::ofstream file(fileName, std::ios::out);
+  auto path = Utf8ToPath(fileName);
+  auto parentPath = path.parent_path();
+  if (!parentPath.empty() && !fs::exists(parentPath)) {
+    fs::create_directories(parentPath);
+  }
+  std::ofstream file(path, std::ios::out);
   if (!file.is_open()) {
     return 0;
   }
   file << text;
+  auto size = static_cast<size_t>(file.tellp());
   file.close();
-  return file.tellp();
+  return size;
 }
 
 size_t WriteTextFile(const std::string& fileName, const std::string& text) {
@@ -55,9 +65,8 @@ size_t GetFileSize(const std::string& fileName) {
     return 0;
   }
   std::error_code ec;
-  size_t ret = fs::file_size(fileName, ec);
-
-  return ret;
+  auto ret = fs::file_size(Utf8ToPath(fileName), ec);
+  return ec ? 0 : ret;
 }
 
 bool FileIsExist(const std::string& fileName) {
@@ -65,21 +74,21 @@ bool FileIsExist(const std::string& fileName) {
     return false;
   }
   std::error_code ec;
-  bool ret = fs::exists(fileName, ec);
-  return ret;
+  return fs::exists(Utf8ToPath(fileName), ec);
 }
 
 bool CopyFile(const std::string& src, const std::string& dst) {
   try {
-    if (!FileIsExist(src)) {
+    auto srcPath = Utf8ToPath(src);
+    if (!fs::exists(srcPath)) {
       return false;
     }
-    auto parentPath = fs::path(dst).parent_path();
-    if (!FileIsExist(parentPath.string())) {
-
+    auto dstPath = Utf8ToPath(dst);
+    auto parentPath = dstPath.parent_path();
+    if (!parentPath.empty() && !fs::exists(parentPath)) {
       fs::create_directories(parentPath);
     }
-    fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
+    fs::copy_file(srcPath, dstPath, fs::copy_options::overwrite_existing);
     return true;
   } catch (...) {
     return false;
@@ -88,7 +97,12 @@ bool CopyFile(const std::string& src, const std::string& dst) {
 
 bool WriteToFile(const std::string& filePath, const char* data, std::streamsize size,
                  std::ios::openmode mode) {
-  std::ofstream file(filePath, mode);
+  auto path = Utf8ToPath(filePath);
+  auto parentPath = path.parent_path();
+  if (!parentPath.empty() && !fs::exists(parentPath)) {
+    fs::create_directories(parentPath);
+  }
+  std::ofstream file(path, mode);
   if (!file) {
     LOGE("Failed to open file: %s", filePath.c_str());
     return false;
@@ -109,4 +123,39 @@ bool WriteToFile(const std::string& filePath, const char* data, std::streamsize 
   return true;
 }
 
-}  // namespace FileHelper
+bool DeleteFile(const std::string& path) {
+  return fs::remove_all(path);
+}
+
+bool CreateDir(const std::string& path) {
+  return fs::create_directories(path);
+}
+
+int ReadFileData(const std::string& filePath, uint8_t* buf, size_t bufSize) {
+  std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+  if (!file) {
+    return 0;
+  }
+
+  size_t fileSize = file.tellg();
+  file.seekg(0);
+  file.read(reinterpret_cast<char*>(buf), std::min(fileSize, bufSize));
+  if (fileSize < bufSize) {
+    buf[fileSize] = '\0';
+  }
+  return std::min(fileSize, bufSize);
+}
+
+std::string GetFileName(const std::string& filePath) {
+  return PathToUtf8(Utf8ToPath(filePath).filename());
+}
+
+std::string GetDir(const std::string& filePath) {
+  return PathToUtf8(Utf8ToPath(filePath).parent_path());
+}
+
+void OpenPAGFile(const std::string& filePath) {
+  QDesktopServices::openUrl(QUrl::fromLocalFile(filePath.data()));
+}
+
+}  // namespace exporter

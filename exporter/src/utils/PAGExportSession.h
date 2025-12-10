@@ -17,93 +17,66 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include <map>
 #include <memory>
 #include <string>
-#include "../Config/ConfigParam.h"
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
 #include "AlertInfo.h"
+#include "config/ConfigParam.h"
 #include "pag/file.h"
 #include "pag/types.h"
+#include "ui/ProgressModel.h"
 
 namespace exporter {
 
-#define RECORD_ERROR(statements)                          \
-  do {                                                    \
-    if ((statements) != A_Err_NONE) {                     \
-      session->pushWarning(AlertInfoType::ExportAEError); \
-    }                                                     \
-  } while (0)
-
-class AlertInfoManager;
-
 class PAGExportSession {
  public:
-  PAGExportSession(const std::string& path);
-  ~PAGExportSession();
-
+  PAGExportSession(const AEGP_ItemH& activeItemHandle, const std::string& outputPath);
   void checkParamValid();
-
-  pag::TextDocumentHandle currentTextDocument();
-  pag::GradientColorHandle currentGradientColors(const std::vector<std::string>& matchNames,
-                                                 int index = 0);
-  pag::TextDirection currentTextDocumentDirection();
-
-  AEGP_ItemH getCompItemHById(pag::ID id);
-  AEGP_LayerH getLayerHById(pag::ID id);
-  bool isVideoReplaceLayer(AEGP_LayerH layerH);
   void pushWarning(AlertInfoType type, const std::string& addInfo = "");
-  void pushWarning(AlertInfoType type, pag::ID compId, pag::ID layerId,
-                   const std::string& addInfo = "");
+  pag::GradientColorHandle GetGradientColorsFromFileBytes(
+      const std::vector<std::string>& matchNames, int index, int keyFrameIndex = 0);
+  bool isVideoLayer(pag::ID id);
+  AEGP_LayerH getLayerHByID(pag::ID id);
 
-  std::vector<char> fileBytes = {};
-  const std::vector<char>& getFileBytes();
-
-  AEGP_PluginID pluginID = 0L;
-  std::shared_ptr<AEGP_SuiteHandler> suites = nullptr;
-  std::string outputPath = "";
-  AlertInfoManager& alertInfoManager = AlertInfoManager::GetInstance();
-  std::atomic_bool bEarlyExit = false;
-  ConfigParam configParam = {};
-
-  std::vector<std::pair<AEGP_LayerH, bool>> imageLayerHList = {};
-  std::unordered_map<pag::ID, AEGP_ItemH> compItemHList = {};
-  std::unordered_map<pag::ID, AEGP_LayerH> layerHList = {};
+  bool exportActually = true;
+  bool videoHasAlpha = false;
+  bool videoAlphaDetected = false;
+  bool showAlertInfo = false;
+  bool stopExport = false;
+  bool exportAudio = false;
+  bool hardwareEncode = false;
+  bool enableRunScript = true;
+  bool exportStaticCompAsBmp = true;
 
   float frameRate = -1;
-  pag::ID curCompId = 0;
-  pag::ID curLayerId = 0;
+
+  pag::ID compID = 0;
+  pag::ID layerID = 0;
   int layerIndex = 0;
-  int gradientIndex = 0;
-  int keyframeNum = 0;  // for text
-  int keyframeIndex = 0;
-  // Whether the alpha channel has been detected in the video sequence frame
-  bool alphaDetected = false;
-  // Whether the video sequence frame contains an alpha channel
-  bool hasAlpha = false;
 
-  bool enableRunScript = true;
+  AEGP_ItemH itemHandle = nullptr;
 
-  bool enableFontFile = false /*DEFAULT_ENABLE_FONT_FILE*/;
-  std::vector<std::string> fontFilePathList = {};
+  ConfigParam configParam = {};
+  ProgressModel progressModel;
+  AlertInfoManager& alertInfoManager = AlertInfoManager::GetInstance();
 
-  pag::ID recordCompId = 0;
-  pag::ID recordLayerId = 0;
-  std::vector<pag::TextDirection> textDirectList = {};
-  bool enableAudio = true;
-  bool enableForceStaticBMP = true;
+  std::vector<pag::Marker*>* audioMarkers = nullptr;
+  std::vector<char> fileBytes = {};
+  std::vector<pag::Composition*> compositions = {};
+  std::vector<pag::ImageBytes*> imageBytesList = {};
+  /* first: is video layer, second: layer handle */
+  std::vector<std::pair<bool, AEGP_LayerH>> imageLayerHandleList = {};
+  /* key: comp item ID, value: comp item handle */
+  std::unordered_map<pag::ID, AEGP_ItemH> itemHandleMap = {};
+  /* key: layer ID, value: layer handle */
+  std::unordered_map<pag::ID, AEGP_LayerH> layerHandleMap = {};
 
-  std::vector<std::shared_ptr<pag::Composition>> compositions = {};
+  std::unordered_map<pag::ID, pag::Frame> videoCompositionStartTime = {};
 
- private:
-  std::vector<std::vector<float>> extractFloatArraysByKey(const std::string& xmlContent,
-                                                          const std::string& keyName);
-  std::vector<pag::AlphaStop> ParseAlphaStops(const std::string& text);
-  std::vector<pag::ColorStop> ParseColorStops(const std::string& text);
-  static pag::GradientColorHandle DefaultGradientColors();
-  pag::GradientColorHandle ParseGradientColor(const std::string& text);
-  template <typename T>
-  void ResortGradientStops(std::vector<T>& list);
+  std::string outputPath = "";
 };
 
 }  // namespace exporter

@@ -54,7 +54,6 @@ class RuntimeProgram : public tgfx::RuntimeProgram {
  protected:
   void onReleaseGPU() override;
 
- private:
   explicit RuntimeProgram(tgfx::Context* context) : tgfx::RuntimeProgram(context) {
   }
 };

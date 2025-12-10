@@ -1,0 +1,24 @@
+---
+description: 当需要提交代码、创建分支、发起PR、或涉及commit/push操作时
+alwaysApply: false
+enabled: true
+updatedAt: 2025-12-10T02:54:23.155Z
+provider: 
+---
+
+## 分支命名
+- 格式：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`
+- 模块名用下划线连接，最多两个单词，如 `feature/domchen_layer_content`
+
+## Commit 信息
+- 120 字符内的英语概括，以英文句号结尾，中间无其他标点
+- 侧重描述用户可感知的变化：公开接口调整、性能优化等
+
+## 发起 Github PR
+- 先创建新分支并提交到本地仓库
+- PR 标题：英语，格式同 commit 信息
+- PR 描述：中文详细说明
+- 信息准备好后需经我确认，再推送并执行 `gh pr create`
+
+## 提交前格式化
+- 提交前运行 `./codeformat.sh` 格式化代码（忽略输出信息）

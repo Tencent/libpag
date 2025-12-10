@@ -16,23 +16,27 @@ Item {
     property var performanceWarn1: qsTr("Rendering time too long, suggest optimizing time cost to under %1 us")
     property var performanceWarn2: qsTr("Memory usage is too large, suggest optimizing memory cost to under 50M")
     property var performanceWarn3: qsTr("(Run performance benchmark, results will be more accurate)")
+    property var performanceWarn4: qsTr("Using too many video sequences can slow performance")
 
     property var performanceTip1: qsTr("Too many layers, Suggest combining same layers into composition")
     property var performanceTip2: qsTr("Sticker scale is too large, suggest reducing sticker scale")
+    property var performanceTip3: qsTr("Limit video sequences to two or fewer")
 
     width: defaultWidth
     height: defaultHeight
 
     Connections {
         target: runTimeDataModel
-        onDataChanged: {
+
+        function onDataChanged() {
             currentFrameText.text = runTimeDataModel.currentFrame + "/" + runTimeDataModel.totalFrame;
         }
     }
 
     Connections {
         target: runTimeDataModel.chartDataModel
-        onItemsChange: {
+
+        function onItemsChanged() {
             graphCanvas.requestPaint();
         }
     }
@@ -164,10 +168,20 @@ Item {
                         width: 11
                         height: 10
                         visible: {
-                            if (name === "Graphics" && value > 50 && ext === "MB") {
+                            if (name === "Graphics" && Number(value) > 50 && unit === "MB") {
+                                performanceWarnDialog.clearAllTips();
+                                performanceWarnDialog.warnMessage = performanceWarn2;
+                                performanceWarnDialog.addTip(performanceTip1);
+                                performanceWarnDialog.addTip(performanceTip2);
                                 return true;
                             }
-                            return name === "Videos" && value > 2;
+                            if (name === "Videos" && Number(value) > 2) {
+                                performanceWarnDialog.clearAllTips();
+                                performanceWarnDialog.warnMessage = performanceWarn4;
+                                performanceWarnDialog.addTip(performanceTip3);
+                                return true;
+                            }
+                            return false;
                         }
                         anchors.top: parent.top
                         anchors.topMargin: 4
@@ -180,10 +194,6 @@ Item {
                                 performanceWarnDialog.x = performanceWarnImage.x + performanceWarnImage.width - (performanceWarnDialog.width / 2);
                                 performanceWarnDialog.y = performanceWarnImage.y + performanceWarnImage.height + 2;
                                 performanceWarnDialog.setToTop();
-                                performanceWarnDialog.clearAllTips();
-                                performanceWarnDialog.warnMessage = performanceWarn2;
-                                performanceWarnDialog.addTip(performanceTip1);
-                                performanceWarnDialog.addTip(performanceTip2);
                                 performanceWarnDialog.open();
                             }
                         }
@@ -491,6 +501,10 @@ Item {
     }
 
     Component.onCompleted: {
+        runTimeDataModel.chartDataSize = Math.max(60, (graphCanvas.width + 1) / 4);
+    }
+
+    onWidthChanged: {
         runTimeDataModel.chartDataSize = Math.max(60, (graphCanvas.width + 1) / 4);
     }
 }

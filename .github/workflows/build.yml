@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -67,8 +65,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -118,8 +114,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
@@ -211,8 +205,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -254,8 +246,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -307,8 +297,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -338,6 +326,7 @@ jobs:
           aqtversion: '==3.2.1'
           cache: 'true'
           cache-key-prefix: 'install-qt-action'
+          modules: 'qtmultimedia'
 
       - name: Build QT
         run: |
@@ -364,21 +353,19 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get CLI Tools Cache
         id: cli-tools-cache
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64-x64
+          key: ohos-cli-6.0.0.868-mac-arm64-x64
           restore-keys: ohos-cli-
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/6.0.0.868/commandline-tools-mac-arm64-6.0.0.868.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
@@ -388,7 +375,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64-x64
+          key: ohos-cli-6.0.0.868-mac-arm64-x64
 
       - name: Configure Environment
         run: |
@@ -425,8 +412,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: third-party-openharmony-
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ohos-
 
       - name: Configure npm registry
         run: |
@@ -456,7 +443,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-mac-arm64-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}

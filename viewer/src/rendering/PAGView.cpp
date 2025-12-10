@@ -23,6 +23,9 @@
 
 namespace pag {
 
+constexpr int64_t MaxAudioLeadThreshold = 25000;
+constexpr int64_t MinAudioLagThreshold = -100000;
+
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   drawable = GPUDrawable::MakeFrom(this);
@@ -32,11 +35,35 @@ PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   renderThread = std::make_unique<PAGRenderThread>(this);
   renderThread->moveToThread(renderThread.get());
   drawable->moveToThread(renderThread.get());
+  audioPlayer = std::make_unique<PAGAudioPlayer>();
+  resizeTimer = std::make_unique<QTimer>();
+  connect(resizeTimer.get(), &QTimer::timeout, this, &PAGView::sizeChangedDelayHandle);
+  connect(audioPlayer.get(), &PAGAudioPlayer::audioTimeChanged, this, &PAGView::onAudioTimeChanged,
+          Qt::QueuedConnection);
 }
 
 void PAGView::flush() const {
   if (isPlaying_) {
     QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  }
+}
+
+void PAGView::sizeChangedDelayHandle() {
+  resizeTimer->stop();
+  sizeChanged = true;
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+}
+
+void PAGView::onAudioTimeChanged(int64_t audioTime) {
+  auto timeNow = tgfx::Clock::Now();
+  auto displayTime = timeNow - lastPlayTime;
+  auto duration = static_cast<double>(pagPlayer->duration());
+  auto currentDisplayTime = static_cast<int64_t>(progress * duration) + displayTime;
+  if (audioTime == 0 || (audioTime - currentDisplayTime > MaxAudioLeadThreshold)) {
+    lastPlayTime = timeNow;
+    setProgressInternal(static_cast<double>(audioTime) / duration, false);
+  } else if (audioTime - currentDisplayTime < MinAudioLagThreshold) {
+    lastPlayTime = timeNow;
   }
 }
 
@@ -81,7 +108,8 @@ QString PAGView::getTotalFrame() const {
 
 QString PAGView::getCurrentFrame() const {
   int64_t totalFrames = getTotalFrame().toLongLong();
-  int64_t currentFrame = static_cast<int64_t>(std::round(getProgress() * (totalFrames - 1)));
+  auto currentFrame =
+      static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
   return QString::number(currentFrame);
 }
 
@@ -112,7 +140,7 @@ QString PAGView::getFilePath() const {
     return "";
   }
 
-  return QString::fromStdString(pagFile->path());
+  return QString::fromLocal8Bit(pagFile->path().data());
 }
 
 QString PAGView::getDisplayedTime() const {
@@ -165,6 +193,7 @@ void PAGView::setIsPlaying(bool isPlaying) {
   if (this->isPlaying_ == isPlaying) {
     return;
   }
+  audioPlayer->setIsPlaying(isPlaying);
   this->isPlaying_ = isPlaying;
   Q_EMIT isPlayingChanged(isPlaying);
   if (isPlaying) {
@@ -184,10 +213,15 @@ void PAGView::setProgress(double progress) {
   if (this->progress == progress) {
     return;
   }
-  pagPlayer->setProgress(progress);
-  this->progress = progress;
-  Q_EMIT progressChanged(progress);
-  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+  setProgressInternal(progress, true);
+}
+
+void PAGView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
+  if (newGeometry == oldGeometry) {
+    return;
+  }
+  QQuickItem::geometryChange(newGeometry, oldGeometry);
+  resizeTimer->start(400);
 }
 
 bool PAGView::setFile(const QString& filePath) {
@@ -207,13 +241,15 @@ bool PAGView::setFile(const QString& filePath) {
   pagFile = newPagFile;
   pagFile->getFile()->path = strPath;
   pagPlayer->setComposition(pagFile);
+  audioPlayer->setComposition(pagFile);
   setSize(getPreferredSize());
+  sizeChanged = true;
   progressPerFrame = 1.0 / (pagFile->frameRate() * pagFile->duration() / 1000000);
   Q_EMIT fileChanged(pagFile->getFile());
   Q_EMIT filePathChanged(strPath);
   Q_EMIT pagFileChanged(pagFile);
-  pagPlayer->setProgress(0);
-  setProgress(0);
+  audioPlayer->setVolume(1.0f);
+  setProgressInternal(0, true);
   setIsPlaying(true);
 
   editableTextLayerCount = static_cast<int>(pagFile->getEditableIndices(LayerType::Text).size());
@@ -257,17 +293,6 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     renderThread->start();
   }
 
-  if (lastWidth != width() || lastHeight != height() ||
-      lastPixelRatio != window()->devicePixelRatio()) {
-    lastWidth = width();
-    lastHeight = height();
-    lastPixelRatio = window()->devicePixelRatio();
-    auto pagSurface = pagPlayer->getSurface();
-    if (pagSurface) {
-      pagSurface->updateSize();
-    }
-  }
-
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = drawable->getTexture();
   if (texture) {
@@ -288,10 +313,10 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     if (duration > 0) {
       auto progress =
           static_cast<double>(displayTime) / static_cast<double>(duration) + this->progress;
-      if (progress > 1) {
+      if (progress > 1.0) {
         progress = 0.0;
       }
-      setProgress(progress);
+      setProgressInternal(progress, false);
     }
   }
   return node;
@@ -300,4 +325,15 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 PAGRenderThread* PAGView::getRenderThread() const {
   return renderThread.get();
 }
+
+void PAGView::setProgressInternal(double progress, bool isAudioSeek) {
+  if (isAudioSeek) {
+    audioPlayer->setProgress(progress);
+  }
+  pagPlayer->setProgress(progress);
+  this->progress = progress;
+  Q_EMIT progressChanged(progress);
+  QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
+}
+
 }  // namespace pag

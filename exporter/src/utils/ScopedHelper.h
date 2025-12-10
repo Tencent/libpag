@@ -29,6 +29,7 @@ class ScopedTimeSetter {
   ~ScopedTimeSetter();
 
  private:
+  void* address = nullptr;
   const AEGP_ItemH& itemHandle = nullptr;
   A_Time orgTime = {0, 100};
 };

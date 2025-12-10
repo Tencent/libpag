@@ -26,11 +26,10 @@ class PAGExportPNGTask : public PAGPlayTask {
   Q_OBJECT
  public:
   // use to export a single frame of a pag file as png file.
-  explicit PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile, const QString& pngfilePath,
+  explicit PAGExportPNGTask(std::shared_ptr<PAGFile> pagFile, const QString& pngfilePath,
                             int exportFrame);
   // use to export a pag file as png sequcence.
-  explicit PAGExportPNGTask(const std::shared_ptr<PAGFile>& pagFile,
-                            const QString& pngSequenceDirPath);
+  explicit PAGExportPNGTask(std::shared_ptr<PAGFile> pagFile, const QString& pngSequenceDirPath);
 
  protected:
   void onFrameFlush(double progress) override;

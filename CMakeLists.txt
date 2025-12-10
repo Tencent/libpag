@@ -430,6 +430,7 @@ elseif (OHOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ohos/libpag/export.def")
     endif ()
 endif ()
 
@@ -445,10 +446,10 @@ else ()
 endif ()
 
 if (PAG_USE_C)
-    if (ANDROID OR WIN32)
+    if (ANDROID OR (WIN32 AND PAG_USE_ANGLE))
         file(GLOB PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
-    endif ()
+    endif()
 endif ()
 
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
@@ -530,7 +531,7 @@ if (WEB)
     add_executable(pag ${PAG_FILES})
     list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
-            -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1)
+            -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1 -sEXPORTED_FUNCTIONS=['_malloc','_free'])
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
         if (${EMSCRIPTEN_VERSION} VERSION_EQUAL ${unsupported_version})
@@ -570,6 +571,7 @@ if (PAG_BUILD_FRAMEWORK)
     set(PAG_IDENTIFIER "com.tencent.libpag")
     set_target_properties(pag PROPERTIES
             FRAMEWORK TRUE
+            PUBLIC_HEADER "${PAG_PLATFORM_HEADERS}"
             MACOSX_FRAMEWORK_IDENTIFIER ${PAG_IDENTIFIER}
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})

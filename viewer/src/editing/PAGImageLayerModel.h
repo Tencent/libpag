@@ -28,15 +28,19 @@ class PAGImageLayerModel : public QAbstractListModel {
  public:
   enum class PAGImageLayerRoles { IndexRole = Qt::UserRole + 1, ReveryRole };
 
+  static QImage GetVideoFirstFrame(const QString& filePath);
+
   explicit PAGImageLayerModel(QObject* parent = nullptr);
 
   int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
   QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
   QImage requestImage(int index);
 
-  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
+  Q_SIGNAL void imageChanged();
 
-  Q_INVOKABLE void replaceImage(int index, const QString& filePath);
+  Q_SLOT void setPAGFile(std::shared_ptr<PAGFile> pagFile);
+
+  Q_INVOKABLE void changeImage(int index, const QString& filePath);
   Q_INVOKABLE void revertImage(int index);
   Q_INVOKABLE int convertIndex(int index);
 
@@ -44,9 +48,11 @@ class PAGImageLayerModel : public QAbstractListModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
  private:
+  void replaceImage(int index, std::shared_ptr<PAGImage> image);
+
   QSet<int> revertSet = {};
   QMap<int, QImage> imageLayers = {};
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> _pagFile = nullptr;
 };
 
 }  // namespace pag

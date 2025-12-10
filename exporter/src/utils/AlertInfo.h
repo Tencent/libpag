@@ -95,11 +95,12 @@ enum class AlertInfoType {
 
 class AlertInfo {
  public:
-  AlertInfo(AlertInfoType type, AEGP_ItemH itemH, AEGP_LayerH layerH, const std::string& info = "");
+  AlertInfo(AlertInfoType type, AEGP_ItemH itemHandle, AEGP_LayerH layerHandle,
+            const std::string& info = "");
   void select();  // Navigate to the problematic composition/layer
 
-  AEGP_ItemH itemH = nullptr;
-  AEGP_LayerH layerH = nullptr;
+  AEGP_ItemH itemHandle = nullptr;
+  AEGP_LayerH layerHandle = nullptr;
   AlertInfoType type = AlertInfoType::OtherWarning;
   std::string compName = "";
   std::string layerName = "";
@@ -116,16 +117,15 @@ class AlertInfo {
 class AlertInfoManager {
  public:
   static AlertInfoManager& GetInstance();
-  std::vector<AlertInfo> GetAlertList(AEGP_ItemH itemH);
+  std::vector<AlertInfo> GetAlertList(AEGP_ItemH itemHandle);
 
   bool showAlertInfo(bool showWarning = true, bool showError = true);
 
   std::vector<AlertInfo> warningList = {};
   std::vector<AlertInfo> saveWarnings = {};
 
-  void pushWarning(const std::unordered_map<pag::ID, AEGP_ItemH>& compItemHList,
-                   const std::unordered_map<pag::ID, AEGP_LayerH>& layerHList, AlertInfoType type,
-                   pag::ID compId, pag::ID layerId, const std::string& addInfo = "");
+  void pushWarning(const AEGP_ItemH& itemHandle, const AEGP_LayerH& layerHandle, AlertInfoType type,
+                   const std::string& addInfo = "");
 
   AlertInfoManager(const AlertInfoManager&) = delete;
   AlertInfoManager& operator=(const AlertInfoManager&) = delete;

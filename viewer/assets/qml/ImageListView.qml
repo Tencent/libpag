@@ -15,8 +15,8 @@ ListView {
     boundsMovement: Flickable.StopAtBounds
 
     delegate: Rectangle {
-        height: imageHeight
         width: listView.width
+        height: imageHeight
         color: "#20202A"
 
         DropArea {
@@ -30,7 +30,7 @@ ListView {
                 } else {
                     filePath = drag.source.text;
                 }
-                imageModel.replaceImage(index, filePath);
+                imageModel.changeImage(index, filePath);
             }
         }
 
@@ -153,10 +153,10 @@ ListView {
         visible: false
         title: "Please select a file"
         fileMode: FileDialog.OpenFile
-        nameFilters: ["Replacement files (*.jpg *.jpeg *.bmp *.png)"]
+        nameFilters: ["Replacement files (*.jpg *.jpeg *.bmp *.png *.mp4 *.mov)"]
         onAccepted: {
             let file = selectImageDialog.selectedFile;
-            imageModel.replaceImage(selectIndex, file);
+            imageModel.changeImage(selectIndex, file);
         }
     }
 }

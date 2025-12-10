@@ -17,11 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <vector>
 #include "ByteArray.h"
 #include "FileHelper.h"
 using namespace exporter;
 
-namespace AEPReader {
+namespace exporter {
 
 struct Tag {
   std::string name;
@@ -60,4 +61,4 @@ std::vector<Composition> ReadCompositions(ByteArray* bytes);
 
 std::vector<Layer> ReadLayers(ByteArray* bytes);
 
-}  // namespace AEPReader
+}  // namespace exporter
