@@ -23,61 +23,88 @@
 <context>
     <name>AlertError</name>
     <message>
-        <source>Export failed due to error:</source>
-        <translation type="vanished">导出失败，原因是：</translation>
+        <location filename="../qml/AlertError.qml" line="11"/>
+        <source>Export Error</source>
+        <translation>导出错误</translation>
     </message>
     <message>
+        <location filename="../qml/AlertError.qml" line="79"/>
+        <source>Export failed due to error:</source>
+        <translation>导出失败，原因是：</translation>
+    </message>
+    <message>
+        <location filename="../qml/AlertError.qml" line="124"/>
         <source>Cancel and Modify</source>
-        <translation type="vanished">取消并修改</translation>
+        <translation>取消并修改</translation>
     </message>
 </context>
 <context>
     <name>AlertWarning</name>
     <message>
+        <location filename="../qml/AlertWarning.qml" line="11"/>
+        <source>Optimization Suggestions</source>
+        <translation>优化建议</translation>
+    </message>
+    <message>
+        <location filename="../qml/AlertWarning.qml" line="72"/>
+        <source>Total of %1 items, please refer below optimization suggestion and re-export:</source>
+        <translation>总共%1项，请参考下方优化建议并重新导出：</translation>
+    </message>
+    <message>
+        <location filename="../qml/AlertWarning.qml" line="93"/>
         <source>Click to View All Validation Rules</source>
-        <translation type="vanished">点击查看所有校验规则</translation>
+        <translation>点击查看所有校验规则</translation>
     </message>
     <message>
+        <location filename="../qml/AlertWarning.qml" line="163"/>
         <source>Continue Exporting</source>
-        <translation type="vanished">继续导出</translation>
+        <translation>继续导出</translation>
     </message>
     <message>
+        <location filename="../qml/AlertWarning.qml" line="196"/>
         <source>Cancel and Modify</source>
-        <translation type="vanished">取消并修改</translation>
+        <translation>取消并修改</translation>
     </message>
 </context>
 <context>
     <name>CompositionListView</name>
     <message>
+        <location filename="../qml/CompositionListView.qml" line="309"/>
         <source>Select Save Path</source>
-        <translation type="vanished">选择存储路径</translation>
+        <translation>选择存储路径</translation>
     </message>
 </context>
 <context>
     <name>CompositionSettingPage</name>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="26"/>
         <source>Setting Panel</source>
-        <translation type="vanished">设置面板</translation>
+        <translation>设置面板</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="66"/>
         <source>PreComposition</source>
-        <translation type="vanished">预合成</translation>
+        <translation>预合成</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="72"/>
         <source>Text Layer</source>
-        <translation type="vanished">文本图层</translation>
+        <translation>文本图层</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="78"/>
         <source>Placeholder Images</source>
-        <translation type="vanished">占位图</translation>
+        <translation>占位图</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="84"/>
         <source>Time Stretch</source>
-        <translation type="vanished">时间伸缩</translation>
+        <translation>时间伸缩</translation>
     </message>
     <message>
+        <location filename="../qml/CompositionSettingPage.qml" line="164"/>
         <source>Confirm</source>
-        <translation type="vanished">确认</translation>
+        <translation>确认</translation>
     </message>
 </context>
 <context>
@@ -86,143 +113,271 @@
         <source>PAG Config</source>
         <translation type="vanished">配置面板</translation>
     </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="214"/>
+        <location filename="../qml/ConfigWindow.qml" line="308"/>
+        <source>General</source>
+        <translation>通用</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="241"/>
+        <source>BMP Composition</source>
+        <translation>BMP预合成</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="284"/>
+        <source>Language:</source>
+        <translation>语言：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="294"/>
+        <source>Auto</source>
+        <translation>自动</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="298"/>
+        <source>Export Use Case:</source>
+        <translation>导出场景：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="308"/>
+        <source>UI Animation</source>
+        <translation>UI动画</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="308"/>
+        <source>Video Editing</source>
+        <translation>视频编辑</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="311"/>
+        <source>Export Version Control:</source>
+        <translation>导出版本控制：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="334"/>
+        <source>TAG Level:</source>
+        <translation>TAG等级：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="364"/>
+        <source>Bitmap Compression Quality:</source>
+        <translation>位图压缩质量：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="389"/>
+        <source>Image Scale Ratio:</source>
+        <translation>图像缩放比例：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="415"/>
+        <source>Export Layer Name:</source>
+        <translation>导出图层名称：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="425"/>
+        <location filename="../qml/ConfigWindow.qml" line="439"/>
+        <source>Yes</source>
+        <translation>是</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="425"/>
+        <location filename="../qml/ConfigWindow.qml" line="439"/>
+        <source>No</source>
+        <translation>否</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="429"/>
+        <source>Export Fonts:</source>
+        <translation>导出字体：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="456"/>
+        <location filename="../qml/ConfigWindow.qml" line="622"/>
+        <source>Reset Default</source>
+        <translation>重置默认值</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="496"/>
+        <source>Bitmap Quality:</source>
+        <translation>位图质量：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="510"/>
+        <source>Image Quality:</source>
+        <translation>图像质量：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="535"/>
+        <source>Export Size Limit（Short Size）:</source>
+        <translation>导出尺寸上限（短边长度）：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="557"/>
+        <source>Maximum Frame Rate:</source>
+        <translation>最大帧率上限：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="583"/>
+        <source>Keyframe Interval:</source>
+        <translation>关键帧间隔：</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="673"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../qml/ConfigWindow.qml" line="702"/>
+        <source>OK</source>
+        <translation>确认</translation>
+    </message>
 </context>
 <context>
     <name>ExportCompositionProgress</name>
     <message>
+        <location filename="../qml/ExportCompositionProgress.qml" line="11"/>
         <source>PAG Export Progress</source>
-        <translation type="vanished">PAG导出进度</translation>
+        <translation>PAG导出进度</translation>
     </message>
     <message>
+        <location filename="../qml/ExportCompositionProgress.qml" line="13"/>
         <source>Exporting PAG</source>
-        <translation type="vanished">正在导出PAG</translation>
+        <translation>正在导出PAG</translation>
     </message>
 </context>
 <context>
     <name>ExportCompositionsProgress</name>
     <message>
+        <location filename="../qml/ExportCompositionsProgress.qml" line="11"/>
         <source>Creating PAG</source>
-        <translation type="vanished">PAG生成中</translation>
+        <translation>PAG生成中</translation>
     </message>
     <message>
+        <location filename="../qml/ExportCompositionsProgress.qml" line="57"/>
         <source>%1/%2 Complete</source>
-        <translation type="vanished">%1/%2已完成</translation>
+        <translation>%1/%2已完成</translation>
     </message>
     <message>
+        <location filename="../qml/ExportCompositionsProgress.qml" line="110"/>
         <source>Finish</source>
-        <translation type="vanished">完成</translation>
+        <translation>完成</translation>
     </message>
 </context>
 <context>
-    <name>ExportingPanel</name>
+    <name>ExportPanel</name>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="12"/>
         <source>Export PAG</source>
-        <translation type="vanished">导出PAG</translation>
+        <translation>导出PAG</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="108"/>
         <source>Search Composition</source>
-        <translation type="vanished">查找合成</translation>
+        <translation>查找合成</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="186"/>
         <source>Storage Path</source>
-        <translation type="vanished">存储路径</translation>
+        <translation>存储路径</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="206"/>
         <source>Setting</source>
-        <translation type="vanished">设置</translation>
+        <translation>设置</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="226"/>
         <source>Preview</source>
-        <translation type="vanished">预览</translation>
+        <translation>预览</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="278"/>
         <source>No Error Message Found</source>
-        <translation type="vanished">暂未发现错误信息</translation>
+        <translation>暂未发现错误信息</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="342"/>
         <source>Also Export Audio</source>
-        <translation type="vanished">同时导出音频</translation>
+        <translation>同时导出音频</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="380"/>
         <source>Cancel</source>
-        <translation type="vanished">取消</translation>
+        <translation>取消</translation>
     </message>
     <message>
+        <location filename="../qml/ExportPanel.qml" line="410"/>
         <source>Export</source>
-        <translation type="vanished">导出</translation>
+        <translation>导出</translation>
     </message>
 </context>
 <context>
     <name>PAGListView</name>
     <message>
-        <source>Locate</source>
-        <translation type="vanished">定位</translation>
-    </message>
-    <message>
         <location filename="../qml/PAGListView.qml" line="157"/>
-        <source>定位</source>
-        <translation type="unfinished"></translation>
+        <source>Locate</source>
+        <translation>定位</translation>
     </message>
 </context>
 <context>
     <name>PAGViewerInstall</name>
     <message>
-        <source>Install PAGViewer</source>
-        <translation type="vanished">安装PAGViewer</translation>
-    </message>
-    <message>
-        <source>Cancel</source>
-        <translation type="vanished">取消</translation>
-    </message>
-    <message>
         <location filename="../qml/PAGViewerInstall.qml" line="9"/>
-        <source>PAGViewer安装</source>
-        <translation type="unfinished"></translation>
+        <source>Install PAGViewer</source>
+        <translation>安装PAGViewer</translation>
     </message>
     <message>
         <location filename="../qml/PAGViewerInstall.qml" line="94"/>
-        <source>取消</source>
-        <translation type="unfinished"></translation>
+        <source>Cancel</source>
+        <translation>取消</translation>
     </message>
 </context>
 <context>
     <name>PlaceholderImageItem</name>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="22"/>
         <source>Number</source>
-        <translation type="vanished">序号</translation>
+        <translation>序号</translation>
     </message>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="35"/>
         <source>Image Name</source>
-        <translation type="vanished">图片名称</translation>
+        <translation>图片名称</translation>
     </message>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="72"/>
         <source>Fill Mode</source>
-        <translation type="vanished">填充模式</translation>
+        <translation>填充模式</translation>
     </message>
     <message>
+        <location filename="../qml/PlaceholderImageItem.qml" line="110"/>
         <source>Editable</source>
-        <translation type="vanished">可编辑</translation>
+        <translation>可编辑</translation>
     </message>
 </context>
 <context>
     <name>PreCompositionItem</name>
     <message>
+        <location filename="../qml/PreCompositionItem.qml" line="33"/>
         <source>Name</source>
-        <translation type="vanished">名称</translation>
+        <translation>名称</translation>
     </message>
 </context>
 <context>
     <name>ProgressListView</name>
     <message>
+        <location filename="../qml/ProgressListView.qml" line="181"/>
         <source>View</source>
-        <translation type="vanished">查看</translation>
+        <translation>查看</translation>
     </message>
 </context>
 <context>
     <name>QObject</name>
     <message>
+        <location filename="../../src/ui/export/ExportWindow.cpp" line="70"/>
         <source>Select Storage Path</source>
-        <translation type="vanished">选择存储路径</translation>
+        <translation>选择存储路径</translation>
     </message>
     <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="38"/>
@@ -734,146 +889,171 @@
     </message>
     <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
+        <source>Composition handle not found: The AE project handle for this composition (ID: %1) is not registered. This may occur if the composition was added after export initialization or if the project structure changed.</source>
+        <translation>找不到合成句柄：此合成(ID: %1)的AE项目句柄未注册。这可能发生在导出初始化后添加了合成，或项目结构发生了变化。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="454"/>
+        <source>Try re-exporting the project. If the issue persists, restart After Effects and try again.</source>
+        <translation>请尝试重新导出项目。如果问题持续存在，请重启 After Effects 后重试。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="461"/>
         <source>DisplacementMap does not support referencing its own layer.</source>
         <translation>置换图DisplacementMap暂不支持指向自身图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="451"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="462"/>
         <source>Recommend removing this effect or redirecting the displacement layer to another layer.</source>
         <translation>建议去掉该效果，或修改该置换图层指向其它图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="458"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="469"/>
         <source>[Text Animation - Selector] export error.</source>
         <translation>[文本动画-选择器]导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="463"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="474"/>
         <source>PAG file verification error.</source>
         <translation>PAG文件校验错误。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AEHelper.cpp" line="249"/>
+        <source>Failed to save project file. The file could not be written to disk after multiple attempts. Please check disk space and file permissions, then try again.</source>
+        <translation>保存项目文件失败。多次尝试后，文件无法写入磁盘。请检查磁盘空间和文件权限，然后再试。</translation>
     </message>
 </context>
 <context>
     <name>TextLayerItem</name>
     <message>
+        <location filename="../qml/TextLayerItem.qml" line="22"/>
         <source>Number</source>
-        <translation type="vanished">序号</translation>
+        <translation>序号</translation>
     </message>
     <message>
+        <location filename="../qml/TextLayerItem.qml" line="35"/>
         <source>Layer Name</source>
-        <translation type="vanished">图层名称</translation>
+        <translation>图层名称</translation>
     </message>
     <message>
+        <location filename="../qml/TextLayerItem.qml" line="72"/>
         <source>Editable</source>
-        <translation type="vanished">可编辑</translation>
+        <translation>可编辑</translation>
     </message>
 </context>
 <context>
     <name>TimeStretchItem</name>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="23"/>
         <source>Time Stretch Mode</source>
-        <translation type="vanished">时间伸缩模式</translation>
+        <translation>时间伸缩模式</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="61"/>
         <source>Starting Time</source>
-        <translation type="vanished">起始时间</translation>
+        <translation>起始时间</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="109"/>
         <source>Starting Time Out of Range</source>
-        <translation type="vanished">起始时间超出范围</translation>
+        <translation>起始时间超出范围</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="133"/>
         <source>Duration</source>
-        <translation type="vanished">持续时间</translation>
+        <translation>持续时间</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="181"/>
         <source>Duration Out of Range</source>
-        <translation type="vanished">持续时间超出范围</translation>
+        <translation>持续时间超出范围</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="216"/>
         <source>FPS: </source>
-        <translation type="vanished">帧率：</translation>
+        <translation>帧率：</translation>
     </message>
     <message>
+        <location filename="../qml/TimeStretchItem.qml" line="226"/>
         <source>Duration: </source>
-        <translation type="vanished">持续时间：</translation>
+        <translation>持续时间：</translation>
     </message>
 </context>
 <context>
     <name>exporter::PAGViewerInstallModel</name>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="104"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="108"/>
         <source>PAGViewer is not installed</source>
         <translation>PAGViewer尚未安装</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="106"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="110"/>
         <source>PAGViewer is used to preview PAG files.
 Would you like to download and install it now?</source>
         <translation>PAGViewer可以预览PAG文件。
 是否立即下载并安装？</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="108"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="112"/>
         <source>Confirm</source>
         <translation>确认</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="113"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="117"/>
         <source>Installing PAGViewer</source>
         <translation>正在安装PAGViewer</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="114"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="118"/>
         <source>Please wait, downloading and installing PAGViewer...</source>
         <translation>请稍候，正在下载并安装PAGViewer...</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="120"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="124"/>
         <source>Installation Complete</source>
         <translation>安装完成</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="121"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="125"/>
         <source>PAGViewer installed successfully!
 Previewing your PAG file now.</source>
         <translation>安装PAGViewer成功！
 现在将预览您的PAG文件。</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="122"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="126"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="127"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="131"/>
         <source>Installation Failed</source>
         <translation>安装失败</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="129"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="133"/>
         <source>PAGViewer installation failed
 Please check your network connection or install manually.</source>
         <translation>安装PAGViewer失败
 请检查网络连接或手动安装。</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="131"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="135"/>
         <source>Retry</source>
         <translation>重试</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="154"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="158"/>
         <source>Installing PAGViewer... </source>
         <translation>正在安装PAGViewer...</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="169"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="173"/>
         <source>PAGViewer installation failed</source>
         <translation>PAGViewer安装失败</translation>
     </message>
     <message>
-        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="184"/>
+        <location filename="../../src/ui/PAGViewerInstallModel.cpp" line="188"/>
         <source>An error occurred during installation: </source>
         <translation>安装过程中发生异常：</translation>
     </message>

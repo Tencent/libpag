@@ -87,6 +87,9 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
     AEGP_StreamRefH childStreamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, contents, index,
                                                                &childStreamHandle);
+    if (childStreamHandle == nullptr) {
+      continue;
+    }
     auto shape = GetShape(childStreamHandle, gradientIndex);
     if (shape != nullptr) {
       element->elements.push_back(shape);
@@ -100,8 +103,8 @@ static pag::ShapeElement* GetShapeGroup(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetRectangle(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::RectangleElement();
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->size =
       GetProperty(streamHandle, "ADBE Vector Rect Size", AEStreamParser::PointParser, {}, 2);
   element->position =
@@ -114,8 +117,8 @@ static pag::ShapeElement* GetRectangle(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetEllipse(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::EllipseElement();
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->size =
       GetProperty(streamHandle, "ADBE Vector Ellipse Size", AEStreamParser::PointParser, {}, 2);
   element->position =
@@ -126,8 +129,8 @@ static pag::ShapeElement* GetEllipse(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetPolyStar(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::PolyStarElement();
 
-  element->reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  element->reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                               AEStreamParser::ShapeDirectionReversedParser);
   element->polyType =
       GetValue(streamHandle, "ADBE Vector Star Type", AEStreamParser::PolyStarTypeParser);
   element->points =
@@ -150,8 +153,8 @@ static pag::ShapeElement* GetPolyStar(const AEGP_StreamRefH& streamHandle) {
 static pag::ShapeElement* GetShapePath(const AEGP_StreamRefH& streamHandle) {
   auto element = new pag::ShapePathElement();
 
-  auto reversed =
-      GetValue(streamHandle, "ADBE Vector Shape Direction", AEStreamParser::ShapeDirectionParser);
+  auto reversed = GetValue(streamHandle, "ADBE Vector Shape Direction",
+                           AEStreamParser::ShapeDirectionReversedParser);
   element->shapePath = GetProperty(streamHandle, "ADBE Vector Shape", AEStreamParser::PathParser);
   if (reversed) {
     if (element->shapePath->animatable()) {
@@ -189,6 +192,9 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
   AEGP_StreamRefH dashStreamHandle = nullptr;
   Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       PluginID, streamHandle, "ADBE Vector Stroke Dashes", &dashStreamHandle);
+  if (dashStreamHandle == nullptr) {
+    return;
+  }
   A_long numStreams = 0;
   Suites->DynamicStreamSuite4()->AEGP_GetNumStreamsInGroup(dashStreamHandle, &numStreams);
   if (numStreams > 0 && IsStreamActive(dashStreamHandle)) {
@@ -206,6 +212,9 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
       AEGP_StreamRefH childStreamHandle = nullptr;
       Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, dashStreamHandle, index,
                                                                  &childStreamHandle);
+      if (IsStreamHidden(childStreamHandle)) {
+        continue;
+      }
       if (!IsStreamHidden(childStreamHandle)) {
         auto dash = GetProperty(childStreamHandle, index, AEStreamParser::FloatParser);
         dashes.push_back(dash);
@@ -436,6 +445,9 @@ std::vector<pag::ShapeElement*> GetShapes(const AEGP_LayerH& layerHandle) {
     AEGP_StreamRefH streamHandle = nullptr;
     Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, rootStreamHandle, index,
                                                                &streamHandle);
+    if (streamHandle == nullptr) {
+      continue;
+    }
     auto element = GetShape(streamHandle, gradientIndex);
     if (element != nullptr) {
       contents.push_back(element);

@@ -430,6 +430,7 @@ elseif (OHOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ohos/libpag/export.def")
     endif ()
 endif ()
 
@@ -445,10 +446,10 @@ else ()
 endif ()
 
 if (PAG_USE_C)
-    if (ANDROID OR WIN32)
+    if (ANDROID OR (WIN32 AND PAG_USE_ANGLE))
         file(GLOB PLATFORM_FILES src/c/ext/egl/pag_egl_globals.cpp)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
-    endif ()
+    endif()
 endif ()
 
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)

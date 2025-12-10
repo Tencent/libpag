@@ -48,7 +48,7 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   app->setObjectName("PAGViewer-Install");
   engine = std::make_unique<QQmlApplicationEngine>(app.get());
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("installModel", this);
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/PAGViewerInstall.qml")));
@@ -67,7 +67,11 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
   window->show();
 
-  app->exec();
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
   return dialogResult;
 }
 

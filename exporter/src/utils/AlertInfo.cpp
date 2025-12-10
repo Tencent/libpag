@@ -446,6 +446,17 @@ DEFINE_GETINFO(ExportRenderError) {
   info = infoData.toStdString();
 }
 
+DEFINE_GETINFO(CompositionHandleNotFound) {
+  auto infoData = QObject::tr(
+      "Composition handle not found: The AE project handle for this composition (ID: %1) is not "
+      "registered. This may occur if the composition was added after export initialization or if "
+      "the project structure changed.");
+  auto suggestData = QObject::tr(
+      "Try re-exporting the project. If the issue persists, restart After Effects and try again.");
+  info = infoData.arg(QString::fromStdString(addInfo)).toStdString();
+  suggest = suggestData.toStdString();
+}
+
 DEFINE_GETINFO(DisplacementMapRefSelf) {
   auto infoData = QObject::tr("DisplacementMap does not support referencing its own layer.");
   auto suggestData = QObject::tr(
@@ -532,6 +543,7 @@ static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pa
                         LINE_GETINFO(ExportVideoSequenceError),
                         LINE_GETINFO(WebpEncodeError),
                         LINE_GETINFO(ExportRenderError),
+                        LINE_GETINFO(CompositionHandleNotFound),
                         LINE_GETINFO(DisplacementMapRefSelf),
                         LINE_GETINFO(ExportRangeSlectorError),
                         LINE_GETINFO(PAGVerifyError),
