@@ -1644,6 +1644,7 @@ class PAG_API PAGDecoder {
   int _numFrames = 0;
   float _frameRate = 30.0f;
   float maxFrameRate = 30.0f;
+  void* sharedContext = nullptr;
   int lastReadIndex = -1;
   tgfx::ImageInfo* lastImageInfo = nullptr;
   uint32_t lastContentVersion = 0;
@@ -1661,7 +1662,7 @@ class PAG_API PAGDecoder {
                                                    int numFrames);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate, float maxFrameRate);
+             float frameRate, float maxFrameRate, void* sharedContext = nullptr);
 
   bool readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap);
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index,
