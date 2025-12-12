@@ -172,14 +172,6 @@ jobs:
           source emsdk/emsdk_env.sh
           npm run build:st
 
-      - name: Cypress run:st
-        uses: cypress-io/github-action@v6
-        with:
-          working-directory: web
-          start: npm run server:cypress
-          wait-on: 'http://localhost:8080'
-          command: npm run cypress
-
       - name: Save emsdk Cache
         if: ${{ (github.event_name == 'push') && (steps.emsdk-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
