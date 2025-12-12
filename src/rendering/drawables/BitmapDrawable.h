@@ -24,7 +24,7 @@
 namespace pag {
 class BitmapDrawable : public Drawable {
  public:
-  static std::shared_ptr<BitmapDrawable> Make(int width, int height);
+  static std::shared_ptr<BitmapDrawable> Make(int width, int height, void* sharedContext = nullptr);
 
   int width() const override {
     return _width;

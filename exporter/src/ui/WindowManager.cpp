@@ -47,13 +47,21 @@ WindowManager::WindowManager() {
   translator = std::make_unique<QTranslator>();
 }
 
+void WindowManager::runEventLoopIfNeeded() {
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
+}
+
 void WindowManager::showExportPanelWindow() {
   init();
   if (exportPanelWindow == nullptr) {
     exportPanelWindow = std::make_unique<ExportPanelWindow>(app.get());
   }
   exportPanelWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 void WindowManager::showPAGConfigWindow() {
@@ -62,7 +70,7 @@ void WindowManager::showPAGConfigWindow() {
     configWindow = std::make_unique<ConfigWindow>(app.get());
   }
   configWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 void WindowManager::showExportPreviewWindow() {
@@ -72,7 +80,7 @@ void WindowManager::showExportPreviewWindow() {
     previewWindow = std::make_unique<ExportWindow>(app.get(), outputPath);
   }
   previewWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 void WindowManager::showExportWindow() {
@@ -81,7 +89,7 @@ void WindowManager::showExportWindow() {
     exportWindow = std::make_unique<ExportWindow>(app.get());
   }
   exportWindow->show();
-  app->exec();
+  runEventLoopIfNeeded();
 }
 
 bool WindowManager::showWarnings(const std::vector<AlertInfo>& infos) {

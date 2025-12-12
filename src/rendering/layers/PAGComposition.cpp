@@ -679,4 +679,5 @@ void PAGComposition::updateDurationAndFrameRate() {
     _parent->updateDurationAndFrameRate();
   }
 }
+
 }  // namespace pag

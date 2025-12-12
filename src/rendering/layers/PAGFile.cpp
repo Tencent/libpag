@@ -429,4 +429,5 @@ void PAGFile::replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>&
     }
   }
 }
+
 }  // namespace pag
