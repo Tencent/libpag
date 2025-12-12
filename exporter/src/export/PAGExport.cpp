@@ -290,6 +290,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
 
   if (session->stopExport ||
       (session->showAlertInfo && !AlertInfoManager::GetInstance().showAlertInfo())) {
+    canceled = true;
     return nullptr;
   }
 
@@ -322,6 +323,7 @@ std::shared_ptr<pag::File> PAGExport::exportAsFile() {
   CheckGraphicsMemory(session, pagFile);
 
   if (session->showAlertInfo && !AlertInfoManager::GetInstance().showAlertInfo()) {
+    canceled = true;
     return nullptr;
   }
 
