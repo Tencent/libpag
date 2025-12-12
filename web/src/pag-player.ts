@@ -365,7 +365,7 @@ export class PAGPlayer {
      * Prepares the video frame for the current composition before rendering.
      */
     private async prepareVideoFrame() {
-        if (PAGModule._useSoftwareDecoder !== null && !PAGModule._useSoftwareDecoder) {
+        if (PAGModule._useSoftwareDecoder !== undefined && !PAGModule._useSoftwareDecoder) {
             if (this.pagComposition !== null) {
                 if (this.videoReaderManager === null && VideoReaderManager.HasVideo(this.pagComposition?.wasmIns)) {
                     this.videoReaderManager = await VideoReaderManager.make(this.pagComposition?.wasmIns);

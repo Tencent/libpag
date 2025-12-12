@@ -119,7 +119,7 @@ export interface PAG extends EmscriptenModule {
     _Make: (pagFile:any) => any;
     _HasVideo:(pagFile:any) => any;
   };
-  _useSoftwareDecoder: boolean | null;
+  _useSoftwareDecoder: boolean;
   [key: string]: any;
 }
 
