@@ -6,6 +6,15 @@
   "module": "lib/libpag.esm.js",
   "browser": "lib/libpag.umd.js",
   "typings": "types/web/src/pag.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/web/src/pag.d.ts",
+      "import": "./lib/libpag.esm.js",
+      "require": "./lib/libpag.cjs.js",
+      "default": "./lib/libpag.esm.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build:js:mt": "rimraf --glob lib-mt/*.js lib-mt/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm-mt && tsc -p ./tsconfig.type.json && cp -r ./tsconfig.json ./types/web/ && node script/restore.replace.js -a wasm-mt",
     "build:js:st": "rimraf --glob lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js --environment ARCH:wasm && tsc -p ./tsconfig.type.json && cp -r ./tsconfig.json ./types/web/ && node script/restore.replace.js -a wasm",

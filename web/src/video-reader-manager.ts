@@ -41,8 +41,6 @@ export class VideoReaderManager {
 
     /** Map storing VideoReader instances indexed by video ID */
     private videoReaderMap: Map<number, VideoReader> = new Map<number, VideoReader>();
-    /** Map tracking whether software decoding is enabled for each video ID */
-    private softWareDecodeEnableMap: Map<number, boolean> = new Map<number, boolean>();
 
     /**
      * Constructor for VideoReaderManager.
@@ -96,8 +94,6 @@ export class VideoReaderManager {
             console.error(`get VideoReader fail!,id:${id}`);
             return undefined;
         }
-        // Mark as hardware decoding (software decode disabled)
-        this.softWareDecodeEnableMap.set(id, false);
         return this.videoReaderMap.get(id);
     }
 
@@ -108,10 +104,6 @@ export class VideoReaderManager {
      */
     public async prepareTargetFrame() {
         for (const id of this.videoIDs) {
-            // Skip videos that are already using software decoding
-            if (this.softWareDecodeEnableMap.get(id) !== undefined && this.softWareDecodeEnableMap.get(id)) {
-                continue;
-            }
             // Get the target frame index from WASM
             const targetFrame = this.wasmIns._getTargetFrameByID(id) as number;
             if (targetFrame < 0) {
@@ -120,11 +112,6 @@ export class VideoReaderManager {
             if (this.videoReaderMap.get(id) !== undefined) {
                 // Prepare the target frame with current playback rate.
                 await this.videoReaderMap.get(id)?.prepare(targetFrame, this.wasmIns._getPlaybackRateByID(id));
-                // If this is the first time preparing a frame, enable software decoding and stop the decode loop.
-                if (this.softWareDecodeEnableMap.get(id) === undefined) {
-                    this.softWareDecodeEnableMap.set(id, true);
-                    this.videoReaderMap.get(id)?.stop();
-                }
             } else {
                 console.error("videoReader is undefined,id:", id);
             }
@@ -146,7 +133,6 @@ export class VideoReaderManager {
         }
         // Clear all internal maps
         this.videoReaderMap.clear();
-        this.softWareDecodeEnableMap.clear();
         // Mark as destroyed
         this.isDestroyed = true;
     }

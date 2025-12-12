@@ -127,7 +127,9 @@ jobs:
         id: node-cache
         uses: actions/cache/restore@v4
         with:
-          path: web/node_modules
+          path: |
+            web/node_modules
+            web/package-lock.json
           key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
           restore-keys: node-modules-web-linux-
 
@@ -172,6 +174,14 @@ jobs:
           source emsdk/emsdk_env.sh
           npm run build:st
 
+      - name: Cypress run:st
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: web
+          start: npm run server:cypress
+          wait-on: 'http://localhost:8080'
+          command: npm run cypress
+
       - name: Save emsdk Cache
         if: ${{ (github.event_name == 'push') && (steps.emsdk-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
@@ -183,7 +193,9 @@ jobs:
         if: ${{ (github.event_name == 'push') && (steps.node-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
-          path: web/node_modules
+          path: |
+            web/node_modules
+            web/package-lock.json
           key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
 
       - name: Save Third-Party Cache
