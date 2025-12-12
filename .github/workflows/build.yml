@@ -5,22 +5,7 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Platform to build (leave empty for all)'
-        required: false
-        default: ''
-        type: choice
-        options:
-          - ''
-          - ios
-          - android
-          - web
-          - win
-          - linux
-          - qt
-          - ohos
+
 
 jobs:
   ios:
