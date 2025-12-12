@@ -43,6 +43,15 @@ class PAGTest : public testing::Test {
   pagPlayer->setSurface(pagSurface);                                             \
   pagPlayer->setComposition(pagFile);
 
+#define PAG_SETUP_ISOLATED(pagSurface, pagPlayer, pagFile)                          \
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");                         \
+  ASSERT_TRUE(pagFile != nullptr);                                                  \
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height()); \
+  ASSERT_TRUE(pagSurface != nullptr);                                               \
+  auto pagPlayer = std::make_shared<PAGPlayer>();                                   \
+  pagPlayer->setSurface(pagSurface);                                                \
+  pagPlayer->setComposition(pagFile);
+
 #define PAG_SETUP_WITH_PATH(pagSurface, pagPlayer, pagFile, pagPath)             \
   auto pagFile = LoadPAGFile(pagPath);                                           \
   ASSERT_TRUE(pagFile != nullptr);                                               \

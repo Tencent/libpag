@@ -32,7 +32,7 @@ using nlohmann::json;
  * 用例描述: PAGTextLayerTest fillColor 接口测试
  */
 PAG_TEST(PAGTextLayerTest, fillColor) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   int target = 0;
   auto layer = GetLayer(TestPAGFile, LayerType::Text, target);
@@ -51,7 +51,7 @@ PAG_TEST(PAGTextLayerTest, fillColor) {
  * 用例描述: PAGTextLayerTest strokeColor 接口测试
  */
 PAG_TEST(PAGTextLayerTest, strokeColor) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   int target = 0;
   auto layer = GetLayer(TestPAGFile, LayerType::Text, target);
@@ -69,7 +69,7 @@ PAG_TEST(PAGTextLayerTest, strokeColor) {
  * 用例描述: PAGTextLayerTest fontSize 接口测试
  */
 PAG_TEST(PAGTextLayerTest, fontSize) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   int target = 0;
   auto layer = GetLayer(TestPAGFile, LayerType::Text, target);
@@ -91,7 +91,7 @@ PAG_TEST(PAGTextLayerTest, fontSize) {
  * 用例描述: PAGTextLayerTest text 接口测试
  */
 PAG_TEST(PAGTextLayerTest, text) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   int target = 0;
   auto layer = GetLayer(TestPAGFile, LayerType::Text, target);
@@ -105,7 +105,7 @@ PAG_TEST(PAGTextLayerTest, text) {
  * 用例描述: PAGTextLayerTest textDocument 接口测试
  */
 PAG_TEST(PAGTextLayerTest, textDocument) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textDocument"));
@@ -115,7 +115,7 @@ PAG_TEST(PAGTextLayerTest, textDocument) {
  * 用例描述: PAGTextLayerTest多线程修改测试
  */
 PAG_TEST(PAGTextLayerTest, multiThreadModify) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   TestPAGFile->setCurrentTime(5 * 1000000);
   int target = 0;
   auto layer = GetLayer(TestPAGFile, LayerType::Text, target);
@@ -166,7 +166,7 @@ PAG_TEST(PAGTextLayerTest, Make) {
  * 用例描述: PAGTextLayer Emoji 功能测试
  */
 PAG_TEST(PAGTextLayerTest, Emoji_ID79762747) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/zongyi2.pag");
   auto textData = pagFile->getTextData(0);
   // 自动化测试里屏蔽了 mac 端原生的字体库改用 freetype，防止自动化测试过程总是弹出
@@ -185,7 +185,7 @@ PAG_TEST(PAGTextLayerTest, Emoji_ID79762747) {
  * 用例描述: PAGTextLayer Emoji 功能测试
  */
 PAG_TEST(PAGTextLayerTest, NormalEmoji) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/test2.pag");
   auto textData = pagFile->getTextData(0);
   textData->text = "ha ha哈哈\n哈😆哈哈哈";
@@ -200,7 +200,7 @@ PAG_TEST(PAGTextLayerTest, NormalEmoji) {
  * 用例描述: 测试文字替换
  */
 PAG_TEST(PAGTextLayerTest, TextReplacement) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/test2.pag");
   auto textData = pagFile->getTextData(0);
   textData->text = "ha ha哈哈\n哈哈哈哈";
@@ -216,7 +216,7 @@ PAG_TEST(PAGTextLayerTest, TextReplacement) {
  * 用例描述: PAGTextLayer 竖排文本 功能测试
  */
 PAG_TEST(PAGTextLayerTest, VerticalText_ID80511765) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextDirection.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -228,7 +228,7 @@ PAG_TEST(PAGTextLayerTest, VerticalText_ID80511765) {
  * 用例描述: PAGTextLayer 字间距动画 横排文本 背景框 功能测试
  */
 PAG_TEST(PAGTextLayerTest, TrackingAnimator_ID859317799) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TrackingAnimator.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -240,7 +240,7 @@ PAG_TEST(PAGTextLayerTest, TrackingAnimator_ID859317799) {
  * 用例描述: PAGTextLayer 字间距动画 竖排文本 功能测试
  */
 PAG_TEST(PAGTextLayerTest, TrackingAnimatorVertical_ID859317799) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TrackingAnimatorVertical.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -252,7 +252,7 @@ PAG_TEST(PAGTextLayerTest, TrackingAnimatorVertical_ID859317799) {
  * 用例描述: PAGTextLayer 位置动画
  */
 PAG_TEST(PAGTextLayerTest, PositionAnimator) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPositionAnimator.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -264,7 +264,7 @@ PAG_TEST(PAGTextLayerTest, PositionAnimator) {
  * 用例描述: PAGTextLayer 文本动画
  */
 PAG_TEST(PAGTextLayerTest, TextAnimators_ID863204853) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextAnimators.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -276,7 +276,7 @@ PAG_TEST(PAGTextLayerTest, TextAnimators_ID863204853) {
  * 用例描述: PAGTextLayer 文本动画
  */
 PAG_TEST(PAGTextLayerTest, TextAnimatorsMode_ID863204817) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextAnimatorMode.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -302,7 +302,7 @@ PAG_TEST(PAGTextLayerTest, TextAnimatorsMode_ID863204817) {
  * 用例描述: PAGTextLayer 文本动画
  */
 PAG_TEST(PAGTextLayerTest, TextAnimatorsX7_ID863204817) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextAnimatorX7.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -323,7 +323,7 @@ PAG_TEST(PAGTextLayerTest, TextAnimatorsX7_ID863204817) {
  * 用例描述: PAGTextLayer 文本动画 平滑
  */
 PAG_TEST(PAGTextLayerTest, TextAnimatorSmooth_ID863204817) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextAnimatorSmooth.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -336,7 +336,7 @@ PAG_TEST(PAGTextLayerTest, TextAnimatorSmooth_ID863204817) {
  */
 PAG_TEST(PAGTextLayerTest, TextBounds) {
   auto pagFile = LoadPAGFile("assets/test2.pag");
-  auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);
@@ -386,7 +386,7 @@ PAG_TEST(PAGTextLayerTest, TextBounds) {
  * 用例描述: PAGTextLayer 文本Bounds获取-含有遮罩
  */
 PAG_TEST(PAGTextLayerTest, TrackMatteTextBounds) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/text_matte.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5f);
@@ -403,7 +403,7 @@ PAG_TEST(PAGTextLayerTest, TrackMatteTextBounds) {
 }
 
 PAG_TEST(PAGTextLayerTest, SmallFontSizeScale) {
-  auto pagSurface = OffscreenSurface::Make(720, 1080);
+  auto pagSurface = PAGSurface::MakeOffscreen(720, 1080);
   auto pagFile = LoadPAGFile("assets/tougao.pag");
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -411,7 +411,7 @@ PAG_TEST(PAGTextLayerTest, SmallFontSizeScale) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale"));
 
-  pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+  pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   pagPlayer->setSurface(pagSurface);
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
@@ -421,7 +421,7 @@ PAG_TEST(PAGTextLayerTest, SmallFontSizeScale) {
  * 测试点文本的路径绘制
  */
 PAG_TEST(PAGTextLayerTest, TextPathCommon) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathCommon.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -432,7 +432,7 @@ PAG_TEST(PAGTextLayerTest, TextPathCommon) {
  * 测试点文本的路径绘制,路径反转功能
  */
 PAG_TEST(PAGTextLayerTest, TextPathReversePath) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathReversed.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -443,7 +443,7 @@ PAG_TEST(PAGTextLayerTest, TextPathReversePath) {
  * 测试点文本的路径绘制,垂直于路径功能关闭
  */
 PAG_TEST(PAGTextLayerTest, TextPathNotPerpendicular) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathNotPerpendicular.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -454,7 +454,7 @@ PAG_TEST(PAGTextLayerTest, TextPathNotPerpendicular) {
  * 测试点文本的路径绘制,强制对齐功能,路径起点大于终点
  */
 PAG_TEST(PAGTextLayerTest, TextPathForceAlignment) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathForceAlignment.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -465,7 +465,7 @@ PAG_TEST(PAGTextLayerTest, TextPathForceAlignment) {
  * 测试点文本的路径绘制,强制对齐功能,路径终点大于起点
  */
 PAG_TEST(PAGTextLayerTest, TextPathForceAlignment2) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathForceAlignment2.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -476,7 +476,7 @@ PAG_TEST(PAGTextLayerTest, TextPathForceAlignment2) {
  * 测试点文本的路径绘制,闭合路径情况绘制
  */
 PAG_TEST(PAGTextLayerTest, TextPathClosedPath) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathClosedPath.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -487,7 +487,7 @@ PAG_TEST(PAGTextLayerTest, TextPathClosedPath) {
  * 测试框文本的路径绘制
  */
 PAG_TEST(PAGTextLayerTest, TextPathBox) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathBox.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -498,7 +498,7 @@ PAG_TEST(PAGTextLayerTest, TextPathBox) {
  * 测试框文本的路径绘制
  */
 PAG_TEST(PAGTextLayerTest, TextPathBox2) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathBox2.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -509,7 +509,7 @@ PAG_TEST(PAGTextLayerTest, TextPathBox2) {
  * 测试框文本的路径绘制,反转
  */
 PAG_TEST(PAGTextLayerTest, TextPathBoxReversed) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/TextPathBoxReversed.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -520,7 +520,7 @@ PAG_TEST(PAGTextLayerTest, TextPathBoxReversed) {
  * 测试框文本的范围选择器-三角形,缓和度高低
  */
 PAG_TEST(PAGTextLayerTest, TextRangeSelectorTriangleEarseHighAndLow) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("assets/RangeSelectorTriangleEaseHighAndLow.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
@@ -531,7 +531,7 @@ PAG_TEST(PAGTextLayerTest, TextRangeSelectorTriangleEarseHighAndLow) {
  * 测试文本 layer 做缩放动画时，使用 mipmap 的情况
  */
 PAG_TEST(PAGTextLayerTest, TextLayerScaleAnimationWithMipmap) {
-  PAG_SETUP(TestPAGSurface, TestPAGPlayer, TestPAGFile);
+  PAG_SETUP_ISOLATED(TestPAGSurface, TestPAGPlayer, TestPAGFile);
   auto pagFile = LoadPAGFile("resources/apitest/text_layer_scale_mipmap.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5f);
