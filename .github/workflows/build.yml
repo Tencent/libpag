@@ -110,21 +110,26 @@ jobs:
           path: android
 
   web:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
-      - name: Get Environment Cache
-        id: environment-cache
+      - name: Get emsdk Cache
+        id: emsdk-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            web/emsdk
-            web/node_modules
-            web/package-lock.json
-          key: libpag-environment-web-20241106
-          restore-keys: libpag-environment-web-
+          path: web/emsdk
+          key: emsdk-web-linux-20251212
+          restore-keys: emsdk-web-linux-
+
+      - name: Get node_modules Cache
+        id: node-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: web/node_modules
+          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
+          restore-keys: node-modules-web-linux-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -135,11 +140,10 @@ jobs:
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
-      - name: Install Build Tools
-        if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
+      - name: Install emsdk
+        if: ${{ (steps.emsdk-cache.outputs.cache-hit != 'true') }}
         run: |
           cd web
-          npm install
           if [ ! -d "emsdk" ]; then
             git clone https://github.com/emscripten-core/emsdk.git
           else
@@ -150,18 +154,22 @@ jobs:
           cd emsdk
           ./emsdk install 3.1.71
           ./emsdk activate 3.1.71
-        shell: bash
+
+      - name: Install node_modules
+        if: ${{ (steps.node-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
 
       - name: Run depsync
         run: |
           npm install depsync -g
           depsync
-        shell: bash
 
       - name: Build Web
         run: |
           cd web
-          emsdk/emsdk_env
+          source emsdk/emsdk_env.sh
           npm run build:st
 
       - name: Cypress run:st
@@ -172,15 +180,19 @@ jobs:
           wait-on: 'http://localhost:8080'
           command: npm run cypress
 
-      - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+      - name: Save emsdk Cache
+        if: ${{ (github.event_name == 'push') && (steps.emsdk-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
-          path: |
-            web/emsdk
-            web/node_modules
-            web/package-lock.json
-          key: libpag-environment-web-20241106
+          path: web/emsdk
+          key: emsdk-web-linux-20251212
+
+      - name: Save node_modules Cache
+        if: ${{ (github.event_name == 'push') && (steps.node-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: web/node_modules
+          key: node-modules-web-linux-${{ hashFiles('web/package.json') }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -403,6 +415,7 @@ jobs:
           path: |
             ~/.hvigor
             ~/.ohpm
+            ohos/.hvigor
           key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
           restore-keys: |
             hvigor-${{ runner.os }}-
@@ -415,11 +428,6 @@ jobs:
           key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ohos-
 
-      - name: Configure npm registry
-        run: |
-          npm config set registry https://repo.huaweicloud.com/repository/npm/
-          npm config set "@ohos:registry" https://repo.harmonyos.com/npm/      
-
       - name: Run depsync
         run: |
           npm install depsync -g
@@ -430,12 +438,10 @@ jobs:
           cd ohos
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
-          pnpm add @ohos/hvigor@3.2.4
 
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
           hvigorw assembleHar --mode module -p module=libpag@default -p product=default --no-daemon
 
       - name: Save Third-Party Cache
