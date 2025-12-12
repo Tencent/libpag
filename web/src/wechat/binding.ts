@@ -46,4 +46,5 @@ export const binding = (module: PAG) => {
   module.RenderCanvas = RenderCanvas;
   setMixin(module);
   module.currentPlayer = null;
+  module._useSoftwareDecoder = false;
 };

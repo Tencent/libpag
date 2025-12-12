@@ -156,6 +156,8 @@ export class VideoReader {
                     this.currentFrame = targetFrame;
                     resolve();  // Ensure promise resolves
                     return;
+                } else if ((Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) && !this.videoEl!.paused) {
+                    // Within tolerable frame rate deviation
                 } else {
                     // Seek and play
                     this.isSought = true;
@@ -254,6 +256,11 @@ export class VideoReader {
                 removeListener(this.videoEl!, 'seeked', onSeeked);
                 clearTimeout(seekTimeout);
                 if (play) {
+                    // After seeking, the video might still be in 'ended' state
+                    // Reset it by setting currentTime to itself to clear the ended flag
+                    if (this.videoEl!.ended) {
+                        this.videoEl!.currentTime = this.videoEl!.currentTime;
+                    }
                     this.videoEl?.play().catch((e) => {
                         this.setError(e);
                     });

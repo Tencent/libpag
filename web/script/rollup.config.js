@@ -75,7 +75,7 @@ export default [
     input: 'src/pag.ts',
     output: [
       { banner, file: `${libPath}/libpag.esm.js`, format: 'esm', sourcemap: true },
-      { banner, file: `${libPath}/libpag.cjs.js`, format: 'cjs', exports: 'auto', sourcemap: true },
+      { banner, file: `${libPath}/libpag.cjs.js`, format: 'cjs', exports: 'named', sourcemap: true },
     ],
     plugins: [...plugins],
   },

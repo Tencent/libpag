@@ -14,6 +14,7 @@ export const setMixin = (module: PAG) => {
   };
   module.registerSoftwareDecoderFactory = function (factory = null) {
     module._registerSoftwareDecoderFactory(factory);
+    module._useSoftwareDecoder = true;
   };
   module.SDKVersion = function () {
     return module._SDKVersion();
