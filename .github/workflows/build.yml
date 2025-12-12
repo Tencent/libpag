@@ -141,7 +141,7 @@ jobs:
           path: |
             out
             web/src/wasm
-          key: web-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
+          key: web-build-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.c', 'src/**/*.h', 'src/**/*.hpp', 'src/**/*.mm', 'src/**/*.m', 'include/**/*.h', 'include/**/*.hpp', 'third_party/tgfx/src/**/*.cpp', 'third_party/tgfx/src/**/*.c', 'third_party/tgfx/src/**/*.h', 'third_party/tgfx/src/**/*.hpp', 'third_party/tgfx/src/**/*.mm', 'third_party/tgfx/src/**/*.m', 'CMakeLists.txt') }}
           restore-keys: web-build-${{ runner.os }}-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
@@ -188,7 +188,7 @@ jobs:
           path: |
             out
             web/src/wasm
-          key: web-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
+          key: web-build-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.c', 'src/**/*.h', 'src/**/*.hpp', 'src/**/*.mm', 'src/**/*.m', 'include/**/*.h', 'include/**/*.hpp', 'third_party/tgfx/src/**/*.cpp', 'third_party/tgfx/src/**/*.c', 'third_party/tgfx/src/**/*.h', 'third_party/tgfx/src/**/*.hpp', 'third_party/tgfx/src/**/*.mm', 'third_party/tgfx/src/**/*.m', 'CMakeLists.txt') }}
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -330,7 +330,7 @@ jobs:
         with:
           path: |
             out
-          key: qt-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'viewer/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
+          key: qt-build-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.c', 'src/**/*.h', 'src/**/*.hpp', 'src/**/*.mm', 'src/**/*.m', 'include/**/*.h', 'include/**/*.hpp', 'viewer/**/*.cpp', 'viewer/**/*.c', 'viewer/**/*.h', 'viewer/**/*.hpp', 'viewer/**/*.mm', 'viewer/**/*.m', 'third_party/tgfx/src/**/*.cpp', 'third_party/tgfx/src/**/*.c', 'third_party/tgfx/src/**/*.h', 'third_party/tgfx/src/**/*.hpp', 'third_party/tgfx/src/**/*.mm', 'third_party/tgfx/src/**/*.m', 'CMakeLists.txt') }}
           restore-keys: qt-build-${{ runner.os }}-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
@@ -365,7 +365,7 @@ jobs:
         with:
           path: |
             out
-          key: qt-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'viewer/**', 'third_party/tgfx/src/**', 'CMakeLists.txt') }}
+          key: qt-build-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.c', 'src/**/*.h', 'src/**/*.hpp', 'src/**/*.mm', 'src/**/*.m', 'include/**/*.h', 'include/**/*.hpp', 'viewer/**/*.cpp', 'viewer/**/*.c', 'viewer/**/*.h', 'viewer/**/*.hpp', 'viewer/**/*.mm', 'viewer/**/*.m', 'third_party/tgfx/src/**/*.cpp', 'third_party/tgfx/src/**/*.c', 'third_party/tgfx/src/**/*.h', 'third_party/tgfx/src/**/*.hpp', 'third_party/tgfx/src/**/*.mm', 'third_party/tgfx/src/**/*.m', 'CMakeLists.txt') }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -437,6 +437,7 @@ jobs:
           path: |
             ~/.hvigor
             ~/.ohpm
+            ohos/.hvigor
           key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
           restore-keys: |
             hvigor-${{ runner.os }}-
@@ -448,8 +449,7 @@ jobs:
             ohos/libpag/.cxx
             ohos/libpag/build
             ohos/entry/build
-            ohos/.hvigor
-          key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'ohos/libpag/src/**', 'CMakeLists.txt') }}
+          key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.c', 'src/**/*.h', 'src/**/*.hpp', 'src/**/*.mm', 'src/**/*.m', 'include/**/*.h', 'include/**/*.hpp', 'ohos/libpag/src/**/*.cpp', 'ohos/libpag/src/**/*.c', 'ohos/libpag/src/**/*.h', 'ohos/libpag/src/**/*.hpp', 'ohos/libpag/src/**/*.ets', 'CMakeLists.txt') }}
           restore-keys: |
             ohos-build-${{ runner.os }}-
 
