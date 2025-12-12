@@ -120,7 +120,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: web/emsdk
-          key: emsdk-web-linux-20241106
+          key: emsdk-web-linux-20251212
           restore-keys: emsdk-web-linux-
 
       - name: Get node_modules Cache
@@ -185,7 +185,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: web/emsdk
-          key: emsdk-web-linux-20241106
+          key: emsdk-web-linux-20251212
 
       - name: Save node_modules Cache
         if: ${{ (github.event_name == 'push') && (steps.node-cache.outputs.cache-hit != 'true') }}
