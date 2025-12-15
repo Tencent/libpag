@@ -136,6 +136,10 @@ int VideoInfoManager::getTargetFrameByID(ID id) {
       if (IsFrameInStaticRange(targetFrame, iter->second.videoSequence->staticTimeRanges)) {
         continue;
       }
+      if (iter->second.lastFrame == targetFrame) {
+        continue;
+      }
+      iter->second.lastFrame = targetFrame;
       return static_cast<int>(targetFrame);
     }
   }

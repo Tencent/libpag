@@ -365,16 +365,18 @@ export class PAGPlayer {
      * Prepares the video frame for the current composition before rendering.
      */
     private async prepareVideoFrame() {
-        if (this.pagComposition !== null) {
-            if (this.videoReaderManager === null && VideoReaderManager.HasVideo(this.pagComposition?.wasmIns)) {
-                this.videoReaderManager = await VideoReaderManager.make(this.pagComposition?.wasmIns);
-                PAGModule.videoReaderManager = this.videoReaderManager;
+        if (PAGModule._useSoftwareDecoder !== undefined && !PAGModule._useSoftwareDecoder) {
+            if (this.pagComposition !== null) {
+                if (this.videoReaderManager === null && VideoReaderManager.HasVideo(this.pagComposition?.wasmIns)) {
+                    this.videoReaderManager = await VideoReaderManager.make(this.pagComposition?.wasmIns);
+                    PAGModule.videoReaderManager = this.videoReaderManager;
+                }
+                if (this.videoReaderManager !== null) {
+                    await this.videoReaderManager.prepareTargetFrame();
+                }
+            } else {
+                console.error("PAGComposition is null. A valid PAG file is missing.");
             }
-            if (this.videoReaderManager !== null) {
-                await this.videoReaderManager.prepareTargetFrame();
-            }
-        } else {
-            console.error("PAGComposition is null. A valid PAG file is missing.");
         }
     }
 

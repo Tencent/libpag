@@ -439,7 +439,7 @@ export class PAGView {
       if (e.message !== 'The play() request was interrupted because the document was hidden!') {
         this.clearTimer();
       }
-      console.error(e.stack);
+      console.error(e);
     }
   }
 

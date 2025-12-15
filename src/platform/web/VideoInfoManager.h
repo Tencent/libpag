@@ -36,6 +36,7 @@ struct VideoInfo {
   PreComposeLayer* preLayer = nullptr;
   std::vector<std::shared_ptr<PAGComposition>> pagCompositions = {};
   std::unique_ptr<ByteData> mp4Data = nullptr;
+  Frame lastFrame = -1;
 };
 
 class VideoInfoManager {
