@@ -60,6 +60,7 @@ class WindowManager {
 
  private:
   void init();
+  void runEventLoopIfNeeded();
 
   WindowManager();
   ~WindowManager() = default;

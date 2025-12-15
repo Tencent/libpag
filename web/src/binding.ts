@@ -42,5 +42,6 @@ export const PAGBind = (module: PAG) => {
   module.BackendContext = BackendContext;
   module.Matrix = Matrix;
   module.RenderCanvas = RenderCanvas;
+  module._useSoftwareDecoder = false;
   setMixin(module);
 };

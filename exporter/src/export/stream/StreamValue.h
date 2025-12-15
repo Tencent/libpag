@@ -88,16 +88,24 @@ class AEStreamParser {
 
 template <typename T>
 T GetValue(AEGP_StreamRefH streamHandle, StreamParser<T> parser, const QVariantMap& map = {}) {
+  if (streamHandle == nullptr) {
+    return T{};
+  }
   static A_Time time = {0, 100};
-  AEGP_StreamType streamType;
-  GetSuites()->StreamSuite4()->AEGP_GetStreamType(streamHandle, &streamType);
+  AEGP_StreamType streamType = AEGP_StreamType_NO_DATA;
+  A_Err err = GetSuites()->StreamSuite4()->AEGP_GetStreamType(streamHandle, &streamType);
+  if (err != A_Err_NONE) {
+    return T{};
+  }
   AEGP_StreamValue2 streamValue = {};
+  bool needDispose = false;
   if (streamType != AEGP_StreamType_NO_DATA) {
-    GetSuites()->StreamSuite4()->AEGP_GetNewStreamValue(
+    err = GetSuites()->StreamSuite4()->AEGP_GetNewStreamValue(
         GetPluginID(), streamHandle, AEGP_LTimeMode_CompTime, &time, TRUE, &streamValue);
+    needDispose = (err == A_Err_NONE);
   }
   auto value = parser(streamValue.val, map);
-  if (streamType != AEGP_StreamType_NO_DATA) {
+  if (needDispose) {
     GetSuites()->StreamSuite4()->AEGP_DisposeStreamValue(&streamValue);
   }
 
@@ -107,6 +115,9 @@ T GetValue(AEGP_StreamRefH streamHandle, StreamParser<T> parser, const QVariantM
 template <typename T>
 T GetValue(AEGP_StreamRefH groupStreamHandle, int index, StreamParser<T> parser,
            const QVariantMap& map = {}) {
+  if (groupStreamHandle == nullptr) {
+    return T{};
+  }
   AEGP_StreamRefH streamHandle = nullptr;
   GetSuites()->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(GetPluginID(), groupStreamHandle,
                                                                   index, &streamHandle);
@@ -118,6 +129,9 @@ T GetValue(AEGP_StreamRefH groupStreamHandle, int index, StreamParser<T> parser,
 template <typename T>
 T GetValue(AEGP_StreamRefH groupStreamHandle, const A_char* key, StreamParser<T> parser,
            const QVariantMap& map = {}) {
+  if (groupStreamHandle == nullptr) {
+    return T{};
+  }
   AEGP_StreamRefH streamHandle = nullptr;
   GetSuites()->DynamicStreamSuite4()->AEGP_GetNewStreamRefByMatchname(
       GetPluginID(), groupStreamHandle, key, &streamHandle);

@@ -123,7 +123,10 @@ function copyResourceToAEApp() {
 
 function copyQtResouceToAEApp() {
     exporterPath="$1"
-    copyResouceToAEApp "$1" "Frameworks"
-    copyResouceToAEApp "$1" "PlugIns"
-    copyResouceToAEApp "$1" "Resources"
+    copyResourceToAEApp "$1" "Frameworks"
+    copyResourceToAEApp "$1" "PlugIns"
+    copyResourceToAEApp "$1" "Resources"
 }
+
+# Execute the main function to copy Qt resources
+copyQtFromViewerToPlugin

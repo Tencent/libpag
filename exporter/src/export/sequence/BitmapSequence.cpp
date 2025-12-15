@@ -55,7 +55,7 @@ void GetBitmapSequence(std::shared_ptr<PAGExportSession> session,
 
   auto itemIter = session->itemHandleMap.find(composition->id);
   if (itemIter == session->itemHandleMap.end()) {
-    session->pushWarning(AlertInfoType::ExportRenderError);
+    session->pushWarning(AlertInfoType::CompositionHandleNotFound, std::to_string(composition->id));
     return;
   }
   AEGP_ItemH itemHandle = itemIter->second;

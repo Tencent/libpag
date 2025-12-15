@@ -1,7 +1,7 @@
 /**
  * VideoDecode wait frame num.
  */
-export const VIDEO_DECODE_WAIT_FRAME = 3;
+export const VIDEO_DECODE_WAIT_FRAME = 1;
 /**
  * VideoDecode seek timeout frame num.
  */

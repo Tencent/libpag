@@ -195,6 +195,8 @@ void CompositionsModel::exportSelectedCompositions() {
     pagExports.push_back(std::move(pagExport));
   }
 
+  qDebug() << "Selected compositions: " << pagExports.size();
+
   for (auto& pagExport : pagExports) {
     bool result = pagExport->exportFile();
     if (!result) {

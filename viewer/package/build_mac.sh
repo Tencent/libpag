@@ -35,7 +35,7 @@ function createDmg()
 
 # 1 Initialize variables
 print "[ Initialize variables ]"
-AppVersion=${MajorVersion}.${MinorVersion}.${BK_CI_BUILD_NO}
+AppVersion=${MajorVersion}.${MinorVersion}.${BuildNumber}
 CurrentTime=$(date +"%Y-%m-%d %H:%M:%S")
 RFCTime=$(date -R)
 SourceDir=$(dirname "$(dirname "$(realpath "$0")")")

@@ -50,7 +50,7 @@ std::string GetDocumentsFolderPath() {
   return DocumentsFolderPath;
 }
 
-std::string GetAeVersion() {
+std::string GetAEVersion() {
   if (AeVersion.empty()) {
     AeVersion = RunScript("app.version");
   }
@@ -320,7 +320,7 @@ void RunScriptPreWarm() {
   if (!hasInit) {
     RegisterTextDocumentScript();
     GetDocumentsFolderPath();
-    GetAeVersion();
+    GetAEVersion();
     hasInit = true;
   }
 }

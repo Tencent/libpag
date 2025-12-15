@@ -430,6 +430,7 @@ elseif (OHOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ohos/libpag/export.def")
     endif ()
 endif ()
 
@@ -575,6 +576,11 @@ if (PAG_BUILD_FRAMEWORK)
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
     set(CMAKE_XCODE_ATTRIBUTE_DEFINES_MODULE YES)
+    if(IOS)
+        set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/ios/libpag.modulemap)
+    elseif(MACOS)
+        set(CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE ${CMAKE_CURRENT_SOURCE_DIR}/mac/libpag.modulemap)
+    endif()    
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${PAG_IDENTIFIER})
     if (HasParent)
         set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER} PARENT_SCOPE)
@@ -592,6 +598,23 @@ if (PAG_BUILD_FRAMEWORK)
     foreach (header ${PAG_PLATFORM_HEADERS})
         set_source_files_properties(${header} PROPERTIES MACOSX_PACKAGE_LOCATION "Headers")
     endforeach ()
+    if (NOT CMAKE_GENERATOR MATCHES "Xcode")
+        if (MACOS)
+            add_custom_command(TARGET pag POST_BUILD
+                WORKING_DIRECTORY "$<TARGET_FILE_DIR:pag>/../../"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
+                COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
+                COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/Modules" "Modules"
+                COMMENT "Copying modulemap file to framework/Versions/A/Modules/module.modulemap"
+            )
+        else ()
+            add_custom_command(TARGET pag POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Modules"
+                COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_XCODE_ATTRIBUTE_MODULEMAP_FILE}" "$<TARGET_FILE_DIR:pag>/Modules/module.modulemap"
+                COMMENT "Copying modulemap file to framework/Modules/module.modulemap"
+            )
+        endif ()
+    endif ()
 endif ()
 
 if (PAG_BUILD_TESTS)

@@ -26,6 +26,7 @@
 #include "rendering/layers/ContentVersion.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LockGuard.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 
@@ -102,6 +103,7 @@ std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposi
 
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
                                                  float maxFrameRate, float scale) {
+  auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
   if (composition == nullptr || maxFrameRate <= 0 || scale <= 0) {
     return nullptr;
   }
@@ -110,13 +112,13 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   return std::shared_ptr<PAGDecoder>(new PAGDecoder(std::move(composition), static_cast<int>(width),
                                                     static_cast<int>(height), result.first,
-                                                    result.second, maxFrameRate));
+                                                    result.second, maxFrameRate, sharedContext));
 }
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
-                       int numFrames, float frameRate, float maxFrameRate)
+                       int numFrames, float frameRate, float maxFrameRate, void* sharedContext)
     : _width(width), _height(height), _numFrames(numFrames), _frameRate(frameRate),
-      maxFrameRate(maxFrameRate) {
+      maxFrameRate(maxFrameRate), sharedContext(sharedContext) {
   container = PAGComposition::Make(width, height);
   container->addLayer(composition);
   staticTimeRanges = GetStaticTimeRange(composition, _numFrames);
@@ -217,7 +219,7 @@ bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int in
     return false;
   }
   if (reader == nullptr) {
-    reader = CompositionReader::Make(_width, _height);
+    reader = CompositionReader::Make(_width, _height, sharedContext);
     if (reader == nullptr) {
       LOGE("PAGDecoder::renderFrame() Failed to create a CompositionReader!");
       return false;

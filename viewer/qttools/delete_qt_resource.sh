@@ -56,9 +56,9 @@ function deleteOldQtResources() {
   if [ ! -d "$AE_EXPORTER_PATH" ]; then
       return
   fi
-  traversalAndDeleteFiles "$QT_FRAMEWORK_DRI" "Frameworks"
-  traversalAndDeleteFiles "$QT_PLUGINS_DRI" "PlugIns"
-  traversalAndDeleteFiles "$QT_RESOURCE_DRI" "Resources"
+  traversalAndDeleteFiles "$QT_FRAMEWORK_DIR" "Frameworks"
+  traversalAndDeleteFiles "$QT_PLUGINS_DIR" "PlugIns"
+  traversalAndDeleteFiles "$QT_RESOURCE_DIR" "Resources"
 }
 
 deleteOldQtResources

@@ -27,7 +27,7 @@ PAGWindow {
     modality: Qt.ApplicationModal
 
     onClosing: function (closeEvent) {
-        closeEvent.accepted = true;
+        closeEvent.accepted = false;
         alertWindow.onWindowClosing();
     }
 
