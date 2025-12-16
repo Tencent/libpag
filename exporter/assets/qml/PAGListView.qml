@@ -126,6 +126,7 @@ Rectangle {
                 id: suggestText
                 text: suggestion
                 visible: isFold
+                targetListView: errorListView
                 anchors.top: mainText.bottom
                 anchors.left: compIcon.left
                 anchors.right: root.showLocationBtn ? locationBtn.left : parent.right

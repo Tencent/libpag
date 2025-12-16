@@ -27,7 +27,7 @@ PAGWindow {
     modality: Qt.ApplicationModal
 
     onClosing: function (closeEvent) {
-        closeEvent.accepted = true;
+        closeEvent.accepted = false;
         alertWindow.onWindowClosing();
     }
 
@@ -37,10 +37,37 @@ PAGWindow {
         }
     }
 
-    property string errorMessage: typeof alertInfoModel !== 'undefined' && alertInfoModel ? alertInfoModel.errorMessage : ""
+    property string errorMessage: alertInfoModel ? alertInfoModel.errorMessage : ""
+    property var alertDataModel: alertInfoModel ? alertInfoModel : null
+    property string displayErrorText: {
+        if (errorMessage && errorMessage.length > 0) {
+            return errorMessage;
+        }
+        if (alertDataModel && alertDataModel.count > 0) {
+            var infos = alertDataModel.getAlertInfos();
+            var messages = [];
+            for (var i = 0; i < infos.length; i++) {
+                if (infos[i].errorInfo) {
+                    messages.push(infos[i].errorInfo);
+                }
+            }
+            return messages.join("\n\n");
+        }
+        return "";
+    }
+
+    Connections {
+        target: alertInfoModel
+        function onErrorMessageChanged() {
+            mainWindow.errorMessage = alertInfoModel ? alertInfoModel.errorMessage : ""
+        }
+        function onAlertInfoChanged() {
+            mainWindow.errorMessage = alertInfoModel ? alertInfoModel.errorMessage : ""
+        }
+    }
 
     function setErrorMessage(message) {
-        if (typeof alertInfoModel !== 'undefined' && alertInfoModel) {
+        if (alertInfoModel) {
             alertInfoModel.errorMessage = message;
         }
     }
@@ -95,7 +122,7 @@ PAGWindow {
                 id: errorTextArea
                 anchors.fill: parent
                 anchors.margins: 15
-                text: errorMessage
+                text: displayErrorText
                 targetListView: null
             }
         }
