@@ -199,8 +199,8 @@ void CompositionsModel::exportSelectedCompositions() {
 
   for (auto& pagExport : pagExports) {
     pagExport->session->progressModel.setExportStatus(pagExport->exportFile()
-                                                           ? ProgressModel::ExportStatus::Success
-                                                           : ProgressModel::ExportStatus::Error);
+                                                          ? ProgressModel::ExportStatus::Success
+                                                          : ProgressModel::ExportStatus::Error);
   }
   pagExports.clear();
   context->setContextProperty("exportCompositionsWindow", nullptr);

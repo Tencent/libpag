@@ -18,18 +18,11 @@
 
 #pragma once
 
-
-
 #include <QList>
 
 namespace pag {
 
-enum class FileOpResult {
-  Success,
-  FileNotFound,
-  AccessDenied,
-  Failed
-};
+enum class FileOpResult { Success, FileNotFound, AccessDenied, Failed };
 
 struct FileOperation {
   enum class Type { CopyFiles, CopyDirectory, DeleteFiles, DeleteDirectory, CreateDir };
