@@ -324,19 +324,15 @@ jobs:
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-qt-
 
-      # 增量编译缓存：缓存 tgfx 和 viewer 的编译产物
-      - name: Get Build Cache
-        id: build-cache
-        uses: actions/cache/restore@v4
+      # ccache 编译器缓存 - 大幅加速 C++ 编译
+      - name: Get ccache
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          path: |
-            third_party/tgfx/out/cache
-            out/release/viewer
-          key: build-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('third_party/tgfx/src/**', 'third_party/tgfx/include/**', 'third_party/tgfx/CMakeLists.txt') }}-${{ hashFiles('src/**', 'include/**', 'viewer/src/**', 'viewer/CMakeLists.txt') }}
+          key: ccache-qt-macos-${{ github.ref }}
           restore-keys: |
-            build-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('third_party/tgfx/src/**', 'third_party/tgfx/include/**', 'third_party/tgfx/CMakeLists.txt') }}-
-            build-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-
-            build-qt-
+            ccache-qt-macos-${{ github.ref }}
+            ccache-qt-macos-
+          max-size: 2G
 
       - uses: seanmiddleditch/gha-setup-ninja@master
 
@@ -362,8 +358,9 @@ jobs:
       - name: Build QT
         run: |
           mkdir -p third_party/tgfx/out/cache
-          # 使用 -i 启用增量构建，保留 build 目录
-          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a arm64 -i
+          # 使用 ccache 加速编译
+          export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a arm64 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -372,16 +369,6 @@ jobs:
           path: |
             third_party
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-
-      # 保存增量编译缓存
-      - name: Save Build Cache
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            third_party/tgfx/out/cache
-            out/release/viewer
-          key: build-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('third_party/tgfx/src/**', 'third_party/tgfx/include/**', 'third_party/tgfx/CMakeLists.txt') }}-${{ hashFiles('src/**', 'include/**', 'viewer/src/**', 'viewer/CMakeLists.txt') }}
 
       - name: Job Failed
         if: ${{ failure() }}
