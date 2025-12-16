@@ -46,6 +46,7 @@
         <file>qml/PreCompositionItem.qml</file>
         <file>qml/PlaceholderImageItem.qml</file>
         <file>qml/CompositionSettingPage.qml</file>
+        <file>qml/AlertDialog.qml</file>
 
         <!-- JavaScript -->
         <file>scripts/GetTextDocument.js</file>
