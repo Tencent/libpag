@@ -35,11 +35,13 @@ function createDmg()
 
 # 1 Initialize variables
 print "[ Initialize variables ]"
-AppVersion=${MajorVersion}.${MinorVersion}.${BK_CI_BUILD_NO}
-CurrentTime=$(date +"%Y%m%d%H%M%S")
+AppVersion=${MajorVersion}.${MinorVersion}.${BuildNumber}
+CurrentTime=$(date +"%Y-%m-%d %H:%M:%S")
 RFCTime=$(date -R)
 SourceDir=$(dirname "$(dirname "$(realpath "$0")")")
-BuildDir="${SourceDir}/build_${CurrentTime}"
+BuildDir="${SourceDir}/build_viewer"
+
+echo "Build Time: ${CurrentTime}"
 
 if [ -z "${PAG_DeployQt_Path}" ] || [ -z "${PAG_Qt_Path}" ] || [ -z "${PAG_AE_SDK_Path}" ];
 then
@@ -54,44 +56,24 @@ AESDKPath="${PAG_AE_SDK_Path}"
 
 # 2 Compile
 print "[ Compile ]"
+PAGPath=""
+if declare -F GetPAGPath > /dev/null;
+then
+    PAGPath=$(GetPAGPath)
+    echo "Get PAGPath: ${PAGPath}"
+fi
 
-# 2.1 Compile PAGViewer-x86_64
-print "[ Compile x86_64 ]"
+PAGOptions=""
+if declare -F GetPAGOptions > /dev/null;
+then
+    PAGOptions=$(GetPAGOptions)
+    echo "Get PAGOptions: ${PAGOptions}"
+fi
+
 x86_64BuildDir="${BuildDir}/build_x86_64"
-
-cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
-if [ $? -ne 0 ];
-then
-    echo "Build PAGViewer-x86_64 failed"
-    exit 1
-fi
-
-cmake --build ${x86_64BuildDir} --target PAGViewer -j 8
-if [ $? -ne 0 ];
-then
-    echo "Compile PAGViewer-x86_64 failed"
-    exit 1
-fi
-
-# 2.2 Compile PAGViewer-arm
-print "[ Compile arm64 ]"
 arm64BuildDir="${BuildDir}/build_arm64"
 
-cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}"
-if [ $? -ne 0 ];
-then
-    echo "Build PAGViewer-arm64 failed"
-    exit 1
-fi
-
-cmake --build ${arm64BuildDir} --target PAGViewer -j 8
-if [ $? -ne 0 ];
-then
-    echo "Compile PAGViewer-arm64 failed"
-    exit 1
-fi
-
-# 2.3 Compile PAGExporter-x86_64
+# 2.1 Compile PAGExporter-x86_64
 print "[ Compile PAGExporter-x86_64 ]"
 PluginSourceDir="$(dirname "${SourceDir}")/exporter"
 x86_64BuildDirForPlugin="${x86_64BuildDir}/Plugin"
@@ -110,7 +92,7 @@ then
     exit 1
 fi
 
-# 2.4 Compile PAGExporter-arm64
+# 2.2 Compile PAGExporter-arm64
 print "[ Compile PAGExporter-arm64 ]"
 arm64BuildDirForPlugin="${arm64BuildDir}/Plugin"
 
@@ -125,6 +107,42 @@ cmake --build ${arm64BuildDirForPlugin} --target PAGExporter -j 8
 if [ $? -ne 0 ];
 then
     echo "Compile PAGExporter-arm64 failed"
+    exit 1
+fi
+
+# 2.3 Compile PAGViewer-x86_64
+print "[ Compile x86_64 ]"
+x86_64BuildDir="${BuildDir}/build_x86_64"
+
+cmake -S ${SourceDir} -B ${x86_64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
+if [ $? -ne 0 ];
+then
+    echo "Build PAGViewer-x86_64 failed"
+    exit 1
+fi
+
+cmake --build ${x86_64BuildDir} --target PAGViewer -j 8
+if [ $? -ne 0 ];
+then
+    echo "Compile PAGViewer-x86_64 failed"
+    exit 1
+fi
+
+# 2.4 Compile PAGViewer-arm
+print "[ Compile arm64 ]"
+arm64BuildDir="${BuildDir}/build_arm64"
+
+cmake -S ${SourceDir} -B ${arm64BuildDir} -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="${QtCMakePath}" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
+if [ $? -ne 0 ];
+then
+    echo "Build PAGViewer-arm64 failed"
+    exit 1
+fi
+
+cmake --build ${arm64BuildDir} --target PAGViewer -j 8
+if [ $? -ne 0 ];
+then
+    echo "Compile PAGViewer-arm64 failed"
     exit 1
 fi
 
@@ -150,21 +168,34 @@ ExePath="${ExeDir}/PAGViewer"
 x86_64ExePath="${x86_64BuildDir}/PAGViewer"
 arm64ExePath="${arm64BuildDir}/PAGViewer"
 
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/x64" ${x86_64ExePath}
+install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" ${arm64ExePath}
+
 mkdir -p ${ExeDir}
 lipo -create ${x86_64ExePath} ${arm64ExePath} -output ${ExePath}
 
 # 3.2 Obtain the dependencies of PAGViewer
 print "[ Obtain the dependencies of PAGViewer ]"
-${Deployqt} ${AppDir} -qmldir=${SourceDir}/qml
+${Deployqt} ${AppDir} -qmldir=${SourceDir}/assets/qml
+${Deployqt} ${AppDir} -qmldir=${PluginSourceDir}/assets/qml
 if [ $? -ne 0 ];
 then
     echo "Obtain the dependencies of PAGViewer failed"
     exit 1
 fi
 
+# 3.2.1 Copy Sparkle
+print "[ Copy Sparkle.framework ]"
 FrameworkDir="${AppDir}/Contents/Frameworks"
 SparklePath="${SourceDir}/vendor/sparkle/mac/Sparkle.framework"
 cp -f -R -P ${SparklePath} ${FrameworkDir}
+
+# 3.2.2 Merge and copy ffmovie
+print "[ Merge and copy ffmovie.dylib ]"
+x64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/x64/libffmovie.dylib"
+arm64FfmoviePath="${SourceDir}/vendor/ffmovie/mac/arm64/libffmovie.dylib"
+FfmoviePath="${FrameworkDir}/libffmovie.dylib"
+lipo -create ${x64FfmoviePath} ${arm64FfmoviePath} -output ${FfmoviePath}
 
 # 3.3 Obtain public and private keys
 print "[ Obtain public and private keys ]"
@@ -174,15 +205,15 @@ print "[ Obtain DSA public and private keys ]"
 SignForUpdate=false
 DSAPublicKey=""
 DSAPrivateKey=""
-if [ declare -F GetDSAPublicKeyPath > /dev/null 2>&1 ];
+if declare -F GetDSAPublicKeyPath > /dev/null;
 then
-    DSAPublicKey=GetDSAPublicKeyPath
+    DSAPublicKey=$(GetDSAPublicKeyPath)
     print "Get DSAPublicKey: ${DSAPublicKey}"
 fi
 
-if [ declare -F GetDSAPrivateKeyPath > /dev/null 2>&1 ];
+if declare -F GetDSAPrivateKeyPath > /dev/null;
 then
-    DSAPrivateKey=GetDSAPrivateKeyPath
+    DSAPrivateKey=$(GetDSAPrivateKeyPath)
     print "Get DSAPrivateKey: ${DSAPrivateKey}"
 fi
 
@@ -190,15 +221,15 @@ fi
 print "[ Obtain EDDSA public and private keys ]"
 EDDSAPublicKey=""
 EDDSAPrivateKey=""
-if [ declare -F GetEDDSAPublicKeyPath > /dev/null 2>&1 ];
+if declare -F GetEDDSAPublicKeyPath > /dev/null;
 then
-    EDDSAPublicKey=GetEDDSAPublicKeyPath
+    EDDSAPublicKey=$(GetEDDSAPublicKeyPath)
     print "Get EDDSAPublicKey: ${EDDSAPublicKey}"
 fi
 
-if [ declare -F GetEDDSAPrivateKeyPath > /dev/null 2>&1 ];
+if declare -F GetEDDSAPrivateKeyPath > /dev/null;
 then
-    EDDSAPrivateKey=GetEDDSAPrivateKeyPath
+    EDDSAPrivateKey=$(GetEDDSAPrivateKeyPath)
     print "Get EDDSAPrivateKey: ${EDDSAPrivateKey}"
 fi
 
@@ -214,8 +245,8 @@ PlistPath=${SourceDir}/package/templates/Info.plist
 cp -f ${PlistPath} ${ContentsDir}
 
 ResourcesDir="${AppDir}/Contents/Resources"
-cp -f ${SourceDir}/images/appIcon.icns ${ResourcesDir}
-cp -f ${SourceDir}/images/pagIcon.icns ${ResourcesDir}
+cp -f ${SourceDir}/assets/images/appIcon.icns ${ResourcesDir}
+cp -f ${SourceDir}/assets/images/pagIcon.icns ${ResourcesDir}
 if [ -n "${DSAPublicKey}" ] && [ -f "${DSAPublicKey}" ];
 then
     cp -f ${DSAPublicKey} ${ResourcesDir}
@@ -232,8 +263,27 @@ x86_64PluginPath="${x86_64BuildDirForPlugin}/PAGExporter.plugin"
 arm64PluginPath="${arm64BuildDirForPlugin}/PAGExporter.plugin"
 x86_64PluginExePath="${x86_64PluginPath}/Contents/MacOS/PAGExporter"
 arm64PluginExePath="${arm64PluginPath}/Contents/MacOS/PAGExporter"
+
+install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/x64" ${x86_64PluginExePath}
+install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${arm64PluginExePath}
+
 cp -fr ${x86_64PluginPath} ${PluginPath}
+cp "${SourceDir}/package/templates/PAGExporter.rsrc" "${PluginPath}/Contents/Resources/"
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
+
+# 3.5.2 Obtain the dependencies of PAGExporter
+print "[ Obtain the dependencies of PAGExporter ]"
+${Deployqt} ${PluginPath} -qmldir=${PluginSourceDir}/assets/qml
+if [ $? -ne 0 ];
+then
+    echo "Obtain the dependencies of PAGExporter failed"
+    exit 1
+fi
+cp -fRP "${PluginPath}/Contents/Frameworks/*" "${AppDir}/Contents/Frameworks/"
+cp -fRP "${PluginPath}/Contents/Plugins/*" "${AppDir}/Contents/Plugins/"
+rm -rf "${PluginPath}/Contents/Frameworks"
+rm -rf "${PluginPath}/Contents/Plugins"
+rm -rf "${PluginPath}/Contents/Resources/qml"
 
 # 3.5.2 Merge and copy ffaudio
 print "[ Merge and copy ffaudio ]"
@@ -249,32 +299,47 @@ print "[ Copy related tools ]"
 EncoderToolsPath="${EncoderToolBuildDir}/Release/H264EncoderTools"
 cp -f ${EncoderToolsPath} ${ResourcesDir}
 
+# 3.5.4 Copy Qt deployment scripts
+print "[ Copy Qt deployment scripts ]"
+cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
+cp -f "${SourceDir}/qttools/delete_old_qt_resource.sh" "${ResourcesDir}/"
+cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
+
 # 3.6 Update plist
 print "[ Update plist ]"
 DSAPublicKeyName=$(basename "${DSAPublicKey}")
 SUPublicEDKey=""
 if [ -n "${EDDSAPublicKey}" ] && [ -f "${EDDSAPublicKey}" ];
 then
-    SUPublicEDKey=$(cat "${EDDSAPublicKey}")
+    SUPublicEDKey=$(awk '/-----BEGIN PUBLIC KEY-----/{flag=1; next} /-----END PUBLIC KEY-----/{flag=0} flag' "${EDDSAPublicKey}")
 fi
 /usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${ContentsDir}/Info.plist"
 /usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${ContentsDir}/Info.plist"
 /usr/libexec/Plistbuddy -c "Set SUPublicDSAKeyFile ${DSAPublicKeyName}" "${ContentsDir}/Info.plist"
 /usr/libexec/Plistbuddy -c "Set SUPublicEDKey ${SUPublicEDKey}" "${ContentsDir}/Info.plist"
 
+/usr/libexec/Plistbuddy -c "Set CFBundleVersion ${AppVersion}" "${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleShortVersionString ${AppVersion}" "${PluginPath}/Contents/Info.plist"
+/usr/libexec/Plistbuddy -c "Set CFBundleIdentifier im.pag.exporter" "${PluginPath}/Contents/Info.plist"
+
 # 3.7 Set rpath
 print "[ Set rpath ]"
 # todo delete redundant paths
+install_name_tool -delete_rpath "${QtPath}/lib" ${ExePath}
 install_name_tool -delete_rpath "${SourceDir}/vendor/sparkle/mac" ${ExePath}
+install_name_tool -add_rpath "@executable_path/../Frameworks" ${ExePath}
+
 install_name_tool -delete_rpath "${QtPath}/lib" ${PluginExePath}
 install_name_tool -add_rpath "@executable_path/../Frameworks" ${PluginExePath}
+install_name_tool -add_rpath "@loader_path/../Frameworks" ${PluginExePath}
 
 # 4 Sign
 print "[ Sign ]"
 SignCertName=""
-if [ declare -F GetSignCertName > /dev/null 2>&1 ];
+if declare -F GetSignCertName > /dev/null;
 then
-    SignCertName=GetSignCertName
+    SignCertName=$(GetSignCertName)
+    echo "Get SignCertName: ${SignCertName}"
 fi
 
 if security find-certificate -c "${SignCertName}" >/dev/null 2>&1;
@@ -291,7 +356,12 @@ then
         "${FrameworkDir}/Sparkle.framework/Versions/Current/Sparkle"
         "${FrameworkDir}/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc"
         "${FrameworkDir}/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc"
+        "${FrameworkDir}/Sparkle.framework/Versions/Current/Updater.app/Contents/MacOS/Updater"
+        "${AppDir}"
     )
+
+    xattr -rc ${AppDir}
+    xattr -rc ${PluginPath}
 
     for NeedSignFile in ${NeedSignFiles[@]};
     do
@@ -434,11 +504,12 @@ cp -R -P "${AppDir}" "${BuildDir}/dmg_content"
 
 CreateDmgTool="${SourceDir}/tools/create-dmg/create-dmg"
 
-createDmg "${CreateDmgTool}" "${BuildDir}/dmg_content" "${BuildDir}/PAGViewer.dmg" "${SourceDir}/images/dmgIcon.icns" "${SourceDir}/images/dmg-background.png"
+createDmg "${CreateDmgTool}" "${BuildDir}/dmg_content" "${BuildDir}/PAGViewer.dmg" "${SourceDir}/assets/images/dmgIcon.icns" "${SourceDir}/assets/images/dmg-background.png"
 if [  $? -eq 0 ];
 then
     echo "create dmg success"
 else
     echo "create dmg failed"
+    exit 1
 fi
 

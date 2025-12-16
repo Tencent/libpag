@@ -71,7 +71,7 @@ PAGTask* PAGTaskFactory::createTask(PAGTaskType taskType, const QString& outPath
 }
 
 void PAGTaskFactory::setFilePath(const std::string& filePath) {
-  this->pagFile = PAGFile::Load(filePath);
+  pagFile = PAGFile::Load(filePath);
 }
 
 }  // namespace pag

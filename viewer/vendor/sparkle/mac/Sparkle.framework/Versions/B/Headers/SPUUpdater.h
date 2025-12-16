@@ -47,6 +47,8 @@ NS_ASSUME_NONNULL_BEGIN
 
  Please view the documentation on each of these properties for more detail if you are to configure
  them dynamically.
+
+ This class must be used on the main thread.
  */
 SU_EXPORT @interface SPUUpdater : NSObject
 
@@ -115,12 +117,15 @@ SU_EXPORT @interface SPUUpdater : NSObject
 
  If an update hasn't started, the user may be shown that a new check for updates is occurring.
  If an update has already been downloaded or begun installing from a previous session, the user may
- be presented to install that update. If the user is already being presented with an update, that
- update will be shown to the user in active focus.
+ be presented to install that update. If the user is already being presented with an update or
+ update permission prompt, that notice may be shown to the user in active focus (as long as the user
+ driver is the standard `SPUStandardUserDriver` or if it implements `-[SPUUserDriver
+ showUpdateInFocus]`).
 
  This will find updates that the user has previously opted into skipping.
-
  See `canCheckForUpdates` property which can determine when this method may be invoked.
+
+ This must be called on the main thread.
  */
 - (void)checkForUpdates;
 
@@ -149,6 +154,8 @@ SU_EXPORT @interface SPUUpdater : NSObject
  This will not find updates that the user has opted into skipping.
 
  This method does not do anything if there is a `sessionInProgress`.
+
+ This must be called on the main thread.
  */
 - (void)checkForUpdatesInBackground;
 
@@ -167,15 +174,21 @@ SU_EXPORT @interface SPUUpdater : NSObject
  Updates that have been skipped by the user will not be found.
 
  This method does not do anything if there is a `sessionInProgress`.
+
+ This must be called on the main thread.
  */
 - (void)checkForUpdateInformation;
 
 /**
  A property indicating whether or not updates can be checked by the user.
 
- An update check can be made by the user when an update session isn't in progress, or when an update
- or its progress is being shown to the user. A user cannot check for updates when data (such as the
- feed or an update) is still being downloaded automatically in the background.
+ An update check can be made by the user when an update session isn't in progress.
+ An update check can also be made when an update or its progress is being shown to the user
+ (as long as the user driver is the standard `SPUStandardUserDriver` or if it implements
+ `-[SPUUserDriver showUpdateInFocus]`).
+
+ A user cannot check for updates when data (such as the feed or an update) is still being downloaded
+ automatically in the background.
 
  This property is suitable to use for menu item validation for seeing if `-checkForUpdates` can be
  invoked.
@@ -224,7 +237,9 @@ SU_EXPORT @interface SPUUpdater : NSObject
  to your app's command line arguments instead of setting this property.
 
  The update schedule cycle will be reset in a short delay after the property's new value is set.
- This is to allow reverting this property without kicking off a schedule change immediately
+ This is to allow reverting this property without kicking off a schedule change immediately.
+
+ This property is KVO compliant. This property must be called on the main thread.
  */
 @property(nonatomic) BOOL automaticallyChecksForUpdates;
 
@@ -239,7 +254,9 @@ SU_EXPORT @interface SPUUpdater : NSObject
  Do not always set it on launch unless you want to ignore the user's preference.
 
  The update schedule cycle will be reset in a short delay after the property's new value is set.
- This is to allow reverting this property without kicking off a schedule change immediately
+ This is to allow reverting this property without kicking off a schedule change immediately.
+
+ This property is KVO compliant. This property must be called on the main thread.
  */
 @property(nonatomic) NSTimeInterval updateCheckInterval;
 
@@ -264,6 +281,8 @@ SU_EXPORT @interface SPUUpdater : NSObject
  Hence developers shouldn't maintain an additional user default for this property.
  Only set this property if the user wants to change the default via a user settings option.
  Do not always set it on launch unless you want to ignore the user's preference.
+
+ This property is KVO compliant. This property must be called on the main thread.
  */
 @property(nonatomic) BOOL automaticallyDownloadsUpdates;
 
@@ -370,6 +389,8 @@ SU_EXPORT @interface SPUUpdater : NSObject
  for updates.
 
  Setting this property will persist in the host bundle's user defaults.
+
+ This property is KVO compliant. This property must be called on the main thread.
  */
 @property(nonatomic) BOOL sendsSystemProfile;
 
@@ -379,6 +400,8 @@ SU_EXPORT @interface SPUUpdater : NSObject
  For testing purposes, the last update check is stored in the `SULastCheckTime` key in the host
  bundle's user defaults. For example, `defaults delete my-bundle-id SULastCheckTime` can be invoked
  to clear the last update check time and test if update checks are automatically scheduled.
+
+ This property must be called on the main thread.
  */
 @property(nonatomic, readonly, copy, nullable) NSDate* lastUpdateCheckDate;
 
@@ -395,6 +418,8 @@ SU_EXPORT @interface SPUUpdater : NSObject
 
  See also `-resetUpdateCycleAfterShortDelay` which gives the user a short delay before triggering a
  cycle reset.
+
+ This must be called on the main thread.
  */
 - (void)resetUpdateCycle;
 
@@ -411,6 +436,8 @@ SU_EXPORT @interface SPUUpdater : NSObject
 
  If the `updateCheckInterval` or `automaticallyChecksForUpdates` properties are changed, this method
  is automatically invoked. In these cases, manually resetting the update cycle is not necessary.
+
+ This must be called on the main thread.
  */
 - (void)resetUpdateCycleAfterShortDelay;
 

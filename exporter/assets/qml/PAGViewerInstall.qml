@@ -6,7 +6,7 @@ PAGWindow {
     id: root
     width: 450
     height: 320
-    title: qsTr("PAGViewer安装")
+    title: qsTr("Install PAGViewer")
     modality: Qt.ApplicationModal
     isWindows: true
     canResize: false
@@ -91,7 +91,7 @@ PAGWindow {
 
                     Text {
                         id: cancelButtonText
-                        text: qsTr("取消")
+                        text: qsTr("Cancel")
                         color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"
@@ -123,7 +123,7 @@ PAGWindow {
                     Text {
                         id: actionButtonText
                         text: installModel.buttonText
-                        color:  "#ffffff" 
+                        color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"
                         font.bold: true
@@ -138,19 +138,18 @@ PAGWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        //enabled: !installModel.showProgress
 
                         onClicked: {
                             switch (installModel.currentStage) {
-                                case root.confirmStage:
-                                    installModel.onConfirmInstall();
-                                    break;
-                                case root.successStage:
-                                    installModel.onComplete();
-                                    break;
-                                case root.failedStage:
-                                    installModel.onConfirmInstall();
-                                    break;
+                            case root.confirmStage:
+                                installModel.onConfirmInstall();
+                                break;
+                            case root.successStage:
+                                installModel.onComplete();
+                                break;
+                            case root.failedStage:
+                                installModel.onConfirmInstall();
+                                break;
                             }
                         }
                     }

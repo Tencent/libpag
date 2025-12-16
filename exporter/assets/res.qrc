@@ -19,8 +19,9 @@
         <file>images/down-arrow.png</file>
         <file>images/export-warning.png</file>
         <file>images/export-wrong.png</file>
+        <file>images/export-success.png</file>
+        <file>images/export-waiting.png</file>
         <file>images/right-arrow.png</file>
-
 
         <!-- qml -->
         <file>qml/PAGComboBox.qml</file>
@@ -35,6 +36,22 @@
         <file>qml/AlertWarning.qml</file>
         <file>qml/AlertError.qml</file>
         <file>qml/PAGViewerInstall.qml</file>
+        <file>qml/ExportPanel.qml</file>
+        <file>qml/ProgressListView.qml</file>
+        <file>qml/CompositionListView.qml</file>
+        <file>qml/ExportCompositionProgress.qml</file>
+        <file>qml/ExportCompositionsProgress.qml</file>
+        <file>qml/TextLayerItem.qml</file>
+        <file>qml/TimeStretchItem.qml</file>
+        <file>qml/PreCompositionItem.qml</file>
+        <file>qml/PlaceholderImageItem.qml</file>
+        <file>qml/CompositionSettingPage.qml</file>
+        <file>qml/AlertDialog.qml</file>
 
+        <!-- JavaScript -->
+        <file>scripts/GetTextDocument.js</file>
+
+        <!-- qm -->
+        <file>translation/Chinese.qm</file>
     </qresource>
 </RCC>

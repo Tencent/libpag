@@ -23,7 +23,9 @@
 #include "pag/file.h"
 #include "pag/types.h"
 
-namespace StringHelper {
+namespace exporter {
+
+extern const std::string CompositionBmpSuffix;
 
 std::string AeMemoryHandleToString(const AEGP_MemHandle& handle);
 
@@ -64,6 +66,12 @@ std::string Utf16ToUtf8(const char16_t* u16str);
 
 std::u16string Utf8ToUtf16(const std::string& u8str);
 
+std::string GetJavaScriptFromQRC(const QString& jsPath);
+
+bool IsEndWidthSuffix(const std::string& str, const std::string& suffix);
+
+QString ColorToQString(pag::Color color);
+
 void EnsureStringSuffix(std::string& filePath, const std::string& suffix);
 
-}  // namespace StringHelper
+}  // namespace exporter

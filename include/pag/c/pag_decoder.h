@@ -26,23 +26,23 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
  * Creates a new pag_decoder with a pag_composition, a frame rate limit, and a scale factor for the
  * decoded image size. Release it by pag_release.
  */
-PAG_API pag_decoder* pag_decoder_create(pag_composition* composition, float maxFrameRate,
+PAG_EXPORT pag_decoder* pag_decoder_create(pag_composition* composition, float maxFrameRate,
                                         float scale);
 
-PAG_API int pag_decoder_get_width(pag_decoder* decoder);
+PAG_EXPORT int pag_decoder_get_width(pag_decoder* decoder);
 
-PAG_API int pag_decoder_get_height(pag_decoder* decoder);
+PAG_EXPORT int pag_decoder_get_height(pag_decoder* decoder);
 
-PAG_API int pag_decoder_get_num_frames(pag_decoder* decoder);
+PAG_EXPORT int pag_decoder_get_num_frames(pag_decoder* decoder);
 
-PAG_API float pag_decoder_get_frame_rate(pag_decoder* decoder);
+PAG_EXPORT float pag_decoder_get_frame_rate(pag_decoder* decoder);
 
-PAG_API bool pag_decoder_check_frame_changed(pag_decoder* decoder, int index);
+PAG_EXPORT bool pag_decoder_check_frame_changed(pag_decoder* decoder, int index);
 
-PAG_API bool pag_decoder_read_frame(pag_decoder* decoder, int index, void* pixels, size_t rowBytes,
+PAG_EXPORT bool pag_decoder_read_frame(pag_decoder* decoder, int index, void* pixels, size_t rowBytes,
                                     pag_color_type colorType, pag_alpha_type alphaType);
 
-PAG_API bool pag_decoder_read_frame_to_hardware_buffer(pag_decoder* decoder, int index,
+PAG_EXPORT bool pag_decoder_read_frame_to_hardware_buffer(pag_decoder* decoder, int index,
                                                        void* buffer);
 
 PAG_C_PLUS_PLUS_END_GUARD

@@ -21,7 +21,7 @@ TabButton {
             anchors.horizontalCenter: parent.horizontalCenter
         }
 
-        Rectangle{
+        Rectangle {
             id: undlerLine
             anchors.bottom: parent.bottom
             width: parent.width

@@ -48,7 +48,7 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   app->setObjectName("PAGViewer-Install");
   engine = std::make_unique<QQmlApplicationEngine>(app.get());
 
-  QQmlContext* context = engine->rootContext();
+  auto context = engine->rootContext();
   context->setContextProperty("installModel", this);
 
   engine->load(QUrl(QStringLiteral("qrc:/qml/PAGViewerInstall.qml")));
@@ -67,7 +67,11 @@ bool PAGViewerInstallModel::showInstallDialog(const std::string& pagFilePath) {
   window->setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
   window->show();
 
-  app->exec();
+  if (!QCoreApplication::instance()->property("_eventLoopRunning").toBool()) {
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", true);
+    app->exec();
+    QCoreApplication::instance()->setProperty("_eventLoopRunning", false);
+  }
   return dialogResult;
 }
 
@@ -101,30 +105,34 @@ void PAGViewerInstallModel::updateStage(InstallStage stage) {
 
   switch (stage) {
     case Confirm:
-      title = tr("PAGViewer未安装");
-      message = tr("需要安装PAGViewer来预览PAG文件\n是否立即下载安装？");
-      buttonText = tr("确定安装");
+      title = tr("PAGViewer is not installed");
+      message =
+          tr("PAGViewer is used to preview PAG files.\nWould you like to download and install it "
+             "now?");
+      buttonText = tr("Confirm");
       showCancelButton = true;
       break;
 
     case Installing:
-      title = tr("正在安装PAGViewer");
-      message = tr("请稍候，正在下载并安装PAGViewer...");
+      title = tr("Installing PAGViewer");
+      message = tr("Please wait, downloading and installing PAGViewer...");
       buttonText = "";
       showCancelButton = false;
       break;
 
     case Success:
-      title = tr("安装完成");
-      message = tr("PAGViewer安装成功！\n现在将预览您的PAG文件。");
-      buttonText = tr("开始预览");
+      title = tr("Installation Complete");
+      message = tr("PAGViewer installed successfully!\nPreviewing your PAG file now.");
+      buttonText = tr("Preview");
       showCancelButton = false;
       break;
 
     case Failed:
-      title = tr("安装失败");
-      message = tr("PAGViewer安装失败\n请检查网络连接或手动安装。");
-      buttonText = tr("重试");
+      title = tr("Installation Failed");
+      message =
+          tr("PAGViewer installation failed\nPlease check your network connection or install "
+             "manually.");
+      buttonText = tr("Retry");
       showCancelButton = true;
       break;
   }
@@ -147,7 +155,7 @@ void PAGViewerInstallModel::executeInstallation() {
             this,
             [this, progress]() {
               QString progressMessage =
-                  tr("正在安装PAGViewer... ") + QString("(%1%)").arg(progress);
+                  tr("Installing PAGViewer... ") + QString("(%1%)").arg(progress);
               message = progressMessage;
               Q_EMIT messageChanged();
             },
@@ -162,7 +170,7 @@ void PAGViewerInstallModel::executeInstallation() {
             if (!result.isSuccess()) {
               updateStage(Success);
             } else {
-              QString errorMsg = tr("PAGViewer安装失败");
+              QString errorMsg = tr("PAGViewer installation failed");
               if (!result.errorMessage.empty()) {
                 errorMsg += "\n" + QString::fromStdString(result.errorMessage);
               }
@@ -176,7 +184,8 @@ void PAGViewerInstallModel::executeInstallation() {
       QMetaObject::invokeMethod(
           this,
           [this, e]() {
-            message = tr("安装过程中发生异常：") + QString::fromStdString(e.what());
+            message =
+                tr("An error occurred during installation: ") + QString::fromStdString(e.what());
             updateStage(Failed);
           },
           Qt::QueuedConnection);

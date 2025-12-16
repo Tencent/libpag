@@ -25,30 +25,30 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
 /**
  * Creates a new pag_animator with the specified listener. Release it by pag_release.
  */
-PAG_API pag_animator* pag_animator_create(pag_animator_listener* listener, void* user);
+PAG_EXPORT pag_animator* pag_animator_create(pag_animator_listener* listener, void* user);
 
-PAG_API bool pag_animator_is_sync(pag_animator* animator);
+PAG_EXPORT bool pag_animator_is_sync(pag_animator* animator);
 
-PAG_API void pag_animator_set_sync(pag_animator* animator, bool sync);
+PAG_EXPORT void pag_animator_set_sync(pag_animator* animator, bool sync);
 
-PAG_API int64_t pag_animator_get_duration(pag_animator* animator);
+PAG_EXPORT int64_t pag_animator_get_duration(pag_animator* animator);
 
-PAG_API void pag_animator_set_duration(pag_animator* animator, int64_t duration);
+PAG_EXPORT void pag_animator_set_duration(pag_animator* animator, int64_t duration);
 
-PAG_API int pag_animator_get_repeat_count(pag_animator* animator);
+PAG_EXPORT int pag_animator_get_repeat_count(pag_animator* animator);
 
-PAG_API void pag_animator_set_repeat_count(pag_animator* animator, int repeatCount);
+PAG_EXPORT void pag_animator_set_repeat_count(pag_animator* animator, int repeatCount);
 
-PAG_API double pag_animator_get_progress(pag_animator* animator);
+PAG_EXPORT double pag_animator_get_progress(pag_animator* animator);
 
-PAG_API void pag_animator_set_progress(pag_animator* animator, double progress);
+PAG_EXPORT void pag_animator_set_progress(pag_animator* animator, double progress);
 
-PAG_API bool pag_animator_is_running(pag_animator* animator);
+PAG_EXPORT bool pag_animator_is_running(pag_animator* animator);
 
-PAG_API void pag_animator_start(pag_animator* animator);
+PAG_EXPORT void pag_animator_start(pag_animator* animator);
 
-PAG_API void pag_animator_cancel(pag_animator* animator);
+PAG_EXPORT void pag_animator_cancel(pag_animator* animator);
 
-PAG_API void pag_animator_update(pag_animator* animator);
+PAG_EXPORT void pag_animator_update(pag_animator* animator);
 
 PAG_C_PLUS_PLUS_END_GUARD

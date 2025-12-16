@@ -9,7 +9,7 @@ on:
 jobs:
   mac:
     # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           chmod +x autotest.sh
-          ./autotest.sh
+          ./autotest.sh USE_SWIFTSHADER
 
       - name: Run Codecov
         run: |

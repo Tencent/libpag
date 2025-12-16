@@ -109,6 +109,13 @@ class BlockConfig {
   std::vector<AttributeBase*> configs = {};
 };
 
+template <typename T>
+void AddAttribute(BlockConfig* blockConfig, void* target, AttributeType attributeType,
+                  T defaultValue) {
+  blockConfig->targets.push_back(target);
+  blockConfig->configs.push_back(new AttributeConfig<T>(attributeType, defaultValue));
+}
+
 void AddCustomAttribute(BlockConfig* blockConfig, void* target,
                         const std::function<void(DecodeStream*, void*)> reader,
                         const std::function<bool(EncodeStream*, void*)> writer);

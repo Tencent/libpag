@@ -52,7 +52,7 @@ void PAGCheckUpdateModel::checkForUpdates(bool keepSlient, bool isUseBeta) {
 
 void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
   QString baseUrl = data.data();
-  qDebug() << "get update base url: " << baseUrl;
+  qDebug() << "Get update base url: " << baseUrl;
 
   availableUpdates.clear();
   availableUpdateUrls.clear();
@@ -73,9 +73,10 @@ void PAGCheckUpdateModel::getAppcast(const QByteArray& data) {
 
   for (const auto& url : availableUpdateUrls) {
     auto* task = new PAGUpdateVersionFetcherTask(url);
+    task->setAutoDelete(false);
     connect(task, &PAGUpdateVersionFetcherTask::versionFound, this,
             &PAGCheckUpdateModel::getUpdateVersion);
-    task->setAutoDelete(true);
+    connect(task, &PAGUpdateVersionFetcherTask::finished, task, &QObject::deleteLater);
     threadPool->start(task);
   }
 }

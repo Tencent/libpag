@@ -21,15 +21,10 @@
 #include "src/base/utils/Log.h"
 namespace exporter {
 
-tgfx::ByteOrder CheckByteOrder() {
-  const int i = 1;
-  const auto p = reinterpret_cast<const char*>(&i);
-  return *p == 0 ? tgfx::ByteOrder::BigEndian : tgfx::ByteOrder::LittleEndian;
-}
-
 void ByteArray::setPosition(size_t value) {
-  if (!checkEndOfFile(value)) {
-    positionChanged(value - _position);
+  if (value < dataView.size()) {
+    _position = value;
+    _bitPosition = _position * 8;
   }
 }
 
@@ -152,10 +147,9 @@ std::string ByteArray::readUTF8String() {
     auto text = reinterpret_cast<const char*>(dataView.bytes() + _position);
     auto maxLength = dataView.size() - _position;
     auto textLength = strnlen(text, maxLength);
-    if (textLength < maxLength) {
-      positionChanged(textLength + 1);
-      return {text, textLength};
-    }
+    textLength = std::min(textLength, maxLength);
+    positionChanged(textLength);
+    return {text, textLength};
   }
   LOGI("End of file was encountered.");
   return "";

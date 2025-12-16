@@ -25,7 +25,8 @@
 namespace pag {
 class CompositionReader {
  public:
-  static std::shared_ptr<CompositionReader> Make(int width, int height);
+  static std::shared_ptr<CompositionReader> Make(int width, int height,
+                                                 void* sharedContext = nullptr);
 
   ~CompositionReader();
 

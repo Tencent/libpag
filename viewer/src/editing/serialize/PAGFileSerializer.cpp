@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGFileSerializer.h"
+#include <PAGExtraRttr.hpp>
 #include <PAGRttr.hpp>
 #include <QDebug>
 
@@ -30,7 +31,8 @@ auto getWrappedType(const rttr::type& type) {
   return type.is_wrapper() ? type.get_wrapped_type() : type;
 }
 
-void Serialize(const std::shared_ptr<File>& file, PAGTreeNode* node) {
+void Serialize(std::shared_ptr<File> file, PAGTreeNode* node) {
+  RegisterExtraTypes();
   rttr::instance item = file;
   SerializeInstance(item, node);
 }

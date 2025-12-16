@@ -17,24 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StringHelper.h"
+#include <QFile>
+#include <QTextStream>
 #include <iostream>
 #include "AEHelper.h"
 #include "src/base/utils/Log.h"
 
-namespace StringHelper {
+namespace exporter {
+
+const std::string CompositionBmpSuffix = "_bmp";
 
 std::string AeMemoryHandleToString(const AEGP_MemHandle& handle) {
-  const auto& suites = AEHelper::GetSuites();
+  if (handle == nullptr) {
+    return "";
+  }
+  const auto& suites = GetSuites();
+
   char16_t* str = nullptr;
   suites->MemorySuite1()->AEGP_LockMemHandle(handle, reinterpret_cast<void**>(&str));
-
-  std::string u8str = Utf16ToUtf8(str);
-  if (u8str.empty()) {
-    LOGE("AeMemoryHandleToString failed!");
+  std::string u8Str = Utf16ToUtf8(str);
+  suites->MemorySuite1()->AEGP_UnlockMemHandle(handle);
+  if (u8Str.empty() && str != nullptr && str[0] != u'\0') {
+    LOGE("AeMemoryHandleToString failed to convert UTF-16 content to UTF-8.");
   }
 
-  suites->MemorySuite1()->AEGP_UnlockMemHandle(handle);
-  return u8str;
+  return u8Str;
 }
 
 bool LastIsSpace(const std::string& text) {
@@ -115,7 +122,7 @@ bool StringToBoolean(const std::string& value, const bool defaultValue) {
   if (value.empty()) {
     return defaultValue;
   }
-  auto lowerValue = StringHelper::ToLowerCase(value);
+  auto lowerValue = ToLowerCase(value);
   return lowerValue == "true";
 }
 
@@ -260,43 +267,8 @@ std::string Utf16ToUtf8(const char16_t* u16str) {
   if (u16str == nullptr) {
     return "";
   }
-  std::string u8str;
-  u8str.reserve(wcslen(reinterpret_cast<const wchar_t*>(u16str)) * 3);
-
-  try {
-    while (*u16str) {
-      char32_t codePoint = *u16str++;
-      if (codePoint >= 0xD800 && codePoint <= 0xDBFF && *u16str) {
-        char32_t lowSurrogate = *u16str++;
-        if (lowSurrogate >= 0xDC00 && lowSurrogate <= 0xDFFF) {
-          codePoint = 0x10000 + ((codePoint - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-        } else {
-          continue;
-        }
-      }
-
-      if (codePoint <= 0x7F) {
-        u8str.push_back(static_cast<char>(codePoint));
-      } else if (codePoint <= 0x7FF) {
-        u8str.push_back(static_cast<char>(0xC0 | (codePoint >> 6)));
-        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
-      } else if (codePoint <= 0xFFFF) {
-        u8str.push_back(static_cast<char>(0xE0 | (codePoint >> 12)));
-        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
-        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
-      } else if (codePoint <= 0x10FFFF) {
-        u8str.push_back(static_cast<char>(0xF0 | (codePoint >> 18)));
-        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F)));
-        u8str.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F)));
-        u8str.push_back(static_cast<char>(0x80 | (codePoint & 0x3F)));
-      }
-    }
-  } catch (const std::exception& e) {
-    LOGE("Utf16ToUtf8 failed: %s", e.what());
-    return "";
-  }
-
-  return u8str;
+  QString qString = QString::fromUtf16(u16str);
+  return qString.toUtf8().toStdString();
 }
 
 std::u16string Utf8ToUtf16(const std::string& u8str) {
@@ -337,6 +309,37 @@ std::u16string Utf8ToUtf16(const std::string& u8str) {
   return u16str;
 }
 
+std::string GetJavaScriptFromQRC(const QString& jsPath) {
+  QFile jsFile(jsPath);
+  if (!jsFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return "";
+  }
+
+  QTextStream in(&jsFile);
+  in.setEncoding(QStringConverter::Encoding::Utf8);
+  QString jsContent = in.readAll();
+  jsFile.close();
+  return jsContent.toStdString();
+}
+
+bool IsEndWidthSuffix(const std::string& str, const std::string& suffix) {
+  if (str.length() < suffix.length()) {
+    return false;
+  }
+
+  std::string newStr = str.substr(str.length() - suffix.length(), suffix.length());
+  std::transform(newStr.begin(), newStr.end(), newStr.begin(), ::tolower);
+
+  return newStr == suffix;
+}
+
+QString ColorToQString(pag::Color color) {
+  return QString("#%1%2%3")
+      .arg(color.red, 2, 16, QChar('0'))
+      .arg(color.green, 2, 16, QChar('0'))
+      .arg(color.blue, 2, 16, QChar('0'));
+}
+
 void EnsureStringSuffix(std::string& filePath, const std::string& suffix) {
   if (filePath.size() >= suffix.size()) {
     auto tail = filePath.substr(filePath.size() - suffix.size());
@@ -347,4 +350,5 @@ void EnsureStringSuffix(std::string& filePath, const std::string& suffix) {
   }
   filePath += suffix;
 }
-}  // namespace StringHelper
+
+}  // namespace exporter

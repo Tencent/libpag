@@ -25,8 +25,8 @@ namespace pag {
 
 class FrameDisplayInfo {
  public:
-  FrameDisplayInfo(const QString& name, const QString& color, int64_t current, int64_t avg,
-                   int64_t max);
+  FrameDisplayInfo(const QString& name = "", const QString& color = "", int64_t current = 0,
+                   int64_t avg = 0, int64_t max = 0);
 
   QString name = "";
   QString color = "";

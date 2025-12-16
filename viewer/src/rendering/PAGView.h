@@ -20,6 +20,8 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
+#include <QTimer>
+#include "audio/PAGAudioPlayer.h"
 #include "pag/pag.h"
 #include "platform/qt/GPUDrawable.h"
 #include "rendering/PAGRenderThread.h"
@@ -68,16 +70,19 @@ class PAGView : public QQuickItem {
   void setIsPlaying(bool isPlaying);
   void setShowVideoFrames(bool isShow);
   void setProgress(double progress);
+  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
   Q_SIGNAL void editableTextLayerCountChanged(int editableTextLayerCount);
   Q_SIGNAL void editableImageLayerCountChanged(int editableImageLayerCount);
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void progressChanged(double progress);
-  Q_SIGNAL void fileChanged(const std::shared_ptr<pag::File>& file);
+  Q_SIGNAL void fileChanged(std::shared_ptr<pag::File> file);
   Q_SIGNAL void filePathChanged(const std::string& filePath);
-  Q_SIGNAL void pagFileChanged(const std::shared_ptr<pag::PAGFile>& pagFile);
+  Q_SIGNAL void pagFileChanged(std::shared_ptr<pag::PAGFile> pagFile);
 
   Q_SLOT void flush() const;
+  Q_SLOT void sizeChangedDelayHandle();
+  Q_SLOT void onAudioTimeChanged(int64_t audioTime);
 
   Q_INVOKABLE bool setFile(const QString& filePath);
   Q_INVOKABLE void firstFrame();
@@ -89,19 +94,24 @@ class PAGView : public QQuickItem {
   PAGRenderThread* getRenderThread() const;
 
  private:
+  void setProgressInternal(double progress, bool isAudioSeek);
+
   int editableTextLayerCount = 0;
   int editableImageLayerCount = 0;
   int64_t lastPlayTime = 0;
   bool isPlaying_ = true;
+  std::atomic_bool sizeChanged = false;
   qreal lastWidth = 0;
   qreal lastHeight = 0;
   qreal lastPixelRatio = 1;
   double progress = 0.0;
   double progressPerFrame = 0.0;
+  std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
   std::unique_ptr<PAGRenderThread> renderThread = nullptr;
   std::shared_ptr<PAGFile> pagFile = nullptr;
   std::shared_ptr<GPUDrawable> drawable = nullptr;
+  std::unique_ptr<PAGAudioPlayer> audioPlayer = nullptr;
 
   friend class PAGRenderThread;
 };

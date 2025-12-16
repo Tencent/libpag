@@ -3,6 +3,9 @@ import { removeFile, touchDirectory, writeFile } from './file-utils';
 import { ArrayBufferImage, FrameData } from '@tgfx/wechat/array-buffer-image';
 
 import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
+import {PAGModule} from "../pag-module";
+import type {PAGPlayer} from "../pag-player";
+import {destroyVerify} from "../utils/decorators";
 
 declare const wx: wx;
 declare const setInterval: (callback: () => void, delay: number) => number;
@@ -27,19 +30,22 @@ export interface TimeRange {
   end: number;
 }
 
+@destroyVerify
 export class VideoReader {
   public static async create(
-    mp4Data: Uint8Array,
-    width: number,
-    height: number,
-    frameRate: number,
-    staticTimeRanges: TimeRange[],
+      mp4Data: Uint8Array,
+      width: number,
+      height: number,
+      frameRate: number,
+      staticTimeRanges: TimeRange[],
   ): Promise<VideoReader> {
     return new VideoReader(mp4Data, width, height, frameRate, staticTimeRanges);
   }
 
   public isSought = false; // Web SDK use this property to check if video is seeked
   public isPlaying = false; // Web SDK use this property to check if video is playing
+  public isDestroyed = false;
+  private player: PAGPlayer | null = null;
 
   private readonly frameRate: number;
   private currentFrame: number;
@@ -55,11 +61,11 @@ export class VideoReader {
   private arrayBufferImage = new ArrayBufferImage(new ArrayBuffer(0), 0, 0);
 
   public constructor(
-    mp4Data: Uint8Array,
-    width: number,
-    height: number,
-    frameRate: number,
-    staticTimeRanges: TimeRange[],
+      mp4Data: Uint8Array,
+      width: number,
+      height: number,
+      frameRate: number,
+      staticTimeRanges: TimeRange[],
   ) {
     this.frameRate = frameRate;
     this.currentFrame = -1;
@@ -75,10 +81,12 @@ export class VideoReader {
     this.videoDecoderPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 1 }).then(() => {
       this.startGetFrameDataLoop();
     });
+    this.linkPlayer(PAGModule.currentPlayer);
   }
 
   public async prepare(targetFrame: number) {
     if (targetFrame === this.currentFrame) return;
+    this.isSought = false;
     // Wait for videoDecoder ready
     await this.videoDecoderPromise;
     if (this.frameDataBuffers.length > 0) {
@@ -94,6 +102,8 @@ export class VideoReader {
 
     if (targetFrame !== this.bufferIndex) {
       this.seeking = true;
+      this.isSought = true;
+      this.bufferIndex = targetFrame;
       await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
       this.seeking = false;
     }
@@ -104,6 +114,10 @@ export class VideoReader {
 
   public getVideo() {
     return this.arrayBufferImage;
+  }
+
+  public getCurrentFrame(): number {
+    return this.currentFrame;
   }
 
   public async play() {
@@ -124,11 +138,16 @@ export class VideoReader {
   }
 
   public onDestroy() {
+    if (this.player) {
+      this.player.unlinkVideoReader(this);
+      this.player = null;
+    }
     this.clearFrameDataLoop();
     this.videoDecoder.remove();
     if (this.mp4Path) {
       removeFile(this.mp4Path);
     }
+    this.isDestroyed = true;
   }
 
   private getFrameData() {
@@ -185,5 +204,12 @@ export class VideoReader {
       this.getFrameDataLoopTimer = null;
     }
     this.getFrameDataLooping = false;
+  }
+
+  private linkPlayer(player: PAGPlayer | null) {
+    this.player = player;
+    if (player) {
+      player.linkVideoReader(this);
+    }
   }
 }

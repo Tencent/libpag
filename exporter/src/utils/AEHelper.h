@@ -17,141 +17,130 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <QString>
+#include <QImage>
 #include <memory>
 #include <string>
 #include "AEGP_SuiteHandler.h"
 #include "AE_GeneralPlug.h"
+#include "rendering/caches/FrameCache.h"
 
-namespace AEHelper {
+namespace exporter {
 
-AEGP_ItemH GetActiveCompositionItem();
-
-void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id);
+struct AEVersion {
+  static int32_t MajorVerison;
+  static int32_t MinorVersion;
+};
 
 std::shared_ptr<AEGP_SuiteHandler> GetSuites();
 
+std::string GetAEVersion();
+
 AEGP_PluginID GetPluginID();
 
-std::string RunScript(std::shared_ptr<AEGP_SuiteHandler> suites, AEGP_PluginID pluginID,
-                      const std::string& scriptText);
+QString GetProjectName();
+
+QString GetProjectPath();
+
+AEGP_ItemH GetActiveCompositionItem();
+
+void GetRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_long width,
+                    A_long height, AEGP_RenderOptionsH& renderOptions);
+
+void GetRenderFrameSize(AEGP_RenderOptionsH& renderOptions, A_u_long& stride, A_long& width,
+                        A_long& height);
+
+void GetLayerRenderFrame(uint8* rgbaBytes, A_u_long srcStride, A_u_long dstStride, A_long width,
+                         A_long height, AEGP_LayerRenderOptionsH& renderOptions);
+
+void GetLayerRenderFrameSize(AEGP_LayerRenderOptionsH& renderOptions, A_u_long& stride,
+                             A_long& width, A_long& height);
+
+std::vector<char> GetProjectFileBytes();
+
+void SetRenderTime(const AEGP_RenderOptionsH& renderOptions, float frameRate, pag::Frame frame);
+
+void SetSuitesAndPluginID(SPBasicSuite* basicSuite, AEGP_PluginID id);
+
+std::string RunScript(const std::string& scriptText);
 
 void RunScriptPreWarm();
 
 bool CheckAeVersion();
 
-std::string GetItemName(const AEGP_ItemH& itemH);
+void SetMajorVersion(int32_t majorVersion);
 
-std::string GetCompName(const AEGP_CompH& compH);
-
-std::string GetLayerName(const AEGP_LayerH& layerH);
-
-AEGP_CompH GetCompFromItem(const AEGP_ItemH& itemH);
-
-void SelectItem(const AEGP_ItemH& itemH);
-
-void SelectItem(const AEGP_ItemH& itemH, const AEGP_LayerH& layerH);
-
-AEGP_ItemH GetItemFromComp(const AEGP_CompH& compH);
-
-AEGP_ItemH GetItemFromLayer(const AEGP_LayerH& layerH);
-
-uint32_t GetItemId(const AEGP_ItemH& itemH);
-
-uint32_t GetItemIdFromLayer(const AEGP_LayerH& layerH);
-
-uint32_t GetLayerId(const AEGP_LayerH& layerH);
+void setMinorVersion(int32_t minorVersion);
 
 void RegisterTextDocumentScript();
 
-QString GetProjectPath();
+uint32_t GetLayerID(const AEGP_LayerH& layerHandle);
 
-AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH);
+uint32_t GetLayerItemID(const AEGP_LayerH& layerHandle);
 
-void DeleteStream(AEGP_StreamRefH streamRefH);
+std::string GetLayerName(const AEGP_LayerH& layerHandle);
 
-AEGP_StreamRefH GetMarkerStreamFromLayer(const AEGP_LayerH& layerH);
+AEGP_ItemH GetLayerItemH(const AEGP_LayerH& layerHandle);
 
-AEGP_StreamRefH GetMarkerStreamFromItem(const AEGP_ItemH& litemH);
+pag::Ratio GetLayerStretch(const AEGP_LayerH& layerHandle);
 
-AEGP_StreamRefH GetMarkerStreamFromComposition(const AEGP_CompH& compH);
+pag::Frame GetLayerStartTime(const AEGP_LayerH& layerHandle, float frameRate);
 
-float GetFrameRateFromItem(const AEGP_ItemH& itemH);
+pag::Frame GetLayerDuration(const AEGP_LayerH& layerHandle, float frameRate);
 
-float GetFrameRateFromComp(const AEGP_CompH& compH);
+AEGP_LayerFlags GetLayerFlags(const AEGP_LayerH& layerHandle);
 
-const std::string TextDocumentScript = R"(
-if (typeof PAG !== 'object') {
-    PAG = {};
-}
-(function () {
-    'use strict';
-    PAG.printTextDocuments = function (compositionID, layerIndex, keyframeIndex) {
-        var composition = null;
-        for (var i = 1; i <= app.project.numItems; i++) {
-            var item = app.project.item(i);
-            if (item instanceof CompItem && item.id == compositionID) {
-                composition = item;
-                break;
-            }
-        }
-        if (composition == null) {
-            return "{}";
-        }
-        if (layerIndex >= composition.layers.length) {
-            return "{}";
-        }
-        var textLayer = composition.layers[layerIndex + 1];
-        var sourceText = textLayer.property("Source Text");
-        if (!sourceText) {
-            return "{}";
-        }
-        var textDocument;
-        if (keyframeIndex === 0 && sourceText.numKeys === 0) {
-            textDocument = sourceText.value;
-        } else {
-            textDocument = sourceText.keyValue(keyframeIndex + 1);
-        }
-        if (!textDocument) {
-            return "{}";
-        }
-        var resultObject = {};
-        for (var key in textDocument) {
-            if (!Object.prototype.hasOwnProperty.call(textDocument, key)) {
-                continue;
-            }
-            try {
-                var value = textDocument[key];
-            } catch (e) {
-                continue;
-            }
-            switch (typeof value) {
-                case 'string':
-                    value = value.split("\x03").join("\n");
-                    value = value.split("\r\n").join("\n");
-                    value = value.split("\r").join("\n");
-                    value = value.split("\n").join("\\n");
-                    resultObject[key] = value;
-                    break;
-                case 'number':
-                case 'boolean':
-                    resultObject[key] = value;
-                    break;
-                case 'object':
-                    if (value && Object.prototype.toString.apply(value) === '[object Array]') {
-                        var partial = [];
-                        var length = value.length;
-                        for (var i = 0; i < length; i += 1) {
-                            partial[i] = String(value[i]);
-                        }
-                        resultObject[key] = partial;
-                    }
-                    break;
-            }
-        }
-        return JSON.stringify(resultObject);
-    }
-}());
-)";
+AEGP_LayerH GetLayerParentLayerH(const AEGP_LayerH& layerHandle);
 
-}  // namespace AEHelper
+pag::BlendMode GetLayerBlendMode(const AEGP_LayerH& layerHandle);
+
+AEGP_LayerH GetLayerTrackMatteLayerH(const AEGP_LayerH& layerHandle);
+
+pag::TrackMatteType GetLayerTrackMatteType(const AEGP_LayerH& layerHandle);
+
+A_long GetLayerEffectNum(const AEGP_LayerH& layerHandle);
+
+void SelectLayer(const AEGP_ItemH& itemHandle, const AEGP_LayerH& layerHandle);
+
+uint32_t GetItemID(const AEGP_ItemH& itemHandle);
+
+uint32_t GetItemParentID(const AEGP_ItemH& itemHandle);
+
+std::string GetItemName(const AEGP_ItemH& itemHandle);
+
+AEGP_CompH GetItemCompH(const AEGP_ItemH& itemHandle);
+
+float GetItemFrameRate(const AEGP_ItemH& itemHandle);
+
+pag::Frame GetItemDuration(const AEGP_ItemH& itemHandle);
+
+QSize GetItemDimensions(const AEGP_ItemH& itemHandle);
+
+QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame);
+
+void SetItemName(const AEGP_ItemH& itemHandle, const std::string& name);
+
+void SelectItem(const AEGP_ItemH& itemHandle);
+
+std::string GetCompName(const AEGP_CompH& compositionHandle);
+
+AEGP_ItemH GetCompItemH(const AEGP_CompH& compositionHandle);
+
+pag::Color GetCompBackgroundColor(const AEGP_CompH& compositionHandle);
+
+bool IsStaticComposition(const AEGP_CompH& compositionHandle);
+
+std::string GetStreamMatchName(const AEGP_StreamRefH& streamHandle);
+
+bool IsStreamHidden(const AEGP_StreamRefH& streamHandle);
+
+bool IsStreamActive(const AEGP_StreamRefH& streamHandle);
+
+void DeleteStream(AEGP_StreamRefH streamHandle);
+
+AEGP_StreamRefH GetLayerMarkerStream(const AEGP_LayerH& layerHandle);
+
+AEGP_StreamRefH GetItemMarkerStream(const AEGP_ItemH& itemHandle);
+
+AEGP_StreamRefH GetCompositionMarkerStream(const AEGP_CompH& compositionHandle);
+
+}  // namespace exporter

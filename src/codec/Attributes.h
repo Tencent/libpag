@@ -19,7 +19,6 @@
 #pragma once
 
 #include "AttributeHelper.h"
-#include "codec/AddAttributes.h"
 
 namespace pag {
 template <typename T, template <typename TT> class K = Keyframe>

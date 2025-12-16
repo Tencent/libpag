@@ -18,6 +18,8 @@ endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30)
+    add_definitions(-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1)
 endif ()
 
 # configures the local installation path of the AE_SDK.
@@ -38,17 +40,10 @@ if (NOT CMAKE_PREFIX_PATH)
     include("./QTCMAKE.cfg")
 endif ()
 
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTORCC ON)
-
-find_package(Qt6 COMPONENTS Widgets Core Gui OpenGL Qml Quick Network REQUIRED)
-add_definitions(${Qt6Widgets_DEFINITIONS} ${QtQml_DEFINITIONS} ${${Qt6Quick_DEFINITIONS}})
-qt6_add_resources(QT_RESOURCES assets/res.qrc)
-
 if (MSVC)
     add_compile_options("/utf-8")
     add_compile_options(/GR-)
+    add_compile_options(/bigobj)
 endif (MSVC)
 
 # Sets flags
@@ -58,7 +53,50 @@ endif ()
 
 add_definitions(-DQT_NO_KEYWORDS)
 
-list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets OpenGL QuickControls2 LinguistTools)
+list(APPEND libs Qt6::Core Qt6::Qml Qt6::Quick Qt::Widgets Qt6::OpenGL Qt6::QuickControls2)
+find_program(LUPDATE_EXECUTABLE lupdate
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
+find_program(LRELEASE_EXECUTABLE lrelease
+        PATHS ${CMAKE_PREFIX_PATH}/../../bin
+        REQUIRED)
+execute_process(COMMAND ${LUPDATE_EXECUTABLE} -recursive ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/assets/qml -ts ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts)
+execute_process(COMMAND ${LRELEASE_EXECUTABLE} ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.ts -qm ${PROJECT_SOURCE_DIR}/assets/translation/Chinese.qm)
+qt_add_resources(QT_RESOURCES assets/res.qrc)
+
+message(STATUS "Generate Version File")
+if (DEFINED ENV{MajorVersion})
+    set(MajorVersion "$ENV{MajorVersion}")
+else ()
+    set(MajorVersion "1")
+endif()
+if (DEFINED ENV{MinorVersion})
+    set(MinorVersion "$ENV{MinorVersion}")
+else ()
+    set(MinorVersion "0")
+endif ()
+if (DEFINED ENV{BuildNumber})
+    set(BuildNumber "$ENV{BuildNumber}")
+else()
+    set(BuildNumber "0")
+endif ()
+if ($ENV{isBetaVersion} MATCHES false)
+    set(UpdateChannel "stable")
+else ()
+    set(UpdateChannel "beta")
+endif ()
+configure_file(${CMAKE_SOURCE_DIR}/templates/version.h.in
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
+)
+
+list(APPEND PAG_EXPORTER_INCLUDES ./ src ../ ../include ../src ../third_party/tgfx/include)
 file(GLOB_RECURSE PAG_EXPORTER_SOURCE_FILES src/*.*)
 file(GLOB_RECURSE PAG_EXPORTER_THIRD_PARTY_SOURCE_FILES
         ${AE_SDK_PATH}/Util/*.cpp
@@ -86,7 +124,9 @@ list(APPEND PAG_EXPORTER_THIRD_PARTY_INCLUDES
         ${AE_SDK_PATH}/Resources
         ../third_party/tgfx/include
         ../third_party/tgfx/third_party/json/include
-        vendor/TinyXML2)
+        ../third_party/tgfx/third_party/libwebp/src
+        vendor/TinyXML2
+        vendor/ffaudio/include)
 
 if (APPLE)
     find_library(COCOA Cocoa REQUIRED)
@@ -107,7 +147,8 @@ if (APPLE)
     list(APPEND libs ${CORE_MEDIA})
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND libs ${ICONV_LIBRARIES})
-
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffaudio/mac/${ARCH}/libffaudio.dylib)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
 elseif (WIN32)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ffaudio/win/x64/ffaudio.lib)
 endif ()
@@ -118,14 +159,19 @@ set(PAG_USE_LIBAVC ON)
 set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_TESTS OFF)
 set(PAG_BUILD_FRAMEWORK OFF)
+set(TGFX_BUILD_LAYERS ON)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 list(APPEND PAG_OPTIONS "-DPAG_USE_QT=${PAG_USE_QT}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_RTTR=${PAG_USE_RTTR}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_LIBAVC=${PAG_USE_LIBAVC}")
+list(APPEND PAG_OPTIONS "-DTGFX_BUILD_LAYERS=${TGFX_BUILD_LAYERS}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_TESTS=${PAG_BUILD_TESTS}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30)
+    list(APPEND PAG_OPTIONS "-DCMAKE_CXX_FLAGS=\"-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1\"")
+endif ()
 list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     list(APPEND PAG_OPTIONS "-d")
@@ -149,7 +195,7 @@ endif ()
 
 target_include_directories(PAGExporter SYSTEM PRIVATE ${PAG_EXPORTER_THIRD_PARTY_INCLUDES})
 target_include_directories(PAGExporter PUBLIC ${PAG_EXPORTER_INCLUDES})
-target_link_libraries(PAGExporter ${libs} Qt6::Widgets Qt6::OpenGL Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Network)
+target_link_libraries(PAGExporter ${libs})
 
 if (APPLE)
     target_link_libraries(PAGExporter "-framework AppKit" compression)

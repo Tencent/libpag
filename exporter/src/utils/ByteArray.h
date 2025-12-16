@@ -21,8 +21,6 @@
 #include "tgfx/core/DataView.h"
 namespace exporter {
 
-tgfx::ByteOrder CheckByteOrder();
-
 inline uint32_t BitsToBytes(const uint64_t capacity) {
   return static_cast<uint32_t>((capacity + 7) >> 3);
 }
@@ -31,7 +29,8 @@ class ByteArray final {
  public:
   ByteArray() = default;
 
-  ByteArray(const uint8_t* data, size_t length) : dataView(data, length, CheckByteOrder()) {
+  ByteArray(const uint8_t* data, size_t length)
+      : dataView(data, length, tgfx::ByteOrder::BigEndian) {
   }
 
   /**

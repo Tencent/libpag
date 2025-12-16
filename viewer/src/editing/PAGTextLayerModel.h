@@ -33,7 +33,9 @@ class PAGTextLayerModel : public QAbstractListModel {
   int rowCount(const QModelIndex& parent) const Q_DECL_OVERRIDE;
   QVariant data(const QModelIndex& index, int role) const Q_DECL_OVERRIDE;
 
-  Q_SLOT void setPAGFile(const std::shared_ptr<PAGFile>& pagFile);
+  Q_SIGNAL void textChanged();
+
+  Q_SLOT void setPAGFile(std::shared_ptr<PAGFile> pagFile);
 
   Q_INVOKABLE void revertText(int index);
   Q_INVOKABLE int convertIndex(int index);
@@ -67,6 +69,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   QHash<int, QByteArray> roleNames() const Q_DECL_OVERRIDE;
 
  private:
+  void replaceText(int index, std::shared_ptr<TextDocument> textData);
   bool compareTextDocument(TextDocument* oldTextDocument, TextDocument* newTextDocument);
 
  private:
@@ -74,7 +77,7 @@ class PAGTextLayerModel : public QAbstractListModel {
   QSet<int> revertSet = {};
   QStringList fontFamilyList = {};
   QList<TextDocumentHandle> textLayers = {};
-  std::shared_ptr<PAGFile> pagFile = nullptr;
+  std::shared_ptr<PAGFile> _pagFile = nullptr;
 };
 
 }  // namespace pag

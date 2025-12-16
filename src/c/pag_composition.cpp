@@ -19,7 +19,7 @@
 #include "pag/c/pag_composition.h"
 #include "pag_types_priv.h"
 
-PAG_API int pag_composition_get_width(pag_composition* composition) {
+int pag_composition_get_width(pag_composition* composition) {
   auto p = ToPAGComposition(composition);
   if (p == nullptr) {
     return 0;
@@ -27,7 +27,7 @@ PAG_API int pag_composition_get_width(pag_composition* composition) {
   return p->width();
 }
 
-PAG_API int pag_composition_get_height(pag_composition* composition) {
+int pag_composition_get_height(pag_composition* composition) {
   auto p = ToPAGComposition(composition);
   if (p == nullptr) {
     return 0;

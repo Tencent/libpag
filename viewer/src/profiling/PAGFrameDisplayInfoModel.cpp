@@ -26,9 +26,11 @@ FrameDisplayInfo::FrameDisplayInfo(const QString& name, const QString& color, in
 }
 
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel() : QAbstractListModel(nullptr) {
+  diplayInfos.resize(3);
 }
 
 PAGFrameDisplayInfoModel::PAGFrameDisplayInfoModel(QObject* parent) : QAbstractListModel(parent) {
+  diplayInfos.resize(3);
 }
 
 QVariant PAGFrameDisplayInfoModel::data(const QModelIndex& index, int role) const {
@@ -67,12 +69,10 @@ void PAGFrameDisplayInfoModel::updateData(const FrameDisplayInfo& render,
                                           const FrameDisplayInfo& present,
                                           const FrameDisplayInfo& imageDecode) {
 
-  beginResetModel();
-  diplayInfos.clear();
-  diplayInfos.push_back(render);
-  diplayInfos.push_back(imageDecode);
-  diplayInfos.push_back(present);
-  endResetModel();
+  diplayInfos[0] = render;
+  diplayInfos[1] = imageDecode;
+  diplayInfos[2] = present;
+  dataChanged(createIndex(0, 0), createIndex(static_cast<int>(diplayInfos.size()) - 1, 0));
 }
 
 QHash<int, QByteArray> PAGFrameDisplayInfoModel::roleNames() const {

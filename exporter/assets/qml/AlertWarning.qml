@@ -8,7 +8,7 @@ PAGWindow {
     property int windowWidth: 1070
     property int windowHeight: 650
 
-    title: "Optimization Suggestions"
+    title: qsTr("Optimization Suggestions")
     width: windowWidth
     height: windowHeight
     minimumWidth: windowWidth
@@ -26,32 +26,25 @@ PAGWindow {
     titleFontSize: 14
     modality: Qt.ApplicationModal
 
-    property var alertDataModel: (typeof alertModel !== 'undefined') ? alertModel : null
+    onClosing: function (closeEvent) {
+        closeEvent.accepted = false;
+        alertWindow.onWindowClosing();
+    }
+
+    property var alertDataModel: (typeof alertInfoModel !== 'undefined') ? alertInfoModel : null
 
     property QtObject model: QtObject {
         function viewAllRules() {
-            console.log("View All Validation Rules clicked");
-            console.log("Alert count:", (alertDataModel ? alertDataModel.rowCount() : 0));
-            if(alertDataModel){
-                alertDataModel.jumpToUrl();
+            if (alertDataModel) {
+                alertDataModel.JumpToUrl();
             }
         }
-
-        function continueExport() {
-            console.log("Continue Exporting clicked");
-            console.log("Continuing export with", (alertDataModel ? alertDataModel.rowCount() : 0), "alerts");
-            //mainWindow.close();
-        }
-
-        function cancelAndModify() {
-            mainWindow.close();
-        }
-
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 15
+        anchors.leftMargin: 15
+        anchors.rightMargin: 15
         spacing: 0
 
         Rectangle {
@@ -62,7 +55,6 @@ PAGWindow {
             RowLayout {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: 5
                 spacing: 8
                 width: parent.width
 
@@ -77,7 +69,7 @@ PAGWindow {
                 }
 
                 Text {
-                    text: "Total of " + (alertDataModel ? alertDataModel.rowCount() : 0) + " items, please refer below optimization suggestion and re-export:"
+                    text: qsTr("Total of %1 items, please refer below optimization suggestion and re-export:").arg(alertDataModel ? alertDataModel.rowCount() : 0)
                     color: "#cccccc"
                     font.pixelSize: 16
                     font.family: "PingFang SC"
@@ -89,7 +81,7 @@ PAGWindow {
 
                 Rectangle {
                     Layout.preferredWidth: Math.max(180, rulesButtonText.implicitWidth + 20)
-                    Layout.preferredHeight: 35
+                    Layout.preferredHeight: 30
                     color: rulesMouseArea.pressed ? "#4a4a50" : "#383840"
                     border.color: "#555555"
                     border.width: 1
@@ -98,7 +90,7 @@ PAGWindow {
 
                     Text {
                         id: rulesButtonText
-                        text: "Click to View All Validation Rules"
+                        text: qsTr("Click to View All Validation Rules")
                         color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"
@@ -136,8 +128,6 @@ PAGWindow {
                 isPreview: true
                 normalColor: "#22222c"
                 secondRowColor: "#272730"
-                // fontSize: 18
-                // fontFamily: "PingFang SC"
                 showLocationBtn: false
 
                 model: alertDataModel
@@ -152,13 +142,12 @@ PAGWindow {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 80
+            Layout.preferredHeight: 70
             color: "transparent"
 
             RowLayout {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.rightMargin: 5
                 spacing: 15
 
                 Rectangle {
@@ -171,7 +160,7 @@ PAGWindow {
 
                     Text {
                         id: continueButtonText
-                        text: "Continue Exporting"
+                        text: qsTr("Continue Exporting")
                         color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"
@@ -187,7 +176,8 @@ PAGWindow {
 
                         onClicked: {
                             if (mainWindow.model) {
-                                mainWindow.model.continueExport();
+                                alertWindow.continueExport();
+                                mainWindow.close();
                             }
                         }
                     }
@@ -203,7 +193,7 @@ PAGWindow {
 
                     Text {
                         id: cancelButtonText
-                        text: "Cancel and Modify"
+                        text: qsTr("Cancel and Modify")
                         color: "#ffffff"
                         font.pixelSize: 14
                         font.family: "PingFang SC"
@@ -219,7 +209,8 @@ PAGWindow {
 
                         onClicked: {
                             if (mainWindow.model) {
-                                mainWindow.model.cancelAndModify();
+                                alertWindow.cancelAndModify();
+                                mainWindow.close();
                             }
                         }
                     }

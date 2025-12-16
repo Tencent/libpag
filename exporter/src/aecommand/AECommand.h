@@ -23,6 +23,7 @@
 #include "entry.h"
 
 namespace exporter {
+
 class AECommand {
  public:
   static A_Err OnUpdateMenu(AEGP_GlobalRefcon globalRefcon, AEGP_UpdateMenuRefcon menuRefcon,
@@ -46,4 +47,5 @@ class AECommand {
   static AEGP_Command PAGPanelCMD;
   static AEGP_Command PAGPreviewCMD;
 };
+
 }  // namespace exporter

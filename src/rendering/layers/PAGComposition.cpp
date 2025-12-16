@@ -253,13 +253,13 @@ std::shared_ptr<PAGLayer> PAGComposition::doRemoveLayer(int index) {
   if (rootFile && file == layer->file) {
     layer->onRemoveFromRootFile();
   }
-  layer->detachFromTree();
   layer->_parent = nullptr;
   layers.erase(layers.begin() + index);
   notifyModified(true);
   if (emptyComposition) {
     updateDurationAndFrameRate();
   }
+  layer->detachFromTree();
   return layer;
 }
 
@@ -679,4 +679,5 @@ void PAGComposition::updateDurationAndFrameRate() {
     _parent->updateDurationAndFrameRate();
   }
 }
+
 }  // namespace pag

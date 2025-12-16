@@ -114,7 +114,7 @@ export class PAGView extends NativePAGView {
       this.flushingNextFrame = false;
     } catch (e: any) {
       this.flushingNextFrame = false;
-      throw e;
+      console.error(e);
     }
   }
 
@@ -141,6 +141,11 @@ export class PAGView extends NativePAGView {
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
+    if (this.needResetStartTime()) {
+      // The WeChat Mini Program decoder takes a long time to start decoding,
+      // Decoding BMP takes too much time and makes the video reader seek repeatedly.
+      this.startTime = this.getNowTime() * 1000 - this.playTime;
+    }
     this.playFrame = playFrame;
     this.repeatedTimes = count;
     return res;

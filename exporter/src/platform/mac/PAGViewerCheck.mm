@@ -9,7 +9,7 @@
 
 namespace exporter {
 
-static NSBundle* FindPAGViewerBundle(const std::shared_ptr<AppConfig>& config) {
+static NSBundle* FindPAGViewerBundle(std::shared_ptr<AppConfig> config) {
   @autoreleasepool {
     std::string bundleIDString = config->getPlatformSpecificConfig("bundleID");
     NSString* bundleID = [NSString stringWithUTF8String:bundleIDString.c_str()];

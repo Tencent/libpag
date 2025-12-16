@@ -24,7 +24,6 @@
 #ifdef PAG_USE_HARFBUZZ
 #include "base/utils/USE.h"
 #endif
-
 using namespace emscripten;
 
 namespace pag {

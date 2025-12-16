@@ -22,6 +22,6 @@
 
 PAG_C_PLUS_PLUS_BEGIN_GUARD
 
-PAG_API egl_globals* pag_egl_globals_get();
+PAG_EXPORT egl_globals* pag_egl_globals_get();
 
 PAG_C_PLUS_PLUS_END_GUARD

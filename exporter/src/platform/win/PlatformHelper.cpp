@@ -46,7 +46,7 @@ std::string GetRoamingPath() {
 }
 
 bool CreateFolder(const std::string& path) {
-  if (!FileHelper::FileIsExist(path)) {
+  if (!FileIsExist(path)) {
     std::error_code errorCode;
     if (!fs::create_directories(path, errorCode)) {
       LOGE("Create %s failed: %s", path.c_str(), errorCode.message().c_str());
@@ -71,9 +71,7 @@ std::string GetConfigPath() {
 
 std::string GetTempFolderPath() {
   if (TempFolderPath.empty()) {
-    const auto& suites = AEHelper::GetSuites();
-    auto pluginID = AEHelper::GetPluginID();
-    TempFolderPath = AEHelper::RunScript(suites, pluginID, "Folder.temp.fsName;");
+    TempFolderPath = RunScript("Folder.temp.fsName;");
   }
   return TempFolderPath;
 }
@@ -103,10 +101,22 @@ std::string GetDownloadsPath() {
   return "";
 }
 
+bool IsAEWindowActive() {
+  HWND foreground = GetForegroundWindow();
+  if (!foreground) {
+    return false;
+  }
+
+  char className[256] = {};
+  GetClassNameA(foreground, className, sizeof(className));
+  std::string name = className;
+  return name.find_first_of("AE") == 0;
+}
+
 std::string GetPAGViewerPath() {
   auto configPath = GetRoamingPath() + "PAGViewerPath.txt";
-  auto pagViewerPath = FileHelper::ReadTextFile(configPath.c_str());
-  if (!pagViewerPath.empty() && FileHelper::FileIsExist(pagViewerPath)) {
+  auto pagViewerPath = ReadTextFile(configPath.c_str());
+  if (!pagViewerPath.empty() && FileIsExist(pagViewerPath)) {
     return pagViewerPath;
   }
 
@@ -118,7 +128,7 @@ std::string GetPAGViewerPath() {
   if (!info.installLocation.empty()) {
     std::filesystem::path viewerPath =
         std::filesystem::path(info.installLocation) / "PAGViewer.exe";
-    if (FileHelper::FileIsExist(viewerPath.string())) {
+    if (FileIsExist(viewerPath.string())) {
       return viewerPath.string();
     }
   }
@@ -126,8 +136,12 @@ std::string GetPAGViewerPath() {
   return "";
 }
 
+std::string GetQmlPath() {
+  return "";
+}
+
 static void StartPreview(const std::string& pagFilePath) {
-  if (!FileHelper::FileIsExist(pagFilePath)) {
+  if (!FileIsExist(pagFilePath)) {
     QString errorMsg =
         QString::fromUtf8(Messages::FILE_NOT_EXIST) + QString::fromStdString(pagFilePath);
     WindowManager::GetInstance().showSimpleError(errorMsg);
@@ -173,6 +187,14 @@ void PreviewPAGFile(std::string pagFilePath) {
     }
   }
   StartPreview(pagFilePath);
+}
+
+std::filesystem::path Utf8ToPath(const std::string& utf8) {
+  return {QString::fromUtf8(utf8.c_str()).toStdWString()};
+}
+
+std::string PathToUtf8(const std::filesystem::path& path) {
+  return QString::fromStdWString(path.wstring()).toUtf8().toStdString();
 }
 
 }  // namespace exporter

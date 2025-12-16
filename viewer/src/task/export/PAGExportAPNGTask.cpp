@@ -30,9 +30,9 @@ static QString GetPNGTempDir(const QString& apngFilePath) {
   return pngFilePath;
 }
 
-PAGExportAPNGTask::PAGExportAPNGTask(const std::shared_ptr<PAGFile>& pagFile,
-                                     const QString& apngFilePath)
-    : PAGExportPNGTask(pagFile, GetPNGTempDir(apngFilePath)), apngFilePath(apngFilePath) {
+PAGExportAPNGTask::PAGExportAPNGTask(std::shared_ptr<PAGFile> pagFile, const QString& apngFilePath)
+    : PAGExportPNGTask(std::move(pagFile), GetPNGTempDir(apngFilePath)),
+      apngFilePath(apngFilePath) {
   openAfterExport = false;
 }
 

@@ -21,9 +21,9 @@ SplitView {
 
     property int minPanelWidth: 300
 
-    property int splitHandleWidth: 0
+    property int splitHandleWidth: 3
 
-    property int splitHandleHeight: 0
+    property int splitHandleHeight: splitView.height
 
     property int controlFormHeight: 76
 
@@ -69,10 +69,10 @@ SplitView {
         }
         PAGView {
             id: pagView
+            x: 0
+            y: 0
+            width: parent.width
             height: splitView.height - controlFormHeight
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
             objectName: "pagView"
         }
         ControlForm {
@@ -126,7 +126,6 @@ SplitView {
         id: rightItemLoader
         active: isEditPanelOpen
         visible: isEditPanelOpen
-        width: minPanelWidth
         SplitView.minimumWidth: minPanelWidth
         SplitView.preferredWidth: minPanelWidth
         sourceComponent: PAGRectangle {
@@ -143,7 +142,7 @@ SplitView {
             Column {
                 spacing: 0
                 height: parent.height
-                width: parent.height
+                width: parent.width
                 anchors.fill: parent
 
                 Item {
@@ -224,7 +223,7 @@ SplitView {
 
                             Column {
                                 spacing: 0
-                                width: parent.width
+                                width: editArea.width
 
                                 Rectangle {
                                     width: parent.width
@@ -247,10 +246,6 @@ SplitView {
                                     height: isTextListOpen ? (pagView.editableTextLayerCount * 40 + 44) : 32
                                     visible: pagView.editableTextLayerCount > 0
                                     color: "#20202A"
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 0
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: 0
 
                                     Row {
                                         id: textListTitle
@@ -333,10 +328,6 @@ SplitView {
                                     height: isImageListOpen ? (pagView.editableImageLayerCount * 60 + 44) : 32
                                     visible: pagView.editableImageLayerCount > 0
                                     color: "#20202A"
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 0
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: 0
 
                                     Row {
                                         id: imageListTitle

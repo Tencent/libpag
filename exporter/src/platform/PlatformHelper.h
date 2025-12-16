@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <filesystem>
 #include <string>
 
 namespace exporter {
@@ -37,10 +38,22 @@ std::string GetConfigPath();
 
 std::string GetTempFolderPath();
 
+bool IsAEWindowActive();
+
 std::string GetDownloadsPath();
 
 std::string GetPAGViewerPath();
 
+std::string GetQmlPath();
+
 void PreviewPAGFile(std::string pagFilePath);
+
+std::filesystem::path Utf8ToPath(const std::string& utf8);
+
+std::string PathToUtf8(const std::filesystem::path& path);
+
+inline std::filesystem::path Utf8ToPath(const char* utf8) {
+  return Utf8ToPath(utf8 ? std::string(utf8) : std::string());
+}
 
 }  // namespace exporter
