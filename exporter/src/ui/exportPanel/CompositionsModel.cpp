@@ -198,17 +198,9 @@ void CompositionsModel::exportSelectedCompositions() {
   qDebug() << "Selected compositions: " << pagExports.size();
 
   for (auto& pagExport : pagExports) {
-    bool result = pagExport->exportFile();
-    if (!result) {
-      pagExport->session->progressModel.setExportStatus(ProgressModel::ExportStatus::Error);
-      if (pagExport->canceled) {
-        qDebug() << "cancel export";
-        Q_EMIT cancelExport();
-        break;
-      }
-    } else {
-      pagExport->session->progressModel.setExportStatus(ProgressModel::ExportStatus::Success);
-    }
+    pagExport->session->progressModel.setExportStatus(pagExport->exportFile()
+                                                           ? ProgressModel::ExportStatus::Success
+                                                           : ProgressModel::ExportStatus::Error);
   }
   pagExports.clear();
   context->setContextProperty("exportCompositionsWindow", nullptr);

@@ -85,20 +85,17 @@ std::string ExportWindow::getOutputPath() {
 void ExportWindow::init() {
   if (QThread::currentThread() != app->thread()) {
     qCritical() << "Must call init() in main thread";
-    onWindowClosing();
     return;
   }
 
   itemHandle = GetActiveCompositionItem();
   if (itemHandle == nullptr) {
-    onWindowClosing();
     return;
   }
 
   if (outputPath.empty()) {
     outputPath = getOutputPath();
     if (outputPath.empty()) {
-      onWindowClosing();
       return;
     }
     qDebug() << "Select outputPath: " << outputPath.data();

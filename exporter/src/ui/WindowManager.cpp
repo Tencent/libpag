@@ -142,6 +142,7 @@ void WindowManager::initializeQtEnvironment() {
   defaultFonts.setStyleHint(QFont::SansSerif);
   QApplication::setFont(defaultFonts);
 #endif
+  QApplication::setApplicationName("PAGExporter");
   app = std::make_unique<QApplication>(argc, argv);
   app->setObjectName("PAG-Exporter");
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);

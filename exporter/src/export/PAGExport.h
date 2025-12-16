@@ -40,7 +40,6 @@ class PAGExport {
 
   bool exportFile();
 
-  bool canceled = false;
   AEGP_ItemH itemHandle = nullptr;
   std::shared_ptr<PAGExportSession> session = nullptr;
   ScopedTimeSetter timeSetter = {nullptr, 0};

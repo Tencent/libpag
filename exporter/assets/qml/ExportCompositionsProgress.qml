@@ -132,11 +132,4 @@ PAGWindow {
             exportCompositionsWindow.onWindowClosing();
         }
     }
-
-    Connections {
-        target: exportCompositionsWindow
-        onCancelExport: {
-            window.close();
-        }
-    }
 }
