@@ -20,11 +20,23 @@
 #include <QSGImageNode>
 #include "pag/file.h"
 #include "tgfx/core/Clock.h"
+#include "version.h"
 
 namespace pag {
 
 constexpr int64_t MaxAudioLeadThreshold = 25000;
 constexpr int64_t MinAudioLagThreshold = -100000;
+
+static void reportPAGFIleInfo(const std::shared_ptr<PAGFile>& pagFile, size_t length) {
+  QVariantMap map;
+  map["Event"] = "OPEN_PAG";
+  map["FileSize"] = QString::number(length);
+  map["PAGLayerCount"] = QString::number(pagFile->numChildren());
+  map["VideoCompositionCount"] = QString::number(pagFile->numVideos());
+  map["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
+  map["PAGImageLayerCount"] = QString::number(pagFile->numImages());
+  qDebug() << map;
+}
 
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
@@ -257,6 +269,8 @@ bool PAGView::setFile(const QString& filePath) {
   Q_EMIT editableTextLayerCountChanged(editableTextLayerCount);
   Q_EMIT editableImageLayerCountChanged(editableImageLayerCount);
 
+  reportPAGFIleInfo(pagFile, byteData->length());
+
   return true;
 }
 
@@ -318,6 +332,8 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       }
       setProgressInternal(progress, false);
     }
+  } else {
+    QMetaObject::invokeMethod(renderThread.get(), "flush", Qt::QueuedConnection);
   }
   return node;
 }

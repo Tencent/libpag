@@ -240,6 +240,9 @@ Item {
                     property bool entered: false
                     hoverEnabled: true
                     anchors.fill: parent
+                    onClicked: {
+                        updateButton.click();
+                    }
                     onEntered: {
                         entered = true;
                     }

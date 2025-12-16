@@ -53,7 +53,12 @@ void GetBitmapSequence(std::shared_ptr<PAGExportSession> session,
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
 
-  AEGP_ItemH itemHandle = session->itemHandleMap[composition->id];
+  auto itemIter = session->itemHandleMap.find(composition->id);
+  if (itemIter == session->itemHandleMap.end()) {
+    session->pushWarning(AlertInfoType::CompositionHandleNotFound, std::to_string(composition->id));
+    return;
+  }
+  AEGP_ItemH itemHandle = itemIter->second;
   float factor = compositionFactor;
   float frameRate = std::min(session->configParam.frameRate, composition->frameRate);
   auto duration =

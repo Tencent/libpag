@@ -121,6 +121,11 @@ PAGWindow {
                     }
                 }
             }
+            updateButton {
+                onClicked: {
+                    checkForUpdates(false);
+                }
+            }
             backgroundButton {
                 checked: mainForm.isBackgroundOn
                 onClicked: {
@@ -195,6 +200,11 @@ PAGWindow {
     PAGTaskFactory {
         id: taskFactory
         objectName: "taskFactory"
+    }
+
+    PluginInstallerModel {
+        id: pluginInstaller
+        objectName: "pluginInstaller"
     }
 
     FileDialog {
@@ -525,6 +535,12 @@ PAGWindow {
             break;
         case "open-commerce-page":
             Qt.openUrlExternally("https://pag.io/product.html#pag-enterprise-edition");
+            break;
+        case "install-plugin":
+            pluginInstaller.installPlugin();
+            break;
+        case "uninstall-plugin":
+            pluginInstaller.uninstallPlugin();
             break;
         case "minimize-window":
             viewWindow.showMinimized();

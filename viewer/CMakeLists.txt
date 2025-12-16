@@ -78,19 +78,19 @@ if (DEFINED ENV{MinorVersion})
 else ()
     set(MinorVersion "0")
 endif ()
-if (DEFINED ENV{BK_CI_BUILD_NO})
-    set(BuildNumber "$ENV{BK_CI_BUILD_NO}")
+if (DEFINED ENV{BuildNumber})
+    set(BuildNumber "$ENV{BuildNumber}")
 else()
     set(BuildNumber "0")
 endif ()
-if ($ENV{isStableVersion} MATCHES "true")
+if ($ENV{isBetaVersion} MATCHES false)
     set(UpdateChannel "stable")
 else ()
     set(UpdateChannel "beta")
 endif ()
 configure_file(${CMAKE_SOURCE_DIR}/package/templates/version.h.in
-    ${CMAKE_SOURCE_DIR}/src/version.h
-    @ONLY
+        ${CMAKE_SOURCE_DIR}/src/version.h
+        @ONLY
 )
 
 message(STATUS "Build Version: ${MajorVersion}.${MinorVersion}.${BuildNumber}")
@@ -120,12 +120,15 @@ elseif (WIN32)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${Bcrypt_LIB})
     find_library(ws2_32_LIB ws2_32)
     list(APPEND PAG_VIEWER_PLATFORM_LIBS ${ws2_32_LIB})
+    find_library(version_LIB version)
+    list(APPEND PAG_VIEWER_PLATFORM_LIBS ${version_LIB})
 endif ()
 
 set(PAG_USE_QT ON)
 set(PAG_USE_RTTR ON)
 set(PAG_USE_LIBAVC OFF)
 set(PAG_BUILD_TESTS OFF)
+set(PAG_USE_HARFBUZZ ON)
 set(PAG_BUILD_SHARED OFF)
 set(PAG_BUILD_FRAMEWORK OFF)
 
@@ -134,8 +137,10 @@ list(APPEND PAG_OPTIONS "-DPAG_USE_QT=${PAG_USE_QT}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_RTTR=${PAG_USE_RTTR}")
 list(APPEND PAG_OPTIONS "-DPAG_USE_LIBAVC=${PAG_USE_LIBAVC}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_TESTS=${PAG_BUILD_TESTS}")
+list(APPEND PAG_OPTIONS "-DPAG_USE_HARFBUZZ=${PAG_USE_HARFBUZZ}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_SHARED=${PAG_BUILD_SHARED}")
 list(APPEND PAG_OPTIONS "-DPAG_BUILD_FRAMEWORK=${PAG_BUILD_FRAMEWORK}")
+list(APPEND PAG_OPTIONS "-DCMAKE_CXX_FLAGS=\"-DPAG_USE_FFAVC -I${CMAKE_SOURCE_DIR}/vendor/ffmovie/include\"")
 list(APPEND PAG_OPTIONS "-DCMAKE_PREFIX_PATH=\"${CMAKE_PREFIX_PATH}\"")
 if (NOT DEFINED PAG_PATH OR "${PAG_PATH}" STREQUAL "")
     set(PAG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/..")
@@ -188,8 +193,8 @@ if (APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
 elseif (WIN32)
     set(RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/PAGViewer.rc"
-                  "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/appIcon.ico"
-                  "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/pagIcon.ico")
+            "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/appIcon.ico"
+            "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/pagIcon.ico")
 
     add_executable(PAGViewer WIN32 ${RC_FILES} ${PAG_VIEWER_SOURCE_FILES} ${QT_RESOURCES} ${RESOURCES})
     list(APPEND PAG_VIEWER_SYSTEM_INCLUDES ../third_party/out/rttr/win/include)

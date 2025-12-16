@@ -220,7 +220,12 @@ int OfflineVideoEncoder::getEncodedFrame(bool wait, uint8_t** outData, FrameType
         return size;
       }
     }
-
+    if (process->state() != QProcess::Running) {
+      qDebug() << "H264EncoderTools abnormal exit: " << process->exitCode();
+      qDebug() << "Error: " << process->error();
+      qDebug() << "Standard Error: " << process->readAllStandardError().data();
+      return -1;
+    }
     if (wait) {
       std::this_thread::sleep_for(std::chrono::microseconds(SleepUS));
     } else {

@@ -50,7 +50,7 @@ std::string GetDocumentsFolderPath() {
   return DocumentsFolderPath;
 }
 
-std::string GetAeVersion() {
+std::string GetAEVersion() {
   if (AeVersion.empty()) {
     AeVersion = RunScript("app.version");
   }
@@ -320,7 +320,7 @@ void RunScriptPreWarm() {
   if (!hasInit) {
     RegisterTextDocumentScript();
     GetDocumentsFolderPath();
-    GetAeVersion();
+    GetAEVersion();
     hasInit = true;
   }
 }
@@ -575,6 +575,9 @@ QSize GetItemDimensions(const AEGP_ItemH& itemHandle) {
 }
 
 QImage GetCompositionFrameImage(const AEGP_ItemH& itemHandle, pag::Frame frame) {
+  if (itemHandle == nullptr) {
+    return {};
+  }
   AEGP_RenderOptionsH renderOptions = nullptr;
   float frameRate = GetItemFrameRate(itemHandle);
 

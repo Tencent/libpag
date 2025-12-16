@@ -2,6 +2,7 @@
 /cmake-build-*
 /vendor/AfterEffectsSDK
 /assets/translation/Chinese.qm
+src/version.h
 *.cfg
 *.rsrc
 *_bak*

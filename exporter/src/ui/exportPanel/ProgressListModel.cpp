@@ -30,7 +30,7 @@ void ProgressListModel::addSession(std::shared_ptr<PAGExportSession> session) {
   if (iter != sessionList.end()) {
     return;
   }
-  int index = static_cast<int>(sessionList.size() - 1);
+  int index = static_cast<int>(sessionList.size());
   connect(&session->progressModel, &ProgressModel::exportStatusChanged, this, [this, index]() {
     QModelIndex modelIndex = createIndex(index, 0);
     Q_EMIT dataChanged(modelIndex, modelIndex,

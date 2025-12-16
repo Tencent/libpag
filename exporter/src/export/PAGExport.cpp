@@ -31,8 +31,14 @@
 #include "utils/LayerHelper.h"
 #include "utils/PAGExportSessionManager.h"
 #include "utils/UniqueID.h"
+#include "version.h"
 
 namespace exporter {
+
+static void ReportExportInfo(const QVariantMap& map) {
+  qDebug() << "Export Info:";
+  qDebug() << map;
+}
 
 static bool ValidatePAGFile(uint8_t* data, size_t size) {
   auto pagFileDecoded = pag::File::Load(data, size);
@@ -188,7 +194,10 @@ static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {
   }
   for (auto layer : trackMatteLayers) {
     maxID += 1;
-    session->itemHandleMap[maxID] = session->itemHandleMap[layer->id];
+    auto itemIter = session->itemHandleMap.find(layer->id);
+    if (itemIter != session->itemHandleMap.end()) {
+      session->itemHandleMap[maxID] = itemIter->second;
+    }
     layer->id = maxID;
   }
 }
@@ -209,22 +218,42 @@ bool PAGExport::exportFile() {
     return false;
   }
   auto pagFile = exportAsFile();
+  QVariantMap exportInfo;
+  exportInfo["AEVersion"] = QString::fromStdString(GetAEVersion());
+  exportInfo["Event"] = "EXPORT_PAG";
   if (pagFile == nullptr) {
+    exportInfo["FailReason"] = "ExportFail";
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
+  exportInfo["PAGLayerCount"] = QString::number(pagFile->numLayers());
+  exportInfo["VideoCompositionCount"] = QString::number(pagFile->numVideos());
+  exportInfo["PAGTextLayerCount"] = QString::number(pagFile->numTexts());
+  exportInfo["PAGImageLayerCount"] = QString::number(pagFile->numImages());
 
   const auto bytes = pag::Codec::Encode(pagFile);
   if (bytes->length() == 0) {
+    exportInfo["FailReason"] = "EncodeFail";
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
   if (!ValidatePAGFile(bytes->data(), bytes->length())) {
+    exportInfo["FailReason"] = "ValidateFail";
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
   if (!WriteToFile(session->outputPath, reinterpret_cast<char*>(bytes->data()),
                    static_cast<std::streamsize>(bytes->length()))) {
+    exportInfo["FailReason"] = "WriteFileFail";
+    exportInfo["ExportStatus"] = "fail";
+    ReportExportInfo(exportInfo);
     return false;
   }
-
+  exportInfo["ExportStatus"] = "success";
+  ReportExportInfo(exportInfo);
   return true;
 }
 
