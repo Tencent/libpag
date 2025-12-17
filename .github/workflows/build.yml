@@ -366,7 +366,7 @@ jobs:
           export PATH="/opt/homebrew/opt/ccache/libexec:$PATH"
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a arm64
+          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
          
 
       - name: Save ccache
