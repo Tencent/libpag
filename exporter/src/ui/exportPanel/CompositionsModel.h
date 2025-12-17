@@ -77,6 +77,7 @@ class CompositionsModel : public QAbstractListModel {
   Q_SIGNAL void allSelectedChanged(bool allSelected);
   Q_SIGNAL void canExportChanged(bool canExport);
   Q_SIGNAL void exportAudioChanged(bool exportAudio);
+  Q_SIGNAL void cancelExport();
 
  protected:
   void updateCompositionLevel();
