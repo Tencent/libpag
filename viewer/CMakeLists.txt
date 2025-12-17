@@ -190,6 +190,7 @@ if (APPLE)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sonic/mac/${ARCH}/libsonic.a)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
 elseif (WIN32)
     set(RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/PAGViewer.rc"
             "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/appIcon.ico"
