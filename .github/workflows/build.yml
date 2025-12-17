@@ -324,15 +324,6 @@ jobs:
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-qt-
 
-      # ccache 编译器缓存 - 大幅加速 C++ 编译
-      - name: Get ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ccache-qt-macos
-          restore-keys: |
-            ccache-qt-macos
-          max-size: 2G
-
       - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Run depsync
@@ -354,18 +345,37 @@ jobs:
           cache-key-prefix: 'install-qt-action'
           modules: 'qtmultimedia'
 
+      - name: Setup ccache
+        run: |
+          brew install ccache
+          ccache --version
+          ccache --max-size=2G
+          ccache --zero-stats
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-qt-${{ runner.os }}-main
+          restore-keys: |
+            ccache-qt-${{ runner.os }}-
+
       - name: Build QT
         run: |
           mkdir -p third_party/tgfx/out/cache
-          # 通过符号链接方式让 ccache 拦截编译器调用（对所有子构建生效）
           export PATH="/opt/homebrew/opt/ccache/libexec:$PATH"
-          # 设置环境变量确保 CMake 子进程也使用 ccache
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          # 验证 ccache 配置
-          which gcc && which g++ && which clang && which clang++
-          ccache --version
           node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a arm64
+          echo "=== ccache statistics ==="
+          ccache --show-stats
+
+      - name: Save ccache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-qt-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
