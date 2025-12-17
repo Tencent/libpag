@@ -367,7 +367,7 @@ jobs:
           node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
 
       - name: Save ccache
-        if: ${{ github.event_name == 'push' }}
+        if: github.ref == 'refs/heads/main'
         uses: actions/cache/save@v4
         with:
           path: ~/Library/Caches/ccache
