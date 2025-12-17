@@ -220,8 +220,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
           static_cast<float>(renderScaleFactor * (self.viewSize.height *
                                                   [UIScreen mainScreen].scale / self.fileHeight));
     }
-    if (pagComposition) {
-      pagDecoder = [PAGDecoder Make:pagComposition
+      
+    // Retain pagComposition to ensure it remains valid during decoder creation.
+    // This prevents crashes when pagComposition is released on another thread.
+    PAGComposition* composition = pagComposition ? [[pagComposition retain] autorelease] : nil;
+    if (composition) {
+      pagDecoder = [PAGDecoder Make:[[composition retain] autorelease]
                        maxFrameRate:self.maxFrameRate
                               scale:scaleFactor];
     } else if (filePath) {
