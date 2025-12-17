@@ -4,24 +4,20 @@
 <context>
     <name>AlertDialog</name>
     <message>
-        <location filename="../qml/AlertDialog.qml" line="24"/>
         <source>Convert to BMP?</source>
-        <translation>确认转成BMP？</translation>
+        <translation type="vanished">确认转成BMP？</translation>
     </message>
     <message>
-        <location filename="../qml/AlertDialog.qml" line="37"/>
         <source>Placeholder image and text in composition cannot edit after converting to BMP</source>
-        <translation>转换为BMP后，合成中的占位图和文本将无法编辑</translation>
+        <translation type="vanished">转换为BMP后，合成中的占位图和文本将无法编辑</translation>
     </message>
     <message>
-        <location filename="../qml/AlertDialog.qml" line="63"/>
         <source>Cancel</source>
-        <translation>取消</translation>
+        <translation type="vanished">取消</translation>
     </message>
     <message>
-        <location filename="../qml/AlertDialog.qml" line="95"/>
         <source>Confirm</source>
-        <translation>确认</translation>
+        <translation type="vanished">确认</translation>
     </message>
 </context>
 <context>
@@ -32,12 +28,12 @@
         <translation>导出错误</translation>
     </message>
     <message>
-        <location filename="../qml/AlertError.qml" line="106"/>
+        <location filename="../qml/AlertError.qml" line="79"/>
         <source>Export failed due to error:</source>
         <translation>导出失败，原因是：</translation>
     </message>
     <message>
-        <location filename="../qml/AlertError.qml" line="151"/>
+        <location filename="../qml/AlertError.qml" line="124"/>
         <source>Cancel and Modify</source>
         <translation>取消并修改</translation>
     </message>
@@ -319,7 +315,7 @@
 <context>
     <name>PAGListView</name>
     <message>
-        <location filename="../qml/PAGListView.qml" line="158"/>
+        <location filename="../qml/PAGListView.qml" line="157"/>
         <source>Locate</source>
         <translation>定位</translation>
     </message>
