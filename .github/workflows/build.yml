@@ -356,7 +356,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/Library/Caches/ccache
-          key: ccache-qt-${{ runner.os }}-main
+          key: ccache-qt-${{ runner.os }}-${{ github.ref_name }}
           restore-keys: |
             ccache-qt-${{ runner.os }}-
 
@@ -371,11 +371,12 @@ jobs:
           ccache --show-stats
 
       - name: Save ccache
-        if: github.ref == 'refs/heads/main'
+        # TODO: 测试完成后改回 github.ref == 'refs/heads/main'
+        if: always()
         uses: actions/cache/save@v4
         with:
           path: ~/Library/Caches/ccache
-          key: ccache-qt-${{ runner.os }}-main
+          key: ccache-qt-${{ runner.os }}-${{ github.ref_name }}
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
