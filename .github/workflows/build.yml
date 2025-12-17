@@ -367,8 +367,7 @@ jobs:
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a arm64
-          echo "=== ccache statistics ==="
-          ccache --show-stats
+         
 
       - name: Save ccache
         if: github.ref == 'refs/heads/main'
