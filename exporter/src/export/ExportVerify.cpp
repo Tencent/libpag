@@ -355,6 +355,49 @@ static void CheckVideoCompositionInUIScenes(std::shared_ptr<PAGExportSession> se
   }
 }
 
+static void CheckVideoCompositionOverlap(std::shared_ptr<PAGExportSession> session,
+                                         std::vector<pag::Composition*>& compositions) {
+  std::vector<pag::VideoComposition*> videoCompositions = {};
+  std::vector<pag::VectorComposition*> vectorCompositions = {};
+
+  for (auto composition : compositions) {
+    if (composition->type() == pag::CompositionType::Video) {
+      videoCompositions.push_back(static_cast<pag::VideoComposition*>(composition));
+    } else if (composition->type() == pag::CompositionType::Vector) {
+      vectorCompositions.push_back(static_cast<pag::VectorComposition*>(composition));
+    }
+  }
+
+  for (auto videoComposition : videoCompositions) {
+    std::vector<std::pair<pag::Frame, pag::Frame>> timeRanges = {};
+    for (auto vectorComposition : vectorCompositions) {
+      for (auto layer : vectorComposition->layers) {
+        if (layer->type() == pag::LayerType::PreCompose) {
+          auto preComposeLayer = static_cast<pag::PreComposeLayer*>(layer);
+          if (preComposeLayer->composition == videoComposition) {
+            auto timeRange =
+                std::make_pair(preComposeLayer->startTime,
+                               preComposeLayer->startTime + preComposeLayer->duration - 1);
+            auto hasOverlap =
+                std::any_of(timeRanges.begin(), timeRanges.end(), [timeRange](auto& range) {
+                  return !(timeRange.first > range.second || timeRange.second < range.first);
+                });
+            if (hasOverlap) {
+              ScopedAssign<pag::ID> compID(session->compID, vectorComposition->id);
+              auto itemHandle = session->itemHandleMap[videoComposition->id];
+              auto name = GetItemName(itemHandle);
+              session->pushWarning(AlertInfoType::VideoCompositionOverlap, name);
+              break;
+            }
+            timeRanges.emplace_back(preComposeLayer->startTime,
+                                    preComposeLayer->duration + preComposeLayer->startTime - 1);
+          }
+        }
+      }
+    }
+  }
+}
+
 static bool CompareVideoComposition(std::shared_ptr<PAGExportSession> session,
                                     pag::VideoComposition* composition1,
                                     pag::VideoComposition* composition2) {
@@ -654,6 +697,7 @@ void CheckBeforeExport(std::shared_ptr<PAGExportSession> session,
   CheckLayerNum(session, compositions);
   CheckImageFillRule(session, compositions.back());
   CheckVideoCompositionInUIScenes(session, compositions);
+  CheckVideoCompositionOverlap(session, compositions);
   CheckDuplicateVideoSequence(session, compositions);
   CheckLayerProperty(session, compositions);
 }
