@@ -40,6 +40,9 @@
 namespace pag {
 
 static float GetScaleFactorLimit(Layer* layer) {
+  if (layer->transform3D != nullptr) {
+    return FLT_MAX;
+  }
   auto scaleFactorLimit = layer->type() == LayerType::Image ? 1.0f : FLT_MAX;
   return scaleFactorLimit;
 }
