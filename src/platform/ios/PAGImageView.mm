@@ -101,7 +101,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   self.currentFrameIndex = -1;
   renderScaleFactor = 1.0;
   duration = 0;
-  pagContentVersion  =  0;
+  pagContentVersion = 0;
   self.memoryCacheEnabled = NO;
   self.memeoryCacheFinished = NO;
   self.isVisible = NO;
@@ -162,9 +162,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagComposition == newComposition) {
     return;
   }
-    if (!filePath) {
-        pagComposition = newComposition;
-    }
+  if (!filePath) {
+    pagComposition = newComposition;
+  }
   if (newComposition) {
     self.fileWidth = newComposition->width();
     self.fileHeight = newComposition->height();
