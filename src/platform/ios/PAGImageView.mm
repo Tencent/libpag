@@ -70,7 +70,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 @implementation PAGImageView {
   NSString* filePath;
   PAGAnimator* animator;
-  PAGComposition* pagCompositionObjC;
   std::shared_ptr<pag::PAGComposition> pagComposition;
   std::shared_ptr<pag::PAGDecoder> pagDecoder;
   int64_t duration;
@@ -97,7 +96,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)initPAG {
   pagDecoder = nullptr;
   pagComposition = nullptr;
-  pagCompositionObjC = nil;
   self.currentFrameIndex = -1;
   renderScaleFactor = 1.0;
   duration = 0;
@@ -122,10 +120,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [animator cancel];
   [animator release];
   [self reset];
-  if (pagCompositionObjC) {
-    [pagCompositionObjC release];
-    pagCompositionObjC = nil;
-  }
+  pagComposition = nullptr;
   if (_currentUIImage) {
     [_currentUIImage release];
   }
@@ -522,10 +517,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [filePath release];
     filePath = nil;
   }
-  if (pagCompositionObjC) {
-    [pagCompositionObjC release];
-    pagCompositionObjC = nil;
-  }
   filePath = [path retain];
   auto file = pag::PAGFile::Load([path UTF8String]);
   [self setCompositionInternal:file maxFrameRate:maxFrameRate];
@@ -548,10 +539,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [filePath release];
     filePath = nil;
   }
-  if (pagCompositionObjC) {
-    [pagCompositionObjC release];
-    pagCompositionObjC = nil;
-  }
   filePath = [path retain];
   [self retain];
   [PAGFile LoadAsync:path
@@ -571,10 +558,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (PAGComposition*)getComposition {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  if (filePath) {
+  if (filePath || pagComposition == nullptr) {
     return nil;
   }
-  return pagCompositionObjC ? [[pagCompositionObjC retain] autorelease] : nil;
+  return (PAGComposition*)[PAGLayerImpl ToPAGLayer:pagComposition];
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
@@ -586,13 +573,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (filePath) {
     [filePath release];
     filePath = nil;
-  }
-  if (pagCompositionObjC != newComposition) {
-    if (pagCompositionObjC) {
-      [pagCompositionObjC release];
-      pagCompositionObjC = nil;
-    }
-    pagCompositionObjC = [newComposition retain];
   }
   std::shared_ptr<pag::PAGComposition> cppComposition = nullptr;
   if (newComposition != nil) {
