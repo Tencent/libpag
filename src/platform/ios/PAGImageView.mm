@@ -21,13 +21,15 @@
 #include <mutex>
 
 #include "base/utils/TimeUtil.h"
+#include "pag/pag.h"
+#include "rendering/layers/ContentVersion.h"
 
-#import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/cocoa/private/PAGLayer+Internal.h"
+#import "platform/cocoa/private/PAGLayerImpl+Internal.h"
 #import "platform/cocoa/private/PixelBufferUtil.h"
-#import "platform/ios/private/PAGContentVersion.h"
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
@@ -56,7 +58,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 @property(atomic, assign) BOOL isVisible;
 @property(atomic, assign) NSInteger currentFrameIndex;
 @property(atomic, retain) UIImage* currentUIImage;
-@property(atomic, assign) NSInteger pagContentVersion;
 @property(nonatomic, assign) BOOL memoryCacheEnabled;
 @property(nonatomic, assign) BOOL memeoryCacheFinished;
 @property(nonatomic, assign) NSInteger fileWidth;
@@ -69,13 +70,15 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 @implementation PAGImageView {
   NSString* filePath;
   PAGAnimator* animator;
-  PAGComposition* pagComposition;
-  PAGDecoder* pagDecoder;
-  NSInteger duartion;
+  PAGComposition* pagCompositionObjC;
+  std::shared_ptr<pag::PAGComposition> pagComposition;
+  std::shared_ptr<pag::PAGDecoder> pagDecoder;
+  int64_t duration;
   float renderScaleFactor;
   NSInteger width;
   NSInteger height;
   NSUInteger numFrames;
+  uint32_t pagContentVersion;
 
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
   std::mutex imageViewLock;
@@ -92,10 +95,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)initPAG {
-  pagDecoder = nil;
+  pagDecoder = nullptr;
+  pagComposition = nullptr;
+  pagCompositionObjC = nil;
   self.currentFrameIndex = -1;
   renderScaleFactor = 1.0;
-  duartion = 0;
+  duration = 0;
+  pagContentVersion  =  0;
   self.memoryCacheEnabled = NO;
   self.memeoryCacheFinished = NO;
   self.isVisible = NO;
@@ -116,8 +122,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [animator cancel];
   [animator release];
   [self reset];
-  if (pagComposition) {
-    [pagComposition release];
+  if (pagCompositionObjC) {
+    [pagCompositionObjC release];
+    pagCompositionObjC = nil;
   }
   if (_currentUIImage) {
     [_currentUIImage release];
@@ -150,27 +157,31 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   });
 }
 
-- (void)setCompositionInternal:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate {
+- (void)setCompositionInternal:(std::shared_ptr<pag::PAGComposition>)newComposition
+                  maxFrameRate:(float)maxFrameRate {
   if (pagComposition == newComposition) {
     return;
   }
-  if (pagComposition) {
-    [pagComposition release];
-    pagComposition = nil;
+    if (!filePath) {
+        pagComposition = newComposition;
+    }
+  if (newComposition) {
+    self.fileWidth = newComposition->width();
+    self.fileHeight = newComposition->height();
+    pagContentVersion = pag::ContentVersion::Get(newComposition);
+    duration = newComposition->duration();
+  } else {
+    self.fileWidth = 0;
+    self.fileHeight = 0;
+    pagContentVersion = 0;
+    duration = 0;
   }
-  if (!filePath) {
-    pagComposition = [newComposition retain];
-  }
-  self.fileWidth = [newComposition width];
-  self.fileHeight = [newComposition height];
-  self.pagContentVersion = [PAGContentVersion Get:newComposition];
   self.maxFrameRate = maxFrameRate;
-  duartion = [newComposition duration];
 
   [self reset];
   [self updatePAGDecoder];
   if (self.isVisible) {
-    [animator setDuration:duartion];
+    [animator setDuration:duration];
   }
 }
 
@@ -210,7 +221,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)updatePAGDecoder {
-  if (pagDecoder == nil) {
+  if (pagDecoder == nullptr) {
     float scaleFactor;
     if (self.viewSize.width >= self.viewSize.height) {
       scaleFactor = static_cast<float>(
@@ -221,19 +232,15 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
                                                   [UIScreen mainScreen].scale / self.fileHeight));
     }
     if (pagComposition) {
-      pagDecoder = [PAGDecoder Make:pagComposition
-                       maxFrameRate:self.maxFrameRate
-                              scale:scaleFactor];
+      pagDecoder = pag::PAGDecoder::MakeFrom(pagComposition, self.maxFrameRate, scaleFactor);
     } else if (filePath) {
-      pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
-                       maxFrameRate:self.maxFrameRate
-                              scale:scaleFactor];
+      auto file = pag::PAGFile::Load([filePath UTF8String]);
+      pagDecoder = pag::PAGDecoder::MakeFrom(file, self.maxFrameRate, scaleFactor);
     }
     if (pagDecoder) {
-      width = [pagDecoder width];
-      height = [pagDecoder height];
-      numFrames = [pagDecoder numFrames];
-      [pagDecoder retain];
+      width = pagDecoder->width();
+      height = pagDecoder->height();
+      numFrames = pagDecoder->numFrames();
     }
   }
 }
@@ -254,8 +261,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   self.isVisible = visible;
   if (self.isVisible) {
-    duartion = pagComposition ? [pagComposition duration] : duartion;
-    [animator setDuration:duartion];
+    int64_t currentDuration = pagComposition ? pagComposition->duration() : duration;
+    [animator setDuration:currentDuration];
   } else {
     [animator setDuration:0];
   }
@@ -276,11 +283,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     return YES;
   }
   [self updatePAGDecoder];
-  if (pagDecoder == nil) {
+  if (pagDecoder == nullptr) {
     return false;
   }
-  if ([pagDecoder checkFrameChanged:(int)frameIndex]) {
-    BOOL status = [pagDecoder readFrame:frameIndex to:pixelBuffer];
+  if (pagDecoder->checkFrameChanged(static_cast<int>(frameIndex))) {
+    BOOL status = pagDecoder->readFrame(static_cast<int>(frameIndex), pixelBuffer);
     if (!status) {
       return status;
     }
@@ -302,12 +309,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (BOOL)checkPAGCompositionChanged {
-  if ([PAGContentVersion Get:pagComposition] != self.pagContentVersion) {
-    self.pagContentVersion = [PAGContentVersion Get:pagComposition];
+  uint32_t currentVersion = pag::ContentVersion::Get(pagComposition);
+  if (currentVersion != pagContentVersion) {
+    pagContentVersion = currentVersion;
     [self reset];
     [self updatePAGDecoder];
-    if (self.isVisible) {
-      [animator setDuration:[pagComposition duration]];
+    if (self.isVisible && pagComposition) {
+      [animator setDuration:pagComposition->duration()];
     }
     return YES;
   }
@@ -330,8 +338,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (void)freeCache {
   if (self.memoryCacheEnabled && self->pagDecoder && [self->imagesMap count] == numFrames) {
-    [self->pagDecoder release];
-    self->pagDecoder = nil;
+    self->pagDecoder = nullptr;
   }
 }
 
@@ -346,10 +353,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     CVPixelBufferPoolRelease(diskBufferPool);
     diskBufferPool = nil;
   }
-  if (pagDecoder) {
-    [pagDecoder release];
-    pagDecoder = nil;
-  }
+  pagDecoder = nullptr;
   width = 0;
   height = 0;
   numFrames = 0;
@@ -518,10 +522,14 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [filePath release];
     filePath = nil;
   }
+  if (pagCompositionObjC) {
+    [pagCompositionObjC release];
+    pagCompositionObjC = nil;
+  }
   filePath = [path retain];
-  PAGFile* file = [PAGFile Load:path];
+  auto file = pag::PAGFile::Load([path UTF8String]);
   [self setCompositionInternal:file maxFrameRate:maxFrameRate];
-  return file != nil;
+  return file != nullptr;
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {
@@ -540,12 +548,21 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [filePath release];
     filePath = nil;
   }
+  if (pagCompositionObjC) {
+    [pagCompositionObjC release];
+    pagCompositionObjC = nil;
+  }
   filePath = [path retain];
   [self retain];
   [PAGFile LoadAsync:path
       completionBlock:^(PAGFile* pagFile) {
+        std::shared_ptr<pag::PAGFile> cppFile = nullptr;
+        if (pagFile != nil) {
+          auto layer = [[pagFile impl] pagLayer];
+          cppFile = std::static_pointer_cast<pag::PAGFile>(layer);
+        }
         imageViewLock.lock();
-        [self setCompositionInternal:pagFile maxFrameRate:maxFrameRate];
+        [self setCompositionInternal:cppFile maxFrameRate:maxFrameRate];
         imageViewLock.unlock();
         callback(pagFile);
         [self release];
@@ -557,7 +574,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (filePath) {
     return nil;
   }
-  return pagComposition ? [[pagComposition retain] autorelease] : nil;
+  return pagCompositionObjC ? [[pagCompositionObjC retain] autorelease] : nil;
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
@@ -570,7 +587,19 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     [filePath release];
     filePath = nil;
   }
-  [self setCompositionInternal:newComposition maxFrameRate:maxFrameRate];
+  if (pagCompositionObjC != newComposition) {
+    if (pagCompositionObjC) {
+      [pagCompositionObjC release];
+      pagCompositionObjC = nil;
+    }
+    pagCompositionObjC = [newComposition retain];
+  }
+  std::shared_ptr<pag::PAGComposition> cppComposition = nullptr;
+  if (newComposition != nil) {
+    auto layer = [[newComposition impl] pagLayer];
+    cppComposition = std::static_pointer_cast<pag::PAGComposition>(layer);
+  }
+  [self setCompositionInternal:cppComposition maxFrameRate:maxFrameRate];
 }
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {
