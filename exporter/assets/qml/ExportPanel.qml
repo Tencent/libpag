@@ -390,7 +390,7 @@ PAGWindow {
                 acceptedButtons: Qt.LeftButton
                 cursorShape: Qt.PointingHandCursor
                 onPressed: {
-                    window.hide();
+                    window.close();
                 }
             }
         }

@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExportVerify.h"
+#include <QDebug>
 #include <QJsonDocument>
 #include <QJsonParseError>
+#include "utils/AEDataTypeConverter.h"
 #include "utils/AEHelper.h"
 #include "utils/LayerHelper.h"
 #include "utils/ScopedHelper.h"
@@ -355,45 +357,167 @@ static void CheckVideoCompositionInUIScenes(std::shared_ptr<PAGExportSession> se
   }
 }
 
-static void CheckVideoCompositionOverlap(std::shared_ptr<PAGExportSession> session,
-                                         std::vector<pag::Composition*>& compositions) {
-  std::vector<pag::VideoComposition*> videoCompositions = {};
-  std::vector<pag::VectorComposition*> vectorCompositions = {};
+static void CollectVideoCompositionReferences(pag::Composition* composition,
+                                              pag::VideoComposition* targetVideo,
+                                              pag::Frame mainCompClipStart,
+                                              pag::Frame localClipStart, pag::Frame localClipEnd,
+                                              std::vector<pag::TimeRange>& referenceRanges) {
+  if (composition->type() != pag::CompositionType::Vector) {
+    return;
+  }
 
-  for (auto composition : compositions) {
-    if (composition->type() == pag::CompositionType::Video) {
-      videoCompositions.push_back(static_cast<pag::VideoComposition*>(composition));
-    } else if (composition->type() == pag::CompositionType::Vector) {
-      vectorCompositions.push_back(static_cast<pag::VectorComposition*>(composition));
+  for (auto layer : static_cast<pag::VectorComposition*>(composition)->layers) {
+    if (layer->type() != pag::LayerType::PreCompose) {
+      continue;
+    }
+
+    auto preComposeLayer = static_cast<pag::PreComposeLayer*>(layer);
+    pag::Frame offset = preComposeLayer->compositionStartTime;
+
+    pag::Frame visibleStart = std::max(layer->startTime, localClipStart);
+    pag::Frame visibleEnd = std::min(layer->startTime + layer->duration, localClipEnd);
+    if (visibleStart >= visibleEnd) {
+      continue;
+    }
+
+    pag::Frame absoluteStart = mainCompClipStart + (visibleStart - localClipStart);
+    pag::Frame absoluteEnd = mainCompClipStart + (visibleEnd - localClipStart);
+
+    if (preComposeLayer->composition == targetVideo) {
+      referenceRanges.push_back({absoluteStart, absoluteEnd});
+    } else if (preComposeLayer->composition->type() == pag::CompositionType::Vector) {
+      pag::Frame newLocalClipStart = visibleStart - offset;
+      pag::Frame newLocalClipEnd = visibleEnd - offset;
+      if (newLocalClipStart < newLocalClipEnd) {
+        CollectVideoCompositionReferences(preComposeLayer->composition, targetVideo, absoluteStart,
+                                          newLocalClipStart, newLocalClipEnd, referenceRanges);
+      }
+    }
+  }
+}
+
+static std::string GetOverlapFrameRanges(std::vector<pag::TimeRange>& referenceRanges) {
+  if (referenceRanges.size() < 2) {
+    return "";
+  }
+
+  std::vector<std::pair<pag::Frame, int>> events;
+  for (const auto& range : referenceRanges) {
+    events.emplace_back(range.start, 1);
+    events.emplace_back(range.end, -1);
+  }
+
+  std::sort(events.begin(), events.end(), [](const auto& a, const auto& b) {
+    return a.first != b.first ? a.first < b.first : a.second > b.second;
+  });
+
+  std::vector<pag::TimeRange> overlapRanges;
+  int count = 0;
+  pag::Frame overlapStart = 0;
+  bool inOverlap = false;
+
+  for (const auto& event : events) {
+    if (count > 1 && !inOverlap) {
+      overlapStart = event.first;
+      inOverlap = true;
+    }
+    count += event.second;
+    if (count <= 1 && inOverlap) {
+      overlapRanges.push_back({overlapStart, event.first});
+      inOverlap = false;
+    } else if (count > 1 && !inOverlap) {
+      overlapStart = event.first;
+      inOverlap = true;
     }
   }
 
-  for (auto videoComposition : videoCompositions) {
-    std::vector<std::pair<pag::Frame, pag::Frame>> timeRanges = {};
-    for (auto vectorComposition : vectorCompositions) {
-      for (auto layer : vectorComposition->layers) {
-        if (layer->type() == pag::LayerType::PreCompose) {
-          auto preComposeLayer = static_cast<pag::PreComposeLayer*>(layer);
-          if (preComposeLayer->composition == videoComposition) {
-            auto timeRange =
-                std::make_pair(preComposeLayer->startTime,
-                               preComposeLayer->startTime + preComposeLayer->duration - 1);
-            auto hasOverlap =
-                std::any_of(timeRanges.begin(), timeRanges.end(), [timeRange](auto& range) {
-                  return !(timeRange.first > range.second || timeRange.second < range.first);
-                });
-            if (hasOverlap) {
-              ScopedAssign<pag::ID> compID(session->compID, vectorComposition->id);
-              auto itemHandle = session->itemHandleMap[videoComposition->id];
-              auto name = GetItemName(itemHandle);
-              session->pushWarning(AlertInfoType::VideoCompositionOverlap, name);
-              break;
-            }
-            timeRanges.emplace_back(preComposeLayer->startTime,
-                                    preComposeLayer->duration + preComposeLayer->startTime - 1);
-          }
-        }
-      }
+  std::string result;
+  for (size_t i = 0; i < overlapRanges.size(); i++) {
+    if (i > 0) {
+      result += ", ";
+    }
+    pag::Frame start = overlapRanges[i].start;
+    pag::Frame end = overlapRanges[i].end - 1;
+    if (start == end) {
+      result += std::to_string(start);
+    } else {
+      result += "[" + std::to_string(start) + "-" + std::to_string(end) + "]";
+    }
+  }
+  return result;
+}
+
+static size_t GetMaxOverlapCount(std::vector<pag::TimeRange>& referenceRanges) {
+  if (referenceRanges.empty()) {
+    return 0;
+  }
+
+  std::vector<pag::Frame> startTimes, endTimes;
+  for (const auto& range : referenceRanges) {
+    startTimes.push_back(range.start);
+    endTimes.push_back(range.end);
+  }
+
+  std::sort(startTimes.begin(), startTimes.end());
+  std::sort(endTimes.begin(), endTimes.end());
+
+  size_t startIndex = 0, endIndex = 0, maxCount = 0, count = 0;
+  while (startIndex < startTimes.size()) {
+    if (startTimes[startIndex] < endTimes[endIndex]) {
+      maxCount = std::max(maxCount, ++count);
+      startIndex++;
+    } else {
+      count--;
+      endIndex++;
+    }
+  }
+  return maxCount;
+}
+
+static void CheckVideoCompositionOverlap(std::shared_ptr<PAGExportSession> session,
+                                         std::vector<pag::Composition*>& compositions) {
+  constexpr size_t maxAllowedOverlap = 1;
+
+  auto mainCompId = GetItemID(session->itemHandle);
+  pag::Composition* mainComposition = nullptr;
+  for (auto comp : compositions) {
+    if (comp->id == mainCompId) {
+      mainComposition = comp;
+      break;
+    }
+  }
+
+  if (mainComposition == nullptr || mainComposition->type() != pag::CompositionType::Vector) {
+    return;
+  }
+
+  const auto& Suites = GetSuites();
+  AEGP_CompH compositionHandle = GetItemCompH(session->itemHandle);
+  A_Time workAreaStart = {};
+  A_Time workAreaDuration = {};
+  Suites->CompSuite6()->AEGP_GetCompWorkAreaStart(compositionHandle, &workAreaStart);
+  Suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compositionHandle, &workAreaDuration);
+  pag::Frame clipStart = AEDurationToFrame(workAreaStart, session->frameRate);
+  pag::Frame clipEnd = clipStart + AEDurationToFrame(workAreaDuration, session->frameRate);
+
+  for (auto composition : compositions) {
+    if (composition->type() != pag::CompositionType::Video) {
+      continue;
+    }
+
+    auto videoComposition = static_cast<pag::VideoComposition*>(composition);
+    std::vector<pag::TimeRange> referenceRanges;
+    CollectVideoCompositionReferences(mainComposition, videoComposition, clipStart, clipStart,
+                                      clipEnd, referenceRanges);
+
+    size_t maxOverlap = GetMaxOverlapCount(referenceRanges);
+    if (maxOverlap > maxAllowedOverlap) {
+      auto itemHandle = session->itemHandleMap[videoComposition->id];
+      auto name = GetItemName(itemHandle);
+      auto overlapFrames = GetOverlapFrameRanges(referenceRanges);
+      qDebug() << "References to Composition" << name.c_str()
+               << "overlap at frames: " << overlapFrames.c_str();
+      session->pushWarning(AlertInfoType::VideoCompositionOverlap, name);
     }
   }
 }
