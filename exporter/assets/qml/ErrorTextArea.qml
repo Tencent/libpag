@@ -3,6 +3,8 @@ import QtQuick.Controls
 
 TextArea {
     id: suggestText
+    property var targetListView: null
+
     renderType: Text.NativeRendering
     color: "white"
     verticalAlignment: Text.AlignTop
@@ -27,21 +29,24 @@ TextArea {
         property var endPosition: 0
         property var isInit: false
         property var hasMoved: false
-        property var targetListView: errorListView
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         hoverEnabled: false
 
         onPressed: function (pressed) {
             hasMoved = false;
-            targetListView.interactive = false;
+            if (suggestText.targetListView) {
+                suggestText.targetListView.interactive = false;
+            }
             clearSelect();
             targetTextArea.forceActiveFocus();
             console.log("pressed:" + pressed + ", activeFocus:" + targetTextArea.activeFocus);
         }
 
         onReleased: {
-            targetListView.interactive = true;
+            if (suggestText.targetListView) {
+                suggestText.targetListView.interactive = true;
+            }
             isInit = false;
             if (!hasMoved) {
                 return;
