@@ -8,7 +8,7 @@ This file provides guidance to CodeBuddy Code when working with code in this rep
 
 libpag is a real-time rendering library for PAG (Portable Animated Graphics) files. It renders vector and raster animations across iOS, Android, macOS, Windows, Linux, OpenHarmony, and Web platforms.
 
-### Key Directories
+### Source Structure
 
 | Directory | Purpose |
 |-----------|---------|
@@ -19,6 +19,8 @@ libpag is a real-time rendering library for PAG (Portable Animated Graphics) fil
 | `src/platform/` | Platform-specific code (cocoa, android, ios, mac, ohos, web, win) |
 | `test/src/` | Google Test-based test cases |
 | `third_party/tgfx/` | GPU abstraction layer (OpenGL, Metal, Vulkan) |
+
+File extensions: `.h` (headers), `.cpp` (implementation), `.mm` (Objective-C++). Source files are auto-collected via `file(GLOB)` - no CMake changes needed for new files.
 
 ### Core Classes
 
@@ -53,33 +55,33 @@ npm install -g depsync
 depsync
 ```
 
-### Build and Run Tests
+### Build Verification
+
+After modifying code, use this command to verify compilation. Must pass `-DPAG_BUILD_TESTS=ON` to enable ALL modules (layers, svg, pdf, etc.).
 
 ```bash
-mkdir build && cd build
-cmake -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ..
-cmake --build . --target PAGFullTest -- -j 12
-./PAGFullTest
+cmake -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
+cmake --build cmake-build-debug --target PAGFullTest -- -j 12
 ```
 
-### Run Specific Test
-
-```bash
-./PAGFullTest --gtest_filter="TestSuiteName.TestName"
-```
-
-### Code Formatting
-
+### Code Formatting (REQUIRED before commit)
 ```bash
 ./codeformat.sh
 ```
+Run this before every commit. Ignore any error output - the script completes formatting regardless of reported errors.
 
-Run before committing. Ignore output errors - the formatting completes regardless.
 
 ## Testing
 
 - Location: `/test/src/*Test.cpp`, based on Google Test framework
 - Test code can access all private members via compile flags (no friend class needed)
+
+### Run Tests
+```bash
+./cmake-build-debug/PAGFullTest                                        # Run all tests
+./cmake-build-debug/PAGFullTest --gtest_filter=CanvasTest.drawRect     # Run specific test
+./cmake-build-debug/PAGFullTest --gtest_filter=Canvas*                 # Run pattern match
+```
 
 ### Screenshot Tests
 
@@ -93,14 +95,3 @@ Run before committing. Ignore output errors - the formatting completes regardles
   - Use `version.json` output from running ALL test cases in `PAGFullTest`, never use partial test output
   - User explicitly confirms accepting all screenshot changes
 - `UpdateBaseline` or `update_baseline.sh` syncs `test/baseline/version.json` to `.cache/` and generates local baseline cache. CMake warns when version.json files differ. **NEVER run this command automatically**
-
-## Key CMake Options
-
-- `-DPAG_BUILD_TESTS=ON`: Enable test targets (required for full module compilation)
-- `-DCMAKE_BUILD_TYPE=Debug`: Debug build with profiling enabled
-
-## File Conventions
-
-- Headers: `.h`, Implementation: `.cpp`, Objective-C++: `.mm`
-- Test files: `*Test.cpp` in `/test/src/`
-- Source files auto-collected via `file(GLOB)` - no CMake changes needed for new files
