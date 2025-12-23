@@ -4,20 +4,24 @@
 <context>
     <name>AlertDialog</name>
     <message>
+        <location filename="../qml/AlertDialog.qml" line="24"/>
         <source>Convert to BMP?</source>
-        <translation type="vanished">确认转成BMP？</translation>
+        <translation>确认转成BMP？</translation>
     </message>
     <message>
+        <location filename="../qml/AlertDialog.qml" line="37"/>
         <source>Placeholder image and text in composition cannot edit after converting to BMP</source>
-        <translation type="vanished">转换为BMP后，合成中的占位图和文本将无法编辑</translation>
+        <translation>转换为BMP后，合成中的占位图和文本将无法编辑</translation>
     </message>
     <message>
+        <location filename="../qml/AlertDialog.qml" line="63"/>
         <source>Cancel</source>
-        <translation type="vanished">取消</translation>
+        <translation>取消</translation>
     </message>
     <message>
+        <location filename="../qml/AlertDialog.qml" line="95"/>
         <source>Confirm</source>
-        <translation type="vanished">确认</translation>
+        <translation>确认</translation>
     </message>
 </context>
 <context>
@@ -28,12 +32,12 @@
         <translation>导出错误</translation>
     </message>
     <message>
-        <location filename="../qml/AlertError.qml" line="79"/>
+        <location filename="../qml/AlertError.qml" line="106"/>
         <source>Export failed due to error:</source>
         <translation>导出失败，原因是：</translation>
     </message>
     <message>
-        <location filename="../qml/AlertError.qml" line="124"/>
+        <location filename="../qml/AlertError.qml" line="151"/>
         <source>Cancel and Modify</source>
         <translation>取消并修改</translation>
     </message>
@@ -61,7 +65,7 @@
         <translation>继续导出</translation>
     </message>
     <message>
-        <location filename="../qml/AlertWarning.qml" line="196"/>
+        <location filename="../qml/AlertWarning.qml" line="194"/>
         <source>Cancel and Modify</source>
         <translation>取消并修改</translation>
     </message>
@@ -315,7 +319,7 @@
 <context>
     <name>PAGListView</name>
     <message>
-        <location filename="../qml/PAGListView.qml" line="157"/>
+        <location filename="../qml/PAGListView.qml" line="158"/>
         <source>Locate</source>
         <translation>定位</translation>
     </message>
@@ -382,7 +386,7 @@
     <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="38"/>
         <source>Increase TagLevel: Go to Preferences-&gt;PAG Config-&gt;General, change &quot;Export version control&quot; to &quot;Beta&quot;. (Generated PAG files may only be supported by newer SDK versions)</source>
-        <translation>调高TagLevel：首选项-&gt;PAG Config-&gt;通用, 将/“导出版本控制/”改为/“Beta/”. (调高后生成的pag文件可能只有较新版本SDK才能支持)</translation>
+        <translation>调高TagLevel：首选项-&gt;PAG Config-&gt;通用, 将“导出版本控制”改为“Beta”. (调高后生成的pag文件可能只有较新版本SDK才能支持)</translation>
     </message>
     <message>
         <location filename="../../src/utils/AlertInfo.cpp" line="42"/>
@@ -858,62 +862,72 @@
         <translation>建议去掉文本路径或去掉文本动画。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="420"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="412"/>
+        <source>There are overlapping time intervals for references to video composition &quot;%1&quot;.</source>
+        <translation>对视频合成“%1”的引用存在时间重叠。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="414"/>
+        <source>Recommend adjusting the start time and duration of the layers referencing video composition &quot;%1&quot;.</source>
+        <translation>建议调整视频合成“%1”的引用图层的起始时间和持续时间。</translation>
+    </message>
+    <message>
+        <location filename="../../src/utils/AlertInfo.cpp" line="430"/>
         <source>AE export error.</source>
         <translation>AE导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="425"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="435"/>
         <source>Bitmap sequence export error.</source>
         <translation>位图序列帧导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="430"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="440"/>
         <source>Video sequence export error.</source>
         <translation>视频序列帧导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="435"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="445"/>
         <source>Audio export error.</source>
         <translation>音频导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="440"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
         <source>WebP encoding error.</source>
         <translation>Webp编码错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="445"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="455"/>
         <source>Export rendering error.</source>
         <translation>导出渲染错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="450"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="460"/>
         <source>Composition handle not found: The AE project handle for this composition (ID: %1) is not registered. This may occur if the composition was added after export initialization or if the project structure changed.</source>
         <translation>找不到合成句柄：此合成(ID: %1)的AE项目句柄未注册。这可能发生在导出初始化后添加了合成，或项目结构发生了变化。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="454"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="464"/>
         <source>Try re-exporting the project. If the issue persists, restart After Effects and try again.</source>
         <translation>请尝试重新导出项目。如果问题持续存在，请重启 After Effects 后重试。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="461"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="471"/>
         <source>DisplacementMap does not support referencing its own layer.</source>
         <translation>置换图DisplacementMap暂不支持指向自身图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="462"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="472"/>
         <source>Recommend removing this effect or redirecting the displacement layer to another layer.</source>
         <translation>建议去掉该效果，或修改该置换图层指向其它图层。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="469"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="479"/>
         <source>[Text Animation - Selector] export error.</source>
         <translation>[文本动画-选择器]导出错误。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="474"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="484"/>
         <source>PAG file verification error.</source>
         <translation>PAG文件校验错误。</translation>
     </message>

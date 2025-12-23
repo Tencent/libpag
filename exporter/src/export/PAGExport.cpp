@@ -171,7 +171,7 @@ static void AdjustmentPreComposeLayerForVideoComposition(std::shared_ptr<PAGExpo
       preComposeLayer->composition->uniqueID == videoComposition->uniqueID) {
     if (session->videoCompositionStartTime.find(videoComposition->uniqueID) !=
         session->videoCompositionStartTime.end()) {
-      preComposeLayer->compositionStartTime +=
+      preComposeLayer->compositionStartTime =
           session->videoCompositionStartTime[videoComposition->uniqueID];
     }
   }
