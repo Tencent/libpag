@@ -359,13 +359,14 @@ static void CheckVideoCompositionInUIScenes(std::shared_ptr<PAGExportSession> se
 
 static void CollectVideoCompositionReferences(const pag::Composition* composition,
                                               const pag::VideoComposition* targetVideo,
-                                              float parentFrameRate, pag::Frame mainCompClipStart,
+                                              float mainCompFrameRate, pag::Frame mainCompClipStart,
                                               pag::Frame localClipStart, pag::Frame localClipEnd,
                                               std::vector<pag::TimeRange>* referenceRanges) {
   if (composition->type() != pag::CompositionType::Vector) {
     return;
   }
 
+  float currentFrameRate = composition->frameRate;
   for (auto layer : static_cast<const pag::VectorComposition*>(composition)->layers) {
     if (layer->type() != pag::LayerType::PreCompose) {
       continue;
@@ -380,19 +381,23 @@ static void CollectVideoCompositionReferences(const pag::Composition* compositio
       continue;
     }
 
-    pag::Frame absoluteStart = mainCompClipStart + (visibleStart - localClipStart);
-    pag::Frame absoluteEnd = mainCompClipStart + (visibleEnd - localClipStart);
+    // Convert frame offset from current composition's frame rate to main composition's frame rate
+    float toMainFactor = mainCompFrameRate / currentFrameRate;
+    pag::Frame absoluteStart =
+        mainCompClipStart + static_cast<pag::Frame>((visibleStart - localClipStart) * toMainFactor);
+    pag::Frame absoluteEnd =
+        mainCompClipStart + static_cast<pag::Frame>((visibleEnd - localClipStart) * toMainFactor);
 
     if (preComposeLayer->composition == targetVideo) {
       referenceRanges->push_back({absoluteStart, absoluteEnd});
     } else if (preComposeLayer->composition->type() == pag::CompositionType::Vector) {
       auto subComposition = preComposeLayer->composition;
-      float frameRateFactor = subComposition->frameRate / parentFrameRate;
+      float toSubFactor = subComposition->frameRate / currentFrameRate;
       pag::Frame newLocalClipStart =
-          static_cast<pag::Frame>((visibleStart - offset) * frameRateFactor);
-      pag::Frame newLocalClipEnd = static_cast<pag::Frame>((visibleEnd - offset) * frameRateFactor);
+          static_cast<pag::Frame>((visibleStart - offset) * toSubFactor);
+      pag::Frame newLocalClipEnd = static_cast<pag::Frame>((visibleEnd - offset) * toSubFactor);
       if (newLocalClipStart < newLocalClipEnd) {
-        CollectVideoCompositionReferences(subComposition, targetVideo, subComposition->frameRate,
+        CollectVideoCompositionReferences(subComposition, targetVideo, mainCompFrameRate,
                                           absoluteStart, newLocalClipStart, newLocalClipEnd,
                                           referenceRanges);
       }
