@@ -30,6 +30,7 @@
 #include "platform/ohos/JPAGText.h"
 #include "platform/ohos/JPAGView.h"
 #include "platform/ohos/JsHelper.h"
+#include "platform/ohos/NativeDisplayLink.h"
 
 namespace pag {
 static napi_value SDKVersion(napi_env env, napi_callback_info) {
@@ -67,7 +68,8 @@ static napi_value Init(napi_env env, napi_value exports) {
                 pag::JPAGText::Init(env, exports) && pag::JPAGImage::Init(env, exports) &&
                 pag::JPAGView::Init(env, exports) && pag::JPAGImageView::Init(env, exports) &&
                 pag::JPAGDiskCache::Init(env, exports) &&
-                pag::XComponentHandler::Init(env, exports);
+                pag::XComponentHandler::Init(env, exports) &&
+                pag::NativeDisplayLink::InitThreadSafeFunction(env);
   if (!result) {
     LOGE("PAG InitFailed");
   }
