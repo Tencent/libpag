@@ -20,24 +20,28 @@
 
 // clang-format off
 #include <stdint.h>
-#include <native_vsync/native_vsync.h>
+#include <napi/native_api.h>
+#include <native_display_soloist/native_display_soloist.h>
 // clang-format on
+#include <atomic>
 #include <functional>
-#include <mutex>
 #include "rendering/utils/DisplayLink.h"
 namespace pag {
 
 class NativeDisplayLink : public DisplayLink {
  public:
+  static bool InitThreadSafeFunction(napi_env env);
+
   explicit NativeDisplayLink(std::function<void()> callback);
   ~NativeDisplayLink() override;
 
   void start() override;
   void stop() override;
+  void update();
 
  private:
-  static void PAGVSyncCallback(long long timestamp, void* data);
-  OH_NativeVSync* vSync = nullptr;
+  static void PAGDisplaySoloistCallback(long long timestamp, long long targetTimestamp, void* data);
+  OH_DisplaySoloist* displaySoloist = nullptr;
   std::function<void()> callback = nullptr;
   std::atomic<bool> playing = false;
 };
