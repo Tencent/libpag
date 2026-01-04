@@ -37,6 +37,7 @@ struct VideoInfo {
   std::vector<std::shared_ptr<PAGComposition>> pagCompositions = {};
   std::unique_ptr<ByteData> mp4Data = nullptr;
   Frame lastFrame = -1;
+  std::unordered_map<int, Frame> pagCompositionLastFrames = {};
 };
 
 class VideoInfoManager {
@@ -61,7 +62,7 @@ class VideoInfoManager {
 
   emscripten::val getVideoIDs();
 
-  bool hasTimeRangeOverlap() const;
+  bool hasTimeRangeOverlap();
 
   void getPAGFileFromPAGComposition(std::shared_ptr<PAGComposition>& pagComposition,
                                     std::vector<std::shared_ptr<PAGFile>>& pagFiles);
