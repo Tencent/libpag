@@ -393,8 +393,7 @@ static void CollectVideoCompositionReferences(const pag::Composition* compositio
     } else if (preComposeLayer->composition->type() == pag::CompositionType::Vector) {
       auto subComposition = preComposeLayer->composition;
       float toSubFactor = subComposition->frameRate / currentFrameRate;
-      pag::Frame newLocalClipStart =
-          static_cast<pag::Frame>((visibleStart - offset) * toSubFactor);
+      pag::Frame newLocalClipStart = static_cast<pag::Frame>((visibleStart - offset) * toSubFactor);
       pag::Frame newLocalClipEnd = static_cast<pag::Frame>((visibleEnd - offset) * toSubFactor);
       if (newLocalClipStart < newLocalClipEnd) {
         CollectVideoCompositionReferences(subComposition, targetVideo, mainCompFrameRate,
