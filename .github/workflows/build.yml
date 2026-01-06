@@ -364,7 +364,6 @@ jobs:
           ccache --set-config=base_dir=${{ github.workspace }}
           ccache --set-config=hash_dir=false
           ccache --zero-stats
-          ccache --show-config
 
       - name: Build QT
         run: |
@@ -374,7 +373,7 @@ jobs:
           ccache --show-stats
 
       - name: Save ccache
-        if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.ccache-restore.outputs.cache-hit != 'true' }}
+        if: ${{ (github.event_name == 'push') && (steps.ccache-restore.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: ~/Library/Caches/ccache
