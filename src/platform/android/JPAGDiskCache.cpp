@@ -21,7 +21,7 @@
 
 namespace pag {
 static Global<jclass> PAGClass;
-static jmethodID PAG_GetCacheDir;
+static jmethodID PAG_GetDefaultCacheDir;
 
 void JPAGDiskCache::InitJNI(JNIEnv* env) {
   PAGClass = env->FindClass("org/libpag/PAGDiskCache");
@@ -29,7 +29,8 @@ void JPAGDiskCache::InitJNI(JNIEnv* env) {
     LOGE("Could not run PAGDiskCache.InitJNI(), PAGClass is not found!");
     return;
   }
-  PAG_GetCacheDir = env->GetStaticMethodID(PAGClass.get(), "GetCacheDir", "()Ljava/lang/String;");
+  PAG_GetDefaultCacheDir =
+      env->GetStaticMethodID(PAGClass.get(), "GetDefaultCacheDir", "()Ljava/lang/String;");
 }
 
 std::string JPAGDiskCache::GetCacheDir() {
@@ -42,12 +43,17 @@ std::string JPAGDiskCache::GetCacheDir() {
     LOGE("Could not run PAGDiskCache.GetCacheDir(), PAGClass is not found!");
     return "";
   }
-  jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetCacheDir);
+  jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetDefaultCacheDir);
   return SafeConvertToStdString(env, reinterpret_cast<jstring>(cacheDirPath));
 }
 }  // namespace pag
 
 extern "C" {
+PAG_API void JNICALL Java_org_libpag_PAGDiskCache_SetCacheDir(JNIEnv* env, jclass, jstring dir) {
+  auto cacheDir = pag::SafeConvertToStdString(env, dir);
+  pag::PAGDiskCache::SetCacheDir(cacheDir);
+}
+
 PAG_API jlong JNICALL Java_org_libpag_PAGDiskCache_MaxDiskSize(JNIEnv*, jclass) {
   return static_cast<jlong>(pag::PAGDiskCache::MaxDiskSize());
 }
