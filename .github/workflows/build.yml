@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   ios:
@@ -350,11 +351,11 @@ jobs:
           ccache --max-size=2G
           ccache --zero-stats
 
-      - name: Restore ccache
-        uses: actions/cache/restore@v4
+      - name: Cache ccache
+        uses: actions/cache@v4
         with:
           path: ~/Library/Caches/ccache
-          key: ccache-qt-${{ runner.os }}-main
+          key: ccache-qt-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             ccache-qt-${{ runner.os }}-
 
@@ -365,13 +366,6 @@ jobs:
           export CMAKE_C_COMPILER_LAUNCHER=ccache
           export CMAKE_CXX_COMPILER_LAUNCHER=ccache
           node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
-
-      - name: Save ccache
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/cache/save@v4
-        with:
-          path: ~/Library/Caches/ccache
-          key: ccache-qt-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
