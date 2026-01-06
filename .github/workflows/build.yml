@@ -350,6 +350,7 @@ jobs:
           brew install ccache
 
       - name: Restore ccache
+        id: ccache-restore
         uses: actions/cache/restore@v4
         with:
           path: ~/Library/Caches/ccache
@@ -373,7 +374,7 @@ jobs:
           ccache --show-stats
 
       - name: Save ccache
-        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.ccache-restore.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ~/Library/Caches/ccache
