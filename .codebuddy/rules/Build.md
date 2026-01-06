@@ -8,9 +8,10 @@ alwaysApply: true
 修改代码后，使用以下命令验证编译。必须传递 `-DPAG_BUILD_TESTS=ON` 以启用所有模块触发编译。
 
 ```bash
-cmake -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target PAGFullTest -- -j 12
+cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
+cmake --build cmake-build-debug --target PAGFullTest
 ```
+
 
 ## 测试框架
 - 测试用例位于 `test/src/`，基于 Google Test 框架

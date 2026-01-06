@@ -1,6 +1,6 @@
 ---
 description: 当用户发送Github PR链接、要求审查代码、或需要提交代码、发起PR时
-alwaysApply: false
+alwaysApply: true
 ---
 
 ## 代码审查要点
