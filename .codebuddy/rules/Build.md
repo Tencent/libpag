@@ -1,12 +1,21 @@
 ---
-description: 当需要运行测试、编写测试用例、或涉及截图对比/更新基准时
-alwaysApply: false
+description: PAG 项目编译与测试相关配置
+alwaysApply: true
 ---
+
+## 编译验证
+
+修改代码后，使用以下命令验证编译。必须传递 `-DPAG_BUILD_TESTS=ON` 以启用所有模块触发编译。
+
+```bash
+cmake -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
+cmake --build cmake-build-debug --target PAGFullTest -- -j 12
+```
 
 ## 测试框架
 - 测试用例位于 `test/src/`，基于 Google Test 框架
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
-- 运行测试：构建并执行 `PAGFullTest`，编译命令见 Coding.md
+- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest`
 
 ## 截图测试
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `PAGSurfaceTest/Mask`

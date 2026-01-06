@@ -22,12 +22,3 @@ alwaysApply: true
 - 函数内代码不加行注释，除非只看代码无法理解设计意图
 - 未明确的规范，模仿项目已有风格
 
-## 编译验证
-
-修改代码后，使用以下命令验证编译。必须传递 `-DPAG_BUILD_TESTS=ON` 以启用所有模块触发编译。
-
-```bash
-cmake -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target PAGFullTest -- -j 12
-```
-
