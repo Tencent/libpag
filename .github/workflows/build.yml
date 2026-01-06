@@ -347,10 +347,9 @@ jobs:
       - name: Setup ccache
         run: |
           brew install ccache
-          ccache --max-size=2G
-          ccache --zero-stats
 
       - name: Restore ccache
+        id: ccache-restore
         uses: actions/cache/restore@v4
         with:
           path: ~/Library/Caches/ccache
@@ -358,16 +357,22 @@ jobs:
           restore-keys: |
             ccache-qt-${{ runner.os }}-
 
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=2G
+          ccache --set-config=base_dir=${{ github.workspace }}
+          ccache --set-config=hash_dir=false
+          ccache --zero-stats
+
       - name: Build QT
         run: |
           mkdir -p third_party/tgfx/out/cache
           export PATH="/opt/homebrew/opt/ccache/libexec:$PATH"
-          export CMAKE_C_COMPILER_LAUNCHER=ccache
-          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/viewer -a x64
+          node build_pag -i -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -o ./out/release/viewer -a x64
+          ccache --show-stats
 
       - name: Save ccache
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ (github.event_name == 'push') && (steps.ccache-restore.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: ~/Library/Caches/ccache
@@ -396,10 +401,10 @@ jobs:
 
       - name: Get CLI Tools Cache
         id: cli-tools-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v4
         with:
-          path: /opt/ohos-cmd-tools
-          key: ohos-cli-6.0.0.868-mac-arm64-x64
+          path: ~/ohos-cmd-tools
+          key: ohos-cli-6.0.0.868-mac-arm64-v2
           restore-keys: ohos-cli-
 
       - name: Install CLI Tools
@@ -408,18 +413,11 @@ jobs:
           TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/6.0.0.868/commandline-tools-mac-arm64-6.0.0.868.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
-          sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
-
-      - name: Save CLI Tools Cache
-        if: ${{ (github.event_name == 'push') && (steps.cli-tools-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: /opt/ohos-cmd-tools
-          key: ohos-cli-6.0.0.868-mac-arm64-x64
+          mv /tmp/command-line-tools ~/ohos-cmd-tools
 
       - name: Configure Environment
         run: |
-          CLI_DIR=/opt/ohos-cmd-tools
+          CLI_DIR=~/ohos-cmd-tools
           echo "$CLI_DIR/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
           echo "$CLI_DIR/ohpm/bin"                       >> $GITHUB_PATH
           echo "$CLI_DIR/hvigor/bin"                     >> $GITHUB_PATH
