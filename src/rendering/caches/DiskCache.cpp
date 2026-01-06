@@ -26,10 +26,6 @@
 
 namespace pag {
 
-// Static member definitions
-std::mutex DiskCache::customCacheDirMutex;
-std::string DiskCache::customCacheDir;
-
 class FileInfo {
  public:
   FileInfo(std::string cacheKey, uint32_t fileID, size_t fileSize = 0)
@@ -43,7 +39,7 @@ class FileInfo {
 };
 
 void PAGDiskCache::SetCacheDir(const std::string& dir) {
-  DiskCache::SetCacheDir(dir);
+  DiskCache::GetInstance()->setCacheDir(dir);
 }
 
 size_t PAGDiskCache::MaxDiskSize() {
@@ -58,17 +54,27 @@ void PAGDiskCache::RemoveAll() {
   DiskCache::GetInstance()->removeAll();
 }
 
-std::string DiskCache::GetCacheDir() {
-  std::lock_guard<std::mutex> autoLock(customCacheDirMutex);
+std::string DiskCache::getCacheDir() {
+  std::lock_guard<std::mutex> autoLock(locker);
   if (!customCacheDir.empty()) {
     return customCacheDir;
   }
   return Platform::Current()->getCacheDir();
 }
 
-void DiskCache::SetCacheDir(const std::string& dir) {
-  std::lock_guard<std::mutex> autoLock(customCacheDirMutex);
+void DiskCache::setCacheDir(const std::string& dir) {
+  std::lock_guard<std::mutex> autoLock(locker);
   customCacheDir = dir;
+  if (!customCacheDir.empty()) {
+    configPath = Directory::JoinPath(customCacheDir, "cache.cfg");
+    cacheFolder = Directory::JoinPath(customCacheDir, "files");
+  } else {
+    auto defaultDir = Platform::Current()->getCacheDir();
+    if (!defaultDir.empty()) {
+      configPath = Directory::JoinPath(defaultDir, "cache.cfg");
+      cacheFolder = Directory::JoinPath(defaultDir, "files");
+    }
+  }
 }
 
 DiskCache* DiskCache::GetInstance() {
@@ -91,7 +97,7 @@ bool DiskCache::WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> da
 }
 
 DiskCache::DiskCache() {
-  auto cacheDir = GetCacheDir();
+  auto cacheDir = getCacheDir();
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");

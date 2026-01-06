@@ -50,10 +50,8 @@ class DiskCache {
   static bool WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 
  private:
-  static std::mutex customCacheDirMutex;
-  static std::string customCacheDir;
-
   std::mutex locker = {};
+  std::string customCacheDir;
   std::string configPath;
   std::string cacheFolder;
   uint32_t fileIDCount = 1;
@@ -65,8 +63,9 @@ class DiskCache {
   std::unordered_map<uint32_t, std::weak_ptr<SequenceFile>> openedFiles = {};
 
   static DiskCache* GetInstance();
-  static std::string GetCacheDir();
-  static void SetCacheDir(const std::string& dir);
+
+  std::string getCacheDir();
+  void setCacheDir(const std::string& dir);
 
   DiskCache();
 
