@@ -348,9 +348,6 @@ jobs:
       - name: Setup ccache
         run: |
           brew install ccache
-          ccache --set-config=max_size=2G
-          ccache --set-config=base_dir=${{ github.workspace }}
-          ccache --set-config=hash_dir=false
 
       - name: Restore ccache
         uses: actions/cache/restore@v4
@@ -360,11 +357,18 @@ jobs:
           restore-keys: |
             ccache-qt-${{ runner.os }}-
 
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=2G
+          ccache --set-config=base_dir=${{ github.workspace }}
+          ccache --set-config=hash_dir=false
+          ccache --zero-stats
+          ccache --show-config
+
       - name: Build QT
         run: |
           mkdir -p third_party/tgfx/out/cache
           export PATH="/opt/homebrew/opt/ccache/libexec:$PATH"
-          ccache --zero-stats
           node build_pag -i -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -o ./out/release/viewer -a x64
           ccache --show-stats
 
