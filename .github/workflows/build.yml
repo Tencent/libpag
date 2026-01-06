@@ -363,7 +363,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           export PATH="/opt/homebrew/opt/ccache/libexec:$PATH"
-          node build_pag -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -o ./out/release/viewer -a x64
+          node build_pag -i -s ./viewer PAGViewer -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -o ./out/release/viewer -a x64
 
       - name: Save ccache
         if: ${{ github.event_name == 'push' }}
