@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "rendering/filters/RuntimeFilter.h"
+#include "HardwareBufferUtil.h"
 
 namespace pag {
 
-class AlphaEdgeDetectLayerEffect : public RuntimeFilter {
- public:
-  AlphaEdgeDetectLayerEffect() = default;
+tgfx::ColorType HardwareBufferFormatToColorType(tgfx::HardwareBufferFormat format) {
+  switch (format) {
+    case tgfx::HardwareBufferFormat::RGBA_8888:
+      return tgfx::ColorType::RGBA_8888;
+    case tgfx::HardwareBufferFormat::BGRA_8888:
+      return tgfx::ColorType::BGRA_8888;
+    case tgfx::HardwareBufferFormat::ALPHA_8:
+      return tgfx::ColorType::ALPHA_8;
+    default:
+      return tgfx::ColorType::Unknown;
+  }
+}
 
-  std::string onBuildFragmentShader() const override;
-
-  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
-
-  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
-                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
-                        const tgfx::Point& offset) const override;
-};
+tgfx::ImageInfo HardwareBufferInfoToImageInfo(const tgfx::HardwareBufferInfo& hwInfo) {
+  auto colorType = HardwareBufferFormatToColorType(hwInfo.format);
+  return tgfx::ImageInfo::Make(hwInfo.width, hwInfo.height, colorType,
+                               tgfx::AlphaType::Premultiplied, hwInfo.rowBytes);
+}
 
 }  // namespace pag

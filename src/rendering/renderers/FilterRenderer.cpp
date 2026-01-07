@@ -35,7 +35,7 @@
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 
 namespace pag {
 
@@ -352,7 +352,7 @@ tgfx::Matrix GetLayerMatrix(const FilterList* filterList, float contentScale) {
 
 static std::shared_ptr<tgfx::Picture> CreateSource(RenderCache* cache, const tgfx::Matrix& matrix,
                                                    std::shared_ptr<Graphic> content) {
-  tgfx::Recorder recorder;
+  tgfx::PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   auto contentCanvas = Canvas(canvas, cache);
   contentCanvas.concat(matrix);

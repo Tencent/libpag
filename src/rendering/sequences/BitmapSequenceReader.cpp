@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapSequenceReader.h"
+#include "rendering/utils/HardwareBufferUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -28,13 +29,21 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   // decoding will fail due to the memory sharing mechanism.
   if (tgfx::HardwareBufferAvailable() && sequence->composition->staticContent()) {
     hardWareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
-    info = tgfx::HardwareBufferGetInfo(hardWareBuffer);
+    if (hardWareBuffer != nullptr) {
+      auto hwInfo = tgfx::HardwareBufferGetInfo(hardWareBuffer);
+      if (hwInfo.width > 0 && hwInfo.height > 0) {
+        info = HardwareBufferInfoToImageInfo(hwInfo);
+      }
+    }
   }
-  if (hardWareBuffer == nullptr) {
+  if (hardWareBuffer == nullptr || info.isEmpty()) {
+    if (hardWareBuffer != nullptr) {
+      tgfx::HardwareBufferRelease(hardWareBuffer);
+      hardWareBuffer = nullptr;
+    }
     info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);
-    tgfx::Buffer buffer(info.byteSize());
-    buffer.clear();
-    pixels = buffer.release();
+    pixelBuffer.alloc(info.byteSize());
+    pixelBuffer.clear();
   }
 }
 
@@ -50,7 +59,7 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   if (lastDecodeFrame == targetFrame) {
     return imageBuffer;
   }
-  if (hardWareBuffer == nullptr && pixels == nullptr) {
+  if (hardWareBuffer == nullptr && pixelBuffer.isEmpty()) {
     return nullptr;
   }
   imageBuffer = nullptr;
@@ -63,7 +72,7 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
     }
     pixmap.reset(info, hardwarePixels);
   } else {
-    pixmap.reset(info, const_cast<void*>(pixels->data()));
+    pixmap.reset(info, pixelBuffer.data());
   }
   auto startFrame = findStartFrame(targetFrame);
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
@@ -98,6 +107,7 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
     tgfx::HardwareBufferUnlock(hardWareBuffer);
     imageBuffer = tgfx::ImageBuffer::MakeFrom(hardWareBuffer);
   } else {
+    auto pixels = pixelBuffer.copyRange(0, pixelBuffer.size());
     auto codec = tgfx::ImageCodec::MakeFrom(info, pixels);
     imageBuffer = codec ? codec->makeBuffer() : nullptr;
   }

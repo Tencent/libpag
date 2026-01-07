@@ -23,25 +23,20 @@
 
 namespace pag {
 
-class GlowMergeUniforms : public Uniforms {
- public:
-  GlowMergeUniforms(tgfx::Context* context, unsigned program);
-  int progressHandle = -1;
-};
-
 class GlowMergeRuntimeFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   GlowMergeRuntimeFilter(float progress, std::shared_ptr<tgfx::Image> blurImage);
 
  protected:
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  std::vector<tgfx::BindingEntry> textureSamplers() const override;
+
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
  private:
   float progress = 0.f;

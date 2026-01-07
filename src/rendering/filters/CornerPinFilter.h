@@ -25,8 +25,6 @@
 namespace pag {
 class CornerPinFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID;
-
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, const tgfx::Point& sourceScale,
                                             tgfx::Point* offset);
@@ -43,12 +41,10 @@ class CornerPinFilter : public RuntimeFilter {
 
   std::string onBuildFragmentShader() const override;
 
-  std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
-                                     const tgfx::BackendRenderTarget& target,
-                                     const tgfx::Point& offset) const override;
+  std::vector<tgfx::Attribute> vertexAttributes() const override;
 
-  void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
-                    const std::vector<float>& points) const override;
+  void collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+                       const tgfx::Point& offset, float* vertices) const override;
 
   int sampleCount() const override;
 

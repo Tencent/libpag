@@ -89,37 +89,36 @@ static void AdjustBottom(const Point& bulgeCenterValue, float verticalRadiusValu
 }
 
 static const char BULGE_VERTEX_SHADER[] = R"(
-        #version 100
-        attribute vec2 aPosition;
-        attribute vec2 aTextureCoord;
-        uniform vec2 uBulgeCenter;
-        varying vec2 vertexColor;
-        varying vec2 bulgeCenter;
+        in vec2 aPosition;
+        in vec2 aTextureCoord;
+        out vec2 vertexColor;
         void main() {
             gl_Position = vec4(aPosition.xy, 0, 1);
             vertexColor = aTextureCoord.xy;
-            bulgeCenter = uBulgeCenter.xy;
         }
     )";
 
 static const char BULGE_FRAGMENT_SHADER[] = R"(
-    #version 100
     precision highp float;
-    varying highp vec2 vertexColor;
-    varying highp vec2 bulgeCenter;
-    uniform sampler2D inputImageTexture;
+    in highp vec2 vertexColor;
+    uniform sampler2D sTexture;
 
-    uniform float uHorizontalRadius;
-    uniform float uVerticalRadius;
-    uniform float uBulgeHeight;
-    uniform bool uPinning;
+    layout(std140) uniform Args {
+        float uHorizontalRadius;
+        float uVerticalRadius;
+        vec2 uBulgeCenter;
+        float uBulgeHeight;
+        int uPinning;
+    };
+
+    out vec4 tgfx_FragColor;
 
     float PI = 3.1415926535;
     float edge = 0.005;
 
     void main() {
         vec2 target = vertexColor;
-        vec2 point = target - bulgeCenter;
+        vec2 point = target - uBulgeCenter;
 
         float distance = pow(point.x, 2.0) / pow(uHorizontalRadius, 2.0) + pow(point.y, 2.0) / pow(uVerticalRadius, 2.0);
 
@@ -130,29 +129,19 @@ static const char BULGE_FRAGMENT_SHADER[] = R"(
 
         // TODO: 在swiftshader上，此处使用mix来减少分支语句会引起画面异常，待排查
         if (distance <= 1.0) {
-            target = newPoint + bulgeCenter;
+            target = newPoint + uBulgeCenter;
         }
 
-        if(uPinning) {
+        if(uPinning != 0) {
             target.x = clamp(target.x, edge, 1.0 - edge);
             target.y = clamp(target.y, edge, 1.0 - edge);
         }
 
         vec2 edgeDetect = abs(step(vec2(1.0), target) - vec2(1.0)) * step(vec2(0.0), target);
 
-        gl_FragColor = texture2D(inputImageTexture, target) * edgeDetect.x * edgeDetect.y;
+        tgfx_FragColor = texture(sTexture, target) * edgeDetect.x * edgeDetect.y;
     }
     )";
-
-BulgeUniforms::BulgeUniforms(tgfx::Context* context, unsigned program)
-    : Uniforms(context, program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  horizontalRadiusHandle = gl->getUniformLocation(program, "uHorizontalRadius");
-  verticalRadiusHandle = gl->getUniformLocation(program, "uVerticalRadius");
-  bulgeCenterHandle = gl->getUniformLocation(program, "uBulgeCenter");
-  bulgeHeightHandle = gl->getUniformLocation(program, "uBulgeHeight");
-  pinningHandle = gl->getUniformLocation(program, "uPinning");
-}
 
 std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                                 Frame layerFrame, const tgfx::Rect& contentBounds,
@@ -186,40 +175,55 @@ std::string BulgeFilter::onBuildFragmentShader() const {
   return BULGE_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> BulgeFilter::onPrepareProgram(tgfx::Context* context,
-                                                        unsigned program) const {
-  return std::make_unique<BulgeUniforms>(context, program);
+std::vector<tgfx::BindingEntry> BulgeFilter::uniformBlocks() const {
+  return {{"Args", 0}};
 }
 
-void BulgeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                 const std::vector<tgfx::BackendTexture>&) const {
+void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                   const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                   const tgfx::Point&) const {
+  struct Uniforms {
+    float horizontalRadius = 0.0f;
+    float verticalRadius = 0.0f;
+    float bulgeCenterX = 0.0f;
+    float bulgeCenterY = 0.0f;
+    float bulgeHeight = 0.0f;
+    int pinning = 0;
+  };
 
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<BulgeUniforms*>(program->uniforms.get());
-  gl->uniform1f(uniform->horizontalRadiusHandle, horizontalRadius);
-  gl->uniform1f(uniform->verticalRadiusHandle, verticalRadius);
-  gl->uniform2f(uniform->bulgeCenterHandle, bulgeCenter.x, bulgeCenter.y);
-  gl->uniform1f(uniform->bulgeHeightHandle, bulgeHeight);
-  gl->uniform1i(uniform->pinningHandle, pinning);
-}
+  Uniforms uniforms = {};
+  uniforms.horizontalRadius = horizontalRadius;
+  uniforms.verticalRadius = verticalRadius;
+  uniforms.bulgeCenterX = bulgeCenter.x;
+  uniforms.bulgeCenterY = bulgeCenter.y;
+  uniforms.bulgeHeight = bulgeHeight;
+  uniforms.pinning = static_cast<int>(pinning);
 
-std::vector<float> BulgeFilter::computeVertices(const std::vector<tgfx::BackendTexture>& sources,
-                                                const tgfx::BackendRenderTarget& target,
-                                                const tgfx::Point& offset) const {
-  auto inputRect = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
-  auto outputRect = filterBounds(inputRect);
-  auto vertices = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
-  std::vector<float> result;
-  result.reserve(vertices.size() * 4);
-  for (size_t i = 0; i < vertices.size();) {
-    auto vertexPoint = ToGLVertexPoint(target, vertices[i++] + offset);
-    result.push_back(vertexPoint.x);
-    result.push_back(vertexPoint.y);
-    auto texturePoint = ToGLTexturePoint(&sources[0], vertices[i++]);
-    result.push_back(texturePoint.x);
-    result.push_back(texturePoint.y);
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(Uniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+    }
   }
-  return result;
+}
+
+void BulgeFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+                                  const tgfx::Point& offset, float* vertices) const {
+  auto inputRect = tgfx::Rect::MakeWH(source->width(), source->height());
+  auto outputRect = filterBounds(inputRect);
+  auto points = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
+  size_t index = 0;
+  for (size_t i = 0; i < points.size();) {
+    auto vertexPoint = ToVertexPoint(target, points[i++] + offset);
+    vertices[index++] = vertexPoint.x;
+    vertices[index++] = vertexPoint.y;
+    auto texturePoint = ToTexturePoint(source, points[i++]);
+    vertices[index++] = texturePoint.x;
+    vertices[index++] = texturePoint.y;
+  }
 }
 
 tgfx::Rect BulgeFilter::filterBounds(const tgfx::Rect& srcRect) const {

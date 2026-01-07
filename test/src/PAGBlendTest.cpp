@@ -17,8 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
+
+#ifdef __APPLE__
+#include <OpenGL/gl3.h>
+#else
+#include <GLES3/gl3.h>
+#endif
 
 namespace pag {
 using namespace tgfx;
@@ -87,8 +92,7 @@ PAG_TEST(PAGBlendTest, CopyDstTexture) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/CopyDstTexture"));
 
   context = device->lockContext();
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
+  glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 
@@ -121,9 +125,8 @@ PAG_TEST(PAGBlendTest, TextureBottomLeft) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/TextureBottomLeft"));
 
   context = device->lockContext();
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &replaceTextureInfo.id);
-  gl->deleteTextures(1, &textureInfo.id);
+  glDeleteTextures(1, &replaceTextureInfo.id);
+  glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 
@@ -162,9 +165,8 @@ PAG_TEST(PAGBlendTest, BothBottomLeft) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &replaceTextureInfo.id);
-  gl->deleteTextures(1, &textureInfo.id);
+  glDeleteTextures(1, &replaceTextureInfo.id);
+  glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 }  // namespace pag
