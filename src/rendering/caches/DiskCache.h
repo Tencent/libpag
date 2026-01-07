@@ -54,6 +54,7 @@ class DiskCache {
   std::string customCacheDir;
   std::string configPath;
   std::string cacheFolder;
+  bool initialized = false;
   uint32_t fileIDCount = 1;
   size_t totalDiskSize = 0;
   size_t maxDiskSize = 1073741824;  // 1 GB
@@ -69,6 +70,7 @@ class DiskCache {
 
   DiskCache();
 
+  void checkInitialized();
   size_t getMaxDiskSize();
   void setMaxDiskSize(size_t size);
   void removeAll();

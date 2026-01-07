@@ -55,7 +55,6 @@ void PAGDiskCache::RemoveAll() {
 }
 
 std::string DiskCache::getCacheDir() {
-  std::lock_guard<std::mutex> autoLock(locker);
   if (!customCacheDir.empty()) {
     return customCacheDir;
   }
@@ -65,15 +64,11 @@ std::string DiskCache::getCacheDir() {
 void DiskCache::setCacheDir(const std::string& dir) {
   std::lock_guard<std::mutex> autoLock(locker);
   customCacheDir = dir;
-  if (!customCacheDir.empty()) {
-    configPath = Directory::JoinPath(customCacheDir, "cache.cfg");
-    cacheFolder = Directory::JoinPath(customCacheDir, "files");
-  } else {
-    auto defaultDir = Platform::Current()->getCacheDir();
-    if (!defaultDir.empty()) {
-      configPath = Directory::JoinPath(defaultDir, "cache.cfg");
-      cacheFolder = Directory::JoinPath(defaultDir, "files");
-    }
+  // Update cache paths
+  auto cacheDir = dir.empty() ? Platform::Current()->getCacheDir() : dir;
+  if (!cacheDir.empty()) {
+    configPath = Directory::JoinPath(cacheDir, "cache.cfg");
+    cacheFolder = Directory::JoinPath(cacheDir, "files");
   }
 }
 
@@ -97,6 +92,13 @@ bool DiskCache::WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> da
 }
 
 DiskCache::DiskCache() {
+}
+
+void DiskCache::checkInitialized() {
+  if (initialized) {
+    return;
+  }
+  initialized = true;
   auto cacheDir = getCacheDir();
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
@@ -115,6 +117,7 @@ size_t DiskCache::getMaxDiskSize() {
 
 void DiskCache::setMaxDiskSize(size_t size) {
   std::lock_guard<std::mutex> autoLock(locker);
+  checkInitialized();
   if (maxDiskSize == size) {
     return;
   }
@@ -126,6 +129,7 @@ void DiskCache::setMaxDiskSize(size_t size) {
 
 void DiskCache::removeAll() {
   std::lock_guard<std::mutex> autoLock(locker);
+  checkInitialized();
   if (cacheFolder.empty()) {
     return;
   }
@@ -148,6 +152,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
     const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
     const std::vector<TimeRange>& staticTimeRanges) {
   std::lock_guard<std::mutex> autoLock(locker);
+  checkInitialized();
   if (cacheFolder.empty()) {
     return nullptr;
   }
@@ -189,6 +194,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
 
 std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
   std::lock_guard<std::mutex> autoLock(locker);
+  checkInitialized();
   if (cacheFolder.empty() || key.empty()) {
     return nullptr;
   }
@@ -208,6 +214,7 @@ std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
 
 bool DiskCache::writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data) {
   std::lock_guard<std::mutex> autoLock(locker);
+  checkInitialized();
   if (cacheFolder.empty() || key.empty() || data == nullptr) {
     return false;
   }
