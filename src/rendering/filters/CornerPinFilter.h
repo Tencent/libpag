@@ -43,8 +43,8 @@ class CornerPinFilter : public RuntimeFilter {
 
   std::vector<tgfx::Attribute> vertexAttributes() const override;
 
-  void computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
-                       const tgfx::Point& offset, float* vertices) const override;
+  std::vector<float> computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+                                     const tgfx::Point& offset) const override;
 
   int sampleCount() const override;
 

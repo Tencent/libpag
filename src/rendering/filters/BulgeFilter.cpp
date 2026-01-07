@@ -210,20 +210,23 @@ void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
   }
 }
 
-void BulgeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
-                                  const tgfx::Point& offset, float* vertices) const {
+std::vector<float> BulgeFilter::computeVertices(const tgfx::Texture* source,
+                                                const tgfx::Texture* target,
+                                                const tgfx::Point& offset) const {
   auto inputRect = tgfx::Rect::MakeWH(source->width(), source->height());
   auto outputRect = filterBounds(inputRect);
   auto points = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
-  size_t index = 0;
+  std::vector<float> vertices = {};
+  vertices.reserve(points.size() * 2);
   for (size_t i = 0; i < points.size();) {
     auto vertexPoint = ToVertexPoint(target, points[i++] + offset);
-    vertices[index++] = vertexPoint.x;
-    vertices[index++] = vertexPoint.y;
+    vertices.push_back(vertexPoint.x);
+    vertices.push_back(vertexPoint.y);
     auto texturePoint = ToTexturePoint(source, points[i++]);
-    vertices[index++] = texturePoint.x;
-    vertices[index++] = texturePoint.y;
+    vertices.push_back(texturePoint.x);
+    vertices.push_back(texturePoint.y);
   }
+  return vertices;
 }
 
 tgfx::Rect BulgeFilter::filterBounds(const tgfx::Rect& srcRect) const {
