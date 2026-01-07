@@ -198,7 +198,7 @@ void MotionBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU*
   }
 }
 
-void MotionBlurFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+void MotionBlurFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                        const tgfx::Point& offset, float* vertices) const {
   auto inputRect = tgfx::Rect::MakeWH(source->width(), source->height());
   auto outputRect = filterBounds(inputRect);

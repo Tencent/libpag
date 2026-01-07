@@ -114,7 +114,7 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::createPipeline(tgfx::GPU* g
   return gpu->createRenderPipeline(descriptor);
 }
 
-void RuntimeFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+void RuntimeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                     const tgfx::Point& offset, float* vertices) const {
   auto inputBounds = tgfx::Rect::MakeWH(source->width(), source->height());
   auto targetBounds = filterBounds(inputBounds);
@@ -212,7 +212,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
     renderPass->end();
     return false;
   }
-  collectVertices(inputTextures[0].get(), outputTexture.get(), offset, vertices);
+  computeVertices(inputTextures[0].get(), outputTexture.get(), offset, vertices);
   vertexBuffer->unmap();
 
   renderPass->setVertexBuffer(vertexBuffer);
