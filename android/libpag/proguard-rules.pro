@@ -61,7 +61,7 @@
 }
 
 -keepclasseswithmembers class org.libpag.PAGDiskCache {
-    private static java.lang.String GetDefaultCacheDir();
+    private static java.lang.String GetCacheDir();
 }
 
 -keepclasseswithmembers class org.libpag.VideoSurface {

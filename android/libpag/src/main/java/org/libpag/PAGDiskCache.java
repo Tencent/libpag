@@ -63,7 +63,7 @@ public class PAGDiskCache {
 
     static native boolean WriteFile(String key, byte[] bytes);
 
-    private static String GetDefaultCacheDir() {
+    private static String GetCacheDir() {
         Context context = LibraryLoadUtils.getAppContext();
         if (context == null) {
             return "";
