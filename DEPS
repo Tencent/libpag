@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "3d2f8e7a2a2e68606e17aa6337325173e1759bcd",
+        "commit": "48b78e36fe91674d7e21ad6385d0285a53c30d96",
         "dir": "third_party/tgfx"
       },
       {

@@ -24,7 +24,7 @@ namespace pag {
 std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::MakeFrom(
     HardwareBufferRef hardwareBuffer, std::shared_ptr<tgfx::Device> device) {
   auto info = tgfx::HardwareBufferGetInfo(hardwareBuffer);
-  if (info.isEmpty()) {
+  if (info.width <= 0 || info.height <= 0) {
     return nullptr;
   }
   if (device == nullptr) {
@@ -34,7 +34,7 @@ std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::MakeFrom(
     return nullptr;
   }
   return std::shared_ptr<HardwareBufferDrawable>(
-      new HardwareBufferDrawable(info.width(), info.height(), hardwareBuffer, std::move(device)));
+      new HardwareBufferDrawable(info.width, info.height, hardwareBuffer, std::move(device)));
 }
 
 HardwareBufferDrawable::HardwareBufferDrawable(int width, int height,

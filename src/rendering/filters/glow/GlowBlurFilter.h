@@ -22,17 +22,8 @@
 #include "rendering/filters/utils/BlurTypes.h"
 
 namespace pag {
-class GlowBlurUniforms : public Uniforms {
- public:
-  explicit GlowBlurUniforms(tgfx::Context* context, unsigned program);
-
-  int textureOffsetHHandle = -1;
-  int textureOffsetVHandle = -1;
-};
-
 class GlowBlurRuntimeFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset, float resizeRatio);
 
  protected:
@@ -40,11 +31,11 @@ class GlowBlurRuntimeFilter : public RuntimeFilter {
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>&) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 

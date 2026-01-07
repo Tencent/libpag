@@ -23,24 +23,8 @@
 
 namespace pag {
 
-class MosaicUniforms : public Uniforms {
- public:
-  MosaicUniforms(tgfx::Context* context, unsigned program) : Uniforms(context, program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
-    verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
-    sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
-  }
-
-  int horizontalBlocksHandle = -1;
-  int verticalBlocksHandle = -1;
-  int sharpColorsHandle = -1;
-};
-
 class MosaicFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
-
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Frame layerFrame, tgfx::Point* offset);
 
@@ -51,11 +35,11 @@ class MosaicFilter : public RuntimeFilter {
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>&) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
  private:
   float horizontalBlocks = 1;

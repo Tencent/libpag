@@ -39,28 +39,6 @@ struct SolidStrokeOption {
   }
 };
 
-class SolidStrokeUniforms : public Uniforms {
- public:
-  SolidStrokeUniforms(tgfx::Context* context, unsigned program) : Uniforms(context, program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    originalTextureHandle = gl->getUniformLocation(program, "uOriginalTextureInput");
-    isUseOriginalTextureHandle = gl->getUniformLocation(program, "uIsUseOriginalTexture");
-    colorHandle = gl->getUniformLocation(program, "uColor");
-    sizeHandle = gl->getUniformLocation(program, "uSize");
-    isOutsideHandle = gl->getUniformLocation(program, "uIsOutside");
-    isCenterHandle = gl->getUniformLocation(program, "uIsCenter");
-    isInsideHandle = gl->getUniformLocation(program, "uIsInside");
-    CheckGLError(context);
-  }
-  int colorHandle = -1;
-  int sizeHandle = -1;
-  int originalTextureHandle = -1;
-  int isUseOriginalTextureHandle = -1;
-  int isOutsideHandle = -1;
-  int isCenterHandle = -1;
-  int isInsideHandle = -1;
-};
-
 class SolidStrokeFilter : public RuntimeFilter {
  public:
   static std::shared_ptr<tgfx::ImageFilter> CreateFilter(
@@ -74,15 +52,16 @@ class SolidStrokeFilter : public RuntimeFilter {
       : RuntimeFilter({std::move(originalImage)}), option(option), hasOriginalImage(true) {
   }
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
-                                     const tgfx::BackendRenderTarget& target,
-                                     const tgfx::Point& offset) const override;
+  std::vector<tgfx::BindingEntry> textureSamplers() const override;
+
+  void collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+                       const tgfx::Point& offset, float* vertices) const override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 
@@ -93,7 +72,6 @@ class SolidStrokeFilter : public RuntimeFilter {
 
 class SolidStrokeNormalFilter : public SolidStrokeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
   static std::shared_ptr<SolidStrokeNormalFilter> Make(SolidStrokeOption option,
                                                        std::shared_ptr<tgfx::Image> originalImage);
   explicit SolidStrokeNormalFilter(SolidStrokeOption option) : SolidStrokeFilter(option) {
@@ -107,8 +85,6 @@ class SolidStrokeNormalFilter : public SolidStrokeFilter {
 
 class SolidStrokeThickFilter : public SolidStrokeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
-
   static std::shared_ptr<SolidStrokeThickFilter> Make(SolidStrokeOption option,
                                                       std::shared_ptr<tgfx::Image> originalImage);
 

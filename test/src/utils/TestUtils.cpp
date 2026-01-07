@@ -22,9 +22,14 @@
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
+
+#ifdef __APPLE__
+#include <OpenGL/gl3.h>
+#else
+#include <GLES3/gl3.h>
+#endif
 
 namespace pag {
 using namespace tgfx;
@@ -86,21 +91,20 @@ std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerTy
   return nullptr;
 }
 
-bool CreateGLTexture(Context* context, int width, int height, tgfx::GLTextureInfo* texture) {
+bool CreateGLTexture(Context*, int width, int height, tgfx::GLTextureInfo* texture) {
   texture->target = GL_TEXTURE_2D;
   texture->format = GL_RGBA8;
-  auto gl = GLFunctions::Get(context);
-  gl->genTextures(1, &texture->id);
+  glGenTextures(1, &texture->id);
   if (texture->id <= 0) {
     return false;
   }
-  gl->bindTexture(texture->target, texture->id);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  gl->bindTexture(texture->target, 0);
+  glBindTexture(texture->target, texture->id);
+  glTexParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  glBindTexture(texture->target, 0);
   return true;
 }
 

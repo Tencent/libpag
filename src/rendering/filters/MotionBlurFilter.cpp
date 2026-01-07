@@ -24,14 +24,17 @@ namespace pag {
 #define MOTION_BLUR_SCALE_FACTOR 1.2f
 
 static const char MOTIONBLUR_VERTEX_SHADER[] = R"(
-        #version 100
-        attribute vec2 aPosition;
-        attribute vec2 aTextureCoord;
-		    uniform mat3 uPrevTransform;
-        uniform mat3 uTransform;
-        varying vec2 vertexColor;
-        varying vec2 vCurrPosition;
-        varying vec2 vPrevPosition;
+        in vec2 aPosition;
+        in vec2 aTextureCoord;
+
+        layout(std140) uniform VertexArgs {
+            mat3 uPrevTransform;
+            mat3 uTransform;
+        };
+
+        out vec2 vertexColor;
+        out vec2 vCurrPosition;
+        out vec2 vPrevPosition;
         void main() {
             gl_Position = vec4(aPosition.xy, 0, 1);
             vertexColor = aTextureCoord.xy;
@@ -41,16 +44,20 @@ static const char MOTIONBLUR_VERTEX_SHADER[] = R"(
     )";
 
 static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
-        #version 100
         precision highp float;
 
-        varying vec2 vCurrPosition;
-        varying vec2 vPrevPosition;
-        varying vec2 vertexColor;
+        in vec2 vCurrPosition;
+        in vec2 vPrevPosition;
+        in vec2 vertexColor;
 
-        uniform sampler2D uTextureInput;
-        uniform float uVelCenter;
-        uniform float maxDistance;
+        uniform sampler2D sTexture;
+
+        layout(std140) uniform FragmentArgs {
+            float uVelCenter;
+            float maxDistance;
+        };
+
+        out vec4 tgfx_FragColor;
         const int kSamplesPerFrame = 37;
         void main() {
             vec2 velocity = vCurrPosition.xy - vPrevPosition.xy;
@@ -62,7 +69,7 @@ static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
             float edgeDetectValue = 0.0;
             float reachedEdgeCount = 0.0;
 
-            vec4 result = texture2D(uTextureInput, vertexColor);
+            vec4 result = texture(sTexture, vertexColor);
             for (int i = 1; i < kSamplesPerFrame; ++i) {
                 target = vertexColor + velocity * (float(i) / float(kSamplesPerFrame - 1) - uVelCenter);
 
@@ -71,9 +78,9 @@ static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
 
                 reachedEdgeCount += (1.0 - edgeDetectValue);
 
-                result += texture2D(uTextureInput, target) * edgeDetectValue;
+                result += texture(sTexture, target) * edgeDetectValue;
             }
-            gl_FragColor = (reachedEdgeCount < float(kSamplesPerFrame) - 1.0) ? result / float(kSamplesPerFrame) : vec4(0.0);
+            tgfx_FragColor = (reachedEdgeCount < float(kSamplesPerFrame) - 1.0) ? result / float(kSamplesPerFrame) : vec4(0.0);
         }
     )";
 
@@ -112,9 +119,8 @@ std::shared_ptr<tgfx::Image> MotionBlurFilter::Apply(std::shared_ptr<tgfx::Image
   auto width = static_cast<int>(contentBounds.width());
   auto height = static_cast<int>(contentBounds.height());
   auto previousGLMatrix =
-      ToGLTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
-  auto currentGLMatrix =
-      ToGLTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
+      ToTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
+  auto currentGLMatrix = ToTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
   auto filter = std::make_shared<MotionBlurFilter>(previousGLMatrix, currentGLMatrix);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
@@ -127,39 +133,85 @@ std::string MotionBlurFilter::onBuildFragmentShader() const {
   return MOTIONBLUR_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> MotionBlurFilter::onPrepareProgram(tgfx::Context* context,
-                                                             unsigned program) const {
-  return std::make_unique<MotionBlurUniforms>(context, program);
+std::vector<tgfx::Attribute> MotionBlurFilter::vertexAttributes() const {
+  return {{"aPosition", tgfx::VertexFormat::Float2}, {"aTextureCoord", tgfx::VertexFormat::Float2}};
 }
 
-void MotionBlurFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                      const std::vector<tgfx::BackendTexture>&) const {
+std::vector<tgfx::BindingEntry> MotionBlurFilter::uniformBlocks() const {
+  return {{"VertexArgs", 0}, {"FragmentArgs", 1}};
+}
+
+void MotionBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                        const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                        const tgfx::Point&) const {
   auto scaling = _previousMatrix[0] != _currentMatrix[0] || _previousMatrix[4] != _currentMatrix[4];
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<MotionBlurUniforms*>(program->uniforms.get());
-  gl->uniformMatrix3fv(uniform->prevTransformHandle, 1, GL_FALSE, _previousMatrix.data());
-  gl->uniformMatrix3fv(uniform->transformHandle, 1, GL_FALSE, _currentMatrix.data());
-  gl->uniform1f(uniform->velCenterHandle, scaling ? 0.0f : 0.5f);
-  gl->uniform1f(uniform->maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
+
+  // Vertex uniform buffer for matrices
+  // mat3 in std140 is stored as 3 vec4s (each column padded to vec4)
+  struct VertexUniforms {
+    float prevTransform[12] = {};  // mat3 padded to 3 vec4s
+    float transform[12] = {};      // mat3 padded to 3 vec4s
+  };
+
+  VertexUniforms vertexUniforms = {};
+  // Copy mat3 with padding (each column padded to vec4)
+  for (int i = 0; i < 3; i++) {
+    vertexUniforms.prevTransform[i * 4 + 0] = _previousMatrix[i * 3 + 0];
+    vertexUniforms.prevTransform[i * 4 + 1] = _previousMatrix[i * 3 + 1];
+    vertexUniforms.prevTransform[i * 4 + 2] = _previousMatrix[i * 3 + 2];
+    vertexUniforms.prevTransform[i * 4 + 3] = 0.0f;
+
+    vertexUniforms.transform[i * 4 + 0] = _currentMatrix[i * 3 + 0];
+    vertexUniforms.transform[i * 4 + 1] = _currentMatrix[i * 3 + 1];
+    vertexUniforms.transform[i * 4 + 2] = _currentMatrix[i * 3 + 2];
+    vertexUniforms.transform[i * 4 + 3] = 0.0f;
+  }
+
+  auto vertexBuffer = gpu->createBuffer(sizeof(VertexUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (vertexBuffer != nullptr) {
+    auto* data = vertexBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &vertexUniforms, sizeof(VertexUniforms));
+      vertexBuffer->unmap();
+      renderPass->setUniformBuffer(0, vertexBuffer, 0, sizeof(VertexUniforms));
+    }
+  }
+
+  // Fragment uniform buffer
+  struct FragmentUniforms {
+    float velCenter = 0.0f;
+    float maxDistance = 0.0f;
+  };
+
+  FragmentUniforms fragmentUniforms = {};
+  fragmentUniforms.velCenter = scaling ? 0.0f : 0.5f;
+  fragmentUniforms.maxDistance = (MOTION_BLUR_SCALE_FACTOR - 1.0f) * 0.5f;
+
+  auto fragmentBuffer = gpu->createBuffer(sizeof(FragmentUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (fragmentBuffer != nullptr) {
+    auto* data = fragmentBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &fragmentUniforms, sizeof(FragmentUniforms));
+      fragmentBuffer->unmap();
+      renderPass->setUniformBuffer(1, fragmentBuffer, 0, sizeof(FragmentUniforms));
+    }
+  }
 }
 
-std::vector<float> MotionBlurFilter::computeVertices(
-    const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
-    const tgfx::Point& offset) const {
-  auto inputRect = tgfx::Rect::MakeWH(sources[0].width(), sources[0].height());
+void MotionBlurFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+                                       const tgfx::Point& offset, float* vertices) const {
+  auto inputRect = tgfx::Rect::MakeWH(source->width(), source->height());
   auto outputRect = filterBounds(inputRect);
-  auto vertices = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
-  std::vector<float> result;
-  result.reserve(vertices.size() * 4);
-  for (size_t i = 0; i < vertices.size();) {
-    auto vertexPoint = ToGLVertexPoint(target, vertices[i++] + offset);
-    result.push_back(vertexPoint.x);
-    result.push_back(vertexPoint.y);
-    auto texturePoint = ToGLTexturePoint(&sources[0], vertices[i++]);
-    result.push_back(texturePoint.x);
-    result.push_back(texturePoint.y);
+  auto points = ComputeVerticesForMotionBlurAndBulge(inputRect, outputRect);
+  size_t index = 0;
+  for (size_t i = 0; i < points.size();) {
+    auto vertexPoint = ToVertexPoint(target, points[i++] + offset);
+    vertices[index++] = vertexPoint.x;
+    vertices[index++] = vertexPoint.y;
+    auto texturePoint = ToTexturePoint(source, points[i++]);
+    vertices[index++] = texturePoint.x;
+    vertices[index++] = texturePoint.y;
   }
-  return result;
 }
 
 tgfx::Rect MotionBlurFilter::filterBounds(const tgfx::Rect& srcRect) const {

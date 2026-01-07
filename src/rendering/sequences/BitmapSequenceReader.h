@@ -22,6 +22,7 @@
 #include "pag/file.h"
 #include "rendering/Performance.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
 
 namespace pag {
 class BitmapSequenceReader : public SequenceReader {
@@ -52,7 +53,7 @@ class BitmapSequenceReader : public SequenceReader {
   Frame lastDecodeFrame = -1;
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
   tgfx::ImageInfo info = {};
-  std::shared_ptr<tgfx::Data> pixels = nullptr;
+  tgfx::Buffer pixelBuffer = {};
   HardwareBufferRef hardWareBuffer = nullptr;
 };
 }  // namespace pag
