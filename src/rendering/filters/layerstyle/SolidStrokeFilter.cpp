@@ -228,7 +228,7 @@ void SolidStrokeFilter::onUpdateUniforms(
   }
 }
 
-void SolidStrokeFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+void SolidStrokeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                         const tgfx::Point&, float* vertices) const {
   auto outputBounds = tgfx::Rect::MakeWH(target->width(), target->height());
   tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},

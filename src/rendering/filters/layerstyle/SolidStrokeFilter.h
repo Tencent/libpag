@@ -60,7 +60,7 @@ class SolidStrokeFilter : public RuntimeFilter {
 
   std::vector<tgfx::BindingEntry> textureSamplers() const override;
 
-  void collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+  void computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                        const tgfx::Point& offset, float* vertices) const override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;

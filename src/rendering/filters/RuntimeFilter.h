@@ -63,7 +63,7 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
     return {{"sTexture", 0}};
   }
 
-  virtual void collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+  virtual void computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                const tgfx::Point& offset, float* vertices) const;
 
   virtual size_t vertexCount() const {

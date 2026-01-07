@@ -50,7 +50,7 @@ class MotionBlurFilter : public RuntimeFilter {
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+  void computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                        const tgfx::Point& offset, float* vertices) const override;
 
   void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

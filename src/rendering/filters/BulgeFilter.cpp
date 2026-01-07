@@ -210,7 +210,7 @@ void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
   }
 }
 
-void BulgeFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+void BulgeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                   const tgfx::Point& offset, float* vertices) const {
   auto inputRect = tgfx::Rect::MakeWH(source->width(), source->height());
   auto outputRect = filterBounds(inputRect);

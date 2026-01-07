@@ -37,7 +37,7 @@ class BulgeFilter : public RuntimeFilter {
 
   std::string onBuildFragmentShader() const override;
 
-  void collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+  void computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                        const tgfx::Point& offset, float* vertices) const override;
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;

@@ -132,7 +132,7 @@ void CornerPinFilter::calculateVertexQs() {
   }
 }
 
-void CornerPinFilter::collectVertices(const tgfx::Texture* source, const tgfx::Texture* target,
+void CornerPinFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                       const tgfx::Point& offset, float* vertices) const {
   tgfx::Point texturePoints[4] = {
       {0.0f, static_cast<float>(source->height())},
