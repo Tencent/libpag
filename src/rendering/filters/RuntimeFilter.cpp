@@ -114,8 +114,9 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::createPipeline(tgfx::GPU* g
   return gpu->createRenderPipeline(descriptor);
 }
 
-void RuntimeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
-                                    const tgfx::Point& offset, float* vertices) const {
+std::vector<float> RuntimeFilter::computeVertices(const tgfx::Texture* source,
+                                                  const tgfx::Texture* target,
+                                                  const tgfx::Point& offset) const {
   auto inputBounds = tgfx::Rect::MakeWH(source->width(), source->height());
   auto targetBounds = filterBounds(inputBounds);
   tgfx::Point contentPoint[4] = {{targetBounds.left, targetBounds.bottom},
@@ -127,15 +128,17 @@ void RuntimeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Tex
                                   {inputBounds.left, inputBounds.top},
                                   {inputBounds.right, inputBounds.top}};
 
-  size_t index = 0;
+  std::vector<float> vertices = {};
+  vertices.reserve(16);
   for (size_t i = 0; i < 4; i++) {
     auto vertexPoint = ToVertexPoint(target, contentPoint[i] + offset);
-    vertices[index++] = vertexPoint.x;
-    vertices[index++] = vertexPoint.y;
+    vertices.push_back(vertexPoint.x);
+    vertices.push_back(vertexPoint.y);
     auto texturePoint = ToTexturePoint(source, texturePoints[i]);
-    vertices[index++] = texturePoint.x;
-    vertices[index++] = texturePoint.y;
+    vertices.push_back(texturePoint.x);
+    vertices.push_back(texturePoint.y);
   }
+  return vertices;
 }
 
 void RuntimeFilter::onUpdateUniforms(tgfx::RenderPass*, tgfx::GPU*,
@@ -192,27 +195,22 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
 
   renderPass->setPipeline(pipeline);
 
-  auto attributes = vertexAttributes();
-  size_t vertexStride = 0;
-  for (const auto& attr : attributes) {
-    vertexStride += attr.size();
-  }
-  auto numVertices = vertexCount();
-  auto vertexBufferSize = vertexStride * numVertices;
-  auto vertexBuffer = gpu->createBuffer(vertexBufferSize, tgfx::GPUBufferUsage::VERTEX);
+  auto vertices = computeVertices(inputTextures[0].get(), outputTexture.get(), offset);
+  auto vertexBuffer =
+      gpu->createBuffer(vertices.size() * sizeof(float), tgfx::GPUBufferUsage::VERTEX);
   if (vertexBuffer == nullptr) {
     LOGE("RuntimeFilter::onDraw() failed to create vertex buffer");
     renderPass->end();
     return false;
   }
 
-  auto vertices = static_cast<float*>(vertexBuffer->map());
-  if (vertices == nullptr) {
+  auto data = vertexBuffer->map();
+  if (data == nullptr) {
     LOGE("RuntimeFilter::onDraw() failed to map vertex buffer");
     renderPass->end();
     return false;
   }
-  computeVertices(inputTextures[0].get(), outputTexture.get(), offset, vertices);
+  memcpy(data, vertices.data(), vertices.size() * sizeof(float));
   vertexBuffer->unmap();
 
   renderPass->setVertexBuffer(vertexBuffer);
@@ -229,7 +227,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
 
   onUpdateUniforms(renderPass.get(), gpu, inputTextures, offset);
 
-  renderPass->draw(tgfx::PrimitiveType::TriangleStrip, 0, numVertices);
+  renderPass->draw(tgfx::PrimitiveType::TriangleStrip, 0, vertexCount());
   renderPass->end();
   return true;
 }

@@ -228,8 +228,9 @@ void SolidStrokeFilter::onUpdateUniforms(
   }
 }
 
-void SolidStrokeFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
-                                        const tgfx::Point&, float* vertices) const {
+std::vector<float> SolidStrokeFilter::computeVertices(const tgfx::Texture* source,
+                                                      const tgfx::Texture* target,
+                                                      const tgfx::Point&) const {
   auto outputBounds = tgfx::Rect::MakeWH(target->width(), target->height());
   tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
                                  {outputBounds.right, outputBounds.bottom},
@@ -245,15 +246,17 @@ void SolidStrokeFilter::computeVertices(const tgfx::Texture* source, const tgfx:
       {deltaX, deltaY},
       {(outputBounds.width() + deltaX), deltaY}};
 
-  size_t index = 0;
+  std::vector<float> vertices = {};
+  vertices.reserve(16);
   for (size_t i = 0; i < 4; i++) {
     auto vertexPoint = ToVertexPoint(target, contentPoint[i]);
-    vertices[index++] = vertexPoint.x;
-    vertices[index++] = vertexPoint.y;
+    vertices.push_back(vertexPoint.x);
+    vertices.push_back(vertexPoint.y);
     auto texturePoint = ToTexturePoint(source, texturePoints[i]);
-    vertices[index++] = texturePoint.x;
-    vertices[index++] = texturePoint.y;
+    vertices.push_back(texturePoint.x);
+    vertices.push_back(texturePoint.y);
   }
+  return vertices;
 }
 
 tgfx::Rect SolidStrokeFilter::filterBounds(const tgfx::Rect& srcRect) const {

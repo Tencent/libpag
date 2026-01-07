@@ -132,24 +132,27 @@ void CornerPinFilter::calculateVertexQs() {
   }
 }
 
-void CornerPinFilter::computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
-                                      const tgfx::Point& offset, float* vertices) const {
+std::vector<float> CornerPinFilter::computeVertices(const tgfx::Texture* source,
+                                                    const tgfx::Texture* target,
+                                                    const tgfx::Point& offset) const {
   tgfx::Point texturePoints[4] = {
       {0.0f, static_cast<float>(source->height())},
       {static_cast<float>(source->width()), static_cast<float>(source->height())},
       {0.0f, 0.0f},
       {static_cast<float>(source->width()), 0.0f}};
 
-  size_t index = 0;
+  std::vector<float> vertices = {};
+  vertices.reserve(20);
   for (size_t i = 0; i < 4; i++) {
     auto vertexPoint = ToVertexPoint(target, cornerPoints[i] + offset);
-    vertices[index++] = vertexPoint.x;
-    vertices[index++] = vertexPoint.y;
+    vertices.push_back(vertexPoint.x);
+    vertices.push_back(vertexPoint.y);
     auto texturePoint = ToTexturePoint(source, texturePoints[i]);
-    vertices[index++] = texturePoint.x * vertexQs[i];
-    vertices[index++] = texturePoint.y * vertexQs[i];
-    vertices[index++] = vertexQs[i];
+    vertices.push_back(texturePoint.x * vertexQs[i]);
+    vertices.push_back(texturePoint.y * vertexQs[i]);
+    vertices.push_back(vertexQs[i]);
   }
+  return vertices;
 }
 
 int CornerPinFilter::sampleCount() const {
