@@ -23,8 +23,6 @@
 
 namespace pag {
 
-tgfx::ColorType HardwareBufferFormatToColorType(tgfx::HardwareBufferFormat format);
-
 tgfx::ImageInfo HardwareBufferInfoToImageInfo(const tgfx::HardwareBufferInfo& hwInfo);
 
 }  // namespace pag

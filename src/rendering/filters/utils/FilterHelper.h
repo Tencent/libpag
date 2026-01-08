@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "tgfx/gpu/Texture.h"
