@@ -268,7 +268,6 @@ install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/x64" ${x8
 install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${arm64PluginExePath}
 
 cp -fr ${x86_64PluginPath} ${PluginPath}
-cp "${SourceDir}/package/templates/PAGExporter.rsrc" "${PluginPath}/Contents/Resources/"
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
 
 # 3.5.2 Obtain the dependencies of PAGExporter
