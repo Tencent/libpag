@@ -98,20 +98,7 @@ $WindowsSdkDir = [System.IO.Path]::Combine(${env:ProgramFiles(x86)}, "Windows Ki
 $LatestSdkVersion = (Get-ChildItem (Join-Path $WindowsSdkDir "Lib") | Sort-Object Name -Descending | Select-Object -First 1).Name
 $env:LIB = "${WindowsSdkDir}\Lib\${LatestSdkVersion}\um\x64;${WindowsSdkDir}\Lib\${LatestSdkVersion}\ucrt\x64;" + $env:LIB
 
-# 2.2 Compile H264EncoderTools
-Print-Text "[ Compile H264EncoderTools ]"
-$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
-        Join-Path -ChildPath "H264EncoderTools"
-$EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
-$EncoderToolsVcxprojPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.vcxproj"
-(Get-Content "$EncoderToolsVcxprojPath" -Raw) -replace "<PlatformToolset>v142</PlatformToolset>", "<PlatformToolset>$LatestMSVCToolSet</PlatformToolset>" | Set-Content "$EncoderToolsVcxprojPath"
-& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
-if (-not $?) {
-    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
-    exit 1
-}
-
-# 2.3 Compile PAGExporter
+# 2.2 Compile PAGExporter
 Print-Text "[ Compile PAGExporter ]"
 $PluginSourceDir = Join-Path $LibpagDir -ChildPath "exporter"
 $x64BuildDirForPlugin = Join-Path $x64BuildDir -ChildPath "Plugin"
@@ -127,7 +114,7 @@ if (-not $?) {
     exit 1
 }
 
-# 2.4 Compile PAGViewer
+# 2.3 Compile PAGViewer
 Print-Text "[ Compile PAGViewer ]"
 cmake -S $SourceDir -B $x64BuildDir -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QtCMakePath" -DPAG_PATH="${PAGPath}" -DPAG_OPTIONS="${PAGOptions}"
 if (-not $?) {
@@ -138,6 +125,23 @@ if (-not $?) {
 cmake --build $x64BuildDir --config Release -j 16
 if (-not $?) {
     Write-Host "Compile PAGViewer-x64 failed" -ForegroundColor Red
+    exit 1
+}
+
+# 2.4 Compile H264EncoderTools
+Print-Text "[ Compile H264EncoderTools ]"
+$EncoderToolsSourceDir = Join-Path $SourceDir -ChildPath "third_party" |
+        Join-Path -ChildPath "H264EncoderTools"
+$EncoderToolsSlnPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.sln"
+$EncoderToolsVcxprojPath = Join-Path $EncoderToolsSourceDir -ChildPath "H264EncoderTools.vcxproj"
+(Get-Content "$EncoderToolsVcxprojPath" -Raw) -replace "<PlatformToolset>v142</PlatformToolset>", "<PlatformToolset>$LatestMSVCToolSet</PlatformToolset>" | Set-Content "$EncoderToolsVcxprojPath"
+if (-not $?) {
+    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
+    exit 1
+}
+& $VSDevEnv $EncoderToolsSlnPath /Rebuild "Release|x64"
+if (-not $?) {
+    Write-Host "Build H264EncoderTools-x64 failed" -ForegroundColor Red
     exit 1
 }
 
@@ -208,7 +212,7 @@ $ISCCPath = Join-Path $InnoSetupDir "ISCC.exe"
 if (-not (Test-Path $ISCCPath)) {
     $Installer = "$env:TEMP\innosetup.exe"
     Invoke-WebRequest -Uri "https://www.jrsoftware.org/download.php/is.exe" -OutFile $Installer
-    Start-Process -Wait -FilePath $Installer -ArgumentList "/VERYSILENT /NORESTART /DIR=$InnoSetupDir"
+    Start-Process -Wait -FilePath $Installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=$InnoSetupDir"
     if (-not $?) {
         Write-Host "Install InnoSetup failed" -ForegroundColor Red
         exit 1
