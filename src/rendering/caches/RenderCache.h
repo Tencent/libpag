@@ -55,6 +55,8 @@ class RenderCache : public Performance {
 
   void detachFromContext();
 
+  void prepareNextFrame();
+
   /**
    * Returns the total memory usage of this cache.
    */
@@ -200,7 +202,6 @@ class RenderCache : public Performance {
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  void prepareNextFrame();
   std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);
   void recordPerformance();
 
