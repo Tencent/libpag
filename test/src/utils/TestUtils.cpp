@@ -26,6 +26,7 @@
 #include "utils/TestDir.h"
 
 #ifdef __APPLE__
+#define GL_SILENCE_DEPRECATION
 #include <OpenGL/gl3.h>
 #else
 #include <GLES3/gl3.h>
