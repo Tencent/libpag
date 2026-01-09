@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeDisplayLink.h"
+#include <mutex>
 #include "base/utils/USE.h"
 namespace pag {
 
+static std::once_flag init_flag;
 static napi_threadsafe_function js_threadsafe_function = nullptr;
 void NativeDisplayLink::PAGDisplaySoloistCallback(long long timestamp, long long targetTimestamp,
                                                   void* data) {
@@ -42,16 +44,14 @@ static void CallJsFunction(napi_env env, napi_value callBack, void* context, voi
 };
 
 bool NativeDisplayLink::InitThreadSafeFunction(napi_env env) {
-  if (js_threadsafe_function != nullptr) {
-    napi_release_threadsafe_function(js_threadsafe_function, napi_tsfn_release);
-    js_threadsafe_function = nullptr;
-  }
-  napi_value resourceName = nullptr;
-  napi_create_string_utf8(env, "NativeDisplayLink Safe Function", NAPI_AUTO_LENGTH, &resourceName);
-  auto status =
-      napi_create_threadsafe_function(env, nullptr, nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                      nullptr, CallJsFunction, &js_threadsafe_function);
-  return status;
+  std::call_once(init_flag, [env] {
+    napi_value resourceName = nullptr;
+    napi_create_string_utf8(env, "NativeDisplayLink Safe Function", NAPI_AUTO_LENGTH,
+                            &resourceName);
+    napi_create_threadsafe_function(env, nullptr, nullptr, resourceName, 0, 1, nullptr, nullptr,
+                                    nullptr, CallJsFunction, &js_threadsafe_function);
+  });
+  return js_threadsafe_function != nullptr;
 }
 
 NativeDisplayLink::NativeDisplayLink(std::function<void()> callback) : callback(callback) {
