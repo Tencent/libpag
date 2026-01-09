@@ -301,8 +301,24 @@ cp -f ${EncoderToolsPath} ${ResourcesDir}
 # 3.5.4 Copy Qt deployment scripts
 print "[ Copy Qt deployment scripts ]"
 cp -f "${SourceDir}/qttools/copy_qt_resource.sh" "${ResourcesDir}/"
-cp -f "${SourceDir}/qttools/delete_old_qt_resource.sh" "${ResourcesDir}/"
+cp -f "${SourceDir}/qttools/delete_qt_resource.sh" "${ResourcesDir}/"
 cp -f "${SourceDir}/qttools/replace_qt_path.sh" "${ResourcesDir}/"
+
+# 3.5.5 Generate qt.conf for PAGExporter plugin
+# Use absolute path to load Qt resources from external shared directory
+# This avoids modifying plugin bundle contents which would break code signature
+# Note: qt.conf in Resources/ has higher priority than MacOS/ on macOS
+print "[ Generate qt.conf for PAGExporter ]"
+PLUGIN_RESOURCES_DIR="${ResourcesDir}/PAGExporter.plugin/Contents/Resources"
+PLUGIN_QT_CONF="${PLUGIN_RESOURCES_DIR}/qt.conf"
+mkdir -p "${PLUGIN_RESOURCES_DIR}"
+cat > "${PLUGIN_QT_CONF}" << 'EOF'
+[Paths]
+Prefix = /Library/Application Support/PAGExporter
+Plugins = PlugIns
+Imports = Resources/qml
+QmlImports = Resources/qml
+EOF
 
 # 3.6 Update plist
 print "[ Update plist ]"
@@ -331,6 +347,8 @@ install_name_tool -add_rpath "@executable_path/../Frameworks" ${ExePath}
 install_name_tool -delete_rpath "${QtPath}/lib" ${PluginExePath}
 install_name_tool -add_rpath "@executable_path/../Frameworks" ${PluginExePath}
 install_name_tool -add_rpath "@loader_path/../Frameworks" ${PluginExePath}
+# Add rpath to load Qt frameworks from external shared directory
+install_name_tool -add_rpath "/Library/Application Support/PAGExporter/Frameworks" ${PluginExePath}
 
 # 4 Sign
 print "[ Sign ]"
