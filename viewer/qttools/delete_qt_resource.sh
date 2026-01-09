@@ -9,9 +9,9 @@ echo "Cleaning up PAGExporter Qt resources..."
 if [ -d "$SHARED_QT_DIR" ]; then
     echo "  Removing shared Qt directory: $SHARED_QT_DIR"
     sudo rm -rf "$SHARED_QT_DIR"
-    echo "✓ Shared Qt directory removed"
+    echo "Shared Qt directory removed"
 else
     echo "  Shared Qt directory not found: $SHARED_QT_DIR"
 fi
 
-echo "✓ PAGExporter Qt resources cleanup completed"
+echo "PAGExporter Qt resources cleanup completed"

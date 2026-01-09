@@ -14,18 +14,18 @@ else
 fi
 
 if [ -z "$PAGVIEWER_APP" ] || [ ! -d "$PAGVIEWER_APP" ]; then
-    echo "❌ PAGViewer.app not found!"
+    echo "Error: PAGViewer.app not found!"
     echo "PAGExporter requires PAGViewer to be installed first."
     echo "Please install PAGViewer.app in /Applications/ or ~/Applications/"
     exit 1
 fi
 
-echo "✓ Found PAGViewer: $PAGVIEWER_APP"
+echo "Found PAGViewer: $PAGVIEWER_APP"
 
 # Verify PAGViewer has the required Qt resources
 VIEWER_FRAMEWORKS="$PAGVIEWER_APP/Contents/Frameworks"
 if [ ! -d "$VIEWER_FRAMEWORKS" ] || [ -z "$(ls -A "$VIEWER_FRAMEWORKS"/Qt*.framework 2>/dev/null)" ]; then
-    echo "❌ PAGViewer installation appears incomplete (missing Qt frameworks)"
+    echo "Error: PAGViewer installation appears incomplete (missing Qt frameworks)"
     echo "Please reinstall PAGViewer.app"
     exit 1
 fi
@@ -83,4 +83,4 @@ for resource in "$VIEWER_RESOURCES"/*.qm; do
     fi
 done
 
-echo "✓ Qt resources copied to shared directory: $SHARED_QT_DIR"
+echo "Qt resources copied to shared directory: $SHARED_QT_DIR"
