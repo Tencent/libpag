@@ -211,7 +211,7 @@ if (APPLE)
 
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc
-            COMMAND Rez -o ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
+            COMMAND Rez -useDF -o ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
             -i ${AE_SDK_PATH}/Headers
             -i ${AE_SDK_PATH}/Resources
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
@@ -225,12 +225,14 @@ if (APPLE)
     add_dependencies(PAGExporter GeneratePAGExporterRsrc)
 
     set(RSRC_FILE ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc)
+    set(CONTENTS_DIR "$<TARGET_BUNDLE_DIR:PAGExporter>/Contents")
     set(RESOURCES_DIR "$<TARGET_BUNDLE_DIR:PAGExporter>/Contents/Resources")
     add_custom_command(
             TARGET PAGExporter POST_BUILD
             COMMAND /bin/sh -c "mkdir -p ${RESOURCES_DIR}"
             COMMAND /bin/sh -c "cp -r ${RSRC_FILE} ${RESOURCES_DIR}"
-            COMMENT "Copying ${RSRC_FILE} to ${RESOURCES_DIR}"
+            COMMAND /bin/sh -c "printf 'AEgxFXTC' > ${CONTENTS_DIR}/PkgInfo"
+            COMMENT "Copying ${RSRC_FILE} to ${RESOURCES_DIR} and generating PkgInfo"
             VERBATIM
     )
 
