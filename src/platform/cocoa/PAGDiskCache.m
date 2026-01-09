@@ -21,6 +21,10 @@
 
 @implementation PAGDiskCache
 
++ (void)SetCacheDir:(NSString*)dir {
+  [PAGDiskCacheImpl SetCacheDir:dir];
+}
+
 + (size_t)MaxDiskSize {
   return [PAGDiskCacheImpl MaxDiskSize];
 }

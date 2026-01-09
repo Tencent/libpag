@@ -22,6 +22,11 @@
 
 @implementation PAGDiskCacheImpl
 
++ (void)SetCacheDir:(NSString*)dir {
+  std::string cacheDir = dir ? [dir UTF8String] : "";
+  pag::PAGDiskCache::SetCacheDir(cacheDir);
+}
+
 + (size_t)MaxDiskSize {
   return pag::PAGDiskCache::MaxDiskSize();
 }
