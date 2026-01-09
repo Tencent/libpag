@@ -27,7 +27,7 @@
 #include "rendering/editing/StillImage.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include <GLES3/gl31.h>
 
 using namespace emscripten;
 
