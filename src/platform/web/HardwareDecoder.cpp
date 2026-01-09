@@ -21,7 +21,6 @@
 #include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace emscripten {
 class val;

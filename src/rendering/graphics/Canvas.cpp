@@ -31,7 +31,8 @@ tgfx::SamplingOptions GetSamplingOptions(const tgfx::Matrix& matrix, tgfx::Image
     float tx = matrix.getTranslateX();
     float ty = matrix.getTranslateY();
     if (std::floor(tx) == tx && std::floor(ty) == ty) {
-      samplingOptions.filterMode = tgfx::FilterMode::Nearest;
+      samplingOptions.minFilterMode = tgfx::FilterMode::Nearest;
+      samplingOptions.magFilterMode = tgfx::FilterMode::Nearest;
     }
   }
   return samplingOptions;

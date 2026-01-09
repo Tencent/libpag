@@ -1177,8 +1177,6 @@ class Composition;
 
 class PAGPlayer;
 
-class GLRestorer;
-
 class PAG_API PAGSurface {
  public:
   /**
@@ -1271,7 +1269,6 @@ class PAG_API PAGSurface {
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
   bool externalContext = false;
-  GLRestorer* glRestorer = nullptr;
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);

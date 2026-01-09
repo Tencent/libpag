@@ -20,14 +20,15 @@
 
 namespace pag {
 static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
-    #version 100
-    attribute vec2 aPosition;
-    attribute vec2 aTextureCoord;
+    in vec2 aPosition;
+    in vec2 aTextureCoord;
 
-    uniform float textureOffsetH;
-    uniform float textureOffsetV;
+    layout(std140) uniform VertexUniforms {
+        float textureOffsetH;
+        float textureOffsetV;
+    };
 
-    varying vec2 blurCoordinates[5];
+    out vec2 blurCoordinates[5];
 
     void main() {
         gl_Position = vec4(aPosition.xy, 0, 1);
@@ -41,26 +42,25 @@ static const char GLOW_BLUR_VERTEX_SHADER[] = R"(
     )";
 
 static const char GLOW_BLUR_FRAGMENT_SHADER[] = R"(
-    #version 100
     precision mediump float;
-    uniform sampler2D inputImageTexture;
-    varying highp vec2 blurCoordinates[5];
+    uniform sampler2D sTexture;
+    in highp vec2 blurCoordinates[5];
+    out vec4 tgfx_FragColor;
     void main() {
         lowp vec4 sum = vec4(0.0);
-        sum += texture2D(inputImageTexture, blurCoordinates[0]) * 0.398943;
-        sum += texture2D(inputImageTexture, blurCoordinates[1]) * 0.295963;
-        sum += texture2D(inputImageTexture, blurCoordinates[2]) * 0.295963;
-        sum += texture2D(inputImageTexture, blurCoordinates[3]) * 0.004566;
-        sum += texture2D(inputImageTexture, blurCoordinates[4]) * 0.004566;
-        gl_FragColor = sum;
+        sum += texture(sTexture, blurCoordinates[0]) * 0.398943;
+        sum += texture(sTexture, blurCoordinates[1]) * 0.295963;
+        sum += texture(sTexture, blurCoordinates[2]) * 0.295963;
+        sum += texture(sTexture, blurCoordinates[3]) * 0.004566;
+        sum += texture(sTexture, blurCoordinates[4]) * 0.004566;
+        tgfx_FragColor = sum;
     }
     )";
-GlowBlurUniforms::GlowBlurUniforms(tgfx::Context* context, unsigned program)
-    : Uniforms(context, program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  textureOffsetHHandle = gl->getUniformLocation(program, "textureOffsetH");
-  textureOffsetVHandle = gl->getUniformLocation(program, "textureOffsetV");
-}
+
+struct GlowBlurUniforms {
+  float textureOffsetH = 0.0f;
+  float textureOffsetV = 0.0f;
+};
 
 GlowBlurRuntimeFilter::GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset,
                                              float resizeRatio)
@@ -75,19 +75,25 @@ std::string GlowBlurRuntimeFilter::onBuildFragmentShader() const {
   return GLOW_BLUR_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> GlowBlurRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                  unsigned program) const {
-  return std::make_unique<GlowBlurUniforms>(context, program);
+std::vector<tgfx::BindingEntry> GlowBlurRuntimeFilter::uniformBlocks() const {
+  return {{"VertexUniforms", 0}};
 }
 
-void GlowBlurRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                           const std::vector<tgfx::BackendTexture>&) const {
-  auto textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
-  auto textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<GlowBlurUniforms*>(program->uniforms.get());
-  gl->uniform1f(uniform->textureOffsetHHandle, textureOffsetH);
-  gl->uniform1f(uniform->textureOffsetVHandle, textureOffsetV);
+void GlowBlurRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                             const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                             const tgfx::Point&) const {
+  GlowBlurUniforms uniforms = {};
+  uniforms.textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
+  uniforms.textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
+  auto uniformBuffer = gpu->createBuffer(sizeof(GlowBlurUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(GlowBlurUniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(GlowBlurUniforms));
+    }
+  }
 }
 
 tgfx::Rect GlowBlurRuntimeFilter::filterBounds(const tgfx::Rect& srcRect) const {

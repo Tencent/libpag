@@ -17,10 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapBuffer.h"
+#include "HardwareBufferUtil.h"
 
 namespace pag {
+
 std::shared_ptr<BitmapBuffer> BitmapBuffer::Wrap(pag::HardwareBufferRef hardwareBuffer) {
-  auto info = tgfx::HardwareBufferGetInfo(hardwareBuffer);
+  auto hwInfo = tgfx::HardwareBufferGetInfo(hardwareBuffer);
+  if (hwInfo.width <= 0 || hwInfo.height <= 0) {
+    return nullptr;
+  }
+  auto info = HardwareBufferInfoToImageInfo(hwInfo);
   if (info.isEmpty()) {
     return nullptr;
   }

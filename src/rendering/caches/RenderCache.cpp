@@ -191,7 +191,6 @@ void RenderCache::detachFromContext() {
     context = nullptr;
     return;
   }
-  prepareNextFrame();
   recordPerformance();
   clearExpiredSequences();
   clearExpiredDecodedImages();
