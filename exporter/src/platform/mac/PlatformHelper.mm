@@ -79,7 +79,8 @@ bool IsAEWindowActive() {
 }
 
 std::string GetQmlPath() {
-  // Use shared Qt resources directory to avoid modifying plugin bundle (which would break code signature)
+  // Use shared Qt resources directory to avoid modifying plugin bundle (which would break code
+  // signature)
   return "/Library/Application Support/PAGExporter/Resources/qml";
 }
 
