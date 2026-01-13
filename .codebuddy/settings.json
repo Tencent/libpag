@@ -3,6 +3,5 @@
     "defaultMode": "bypassPermissions"
   },
   "includeCoAuthoredBy": false,
-  "model": "claude-opus-4.5",
-  "autoCompactEnabled": false
+  "model": "claude-opus-4.5"
 }
