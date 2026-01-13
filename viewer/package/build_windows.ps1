@@ -181,7 +181,17 @@ $GeneratedEncorderToolsPath = Join-Path $EncoderToolsSourceDir -ChildPath "x64" 
                               Join-Path -ChildPath "H264EncoderTools.exe"
 Copy-Item -Path $GeneratedEncorderToolsPath -Destination $ExeDir -Force
 
-# 3.3 Obtain the dependencies of PAGViewer
+# 3.3 Copy symbol files
+Print-Text "[ Copy symbol files ]"
+$PAGViewerPdbPath = Join-Path $x64BuildDir "RelWithDebInfo" |
+                    Join-Path -ChildPath "PAGViewer.pdb"
+Copy-Item -Path $PAGViewerPdbPath -Destination $BuildDir -Force
+
+$PAGExporterPdbPath = Join-Path $x64BuildDirForPlugin "RelWithDebInfo" |
+                      Join-Path -ChildPath "PAGExporter.pdb"
+Copy-Item -Path $PAGExporterPdbPath -Destination $BuildDir -Force
+
+# 3.4 Obtain the dependencies of PAGViewer
 Print-Text "[ Obtain the dependencies of PAGViewer ]"
 $QmlDir = Join-Path $SourceDir "assets" |
           Join-Path -ChildPath "qml"
@@ -202,8 +212,7 @@ $FfmoviePath = Join-Path $SourceDir "vendor" |
                Join-Path -ChildPath "ffmovie.dll"
 Copy-Item -Path $FfmoviePath -Destination $ExeDir -Force
 
-# 3.3 Install tool
-# 3.3.1 Install InnoSetup
+# 3.5 Install InnoSetup
 Print-Text "[ Install InnoSetup ]"
 $UninstallInnoSetup = $false
 $InnoSetupDir = Join-Path $SourceDir "tools" | 
