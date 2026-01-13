@@ -13,7 +13,7 @@ if [[ `uname` == 'Darwin' ]]; then
 fi
 
 mkdir -p result
-gcovr -r . -f='src/' -f='include/' --xml-pretty --merge-mode-functions=merge-use-line-0 -o ./result/coverage.xml
+gcovr -r . -f='src/' -f='include/' --xml-pretty --merge-mode-functions=merge-use-line-min -o ./result/coverage.xml
 if test $? -ne 0; then
    exit 1
 fi
