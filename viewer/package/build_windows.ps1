@@ -108,7 +108,7 @@ if (-not $?) {
     exit 1
 }
 
-cmake --build $x64BuildDirForPlugin --config Release -j 16
+cmake --build $x64BuildDirForPlugin --config RelWithDebInfo -j 16
 if (-not $?) {
     Write-Host "Compile PAGExporter-x64 failed" -ForegroundColor Red
     exit 1
@@ -122,7 +122,7 @@ if (-not $?) {
     exit 1
 }
 
-cmake --build $x64BuildDir --config Release -j 16
+cmake --build $x64BuildDir --config RelWithDebInfo -j 16
 if (-not $?) {
     Write-Host "Compile PAGViewer-x64 failed" -ForegroundColor Red
     exit 1
@@ -157,7 +157,7 @@ New-Item -ItemType Directory -Path "$TemplatePackageDir\meta" -Force
 $PackageDir = Join-Path $BuildDir "com.tencent.pagplayer"
 Copy-Item -Path $TemplatePackageDir -Destination $PackageDir -Recurse -Force
 
-$GeneratedExePath = Join-Path $x64BuildDir "Release" | 
+$GeneratedExePath = Join-Path $x64BuildDir "RelWithDebInfo" | 
                     Join-Path -ChildPath "PAGViewer.exe"
 $ExeDir = Join-Path $PackageDir "data"
 $ExePath = Join-Path $ExeDir "PAGViewer.exe"
@@ -165,7 +165,7 @@ Copy-Item -Path $GeneratedExePath -Destination $ExePath -Force
 
 # 3.2 Copy PAGExporter and tools
 Print-Text "[ Copy PAGExporter and tools ]"
-$GeneratedPluginPath = Join-Path $x64BuildDirForPlugin -ChildPath "Release" |
+$GeneratedPluginPath = Join-Path $x64BuildDirForPlugin -ChildPath "RelWithDebInfo" |
                        Join-Path -ChildPath "PAGExporter.aex"
 Copy-Item -Path $GeneratedPluginPath -Destination $ExeDir -Force
 
