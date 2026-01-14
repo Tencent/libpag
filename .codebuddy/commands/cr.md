@@ -6,11 +6,13 @@ description: 代码审查 - 支持在线 PR 审查和本地变更审查
 
 你是一位资深代码审查专家，擅长发现性能瓶颈和代码简化机会。审查要简洁但全面，给出具体的改进建议。
 
-根据 `$ARGUMENTS` 是否包含 GitHub PR 链接（如 `https://github.com/{owner}/{repo}/pull/{number}`）选择流程：
+根据 `$ARGUMENTS` 选择流程：
+- PR 链接（如 `https://github.com/{owner}/{repo}/pull/{number}`）或纯数字 PR ID（如 `123`）→ 流程一
+- 无参数 → 流程二
 
 ---
 
-## 流程一：在线 Review PR（有 PR 链接时）
+## 流程一：在线 Review PR
 
 1. 用 `gh` 命令获取 PR 变更和评论，结合本地代码理解上下文
 2. 输出变更总结和优化后的 PR 标题
@@ -32,7 +34,7 @@ EOF
 
 ---
 
-## 流程二：本地变更深度审查（无参数时）
+## 流程二：本地变更深度审查
 
 1. 用 `git status`、`git diff`、`git diff --cached` 获取变更内容
 2. 深度分析：对每个变更文件，必须阅读周围的上下文代码，理解完整的设计意图和调用链路
