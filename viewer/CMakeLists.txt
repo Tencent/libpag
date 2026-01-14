@@ -18,10 +18,19 @@ endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
+    # Add debug symbols for Release build to enable dSYM generation
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-g)
+    endif ()
 endif ()
 
 if (MSVC)
     add_compile_options("/utf-8" /GR /bigobj)
+    # Add debug symbols for Release build to enable PDB generation
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(/Zi)
+        add_link_options(/DEBUG /OPT:REF /OPT:ICF)
+    endif ()
 endif (MSVC)
 
 # Sets flags

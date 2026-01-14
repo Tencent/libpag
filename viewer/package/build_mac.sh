@@ -174,6 +174,46 @@ install_name_tool -delete_rpath "${SourceDir}/vendor/ffmovie/mac/arm64" ${arm64E
 mkdir -p ${ExeDir}
 lipo -create ${x86_64ExePath} ${arm64ExePath} -output ${ExePath}
 
+# 3.1.1 Generate dSYM files for PAGViewer
+print "[ Generate dSYM files for PAGViewer ]"
+
+# Generate dSYM for each architecture in their respective build directories
+x86_64DsymPath="${x86_64BuildDir}/PAGViewer.dSYM"
+arm64DsymPath="${arm64BuildDir}/PAGViewer.dSYM"
+UniversalDsymPath="${BuildDir}/PAGViewer.dSYM"
+
+dsymutil ${x86_64ExePath} -o ${x86_64DsymPath}
+if [ $? -ne 0 ];
+then
+    echo "Generate PAGViewer x86_64 dSYM failed"
+    exit 1
+fi
+
+dsymutil ${arm64ExePath} -o ${arm64DsymPath}
+if [ $? -ne 0 ];
+then
+    echo "Generate PAGViewer arm64 dSYM failed"
+    exit 1
+fi
+
+# Create universal dSYM by copying structure and merging DWARF
+cp -R ${x86_64DsymPath} ${UniversalDsymPath}
+lipo -create \
+    ${x86_64DsymPath}/Contents/Resources/DWARF/PAGViewer \
+    ${arm64DsymPath}/Contents/Resources/DWARF/PAGViewer \
+    -output ${UniversalDsymPath}/Contents/Resources/DWARF/PAGViewer
+
+if [ $? -ne 0 ];
+then
+    echo "Merge PAGViewer dSYM failed"
+    exit 1
+fi
+
+echo "PAGViewer dSYM files generated:"
+echo "  Universal: ${UniversalDsymPath}"
+echo "  x86_64: ${x86_64DsymPath}"
+echo "  arm64: ${arm64DsymPath}"
+
 # 3.2 Obtain the dependencies of PAGViewer
 print "[ Obtain the dependencies of PAGViewer ]"
 ${Deployqt} ${AppDir} -qmldir=${SourceDir}/assets/qml
@@ -269,6 +309,46 @@ install_name_tool -delete_rpath "${PluginSourceDir}/vendor/ffaudio/mac/arm64" ${
 
 cp -fr ${x86_64PluginPath} ${PluginPath}
 lipo -create ${x86_64PluginExePath} ${arm64PluginExePath} -output ${PluginExePath}
+
+# 3.5.1.1 Generate dSYM files for PAGExporter
+print "[ Generate dSYM files for PAGExporter ]"
+
+# Generate dSYM for each architecture in their respective build directories
+x86_64PluginDsymPath="${x86_64BuildDirForPlugin}/PAGExporter.dSYM"
+arm64PluginDsymPath="${arm64BuildDirForPlugin}/PAGExporter.dSYM"
+UniversalPluginDsymPath="${BuildDir}/PAGExporter.dSYM"
+
+dsymutil ${x86_64PluginExePath} -o ${x86_64PluginDsymPath}
+if [ $? -ne 0 ];
+then
+    echo "Generate PAGExporter x86_64 dSYM failed"
+    exit 1
+fi
+
+dsymutil ${arm64PluginExePath} -o ${arm64PluginDsymPath}
+if [ $? -ne 0 ];
+then
+    echo "Generate PAGExporter arm64 dSYM failed"
+    exit 1
+fi
+
+# Create universal dSYM by copying structure and merging DWARF
+cp -R ${x86_64PluginDsymPath} ${UniversalPluginDsymPath}
+lipo -create \
+    ${x86_64PluginDsymPath}/Contents/Resources/DWARF/PAGExporter \
+    ${arm64PluginDsymPath}/Contents/Resources/DWARF/PAGExporter \
+    -output ${UniversalPluginDsymPath}/Contents/Resources/DWARF/PAGExporter
+
+if [ $? -ne 0 ];
+then
+    echo "Merge PAGExporter dSYM failed"
+    exit 1
+fi
+
+echo "PAGExporter dSYM files generated:"
+echo "  Universal: ${UniversalPluginDsymPath}"
+echo "  x86_64: ${x86_64PluginDsymPath}"
+echo "  arm64: ${arm64PluginDsymPath}"
 
 # 3.5.2 Obtain the dependencies of PAGExporter
 print "[ Obtain the dependencies of PAGExporter ]"

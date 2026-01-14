@@ -18,8 +18,20 @@ endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
+    # Add debug symbols for Release build to enable dSYM generation
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-g)
+    endif ()
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30)
     add_definitions(-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1)
+endif ()
+
+if (MSVC)
+    # Add debug symbols for Release build to enable PDB generation
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(/Zi)
+        add_link_options(/DEBUG /OPT:REF /OPT:ICF)
+    endif ()
 endif ()
 
 # configures the local installation path of the AE_SDK.
