@@ -28,11 +28,8 @@ cmake --build cmake-build-debug --target PAGFullTest
 
 ## 接受截图基准变更
 
-**禁止自动接受基准变更**，必须经过用户主动确认后，执行以下命令：
-
-```bash
-cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target UpdateBaseline
-./cmake-build-debug/UpdateBaseline
-```
+**禁止自动接受基准变更**，必须经过用户主动确认后，按以下步骤操作：
+1. 编译并完整运行 `PAGFullTest` 所有用例，禁止使用部分用例的输出
+2. 将前一步用例输出的 `test/out/version.json` 覆盖到 `test/baseline/`
+3. 运行 `UpdateBaseline` target 更新本地基准图缓存
 
