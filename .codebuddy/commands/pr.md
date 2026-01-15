@@ -59,7 +59,15 @@ git push -u origin {分支名称}
 gh pr create --title "{PR标题}" --body "{PR描述}"
 ```
 
-完成后输出 PR 链接。
+完成后输出以下信息：
+
+```
+**PR 标题**：{PR标题}
+
+**PR 描述**：{PR描述}
+
+**PR 链接**：{PR链接}
+```
 
 ---
 
