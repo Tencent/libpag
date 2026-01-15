@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# Update local baseline cache from remote changes.
+# Run this after pulling main branch that contains baseline changes from others.
+# Without updating the cache, affected tests will be skipped, leading to inaccurate results.
+
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
   if [ -f "$CACHE_VERSION_FILE" ]; then
@@ -18,15 +23,10 @@
   ./install_tools.sh
   depsync
 
-  if [[ "$1" == "USE_SWIFTSHADER" ]]; then
-    BUILD_DIR=build
-  else
-    BUILD_DIR=cmake-build-debug
-  fi
+  BUILD_DIR=build
 
-  if [ ! -d "./${BUILD_DIR}" ]; then
-    mkdir ${BUILD_DIR}
-  fi
+  rm -rf ${BUILD_DIR}
+  mkdir ${BUILD_DIR}
   cd ${BUILD_DIR}
 
   if [ -f "./CMakeCache.txt" ]; then
@@ -52,7 +52,7 @@
   ./UpdateBaseline
 
   if test $? -eq 0; then
-    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
+     echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
   else
     echo "~~~~~~~~~~~~~~~~~~~Update Baseline Failed~~~~~~~~~~~~~~~~~~"
     COMPLIE_RESULT=false
@@ -76,4 +76,5 @@
     cp -r test/out result
     exit 1
   fi
+  rm -rf ${BUILD_DIR}
 }
