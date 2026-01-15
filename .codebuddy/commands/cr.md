@@ -6,56 +6,191 @@ description: 代码审查 - 支持在线 PR 审查和本地变更审查
 
 你是一位资深代码审查专家，擅长发现性能瓶颈和代码简化机会。审查要简洁但全面，给出具体的改进建议。
 
-根据 `$ARGUMENTS` 选择流程：
-- PR 链接（如 `https://github.com/{owner}/{repo}/pull/{number}`）或纯数字 PR ID（如 `123`）→ 流程一
-- 无参数 → 流程二
+---
+
+## 前置检查
+
+静默执行，仅在异常时提示用户。
+
+### 检查 gh 命令
+
+```bash
+gh --version
+gh auth status
+```
+
+- 未安装 gh：提示用户安装（macOS: `brew install gh`，其他系统参考 https://cli.github.com）
+- 未登录：提示用户运行 `gh auth login` 完成登录
+
+### 清理遗留环境
+
+先检查是否存在遗留的 worktree 目录：
+
+```bash
+ls -d /tmp/pr-review-* 2>/dev/null
+```
+
+仅当上述命令输出了目录列表时，才执行清理：
+
+```bash
+for dir in /tmp/pr-review-*; do
+    pr_num=$(basename "$dir" | sed 's/pr-review-//')
+    git worktree remove "$dir" 2>/dev/null
+    git branch -D "pr-${pr_num}" 2>/dev/null
+    echo "已清理遗留的审查环境: $dir"
+done
+```
 
 ---
 
-## 流程一：在线 Review PR
+## 流程选择
 
-1. 用 `gh` 命令获取 PR 变更和评论，结合本地代码理解上下文
-2. 输出变更总结和优化后的 PR 标题
-3. 按代码审查要点逐项检查（见下方审查清单）
-4. 验证已有评论是否真正修复（重点关注用户提过的评论）
-5. 深度复核：对发现的每个问题进行二次验证，确认是否真正存在问题（排除误报、已处理、或理解偏差的情况）
-6. 输出最终问题列表，按序号汇总真正存在的问题，经用户确认后添加中文行级评论
+根据 `$ARGUMENTS` 和仓库匹配情况选择模式：
 
-### 行级评论格式（必须严格遵守）
+| 参数 | 条件 | 模式 |
+|------|------|------|
+| 无参数 | - | **本地模式** |
+| PR ID（如 `123`） | 当前目录是 git 仓库 | **Worktree 模式** |
+| PR URL | owner/repo 匹配当前仓库 | **Worktree 模式** |
+| PR URL | owner/repo 不匹配 | **在线模式** |
+| PR ID 或 URL | 当前目录非 git 仓库 | **在线模式** |
 
-- **禁止使用 `gh pr comment`、`gh pr review --comment`、`gh pr review --body` 或任何非行级评论命令**
-- 使用 `gh api` 配合 `--input -` 和 heredoc 传递 JSON
+判断是否匹配当前仓库：`gh repo view --json nameWithOwner -q '.nameWithOwner'`
+
+---
+
+## 第一步：准备变更内容
+
+### 本地模式
+
 ```bash
-gh api repos/{owner}/{repo}/pulls/{pr}/reviews --input - <<'EOF'
-{"commit_id":"HEAD_SHA","event":"COMMENT","comments":[{"path":"文件路径","line":行号,"side":"RIGHT","body":"内容"}]}
+git status && git diff && git diff --cached
+```
+
+### Worktree 模式
+
+先判断当前分支是否为 PR 分支：
+```bash
+PR_BRANCH=$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+CURRENT_BRANCH=$(git branch --show-current)
+[ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
+```
+
+**若当前分支就是 PR 分支**，直接在当前目录操作，跳过 worktree 创建。
+
+**若当前分支不是 PR 分支**，创建隔离环境：
+```bash
+git fetch origin pull/{pr_number}/head:pr-{pr_number}
+git worktree add /tmp/pr-review-{pr_number} pr-{pr_number}
+cd /tmp/pr-review-{pr_number}
+```
+
+获取变更内容：
+```bash
+BASE_BRANCH=$(gh pr view {pr_number} --json baseRefName -q '.baseRefName')
+git diff origin/${BASE_BRANCH}...HEAD
+gh pr view {pr_number} --comments
+```
+
+### 在线模式
+
+```bash
+gh pr diff {pr_number}
+gh pr view {pr_number} --comments
+```
+
+---
+
+## 第二步：审查（所有模式通用）
+
+**内部分析阶段**（静默执行，不输出任何内容）：
+1. 对每个变更文件，阅读完整上下文代码，理解设计意图和调用链路
+2. 按下方审查要点清单检查，记录潜在问题
+3. 验证已有评论（仅 Worktree / 在线模式）：检查 PR 中用户提过的评论是否已真正修复
+4. 对每个潜在问题进行二次验证，排除误报、已处理、或理解偏差的情况
+5. **丢弃所有已排除的问题，仅保留最终确认存在的问题**
+
+**输出审查结果**：
+- 变更概述：一段话总结本次变更的目的和范围
+- 总体评价：代码质量评估和主要改进方向
+- 问题列表：按序号列出真正存在的问题，每个问题包含位置、描述、修复建议
+- 若无问题则输出"无问题"
+
+**输出禁令**（严格遵守）：
+- **禁止输出任何已排除的问题**，包括禁止以"排除"、"不是问题"、"二次验证后确认正确"等形式提及
+- **禁止输出分析推理过程**，只输出最终结论
+
+---
+
+## 第三步：处理问题
+
+**若无问题**：
+- 本地模式 / 在线模式：流程结束
+- Worktree 模式：执行清理后流程结束
+
+**若有问题**：按以下流程处理。
+
+判断代码归属（Worktree / 在线模式）：`[ "$(gh pr view {pr_number} --json author -q '.author.login')" = "$(gh api user -q '.login')" ]`
+
+| 模式 | 自己的代码 | 别人的代码 |
+|------|----------|----------|
+| 本地模式 | 询问修复 | - |
+| Worktree 模式 | 优化标题 + 询问修复 + 推送 + 清理 | 优化标题 + 询问评论 + 清理 |
+| 在线模式 | 优化标题 + 询问评论 | 优化标题 + 询问评论 |
+
+### 优化标题
+
+如有必要，用 `gh pr edit {pr_number} --title "新标题"` 更新，并输出优化后的标题。
+
+格式：根据变更内容总结 120 字符内的英语概括，以英文句号结尾，中间无其他标点，侧重描述用户可感知的变化。
+
+### 询问修复
+
+询问用户需要修复哪些序号的问题，然后逐一修复。
+
+Worktree 模式下修复完成后提交并推送到 PR 分支：
+```bash
+git add . && git commit -m "{根据修复内容生成}"
+git push origin HEAD:$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+```
+
+### 询问评论
+
+询问用户是否需要将问题作为 PR 行级评论提交。
+
+- 使用简洁的中文描述问题和建议
+- **必须**使用 `gh api` + heredoc，**禁止**使用 `gh pr comment`、`gh pr review` 等或任何非行级评论命令
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --input - <<'EOF'
+{"commit_id":"HEAD_SHA","event":"COMMENT","comments":[{"path":"文件路径","line":行号,"side":"RIGHT","body":"评论内容"}]}
 EOF
 ```
 
-⚠️ 每次添加评论时必须重新阅读此格式要求，确保使用 `gh api` 而非其他命令
+### 清理（仅 Worktree 模式）
+
+若当前分支就是 PR 分支（未创建 worktree），则跳过清理步骤。
+
+若创建了 worktree，自动清理临时环境并输出提示：
+
+```bash
+cd - # 返回原目录
+git worktree remove /tmp/pr-review-{pr_number}
+git branch -D pr-{pr_number}
+echo "已清理临时审查环境"
+```
 
 ---
 
-## 流程二：本地变更深度审查
+## 审查要点清单
 
-1. 用 `git status`、`git diff`、`git diff --cached` 获取变更内容
-2. 深度分析：对每个变更文件，必须阅读周围的上下文代码，理解完整的设计意图和调用链路
-3. 按代码审查要点逐项深度检查（见下方审查清单）
-4. 输出审查报告：
-   - **变更概述**：一段话总结本次变更的目的和范围
-   - **问题列表**：按文件分组，每个问题包含位置、类型、描述、修复建议
-   - **总体评价**：代码质量评估和主要改进方向
-
----
-
-## 代码审查要点清单
+> 注：对于测试用例代码，整体降低审查要求，仅关注明显的实现错误或注释错误。
 
 **最高优先级**：
-
 1. **性能优化**：深度挖掘一切可能的性能提升机会
 2. **代码简化**：寻找一切可以简化代码的机会
 
 **标准检查项**：
-
 3. **代码正确性**：实现是否符合预期，边界条件和异常路径是否处理
 4. **规范符合性**：代码风格、命名、注释是否符合项目规范
 5. **安全与稳定**：线程安全、资源泄漏、返回值检查
