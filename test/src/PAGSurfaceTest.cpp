@@ -20,11 +20,13 @@
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
-#ifdef __APPLE__
-#define GL_SILENCE_DEPRECATION
-#include <OpenGL/gl3.h>
-#else
+#ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
+#else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
+#include <OpenGL/gl3.h>
 #endif
 
 namespace pag {
