@@ -148,7 +148,9 @@ gh pr view {pr_number} --comments
 
 询问用户需要修复哪些序号的问题，然后逐一修复。
 
-Worktree 模式下修复完成后提交并推送到 PR 分支：
+**本地模式**：修复完成后，**不要**自动执行 `git add`，保持文件为未暂存状态，由用户自行决定是否暂存。
+
+**Worktree 模式**：修复完成后提交并推送到 PR 分支：
 ```bash
 git add . && git commit -m "{根据修复内容生成}"
 git push origin HEAD:$(gh pr view {pr_number} --json headRefName -q '.headRefName')
