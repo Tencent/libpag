@@ -11,7 +11,7 @@ cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debu
 cmake --build cmake-build-debug --target PAGFullTest
 
 echo "Step 2: Running PAGFullTest..."
-./cmake-build-debug/PAGFullTestt || true
+./cmake-build-debug/PAGFullTest || true
 
 echo "Step 3: Copying version.json to baseline..."
 cp test/out/version.json test/baseline/
