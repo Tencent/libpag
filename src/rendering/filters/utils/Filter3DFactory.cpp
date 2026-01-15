@@ -20,15 +20,32 @@
 
 namespace pag {
 
-std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, const FilterList*,
-                                            const tgfx::Rect&, const tgfx::Point&, tgfx::Rect*,
-                                            tgfx::Point* offset) {
+std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, RenderCache*,
+                                            const FilterList*, const tgfx::Rect&,
+                                            const tgfx::Point&, tgfx::Rect*, tgfx::Point* offset) {
   offset->set(0, 0);
   return input;
 }
 
 bool Has3DSupport() {
   return false;
+}
+
+std::shared_ptr<tgfx::Texture> GetDepthTexture3D(RenderCache*, ID, int, int) {
+  return nullptr;
+}
+
+bool MarkLayer3DRendered(RenderCache*, ID, ID) {
+  return false;
+}
+
+void BeginFrame3D(RenderCache*) {
+}
+
+void EndFrame3D(RenderCache*) {
+}
+
+void ReleaseAll3D(RenderCache*) {
 }
 
 }  // namespace pag

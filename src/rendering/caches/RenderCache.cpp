@@ -154,6 +154,7 @@ void RenderCache::setSnapshotEnabled(bool value) {
 void RenderCache::beginFrame() {
   usedAssets = {};
   usedSequences = {};
+  BeginFrame3D(this);
   resetPerformance();
 }
 
@@ -183,6 +184,7 @@ void RenderCache::releaseAll() {
   clearAllSnapshots();
   graphicsMemory = 0;
   clearAllSequenceCaches();
+  ReleaseAll3D(this);
   contextID = 0;
 }
 
@@ -195,6 +197,7 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredDecodedImages();
   clearExpiredSnapshots();
+  EndFrame3D(this);
   if (!timestamps.empty()) {
     // Always purge recycled resources that haven't been used in 1 frame.
     context->purgeResourcesNotUsedSince(timestamps.back());
