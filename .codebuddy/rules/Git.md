@@ -10,4 +10,11 @@ alwaysApply: true
 - 禁止在 main 分支直接提交推送代码，必须通过 PR 流程
 - 禁止 force push，补充 PR 的提交使用正常追加
 
+## 分支命名
+
+格式：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`，模块名用下划线连接，最多两个单词
+
+## Commit 信息
+
+120 字符内的英语概括，以英文句号结尾，中间无其他标点，侧重描述用户可感知的变化
 
