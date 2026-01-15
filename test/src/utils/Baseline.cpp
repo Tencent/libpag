@@ -34,11 +34,13 @@ using namespace tgfx;
 static std::unique_ptr<Baseline> baseline = nullptr;
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline");
 static const std::string CACHE_ROOT = TestDir::GetRoot() + "/baseline/.cache";
+static const std::string EXISTING_OUT_ROOT = TestDir::GetRoot() + "/out";
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = TestDir::GetRoot() + "/baseline-out";
 #else
 static const std::string OUT_ROOT = TestDir::GetRoot() + "/out";
 #endif
+static const std::string WEBP_FILE_EXT = ".webp";
 
 static void RemoveEmptyFolder(const std::filesystem::path& path) {
   if (!std::filesystem::is_directory(path)) {
@@ -120,6 +122,27 @@ std::string DumpMD5(const void* bytes, size_t size) {
   return {buffer, 32};
 }
 
+#ifdef GENERATE_BASELINE_IMAGES
+bool Baseline::tryCopyExistingBaseline(const std::string& key, const std::string& md5) {
+  auto existingPath = EXISTING_OUT_ROOT + "/" + key + "_base" + WEBP_FILE_EXT;
+  if (!std::filesystem::exists(existingPath)) {
+    return false;
+  }
+  auto baselineVersion = getJSONValue(baselineVersions, key);
+  auto cacheVersion = getJSONValue(cacheVersions, key);
+  if (baselineVersion.empty() || baselineVersion != cacheVersion) {
+    return false;
+  }
+  if (getJSONValue(cacheMD5, key) != md5) {
+    return false;
+  }
+  auto destPath = OUT_ROOT + "/" + key + "_base" + WEBP_FILE_EXT;
+  std::filesystem::create_directories(std::filesystem::path(destPath).parent_path());
+  std::filesystem::copy(existingPath, destPath, std::filesystem::copy_options::overwrite_existing);
+  return true;
+}
+#endif
+
 bool Baseline::compare(const Pixmap& pixmap, const std::string& key) {
   if (pixmap.isEmpty()) {
     return false;
@@ -143,7 +166,9 @@ bool Baseline::compare(const Pixmap& pixmap, const std::string& key) {
     SaveImage(pixmap, key);
   }
 #ifdef GENERATE_BASELINE_IMAGES
-  SaveImage(pixmap, key + "_base");
+  if (!tryCopyExistingBaseline(key, md5)) {
+    SaveImage(pixmap, key + "_base");
+  }
 #endif
   return result;
 }
