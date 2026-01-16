@@ -143,6 +143,15 @@ static const char BULGE_FRAGMENT_SHADER[] = R"(
     }
     )";
 
+struct BulgeUniforms {
+  float horizontalRadius = 0.0f;
+  float verticalRadius = 0.0f;
+  float bulgeCenterX = 0.0f;
+  float bulgeCenterY = 0.0f;
+  float bulgeHeight = 0.0f;
+  int pinning = 0;
+};
+
 std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> input,
                                                 RenderCache* cache, Effect* effect,
                                                 Frame layerFrame, const tgfx::Rect& contentBounds,
@@ -183,16 +192,7 @@ std::vector<tgfx::BindingEntry> BulgeFilter::uniformBlocks() const {
 void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                    const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                    const tgfx::Point&) const {
-  struct Uniforms {
-    float horizontalRadius = 0.0f;
-    float verticalRadius = 0.0f;
-    float bulgeCenterX = 0.0f;
-    float bulgeCenterY = 0.0f;
-    float bulgeHeight = 0.0f;
-    int pinning = 0;
-  };
-
-  Uniforms uniforms = {};
+  BulgeUniforms uniforms = {};
   uniforms.horizontalRadius = horizontalRadius;
   uniforms.verticalRadius = verticalRadius;
   uniforms.bulgeCenterX = bulgeCenter.x;
@@ -200,13 +200,13 @@ void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
   uniforms.bulgeHeight = bulgeHeight;
   uniforms.pinning = static_cast<int>(pinning);
 
-  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  auto uniformBuffer = gpu->createBuffer(sizeof(BulgeUniforms), tgfx::GPUBufferUsage::UNIFORM);
   if (uniformBuffer != nullptr) {
     auto* data = uniformBuffer->map();
     if (data != nullptr) {
-      memcpy(data, &uniforms, sizeof(Uniforms));
+      memcpy(data, &uniforms, sizeof(BulgeUniforms));
       uniformBuffer->unmap();
-      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(BulgeUniforms));
     }
   }
 }

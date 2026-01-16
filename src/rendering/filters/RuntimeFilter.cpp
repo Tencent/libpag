@@ -175,8 +175,13 @@ FilterResources* RuntimeFilter::getFilterResources(tgfx::GPU* gpu) const {
     if (pipeline == nullptr) {
       return nullptr;
     }
+    tgfx::SamplerDescriptor samplerDesc(tgfx::AddressMode::ClampToEdge,
+                                        tgfx::AddressMode::ClampToEdge, tgfx::FilterMode::Linear,
+                                        tgfx::FilterMode::Linear, tgfx::MipmapMode::None);
+    auto sampler = gpu->createSampler(samplerDesc);
     auto newResources = onCreateFilterResources();
     newResources->pipeline = std::move(pipeline);
+    newResources->sampler = std::move(sampler);
     resources = newResources.get();
     cache->addFilterResources(type, std::move(newResources));
   }
@@ -195,7 +200,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
 
   auto gpu = encoder->gpu();
   auto resources = getFilterResources(gpu);
-  if (resources == nullptr || resources->pipeline == nullptr) {
+  if (resources == nullptr) {
     LOGE("RuntimeFilter::onDraw() failed to get resources or pipeline");
     return false;
   }
@@ -253,15 +258,10 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
   vertexBuffer->unmap();
 
   renderPass->setVertexBuffer(vertexBuffer);
-
-  tgfx::SamplerDescriptor samplerDesc(tgfx::AddressMode::ClampToEdge,
-                                      tgfx::AddressMode::ClampToEdge, tgfx::FilterMode::Linear,
-                                      tgfx::FilterMode::Linear, tgfx::MipmapMode::None);
-  auto sampler = gpu->createSampler(samplerDesc);
-  renderPass->setTexture(0, inputTextures[0], sampler);
+  renderPass->setTexture(0, inputTextures[0], resources->sampler);
 
   for (size_t i = 1; i < inputTextures.size(); i++) {
-    renderPass->setTexture(static_cast<unsigned>(i), inputTextures[i], sampler);
+    renderPass->setTexture(static_cast<unsigned>(i), inputTextures[i], resources->sampler);
   }
 
   onUpdateUniforms(renderPass.get(), gpu, inputTextures, offset);

@@ -34,6 +34,7 @@ namespace pag {
 
 struct FilterResources {
   std::shared_ptr<tgfx::RenderPipeline> pipeline = nullptr;
+  std::shared_ptr<tgfx::Sampler> sampler = nullptr;
 
   virtual ~FilterResources() = default;
 };
