@@ -128,15 +128,6 @@ static const char SOLID_STROKE_THICK_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-struct SolidStrokeUniforms {
-  float color[3] = {};
-  float isUseOriginalTexture = 0.0f;
-  float size[2] = {};
-  float isOutside = 0.0f;
-  float isCenter = 0.0f;
-  float isInside = 0.0f;
-};
-
 std::shared_ptr<tgfx::ImageFilter> SolidStrokeFilter::CreateFilter(
     RenderCache* cache, const SolidStrokeOption& option, SolidStrokeMode mode,
     std::shared_ptr<tgfx::Image> source) {
@@ -196,7 +187,15 @@ void SolidStrokeFilter::onUpdateUniforms(
   spreadSizeX = std::min(spreadSizeX, STROKE_MAX_SPREAD_SIZE);
   spreadSizeY = std::min(spreadSizeY, STROKE_MAX_SPREAD_SIZE);
 
-  SolidStrokeUniforms uniforms = {};
+  struct Uniforms {
+    float color[3] = {};
+    float isUseOriginalTexture = 0.0f;
+    float size[2] = {};
+    float isOutside = 0.0f;
+    float isCenter = 0.0f;
+    float isInside = 0.0f;
+  };
+  Uniforms uniforms = {};
   uniforms.color[0] = color.red;
   uniforms.color[1] = color.green;
   uniforms.color[2] = color.blue;
@@ -206,25 +205,15 @@ void SolidStrokeFilter::onUpdateUniforms(
   uniforms.isCenter = option.position == StrokePosition::Center ? 1.0f : 0.0f;
   uniforms.isInside = option.position == StrokePosition::Inside ? 1.0f : 0.0f;
 
-  if (hasOriginalImage && inputTextures.size() > 1) {
-    tgfx::SamplerDescriptor samplerDesc(tgfx::AddressMode::ClampToEdge,
-                                        tgfx::AddressMode::ClampToEdge, tgfx::FilterMode::Linear,
-                                        tgfx::FilterMode::Linear, tgfx::MipmapMode::None);
-    auto sampler = gpu->createSampler(samplerDesc);
-    renderPass->setTexture(1, inputTextures[1], sampler);
-    uniforms.isUseOriginalTexture = 1.0f;
-  } else {
-    uniforms.isUseOriginalTexture = 0.0f;
-  }
+  uniforms.isUseOriginalTexture = (hasOriginalImage && inputTextures.size() > 1) ? 1.0f : 0.0f;
 
-  auto uniformBuffer =
-      gpu->createBuffer(sizeof(SolidStrokeUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
   if (uniformBuffer != nullptr) {
     auto* data = uniformBuffer->map();
     if (data != nullptr) {
-      memcpy(data, &uniforms, sizeof(SolidStrokeUniforms));
+      memcpy(data, &uniforms, sizeof(Uniforms));
       uniformBuffer->unmap();
-      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(SolidStrokeUniforms));
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
     }
   }
 }

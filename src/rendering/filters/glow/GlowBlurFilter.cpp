@@ -57,11 +57,6 @@ static const char GLOW_BLUR_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-struct GlowBlurUniforms {
-  float textureOffsetH = 0.0f;
-  float textureOffsetV = 0.0f;
-};
-
 GlowBlurRuntimeFilter::GlowBlurRuntimeFilter(RenderCache* cache, BlurDirection blurDirection,
                                              float blurOffset, float resizeRatio)
     : RuntimeFilter(cache), blurDirection(blurDirection), blurOffset(blurOffset),
@@ -83,16 +78,20 @@ std::vector<tgfx::BindingEntry> GlowBlurRuntimeFilter::uniformBlocks() const {
 void GlowBlurRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                              const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                              const tgfx::Point&) const {
-  GlowBlurUniforms uniforms = {};
+  struct Uniforms {
+    float textureOffsetH = 0.0f;
+    float textureOffsetV = 0.0f;
+  };
+  Uniforms uniforms = {};
   uniforms.textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
   uniforms.textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
-  auto uniformBuffer = gpu->createBuffer(sizeof(GlowBlurUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
   if (uniformBuffer != nullptr) {
     auto* data = uniformBuffer->map();
     if (data != nullptr) {
-      memcpy(data, &uniforms, sizeof(GlowBlurUniforms));
+      memcpy(data, &uniforms, sizeof(Uniforms));
       uniformBuffer->unmap();
-      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(GlowBlurUniforms));
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
     }
   }
 }

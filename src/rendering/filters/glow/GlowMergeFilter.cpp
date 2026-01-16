@@ -48,10 +48,6 @@ static const char GLOW_TARGET_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-struct GlowMergeUniforms {
-  float progress = 0.0f;
-};
-
 GlowMergeRuntimeFilter::GlowMergeRuntimeFilter(RenderCache* cache, float progress,
                                                std::shared_ptr<tgfx::Image> blurImage)
     : RuntimeFilter(cache, {std::move(blurImage)}), progress(progress) {
@@ -72,15 +68,18 @@ std::vector<tgfx::BindingEntry> GlowMergeRuntimeFilter::textureSamplers() const 
 void GlowMergeRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                               const std::vector<std::shared_ptr<tgfx::Texture>>&,
                                               const tgfx::Point&) const {
-  GlowMergeUniforms uniforms = {};
+  struct Uniforms {
+    float progress = 0.0f;
+  };
+  Uniforms uniforms = {};
   uniforms.progress = progress;
-  auto uniformBuffer = gpu->createBuffer(sizeof(GlowMergeUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
   if (uniformBuffer != nullptr) {
     auto* data = uniformBuffer->map();
     if (data != nullptr) {
-      memcpy(data, &uniforms, sizeof(GlowMergeUniforms));
+      memcpy(data, &uniforms, sizeof(Uniforms));
       uniformBuffer->unmap();
-      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(GlowMergeUniforms));
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
     }
   }
 }

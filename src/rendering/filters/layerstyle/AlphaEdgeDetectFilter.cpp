@@ -48,11 +48,6 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-struct AlphaEdgeDetectUniforms {
-  float horizontalStep = 0.0f;
-  float verticalStep = 0.0f;
-};
-
 std::string AlphaEdgeDetectLayerEffect::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
@@ -68,18 +63,21 @@ void AlphaEdgeDetectLayerEffect::onUpdateUniforms(
     return;
   }
 
-  AlphaEdgeDetectUniforms uniforms = {};
+  struct Uniforms {
+    float horizontalStep = 0.0f;
+    float verticalStep = 0.0f;
+  };
+  Uniforms uniforms = {};
   uniforms.horizontalStep = 1.0f / inputTextures[0]->width();
   uniforms.verticalStep = 1.0f / inputTextures[0]->height();
 
-  auto uniformBuffer =
-      gpu->createBuffer(sizeof(AlphaEdgeDetectUniforms), tgfx::GPUBufferUsage::UNIFORM);
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
   if (uniformBuffer != nullptr) {
     auto* data = uniformBuffer->map();
     if (data != nullptr) {
-      memcpy(data, &uniforms, sizeof(AlphaEdgeDetectUniforms));
+      memcpy(data, &uniforms, sizeof(Uniforms));
       uniformBuffer->unmap();
-      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(AlphaEdgeDetectUniforms));
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
     }
   }
 }
