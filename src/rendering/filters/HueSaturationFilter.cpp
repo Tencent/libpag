@@ -95,9 +95,9 @@ std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Im
   auto colorizeHue = hueSaturationEffect->colorizeHue->getValueAt(layerFrame);
   auto colorizeSaturation = hueSaturationEffect->colorizeSaturation->getValueAt(layerFrame);
   auto colorizeLightness = hueSaturationEffect->colorizeLightness->getValueAt(layerFrame);
-  auto filter = std::make_shared<HueSaturationFilter>(cache, hue, saturation, lightness, colorize,
-                                                      colorizeHue, colorizeSaturation,
-                                                      colorizeLightness);
+  auto filter =
+      std::make_shared<HueSaturationFilter>(cache, hue, saturation, lightness, colorize,
+                                            colorizeHue, colorizeSaturation, colorizeLightness);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 

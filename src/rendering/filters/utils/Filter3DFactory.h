@@ -23,8 +23,8 @@
 
 namespace pag {
 
-std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input,
-                                            RenderCache* cache, const FilterList* filterList,
+std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            const FilterList* filterList,
                                             const tgfx::Rect& clipBounds,
                                             const tgfx::Point& sourceScale,
                                             tgfx::Rect* filterBounds, tgfx::Point* offset);

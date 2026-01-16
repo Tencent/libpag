@@ -26,7 +26,8 @@ class RenderCache;
 
 class GlowMergeRuntimeFilter : public RuntimeFilter {
  public:
-  GlowMergeRuntimeFilter(RenderCache* cache, float progress, std::shared_ptr<tgfx::Image> blurImage);
+  GlowMergeRuntimeFilter(RenderCache* cache, float progress,
+                         std::shared_ptr<tgfx::Image> blurImage);
 
  protected:
   DEFINE_RUNTIME_FILTER_TYPE
