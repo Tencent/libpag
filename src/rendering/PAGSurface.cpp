@@ -230,6 +230,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   }
   cache->detachFromContext();
   context->submit(std::move(recording));
+  cache->prepareNextFrame();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
   unlockContext();
