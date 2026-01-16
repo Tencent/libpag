@@ -25,7 +25,9 @@
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
-DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {
+DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle, RenderCache* cache)
+    : layerStyle(layerStyle) {
+  this->cache = cache;
 }
 
 void DropShadowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
@@ -86,7 +88,7 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getStrokeFilter() const {
   strokeOption.spreadSizeY = sizeY * spread;
   strokeOption.offsetX = offsetX;
   strokeOption.offsetY = offsetY;
-  return SolidStrokeFilter::CreateFilter(strokeOption, mode);
+  return SolidStrokeFilter::CreateFilter(cache, strokeOption, mode);
 }
 
 std::shared_ptr<tgfx::ImageFilter> DropShadowFilter::getDropShadowFilter(float offsetX,

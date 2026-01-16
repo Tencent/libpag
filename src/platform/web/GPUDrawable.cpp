@@ -19,7 +19,6 @@
 #include "GPUDrawable.h"
 #include "base/utils/Log.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {

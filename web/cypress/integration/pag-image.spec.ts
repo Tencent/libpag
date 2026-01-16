@@ -65,7 +65,7 @@ describe('PAGImage', () => {
 
   it('Make from Texture', async () => {
     const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
-    const gl = canvas.getContext('webgl', {
+    const gl = canvas.getContext('webgl2', {
       depth: false,
       stencil: false,
       antialias: false,

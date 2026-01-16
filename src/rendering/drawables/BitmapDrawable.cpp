@@ -53,7 +53,7 @@ void BitmapDrawable::present(tgfx::Context* context) {
   }
   auto hardwareBuffer = bitmap->getHardwareBuffer();
   if (hardwareBuffer != nullptr) {
-    context->submit(true);
+    context->flushAndSubmit(true);
     pixelCopied = true;
     return;
   }

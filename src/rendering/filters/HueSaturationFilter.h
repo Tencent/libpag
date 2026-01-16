@@ -23,35 +23,25 @@
 
 namespace pag {
 
-class HueSaturationUniform : public Uniforms {
- public:
-  HueSaturationUniform(tgfx::Context* context, unsigned program);
-
-  int hueHandle = -1;
-  int saturationHandle = -1;
-  int lightnessHandle = -1;
-  int colorizeHandle = -1;
-  int colorizeHueHandle = -1;
-  int colorizeSaturationHandle = -1;
-  int colorizeLightnessHandle = -1;
-};
-
 class HueSaturationFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
-  HueSaturationFilter(float hue, float saturation, float lightness, float colorize,
-                      float colorizeHue, float colorizeSaturation, float colorizeLightness);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
+
+  HueSaturationFilter(RenderCache* cache, float hue, float saturation, float lightness,
+                      float colorize, float colorizeHue, float colorizeSaturation,
+                      float colorizeLightness);
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
  private:
   float hue = 0.f;

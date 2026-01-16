@@ -25,43 +25,14 @@
 namespace pag {
 class RenderCache;
 
-class DisplacementMapEffectUniforms : public Uniforms {
- public:
-  DisplacementMapEffectUniforms(tgfx::Context* context, unsigned program)
-      : Uniforms(context, program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    mapTextureHandle = gl->getUniformLocation(program, "mapTexture");
-    flagsHandle = gl->getUniformLocation(program, "uFlags");
-    inputMatrixHandle = gl->getUniformLocation(program, "uInputMatrix");
-    mapMatrixHandle = gl->getUniformLocation(program, "uMapMatrix");
-    inputSizeHandle = gl->getUniformLocation(program, "uInputSize");
-    selectorMatrixRGBAHandle = gl->getUniformLocation(program, "uSelectorMatrixRGBA");
-    selectorMatrixHSLAHandle = gl->getUniformLocation(program, "uSelectorMatrixHSLA");
-    selectorOffsetHandle = gl->getUniformLocation(program, "uSelectorOffset");
-    effectOpacityHandle = gl->getUniformLocation(program, "uEffectOpacity");
-  }
-
-  int flagsHandle = 0;
-  int inputMatrixHandle = 0;
-  int mapMatrixHandle = 0;
-  int inputSizeHandle = 0;
-  int selectorMatrixRGBAHandle = 0;
-  int selectorMatrixHSLAHandle = 0;
-  int selectorOffsetHandle = 0;
-  int mapTextureHandle = 0;
-  int effectOpacityHandle = 0;
-};
-
 class DisplacementMapFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
-
   static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
                                             Layer* layer, RenderCache* cache,
                                             const tgfx::Matrix& layerMatrix, Frame layerFrame,
                                             const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  DisplacementMapFilter(DisplacementMapSource useForHorizontalDisplacement,
+  DisplacementMapFilter(RenderCache* cache, DisplacementMapSource useForHorizontalDisplacement,
                         float maxHorizontalDisplacement,
                         DisplacementMapSource useForVerticalDisplacement,
                         float maxVerticalDisplacement,
@@ -69,7 +40,7 @@ class DisplacementMapFilter : public RuntimeFilter {
                         bool expandOutput, float effectOpacity, tgfx::Matrix layerMatrix,
                         tgfx::Size size, tgfx::Size displacementSize, tgfx::Rect contentBounds,
                         std::shared_ptr<tgfx::Image> sourceImage)
-      : RuntimeFilter({std::move(sourceImage)}),
+      : RuntimeFilter(cache, {std::move(sourceImage)}),
         useForHorizontalDisplacement(useForHorizontalDisplacement),
         maxHorizontalDisplacement(maxHorizontalDisplacement),
         useForVerticalDisplacement(useForVerticalDisplacement),
@@ -80,12 +51,17 @@ class DisplacementMapFilter : public RuntimeFilter {
   }
 
  protected:
-  std::string onBuildFragmentShader() const override;
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  DEFINE_RUNTIME_FILTER_TYPE
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  std::string onBuildFragmentShader() const override;
+
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
+
+  std::vector<tgfx::BindingEntry> textureSamplers() const override;
+
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 

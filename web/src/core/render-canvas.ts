@@ -18,11 +18,11 @@ export class RenderCanvas {
 
   public constructor(canvas: HTMLCanvasElement | OffscreenCanvas, contextAttributes?: WebGLContextAttributes) {
     this._canvas = canvas;
-    const gl = canvas.getContext('webgl', {
+    const gl = canvas.getContext('webgl2', {
       ...WEBGL_CONTEXT_ATTRIBUTES,
       ...contextAttributes,
-    }) as WebGLRenderingContext;
-    if (!gl) throw new Error('Canvas context is not WebGL!');
+    }) as WebGL2RenderingContext;
+    if (!gl) throw new Error('Canvas context is not WebGL2!');
     this._glContext = BackendContext.from(gl);
   }
 

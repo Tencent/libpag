@@ -18,8 +18,16 @@
 
 #include "rendering/drawables/TextureDrawable.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
+
+#ifdef PAG_USE_SWIFTSHADER
+#include <GLES3/gl3.h>
+#else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
+#include <OpenGL/gl3.h>
+#endif
 
 namespace pag {
 using namespace tgfx;
@@ -45,11 +53,6 @@ uint32_t GetGLVersion(const char* versionString) {
   if (4 == n) {
     return GL_VER(major, minor);
   }
-  char profile[2];
-  n = sscanf(versionString, "OpenGL ES-%c%c %d.%d", profile, profile + 1, &major, &minor);
-  if (4 == n) {
-    return GL_VER(major, minor);
-  }
   n = sscanf(versionString, "OpenGL ES %d.%d", &major, &minor);
   if (2 == n) {
     return GL_VER(major, minor);
@@ -69,8 +72,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto gl = GLFunctions::Get(context);
-  auto versionString = (const char*)gl->getString(GL_VERSION);
+  auto versionString = (const char*)glGetString(GL_VERSION);
   auto glVersion = GetGLVersion(versionString);
 
   tgfx::GLTextureInfo textureInfo;
@@ -141,8 +143,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
+  glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 
@@ -172,8 +173,7 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
+  glDeleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 }  // namespace pag

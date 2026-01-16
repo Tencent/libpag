@@ -23,57 +23,33 @@
 
 namespace pag {
 
-class MotionTileUniforms : public Uniforms {
- public:
-  explicit MotionTileUniforms(tgfx::Context* context, unsigned program)
-      : Uniforms(context, program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
-    tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
-    tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
-    outputWidthHandle = gl->getUniformLocation(program, "uOutputWidth");
-    outputHeightHandle = gl->getUniformLocation(program, "uOutputHeight");
-    mirrorEdgesHandle = gl->getUniformLocation(program, "uMirrorEdges");
-    phaseHandle = gl->getUniformLocation(program, "uPhase");
-    isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
-  }
-  int tileCenterHandle = 0;
-  int tileWidthHandle = 0;
-  int tileHeightHandle = 0;
-  int outputWidthHandle = 0;
-  int outputHeightHandle = 0;
-  int mirrorEdgesHandle = 0;
-  int phaseHandle = 0;
-  int isHorizontalPhaseShiftHandle = 0;
-};
-
 class MotionTileFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID;
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
-
-  explicit MotionTileFilter(Point tileCenter, float tileWidth, float tileHeight, float outputWidth,
-                            float outputHeight, bool mirrorEdges, float phase,
-                            bool horizontalPhaseShift)
-      : tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
+  MotionTileFilter(RenderCache* cache, Point tileCenter, float tileWidth, float tileHeight,
+                   float outputWidth, float outputHeight, bool mirrorEdges, float phase,
+                   bool horizontalPhaseShift)
+      : RuntimeFilter(cache), tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
         outputWidth(outputWidth), outputHeight(outputHeight), mirrorEdges(mirrorEdges),
         phase(phase), horizontalPhaseShift(horizontalPhaseShift) {
   }
   ~MotionTileFilter() override = default;
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>&) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 

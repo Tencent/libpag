@@ -23,35 +23,6 @@
 
 namespace pag {
 
-class LevelsIndividualUniforms : public Uniforms {
- public:
-  LevelsIndividualUniforms(tgfx::Context* context, unsigned program);
-  // Handle
-  int inputBlackHandle;
-  int inputWhiteHandle;
-  int gammaHandle;
-  int outputBlackHandle;
-  int outputWhiteHandle;
-
-  int redInputBlackHandle;
-  int redInputWhiteHandle;
-  int redGammaHandle;
-  int redOutputBlackHandle;
-  int redOutputWhiteHandle;
-
-  int blueInputBlackHandle;
-  int blueInputWhiteHandle;
-  int blueGammaHandle;
-  int blueOutputBlackHandle;
-  int blueOutputWhiteHandle;
-
-  int greenInputBlackHandle;
-  int greenInputWhiteHandle;
-  int greenGammaHandle;
-  int greenOutputBlackHandle;
-  int greenOutputWhiteHandle;
-};
-
 struct LevelsIndividualFilterParam {
   // 0 is red, 1 is green, 2 is blue, 3 is global
   float inBlack[4] = {};
@@ -63,22 +34,23 @@ struct LevelsIndividualFilterParam {
 
 class LevelsIndividualFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
-
-  explicit LevelsIndividualFilter(const LevelsIndividualFilterParam& param) : param(param) {
+  LevelsIndividualFilter(RenderCache* cache, const LevelsIndividualFilterParam& param)
+      : RuntimeFilter(cache), param(param) {
   }
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>&) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
  private:
   LevelsIndividualFilterParam param;

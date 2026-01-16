@@ -24,12 +24,14 @@
 
 namespace pag {
 struct FilterList;
+class RenderCache;
 
 class LayerStylesFilter {
  public:
   static void TransformBounds(tgfx::Rect* bounds, const FilterList* filterList);
 
-  static std::shared_ptr<LayerStylesFilter> Make(const std::vector<LayerStyle*>& layerStyles,
+  static std::shared_ptr<LayerStylesFilter> Make(RenderCache* cache,
+                                                 const std::vector<LayerStyle*>& layerStyles,
                                                  Frame layerFrame, float sourceScale,
                                                  const tgfx::Point& filterScale);
 

@@ -22,10 +22,9 @@
 
 namespace pag {
 static const char CORNER_PIN_VERTEX_SHADER[] = R"(
-        #version 100
-        attribute vec2 aPosition;
-        attribute vec3 aTextureCoord;
-        varying vec3 vertexColor;
+        in vec2 aPosition;
+        in vec3 aTextureCoord;
+        out vec3 vertexColor;
         void main() {
             gl_Position = vec4(aPosition.xy, 0, 1);
             vertexColor = aTextureCoord;
@@ -33,17 +32,18 @@ static const char CORNER_PIN_VERTEX_SHADER[] = R"(
     )";
 
 static const char CORNER_PIN_FRAGMENT_SHADER[] = R"(
-        #version 100
         precision mediump float;
-        varying vec3 vertexColor;
+        in vec3 vertexColor;
         uniform sampler2D sTexture;
+        out vec4 tgfx_FragColor;
         void main() {
-            gl_FragColor = texture2D(sTexture, vertexColor.xy / vertexColor.z);
+            tgfx_FragColor = texture(sTexture, vertexColor.xy / vertexColor.z);
         }
     )";
 
 std::shared_ptr<tgfx::Image> CornerPinFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                    Effect* effect, Frame layerFrame,
+                                                    RenderCache* cache, Effect* effect,
+                                                    Frame layerFrame,
                                                     const tgfx::Point& sourceScale,
                                                     tgfx::Point* offset) {
   auto cornerPinEffect = reinterpret_cast<const CornerPinEffect*>(effect);
@@ -56,7 +56,7 @@ std::shared_ptr<tgfx::Image> CornerPinFilter::Apply(std::shared_ptr<tgfx::Image>
     point.x *= sourceScale.x;
     point.y *= sourceScale.y;
   }
-  auto filter = std::shared_ptr<CornerPinFilter>(new CornerPinFilter(points));
+  auto filter = std::shared_ptr<CornerPinFilter>(new CornerPinFilter(cache, points));
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
@@ -66,6 +66,10 @@ std::string CornerPinFilter::onBuildVertexShader() const {
 
 std::string CornerPinFilter::onBuildFragmentShader() const {
   return CORNER_PIN_FRAGMENT_SHADER;
+}
+
+std::vector<tgfx::Attribute> CornerPinFilter::vertexAttributes() const {
+  return {{"aPosition", tgfx::VertexFormat::Float2}, {"aTextureCoord", tgfx::VertexFormat::Float3}};
 }
 
 tgfx::Rect CornerPinFilter::filterBounds(const tgfx::Rect&) const {
@@ -129,47 +133,27 @@ void CornerPinFilter::calculateVertexQs() {
   }
 }
 
-std::vector<float> CornerPinFilter::computeVertices(
-    const std::vector<tgfx::BackendTexture>& sources, const tgfx::BackendRenderTarget& target,
-    const tgfx::Point& offset) const {
-  const auto& source = sources[0];
+std::vector<float> CornerPinFilter::computeVertices(const tgfx::Texture* source,
+                                                    const tgfx::Texture* target,
+                                                    const tgfx::Point& offset) const {
   tgfx::Point texturePoints[4] = {
-      {0.0f, static_cast<float>(source.height())},
-      {static_cast<float>(source.width()), static_cast<float>(source.height())},
+      {0.0f, static_cast<float>(source->height())},
+      {static_cast<float>(source->width()), static_cast<float>(source->height())},
       {0.0f, 0.0f},
-      {static_cast<float>(source.width()), 0.0f}};
+      {static_cast<float>(source->width()), 0.0f}};
 
   std::vector<float> vertices = {};
+  vertices.reserve(20);
   for (size_t i = 0; i < 4; i++) {
-    auto vertexPoint = ToGLVertexPoint(target, cornerPoints[i] + offset);
+    auto vertexPoint = ToVertexPoint(target, cornerPoints[i] + offset);
     vertices.push_back(vertexPoint.x);
     vertices.push_back(vertexPoint.y);
-    auto texturePoint = ToGLTexturePoint(&source, texturePoints[i]);
+    auto texturePoint = ToTexturePoint(source, texturePoints[i]);
     vertices.push_back(texturePoint.x * vertexQs[i]);
     vertices.push_back(texturePoint.y * vertexQs[i]);
     vertices.push_back(vertexQs[i]);
   }
   return vertices;
-}
-
-void CornerPinFilter::bindVertices(tgfx::Context* context, const RuntimeProgram* program,
-                                   const std::vector<float>& points) const {
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = program->uniforms.get();
-  if (program->vertexArray > 0) {
-    gl->bindVertexArray(program->vertexArray);
-  }
-  gl->bindBuffer(GL_ARRAY_BUFFER, program->vertexBuffer);
-  gl->bufferData(GL_ARRAY_BUFFER, static_cast<tgfx::GLsizeiptr>(points.size() * sizeof(float)),
-                 points.data(), GL_STREAM_DRAW);
-  gl->vertexAttribPointer(static_cast<unsigned>(uniform->positionHandle), 2, GL_FLOAT, GL_FALSE,
-                          5 * sizeof(float), static_cast<void*>(0));
-  gl->enableVertexAttribArray(static_cast<unsigned>(uniform->positionHandle));
-
-  gl->vertexAttribPointer(uniform->textureCoordHandle, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                          reinterpret_cast<void*>(2 * sizeof(float)));
-  gl->enableVertexAttribArray(uniform->textureCoordHandle);
-  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 int CornerPinFilter::sampleCount() const {
