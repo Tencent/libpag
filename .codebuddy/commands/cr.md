@@ -16,11 +16,9 @@ description: 代码审查 - 支持在线 PR 审查和本地变更审查
 
 ```bash
 gh --version
-gh auth status
 ```
 
 - 未安装 gh：提示用户安装（macOS: `brew install gh`，其他系统参考 https://cli.github.com）
-- 未登录：提示用户运行 `gh auth login` 完成登录
 
 ### 清理遗留环境
 
@@ -64,14 +62,25 @@ done
 ### 本地模式
 
 ```bash
-git status && git diff && git diff --cached
+git status
+git diff
+git diff --cached
 ```
+
+对于未跟踪的新增文件（`git status` 中以 `??` 开头的文件），使用 Read 工具读取文件内容进行审查。
 
 ### Worktree 模式
 
-先判断当前分支是否为 PR 分支：
+先获取 PR 信息（一次调用获取所有需要的字段）：
 ```bash
-PR_BRANCH=$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+PR_INFO=$(gh pr view {pr_number} --json headRefName,baseRefName,author)
+PR_BRANCH=$(echo "$PR_INFO" | jq -r '.headRefName')
+BASE_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
+PR_AUTHOR=$(echo "$PR_INFO" | jq -r '.author.login')
+```
+
+判断当前分支是否为 PR 分支：
+```bash
 CURRENT_BRANCH=$(git branch --show-current)
 [ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
 ```
@@ -85,16 +94,17 @@ git worktree add /tmp/pr-review-{pr_number} pr-{pr_number}
 cd /tmp/pr-review-{pr_number}
 ```
 
-获取变更内容：
+获取变更内容和评论：
 ```bash
-BASE_BRANCH=$(gh pr view {pr_number} --json baseRefName -q '.baseRefName')
 git diff origin/${BASE_BRANCH}...HEAD
 gh pr view {pr_number} --comments
 ```
 
 ### 在线模式
 
+**并行获取**以下信息（三个独立 API 调用，并行可显著减少等待时间）：
 ```bash
+PR_AUTHOR=$(gh pr view {pr_number} --json author -q '.author.login')
 gh pr diff {pr_number}
 gh pr view {pr_number} --comments
 ```
@@ -130,7 +140,7 @@ gh pr view {pr_number} --comments
 
 **若有问题**：按以下流程处理。
 
-判断代码归属（Worktree / 在线模式）：`[ "$(gh pr view {pr_number} --json author -q '.author.login')" = "$(gh api user -q '.login')" ]`
+判断代码归属（Worktree / 在线模式）：比较 `$PR_AUTHOR` 与 `gh api user -q '.login'`
 
 | 模式 | 自己的代码 | 别人的代码 |
 |------|----------|----------|
@@ -157,8 +167,10 @@ gh pr view {pr_number} --comments
 **Worktree 模式**：修复完成后提交并推送到 PR 分支：
 ```bash
 git add . && git commit -m "{根据修复内容生成}"
-git push origin HEAD:$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+git push origin HEAD:$PR_BRANCH
 ```
+
+> 注：`{PR_BRANCH}` 使用前面获取的 `headRefName`。
 
 ### 询问评论（别人的代码必须走此流程）
 

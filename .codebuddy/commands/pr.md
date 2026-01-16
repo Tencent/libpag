@@ -13,8 +13,8 @@ description: 提交 PR - 自动识别新建或追加提交
 ### 检查是否已有开启的 PR
 
 ```bash
-git branch --show-current
-gh pr list --head "$(git branch --show-current)" --state open --json number,url
+CURRENT_BRANCH=$(git branch --show-current)
+gh pr list --head "$CURRENT_BRANCH" --state open --json number,url
 ```
 
 根据结果选择模式：
@@ -85,7 +85,7 @@ git push
 ```
 **Commit**：{Commit 信息}
 
-**PR 链接**：{PR 链接}（已追加提交）
+**PR 链接**（已追加提交）：{PR 链接}
 ```
 
 ### 新建模式
@@ -109,7 +109,7 @@ gh pr create --title "{Commit 信息}" --body "{PR 描述}"
 
 **PR 描述**：{PR 描述}
 
-**PR 链接**：{PR 链接}（新建）
+**PR 链接**（新建）：{PR 链接}
 ```
 
 ---
