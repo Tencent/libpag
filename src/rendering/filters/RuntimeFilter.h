@@ -98,6 +98,32 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
                                 const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
                                 const tgfx::Point& offset) const;
 
+  /**
+   * Called to configure the render pipeline descriptor before creating the pipeline.
+   * Subclasses can override this to add custom configurations like depth/stencil settings.
+   */
+  virtual void onConfigurePipeline(tgfx::RenderPipelineDescriptor* descriptor) const;
+
+  /**
+   * Creates and returns the FilterResources for this filter.
+   * Subclasses can override this to return a custom FilterResources subclass.
+   */
+  virtual std::unique_ptr<FilterResources> onCreateFilterResources() const;
+
+  /**
+   * Called to configure the render pass descriptor before beginning the render pass.
+   * Subclasses can override this to add custom attachments like depth textures.
+   * @param renderPassDesc The render pass descriptor to configure.
+   * @param resources The filter resources.
+   * @param gpu The GPU instance.
+   * @param outputTexture The output texture.
+   */
+  virtual void onConfigureRenderPass(tgfx::RenderPassDescriptor* renderPassDesc,
+                                     FilterResources* resources, tgfx::GPU* gpu,
+                                     const std::shared_ptr<tgfx::Texture>& outputTexture) const;
+
+  FilterResources* getFilterResources(tgfx::GPU* gpu) const;
+
   std::shared_ptr<tgfx::RenderPipeline> getPipeline(tgfx::GPU* gpu) const;
 
  private:

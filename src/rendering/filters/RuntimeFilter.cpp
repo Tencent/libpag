@@ -112,7 +112,19 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::createPipeline(tgfx::GPU* g
   descriptor.fragment.colorAttachments.push_back(colorAttachment);
   descriptor.layout.textureSamplers = textureSamplers();
   descriptor.layout.uniformBlocks = uniformBlocks();
+  onConfigurePipeline(&descriptor);
   return gpu->createRenderPipeline(descriptor);
+}
+
+void RuntimeFilter::onConfigurePipeline(tgfx::RenderPipelineDescriptor*) const {
+}
+
+std::unique_ptr<FilterResources> RuntimeFilter::onCreateFilterResources() const {
+  return std::make_unique<FilterResources>();
+}
+
+void RuntimeFilter::onConfigureRenderPass(tgfx::RenderPassDescriptor*, FilterResources*, tgfx::GPU*,
+                                          const std::shared_ptr<tgfx::Texture>&) const {
 }
 
 std::vector<float> RuntimeFilter::computeVertices(const tgfx::Texture* source,
@@ -148,6 +160,14 @@ void RuntimeFilter::onUpdateUniforms(tgfx::RenderPass*, tgfx::GPU*,
 }
 
 std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::getPipeline(tgfx::GPU* gpu) const {
+  auto resources = getFilterResources(gpu);
+  if (resources == nullptr) {
+    return nullptr;
+  }
+  return resources->pipeline;
+}
+
+FilterResources* RuntimeFilter::getFilterResources(tgfx::GPU* gpu) const {
   auto type = filterType();
   auto resources = cache->findFilterResources(type);
   if (resources == nullptr) {
@@ -155,13 +175,13 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::getPipeline(tgfx::GPU* gpu)
     if (pipeline == nullptr) {
       return nullptr;
     }
-    auto newResources = std::make_unique<FilterResources>();
+    auto newResources = onCreateFilterResources();
     newResources->pipeline = std::move(pipeline);
     resources = newResources.get();
     cache->addFilterResources(type, std::move(newResources));
   }
   DEBUG_ASSERT(resources->pipeline != nullptr);
-  return resources->pipeline;
+  return resources;
 }
 
 bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
@@ -174,9 +194,9 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
   }
 
   auto gpu = encoder->gpu();
-  auto pipeline = getPipeline(gpu);
-  if (pipeline == nullptr) {
-    LOGE("RuntimeFilter::onDraw() failed to create pipeline");
+  auto resources = getFilterResources(gpu);
+  if (resources == nullptr || resources->pipeline == nullptr) {
+    LOGE("RuntimeFilter::onDraw() failed to get resources or pipeline");
     return false;
   }
 
@@ -204,6 +224,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
     renderPassDesc = tgfx::RenderPassDescriptor(renderTexture, tgfx::LoadAction::Clear,
                                                 tgfx::StoreAction::Store);
   }
+  onConfigureRenderPass(&renderPassDesc, resources, gpu, outputTexture);
 
   auto renderPass = encoder->beginRenderPass(renderPassDesc);
   if (renderPass == nullptr) {
@@ -211,7 +232,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
     return false;
   }
 
-  renderPass->setPipeline(pipeline);
+  renderPass->setPipeline(resources->pipeline);
 
   auto vertices = computeVertices(inputTextures[0].get(), outputTexture.get(), offset);
   auto vertexBuffer =
