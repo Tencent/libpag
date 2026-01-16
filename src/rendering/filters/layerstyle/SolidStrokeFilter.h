@@ -24,6 +24,8 @@
 #include "tgfx/core/Color.h"
 
 namespace pag {
+class RenderCache;
+
 enum class SolidStrokeMode { Normal, Thick };
 
 struct SolidStrokeOption {
@@ -42,14 +44,16 @@ struct SolidStrokeOption {
 class SolidStrokeFilter : public RuntimeFilter {
  public:
   static std::shared_ptr<tgfx::ImageFilter> CreateFilter(
-      const SolidStrokeOption& option, SolidStrokeMode mode,
+      RenderCache* cache, const SolidStrokeOption& option, SolidStrokeMode mode,
       std::shared_ptr<tgfx::Image> source = nullptr);
 
-  SolidStrokeFilter(const SolidStrokeOption& option) : option(option) {
+  SolidStrokeFilter(RenderCache* cache, const SolidStrokeOption& option)
+      : RuntimeFilter(cache), option(option) {
   }
 
-  SolidStrokeFilter(const SolidStrokeOption& option, std::shared_ptr<tgfx::Image> originalImage)
-      : RuntimeFilter({std::move(originalImage)}), option(option), hasOriginalImage(true) {
+  SolidStrokeFilter(RenderCache* cache, const SolidStrokeOption& option,
+                    std::shared_ptr<tgfx::Image> originalImage)
+      : RuntimeFilter(cache, {std::move(originalImage)}), option(option), hasOriginalImage(true) {
   }
 
   void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
@@ -72,28 +76,38 @@ class SolidStrokeFilter : public RuntimeFilter {
 
 class SolidStrokeNormalFilter : public SolidStrokeFilter {
  public:
-  static std::shared_ptr<SolidStrokeNormalFilter> Make(SolidStrokeOption option,
+  static std::shared_ptr<SolidStrokeNormalFilter> Make(RenderCache* cache, SolidStrokeOption option,
                                                        std::shared_ptr<tgfx::Image> originalImage);
-  explicit SolidStrokeNormalFilter(SolidStrokeOption option) : SolidStrokeFilter(option) {
+  SolidStrokeNormalFilter(RenderCache* cache, SolidStrokeOption option)
+      : SolidStrokeFilter(cache, option) {
   }
-  SolidStrokeNormalFilter(SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage)
-      : SolidStrokeFilter(option, std::move(originalImage)) {
+  SolidStrokeNormalFilter(RenderCache* cache, SolidStrokeOption option,
+                          std::shared_ptr<tgfx::Image> originalImage)
+      : SolidStrokeFilter(cache, option, std::move(originalImage)) {
   }
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 };
 
 class SolidStrokeThickFilter : public SolidStrokeFilter {
  public:
-  static std::shared_ptr<SolidStrokeThickFilter> Make(SolidStrokeOption option,
+  static std::shared_ptr<SolidStrokeThickFilter> Make(RenderCache* cache, SolidStrokeOption option,
                                                       std::shared_ptr<tgfx::Image> originalImage);
 
-  explicit SolidStrokeThickFilter(SolidStrokeOption option) : SolidStrokeFilter(option) {
+  SolidStrokeThickFilter(RenderCache* cache, SolidStrokeOption option)
+      : SolidStrokeFilter(cache, option) {
   }
 
-  SolidStrokeThickFilter(SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage)
-      : SolidStrokeFilter(option, std::move(originalImage)) {
+  SolidStrokeThickFilter(RenderCache* cache, SolidStrokeOption option,
+                         std::shared_ptr<tgfx::Image> originalImage)
+      : SolidStrokeFilter(cache, option, std::move(originalImage)) {
   }
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 };

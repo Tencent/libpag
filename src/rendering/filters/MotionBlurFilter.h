@@ -30,14 +30,18 @@ class MotionBlurFilter : public RuntimeFilter {
 
   static bool ShouldSkipFilter(Layer* layer, Frame layerFrame);
 
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Layer* layer,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Layer* layer, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  MotionBlurFilter(const std::array<float, 9>& preMatrix, const std::array<float, 9>& curMatrix)
-      : _previousMatrix(preMatrix), _currentMatrix(curMatrix) {
+  MotionBlurFilter(RenderCache* cache, const std::array<float, 9>& preMatrix,
+                   const std::array<float, 9>& curMatrix)
+      : RuntimeFilter(cache), _previousMatrix(preMatrix), _currentMatrix(curMatrix) {
   }
   ~MotionBlurFilter() override = default;
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 

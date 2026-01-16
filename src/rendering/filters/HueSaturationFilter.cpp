@@ -84,8 +84,8 @@ static const char FRAGMENT_SHADER[] = R"(
     )";
 
 std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                        Effect* effect, Frame layerFrame,
-                                                        tgfx::Point* offset) {
+                                                        RenderCache* cache, Effect* effect,
+                                                        Frame layerFrame, tgfx::Point* offset) {
   auto* hueSaturationEffect = reinterpret_cast<const HueSaturationEffect*>(effect);
   auto channelControl = static_cast<int>(hueSaturationEffect->channelControl);
   auto hue = hueSaturationEffect->hue[channelControl];
@@ -95,16 +95,17 @@ std::shared_ptr<tgfx::Image> HueSaturationFilter::Apply(std::shared_ptr<tgfx::Im
   auto colorizeHue = hueSaturationEffect->colorizeHue->getValueAt(layerFrame);
   auto colorizeSaturation = hueSaturationEffect->colorizeSaturation->getValueAt(layerFrame);
   auto colorizeLightness = hueSaturationEffect->colorizeLightness->getValueAt(layerFrame);
-  auto filter = std::make_shared<HueSaturationFilter>(
-      hue, saturation, lightness, colorize, colorizeHue, colorizeSaturation, colorizeLightness);
+  auto filter = std::make_shared<HueSaturationFilter>(cache, hue, saturation, lightness, colorize,
+                                                      colorizeHue, colorizeSaturation,
+                                                      colorizeLightness);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
-HueSaturationFilter::HueSaturationFilter(float hue, float saturation, float lightness,
-                                         float colorize, float colorizeHue,
+HueSaturationFilter::HueSaturationFilter(RenderCache* cache, float hue, float saturation,
+                                         float lightness, float colorize, float colorizeHue,
                                          float colorizeSaturation, float colorizeLightness)
-    : hue(hue), saturation(saturation), lightness(lightness), colorize(colorize),
-      colorizeHue(colorizeHue), colorizeSaturation(colorizeSaturation),
+    : RuntimeFilter(cache), hue(hue), saturation(saturation), lightness(lightness),
+      colorize(colorize), colorizeHue(colorizeHue), colorizeSaturation(colorizeSaturation),
       colorizeLightness(colorizeLightness) {
 }
 

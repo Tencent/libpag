@@ -25,14 +25,16 @@ namespace pag {
 
 class BulgeFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  BulgeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
-              float bulgeHeight, float pinning);
+  BulgeFilter(RenderCache* cache, float horizontalRadius, float verticalRadius,
+              const Point& bulgeCenter, float bulgeHeight, float pinning);
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;

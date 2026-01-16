@@ -22,12 +22,15 @@
 #include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
+class RenderCache;
 
 class GlowMergeRuntimeFilter : public RuntimeFilter {
  public:
-  GlowMergeRuntimeFilter(float progress, std::shared_ptr<tgfx::Image> blurImage);
+  GlowMergeRuntimeFilter(RenderCache* cache, float progress, std::shared_ptr<tgfx::Image> blurImage);
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;

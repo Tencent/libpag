@@ -34,13 +34,16 @@ struct LevelsIndividualFilterParam {
 
 class LevelsIndividualFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 
-  explicit LevelsIndividualFilter(const LevelsIndividualFilterParam& param) : param(param) {
+  LevelsIndividualFilter(RenderCache* cache, const LevelsIndividualFilterParam& param)
+      : RuntimeFilter(cache), param(param) {
   }
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;

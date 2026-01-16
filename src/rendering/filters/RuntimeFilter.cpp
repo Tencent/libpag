@@ -18,6 +18,7 @@
 
 #include "RuntimeFilter.h"
 #include "base/utils/Log.h"
+#include "rendering/caches/RenderCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -146,6 +147,23 @@ void RuntimeFilter::onUpdateUniforms(tgfx::RenderPass*, tgfx::GPU*,
                                      const tgfx::Point&) const {
 }
 
+std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::getPipeline(tgfx::GPU* gpu) const {
+  auto type = filterType();
+  auto resources = cache->findFilterResources(type);
+  if (resources == nullptr) {
+    auto pipeline = createPipeline(gpu);
+    if (pipeline == nullptr) {
+      return nullptr;
+    }
+    auto newResources = std::make_unique<FilterResources>();
+    newResources->pipeline = std::move(pipeline);
+    resources = newResources.get();
+    cache->addFilterResources(type, std::move(newResources));
+  }
+  DEBUG_ASSERT(resources->pipeline != nullptr);
+  return resources->pipeline;
+}
+
 bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
                            const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
                            std::shared_ptr<tgfx::Texture> outputTexture,
@@ -156,7 +174,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
   }
 
   auto gpu = encoder->gpu();
-  auto pipeline = createPipeline(gpu);
+  auto pipeline = getPipeline(gpu);
   if (pipeline == nullptr) {
     LOGE("RuntimeFilter::onDraw() failed to create pipeline");
     return false;

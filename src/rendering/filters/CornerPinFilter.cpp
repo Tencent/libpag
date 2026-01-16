@@ -42,7 +42,8 @@ static const char CORNER_PIN_FRAGMENT_SHADER[] = R"(
     )";
 
 std::shared_ptr<tgfx::Image> CornerPinFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                    Effect* effect, Frame layerFrame,
+                                                    RenderCache* cache, Effect* effect,
+                                                    Frame layerFrame,
                                                     const tgfx::Point& sourceScale,
                                                     tgfx::Point* offset) {
   auto cornerPinEffect = reinterpret_cast<const CornerPinEffect*>(effect);
@@ -55,7 +56,7 @@ std::shared_ptr<tgfx::Image> CornerPinFilter::Apply(std::shared_ptr<tgfx::Image>
     point.x *= sourceScale.x;
     point.y *= sourceScale.y;
   }
-  auto filter = std::shared_ptr<CornerPinFilter>(new CornerPinFilter(points));
+  auto filter = std::shared_ptr<CornerPinFilter>(new CornerPinFilter(cache, points));
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 

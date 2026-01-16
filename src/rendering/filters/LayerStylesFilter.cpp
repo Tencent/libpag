@@ -34,12 +34,12 @@ void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* fi
 }
 
 std::shared_ptr<LayerStylesFilter> LayerStylesFilter::Make(
-    const std::vector<LayerStyle*>& layerStyles, Frame layerFrame, float sourceScale,
-    const tgfx::Point& filterScale) {
+    RenderCache* cache, const std::vector<LayerStyle*>& layerStyles, Frame layerFrame,
+    float sourceScale, const tgfx::Point& filterScale) {
   std::vector<std::unique_ptr<LayerStyleFilter>> blowFilters;
   std::vector<std::unique_ptr<LayerStyleFilter>> aboveFilters;
   for (auto& layerStyle : layerStyles) {
-    auto filter = LayerStyleFilter::Make(layerStyle);
+    auto filter = LayerStyleFilter::Make(layerStyle, cache);
     if (!filter) {
       continue;
     }

@@ -18,17 +18,36 @@
 
 #pragma once
 
+#include <memory>
+#include "base/utils/UniqueID.h"
+#include "pag/types.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace pag {
+
+#define DEFINE_RUNTIME_FILTER_TYPE             \
+  ID filterType() const override {             \
+    static const auto type = UniqueID::Next(); \
+    return type;                               \
+  }
+
+struct FilterResources {
+  std::shared_ptr<tgfx::RenderPipeline> pipeline = nullptr;
+
+  virtual ~FilterResources() = default;
+};
+
+class RenderCache;
 
 std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
                                                               const tgfx::Rect& outputBounds);
 
 class RuntimeFilter : public tgfx::RuntimeEffect {
  public:
-  explicit RuntimeFilter(const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
-      : RuntimeEffect(extraInputs) {
+  explicit RuntimeFilter(RenderCache* cache,
+                         const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
+      : RuntimeEffect(extraInputs), cache(cache) {
   }
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect, tgfx::MapDirection) const override {
@@ -41,6 +60,10 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
               const tgfx::Point& offset) const override;
 
  protected:
+  RenderCache* cache = nullptr;
+
+  virtual ID filterType() const = 0;
+
   virtual tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const {
     return srcRect;
   }
@@ -74,6 +97,8 @@ class RuntimeFilter : public tgfx::RuntimeEffect {
   virtual void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                                 const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
                                 const tgfx::Point& offset) const;
+
+  std::shared_ptr<tgfx::RenderPipeline> getPipeline(tgfx::GPU* gpu) const;
 
  private:
   std::shared_ptr<tgfx::RenderPipeline> createPipeline(tgfx::GPU* gpu) const;

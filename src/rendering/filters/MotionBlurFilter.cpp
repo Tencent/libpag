@@ -107,7 +107,8 @@ bool MotionBlurFilter::ShouldSkipFilter(Layer* layer, Frame layerFrame) {
 }
 
 std::shared_ptr<tgfx::Image> MotionBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                     Layer* layer, Frame layerFrame,
+                                                     RenderCache* cache, Layer* layer,
+                                                     Frame layerFrame,
                                                      const tgfx::Rect& contentBounds,
                                                      tgfx::Point* offset) {
   auto contentFrame = layerFrame - layer->startTime;
@@ -121,7 +122,7 @@ std::shared_ptr<tgfx::Image> MotionBlurFilter::Apply(std::shared_ptr<tgfx::Image
   auto previousGLMatrix =
       ToTextureMatrix(previousMatrix, width, height, tgfx::ImageOrigin::TopLeft);
   auto currentGLMatrix = ToTextureMatrix(currentMatrix, width, height, tgfx::ImageOrigin::TopLeft);
-  auto filter = std::make_shared<MotionBlurFilter>(previousGLMatrix, currentGLMatrix);
+  auto filter = std::make_shared<MotionBlurFilter>(cache, previousGLMatrix, currentGLMatrix);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 

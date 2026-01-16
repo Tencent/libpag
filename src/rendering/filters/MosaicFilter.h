@@ -25,13 +25,16 @@ namespace pag {
 
 class MosaicFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 
-  MosaicFilter(float horizontalBlocks, float verticalBlocks, bool sharpColors)
-      : horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
+  MosaicFilter(RenderCache* cache, float horizontalBlocks, float verticalBlocks, bool sharpColors)
+      : RuntimeFilter(cache), horizontalBlocks(horizontalBlocks), verticalBlocks(verticalBlocks),
         sharpColors(sharpColors) {
   }
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 

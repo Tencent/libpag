@@ -52,9 +52,9 @@ struct GlowMergeUniforms {
   float progress = 0.0f;
 };
 
-GlowMergeRuntimeFilter::GlowMergeRuntimeFilter(float progress,
+GlowMergeRuntimeFilter::GlowMergeRuntimeFilter(RenderCache* cache, float progress,
                                                std::shared_ptr<tgfx::Image> blurImage)
-    : RuntimeFilter({std::move(blurImage)}), progress(progress) {
+    : RuntimeFilter(cache, {std::move(blurImage)}), progress(progress) {
 }
 
 std::string GlowMergeRuntimeFilter::onBuildFragmentShader() const {

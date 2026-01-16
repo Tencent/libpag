@@ -32,7 +32,7 @@ class DisplacementMapFilter : public RuntimeFilter {
                                             const tgfx::Matrix& layerMatrix, Frame layerFrame,
                                             const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  DisplacementMapFilter(DisplacementMapSource useForHorizontalDisplacement,
+  DisplacementMapFilter(RenderCache* cache, DisplacementMapSource useForHorizontalDisplacement,
                         float maxHorizontalDisplacement,
                         DisplacementMapSource useForVerticalDisplacement,
                         float maxVerticalDisplacement,
@@ -40,7 +40,7 @@ class DisplacementMapFilter : public RuntimeFilter {
                         bool expandOutput, float effectOpacity, tgfx::Matrix layerMatrix,
                         tgfx::Size size, tgfx::Size displacementSize, tgfx::Rect contentBounds,
                         std::shared_ptr<tgfx::Image> sourceImage)
-      : RuntimeFilter({std::move(sourceImage)}),
+      : RuntimeFilter(cache, {std::move(sourceImage)}),
         useForHorizontalDisplacement(useForHorizontalDisplacement),
         maxHorizontalDisplacement(maxHorizontalDisplacement),
         useForVerticalDisplacement(useForVerticalDisplacement),
@@ -51,6 +51,8 @@ class DisplacementMapFilter : public RuntimeFilter {
   }
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;

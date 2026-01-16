@@ -25,12 +25,15 @@ namespace pag {
 
 class BrightnessContrastFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 
-  BrightnessContrastFilter(float brightness, float contrast)
-      : brightness(brightness), contrast(contrast) {
+  BrightnessContrastFilter(RenderCache* cache, float brightness, float contrast)
+      : RuntimeFilter(cache), brightness(brightness), contrast(contrast) {
   }
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 

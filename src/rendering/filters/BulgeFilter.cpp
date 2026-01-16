@@ -143,7 +143,8 @@ static const char BULGE_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                RenderCache* cache, Effect* effect,
                                                 Frame layerFrame, const tgfx::Rect& contentBounds,
                                                 tgfx::Point* offset) {
   auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
@@ -156,15 +157,15 @@ std::shared_ptr<tgfx::Image> BulgeFilter::Apply(std::shared_ptr<tgfx::Image> inp
   bulgeCenter.y = (bulgeCenter.y - contentBounds.y()) / contentBounds.height();
   auto bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
   auto pinning = bulgeEffect->pinning->getValueAt(layerFrame);
-  auto filter = std::make_shared<BulgeFilter>(horizontalRadius, verticalRadius, bulgeCenter,
+  auto filter = std::make_shared<BulgeFilter>(cache, horizontalRadius, verticalRadius, bulgeCenter,
                                               bulgeHeight, pinning);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
-BulgeFilter::BulgeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
-                         float bulgeHeight, float pinning)
-    : horizontalRadius(horizontalRadius), verticalRadius(verticalRadius), bulgeCenter(bulgeCenter),
-      bulgeHeight(bulgeHeight), pinning(pinning) {
+BulgeFilter::BulgeFilter(RenderCache* cache, float horizontalRadius, float verticalRadius,
+                         const Point& bulgeCenter, float bulgeHeight, float pinning)
+    : RuntimeFilter(cache), horizontalRadius(horizontalRadius), verticalRadius(verticalRadius),
+      bulgeCenter(bulgeCenter), bulgeHeight(bulgeHeight), pinning(pinning) {
 }
 
 std::string BulgeFilter::onBuildVertexShader() const {

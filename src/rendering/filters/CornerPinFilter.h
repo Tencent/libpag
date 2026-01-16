@@ -25,11 +25,11 @@
 namespace pag {
 class CornerPinFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Point& sourceScale,
-                                            tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Point& sourceScale, tgfx::Point* offset);
 
-  explicit CornerPinFilter(const Point cornerPoints[4]) {
+  CornerPinFilter(RenderCache* cache, const Point cornerPoints[4]) : RuntimeFilter(cache) {
     for (int i = 0; i < 4; i++) {
       this->cornerPoints[i] = ToTGFX(cornerPoints[i]);
     }
@@ -37,6 +37,8 @@ class CornerPinFilter : public RuntimeFilter {
   }
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;

@@ -83,7 +83,8 @@ static const char MOTIONTILE_FRAGMENT_SHADER[] = R"(
     )";
 
 std::shared_ptr<tgfx::Image> MotionTileFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                     Effect* effect, Frame layerFrame,
+                                                     RenderCache* cache, Effect* effect,
+                                                     Frame layerFrame,
                                                      const tgfx::Rect& contentBounds,
                                                      tgfx::Point* offset) {
   auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
@@ -98,7 +99,7 @@ std::shared_ptr<tgfx::Image> MotionTileFilter::Apply(std::shared_ptr<tgfx::Image
   auto phase = pagEffect->phase->getValueAt(layerFrame);
   auto horizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
   auto filter = std::shared_ptr<RuntimeFilter>(
-      new MotionTileFilter(tileCenter, tileWidth, tileHeight, outputWidth, outputHeight,
+      new MotionTileFilter(cache, tileCenter, tileWidth, tileHeight, outputWidth, outputHeight,
                            mirrorEdges, phase, horizontalPhaseShift));
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }

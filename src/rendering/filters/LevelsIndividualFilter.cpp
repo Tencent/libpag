@@ -85,8 +85,8 @@ static const char FRAGMENT_SHADER[] = R"(
     )";
 
 std::shared_ptr<tgfx::Image> LevelsIndividualFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                           Effect* effect, Frame layerFrame,
-                                                           tgfx::Point* offset) {
+                                                           RenderCache* cache, Effect* effect,
+                                                           Frame layerFrame, tgfx::Point* offset) {
   auto levelsIndividualEffect = static_cast<LevelsIndividualEffect*>(effect);
   constexpr int redChannel = 0;
   constexpr int greenChannel = 1;
@@ -116,7 +116,7 @@ std::shared_ptr<tgfx::Image> LevelsIndividualFilter::Apply(std::shared_ptr<tgfx:
   param.gamma[globalChannel] = levelsIndividualEffect->gamma->getValueAt(layerFrame);
   param.outBlack[globalChannel] = levelsIndividualEffect->outputBlack->getValueAt(layerFrame);
   param.outWhite[globalChannel] = levelsIndividualEffect->outputWhite->getValueAt(layerFrame);
-  auto filter = std::make_shared<LevelsIndividualFilter>(param);
+  auto filter = std::make_shared<LevelsIndividualFilter>(cache, param);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 

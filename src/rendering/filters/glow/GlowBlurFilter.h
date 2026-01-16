@@ -22,11 +22,16 @@
 #include "rendering/filters/utils/BlurTypes.h"
 
 namespace pag {
+class RenderCache;
+
 class GlowBlurRuntimeFilter : public RuntimeFilter {
  public:
-  GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset, float resizeRatio);
+  GlowBlurRuntimeFilter(RenderCache* cache, BlurDirection blurDirection, float blurOffset,
+                        float resizeRatio);
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;

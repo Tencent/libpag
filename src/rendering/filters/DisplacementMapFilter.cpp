@@ -131,7 +131,7 @@ std::shared_ptr<tgfx::Image> DisplacementMapFilter::Apply(
                                               static_cast<int>(displacementSize.height));
 
   auto filter = std::make_shared<DisplacementMapFilter>(
-      pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
+      cache, pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
       pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
       pagEffect->useForVerticalDisplacement->getValueAt(layerFrame),
       pagEffect->maxVerticalDisplacement->getValueAt(layerFrame),

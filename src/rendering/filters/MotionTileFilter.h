@@ -25,20 +25,22 @@ namespace pag {
 
 class MotionTileFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  explicit MotionTileFilter(Point tileCenter, float tileWidth, float tileHeight, float outputWidth,
-                            float outputHeight, bool mirrorEdges, float phase,
-                            bool horizontalPhaseShift)
-      : tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
+  MotionTileFilter(RenderCache* cache, Point tileCenter, float tileWidth, float tileHeight,
+                   float outputWidth, float outputHeight, bool mirrorEdges, float phase,
+                   bool horizontalPhaseShift)
+      : RuntimeFilter(cache), tileCenter(tileCenter), tileWidth(tileWidth), tileHeight(tileHeight),
         outputWidth(outputWidth), outputHeight(outputHeight), mirrorEdges(mirrorEdges),
         phase(phase), horizontalPhaseShift(horizontalPhaseShift) {
   }
   ~MotionTileFilter() override = default;
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;

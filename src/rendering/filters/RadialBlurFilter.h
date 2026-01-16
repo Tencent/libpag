@@ -25,16 +25,18 @@ namespace pag {
 
 class RadialBlurFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  explicit RadialBlurFilter(double amount, const tgfx::Point& center)
-      : amount(amount), center(center) {
+  RadialBlurFilter(RenderCache* cache, double amount, const tgfx::Point& center)
+      : RuntimeFilter(cache), amount(amount), center(center) {
   }
   ~RadialBlurFilter() override = default;
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;

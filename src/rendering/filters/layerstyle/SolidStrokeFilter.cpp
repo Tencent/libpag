@@ -138,34 +138,35 @@ struct SolidStrokeUniforms {
 };
 
 std::shared_ptr<tgfx::ImageFilter> SolidStrokeFilter::CreateFilter(
-    const SolidStrokeOption& option, SolidStrokeMode mode, std::shared_ptr<tgfx::Image> source) {
+    RenderCache* cache, const SolidStrokeOption& option, SolidStrokeMode mode,
+    std::shared_ptr<tgfx::Image> source) {
   if (!option.valid()) {
     return nullptr;
   }
   std::shared_ptr<tgfx::RuntimeEffect> effect;
   if (mode == SolidStrokeMode::Normal) {
-    effect = SolidStrokeNormalFilter::Make(option, std::move(source));
+    effect = SolidStrokeNormalFilter::Make(cache, option, std::move(source));
   } else {
-    effect = SolidStrokeThickFilter::Make(option, std::move(source));
+    effect = SolidStrokeThickFilter::Make(cache, option, std::move(source));
   }
   return tgfx::ImageFilter::Runtime(effect);
 }
 
 std::shared_ptr<SolidStrokeNormalFilter> SolidStrokeNormalFilter::Make(
-    SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage) {
+    RenderCache* cache, SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage) {
   if (originalImage) {
-    return std::make_shared<SolidStrokeNormalFilter>(option, std::move(originalImage));
+    return std::make_shared<SolidStrokeNormalFilter>(cache, option, std::move(originalImage));
   } else {
-    return std::make_shared<SolidStrokeNormalFilter>(option);
+    return std::make_shared<SolidStrokeNormalFilter>(cache, option);
   }
 }
 
 std::shared_ptr<SolidStrokeThickFilter> SolidStrokeThickFilter::Make(
-    SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage) {
+    RenderCache* cache, SolidStrokeOption option, std::shared_ptr<tgfx::Image> originalImage) {
   if (originalImage) {
-    return std::make_shared<SolidStrokeThickFilter>(option, std::move(originalImage));
+    return std::make_shared<SolidStrokeThickFilter>(cache, option, std::move(originalImage));
   } else {
-    return std::make_shared<SolidStrokeThickFilter>(option);
+    return std::make_shared<SolidStrokeThickFilter>(cache, option);
   }
 }
 

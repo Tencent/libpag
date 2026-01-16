@@ -21,10 +21,15 @@
 #include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
+class RenderCache;
 
 class AlphaEdgeDetectLayerEffect : public RuntimeFilter {
  public:
-  AlphaEdgeDetectLayerEffect() = default;
+  explicit AlphaEdgeDetectLayerEffect(RenderCache* cache) : RuntimeFilter(cache) {
+  }
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 

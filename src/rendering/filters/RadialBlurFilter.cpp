@@ -60,7 +60,8 @@ static const char RADIAL_BLUR_FRAGMENT_SHADER[] = R"(
     )";
 
 std::shared_ptr<tgfx::Image> RadialBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                     Effect* effect, Frame layerFrame,
+                                                     RenderCache* cache, Effect* effect,
+                                                     Frame layerFrame,
                                                      const tgfx::Rect& contentBounds,
                                                      tgfx::Point* offset) {
   auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
@@ -69,7 +70,7 @@ std::shared_ptr<tgfx::Image> RadialBlurFilter::Apply(std::shared_ptr<tgfx::Image
   center.x = center.x / contentBounds.width();
   center.y = center.y / contentBounds.height();
   amount = amount < 0.25 ? amount : 0.25;
-  auto filter = std::make_shared<RadialBlurFilter>(amount, center);
+  auto filter = std::make_shared<RadialBlurFilter>(cache, amount, center);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 

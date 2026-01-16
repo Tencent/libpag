@@ -31,21 +31,4 @@ bool Has3DSupport() {
   return false;
 }
 
-std::shared_ptr<tgfx::Texture> GetDepthTexture3D(RenderCache*, ID, int, int) {
-  return nullptr;
-}
-
-bool MarkLayer3DRendered(RenderCache*, ID, ID) {
-  return false;
-}
-
-void BeginFrame3D(RenderCache*) {
-}
-
-void EndFrame3D(RenderCache*) {
-}
-
-void ReleaseAll3D(RenderCache*) {
-}
-
 }  // namespace pag

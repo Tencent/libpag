@@ -39,7 +39,8 @@ static const char FRAGMENT_SHADER[] = R"(
         }
     )";
 
-std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                 RenderCache* cache, Effect* effect,
                                                  Frame layerFrame, tgfx::Point* offset) {
   auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
   auto sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
@@ -47,7 +48,7 @@ std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> in
   auto horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
   auto verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
 
-  auto filter = std::make_shared<MosaicFilter>(horizontalBlocks, verticalBlocks, sharpColors);
+  auto filter = std::make_shared<MosaicFilter>(cache, horizontalBlocks, verticalBlocks, sharpColors);
 
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }

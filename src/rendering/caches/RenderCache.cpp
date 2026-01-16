@@ -23,7 +23,6 @@
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/ImageReplacement.h"
-#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
@@ -154,7 +153,6 @@ void RenderCache::setSnapshotEnabled(bool value) {
 void RenderCache::beginFrame() {
   usedAssets = {};
   usedSequences = {};
-  BeginFrame3D(this);
   resetPerformance();
 }
 
@@ -184,7 +182,7 @@ void RenderCache::releaseAll() {
   clearAllSnapshots();
   graphicsMemory = 0;
   clearAllSequenceCaches();
-  ReleaseAll3D(this);
+  filterResourcesMap.clear();
   contextID = 0;
 }
 
@@ -197,7 +195,6 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredDecodedImages();
   clearExpiredSnapshots();
-  EndFrame3D(this);
   if (!timestamps.empty()) {
     // Always purge recycled resources that haven't been used in 1 frame.
     context->purgeResourcesNotUsedSince(timestamps.back());
@@ -530,5 +527,20 @@ void RenderCache::recordTextureUploadingTime(int64_t time) {
 
 void RenderCache::recordProgramCompilingTime(int64_t time) {
   programCompilingTime += time;
+}
+
+FilterResources* RenderCache::findFilterResources(ID type) {
+  auto result = filterResourcesMap.find(type);
+  if (result != filterResourcesMap.end()) {
+    return result->second.get();
+  }
+  return nullptr;
+}
+
+void RenderCache::addFilterResources(ID type, std::unique_ptr<FilterResources> resources) {
+  if (resources == nullptr) {
+    return;
+  }
+  filterResourcesMap[type] = std::move(resources);
 }
 }  // namespace pag

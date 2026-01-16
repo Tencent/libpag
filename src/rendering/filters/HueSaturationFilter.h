@@ -25,13 +25,16 @@ namespace pag {
 
 class HueSaturationFilter : public RuntimeFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 
-  HueSaturationFilter(float hue, float saturation, float lightness, float colorize,
-                      float colorizeHue, float colorizeSaturation, float colorizeLightness);
+  HueSaturationFilter(RenderCache* cache, float hue, float saturation, float lightness,
+                      float colorize, float colorizeHue, float colorizeSaturation,
+                      float colorizeLightness);
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;

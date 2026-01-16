@@ -21,9 +21,11 @@
 #include "tgfx/core/Image.h"
 
 namespace pag {
+class RenderCache;
+
 class GlowFilter {
  public:
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 };
 }  // namespace pag

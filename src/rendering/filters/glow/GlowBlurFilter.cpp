@@ -62,9 +62,10 @@ struct GlowBlurUniforms {
   float textureOffsetV = 0.0f;
 };
 
-GlowBlurRuntimeFilter::GlowBlurRuntimeFilter(BlurDirection blurDirection, float blurOffset,
-                                             float resizeRatio)
-    : blurDirection(blurDirection), blurOffset(blurOffset), resizeRatio(resizeRatio) {
+GlowBlurRuntimeFilter::GlowBlurRuntimeFilter(RenderCache* cache, BlurDirection blurDirection,
+                                             float blurOffset, float resizeRatio)
+    : RuntimeFilter(cache), blurDirection(blurDirection), blurOffset(blurOffset),
+      resizeRatio(resizeRatio) {
 }
 
 std::string GlowBlurRuntimeFilter::onBuildVertexShader() const {

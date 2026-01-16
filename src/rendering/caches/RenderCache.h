@@ -159,6 +159,10 @@ class RenderCache : public Performance {
 
   void recordProgramCompilingTime(int64_t time);
 
+  FilterResources* findFilterResources(ID type);
+
+  void addFilterResources(ID type, std::unique_ptr<FilterResources> resources);
+
   void releaseAll();
 
  private:
@@ -204,6 +208,9 @@ class RenderCache : public Performance {
   void prepareImageLayer(PAGImageLayer* layer);
   std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);
   void recordPerformance();
+
+  // filter resources cache:
+  std::unordered_map<ID, std::unique_ptr<FilterResources>> filterResourcesMap = {};
 
   friend class PAGPlayer;
 };
