@@ -72,7 +72,8 @@ static const char FRAGMENT_SHADER[] = R"(
 
 std::shared_ptr<tgfx::Image> BrightnessContrastFilter::Apply(std::shared_ptr<tgfx::Image> input,
                                                              RenderCache* cache, Effect* effect,
-                                                             Frame layerFrame, tgfx::Point* offset) {
+                                                             Frame layerFrame,
+                                                             tgfx::Point* offset) {
   auto* brightnessContrastEffect = static_cast<const BrightnessContrastEffect*>(effect);
   auto brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
   auto contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);

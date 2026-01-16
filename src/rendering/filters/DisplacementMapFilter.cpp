@@ -253,9 +253,9 @@ static void Matrix3x3ToMat4(const std::array<float, 9>& m3, float* m4) {
   m4[15] = 1.0f;
 }
 
-void DisplacementMapFilter::onUpdateUniforms(
-    tgfx::RenderPass* renderPass, tgfx::GPU* gpu, const std::vector<std::shared_ptr<tgfx::Texture>>&,
-    const tgfx::Point&) const {
+void DisplacementMapFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                             const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                             const tgfx::Point&) const {
 
   DisplacementMapUniforms uniforms = {};
 
@@ -354,7 +354,6 @@ void DisplacementMapFilter::onUpdateUniforms(
       renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(DisplacementMapUniforms));
     }
   }
-
 }
 
 tgfx::Rect DisplacementMapFilter::filterBounds(const tgfx::Rect& srcRect) const {

@@ -30,7 +30,7 @@ gh auth status
 ls -d /tmp/pr-review-* 2>/dev/null
 ```
 
-仅当上述命令输出了目录列表时，才执行清理：
+仅当上述命令输出了目录列表时，才执行清理（无输出则跳过，不打印任何信息）：
 
 ```bash
 for dir in /tmp/pr-review-*; do

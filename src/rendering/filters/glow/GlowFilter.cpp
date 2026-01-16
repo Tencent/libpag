@@ -26,8 +26,8 @@
 namespace pag {
 
 std::shared_ptr<tgfx::Image> GlowFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                               RenderCache* cache, Effect* effect,
-                                               Frame layerFrame, tgfx::Point* offset) {
+                                               RenderCache* cache, Effect* effect, Frame layerFrame,
+                                               tgfx::Point* offset) {
   auto glowEffect = static_cast<GlowEffect*>(effect);
   auto glowRadius = glowEffect->glowRadius->getValueAt(layerFrame);
   auto resizeRatio = 1.0f - glowRadius / 1500.f;
@@ -37,13 +37,13 @@ std::shared_ptr<tgfx::Image> GlowFilter::Apply(std::shared_ptr<tgfx::Image> inpu
   auto blurFilterH = std::make_shared<GlowBlurRuntimeFilter>(cache, BlurDirection::Horizontal,
                                                              1.0f / blurWidth, resizeRatio);
   auto imageFilterH = tgfx::ImageFilter::Runtime(blurFilterH);
-  auto blurFilterV =
-      std::make_shared<GlowBlurRuntimeFilter>(cache, BlurDirection::Vertical, 1.0f / blurHeight, 1.0f);
+  auto blurFilterV = std::make_shared<GlowBlurRuntimeFilter>(cache, BlurDirection::Vertical,
+                                                             1.0f / blurHeight, 1.0f);
   auto imageFilterV = tgfx::ImageFilter::Runtime(blurFilterV);
   auto blurFilter = tgfx::ImageFilter::Compose(imageFilterH, imageFilterV);
   auto blurImage = input->makeWithFilter(std::move(blurFilter));
-  auto mergeFilter =
-      tgfx::ImageFilter::Runtime(std::make_shared<GlowMergeRuntimeFilter>(cache, progress, blurImage));
+  auto mergeFilter = tgfx::ImageFilter::Runtime(
+      std::make_shared<GlowMergeRuntimeFilter>(cache, progress, blurImage));
   return input->makeWithFilter(std::move(mergeFilter), offset);
 }
 }  // namespace pag
