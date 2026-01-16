@@ -82,9 +82,7 @@ GLRestorer::~GLRestorer() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, static_cast<unsigned>(frameBuffer));
   gl->activeTexture(static_cast<unsigned>(activeTexture));
   gl->bindTexture(GL_TEXTURE_2D, static_cast<unsigned>(textureID));
-  if (vertexArray > 0) {
-    gl->bindVertexArray(vertexArray);
-  }
+  gl->bindVertexArray(vertexArray);
   gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<unsigned>(arrayBuffer));
   gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<unsigned>(elementArrayBuffer));
   if (blendEnabled) {
