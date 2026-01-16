@@ -114,6 +114,6 @@ gh pr create --title "{Commit 信息}" --body "{PR 描述}"
 
 ---
 
-## 重要限制
+## **!! IMPORTANT - 重要限制**
 
-- **禁止** force push
+- **NEVER** 执行 force push
