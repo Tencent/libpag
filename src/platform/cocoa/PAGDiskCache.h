@@ -25,6 +25,16 @@
 PAG_API @interface PAGDiskCache : NSObject
 
 /**
+ * Sets the disk cache directory. This should be called before any disk cache operations.
+ * If the directory does not exist, it will be created automatically.
+ * Note: Changing the cache directory after cache operations have started may cause
+ * existing cached files to become inaccessible.
+ * @param dir The absolute path of the cache directory. Pass nil or empty string to use the
+ * platform default cache directory.
+ */
++ (void)SetCacheDir:(NSString*)dir;
+
+/**
  * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
  */
 + (size_t)MaxDiskSize;
