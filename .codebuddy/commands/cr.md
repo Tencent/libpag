@@ -61,10 +61,17 @@ done
 
 ### 本地模式
 
+获取当前分支相对 main 的完整变更：
+
 ```bash
+# 拉取最新的 main 分支
+git fetch origin main
+
+# 当前分支相对 origin/main 的完整变更（已提交 + 暂存区 + 工作区的最终结果）
+git diff origin/main
+
+# 查看文件状态（用于识别未跟踪文件）
 git status
-git diff
-git diff --cached
 ```
 
 对于未跟踪的新增文件（`git status` 中以 `??` 开头的文件），使用 Read 工具读取文件内容进行审查。
@@ -73,9 +80,8 @@ git diff --cached
 
 先获取 PR 信息（一次调用获取所有需要的字段）：
 ```bash
-PR_INFO=$(gh pr view {pr_number} --json headRefName,baseRefName,author)
+PR_INFO=$(gh pr view {pr_number} --json headRefName,author)
 PR_BRANCH=$(echo "$PR_INFO" | jq -r '.headRefName')
-BASE_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
 PR_AUTHOR=$(echo "$PR_INFO" | jq -r '.author.login')
 ```
 
@@ -94,9 +100,14 @@ git worktree add /tmp/pr-review-{pr_number} pr-{pr_number}
 cd /tmp/pr-review-{pr_number}
 ```
 
-获取变更内容和评论：
+获取变更内容和评论（两种情况通用）：
 ```bash
-git diff origin/${BASE_BRANCH}...HEAD
+# 拉取最新的 main 分支
+git fetch origin main
+
+# 当前分支相对 origin/main 的完整变更
+git diff origin/main
+
 gh pr view {pr_number} --comments
 ```
 
