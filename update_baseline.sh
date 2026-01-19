@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# Update local baseline cache from remote changes.
+# Run this after pulling main branch that contains baseline changes from others.
+# Without updating the cache, affected tests will be skipped, leading to inaccurate results.
+
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
   if [ -f "$CACHE_VERSION_FILE" ]; then
@@ -18,41 +23,23 @@
   ./install_tools.sh
   depsync
 
-  if [[ "$1" == "USE_SWIFTSHADER" ]]; then
-    BUILD_DIR=build
-  else
-    BUILD_DIR=cmake-build-debug
-  fi
+  BUILD_DIR=build
 
-  if [ ! -d "./${BUILD_DIR}" ]; then
-    mkdir ${BUILD_DIR}
-  fi
+  rm -rf ${BUILD_DIR}
+  mkdir ${BUILD_DIR}
   cd ${BUILD_DIR}
 
-  if [ -f "./CMakeCache.txt" ]; then
-    TEXT=$(cat ./CMakeCache.txt)
-    TEXT=${TEXT#*CMAKE_COMMAND:INTERNAL=}
-    for line in ${TEXT}; do
-      CMAKE_COMMAND=$line
-      break
-    done
-  fi
-  if [ ! -f "$CMAKE_COMMAND" ]; then
-    CMAKE_COMMAND="cmake"
-  fi
-  echo $CMAKE_COMMAND
-
   if [[ "$1" == "USE_SWIFTSHADER" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
+    cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
   else
-    $CMAKE_COMMAND -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
+    cmake -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_ENABLE_PROFILING=OFF -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
-  $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
+  cmake --build . --target UpdateBaseline -- -j 12
   ./UpdateBaseline
 
   if test $? -eq 0; then
-    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
+     echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
   else
     echo "~~~~~~~~~~~~~~~~~~~Update Baseline Failed~~~~~~~~~~~~~~~~~~"
     COMPLIE_RESULT=false
@@ -76,4 +63,5 @@
     cp -r test/out result
     exit 1
   fi
+  rm -rf ${BUILD_DIR}
 }

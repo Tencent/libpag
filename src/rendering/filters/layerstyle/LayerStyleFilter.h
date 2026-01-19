@@ -24,17 +24,21 @@
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace pag {
+class RenderCache;
 
 class LayerStyleFilter {
  public:
   virtual ~LayerStyleFilter() = default;
 
-  static std::unique_ptr<LayerStyleFilter> Make(LayerStyle* layerStyle);
+  static std::unique_ptr<LayerStyleFilter> Make(LayerStyle* layerStyle, RenderCache* cache);
 
   virtual void update(Frame layerFrame, const tgfx::Point& filterScale,
                       const tgfx::Point& sourceScale) = 0;
 
   virtual bool draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) = 0;
+
+ protected:
+  RenderCache* cache = nullptr;
 };
 
 }  // namespace pag

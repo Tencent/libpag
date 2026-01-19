@@ -21,32 +21,23 @@
 #include "rendering/filters/RuntimeFilter.h"
 
 namespace pag {
-
-class AlphaEdgeDetectEffectUniforms : public Uniforms {
- public:
-  AlphaEdgeDetectEffectUniforms(tgfx::Context* context, unsigned program)
-      : Uniforms(context, program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    horizontalStepHandle = gl->getUniformLocation(program, "mHorizontalStep");
-    verticalStepHandle = gl->getUniformLocation(program, "mVerticalStep");
-  }
-  int horizontalStepHandle = -1;
-  int verticalStepHandle = -1;
-};
+class RenderCache;
 
 class AlphaEdgeDetectLayerEffect : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
+  explicit AlphaEdgeDetectLayerEffect(RenderCache* cache) : RuntimeFilter(cache) {
+  }
 
-  AlphaEdgeDetectLayerEffect() = default;
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 };
 
 }  // namespace pag

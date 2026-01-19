@@ -22,7 +22,7 @@
 namespace pag {
 class StrokeFilter : public LayerStyleFilter {
  public:
-  explicit StrokeFilter(StrokeStyle* layerStyle);
+  StrokeFilter(StrokeStyle* layerStyle, RenderCache* cache);
 
   StrokeFilter(const StrokeFilter&) = delete;
 

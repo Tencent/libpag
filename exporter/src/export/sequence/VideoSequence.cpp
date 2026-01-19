@@ -339,12 +339,12 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
         if (!currentFrameIsStatic) {
           if (lastFrameIsStatic && firstExportFrame != frame) {
-            staticTimeRange.end = frame - 1;
+            staticTimeRange.end = frame - firstExportFrame - 1;
             sequence->staticTimeRanges.push_back(staticTimeRange);
           }
-          staticTimeRange.start = frame;
+          staticTimeRange.start = frame - firstExportFrame;
         } else if (frame == duration - 1) {
-          staticTimeRange.end = frame;
+          staticTimeRange.end = frame - firstExportFrame;
           sequence->staticTimeRanges.push_back(staticTimeRange);
         }
         lastFrameIsStatic = currentFrameIsStatic;

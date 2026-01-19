@@ -116,10 +116,8 @@ pag::Frame AEDurationToFrame(A_Time time, float frameRate) {
 
 pag::ParagraphJustification AEJustificationToJustification(int value) {
   switch (value) {
-    case 7413:
-      return pag::ParagraphJustification::RightJustify;
     case 7414:
-      return pag::ParagraphJustification::LeftJustify;
+      return pag::ParagraphJustification::RightJustify;
     case 7415:
       return pag::ParagraphJustification::CenterJustify;
     case 7416:

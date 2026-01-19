@@ -24,7 +24,9 @@
 #include "tgfx/core/ImageFilter.h"
 
 namespace pag {
-OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle) : layerStyle(layerStyle) {
+OuterGlowFilter::OuterGlowFilter(OuterGlowStyle* layerStyle, RenderCache* cache)
+    : layerStyle(layerStyle) {
+  this->cache = cache;
 }
 
 void OuterGlowFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
@@ -73,7 +75,7 @@ std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getStrokeFilter() const {
   strokeOption.color = color;
   strokeOption.spreadSizeX = spread * sizeX / range;
   strokeOption.spreadSizeY = spread * sizeY / range;
-  return SolidStrokeFilter::CreateFilter(strokeOption, mode);
+  return SolidStrokeFilter::CreateFilter(cache, strokeOption, mode);
 }
 
 std::shared_ptr<tgfx::ImageFilter> OuterGlowFilter::getDropShadowFilter() const {

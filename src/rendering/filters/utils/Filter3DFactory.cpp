@@ -20,9 +20,9 @@
 
 namespace pag {
 
-std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, const FilterList*,
-                                            const tgfx::Rect&, const tgfx::Point&, tgfx::Rect*,
-                                            tgfx::Point* offset) {
+std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, RenderCache*,
+                                            const FilterList*, const tgfx::Rect&,
+                                            const tgfx::Point&, tgfx::Rect*, tgfx::Point* offset) {
   offset->set(0, 0);
   return input;
 }

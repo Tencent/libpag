@@ -23,39 +23,27 @@
 
 namespace pag {
 
-class RadialBlurUniforms : public Uniforms {
- public:
-  explicit RadialBlurUniforms(tgfx::Context* context, unsigned program)
-      : Uniforms(context, program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    amountHandle = gl->getUniformLocation(program, "uAmount");
-    centerHandle = gl->getUniformLocation(program, "uCenter");
-  }
-  int amountHandle = -1;
-  int centerHandle = -1;
-};
-
 class RadialBlurFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID;
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
-
-  explicit RadialBlurFilter(double amount, const tgfx::Point& center)
-      : amount(amount), center(center) {
+  RadialBlurFilter(RenderCache* cache, double amount, const tgfx::Point& center)
+      : RuntimeFilter(cache), amount(amount), center(center) {
   }
   ~RadialBlurFilter() override = default;
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
  private:
   double amount = 0.f;

@@ -20,27 +20,31 @@
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
-        #version 100
         precision mediump float;
-        varying vec2 vertexColor;
+        in vec2 vertexColor;
         uniform sampler2D sTexture;
-        uniform float mHorizontalStep;
-        uniform float mVerticalStep;
+
+        layout(std140) uniform FilterUniforms {
+            float mHorizontalStep;
+            float mVerticalStep;
+        };
+
+        out vec4 tgfx_FragColor;
     
         float threshold = 0.9;
 
         void main() {
             float alphaSum = 0.0;
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(-mHorizontalStep, -mVerticalStep)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(-mHorizontalStep, 0.0)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(-mHorizontalStep, mVerticalStep)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(mHorizontalStep, -mVerticalStep)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(mHorizontalStep, 0.0)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(mHorizontalStep, mVerticalStep)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(0.0, -mVerticalStep)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(0.0, 0.0)).a + threshold);
-            alphaSum += floor(texture2D(sTexture, vertexColor + vec2(0.0, mVerticalStep)).a + threshold);
-            gl_FragColor = (alphaSum > 0.0 && alphaSum < 9.0) ? vec4(1.0) : vec4(0.0);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(-mHorizontalStep, -mVerticalStep)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(-mHorizontalStep, 0.0)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(-mHorizontalStep, mVerticalStep)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(mHorizontalStep, -mVerticalStep)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(mHorizontalStep, 0.0)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(mHorizontalStep, mVerticalStep)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(0.0, -mVerticalStep)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(0.0, 0.0)).a + threshold);
+            alphaSum += floor(texture(sTexture, vertexColor + vec2(0.0, mVerticalStep)).a + threshold);
+            tgfx_FragColor = (alphaSum > 0.0 && alphaSum < 9.0) ? vec4(1.0) : vec4(0.0);
         }
     )";
 
@@ -48,18 +52,34 @@ std::string AlphaEdgeDetectLayerEffect::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> AlphaEdgeDetectLayerEffect::onPrepareProgram(tgfx::Context* context,
-                                                                       unsigned program) const {
-  return std::make_unique<AlphaEdgeDetectEffectUniforms>(context, program);
+std::vector<tgfx::BindingEntry> AlphaEdgeDetectLayerEffect::uniformBlocks() const {
+  return {{"FilterUniforms", 0}};
 }
 
-void AlphaEdgeDetectLayerEffect::onUpdateParams(
-    tgfx::Context* context, const RuntimeProgram* program,
-    const std::vector<tgfx::BackendTexture>& sources) const {
-  auto uniforms = static_cast<AlphaEdgeDetectEffectUniforms*>(program->uniforms.get());
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->uniform1f(uniforms->horizontalStepHandle, 1.0f / sources[0].width());
-  gl->uniform1f(uniforms->verticalStepHandle, 1.0f / sources[0].height());
+void AlphaEdgeDetectLayerEffect::onUpdateUniforms(
+    tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+    const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures, const tgfx::Point&) const {
+  if (inputTextures.empty()) {
+    return;
+  }
+
+  struct Uniforms {
+    float horizontalStep = 0.0f;
+    float verticalStep = 0.0f;
+  };
+  Uniforms uniforms = {};
+  uniforms.horizontalStep = 1.0f / inputTextures[0]->width();
+  uniforms.verticalStep = 1.0f / inputTextures[0]->height();
+
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(Uniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+    }
+  }
 }
 
 }  // namespace pag

@@ -21,23 +21,25 @@
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
-        #version 100
         precision highp float;
-        varying vec2 vertexColor;
+        in vec2 vertexColor;
         uniform sampler2D sTexture;
-        uniform float mBrightness;
-        uniform float mContrast;
-    
+        layout(std140) uniform Args {
+            float mBrightness;
+            float mContrast;
+        };
+        out vec4 tgfx_FragColor;
+
         #define EPSILON 1e-10
         vec3 saturate(vec3 v) { return clamp(v, vec3(0.0), vec3(1.0)); }
-    
+
         vec3 HUEtoRGB(float H) {
             float R = abs(H * 6.0 - 3.0) - 1.0;
             float G = 2.0 - abs(H * 6.0 - 2.0);
             float B = 2.0 - abs(H * 6.0 - 4.0);
             return saturate(vec3(R,G,B));
         }
-    
+
         vec3 RGBtoHCV(vec3 RGB) {
             vec4 P = (RGB.g < RGB.b) ? vec4(RGB.bg, -1.0, 2.0/3.0) : vec4(RGB.gb, 0.0, -1.0/3.0);
             vec4 Q = (RGB.r < P.x) ? vec4(P.xyw, RGB.r) : vec4(RGB.r, P.yzx);
@@ -58,30 +60,24 @@ static const char FRAGMENT_SHADER[] = R"(
         }
 
         void main() {
-            vec4 color = texture2D(sTexture, vertexColor);
+            vec4 color = texture(sTexture, vertexColor);
             vec3 rgbColor = color.rgb * mContrast + 0.5 - mContrast * 0.5;
             vec3 hsvColor = RGBtoHSV(rgbColor);
             hsvColor.z *= (mBrightness + 1.0);
             rgbColor = HSVtoRGB(hsvColor);
             rgbColor += (mBrightness / 2.0);
-            gl_FragColor = vec4(rgbColor * color.a, color.a);
+            tgfx_FragColor = vec4(rgbColor * color.a, color.a);
         }
     )";
 
-BrightnessContrastUniforms::BrightnessContrastUniforms(tgfx::Context* context, unsigned program)
-    : Uniforms(context, program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  brightnessBlocksHandle = gl->getUniformLocation(program, "mBrightness");
-  contrastHandle = gl->getUniformLocation(program, "mContrast");
-}
-
 std::shared_ptr<tgfx::Image> BrightnessContrastFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                             Effect* effect, Frame layerFrame,
+                                                             RenderCache* cache, Effect* effect,
+                                                             Frame layerFrame,
                                                              tgfx::Point* offset) {
   auto* brightnessContrastEffect = static_cast<const BrightnessContrastEffect*>(effect);
   auto brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
   auto contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);
-  auto filter = std::make_shared<BrightnessContrastFilter>(brightness, contrast);
+  auto filter = std::make_shared<BrightnessContrastFilter>(cache, brightness, contrast);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
@@ -89,18 +85,31 @@ std::string BrightnessContrastFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> BrightnessContrastFilter::onPrepareProgram(tgfx::Context* context,
-                                                                     unsigned program) const {
-  return std::make_unique<BrightnessContrastUniforms>(context, program);
+std::vector<tgfx::BindingEntry> BrightnessContrastFilter::uniformBlocks() const {
+  return {{"Args", 0}};
 }
 
-void BrightnessContrastFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                              const std::vector<tgfx::BackendTexture>&) const {
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<BrightnessContrastUniforms*>(program->uniforms.get());
-  gl->uniform1f(uniform->brightnessBlocksHandle,
-                brightness > 0 ? brightness / 250.f : brightness / 650.f);
-  gl->uniform1f(uniform->contrastHandle, 1.0f + contrast / 300.f);
+void BrightnessContrastFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                                const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                                const tgfx::Point&) const {
+  struct Uniforms {
+    float brightness = 0.0f;
+    float contrast = 0.0f;
+  };
+
+  Uniforms uniforms = {};
+  uniforms.brightness = brightness > 0 ? brightness / 250.f : brightness / 650.f;
+  uniforms.contrast = 1.0f + contrast / 300.f;
+
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(Uniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+    }
+  }
 }
 
 }  // namespace pag

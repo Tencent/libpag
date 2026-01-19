@@ -18,8 +18,20 @@ endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_definitions(-Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type -fno-rtti)
+    # Add debug symbols for Release build to enable dSYM generation
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-g)
+    endif ()
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30)
     add_definitions(-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1)
+endif ()
+
+if (MSVC)
+    # Add debug symbols for Release build to enable PDB generation
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(/Zi)
+        add_link_options(/DEBUG /OPT:REF /OPT:ICF)
+    endif ()
 endif ()
 
 # configures the local installation path of the AE_SDK.
@@ -211,7 +223,7 @@ if (APPLE)
 
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc
-            COMMAND Rez -o ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
+            COMMAND Rez -useDF -o ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
             -i ${AE_SDK_PATH}/Headers
             -i ${AE_SDK_PATH}/Resources
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporterPiPL.r
@@ -225,12 +237,14 @@ if (APPLE)
     add_dependencies(PAGExporter GeneratePAGExporterRsrc)
 
     set(RSRC_FILE ${CMAKE_CURRENT_SOURCE_DIR}/PAGExporter.rsrc)
+    set(CONTENTS_DIR "$<TARGET_BUNDLE_DIR:PAGExporter>/Contents")
     set(RESOURCES_DIR "$<TARGET_BUNDLE_DIR:PAGExporter>/Contents/Resources")
     add_custom_command(
             TARGET PAGExporter POST_BUILD
             COMMAND /bin/sh -c "mkdir -p ${RESOURCES_DIR}"
             COMMAND /bin/sh -c "cp -r ${RSRC_FILE} ${RESOURCES_DIR}"
-            COMMENT "Copying ${RSRC_FILE} to ${RESOURCES_DIR}"
+            COMMAND /bin/sh -c "printf 'AEgxFXTC' > ${CONTENTS_DIR}/PkgInfo"
+            COMMENT "Copying ${RSRC_FILE} to ${RESOURCES_DIR} and generating PkgInfo"
             VERBATIM
     )
 

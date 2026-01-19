@@ -1,6 +1,7 @@
 #!/bin/bash
-AE_PLUGIN_PATH='/Library/Application Support/Adobe/Common/Plug-ins/7.0/MediaCore'
-AE_EXPORTER_PATH="$AE_PLUGIN_PATH/PAGExporter.plugin"
+
+# Shared directory for PAGExporter Qt resources (outside plugin bundle to preserve code signature)
+SHARED_QT_DIR="/Library/Application Support/PAGExporter"
 
 # Locate PAGViewer.app
 PAGVIEWER_APP=""
@@ -13,120 +14,73 @@ else
 fi
 
 if [ -z "$PAGVIEWER_APP" ] || [ ! -d "$PAGVIEWER_APP" ]; then
+    echo "Error: PAGViewer.app not found!"
+    echo "PAGExporter requires PAGViewer to be installed first."
+    echo "Please install PAGViewer.app in /Applications/ or ~/Applications/"
     exit 1
 fi
 
-echo "✓ Found PAGViewer: $PAGVIEWER_APP"
+echo "Found PAGViewer: $PAGVIEWER_APP"
 
-# Copy Qt resources from PAGViewer to PAGExporter plugin
-function copyQtFromViewerToPlugin() {
-    VIEWER_FRAMEWORKS="$PAGVIEWER_APP/Contents/Frameworks"
-    VIEWER_PLUGINS="$PAGVIEWER_APP/Contents/PlugIns"
-    VIEWER_RESOURCES="$PAGVIEWER_APP/Contents/Resources"
-    
-    PLUGIN_FRAMEWORKS="$AE_EXPORTER_PATH/Contents/Frameworks"
-    PLUGIN_PLUGINS="$AE_EXPORTER_PATH/Contents/PlugIns"
-    PLUGIN_RESOURCES="$AE_EXPORTER_PATH/Contents/Resources"
+# Verify PAGViewer has the required Qt resources
+VIEWER_FRAMEWORKS="$PAGVIEWER_APP/Contents/Frameworks"
+if [ ! -d "$VIEWER_FRAMEWORKS" ] || [ -z "$(ls -A "$VIEWER_FRAMEWORKS"/Qt*.framework 2>/dev/null)" ]; then
+    echo "Error: PAGViewer installation appears incomplete (missing Qt frameworks)"
+    echo "Please reinstall PAGViewer.app"
+    exit 1
+fi
 
-    mkdir -p "$PLUGIN_FRAMEWORKS"
-    mkdir -p "$PLUGIN_PLUGINS"
-    mkdir -p "$PLUGIN_RESOURCES"
+# Remove existing shared directory if exists
+if [ -d "$SHARED_QT_DIR" ]; then
+    echo "Removing existing shared Qt directory..."
+    sudo rm -rf "$SHARED_QT_DIR"
+fi
 
-    # Copy Qt frameworks
-    if [ -d "$VIEWER_FRAMEWORKS" ]; then
-        for framework in "$VIEWER_FRAMEWORKS"/Qt*.framework; do
-            if [ -d "$framework" ]; then
-                frameworkName=$(basename "$framework")
-                echo "  - $frameworkName"
-                cp -R "$framework" "$PLUGIN_FRAMEWORKS/"
-            fi
-        done
+# Create shared Qt directory structure
+echo "Creating shared Qt directory: $SHARED_QT_DIR"
+sudo mkdir -p "$SHARED_QT_DIR/Frameworks"
+sudo mkdir -p "$SHARED_QT_DIR/PlugIns"
+sudo mkdir -p "$SHARED_QT_DIR/Resources"
+
+# Copy Qt frameworks
+echo "Copying Qt frameworks..."
+for framework in "$VIEWER_FRAMEWORKS"/Qt*.framework; do
+    if [ -d "$framework" ]; then
+        frameworkName=$(basename "$framework")
+        echo "  - $frameworkName"
+        sudo cp -R "$framework" "$SHARED_QT_DIR/Frameworks/"
     fi
+done
 
-    # Copy Qt plugins
-    if [ -d "$VIEWER_PLUGINS" ]; then
-        for plugin in "$VIEWER_PLUGINS"/*; do
-            if [ -d "$plugin" ]; then
-                pluginName=$(basename "$plugin")
-                echo "  - $pluginName"
-                cp -R "$plugin" "$PLUGIN_PLUGINS/"
-            fi
-        done
-    fi
-
-    # Copy Qt translation files
-    if [ -d "$VIEWER_RESOURCES" ]; then
-        for resource in "$VIEWER_RESOURCES"/*.qm; do
-            if [ -f "$resource" ]; then
-                resourceName=$(basename "$resource")
-                echo "  - $resourceName"
-                cp "$resource" "$PLUGIN_RESOURCES/"
-            fi
-        done
-    fi
-
-    # Generate qt.conf for plugin
-    # When plugin loads as dylib, Qt searches for qt.conf in library directory
-    # Relative paths calculated from MacOS directory, need ../ to access sibling directories
-    PLUGIN_MACOS="$AE_EXPORTER_PATH/Contents/MacOS"
-    PLUGIN_QT_CONF="$PLUGIN_MACOS/qt.conf"
-    echo "  - qt.conf (generated in MacOS directory)"
-    cat > "$PLUGIN_QT_CONF" << 'EOF'
-[Paths]
-Plugins = ../PlugIns
-Imports = ../Resources/qml
-QmlImports = ../Resources/qml
-EOF
-
-    # Copy QML resources
-    VIEWER_QML="$VIEWER_RESOURCES/qml"
-    PLUGIN_QML="$PLUGIN_RESOURCES/qml"
-    if [ -d "$VIEWER_QML" ]; then
-        mkdir -p "$PLUGIN_QML"
-        cp -R "$VIEWER_QML/"* "$PLUGIN_QML/"
-        QML_COUNT=$(find "$PLUGIN_QML" -type d | wc -l | tr -d ' ')
-    fi
-
-    QT_FW_COUNT=$(find "$PLUGIN_FRAMEWORKS" -maxdepth 1 -name "Qt*.framework" -type d | wc -l | tr -d ' ')
-}
-
-function doCopyFileToAEApp() {
-  aeAppPath="$1"
-  if [ -d "$aeAppPath" ]; then
-        targetPath="$aeAppPath/Contents/$dirName/"
-        if [ ! -d "$targetPath" ]; then
-          mkdir "$targetPath"
+# Copy Qt plugins
+echo "Copying Qt plugins..."
+VIEWER_PLUGINS="$PAGVIEWER_APP/Contents/PlugIns"
+if [ -d "$VIEWER_PLUGINS" ]; then
+    for plugin in "$VIEWER_PLUGINS"/*; do
+        if [ -d "$plugin" ]; then
+            pluginName=$(basename "$plugin")
+            echo "  - $pluginName"
+            sudo cp -R "$plugin" "$SHARED_QT_DIR/PlugIns/"
         fi
+    done
+fi
 
-        for file in *
-          do
-            cp -r -f "$file" "$targetPath"
-          done
-  fi
-}
+# Copy QML resources
+VIEWER_QML="$PAGVIEWER_APP/Contents/Resources/qml"
+if [ -d "$VIEWER_QML" ]; then
+    echo "Copying QML resources..."
+    sudo cp -R "$VIEWER_QML" "$SHARED_QT_DIR/Resources/"
+fi
 
-function copyResourceToAEApp() {
-  dirName="$2"
-  dirPath="$1/Contents/$2"
-  if [ -d "$dirPath" ]; then
-    cd "$dirPath"
-    for((i=2017;i<=2030;i++));
-      do
-        aeAppPath="/Applications/Adobe After Effects $i/Adobe After Effects $i.app"
-        doCopyFileToAEApp "$aeAppPath"
+# Copy Qt translation files
+echo "Copying Qt translations..."
+VIEWER_RESOURCES="$PAGVIEWER_APP/Contents/Resources"
+for resource in "$VIEWER_RESOURCES"/*.qm; do
+    if [ -f "$resource" ]; then
+        resourceName=$(basename "$resource")
+        echo "  - $resourceName"
+        sudo cp "$resource" "$SHARED_QT_DIR/Resources/"
+    fi
+done
 
-        aeAppPath2="/Applications/Adobe After Effects CC $i/Adobe After Effects CC $i.app"
-        doCopyFileToAEApp "$aeAppPath2"
-      done
-  fi
-}
-
-function copyQtResouceToAEApp() {
-    exporterPath="$1"
-    copyResourceToAEApp "$1" "Frameworks"
-    copyResourceToAEApp "$1" "PlugIns"
-    copyResourceToAEApp "$1" "Resources"
-}
-
-# Execute the main function to copy Qt resources
-copyQtFromViewerToPlugin
+echo "Qt resources copied to shared directory: $SHARED_QT_DIR"

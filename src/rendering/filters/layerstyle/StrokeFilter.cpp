@@ -25,7 +25,8 @@
 #include "tgfx/core/Paint.h"
 
 namespace pag {
-StrokeFilter::StrokeFilter(StrokeStyle* layerStyle) : layerStyle(layerStyle) {
+StrokeFilter::StrokeFilter(StrokeStyle* layerStyle, RenderCache* cache) : layerStyle(layerStyle) {
+  this->cache = cache;
 }
 
 void StrokeFilter::update(Frame layerFrame, const tgfx::Point& filterScale,
@@ -60,14 +61,14 @@ bool StrokeFilter::draw(Canvas* canvas, std::shared_ptr<tgfx::Image> image) {
 
   std::shared_ptr<tgfx::ImageFilter> filter = nullptr;
   if (strokeOption.position == StrokePosition::Outside) {
-    filter = SolidStrokeFilter::CreateFilter(strokeOption, mode, nullptr);
+    filter = SolidStrokeFilter::CreateFilter(cache, strokeOption, mode, nullptr);
   } else {
-    auto strokeFilter = SolidStrokeFilter::CreateFilter(strokeOption, mode, image);
+    auto strokeFilter = SolidStrokeFilter::CreateFilter(cache, strokeOption, mode, image);
     if (strokeFilter == nullptr) {
       return false;
     }
     auto alphaEdgeDetectFilter =
-        tgfx::ImageFilter::Runtime(std::make_shared<AlphaEdgeDetectLayerEffect>());
+        tgfx::ImageFilter::Runtime(std::make_shared<AlphaEdgeDetectLayerEffect>(cache));
     filter = tgfx::ImageFilter::Compose(alphaEdgeDetectFilter, strokeFilter);
   }
   if (filter == nullptr) {

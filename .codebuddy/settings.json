@@ -3,6 +3,5 @@
     "defaultMode": "bypassPermissions"
   },
   "includeCoAuthoredBy": false,
-  "model": "claude-opus-4.5",
-  "alwaysThinkingEnabled": true
+  "model": "claude-opus-4.5"
 }

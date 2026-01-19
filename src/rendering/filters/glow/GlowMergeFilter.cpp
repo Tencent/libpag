@@ -21,52 +21,67 @@
 
 namespace pag {
 static const char GLOW_TARGET_FRAGMENT_SHADER[] = R"(
-    #version 100
     precision mediump float;
-    varying highp vec2 vertexColor;
-    uniform sampler2D inputImageTexture;
+    in highp vec2 vertexColor;
+    uniform sampler2D sTexture;
     uniform sampler2D blurImageTexture;
-    uniform float progress;
+
+    layout(std140) uniform FilterUniforms {
+        float progress;
+    };
+
     float translate(float fValue, float fMax)
     {
         return fValue / fMax;
     }
+    out vec4 tgfx_FragColor;
     void main() {
-        vec4 srcColor = texture2D(inputImageTexture, vertexColor);
-        vec4 blurColor = texture2D(blurImageTexture, vertexColor);
+        vec4 srcColor = texture(sTexture, vertexColor);
+        vec4 blurColor = texture(blurImageTexture, vertexColor);
         vec4 glowColor = vec4(0.0, 0.0, 0.0, srcColor.a);
         srcColor.rgb = max(srcColor.rgb, blurColor.rgb);
-        glowColor.r = translate(srcColor.r,progress);
-        glowColor.g = translate(srcColor.g,progress);
-        glowColor.b = translate(srcColor.b,progress);
-        gl_FragColor = glowColor;
+        glowColor.r = translate(srcColor.r, progress);
+        glowColor.g = translate(srcColor.g, progress);
+        glowColor.b = translate(srcColor.b, progress);
+        glowColor = clamp(glowColor, 0.0, 1.0);
+        tgfx_FragColor = glowColor;
     }
     )";
 
-GlowMergeUniforms::GlowMergeUniforms(tgfx::Context* context, unsigned program)
-    : Uniforms(context, program) {
-  auto gl = tgfx::GLFunctions::Get(context);
-  progressHandle = gl->getUniformLocation(program, "progress");
-}
-GlowMergeRuntimeFilter::GlowMergeRuntimeFilter(float progress,
+GlowMergeRuntimeFilter::GlowMergeRuntimeFilter(RenderCache* cache, float progress,
                                                std::shared_ptr<tgfx::Image> blurImage)
-    : RuntimeFilter({std::move(blurImage)}), progress(progress) {
+    : RuntimeFilter(cache, {std::move(blurImage)}), progress(progress) {
 }
 
 std::string GlowMergeRuntimeFilter::onBuildFragmentShader() const {
   return GLOW_TARGET_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> GlowMergeRuntimeFilter::onPrepareProgram(tgfx::Context* context,
-                                                                   unsigned program) const {
-  return std::make_unique<GlowMergeUniforms>(context, program);
+std::vector<tgfx::BindingEntry> GlowMergeRuntimeFilter::uniformBlocks() const {
+  return {{"FilterUniforms", 0}};
 }
 
-void GlowMergeRuntimeFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                            const std::vector<tgfx::BackendTexture>&) const {
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<GlowMergeUniforms*>(program->uniforms.get());
-  gl->uniform1f(uniform->progressHandle, progress);
+std::vector<tgfx::BindingEntry> GlowMergeRuntimeFilter::textureSamplers() const {
+  return {{"sTexture", 0}, {"blurImageTexture", 1}};
+}
+
+void GlowMergeRuntimeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                              const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                              const tgfx::Point&) const {
+  struct Uniforms {
+    float progress = 0.0f;
+  };
+  Uniforms uniforms = {};
+  uniforms.progress = progress;
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(Uniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+    }
+  }
 }
 
 }  // namespace pag

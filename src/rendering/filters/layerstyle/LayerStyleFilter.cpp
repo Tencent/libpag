@@ -24,17 +24,18 @@
 
 namespace pag {
 
-std::unique_ptr<LayerStyleFilter> LayerStyleFilter::Make(LayerStyle* layerStyle) {
+std::unique_ptr<LayerStyleFilter> LayerStyleFilter::Make(LayerStyle* layerStyle,
+                                                         RenderCache* cache) {
   LayerStyleFilter* filter = nullptr;
   switch (layerStyle->type()) {
     case LayerStyleType::DropShadow:
-      filter = new DropShadowFilter(reinterpret_cast<DropShadowStyle*>(layerStyle));
+      filter = new DropShadowFilter(reinterpret_cast<DropShadowStyle*>(layerStyle), cache);
       break;
     case LayerStyleType::OuterGlow:
-      filter = new OuterGlowFilter(reinterpret_cast<OuterGlowStyle*>(layerStyle));
+      filter = new OuterGlowFilter(reinterpret_cast<OuterGlowStyle*>(layerStyle), cache);
       break;
     case LayerStyleType::Stroke:
-      filter = new StrokeFilter(reinterpret_cast<StrokeStyle*>(layerStyle));
+      filter = new StrokeFilter(reinterpret_cast<StrokeStyle*>(layerStyle), cache);
       break;
     case LayerStyleType::GradientOverlay:
       filter = new GradientOverlayFilter(reinterpret_cast<GradientOverlayStyle*>(layerStyle));
@@ -45,6 +46,7 @@ std::unique_ptr<LayerStyleFilter> LayerStyleFilter::Make(LayerStyle* layerStyle)
   if (!filter) {
     return nullptr;
   }
+  filter->cache = cache;
   return std::unique_ptr<LayerStyleFilter>(filter);
 }
 

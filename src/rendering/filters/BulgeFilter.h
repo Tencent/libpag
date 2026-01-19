@@ -22,42 +22,31 @@
 #include "pag/file.h"
 
 namespace pag {
-class BulgeUniforms : public Uniforms {
- public:
-  BulgeUniforms(tgfx::Context* context, unsigned program);
-
-  int horizontalRadiusHandle = -1;
-  int verticalRadiusHandle = -1;
-  int bulgeCenterHandle = -1;
-  int bulgeHeightHandle = -1;
-  int pinningHandle = -1;
-};
 
 class BulgeFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame,
+                                            const tgfx::Rect& contentBounds, tgfx::Point* offset);
 
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, const tgfx::Rect& contentBounds,
-                                            tgfx::Point* offset);
-
-  BulgeFilter(float horizontalRadius, float verticalRadius, const Point& bulgeCenter,
-              float bulgeHeight, float pinning);
+  BulgeFilter(RenderCache* cache, float horizontalRadius, float verticalRadius,
+              const Point& bulgeCenter, float bulgeHeight, float pinning);
 
  protected:
+  DEFINE_RUNTIME_FILTER_TYPE
+
   std::string onBuildVertexShader() const override;
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
-
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
-
-  std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
-                                     const tgfx::BackendRenderTarget& target,
+  std::vector<float> computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                      const tgfx::Point& offset) const override;
+
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
+
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
 

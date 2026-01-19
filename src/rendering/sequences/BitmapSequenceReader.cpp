@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapSequenceReader.h"
+#include "rendering/utils/HardwareBufferUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -28,7 +29,7 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   // decoding will fail due to the memory sharing mechanism.
   if (tgfx::HardwareBufferAvailable() && sequence->composition->staticContent()) {
     hardWareBuffer = tgfx::HardwareBufferAllocate(sequence->width, sequence->height, false);
-    info = tgfx::HardwareBufferGetInfo(hardWareBuffer);
+    info = HardwareBufferInfoToImageInfo(tgfx::HardwareBufferGetInfo(hardWareBuffer));
   }
   if (hardWareBuffer == nullptr) {
     info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);

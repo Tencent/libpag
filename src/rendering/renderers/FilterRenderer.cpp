@@ -35,7 +35,7 @@
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 
 namespace pag {
 
@@ -174,6 +174,7 @@ tgfx::Rect GetClipBounds(Canvas* canvas, const FilterList* filterList,
 }
 
 static std::shared_ptr<tgfx::Image> ApplyMotionBlur(std::shared_ptr<tgfx::Image> input,
+                                                    RenderCache* cache,
                                                     const FilterList* filterList,
                                                     const tgfx::Rect& clipBounds,
                                                     tgfx::Rect* filterBounds, tgfx::Point* offset) {
@@ -188,8 +189,8 @@ static std::shared_ptr<tgfx::Image> ApplyMotionBlur(std::shared_ptr<tgfx::Image>
     if (!filterBounds->intersect(clipBounds)) {
       return nullptr;
     }
-    return MotionBlurFilter::Apply(input, filterList->layer, filterList->layerFrame, oldBounds,
-                                   offset);
+    return MotionBlurFilter::Apply(input, cache, filterList->layer, filterList->layerFrame,
+                                   oldBounds, offset);
   }
   return input;
 }
@@ -202,15 +203,17 @@ std::shared_ptr<tgfx::Image> ApplyFilter(std::shared_ptr<tgfx::Image> input, Eff
                                          const tgfx::Point& sourceScale, tgfx::Point* offset) {
   switch (effect->type()) {
     case EffectType::CornerPin:
-      return CornerPinFilter::Apply(std::move(input), effect, layerFrame, sourceScale, offset);
+      return CornerPinFilter::Apply(std::move(input), cache, effect, layerFrame, sourceScale,
+                                    offset);
     case EffectType::Bulge:
-      return BulgeFilter::Apply(std::move(input), effect, layerFrame, filterBounds, offset);
+      return BulgeFilter::Apply(std::move(input), cache, effect, layerFrame, filterBounds, offset);
     case EffectType::MotionTile:
-      return MotionTileFilter::Apply(std::move(input), effect, layerFrame, filterBounds, offset);
+      return MotionTileFilter::Apply(std::move(input), cache, effect, layerFrame, filterBounds,
+                                     offset);
     case EffectType::Glow:
-      return GlowFilter::Apply(std::move(input), effect, layerFrame, offset);
+      return GlowFilter::Apply(std::move(input), cache, effect, layerFrame, offset);
     case EffectType::LevelsIndividual:
-      return LevelsIndividualFilter::Apply(std::move(input), effect, layerFrame, offset);
+      return LevelsIndividualFilter::Apply(std::move(input), cache, effect, layerFrame, offset);
     case EffectType::FastBlur:
       return GaussianBlurFilter::Apply(std::move(input), effect, layerFrame, effectScale,
                                        sourceScale, offset);
@@ -218,13 +221,14 @@ std::shared_ptr<tgfx::Image> ApplyFilter(std::shared_ptr<tgfx::Image> input, Eff
       return DisplacementMapFilter::Apply(std::move(input), effect, layer, cache, layerMatrix,
                                           layerFrame, filterBounds, offset);
     case EffectType::RadialBlur:
-      return RadialBlurFilter::Apply(std::move(input), effect, layerFrame, filterBounds, offset);
+      return RadialBlurFilter::Apply(std::move(input), cache, effect, layerFrame, filterBounds,
+                                     offset);
     case EffectType::Mosaic:
-      return MosaicFilter::Apply(std::move(input), effect, layerFrame, offset);
+      return MosaicFilter::Apply(std::move(input), cache, effect, layerFrame, offset);
     case EffectType::BrightnessContrast:
-      return BrightnessContrastFilter::Apply(std::move(input), effect, layerFrame, offset);
+      return BrightnessContrastFilter::Apply(std::move(input), cache, effect, layerFrame, offset);
     case EffectType::HueSaturation:
-      return HueSaturationFilter::Apply(std::move(input), effect, layerFrame, offset);
+      return HueSaturationFilter::Apply(std::move(input), cache, effect, layerFrame, offset);
     default:
       return nullptr;
   }
@@ -305,13 +309,14 @@ std::shared_ptr<tgfx::Image> FilterRenderer::ApplyFilters(
   }
   *outputOffset += offset;
 
-  output = Apply3DEffects(output, filterList, clipBounds, contentScale, &filterBounds, &offset);
+  output =
+      Apply3DEffects(output, cache, filterList, clipBounds, contentScale, &filterBounds, &offset);
   if (!output) {
     return input;
   }
   *outputOffset += offset;
 
-  output = ApplyMotionBlur(output, filterList, clipBounds, &filterBounds, &offset);
+  output = ApplyMotionBlur(output, cache, filterList, clipBounds, &filterBounds, &offset);
   if (!output) {
     return input;
   }
@@ -352,7 +357,7 @@ tgfx::Matrix GetLayerMatrix(const FilterList* filterList, float contentScale) {
 
 static std::shared_ptr<tgfx::Picture> CreateSource(RenderCache* cache, const tgfx::Matrix& matrix,
                                                    std::shared_ptr<Graphic> content) {
-  tgfx::Recorder recorder;
+  tgfx::PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   auto contentCanvas = Canvas(canvas, cache);
   contentCanvas.concat(matrix);
@@ -412,7 +417,7 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   parentCanvas->concat(inverted);
   if (!filterList->layerStyles.empty()) {
     parentCanvas->translate(totalOffset.x, totalOffset.y);
-    auto filter = LayerStylesFilter::Make(filterList->layerStyles, filterList->layerFrame,
+    auto filter = LayerStylesFilter::Make(cache, filterList->layerStyles, filterList->layerFrame,
                                           contentScale, filterList->layerStyleScale);
     filter->applyFilter(parentCanvas, std::move(output));
   } else if (input == output) {

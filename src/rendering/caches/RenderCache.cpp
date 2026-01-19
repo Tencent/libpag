@@ -23,7 +23,6 @@
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/ImageReplacement.h"
-#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
@@ -183,6 +182,7 @@ void RenderCache::releaseAll() {
   clearAllSnapshots();
   graphicsMemory = 0;
   clearAllSequenceCaches();
+  filterResourcesMap.clear();
   contextID = 0;
 }
 
@@ -191,7 +191,6 @@ void RenderCache::detachFromContext() {
     context = nullptr;
     return;
   }
-  prepareNextFrame();
   recordPerformance();
   clearExpiredSequences();
   clearExpiredDecodedImages();
@@ -528,5 +527,20 @@ void RenderCache::recordTextureUploadingTime(int64_t time) {
 
 void RenderCache::recordProgramCompilingTime(int64_t time) {
   programCompilingTime += time;
+}
+
+FilterResources* RenderCache::findFilterResources(ID type) {
+  auto result = filterResourcesMap.find(type);
+  if (result != filterResourcesMap.end()) {
+    return result->second.get();
+  }
+  return nullptr;
+}
+
+void RenderCache::addFilterResources(ID type, std::unique_ptr<FilterResources> resources) {
+  if (resources == nullptr) {
+    return;
+  }
+  filterResourcesMap[type] = std::move(resources);
 }
 }  // namespace pag

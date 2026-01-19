@@ -24,7 +24,7 @@
 namespace pag {
 class OuterGlowFilter : public LayerStyleFilter {
  public:
-  explicit OuterGlowFilter(OuterGlowStyle* layerStyle);
+  OuterGlowFilter(OuterGlowStyle* layerStyle, RenderCache* cache);
 
   OuterGlowFilter(const OuterGlowFilter&) = delete;
 

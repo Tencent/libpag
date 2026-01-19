@@ -67,6 +67,9 @@ class Baseline {
   bool compareMd5(const std::string& key, const std::string& md5);
   std::string getJSONValue(nlohmann::json& target, const std::string& key);
   void setJSONValue(nlohmann::json& target, const std::string& key, const std::string& value);
+#ifdef GENERATE_BASELINE_IMAGES
+  bool tryCopyExistingBaseline(const std::string& key, const std::string& md5);
+#endif
 
   static void SetUp();
 

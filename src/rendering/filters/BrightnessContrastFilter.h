@@ -22,32 +22,26 @@
 #include "pag/file.h"
 
 namespace pag {
-class BrightnessContrastUniforms : public Uniforms {
- public:
-  BrightnessContrastUniforms(tgfx::Context* context, unsigned program);
-
-  int brightnessBlocksHandle = -1;
-  int contrastHandle = -1;
-};
 
 class BrightnessContrastFilter : public RuntimeFilter {
  public:
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
+  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
+                                            Effect* effect, Frame layerFrame, tgfx::Point* offset);
 
-  static std::shared_ptr<tgfx::Image> Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
-                                            Frame layerFrame, tgfx::Point* offset);
-
-  BrightnessContrastFilter(float brightness, float contrast)
-      : brightness(brightness), contrast(contrast) {
+  BrightnessContrastFilter(RenderCache* cache, float brightness, float contrast)
+      : RuntimeFilter(cache), brightness(brightness), contrast(contrast) {
   }
+
+ protected:
+  DEFINE_RUNTIME_FILTER_TYPE
 
   std::string onBuildFragmentShader() const override;
 
-  std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                             unsigned program) const override;
+  std::vector<tgfx::BindingEntry> uniformBlocks() const override;
 
-  void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                      const std::vector<tgfx::BackendTexture>& sources) const override;
+  void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                        const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                        const tgfx::Point& offset) const override;
 
  private:
   float brightness = 0.f;

@@ -22,7 +22,6 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/drawables/Drawable.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
@@ -218,18 +217,20 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     canvas->clear();
   }
   onDraw(graphic, surface, cache);
+  std::unique_ptr<tgfx::Recording> recording = nullptr;
   if (signalSemaphore == nullptr) {
-    context->flush();
+    recording = context->flush();
   } else {
     tgfx::BackendSemaphore semaphore = {};
-    context->flush(&semaphore);
+    recording = context->flush(&semaphore);
     tgfx::GLSyncInfo signalInfo = {};
     if (semaphore.getGLSync(&signalInfo)) {
       signalSemaphore->initGL(signalInfo.sync);
     }
   }
   cache->detachFromContext();
-  context->submit();
+  context->submit(std::move(recording));
+  cache->prepareNextFrame();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
   unlockContext();
@@ -286,19 +287,10 @@ tgfx::Context* PAGSurface::lockContext() {
     return nullptr;
   }
   auto context = device->lockContext();
-  if (context != nullptr && externalContext) {
-#ifndef PAG_BUILD_FOR_WEB
-    glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
-#endif
-  }
   return context;
 }
 
 void PAGSurface::unlockContext() {
-  if (externalContext) {
-    delete glRestorer;
-    glRestorer = nullptr;
-  }
   auto device = drawable->getDevice();
   if (device != nullptr) {
     device->unlock();

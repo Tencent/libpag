@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TraceImage.h"
-#include <CoreVideo/CoreVideo.h>
+#import "PixelBufferUtil.h"
 #include "base/utils/Log.h"
-#include "platform/cocoa/private/PixelBufferUtil.h"
-#include "tgfx/core/Pixmap.h"
+#include "rendering/utils/HardwareBufferUtil.h"
+#include "rendering/utils/Trace.h"
 
 namespace pag {
+
 void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
   if (info.isEmpty() || pixels == nullptr) {
     return;
@@ -33,7 +33,8 @@ void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::stri
       return;
     }
     auto dstPixels = tgfx::HardwareBufferLock(pixelBuffer);
-    auto dstInfo = tgfx::HardwareBufferGetInfo(pixelBuffer);
+    auto hwInfo = tgfx::HardwareBufferGetInfo(pixelBuffer);
+    auto dstInfo = HardwareBufferInfoToImageInfo(hwInfo);
     tgfx::Pixmap pixmap(dstInfo, dstPixels);
     pixmap.writePixels(info, pixels);
     tgfx::HardwareBufferUnlock(pixelBuffer);

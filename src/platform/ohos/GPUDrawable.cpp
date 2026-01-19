@@ -72,7 +72,8 @@ void GPUDrawable::present(tgfx::Context* context) {
   if (window == nullptr) {
     return;
   }
-  return window->present(context, currentTimeStamp);
+  window->setPresentationTime(currentTimeStamp);
+  window->present(context);
 }
 
 void GPUDrawable::setTimeStamp(int64_t timeStamp) {

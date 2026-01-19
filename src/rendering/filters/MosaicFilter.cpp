@@ -21,23 +21,26 @@
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
-        #version 100
         precision mediump float;
-        varying vec2 vertexColor;
+        in vec2 vertexColor;
         uniform sampler2D sTexture;
-        uniform float mHorizontalBlocks;
-        uniform float mVerticalBlocks;
-        uniform bool mSharpColors;
+        layout(std140) uniform Args {
+            float mHorizontalBlocks;
+            float mVerticalBlocks;
+            int mSharpColors;
+        };
+        out vec4 tgfx_FragColor;
 
         void main() {
             vec2 blocks = vec2(mHorizontalBlocks, mVerticalBlocks);
             vec2 position = floor(vertexColor / blocks);
             vec2 target = blocks * position + blocks / 2.0;
-            gl_FragColor = texture2D(sTexture, target);
+            tgfx_FragColor = texture(sTexture, target);
         }
     )";
 
-std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> input, Effect* effect,
+std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> input,
+                                                 RenderCache* cache, Effect* effect,
                                                  Frame layerFrame, tgfx::Point* offset) {
   auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
   auto sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
@@ -45,7 +48,8 @@ std::shared_ptr<tgfx::Image> MosaicFilter::Apply(std::shared_ptr<tgfx::Image> in
   auto horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
   auto verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
 
-  auto filter = std::make_shared<MosaicFilter>(horizontalBlocks, verticalBlocks, sharpColors);
+  auto filter =
+      std::make_shared<MosaicFilter>(cache, horizontalBlocks, verticalBlocks, sharpColors);
 
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
@@ -54,18 +58,33 @@ std::string MosaicFilter::onBuildFragmentShader() const {
   return FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> MosaicFilter::onPrepareProgram(tgfx::Context* context,
-                                                         unsigned program) const {
-  return std::make_unique<MosaicUniforms>(context, program);
+std::vector<tgfx::BindingEntry> MosaicFilter::uniformBlocks() const {
+  return {{"Args", 0}};
 }
 
-void MosaicFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                  const std::vector<tgfx::BackendTexture>&) const {
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniform = static_cast<const MosaicUniforms*>(program->uniforms.get());
-  gl->uniform1f(uniform->horizontalBlocksHandle, horizontalBlocks);
-  gl->uniform1f(uniform->verticalBlocksHandle, verticalBlocks);
-  gl->uniform1f(uniform->sharpColorsHandle, sharpColors);
+void MosaicFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                    const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                    const tgfx::Point&) const {
+  struct Uniforms {
+    float horizontalBlocks = 0.0f;
+    float verticalBlocks = 0.0f;
+    int sharpColors = 0;
+  };
+
+  Uniforms uniforms = {};
+  uniforms.horizontalBlocks = horizontalBlocks;
+  uniforms.verticalBlocks = verticalBlocks;
+  uniforms.sharpColors = sharpColors ? 1 : 0;
+
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(Uniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+    }
+  }
 }
 
 }  // namespace pag

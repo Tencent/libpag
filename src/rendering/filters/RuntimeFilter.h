@@ -18,85 +18,117 @@
 
 #pragma once
 
+#include <memory>
+#include "base/utils/UniqueID.h"
+#include "pag/types.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RuntimeEffect.h"
-#include "tgfx/gpu/RuntimeProgram.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+
 namespace pag {
+
+#define DEFINE_RUNTIME_FILTER_TYPE             \
+  ID filterType() const override {             \
+    static const auto type = UniqueID::Next(); \
+    return type;                               \
+  }
+
+struct FilterResources {
+  std::shared_ptr<tgfx::RenderPipeline> pipeline = nullptr;
+  std::shared_ptr<tgfx::Sampler> sampler = nullptr;
+
+  virtual ~FilterResources() = default;
+};
+
+class RenderCache;
 
 std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
                                                               const tgfx::Rect& outputBounds);
 
-class Uniforms {
- public:
-  Uniforms(tgfx::Context* context, unsigned program) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    positionHandle = gl->getAttribLocation(program, "aPosition");
-    textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
-  }
-
-  virtual ~Uniforms() = default;
-
-  int positionHandle = -1;
-  int textureCoordHandle = -1;
-};
-
-class RuntimeProgram : public tgfx::RuntimeProgram {
- public:
-  static std::unique_ptr<RuntimeProgram> Make(tgfx::Context* context, const std::string& vertex,
-                                              const std::string& fragment);
-
-  unsigned program = 0;
-  unsigned int vertexArray = 0;
-  unsigned int vertexBuffer = 0;
-
-  std::unique_ptr<Uniforms> uniforms = nullptr;
-
- protected:
-  void onReleaseGPU() override;
-
-  explicit RuntimeProgram(tgfx::Context* context) : tgfx::RuntimeProgram(context) {
-  }
-};
-
 class RuntimeFilter : public tgfx::RuntimeEffect {
  public:
-  explicit RuntimeFilter(const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
-      : RuntimeEffect(extraInputs) {
+  explicit RuntimeFilter(RenderCache* cache,
+                         const std::vector<std::shared_ptr<tgfx::Image>>& extraInputs = {})
+      : RuntimeEffect(extraInputs), cache(cache) {
   }
 
-  std::unique_ptr<tgfx::RuntimeProgram> onCreateProgram(tgfx::Context* context) const override;
+  tgfx::Rect filterBounds(const tgfx::Rect& srcRect, tgfx::MapDirection) const override {
+    return filterBounds(srcRect);
+  }
+
+  bool onDraw(tgfx::CommandEncoder* encoder,
+              const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+              std::shared_ptr<tgfx::Texture> outputTexture,
+              const tgfx::Point& offset) const override;
 
  protected:
-  bool onDraw(const tgfx::RuntimeProgram* program, const std::vector<tgfx::BackendTexture>& sources,
-              const tgfx::BackendRenderTarget& target, const tgfx::Point& offset) const override;
+  RenderCache* cache = nullptr;
+
+  virtual ID filterType() const = 0;
+
+  virtual tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const {
+    return srcRect;
+  }
 
   virtual std::string onBuildVertexShader() const;
 
   virtual std::string onBuildFragmentShader() const;
 
-  virtual std::unique_ptr<Uniforms> onPrepareProgram(tgfx::Context* context,
-                                                     unsigned program) const;
+  virtual int sampleCount() const {
+    return 1;
+  }
 
-  /**
-   * filter的给shader上传数据接口
-   */
-  virtual void onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                              const std::vector<tgfx::BackendTexture>& sources) const;
+  virtual std::vector<tgfx::Attribute> vertexAttributes() const;
 
-  /**
-   * filter的收集顶点数据的接口
-   * 如果顶点数据和普通滤镜不一致，需要需重载该接口。
-   * @param sources : 滤镜输入的纹理
-   * @param target : 滤镜输出的纹理
-   * @param offset : 滤镜输出的纹理的偏移量
-   * @return : 返回所有顶点数据
-   */
-  virtual std::vector<float> computeVertices(const std::vector<tgfx::BackendTexture>& sources,
-                                             const tgfx::BackendRenderTarget& target,
+  virtual std::vector<tgfx::BindingEntry> uniformBlocks() const {
+    return {};
+  }
+
+  virtual std::vector<tgfx::BindingEntry> textureSamplers() const {
+    return {{"sTexture", 0}};
+  }
+
+  virtual std::vector<float> computeVertices(const tgfx::Texture* source,
+                                             const tgfx::Texture* target,
                                              const tgfx::Point& offset) const;
 
-  virtual void bindVertices(tgfx::Context* context, const RuntimeProgram* program,
-                            const std::vector<float>& points) const;
+  virtual size_t vertexCount() const {
+    return 4;
+  }
+
+  virtual void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
+                                const tgfx::Point& offset) const;
+
+  /**
+   * Called to configure the render pipeline descriptor before creating the pipeline.
+   * Subclasses can override this to add custom configurations like depth/stencil settings.
+   */
+  virtual void onConfigurePipeline(tgfx::RenderPipelineDescriptor* descriptor) const;
+
+  /**
+   * Creates and returns the FilterResources for this filter.
+   * Subclasses can override this to return a custom FilterResources subclass.
+   */
+  virtual std::unique_ptr<FilterResources> onCreateFilterResources() const;
+
+  /**
+   * Called to configure the render pass descriptor before beginning the render pass.
+   * Subclasses can override this to add custom attachments like depth textures.
+   * @param renderPassDesc The render pass descriptor to configure.
+   * @param resources The filter resources.
+   * @param gpu The GPU instance.
+   * @param outputTexture The output texture.
+   */
+  virtual void onConfigureRenderPass(tgfx::RenderPassDescriptor* renderPassDesc,
+                                     FilterResources* resources, tgfx::GPU* gpu,
+                                     const std::shared_ptr<tgfx::Texture>& outputTexture) const;
+
+  FilterResources* getFilterResources(tgfx::GPU* gpu) const;
+
+  std::shared_ptr<tgfx::RenderPipeline> getPipeline(tgfx::GPU* gpu) const;
+
+ private:
+  std::shared_ptr<tgfx::RenderPipeline> createPipeline(tgfx::GPU* gpu) const;
 };
 
 }  // namespace pag

@@ -42,6 +42,9 @@ local.properties
 !**/.idea/fileTemplates/
 !**/.idea/misc.xml
 
+# CodeBuddy
+.codebuddy/designs/
+
 /third_party
 /out
 /result

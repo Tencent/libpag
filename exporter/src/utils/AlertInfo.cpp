@@ -408,6 +408,16 @@ DEFINE_GETINFO(TextPathAnimator) {
   suggest = suggestData.toStdString();
 }
 
+DEFINE_GETINFO(VideoCompositionOverlap) {
+  auto infoData = QObject::tr(
+      "There are overlapping time intervals for references to video composition \"%1\".");
+  auto suggestData = QObject::tr(
+      "Recommend adjusting the start time and duration of the layers referencing video composition "
+      "\"%1\".");
+  info = infoData.arg(QString::fromStdString(addInfo)).toStdString();
+  suggest = suggestData.arg(QString::fromStdString(addInfo)).toStdString();
+}
+
 DEFINE_GETINFO(OtherWarning) {
   info = addInfo;
 }
@@ -535,6 +545,7 @@ static const std::unordered_map<AlertInfoType, std::function<GetInfoHandler>, pa
                         LINE_GETINFO(TextPathVertial),
                         LINE_GETINFO(TextPathBoxText),
                         LINE_GETINFO(TextPathAnimator),
+                        LINE_GETINFO(VideoCompositionOverlap),
                         LINE_GETINFO(OtherWarning),
                         LINE_GETINFO(UnknownError),
                         LINE_GETINFO(ExportAEError),

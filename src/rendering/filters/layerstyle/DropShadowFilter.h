@@ -24,7 +24,7 @@
 namespace pag {
 class DropShadowFilter : public LayerStyleFilter {
  public:
-  explicit DropShadowFilter(DropShadowStyle* layerStyle);
+  DropShadowFilter(DropShadowStyle* layerStyle, RenderCache* cache);
 
   DropShadowFilter(const DropShadowFilter&) = delete;
 

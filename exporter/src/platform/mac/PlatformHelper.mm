@@ -79,14 +79,9 @@ bool IsAEWindowActive() {
 }
 
 std::string GetQmlPath() {
-  Dl_info info;
-  if (dladdr((void*)&GetQmlPath, &info)) {
-    QString dylibPath = QString::fromUtf8(info.dli_fname);
-    QFileInfo file(dylibPath);
-    QString qmlPath = QDir(file.absolutePath() + "/../Resources/qml").absolutePath();
-    return qmlPath.toStdString();
-  }
-  return "";
+  // Use shared Qt resources directory to avoid modifying plugin bundle (which would break code
+  // signature)
+  return "/Library/Application Support/PAGExporter/Resources/qml";
 }
 
 std::string GetDownloadsPath() {

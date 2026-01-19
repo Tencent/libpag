@@ -23,41 +23,45 @@
 namespace pag {
 
 static const char RADIAL_BLUR_FRAGMENT_SHADER[] = R"(
-    #version 100
     precision highp float;
-    varying highp vec2 vertexColor;
-    uniform sampler2D inputImageTexture;
+    in highp vec2 vertexColor;
+    uniform sampler2D sTexture;
 
-    uniform float uAmount;
-    uniform highp vec2 uCenter;
+    layout(std140) uniform Args {
+        highp vec2 uCenter;
+        float uAmount;
+    };
+
+    out vec4 tgfx_FragColor;
 
     const float sampleCount = 16.0;
 
     void main() {
         vec2 oneStep = 1.0 / sampleCount * (vertexColor - uCenter) * uAmount;
-        vec4 color = texture2D(inputImageTexture, vertexColor);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 1.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 2.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 3.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 4.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 5.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 6.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 7.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 8.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 9.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 10.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 11.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 12.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 13.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 14.0);
-        color += texture2D(inputImageTexture, vertexColor + oneStep * 15.0);
+        vec4 color = texture(sTexture, vertexColor);
+        color += texture(sTexture, vertexColor + oneStep * 1.0);
+        color += texture(sTexture, vertexColor + oneStep * 2.0);
+        color += texture(sTexture, vertexColor + oneStep * 3.0);
+        color += texture(sTexture, vertexColor + oneStep * 4.0);
+        color += texture(sTexture, vertexColor + oneStep * 5.0);
+        color += texture(sTexture, vertexColor + oneStep * 6.0);
+        color += texture(sTexture, vertexColor + oneStep * 7.0);
+        color += texture(sTexture, vertexColor + oneStep * 8.0);
+        color += texture(sTexture, vertexColor + oneStep * 9.0);
+        color += texture(sTexture, vertexColor + oneStep * 10.0);
+        color += texture(sTexture, vertexColor + oneStep * 11.0);
+        color += texture(sTexture, vertexColor + oneStep * 12.0);
+        color += texture(sTexture, vertexColor + oneStep * 13.0);
+        color += texture(sTexture, vertexColor + oneStep * 14.0);
+        color += texture(sTexture, vertexColor + oneStep * 15.0);
 
-        gl_FragColor = color / sampleCount;
+        tgfx_FragColor = color / sampleCount;
     }
     )";
 
 std::shared_ptr<tgfx::Image> RadialBlurFilter::Apply(std::shared_ptr<tgfx::Image> input,
-                                                     Effect* effect, Frame layerFrame,
+                                                     RenderCache* cache, Effect* effect,
+                                                     Frame layerFrame,
                                                      const tgfx::Rect& contentBounds,
                                                      tgfx::Point* offset) {
   auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
@@ -66,7 +70,7 @@ std::shared_ptr<tgfx::Image> RadialBlurFilter::Apply(std::shared_ptr<tgfx::Image
   center.x = center.x / contentBounds.width();
   center.y = center.y / contentBounds.height();
   amount = amount < 0.25 ? amount : 0.25;
-  auto filter = std::make_shared<RadialBlurFilter>(amount, center);
+  auto filter = std::make_shared<RadialBlurFilter>(cache, amount, center);
   return input->makeWithFilter(tgfx::ImageFilter::Runtime(filter), offset);
 }
 
@@ -74,17 +78,33 @@ std::string RadialBlurFilter::onBuildFragmentShader() const {
   return RADIAL_BLUR_FRAGMENT_SHADER;
 }
 
-std::unique_ptr<Uniforms> RadialBlurFilter::onPrepareProgram(tgfx::Context* context,
-                                                             unsigned program) const {
-  return std::make_unique<RadialBlurUniforms>(context, program);
+std::vector<tgfx::BindingEntry> RadialBlurFilter::uniformBlocks() const {
+  return {{"Args", 0}};
 }
 
-void RadialBlurFilter::onUpdateParams(tgfx::Context* context, const RuntimeProgram* program,
-                                      const std::vector<tgfx::BackendTexture>&) const {
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto uniforms = static_cast<RadialBlurUniforms*>(program->uniforms.get());
-  gl->uniform1f(uniforms->amountHandle, amount);
-  gl->uniform2f(uniforms->centerHandle, center.x, center.y);
+void RadialBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
+                                        const std::vector<std::shared_ptr<tgfx::Texture>>&,
+                                        const tgfx::Point&) const {
+  struct Uniforms {
+    float centerX = 0.0f;
+    float centerY = 0.0f;
+    float amount = 0.0f;
+  };
+
+  Uniforms uniforms = {};
+  uniforms.amount = static_cast<float>(amount);
+  uniforms.centerX = center.x;
+  uniforms.centerY = center.y;
+
+  auto uniformBuffer = gpu->createBuffer(sizeof(Uniforms), tgfx::GPUBufferUsage::UNIFORM);
+  if (uniformBuffer != nullptr) {
+    auto* data = uniformBuffer->map();
+    if (data != nullptr) {
+      memcpy(data, &uniforms, sizeof(Uniforms));
+      uniformBuffer->unmap();
+      renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(Uniforms));
+    }
+  }
 }
 
 }  // namespace pag
