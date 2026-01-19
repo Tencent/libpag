@@ -1,46 +1,122 @@
 English | [简体中文](./README.zh_CN.md)
 
-## Introduction
-***
+# PAGExporter
 
-The PAGExporter is a plugin for Adobe After Effects (AE), enabling designers to export motion effects created in AE into asset files with one click.  
-While supporting more AE features in pure vector export mode, it also introduces hybrid export mode combining BMP pre-compositions with vectors, supporting all AE features while maintaining runtime editable.
+PAGExporter is an Adobe After Effects plugin that enables designers to export motion graphics created in AE into PAG animation files with one click.
 
-## Development
-***
+## Features
 
-We recommend using the CLion IDE on macOS for development.
+- **Pure Vector Export**: Export AE compositions as pure vector files for small file sizes and infinite scalability
+- **Hybrid Export**: Combine BMP pre-compositions with vectors to support all AE features while maintaining runtime editability
+- **Real-time Preview**: Preview PAG output directly within After Effects before exporting
+- **Batch Export**: Export multiple compositions at once via the Panel interface
+- **Export Validation**: Automatic checks for unsupported features with detailed warnings
+- **PAGViewer Integration**: One-click installation of PAGViewer for desktop preview
+
+## Menu Commands
+
+After installation, the following commands are available in After Effects:
+
+| Menu | Command | Description |
+|------|---------|-------------|
+| Edit > Preferences | PAG Config... | Configure export settings and preferences |
+| File > Export | PAG File... | Export current composition to PAG file |
+| File > Export | PAG File (Panel)... | Open export panel for batch operations |
+| File > Export | PAG Preview... | Preview current composition as PAG |
+
+## Requirements
+
+- **Adobe After Effects 2020+** (CC 2023 recommended)
+- **Qt 6.2.0+** (Qt 6.6.1 recommended)
+- **CLion** IDE
+- **macOS 10.15+** or **Windows 10+** (64-bit)
+- **After Effects SDK** (2023 Windows version recommended)
+- Successfully built libpag library (see [main README](../README.md))
+
+## Build Instructions
 
 ### Environment Setup
 
-First, download the AESDK from the following link:
+1. **Download After Effects SDK**
 
-`https://developer.adobe.com/console/3505738/servicesandapis`
+   Download from: https://developer.adobe.com/console/3505738/servicesandapis
 
-We recommend downloading the 2023 Windows version. After extraction, write the absolute path of the AESDK to `./AESDK.cfg`. Example content of the file:
+   We recommend the 2023 Windows version. After extraction, create `AESDK.cfg` in the exporter directory:
+   ```cmake
+   set(AE_SDK_PATH /path/to/AfterEffectsSDK/Examples)
+   ```
 
-`set(AE_SDK_PATH /Users/[username]/libpag/exporter/vendor/AfterEffectsSDK/Examples)`
+2. **Configure Qt Path**
 
-Next, write the QT cmake path to `QTCMAKE.cfg`. Example content of the file:
+   Create `QTCMAKE.cfg` in the exporter directory:
+   ```cmake
+   set(CMAKE_PREFIX_PATH /Users/[username]/Qt/6.6.1/macos/lib/cmake)
+   ```
 
-`set(CMAKE_PREFIX_PATH /Users/[username]/Qt/6.6.1/macos/lib/cmake)`
+3. **Build libpag First**
 
-Other environment dependencies are the same as [libpag](../README.md).
+   Ensure libpag compiles successfully before building PAGExporter. See [build guide](../README.md).
 
-### Building the Project
+### macOS
 
-Ensure that libpag can be compiled successfully before attempting to compile the PAGExporter. Open the project root directory directly in CLion to start the compilation.
+1. Open the `exporter` folder in CLion.
+2. Build the `PAGExporter` target.
+3. The plugin will be generated as `PAGExporter.plugin`.
 
-**For macOS:**
+### Windows
 
-No additional CLion configuration is needed.
+1. Ensure VS2019 has **Desktop development with C++** and **Universal Windows Platform development** components installed.
 
-**For Windows:**
+2. In CLion, go to **File > Settings > Build, Execution, Deployment > Toolchains** and set:
+   - Toolchain: **Visual Studio**
+   - Architecture: **amd64** (recommended) or **x86**
 
-Follow these steps to configure CLion correctly:
+3. Open the `exporter` folder in CLion.
 
-- Ensure you have installed the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
-- Open the **File->Settings** panel, go to **Build, Execution, Deployment->Toolchains**, and set the toolchain to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
+4. Build the `PAGExporter` target.
 
-**Note: If you encounter issues during the CMake build, update to the latest version of the CMake
-command-line tool and try again.**
+5. The plugin will be generated as `PAGExporter.aex`.
+
+## Installation
+
+### macOS
+Copy `PAGExporter.plugin` to:
+```
+/Applications/Adobe After Effects [version]/Plug-ins/
+```
+
+### Windows
+Copy the `PAGExporter.aex` and its dependencies to:
+```
+C:\Program Files\Adobe\Adobe After Effects [version]\Support Files\Plug-ins\
+```
+
+## Project Structure
+
+```
+exporter/
+├── src/
+│   ├── aecommand/          # AE menu command handlers
+│   ├── config/             # Export configuration management
+│   ├── export/             # Core export logic
+│   ├── platform/           # Platform-specific code (mac/win)
+│   ├── ui/                 # Qt window and model classes
+│   └── utils/              # AE data conversion utilities
+├── assets/
+│   ├── qml/                # QML UI files
+│   ├── images/             # Icons and images
+│   └── translation/        # i18n files
+├── scripts/                # Build and deployment scripts
+├── templates/              # Version file templates
+└── vendor/                 # Third-party dependencies
+```
+
+## Troubleshooting
+
+- **CMake build errors**: Update CMake to the latest version and rebuild.
+- **Plugin not appearing in AE**: Verify the plugin is in the correct Plug-ins directory and restart After Effects.
+- **Export failures**: Check the AE console for detailed error messages.
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](../LICENSE.txt) file for details.
