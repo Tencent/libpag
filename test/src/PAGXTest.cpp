@@ -24,8 +24,11 @@
 #include "pagx/PAGXTypes.h"
 #include "pagx/PathData.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/svg/SVGDOM.h"
+#include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
 #include "utils/DevicePool.h"
 #include "utils/ProjectPath.h"
@@ -89,20 +92,40 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
+  // Create text shaper for SVG rendering
+  auto textShaper = TextShaper::Make(GetFallbackTypefaces());
+
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
 
-    // Convert to PAGX using LayerBuilder API
+    // Load original SVG with text shaper
+    auto svgStream = Stream::MakeFromFile(svgPath);
+    if (svgStream == nullptr) {
+      continue;
+    }
+    auto svgDOM = SVGDOM::Make(*svgStream, textShaper);
+    if (svgDOM == nullptr) {
+      continue;
+    }
+
+    auto containerSize = svgDOM->getContainerSize();
+    int width = static_cast<int>(containerSize.width);
+    int height = static_cast<int>(containerSize.height);
+    if (width <= 0 || height <= 0) {
+      continue;
+    }
+
+    // Render original SVG
+    auto svgSurface = Surface::Make(context, width, height);
+    auto svgCanvas = svgSurface->getCanvas();
+    svgDOM->render(svgCanvas);
+    EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
+
+    // Convert to PAGX using new API
     pagx::LayerBuilder::Options options;
     options.fallbackTypefaces = GetFallbackTypefaces();
     auto content = pagx::LayerBuilder::FromSVGFile(svgPath, options);
     if (content.root == nullptr) {
-      continue;
-    }
-
-    int width = static_cast<int>(content.width);
-    int height = static_cast<int>(content.height);
-    if (width <= 0 || height <= 0) {
       continue;
     }
 
@@ -115,11 +138,11 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       SaveFile(pagxData, "PAGXTest/" + baseName + ".pagx");
     }
 
-    // Render PAGX and compare with baseline
+    // Render PAGX
     auto pagxSurface = Surface::Make(context, width, height);
     auto pagxCanvas = pagxSurface->getCanvas();
     content.root->draw(pagxCanvas);
-    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName));
+    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
   }
 
   device->unlock();
