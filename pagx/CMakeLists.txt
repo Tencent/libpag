@@ -5,13 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(PAGX_BUILD_SVG "Build PAGX SVG parser module" ON)
-option(PAGX_BUILD_TGFX_ADAPTER "Build PAGX to tgfx adapter (LayerBuilder)" OFF)
+option(PAGX_BUILD_TGFX_ADAPTER "Build PAGX to tgfx adapter (LayerBuilder)" ON)
 
 # ============== Core PAGX Library (Independent, no tgfx dependency) ==============
 
 # Core sources
 file(GLOB PAGX_CORE_SOURCES
     src/PAGXNode.cpp
+    src/PAGXTypes.cpp
     src/PAGXDocument.cpp
     src/PAGXXMLParser.cpp
     src/PAGXXMLWriter.cpp

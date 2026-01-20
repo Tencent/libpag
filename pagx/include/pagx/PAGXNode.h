@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,276 +20,947 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "pagx/PAGXTypes.h"
 #include "pagx/PathData.h"
 
 namespace pagx {
 
+class PAGXNode;
+class ColorSourceNode;
+class VectorElementNode;
+class LayerStyleNode;
+class LayerFilterNode;
+struct LayerNode;
+
 /**
- * Types of nodes in a PAGX document.
+ * Node types in PAGX document.
  */
-enum class PAGXNodeType {
-  // Document root
-  Document,
-  Resources,
-
-  // Layers
-  Layer,
-
-  // Vector Elements
-  Group,
-  Rectangle,
-  Ellipse,
-  Polystar,
-  Path,
-  Text,
-
-  // Styles
-  Fill,
-  Stroke,
-  TrimPath,
-  RoundCorner,
-  MergePath,
-  Repeater,
-
-  // Color Sources
+enum class NodeType {
+  // Color sources
   SolidColor,
   LinearGradient,
   RadialGradient,
   ConicGradient,
   DiamondGradient,
   ImagePattern,
+  ColorStop,
 
-  // Effects
-  BlurFilter,
-  DropShadowFilter,
-  DropShadowStyle,
-  InnerShadowStyle,
-
-  // Text
+  // Geometry elements
+  Rectangle,
+  Ellipse,
+  Polystar,
+  Path,
   TextSpan,
 
-  // Masks
-  Mask,
-  ClipPath,
+  // Painters
+  Fill,
+  Stroke,
 
-  // Image
+  // Shape modifiers
+  TrimPath,
+  RoundCorner,
+  MergePath,
+
+  // Text modifiers
+  TextModifier,
+  TextPath,
+  TextLayout,
+  RangeSelector,
+
+  // Repeater
+  Repeater,
+
+  // Container
+  Group,
+
+  // Layer styles
+  DropShadowStyle,
+  InnerShadowStyle,
+  BackgroundBlurStyle,
+
+  // Layer filters
+  BlurFilter,
+  DropShadowFilter,
+  InnerShadowFilter,
+  BlendFilter,
+  ColorMatrixFilter,
+
+  // Resources
   Image,
+  Composition,
 
-  // Unknown/Custom
-  Unknown
+  // Layer
+  Layer
 };
 
 /**
  * Returns the string name of a node type.
  */
-const char* PAGXNodeTypeName(PAGXNodeType type);
+const char* NodeTypeName(NodeType type);
 
 /**
- * Parses a node type from its string name.
- */
-PAGXNodeType PAGXNodeTypeFromName(const std::string& name);
-
-/**
- * PAGXNode represents a node in the PAGX document tree.
- * Each node has a type, attributes, and optional children.
+ * Base class for all PAGX nodes.
  */
 class PAGXNode {
  public:
   virtual ~PAGXNode() = default;
 
   /**
-   * Creates a new node with the specified type.
-   */
-  static std::unique_ptr<PAGXNode> Make(PAGXNodeType type);
-
-  /**
    * Returns the type of this node.
    */
-  PAGXNodeType type() const {
-    return _type;
-  }
+  virtual NodeType type() const = 0;
 
   /**
-   * Returns the ID of this node.
+   * Returns a deep clone of this node.
    */
-  const std::string& id() const {
-    return _id;
-  }
-
-  /**
-   * Sets the ID of this node.
-   */
-  void setId(const std::string& id) {
-    _id = id;
-  }
-
-  // ============== Attribute Access ==============
-
-  /**
-   * Returns true if the node has an attribute with the given name.
-   */
-  bool hasAttribute(const std::string& name) const;
-
-  /**
-   * Returns the string value of an attribute.
-   */
-  std::string getAttribute(const std::string& name, const std::string& defaultValue = "") const;
-
-  /**
-   * Returns the float value of an attribute.
-   */
-  float getFloatAttribute(const std::string& name, float defaultValue = 0.0f) const;
-
-  /**
-   * Returns the integer value of an attribute.
-   */
-  int getIntAttribute(const std::string& name, int defaultValue = 0) const;
-
-  /**
-   * Returns the boolean value of an attribute.
-   */
-  bool getBoolAttribute(const std::string& name, bool defaultValue = true) const;
-
-  /**
-   * Returns the color value of an attribute.
-   */
-  Color getColorAttribute(const std::string& name, const Color& defaultValue = Color::Black()) const;
-
-  /**
-   * Returns the matrix value of an attribute.
-   */
-  Matrix getMatrixAttribute(const std::string& name) const;
-
-  /**
-   * Returns the path data value of an attribute.
-   */
-  PathData getPathAttribute(const std::string& name) const;
-
-  /**
-   * Sets a string attribute.
-   */
-  void setAttribute(const std::string& name, const std::string& value);
-
-  /**
-   * Sets a float attribute.
-   */
-  void setFloatAttribute(const std::string& name, float value);
-
-  /**
-   * Sets an integer attribute.
-   */
-  void setIntAttribute(const std::string& name, int value);
-
-  /**
-   * Sets a boolean attribute.
-   */
-  void setBoolAttribute(const std::string& name, bool value);
-
-  /**
-   * Sets a color attribute.
-   */
-  void setColorAttribute(const std::string& name, const Color& color);
-
-  /**
-   * Sets a matrix attribute.
-   */
-  void setMatrixAttribute(const std::string& name, const Matrix& matrix);
-
-  /**
-   * Sets a path data attribute.
-   */
-  void setPathAttribute(const std::string& name, const PathData& path);
-
-  /**
-   * Removes an attribute.
-   */
-  void removeAttribute(const std::string& name);
-
-  /**
-   * Returns all attribute names.
-   */
-  std::vector<std::string> getAttributeNames() const;
-
-  // ============== Children ==============
-
-  /**
-   * Returns the child nodes.
-   */
-  const std::vector<std::unique_ptr<PAGXNode>>& children() const {
-    return _children;
-  }
-
-  /**
-   * Returns the number of children.
-   */
-  size_t childCount() const {
-    return _children.size();
-  }
-
-  /**
-   * Returns the child at the specified index.
-   */
-  PAGXNode* childAt(size_t index) const;
-
-  /**
-   * Appends a child node.
-   */
-  void appendChild(std::unique_ptr<PAGXNode> child);
-
-  /**
-   * Inserts a child node at the specified index.
-   */
-  void insertChild(size_t index, std::unique_ptr<PAGXNode> child);
-
-  /**
-   * Removes and returns the child at the specified index.
-   */
-  std::unique_ptr<PAGXNode> removeChild(size_t index);
-
-  /**
-   * Removes all children.
-   */
-  void clearChildren();
-
-  // ============== Parent ==============
-
-  /**
-   * Returns the parent node (weak reference).
-   */
-  PAGXNode* parent() const {
-    return _parent;
-  }
-
-  // ============== Traversal ==============
-
-  /**
-   * Finds the first descendant node with the given ID.
-   */
-  PAGXNode* findById(const std::string& id);
-
-  /**
-   * Finds all descendant nodes of the given type.
-   */
-  std::vector<PAGXNode*> findByType(PAGXNodeType type);
-
-  /**
-   * Creates a deep copy of this node and all its children.
-   */
-  std::unique_ptr<PAGXNode> clone() const;
+  virtual std::unique_ptr<PAGXNode> clone() const = 0;
 
  protected:
-  explicit PAGXNode(PAGXNodeType type) : _type(type) {
+  PAGXNode() = default;
+};
+
+//==============================================================================
+// Resource Node (base class - must be defined before ColorSourceNode)
+//==============================================================================
+
+/**
+ * Base class for resource nodes.
+ */
+class ResourceNode : public PAGXNode {
+ public:
+  std::string id = {};
+};
+
+//==============================================================================
+// Color Source Nodes
+//==============================================================================
+
+/**
+ * A color stop in a gradient.
+ */
+struct ColorStopNode : public PAGXNode {
+  float offset = 0;
+  Color color = {};
+
+  NodeType type() const override {
+    return NodeType::ColorStop;
   }
 
- private:
-  PAGXNodeType _type = PAGXNodeType::Unknown;
-  std::string _id = {};
-  std::unordered_map<std::string, std::string> _attributes = {};
-  std::vector<std::unique_ptr<PAGXNode>> _children = {};
-  PAGXNode* _parent = nullptr;
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<ColorStopNode>(*this);
+  }
 };
+
+/**
+ * Base class for color source nodes.
+ * Color sources can be stored as resources (with an id) or inline.
+ */
+class ColorSourceNode : public ResourceNode {
+};
+
+/**
+ * A solid color.
+ */
+struct SolidColorNode : public ColorSourceNode {
+  Color color = {};
+
+  NodeType type() const override {
+    return NodeType::SolidColor;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<SolidColorNode>(*this);
+  }
+};
+
+/**
+ * A linear gradient.
+ */
+struct LinearGradientNode : public ColorSourceNode {
+  float startX = 0;
+  float startY = 0;
+  float endX = 0;
+  float endY = 0;
+  Matrix matrix = {};
+  std::vector<ColorStopNode> colorStops = {};
+
+  NodeType type() const override {
+    return NodeType::LinearGradient;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<LinearGradientNode>(*this);
+  }
+};
+
+/**
+ * A radial gradient.
+ */
+struct RadialGradientNode : public ColorSourceNode {
+  float centerX = 0;
+  float centerY = 0;
+  float radius = 0;
+  Matrix matrix = {};
+  std::vector<ColorStopNode> colorStops = {};
+
+  NodeType type() const override {
+    return NodeType::RadialGradient;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<RadialGradientNode>(*this);
+  }
+};
+
+/**
+ * A conic (sweep) gradient.
+ */
+struct ConicGradientNode : public ColorSourceNode {
+  float centerX = 0;
+  float centerY = 0;
+  float startAngle = 0;
+  float endAngle = 360;
+  Matrix matrix = {};
+  std::vector<ColorStopNode> colorStops = {};
+
+  NodeType type() const override {
+    return NodeType::ConicGradient;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<ConicGradientNode>(*this);
+  }
+};
+
+/**
+ * A diamond gradient.
+ */
+struct DiamondGradientNode : public ColorSourceNode {
+  float centerX = 0;
+  float centerY = 0;
+  float halfDiagonal = 0;
+  Matrix matrix = {};
+  std::vector<ColorStopNode> colorStops = {};
+
+  NodeType type() const override {
+    return NodeType::DiamondGradient;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<DiamondGradientNode>(*this);
+  }
+};
+
+/**
+ * An image pattern.
+ */
+struct ImagePatternNode : public ColorSourceNode {
+  std::string image = {};
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+  SamplingMode sampling = SamplingMode::Linear;
+  Matrix matrix = {};
+
+  NodeType type() const override {
+    return NodeType::ImagePattern;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<ImagePatternNode>(*this);
+  }
+};
+
+//==============================================================================
+// Vector Element Nodes
+//==============================================================================
+
+/**
+ * Base class for vector element nodes.
+ */
+class VectorElementNode : public PAGXNode {};
+
+/**
+ * A rectangle shape.
+ */
+struct RectangleNode : public VectorElementNode {
+  float centerX = 0;
+  float centerY = 0;
+  float width = 0;
+  float height = 0;
+  float roundness = 0;
+  bool reversed = false;
+
+  NodeType type() const override {
+    return NodeType::Rectangle;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<RectangleNode>(*this);
+  }
+};
+
+/**
+ * An ellipse shape.
+ */
+struct EllipseNode : public VectorElementNode {
+  float centerX = 0;
+  float centerY = 0;
+  float width = 0;
+  float height = 0;
+  bool reversed = false;
+
+  NodeType type() const override {
+    return NodeType::Ellipse;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<EllipseNode>(*this);
+  }
+};
+
+/**
+ * A polygon or star shape.
+ */
+struct PolystarNode : public VectorElementNode {
+  float centerX = 0;
+  float centerY = 0;
+  PolystarType polystarType = PolystarType::Star;
+  float points = 5;
+  float outerRadius = 100;
+  float innerRadius = 50;
+  float rotation = 0;
+  float outerRoundness = 0;
+  float innerRoundness = 0;
+  bool reversed = false;
+
+  NodeType type() const override {
+    return NodeType::Polystar;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<PolystarNode>(*this);
+  }
+};
+
+/**
+ * A path shape.
+ */
+struct PathNode : public VectorElementNode {
+  PathData d = {};
+  bool reversed = false;
+
+  NodeType type() const override {
+    return NodeType::Path;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<PathNode>(*this);
+  }
+};
+
+/**
+ * A text span.
+ */
+struct TextSpanNode : public VectorElementNode {
+  float x = 0;
+  float y = 0;
+  std::string font = {};
+  float fontSize = 12;
+  int fontWeight = 400;
+  FontStyle fontStyle = FontStyle::Normal;
+  float tracking = 0;
+  float baselineShift = 0;
+  std::string text = {};
+
+  NodeType type() const override {
+    return NodeType::TextSpan;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<TextSpanNode>(*this);
+  }
+};
+
+//==============================================================================
+// Painter Nodes
+//==============================================================================
+
+/**
+ * A fill painter.
+ * The color can be a simple color string ("#FF0000"), a reference ("#gradientId"),
+ * or an inline color source node.
+ */
+struct FillNode : public VectorElementNode {
+  std::string color = {};
+  std::unique_ptr<ColorSourceNode> colorSource = nullptr;
+  float alpha = 1;
+  BlendMode blendMode = BlendMode::Normal;
+  FillRule fillRule = FillRule::Winding;
+  Placement placement = Placement::Background;
+
+  NodeType type() const override {
+    return NodeType::Fill;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    auto node = std::make_unique<FillNode>();
+    node->color = color;
+    if (colorSource) {
+      node->colorSource.reset(static_cast<ColorSourceNode*>(colorSource->clone().release()));
+    }
+    node->alpha = alpha;
+    node->blendMode = blendMode;
+    node->fillRule = fillRule;
+    node->placement = placement;
+    return node;
+  }
+};
+
+/**
+ * A stroke painter.
+ */
+struct StrokeNode : public VectorElementNode {
+  std::string color = {};
+  std::unique_ptr<ColorSourceNode> colorSource = nullptr;
+  float strokeWidth = 1;
+  float alpha = 1;
+  BlendMode blendMode = BlendMode::Normal;
+  LineCap cap = LineCap::Butt;
+  LineJoin join = LineJoin::Miter;
+  float miterLimit = 4;
+  std::vector<float> dashes = {};
+  float dashOffset = 0;
+  StrokeAlign align = StrokeAlign::Center;
+  Placement placement = Placement::Background;
+
+  NodeType type() const override {
+    return NodeType::Stroke;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    auto node = std::make_unique<StrokeNode>();
+    node->color = color;
+    if (colorSource) {
+      node->colorSource.reset(static_cast<ColorSourceNode*>(colorSource->clone().release()));
+    }
+    node->strokeWidth = strokeWidth;
+    node->alpha = alpha;
+    node->blendMode = blendMode;
+    node->cap = cap;
+    node->join = join;
+    node->miterLimit = miterLimit;
+    node->dashes = dashes;
+    node->dashOffset = dashOffset;
+    node->align = align;
+    node->placement = placement;
+    return node;
+  }
+};
+
+//==============================================================================
+// Shape Modifier Nodes
+//==============================================================================
+
+/**
+ * Trim path modifier.
+ */
+struct TrimPathNode : public VectorElementNode {
+  float start = 0;
+  float end = 1;
+  float offset = 0;
+  TrimType trimType = TrimType::Separate;
+
+  NodeType type() const override {
+    return NodeType::TrimPath;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<TrimPathNode>(*this);
+  }
+};
+
+/**
+ * Round corner modifier.
+ */
+struct RoundCornerNode : public VectorElementNode {
+  float radius = 0;
+
+  NodeType type() const override {
+    return NodeType::RoundCorner;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<RoundCornerNode>(*this);
+  }
+};
+
+/**
+ * Merge path modifier.
+ */
+struct MergePathNode : public VectorElementNode {
+  PathOp op = PathOp::Append;
+
+  NodeType type() const override {
+    return NodeType::MergePath;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<MergePathNode>(*this);
+  }
+};
+
+//==============================================================================
+// Text Modifier Nodes
+//==============================================================================
+
+/**
+ * Range selector for text modifier.
+ */
+struct RangeSelectorNode : public PAGXNode {
+  float start = 0;
+  float end = 1;
+  float offset = 0;
+  SelectorUnit unit = SelectorUnit::Percentage;
+  SelectorShape shape = SelectorShape::Square;
+  float easeIn = 0;
+  float easeOut = 0;
+  SelectorMode mode = SelectorMode::Add;
+  float weight = 1;
+  bool randomize = false;
+  int seed = 0;
+
+  NodeType type() const override {
+    return NodeType::RangeSelector;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<RangeSelectorNode>(*this);
+  }
+};
+
+/**
+ * Text modifier.
+ */
+struct TextModifierNode : public VectorElementNode {
+  Point anchor = {0.5f, 0.5f};
+  Point position = {};
+  float rotation = 0;
+  Point scale = {1, 1};
+  float skew = 0;
+  float skewAxis = 0;
+  float alpha = 1;
+  std::string fillColor = {};
+  std::string strokeColor = {};
+  float strokeWidth = -1;
+  std::vector<RangeSelectorNode> rangeSelectors = {};
+
+  NodeType type() const override {
+    return NodeType::TextModifier;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<TextModifierNode>(*this);
+  }
+};
+
+/**
+ * Text path modifier.
+ */
+struct TextPathNode : public VectorElementNode {
+  std::string path = {};
+  TextPathAlign textPathAlign = TextPathAlign::Start;
+  float firstMargin = 0;
+  float lastMargin = 0;
+  bool perpendicularToPath = true;
+  bool reversed = false;
+  bool forceAlignment = false;
+
+  NodeType type() const override {
+    return NodeType::TextPath;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<TextPathNode>(*this);
+  }
+};
+
+/**
+ * Text layout modifier.
+ */
+struct TextLayoutNode : public VectorElementNode {
+  float width = 0;
+  float height = 0;
+  TextAlign textAlign = TextAlign::Left;
+  VerticalAlign verticalAlign = VerticalAlign::Top;
+  float lineHeight = 1.2f;
+  float indent = 0;
+  Overflow overflow = Overflow::Clip;
+
+  NodeType type() const override {
+    return NodeType::TextLayout;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<TextLayoutNode>(*this);
+  }
+};
+
+//==============================================================================
+// Repeater Node
+//==============================================================================
+
+/**
+ * Repeater modifier.
+ */
+struct RepeaterNode : public VectorElementNode {
+  float copies = 3;
+  float offset = 0;
+  RepeaterOrder order = RepeaterOrder::BelowOriginal;
+  Point anchor = {};
+  Point position = {100, 100};
+  float rotation = 0;
+  Point scale = {1, 1};
+  float startAlpha = 1;
+  float endAlpha = 1;
+
+  NodeType type() const override {
+    return NodeType::Repeater;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<RepeaterNode>(*this);
+  }
+};
+
+//==============================================================================
+// Group Node
+//==============================================================================
+
+/**
+ * Group container.
+ */
+struct GroupNode : public VectorElementNode {
+  std::string name = {};
+  Point anchor = {};
+  Point position = {};
+  float rotation = 0;
+  Point scale = {1, 1};
+  float skew = 0;
+  float skewAxis = 0;
+  float alpha = 1;
+  std::vector<std::unique_ptr<VectorElementNode>> elements = {};
+
+  NodeType type() const override {
+    return NodeType::Group;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    auto node = std::make_unique<GroupNode>();
+    node->name = name;
+    node->anchor = anchor;
+    node->position = position;
+    node->rotation = rotation;
+    node->scale = scale;
+    node->skew = skew;
+    node->skewAxis = skewAxis;
+    node->alpha = alpha;
+    for (const auto& element : elements) {
+      node->elements.push_back(
+          std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(element->clone().release())));
+    }
+    return node;
+  }
+};
+
+//==============================================================================
+// Layer Style Nodes
+//==============================================================================
+
+/**
+ * Base class for layer style nodes.
+ */
+class LayerStyleNode : public PAGXNode {
+ public:
+  BlendMode blendMode = BlendMode::Normal;
+};
+
+/**
+ * Drop shadow style.
+ */
+struct DropShadowStyleNode : public LayerStyleNode {
+  float offsetX = 0;
+  float offsetY = 0;
+  float blurrinessX = 0;
+  float blurrinessY = 0;
+  Color color = {};
+  bool showBehindLayer = true;
+
+  NodeType type() const override {
+    return NodeType::DropShadowStyle;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<DropShadowStyleNode>(*this);
+  }
+};
+
+/**
+ * Inner shadow style.
+ */
+struct InnerShadowStyleNode : public LayerStyleNode {
+  float offsetX = 0;
+  float offsetY = 0;
+  float blurrinessX = 0;
+  float blurrinessY = 0;
+  Color color = {};
+
+  NodeType type() const override {
+    return NodeType::InnerShadowStyle;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<InnerShadowStyleNode>(*this);
+  }
+};
+
+/**
+ * Background blur style.
+ */
+struct BackgroundBlurStyleNode : public LayerStyleNode {
+  float blurrinessX = 0;
+  float blurrinessY = 0;
+  TileMode tileMode = TileMode::Mirror;
+
+  NodeType type() const override {
+    return NodeType::BackgroundBlurStyle;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<BackgroundBlurStyleNode>(*this);
+  }
+};
+
+//==============================================================================
+// Layer Filter Nodes
+//==============================================================================
+
+/**
+ * Base class for layer filter nodes.
+ */
+class LayerFilterNode : public PAGXNode {};
+
+/**
+ * Blur filter.
+ */
+struct BlurFilterNode : public LayerFilterNode {
+  float blurrinessX = 0;
+  float blurrinessY = 0;
+  TileMode tileMode = TileMode::Decal;
+
+  NodeType type() const override {
+    return NodeType::BlurFilter;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<BlurFilterNode>(*this);
+  }
+};
+
+/**
+ * Drop shadow filter.
+ */
+struct DropShadowFilterNode : public LayerFilterNode {
+  float offsetX = 0;
+  float offsetY = 0;
+  float blurrinessX = 0;
+  float blurrinessY = 0;
+  Color color = {};
+  bool shadowOnly = false;
+
+  NodeType type() const override {
+    return NodeType::DropShadowFilter;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<DropShadowFilterNode>(*this);
+  }
+};
+
+/**
+ * Inner shadow filter.
+ */
+struct InnerShadowFilterNode : public LayerFilterNode {
+  float offsetX = 0;
+  float offsetY = 0;
+  float blurrinessX = 0;
+  float blurrinessY = 0;
+  Color color = {};
+  bool shadowOnly = false;
+
+  NodeType type() const override {
+    return NodeType::InnerShadowFilter;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<InnerShadowFilterNode>(*this);
+  }
+};
+
+/**
+ * Blend filter.
+ */
+struct BlendFilterNode : public LayerFilterNode {
+  Color color = {};
+  BlendMode filterBlendMode = BlendMode::Normal;
+
+  NodeType type() const override {
+    return NodeType::BlendFilter;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<BlendFilterNode>(*this);
+  }
+};
+
+/**
+ * Color matrix filter.
+ */
+struct ColorMatrixFilterNode : public LayerFilterNode {
+  std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+
+  NodeType type() const override {
+    return NodeType::ColorMatrixFilter;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<ColorMatrixFilterNode>(*this);
+  }
+};
+
+//==============================================================================
+// Other Resource Nodes
+//==============================================================================
+
+/**
+ * Image resource.
+ */
+struct ImageNode : public ResourceNode {
+  std::string source = {};
+
+  NodeType type() const override {
+    return NodeType::Image;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<ImageNode>(*this);
+  }
+};
+
+/**
+ * Composition resource.
+ */
+struct CompositionNode : public ResourceNode {
+  float width = 0;
+  float height = 0;
+  std::vector<std::unique_ptr<LayerNode>> layers = {};
+
+  NodeType type() const override {
+    return NodeType::Composition;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override;
+};
+
+//==============================================================================
+// Layer Node
+//==============================================================================
+
+/**
+ * Layer node.
+ */
+struct LayerNode : public PAGXNode {
+  std::string id = {};
+  std::string name = {};
+  bool visible = true;
+  float alpha = 1;
+  BlendMode blendMode = BlendMode::Normal;
+  float x = 0;
+  float y = 0;
+  Matrix matrix = {};
+  std::vector<float> matrix3D = {};
+  bool preserve3D = false;
+  bool antiAlias = true;
+  bool groupOpacity = false;
+  bool passThroughBackground = true;
+  bool excludeChildEffectsInLayerStyle = false;
+  Rect scrollRect = {};
+  bool hasScrollRect = false;
+  std::string mask = {};
+  MaskType maskType = MaskType::Alpha;
+  std::string composition = {};
+
+  std::vector<std::unique_ptr<VectorElementNode>> contents = {};
+  std::vector<std::unique_ptr<LayerStyleNode>> styles = {};
+  std::vector<std::unique_ptr<LayerFilterNode>> filters = {};
+  std::vector<std::unique_ptr<LayerNode>> children = {};
+
+  NodeType type() const override {
+    return NodeType::Layer;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    auto node = std::make_unique<LayerNode>();
+    node->id = id;
+    node->name = name;
+    node->visible = visible;
+    node->alpha = alpha;
+    node->blendMode = blendMode;
+    node->x = x;
+    node->y = y;
+    node->matrix = matrix;
+    node->matrix3D = matrix3D;
+    node->preserve3D = preserve3D;
+    node->antiAlias = antiAlias;
+    node->groupOpacity = groupOpacity;
+    node->passThroughBackground = passThroughBackground;
+    node->excludeChildEffectsInLayerStyle = excludeChildEffectsInLayerStyle;
+    node->scrollRect = scrollRect;
+    node->hasScrollRect = hasScrollRect;
+    node->mask = mask;
+    node->maskType = maskType;
+    node->composition = composition;
+    for (const auto& element : contents) {
+      node->contents.push_back(
+          std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(element->clone().release())));
+    }
+    for (const auto& style : styles) {
+      node->styles.push_back(
+          std::unique_ptr<LayerStyleNode>(static_cast<LayerStyleNode*>(style->clone().release())));
+    }
+    for (const auto& filter : filters) {
+      node->filters.push_back(
+          std::unique_ptr<LayerFilterNode>(static_cast<LayerFilterNode*>(filter->clone().release())));
+    }
+    for (const auto& child : children) {
+      node->children.push_back(
+          std::unique_ptr<LayerNode>(static_cast<LayerNode*>(child->clone().release())));
+    }
+    return node;
+  }
+};
+
+// Implementation of CompositionNode::clone
+inline std::unique_ptr<PAGXNode> CompositionNode::clone() const {
+  auto node = std::make_unique<CompositionNode>();
+  node->id = id;
+  node->width = width;
+  node->height = height;
+  for (const auto& layer : layers) {
+    node->layers.push_back(
+        std::unique_ptr<LayerNode>(static_cast<LayerNode*>(layer->clone().release())));
+  }
+  return node;
+}
 
 }  // namespace pagx

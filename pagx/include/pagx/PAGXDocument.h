@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -21,146 +21,106 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include "pagx/PAGXNode.h"
 
 namespace pagx {
 
+class PAGXXMLParser;
+
 /**
- * PAGXDocument is the central data structure for the PAGX format.
- * It can be created from various sources (XML, SVG, PDF) and exported
- * to various formats (XML, PAG binary).
+ * PAGXDocument is the root container for a PAGX document.
+ * It contains resources and layers, and provides methods for loading, saving, and manipulating
+ * the document.
  */
 class PAGXDocument {
  public:
   /**
-   * Creates an empty PAGX document with the specified dimensions.
+   * Format version.
+   */
+  std::string version = "1.0";
+
+  /**
+   * Canvas width.
+   */
+  float width = 0;
+
+  /**
+   * Canvas height.
+   */
+  float height = 0;
+
+  /**
+   * Resources (images, gradients, compositions, etc.).
+   * These can be referenced by "#id" in the document.
+   */
+  std::vector<std::unique_ptr<ResourceNode>> resources = {};
+
+  /**
+   * Top-level layers.
+   */
+  std::vector<std::unique_ptr<LayerNode>> layers = {};
+
+  /**
+   * Base path for resolving relative resource paths.
+   */
+  std::string basePath = {};
+
+  /**
+   * Creates an empty document with the specified size.
    */
   static std::shared_ptr<PAGXDocument> Make(float width, float height);
 
   /**
-   * Creates a PAGX document from a file.
-   * Supports .pagx (XML) and .svg files.
+   * Loads a document from a file.
+   * Returns nullptr if the file cannot be loaded.
    */
   static std::shared_ptr<PAGXDocument> FromFile(const std::string& filePath);
 
   /**
-   * Creates a PAGX document from XML content.
+   * Parses a document from XML content.
+   * Returns nullptr if parsing fails.
    */
   static std::shared_ptr<PAGXDocument> FromXML(const std::string& xmlContent);
 
   /**
-   * Creates a PAGX document from XML data.
+   * Parses a document from XML data.
+   * Returns nullptr if parsing fails.
    */
   static std::shared_ptr<PAGXDocument> FromXML(const uint8_t* data, size_t length);
 
   /**
-   * Returns the width of the document.
-   */
-  float width() const {
-    return _width;
-  }
-
-  /**
-   * Returns the height of the document.
-   */
-  float height() const {
-    return _height;
-  }
-
-  /**
-   * Sets the document dimensions.
-   */
-  void setSize(float width, float height);
-
-  /**
-   * Returns the PAGX version string.
-   */
-  const std::string& version() const {
-    return _version;
-  }
-
-  /**
-   * Returns the root node of the document tree.
-   */
-  PAGXNode* root() const {
-    return _root.get();
-  }
-
-  /**
-   * Sets the root node of the document.
-   */
-  void setRoot(std::unique_ptr<PAGXNode> root);
-
-  /**
-   * Creates a new node with the specified type.
-   */
-  std::unique_ptr<PAGXNode> createNode(PAGXNodeType type);
-
-  // ============== Resource Management ==============
-
-  /**
-   * Returns a resource node by its ID.
-   */
-  PAGXNode* getResourceById(const std::string& id) const;
-
-  /**
-   * Adds a resource to the document.
-   * The resource must have a unique ID.
-   */
-  void addResource(std::unique_ptr<PAGXNode> resource);
-
-  /**
-   * Returns all resource IDs.
-   */
-  std::vector<std::string> getResourceIds() const;
-
-  /**
-   * Returns the resources node.
-   */
-  PAGXNode* resources() const {
-    return _resources.get();
-  }
-
-  // ============== Export ==============
-
-  /**
-   * Exports the document to PAGX XML format.
+   * Exports the document to XML format.
    */
   std::string toXML() const;
 
   /**
-   * Saves the document to a file.
+   * Returns a deep clone of this document.
    */
-  bool saveToFile(const std::string& filePath) const;
-
-  // ============== Base Path ==============
+  std::shared_ptr<PAGXDocument> clone() const;
 
   /**
-   * Returns the base path for resolving relative resource paths.
+   * Finds a resource by ID.
+   * Returns nullptr if not found.
    */
-  const std::string& basePath() const {
-    return _basePath;
-  }
+  ResourceNode* findResource(const std::string& id) const;
 
   /**
-   * Sets the base path for resolving relative resource paths.
+   * Finds a layer by ID (searches recursively).
+   * Returns nullptr if not found.
    */
-  void setBasePath(const std::string& path) {
-    _basePath = path;
-  }
+  LayerNode* findLayer(const std::string& id) const;
 
  private:
+  friend class PAGXXMLParser;
   PAGXDocument() = default;
 
-  float _width = 0.0f;
-  float _height = 0.0f;
-  std::string _version = "1.0";
-  std::string _basePath = {};
-  std::unique_ptr<PAGXNode> _root = nullptr;
-  std::unique_ptr<PAGXNode> _resources = nullptr;
-  std::unordered_map<std::string, PAGXNode*> _resourceMap = {};
+  mutable std::unordered_map<std::string, ResourceNode*> resourceMap = {};
+  mutable bool resourceMapDirty = true;
 
-  friend class PAGXXMLParser;
+  void rebuildResourceMap() const;
+  static LayerNode* findLayerRecursive(const std::vector<std::unique_ptr<LayerNode>>& layers,
+                                       const std::string& id);
 };
 
 }  // namespace pagx

@@ -41,7 +41,7 @@ std::shared_ptr<PAGXDocument> PAGXSVGParser::Parse(const std::string& filePath,
   if (doc) {
     auto lastSlash = filePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
-      doc->setBasePath(filePath.substr(0, lastSlash + 1));
+      doc->basePath = filePath.substr(0, lastSlash + 1);
     }
   }
   return doc;
@@ -393,18 +393,21 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parse(const uint8_t* data, size_t l
     }
   }
 
-  // Second pass: convert elements
-  auto root = _document->root();
+  // Second pass: convert elements to a root layer
+  auto rootLayer = std::make_unique<LayerNode>();
+  rootLayer->name = "root";
+
   for (auto& child : xmlRoot->children) {
     if (child->tagName == "defs") {
       continue;
     }
-    auto pagxNode = convertElement(child.get());
-    if (pagxNode) {
-      root->appendChild(std::move(pagxNode));
+    auto layer = convertToLayer(child.get());
+    if (layer) {
+      rootLayer->children.push_back(std::move(layer));
     }
   }
 
+  _document->layers.push_back(std::move(rootLayer));
   return _document;
 }
 
@@ -421,72 +424,122 @@ void SVGParserImpl::parseDefs(SVGXMLNode* defsNode) {
   }
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertElement(SVGXMLNode* element) {
+std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(SVGXMLNode* element) {
   const auto& tag = element->tagName;
 
-  std::unique_ptr<PAGXNode> node = nullptr;
-
-  if (tag == "g" || tag == "svg") {
-    node = convertG(element);
-  } else if (tag == "rect") {
-    node = convertRect(element);
-  } else if (tag == "circle") {
-    node = convertCircle(element);
-  } else if (tag == "ellipse") {
-    node = convertEllipse(element);
-  } else if (tag == "line") {
-    node = convertLine(element);
-  } else if (tag == "polyline") {
-    node = convertPolyline(element);
-  } else if (tag == "polygon") {
-    node = convertPolygon(element);
-  } else if (tag == "path") {
-    node = convertPath(element);
-  } else if (tag == "text") {
-    node = convertText(element);
-  } else if (tag == "image") {
-    node = convertImage(element);
-  } else if (tag == "use") {
-    node = convertUse(element);
-  } else if (tag == "linearGradient") {
-    node = convertLinearGradient(element);
-  } else if (tag == "radialGradient") {
-    node = convertRadialGradient(element);
-  } else if (tag == "pattern") {
-    node = convertPattern(element);
-  } else if (tag == "mask") {
-    node = convertMask(element);
-  } else if (tag == "clipPath") {
-    node = convertClipPath(element);
-  } else if (tag == "filter") {
-    node = convertFilter(element);
-  } else if (_options.preserveUnknownElements) {
-    node = PAGXNode::Make(PAGXNodeType::Unknown);
-    node->setAttribute("_svgTag", tag);
+  if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
+      tag == "mask" || tag == "clipPath" || tag == "filter") {
+    return nullptr;
   }
 
-  return node;
+  auto layer = std::make_unique<LayerNode>();
+
+  // Parse common layer attributes
+  layer->id = element->getAttribute("id");
+  layer->name = element->getAttribute("id");
+
+  std::string transform = element->getAttribute("transform");
+  if (!transform.empty()) {
+    layer->matrix = parseTransform(transform);
+  }
+
+  std::string opacity = element->getAttribute("opacity");
+  if (!opacity.empty()) {
+    layer->alpha = std::stof(opacity);
+  }
+
+  std::string display = element->getAttribute("display");
+  if (display == "none") {
+    layer->visible = false;
+  }
+
+  std::string visibility = element->getAttribute("visibility");
+  if (visibility == "hidden") {
+    layer->visible = false;
+  }
+
+  // Convert contents
+  if (tag == "g" || tag == "svg") {
+    // Group: convert children as child layers
+    for (auto& child : element->children) {
+      auto childLayer = convertToLayer(child.get());
+      if (childLayer) {
+        layer->children.push_back(std::move(childLayer));
+      }
+    }
+  } else {
+    // Shape element: convert to vector contents
+    convertChildren(element, layer->contents);
+  }
+
+  return layer;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertG(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Group);
-  parseCommonAttributes(element, node.get());
-  parseFillStroke(element, node.get());
+void SVGParserImpl::convertChildren(SVGXMLNode* element,
+                                    std::vector<std::unique_ptr<VectorElementNode>>& contents) {
+  auto shapeElement = convertElement(element);
+  if (shapeElement) {
+    contents.push_back(std::move(shapeElement));
+  }
+
+  addFillStroke(element, contents);
+}
+
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertElement(SVGXMLNode* element) {
+  const auto& tag = element->tagName;
+
+  if (tag == "rect") {
+    return convertRect(element);
+  } else if (tag == "circle") {
+    return convertCircle(element);
+  } else if (tag == "ellipse") {
+    return convertEllipse(element);
+  } else if (tag == "line") {
+    return convertLine(element);
+  } else if (tag == "polyline") {
+    return convertPolyline(element);
+  } else if (tag == "polygon") {
+    return convertPolygon(element);
+  } else if (tag == "path") {
+    return convertPath(element);
+  } else if (tag == "use") {
+    return convertUse(element);
+  }
+
+  return nullptr;
+}
+
+std::unique_ptr<GroupNode> SVGParserImpl::convertG(SVGXMLNode* element) {
+  auto group = std::make_unique<GroupNode>();
+
+  group->name = element->getAttribute("id");
+
+  std::string transform = element->getAttribute("transform");
+  if (!transform.empty()) {
+    // For GroupNode, we need to decompose the matrix into position/rotation/scale
+    // For simplicity, just store as position offset for translation
+    Matrix m = parseTransform(transform);
+    group->position = {m.tx, m.ty};
+    // Note: Full matrix decomposition would be more complex
+  }
+
+  std::string opacity = element->getAttribute("opacity");
+  if (!opacity.empty()) {
+    group->alpha = std::stof(opacity);
+  }
 
   for (auto& child : element->children) {
-    auto childNode = convertElement(child.get());
-    if (childNode) {
-      node->appendChild(std::move(childNode));
+    auto childElement = convertElement(child.get());
+    if (childElement) {
+      group->elements.push_back(std::move(childElement));
     }
+    addFillStroke(child.get(), group->elements);
   }
 
-  return node;
+  return group;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertRect(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Rectangle);
-  parseCommonAttributes(element, node.get());
-
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertRect(SVGXMLNode* element) {
   float x = parseLength(element->getAttribute("x"), _viewBoxWidth);
   float y = parseLength(element->getAttribute("y"), _viewBoxHeight);
   float width = parseLength(element->getAttribute("width"), _viewBoxWidth);
@@ -494,160 +547,113 @@ std::unique_ptr<PAGXNode> SVGParserImpl::convertRect(SVGXMLNode* element) {
   float rx = parseLength(element->getAttribute("rx"), _viewBoxWidth);
   float ry = parseLength(element->getAttribute("ry"), _viewBoxHeight);
 
-  node->setFloatAttribute("x", x);
-  node->setFloatAttribute("y", y);
-  node->setFloatAttribute("width", width);
-  node->setFloatAttribute("height", height);
-  if (rx > 0) {
-    node->setFloatAttribute("rx", rx);
-  }
-  if (ry > 0) {
-    node->setFloatAttribute("ry", ry);
+  if (ry == 0) {
+    ry = rx;
   }
 
-  parseFillStroke(element, node.get());
-  return node;
+  auto rect = std::make_unique<RectangleNode>();
+  rect->centerX = x + width / 2;
+  rect->centerY = y + height / 2;
+  rect->width = width;
+  rect->height = height;
+  rect->roundness = std::max(rx, ry);
+
+  return rect;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertCircle(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Ellipse);
-  parseCommonAttributes(element, node.get());
-
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertCircle(SVGXMLNode* element) {
   float cx = parseLength(element->getAttribute("cx"), _viewBoxWidth);
   float cy = parseLength(element->getAttribute("cy"), _viewBoxHeight);
   float r = parseLength(element->getAttribute("r"), _viewBoxWidth);
 
-  node->setFloatAttribute("cx", cx);
-  node->setFloatAttribute("cy", cy);
-  node->setFloatAttribute("rx", r);
-  node->setFloatAttribute("ry", r);
+  auto ellipse = std::make_unique<EllipseNode>();
+  ellipse->centerX = cx;
+  ellipse->centerY = cy;
+  ellipse->width = r * 2;
+  ellipse->height = r * 2;
 
-  parseFillStroke(element, node.get());
-  return node;
+  return ellipse;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertEllipse(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Ellipse);
-  parseCommonAttributes(element, node.get());
-
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertEllipse(SVGXMLNode* element) {
   float cx = parseLength(element->getAttribute("cx"), _viewBoxWidth);
   float cy = parseLength(element->getAttribute("cy"), _viewBoxHeight);
   float rx = parseLength(element->getAttribute("rx"), _viewBoxWidth);
   float ry = parseLength(element->getAttribute("ry"), _viewBoxHeight);
 
-  node->setFloatAttribute("cx", cx);
-  node->setFloatAttribute("cy", cy);
-  node->setFloatAttribute("rx", rx);
-  node->setFloatAttribute("ry", ry);
+  auto ellipse = std::make_unique<EllipseNode>();
+  ellipse->centerX = cx;
+  ellipse->centerY = cy;
+  ellipse->width = rx * 2;
+  ellipse->height = ry * 2;
 
-  parseFillStroke(element, node.get());
-  return node;
+  return ellipse;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertLine(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Path);
-  parseCommonAttributes(element, node.get());
-
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertLine(SVGXMLNode* element) {
   float x1 = parseLength(element->getAttribute("x1"), _viewBoxWidth);
   float y1 = parseLength(element->getAttribute("y1"), _viewBoxHeight);
   float x2 = parseLength(element->getAttribute("x2"), _viewBoxWidth);
   float y2 = parseLength(element->getAttribute("y2"), _viewBoxHeight);
 
-  PathData path;
-  path.moveTo(x1, y1);
-  path.lineTo(x2, y2);
-  node->setPathAttribute("d", path);
+  auto path = std::make_unique<PathNode>();
+  path->d.moveTo(x1, y1);
+  path->d.lineTo(x2, y2);
 
-  parseFillStroke(element, node.get());
-  return node;
+  return path;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertPolyline(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Path);
-  parseCommonAttributes(element, node.get());
-
-  PathData path = parsePoints(element->getAttribute("points"), false);
-  node->setPathAttribute("d", path);
-
-  parseFillStroke(element, node.get());
-  return node;
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertPolyline(SVGXMLNode* element) {
+  auto path = std::make_unique<PathNode>();
+  path->d = parsePoints(element->getAttribute("points"), false);
+  return path;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertPolygon(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Path);
-  parseCommonAttributes(element, node.get());
-
-  PathData path = parsePoints(element->getAttribute("points"), true);
-  node->setPathAttribute("d", path);
-
-  parseFillStroke(element, node.get());
-  return node;
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertPolygon(SVGXMLNode* element) {
+  auto path = std::make_unique<PathNode>();
+  path->d = parsePoints(element->getAttribute("points"), true);
+  return path;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertPath(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Path);
-  parseCommonAttributes(element, node.get());
-
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertPath(SVGXMLNode* element) {
+  auto path = std::make_unique<PathNode>();
   std::string d = element->getAttribute("d");
-  node->setAttribute("d", d);
-
-  parseFillStroke(element, node.get());
-  return node;
+  if (!d.empty()) {
+    path->d = PathData::FromSVGString(d);
+  }
+  return path;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertText(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Text);
-  parseCommonAttributes(element, node.get());
+std::unique_ptr<GroupNode> SVGParserImpl::convertText(SVGXMLNode* element) {
+  auto group = std::make_unique<GroupNode>();
 
   float x = parseLength(element->getAttribute("x"), _viewBoxWidth);
   float y = parseLength(element->getAttribute("y"), _viewBoxHeight);
-  node->setFloatAttribute("x", x);
-  node->setFloatAttribute("y", y);
 
   if (!element->textContent.empty()) {
-    node->setAttribute("text", element->textContent);
+    auto textSpan = std::make_unique<TextSpanNode>();
+    textSpan->x = x;
+    textSpan->y = y;
+    textSpan->text = element->textContent;
+
+    std::string fontFamily = element->getAttribute("font-family");
+    if (!fontFamily.empty()) {
+      textSpan->font = fontFamily;
+    }
+
+    std::string fontSize = element->getAttribute("font-size");
+    if (!fontSize.empty()) {
+      textSpan->fontSize = parseLength(fontSize, _viewBoxHeight);
+    }
+
+    group->elements.push_back(std::move(textSpan));
   }
 
-  std::string fontFamily = element->getAttribute("font-family");
-  if (!fontFamily.empty()) {
-    node->setAttribute("fontFamily", fontFamily);
-  }
-
-  std::string fontSize = element->getAttribute("font-size");
-  if (!fontSize.empty()) {
-    node->setFloatAttribute("fontSize", parseLength(fontSize, _viewBoxHeight));
-  }
-
-  parseFillStroke(element, node.get());
-  return node;
+  addFillStroke(element, group->elements);
+  return group;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertImage(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Image);
-  parseCommonAttributes(element, node.get());
-
-  float x = parseLength(element->getAttribute("x"), _viewBoxWidth);
-  float y = parseLength(element->getAttribute("y"), _viewBoxHeight);
-  float width = parseLength(element->getAttribute("width"), _viewBoxWidth);
-  float height = parseLength(element->getAttribute("height"), _viewBoxHeight);
-
-  node->setFloatAttribute("x", x);
-  node->setFloatAttribute("y", y);
-  node->setFloatAttribute("width", width);
-  node->setFloatAttribute("height", height);
-
-  std::string href = element->getAttribute("xlink:href");
-  if (href.empty()) {
-    href = element->getAttribute("href");
-  }
-  if (!href.empty()) {
-    node->setAttribute("href", href);
-  }
-
-  return node;
-}
-
-std::unique_ptr<PAGXNode> SVGParserImpl::convertUse(SVGXMLNode* element) {
+std::unique_ptr<VectorElementNode> SVGParserImpl::convertUse(SVGXMLNode* element) {
   std::string href = element->getAttribute("xlink:href");
   if (href.empty()) {
     href = element->getAttribute("href");
@@ -665,237 +671,172 @@ std::unique_ptr<PAGXNode> SVGParserImpl::convertUse(SVGXMLNode* element) {
       float x = parseLength(element->getAttribute("x"), _viewBoxWidth);
       float y = parseLength(element->getAttribute("y"), _viewBoxHeight);
       if (x != 0 || y != 0) {
-        Matrix m = node->getMatrixAttribute("transform");
-        m.preTranslate(x, y);
-        node->setMatrixAttribute("transform", m);
+        // Wrap in a group with translation
+        auto group = std::make_unique<GroupNode>();
+        group->position = {x, y};
+        group->elements.push_back(std::move(node));
+        return group;
       }
     }
     return node;
   }
 
-  auto node = PAGXNode::Make(PAGXNodeType::Group);
-  parseCommonAttributes(element, node.get());
-  node->setAttribute("_useRef", refId);
-  return node;
+  // For non-expanded use references, just create an empty group for now
+  auto group = std::make_unique<GroupNode>();
+  group->name = "_useRef:" + refId;
+  return group;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertLinearGradient(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::LinearGradient);
+std::unique_ptr<LinearGradientNode> SVGParserImpl::convertLinearGradient(SVGXMLNode* element) {
+  auto gradient = std::make_unique<LinearGradientNode>();
 
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
-
-  node->setFloatAttribute("x1", parseLength(element->getAttribute("x1", "0%"), 1.0f));
-  node->setFloatAttribute("y1", parseLength(element->getAttribute("y1", "0%"), 1.0f));
-  node->setFloatAttribute("x2", parseLength(element->getAttribute("x2", "100%"), 1.0f));
-  node->setFloatAttribute("y2", parseLength(element->getAttribute("y2", "0%"), 1.0f));
+  gradient->id = element->getAttribute("id");
+  gradient->startX = parseLength(element->getAttribute("x1", "0%"), 1.0f);
+  gradient->startY = parseLength(element->getAttribute("y1", "0%"), 1.0f);
+  gradient->endX = parseLength(element->getAttribute("x2", "100%"), 1.0f);
+  gradient->endY = parseLength(element->getAttribute("y2", "0%"), 1.0f);
 
   // Parse stops
-  int stopIndex = 0;
   for (auto& child : element->children) {
     if (child->tagName == "stop") {
-      float offset = parseLength(child->getAttribute("offset", "0"), 1.0f);
-      Color color = parseColor(child->getAttribute("stop-color", "#000000"));
+      ColorStopNode stop;
+      stop.offset = parseLength(child->getAttribute("offset", "0"), 1.0f);
+      stop.color = parseColor(child->getAttribute("stop-color", "#000000"));
       float opacity = parseLength(child->getAttribute("stop-opacity", "1"), 1.0f);
-      color = color.withAlpha(opacity);
-
-      std::string prefix = "stop" + std::to_string(stopIndex) + "_";
-      node->setFloatAttribute(prefix + "offset", offset);
-      node->setColorAttribute(prefix + "color", color);
-      ++stopIndex;
+      stop.color.alpha = opacity;
+      gradient->colorStops.push_back(stop);
     }
   }
-  node->setIntAttribute("stopCount", stopIndex);
 
-  return node;
+  return gradient;
 }
 
-std::unique_ptr<PAGXNode> SVGParserImpl::convertRadialGradient(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::RadialGradient);
+std::unique_ptr<RadialGradientNode> SVGParserImpl::convertRadialGradient(SVGXMLNode* element) {
+  auto gradient = std::make_unique<RadialGradientNode>();
 
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
+  gradient->id = element->getAttribute("id");
+  gradient->centerX = parseLength(element->getAttribute("cx", "50%"), 1.0f);
+  gradient->centerY = parseLength(element->getAttribute("cy", "50%"), 1.0f);
+  gradient->radius = parseLength(element->getAttribute("r", "50%"), 1.0f);
 
-  node->setFloatAttribute("cx", parseLength(element->getAttribute("cx", "50%"), 1.0f));
-  node->setFloatAttribute("cy", parseLength(element->getAttribute("cy", "50%"), 1.0f));
-  node->setFloatAttribute("r", parseLength(element->getAttribute("r", "50%"), 1.0f));
-  node->setFloatAttribute("fx", parseLength(element->getAttribute("fx"), 1.0f));
-  node->setFloatAttribute("fy", parseLength(element->getAttribute("fy"), 1.0f));
-
-  // Parse stops (same as linear gradient)
-  int stopIndex = 0;
+  // Parse stops
   for (auto& child : element->children) {
     if (child->tagName == "stop") {
-      float offset = parseLength(child->getAttribute("offset", "0"), 1.0f);
-      Color color = parseColor(child->getAttribute("stop-color", "#000000"));
+      ColorStopNode stop;
+      stop.offset = parseLength(child->getAttribute("offset", "0"), 1.0f);
+      stop.color = parseColor(child->getAttribute("stop-color", "#000000"));
       float opacity = parseLength(child->getAttribute("stop-opacity", "1"), 1.0f);
-      color = color.withAlpha(opacity);
-
-      std::string prefix = "stop" + std::to_string(stopIndex) + "_";
-      node->setFloatAttribute(prefix + "offset", offset);
-      node->setColorAttribute(prefix + "color", color);
-      ++stopIndex;
-    }
-  }
-  node->setIntAttribute("stopCount", stopIndex);
-
-  return node;
-}
-
-std::unique_ptr<PAGXNode> SVGParserImpl::convertPattern(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::ImagePattern);
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
-  // Pattern conversion is complex, store raw attributes for now
-  for (auto& attr : element->attributes) {
-    node->setAttribute(attr.first, attr.second);
-  }
-  return node;
-}
-
-std::unique_ptr<PAGXNode> SVGParserImpl::convertMask(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::Mask);
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
-  for (auto& child : element->children) {
-    auto childNode = convertElement(child.get());
-    if (childNode) {
-      node->appendChild(std::move(childNode));
-    }
-  }
-  return node;
-}
-
-std::unique_ptr<PAGXNode> SVGParserImpl::convertClipPath(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::ClipPath);
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
-  for (auto& child : element->children) {
-    auto childNode = convertElement(child.get());
-    if (childNode) {
-      node->appendChild(std::move(childNode));
-    }
-  }
-  return node;
-}
-
-std::unique_ptr<PAGXNode> SVGParserImpl::convertFilter(SVGXMLNode* element) {
-  auto node = PAGXNode::Make(PAGXNodeType::BlurFilter);
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
-  // Look for feGaussianBlur
-  for (auto& child : element->children) {
-    if (child->tagName == "feGaussianBlur") {
-      std::string stdDev = child->getAttribute("stdDeviation");
-      if (!stdDev.empty()) {
-        node->setFloatAttribute("blurRadius", std::stof(stdDev));
-      }
-    }
-  }
-  return node;
-}
-
-void SVGParserImpl::parseCommonAttributes(SVGXMLNode* element, PAGXNode* node) {
-  std::string id = element->getAttribute("id");
-  if (!id.empty()) {
-    node->setId(id);
-  }
-
-  std::string transform = element->getAttribute("transform");
-  if (!transform.empty()) {
-    Matrix m = parseTransform(transform);
-    if (!m.isIdentity()) {
-      node->setMatrixAttribute("transform", m);
+      stop.color.alpha = opacity;
+      gradient->colorStops.push_back(stop);
     }
   }
 
-  std::string opacity = element->getAttribute("opacity");
-  if (!opacity.empty()) {
-    node->setFloatAttribute("opacity", std::stof(opacity));
-  }
-
-  std::string display = element->getAttribute("display");
-  if (display == "none") {
-    node->setBoolAttribute("visible", false);
-  }
-
-  std::string visibility = element->getAttribute("visibility");
-  if (visibility == "hidden") {
-    node->setBoolAttribute("visible", false);
-  }
+  return gradient;
 }
 
-void SVGParserImpl::parseFillStroke(SVGXMLNode* element, PAGXNode* node) {
+void SVGParserImpl::addFillStroke(SVGXMLNode* element,
+                                  std::vector<std::unique_ptr<VectorElementNode>>& contents) {
   std::string fill = element->getAttribute("fill");
   if (!fill.empty() && fill != "none") {
-    auto fillNode = PAGXNode::Make(PAGXNodeType::Fill);
+    auto fillNode = std::make_unique<FillNode>();
+
     if (fill.find("url(") == 0) {
       std::string refId = resolveUrl(fill);
-      fillNode->setAttribute("colorSourceRef", refId);
+      fillNode->color = "#" + refId;
+
+      // Try to inline the gradient
+      auto it = _defs.find(refId);
+      if (it != _defs.end()) {
+        if (it->second->tagName == "linearGradient") {
+          fillNode->colorSource = convertLinearGradient(it->second);
+        } else if (it->second->tagName == "radialGradient") {
+          fillNode->colorSource = convertRadialGradient(it->second);
+        }
+      }
     } else {
       Color color = parseColor(fill);
       std::string fillOpacity = element->getAttribute("fill-opacity");
       if (!fillOpacity.empty()) {
-        color = color.withAlpha(std::stof(fillOpacity));
+        color.alpha = std::stof(fillOpacity);
       }
-      fillNode->setColorAttribute("color", color);
+      fillNode->color = color.toHexString(color.alpha < 1);
     }
-    node->appendChild(std::move(fillNode));
+
+    std::string fillRule = element->getAttribute("fill-rule");
+    if (fillRule == "evenodd") {
+      fillNode->fillRule = FillRule::EvenOdd;
+    }
+
+    contents.push_back(std::move(fillNode));
   } else if (fill.empty()) {
     // SVG default is black fill
-    auto fillNode = PAGXNode::Make(PAGXNodeType::Fill);
-    fillNode->setColorAttribute("color", Color::Black());
-    node->appendChild(std::move(fillNode));
+    auto fillNode = std::make_unique<FillNode>();
+    fillNode->color = "#000000";
+    contents.push_back(std::move(fillNode));
   }
 
   std::string stroke = element->getAttribute("stroke");
   if (!stroke.empty() && stroke != "none") {
-    auto strokeNode = PAGXNode::Make(PAGXNodeType::Stroke);
+    auto strokeNode = std::make_unique<StrokeNode>();
+
     if (stroke.find("url(") == 0) {
       std::string refId = resolveUrl(stroke);
-      strokeNode->setAttribute("colorSourceRef", refId);
+      strokeNode->color = "#" + refId;
+
+      auto it = _defs.find(refId);
+      if (it != _defs.end()) {
+        if (it->second->tagName == "linearGradient") {
+          strokeNode->colorSource = convertLinearGradient(it->second);
+        } else if (it->second->tagName == "radialGradient") {
+          strokeNode->colorSource = convertRadialGradient(it->second);
+        }
+      }
     } else {
       Color color = parseColor(stroke);
       std::string strokeOpacity = element->getAttribute("stroke-opacity");
       if (!strokeOpacity.empty()) {
-        color = color.withAlpha(std::stof(strokeOpacity));
+        color.alpha = std::stof(strokeOpacity);
       }
-      strokeNode->setColorAttribute("color", color);
+      strokeNode->color = color.toHexString(color.alpha < 1);
     }
 
     std::string strokeWidth = element->getAttribute("stroke-width");
     if (!strokeWidth.empty()) {
-      strokeNode->setFloatAttribute("width", parseLength(strokeWidth, _viewBoxWidth));
+      strokeNode->strokeWidth = parseLength(strokeWidth, _viewBoxWidth);
     }
 
     std::string strokeLinecap = element->getAttribute("stroke-linecap");
     if (!strokeLinecap.empty()) {
-      strokeNode->setAttribute("lineCap", strokeLinecap);
+      strokeNode->cap = LineCapFromString(strokeLinecap);
     }
 
     std::string strokeLinejoin = element->getAttribute("stroke-linejoin");
     if (!strokeLinejoin.empty()) {
-      strokeNode->setAttribute("lineJoin", strokeLinejoin);
+      strokeNode->join = LineJoinFromString(strokeLinejoin);
     }
 
     std::string strokeMiterlimit = element->getAttribute("stroke-miterlimit");
     if (!strokeMiterlimit.empty()) {
-      strokeNode->setFloatAttribute("miterLimit", std::stof(strokeMiterlimit));
+      strokeNode->miterLimit = std::stof(strokeMiterlimit);
     }
 
-    node->appendChild(std::move(strokeNode));
+    std::string dashArray = element->getAttribute("stroke-dasharray");
+    if (!dashArray.empty() && dashArray != "none") {
+      std::istringstream iss(dashArray);
+      float val = 0;
+      char sep = 0;
+      while (iss >> val) {
+        strokeNode->dashes.push_back(val);
+        iss >> sep;
+      }
+    }
+
+    std::string dashOffset = element->getAttribute("stroke-dashoffset");
+    if (!dashOffset.empty()) {
+      strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
+    }
+
+    contents.push_back(std::move(strokeNode));
   }
 }
 
@@ -983,18 +924,18 @@ Matrix SVGParserImpl::parseTransform(const std::string& value) {
     } else if (func == "skewX") {
       float angle = readNumber();
       float radians = angle * 3.14159265358979323846f / 180.0f;
-      m.skewX = std::tan(radians);
+      m.c = std::tan(radians);
     } else if (func == "skewY") {
       float angle = readNumber();
       float radians = angle * 3.14159265358979323846f / 180.0f;
-      m.skewY = std::tan(radians);
+      m.b = std::tan(radians);
     } else if (func == "matrix") {
-      m.scaleX = readNumber();
-      m.skewY = readNumber();
-      m.skewX = readNumber();
-      m.scaleY = readNumber();
-      m.transX = readNumber();
-      m.transY = readNumber();
+      m.a = readNumber();
+      m.b = readNumber();
+      m.c = readNumber();
+      m.d = readNumber();
+      m.tx = readNumber();
+      m.ty = readNumber();
     }
 
     skipWS();
@@ -1010,7 +951,7 @@ Matrix SVGParserImpl::parseTransform(const std::string& value) {
 
 Color SVGParserImpl::parseColor(const std::string& value) {
   if (value.empty() || value == "none") {
-    return Color::Transparent();
+    return {0, 0, 0, 0};
   }
 
   if (value[0] == '#') {
@@ -1021,13 +962,15 @@ Color SVGParserImpl::parseColor(const std::string& value) {
       char g = value[2];
       char b = value[3];
       std::string expanded = std::string() + r + r + g + g + b + b;
-      hex = 0xFF000000 | std::stoul(expanded, nullptr, 16);
+      hex = std::stoul(expanded, nullptr, 16);
+      return Color::FromHex(hex);
     } else if (value.length() == 7) {
-      hex = 0xFF000000 | std::stoul(value.substr(1), nullptr, 16);
+      hex = std::stoul(value.substr(1), nullptr, 16);
+      return Color::FromHex(hex);
     } else if (value.length() == 9) {
       hex = std::stoul(value.substr(1), nullptr, 16);
+      return Color::FromHex(hex, true);
     }
-    return Color::FromHex(hex);
   }
 
   if (value.find("rgb") == 0) {
@@ -1037,7 +980,7 @@ Color SVGParserImpl::parseColor(const std::string& value) {
       std::string inner = value.substr(start + 1, end - start - 1);
       std::istringstream iss(inner);
       float r = 0, g = 0, b = 0, a = 1.0f;
-      char comma;
+      char comma = 0;
       iss >> r >> comma >> g >> comma >> b;
       if (value.find("rgba") == 0) {
         iss >> comma >> a;
@@ -1048,21 +991,25 @@ Color SVGParserImpl::parseColor(const std::string& value) {
 
   // Named colors (subset)
   static const std::unordered_map<std::string, uint32_t> namedColors = {
-      {"black", 0xFF000000},   {"white", 0xFFFFFFFF},   {"red", 0xFFFF0000},
-      {"green", 0xFF008000},   {"blue", 0xFF0000FF},    {"yellow", 0xFFFFFF00},
-      {"cyan", 0xFF00FFFF},    {"magenta", 0xFFFF00FF}, {"gray", 0xFF808080},
-      {"grey", 0xFF808080},    {"silver", 0xFFC0C0C0}, {"maroon", 0xFF800000},
-      {"olive", 0xFF808000},   {"lime", 0xFF00FF00},    {"aqua", 0xFF00FFFF},
-      {"teal", 0xFF008080},    {"navy", 0xFF000080},    {"fuchsia", 0xFFFF00FF},
-      {"purple", 0xFF800080},  {"orange", 0xFFFFA500},  {"transparent", 0x00000000},
+      {"black", 0x000000},      {"white", 0xFFFFFF},   {"red", 0xFF0000},
+      {"green", 0x008000},      {"blue", 0x0000FF},    {"yellow", 0xFFFF00},
+      {"cyan", 0x00FFFF},       {"magenta", 0xFF00FF}, {"gray", 0x808080},
+      {"grey", 0x808080},       {"silver", 0xC0C0C0},  {"maroon", 0x800000},
+      {"olive", 0x808000},      {"lime", 0x00FF00},    {"aqua", 0x00FFFF},
+      {"teal", 0x008080},       {"navy", 0x000080},    {"fuchsia", 0xFF00FF},
+      {"purple", 0x800080},     {"orange", 0xFFA500},  {"transparent", 0x000000},
   };
 
   auto it = namedColors.find(value);
   if (it != namedColors.end()) {
-    return Color::FromHex(it->second);
+    auto color = Color::FromHex(it->second);
+    if (value == "transparent") {
+      color.alpha = 0;
+    }
+    return color;
   }
 
-  return Color::Black();
+  return {0, 0, 0, 1};
 }
 
 float SVGParserImpl::parseLength(const std::string& value, float containerSize) {
@@ -1109,7 +1056,7 @@ std::vector<float> SVGParserImpl::parseViewBox(const std::string& value) {
   float num = 0;
   while (iss >> num) {
     result.push_back(num);
-    char c;
+    char c = 0;
     iss >> c;  // Skip separator
   }
 
@@ -1127,7 +1074,7 @@ PathData SVGParserImpl::parsePoints(const std::string& value, bool closed) {
   float num = 0;
   while (iss >> num) {
     points.push_back(num);
-    char c;
+    char c = 0;
     if (iss.peek() == ',' || iss.peek() == ' ') {
       iss >> c;
     }

@@ -28,7 +28,7 @@
 namespace pagx {
 
 /**
- * Internal SVG XML node representation.
+ * Internal XML node representation for SVG parsing.
  */
 struct SVGXMLNode {
   std::string tagName = {};
@@ -40,10 +40,6 @@ struct SVGXMLNode {
     auto it = attributes.find(name);
     return it != attributes.end() ? it->second : defaultValue;
   }
-
-  bool hasAttribute(const std::string& name) const {
-    return attributes.find(name) != attributes.end();
-  }
 };
 
 /**
@@ -51,41 +47,39 @@ struct SVGXMLNode {
  */
 class SVGParserImpl {
  public:
-  SVGParserImpl(const PAGXSVGParser::Options& options);
+  explicit SVGParserImpl(const PAGXSVGParser::Options& options);
 
   std::shared_ptr<PAGXDocument> parse(const uint8_t* data, size_t length);
 
  private:
   std::unique_ptr<SVGXMLNode> parseXML(const char* data, size_t length);
-  void parseSVGRoot(SVGXMLNode* svgNode);
-  void parseDefs(SVGXMLNode* defsNode);
-  std::unique_ptr<PAGXNode> convertElement(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertG(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertRect(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertCircle(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertEllipse(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertLine(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertPolyline(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertPolygon(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertPath(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertText(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertImage(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertUse(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertLinearGradient(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertRadialGradient(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertPattern(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertMask(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertClipPath(SVGXMLNode* element);
-  std::unique_ptr<PAGXNode> convertFilter(SVGXMLNode* element);
 
-  void parseCommonAttributes(SVGXMLNode* element, PAGXNode* node);
-  void parseFillStroke(SVGXMLNode* element, PAGXNode* node);
+  void parseDefs(SVGXMLNode* defsNode);
+
+  std::unique_ptr<LayerNode> convertToLayer(SVGXMLNode* element);
+  void convertChildren(SVGXMLNode* element, std::vector<std::unique_ptr<VectorElementNode>>& contents);
+  std::unique_ptr<VectorElementNode> convertElement(SVGXMLNode* element);
+  std::unique_ptr<GroupNode> convertG(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertRect(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertCircle(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertEllipse(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertLine(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertPolyline(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertPolygon(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertPath(SVGXMLNode* element);
+  std::unique_ptr<GroupNode> convertText(SVGXMLNode* element);
+  std::unique_ptr<VectorElementNode> convertUse(SVGXMLNode* element);
+
+  std::unique_ptr<LinearGradientNode> convertLinearGradient(SVGXMLNode* element);
+  std::unique_ptr<RadialGradientNode> convertRadialGradient(SVGXMLNode* element);
+
+  void addFillStroke(SVGXMLNode* element, std::vector<std::unique_ptr<VectorElementNode>>& contents);
+
   Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
-  float parseLength(const std::string& value, float containerSize = 0);
+  float parseLength(const std::string& value, float containerSize);
   std::vector<float> parseViewBox(const std::string& value);
   PathData parsePoints(const std::string& value, bool closed);
-
   std::string resolveUrl(const std::string& url);
 
   PAGXSVGParser::Options _options = {};

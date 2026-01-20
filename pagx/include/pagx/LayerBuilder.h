@@ -57,14 +57,15 @@ class LayerBuilder {
     /**
      * Fallback typefaces for text rendering.
      */
-    std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
+    std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
 
     /**
      * Base path for resolving relative resource paths.
      */
-    std::string basePath = {};
+    std::string basePath;
 
-    Options() = default;
+    Options() : fallbackTypefaces(), basePath() {
+    }
   };
 
   /**

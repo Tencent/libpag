@@ -18,18 +18,20 @@
 
 #include "pagx/LayerBuilder.h"
 #include "pagx/PAGXSVGParser.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
-#include "tgfx/layers/vectors/VectorGroup.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
 #include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Polystar.h"
@@ -41,6 +43,7 @@
 #include "tgfx/layers/vectors/StrokeStyle.h"
 #include "tgfx/layers/vectors/TextSpan.h"
 #include "tgfx/layers/vectors/TrimPath.h"
+#include "tgfx/layers/vectors/VectorGroup.h"
 
 namespace pagx {
 
@@ -54,7 +57,7 @@ static tgfx::Color ToTGFX(const Color& c) {
 }
 
 static tgfx::Matrix ToTGFX(const Matrix& m) {
-  return tgfx::Matrix::MakeAll(m.scaleX, m.skewX, m.transX, m.skewY, m.scaleY, m.transY);
+  return tgfx::Matrix::MakeAll(m.a, m.c, m.tx, m.b, m.d, m.ty);
 }
 
 static tgfx::Path ToTGFX(const PathData& pathData) {
@@ -81,244 +84,182 @@ static tgfx::Path ToTGFX(const PathData& pathData) {
   return path;
 }
 
+static tgfx::LineCap ToTGFX(LineCap cap) {
+  switch (cap) {
+    case LineCap::Butt:
+      return tgfx::LineCap::Butt;
+    case LineCap::Round:
+      return tgfx::LineCap::Round;
+    case LineCap::Square:
+      return tgfx::LineCap::Square;
+  }
+  return tgfx::LineCap::Butt;
+}
+
+static tgfx::LineJoin ToTGFX(LineJoin join) {
+  switch (join) {
+    case LineJoin::Miter:
+      return tgfx::LineJoin::Miter;
+    case LineJoin::Round:
+      return tgfx::LineJoin::Round;
+    case LineJoin::Bevel:
+      return tgfx::LineJoin::Bevel;
+  }
+  return tgfx::LineJoin::Miter;
+}
+
 // Internal builder class
 class LayerBuilderImpl {
  public:
-  LayerBuilderImpl(const LayerBuilder::Options& options) : _options(options) {
+  explicit LayerBuilderImpl(const LayerBuilder::Options& options) : _options(options) {
   }
 
   PAGXContent build(const PAGXDocument& document) {
     PAGXContent content;
-    content.width = document.width();
-    content.height = document.height();
-
-    auto root = document.root();
-    if (!root) {
-      return content;
-    }
-
-    // Build resources map
-    auto resources = document.resources();
-    if (resources) {
-      for (size_t i = 0; i < resources->childCount(); ++i) {
-        auto resource = resources->childAt(i);
-        if (!resource->id().empty()) {
-          _resourceNodes[resource->id()] = resource;
-        }
-      }
-    }
+    content.width = document.width;
+    content.height = document.height;
 
     // Build layer tree
-    auto layer = tgfx::Layer::Make();
-    for (size_t i = 0; i < root->childCount(); ++i) {
-      auto childLayer = convertNode(root->childAt(i));
+    auto rootLayer = tgfx::Layer::Make();
+    for (const auto& layer : document.layers) {
+      auto childLayer = convertLayerNode(layer.get());
       if (childLayer) {
-        layer->addChild(childLayer);
+        rootLayer->addChild(childLayer);
       }
     }
 
-    content.root = layer;
+    content.root = rootLayer;
     return content;
   }
 
  private:
-  std::shared_ptr<tgfx::Layer> convertNode(const PAGXNode* node) {
+  std::shared_ptr<tgfx::Layer> convertLayerNode(const LayerNode* node) {
     if (!node) {
       return nullptr;
     }
 
     std::shared_ptr<tgfx::Layer> layer = nullptr;
 
-    switch (node->type()) {
-      case PAGXNodeType::Layer:
-      case PAGXNodeType::Group:
-        layer = convertGroup(node);
-        break;
-      case PAGXNodeType::Rectangle:
-      case PAGXNodeType::Ellipse:
-      case PAGXNodeType::Polystar:
-      case PAGXNodeType::Path:
-      case PAGXNodeType::Text:
-        layer = convertVectorLayer(node);
-        break;
-      case PAGXNodeType::Image:
-        layer = convertImage(node);
-        break;
-      default:
-        break;
+    if (!node->contents.empty()) {
+      layer = convertVectorLayer(node);
+    } else {
+      layer = tgfx::Layer::Make();
     }
 
     if (layer) {
-      applyCommonAttributes(node, layer.get());
-    }
+      applyLayerAttributes(node, layer.get());
 
-    return layer;
-  }
-
-  std::shared_ptr<tgfx::Layer> convertGroup(const PAGXNode* node) {
-    auto layer = tgfx::Layer::Make();
-    for (size_t i = 0; i < node->childCount(); ++i) {
-      auto childLayer = convertNode(node->childAt(i));
-      if (childLayer) {
-        layer->addChild(childLayer);
-      }
-    }
-    return layer;
-  }
-
-  std::shared_ptr<tgfx::Layer> convertVectorLayer(const PAGXNode* node) {
-    auto layer = tgfx::VectorLayer::Make();
-
-    // Convert vector element
-    auto element = convertVectorElement(node);
-    if (element) {
-      layer->setContent(element);
-    }
-
-    return layer;
-  }
-
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const PAGXNode* node) {
-    std::shared_ptr<tgfx::VectorElement> element = nullptr;
-
-    switch (node->type()) {
-      case PAGXNodeType::Rectangle:
-        element = convertRectangle(node);
-        break;
-      case PAGXNodeType::Ellipse:
-        element = convertEllipse(node);
-        break;
-      case PAGXNodeType::Polystar:
-        element = convertPolystar(node);
-        break;
-      case PAGXNodeType::Path:
-        element = convertPath(node);
-        break;
-      case PAGXNodeType::Text:
-        element = convertText(node);
-        break;
-      case PAGXNodeType::Group:
-        element = convertVectorGroup(node);
-        break;
-      default:
-        break;
-    }
-
-    if (element) {
-      // Add fill and stroke styles from children
-      for (size_t i = 0; i < node->childCount(); ++i) {
-        auto child = node->childAt(i);
-        if (child->type() == PAGXNodeType::Fill) {
-          auto fill = convertFill(child);
-          if (fill) {
-            element->addChild(fill);
-          }
-        } else if (child->type() == PAGXNodeType::Stroke) {
-          auto stroke = convertStroke(child);
-          if (stroke) {
-            element->addChild(stroke);
-          }
-        } else if (child->type() == PAGXNodeType::TrimPath) {
-          auto trim = convertTrimPath(child);
-          if (trim) {
-            element->addChild(trim);
-          }
-        } else if (child->type() == PAGXNodeType::RoundCorner) {
-          auto round = convertRoundCorner(child);
-          if (round) {
-            element->addChild(round);
-          }
-        } else if (child->type() == PAGXNodeType::MergePath) {
-          auto merge = convertMergePath(child);
-          if (merge) {
-            element->addChild(merge);
-          }
-        } else if (child->type() == PAGXNodeType::Repeater) {
-          auto repeater = convertRepeater(child);
-          if (repeater) {
-            element->addChild(repeater);
-          }
+      for (const auto& child : node->children) {
+        auto childLayer = convertLayerNode(child.get());
+        if (childLayer) {
+          layer->addChild(childLayer);
         }
       }
     }
 
-    return element;
+    return layer;
   }
 
-  std::shared_ptr<tgfx::Rectangle> convertRectangle(const PAGXNode* node) {
-    float x = node->getFloatAttribute("x", 0);
-    float y = node->getFloatAttribute("y", 0);
-    float width = node->getFloatAttribute("width", 0);
-    float height = node->getFloatAttribute("height", 0);
-    float rx = node->getFloatAttribute("rx", 0);
-    float ry = node->getFloatAttribute("ry", 0);
+  std::shared_ptr<tgfx::Layer> convertVectorLayer(const LayerNode* node) {
+    auto layer = tgfx::VectorLayer::Make();
+    std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
 
-    auto rect = tgfx::Rectangle::Make();
-    rect->setX(x);
-    rect->setY(y);
-    rect->setWidth(width);
-    rect->setHeight(height);
-    rect->setRoundedCornerX(rx);
-    rect->setRoundedCornerY(ry);
+    for (const auto& element : node->contents) {
+      auto tgfxElement = convertVectorElement(element.get());
+      if (tgfxElement) {
+        contents.push_back(tgfxElement);
+      }
+    }
+
+    layer->setContents(contents);
+    return layer;
+  }
+
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const VectorElementNode* node) {
+    if (!node) {
+      return nullptr;
+    }
+
+    switch (node->type()) {
+      case NodeType::Rectangle:
+        return convertRectangle(static_cast<const RectangleNode*>(node));
+      case NodeType::Ellipse:
+        return convertEllipse(static_cast<const EllipseNode*>(node));
+      case NodeType::Polystar:
+        return convertPolystar(static_cast<const PolystarNode*>(node));
+      case NodeType::Path:
+        return convertPath(static_cast<const PathNode*>(node));
+      case NodeType::TextSpan:
+        return convertTextSpan(static_cast<const TextSpanNode*>(node));
+      case NodeType::Fill:
+        return convertFill(static_cast<const FillNode*>(node));
+      case NodeType::Stroke:
+        return convertStroke(static_cast<const StrokeNode*>(node));
+      case NodeType::TrimPath:
+        return convertTrimPath(static_cast<const TrimPathNode*>(node));
+      case NodeType::RoundCorner:
+        return convertRoundCorner(static_cast<const RoundCornerNode*>(node));
+      case NodeType::MergePath:
+        return convertMergePath(static_cast<const MergePathNode*>(node));
+      case NodeType::Repeater:
+        return convertRepeater(static_cast<const RepeaterNode*>(node));
+      case NodeType::Group:
+        return convertGroup(static_cast<const GroupNode*>(node));
+      default:
+        return nullptr;
+    }
+  }
+
+  std::shared_ptr<tgfx::Rectangle> convertRectangle(const RectangleNode* node) {
+    auto rect = std::make_shared<tgfx::Rectangle>();
+    rect->setCenter(tgfx::Point::Make(node->centerX, node->centerY));
+    rect->setSize({node->width, node->height});
+    rect->setRoundness(node->roundness);
+    rect->setReversed(node->reversed);
     return rect;
   }
 
-  std::shared_ptr<tgfx::Ellipse> convertEllipse(const PAGXNode* node) {
-    float cx = node->getFloatAttribute("cx", 0);
-    float cy = node->getFloatAttribute("cy", 0);
-    float rx = node->getFloatAttribute("rx", 0);
-    float ry = node->getFloatAttribute("ry", 0);
-
-    auto ellipse = tgfx::Ellipse::Make();
-    ellipse->setCenterX(cx);
-    ellipse->setCenterY(cy);
-    ellipse->setRadiusX(rx);
-    ellipse->setRadiusY(ry);
+  std::shared_ptr<tgfx::Ellipse> convertEllipse(const EllipseNode* node) {
+    auto ellipse = std::make_shared<tgfx::Ellipse>();
+    ellipse->setCenter(tgfx::Point::Make(node->centerX, node->centerY));
+    ellipse->setSize({node->width, node->height});
+    ellipse->setReversed(node->reversed);
     return ellipse;
   }
 
-  std::shared_ptr<tgfx::Polystar> convertPolystar(const PAGXNode* node) {
-    auto polystar = tgfx::Polystar::Make();
-    polystar->setCenterX(node->getFloatAttribute("centerX", 0));
-    polystar->setCenterY(node->getFloatAttribute("centerY", 0));
-    polystar->setPoints(node->getFloatAttribute("points", 5));
-    polystar->setInnerRadius(node->getFloatAttribute("innerRadius", 0));
-    polystar->setOuterRadius(node->getFloatAttribute("outerRadius", 0));
-    polystar->setInnerRoundness(node->getFloatAttribute("innerRoundness", 0));
-    polystar->setOuterRoundness(node->getFloatAttribute("outerRoundness", 0));
-    polystar->setRotation(node->getFloatAttribute("rotation", 0));
-
-    std::string type = node->getAttribute("type", "Star");
-    if (type == "Polygon") {
-      polystar->setType(tgfx::PolystarType::Polygon);
+  std::shared_ptr<tgfx::Polystar> convertPolystar(const PolystarNode* node) {
+    auto polystar = std::make_shared<tgfx::Polystar>();
+    polystar->setCenter(tgfx::Point::Make(node->centerX, node->centerY));
+    polystar->setPointCount(node->points);
+    polystar->setOuterRadius(node->outerRadius);
+    polystar->setInnerRadius(node->innerRadius);
+    polystar->setOuterRoundness(node->outerRoundness);
+    polystar->setInnerRoundness(node->innerRoundness);
+    polystar->setRotation(node->rotation);
+    polystar->setReversed(node->reversed);
+    if (node->polystarType == PolystarType::Polygon) {
+      polystar->setPolystarType(tgfx::PolystarType::Polygon);
     } else {
-      polystar->setType(tgfx::PolystarType::Star);
+      polystar->setPolystarType(tgfx::PolystarType::Star);
     }
-
     return polystar;
   }
 
-  std::shared_ptr<tgfx::ShapePath> convertPath(const PAGXNode* node) {
-    auto pathData = node->getPathAttribute("d");
-    auto tgfxPath = ToTGFX(pathData);
-    auto shapePath = tgfx::ShapePath::Make();
+  std::shared_ptr<tgfx::ShapePath> convertPath(const PathNode* node) {
+    auto shapePath = std::make_shared<tgfx::ShapePath>();
+    auto tgfxPath = ToTGFX(node->d);
     shapePath->setPath(tgfxPath);
     return shapePath;
   }
 
-  std::shared_ptr<tgfx::TextSpan> convertText(const PAGXNode* node) {
-    std::string text = node->getAttribute("text");
-    float fontSize = node->getFloatAttribute("fontSize", 16);
-    std::string fontFamily = node->getAttribute("fontFamily");
+  std::shared_ptr<tgfx::TextSpan> convertTextSpan(const TextSpanNode* node) {
+    auto textSpan = std::make_shared<tgfx::TextSpan>();
+    textSpan->setPosition(tgfx::Point::Make(node->x, node->y));
 
-    auto textSpan = tgfx::TextSpan::Make();
-    textSpan->setText(text);
-
-    // Create font from typeface
     std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (!fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
-      for (auto& tf : _options.fallbackTypefaces) {
-        if (tf && tf->fontFamily() == fontFamily) {
+    if (!node->font.empty() && !_options.fallbackTypefaces.empty()) {
+      for (const auto& tf : _options.fallbackTypefaces) {
+        if (tf && tf->fontFamily() == node->font) {
           typeface = tf;
           break;
         }
@@ -327,143 +268,88 @@ class LayerBuilderImpl {
     if (!typeface && !_options.fallbackTypefaces.empty()) {
       typeface = _options.fallbackTypefaces[0];
     }
-
-    if (typeface) {
-      textSpan->setTypeface(typeface);
+    if (typeface && !node->text.empty()) {
+      auto font = tgfx::Font(typeface, node->fontSize);
+      auto textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
+      textSpan->setTextBlob(textBlob);
     }
-    textSpan->setFontSize(fontSize);
-
-    float x = node->getFloatAttribute("x", 0);
-    float y = node->getFloatAttribute("y", 0);
-    textSpan->setX(x);
-    textSpan->setY(y);
 
     return textSpan;
   }
 
-  std::shared_ptr<tgfx::VectorGroup> convertVectorGroup(const PAGXNode* node) {
-    auto group = tgfx::VectorGroup::Make();
-    for (size_t i = 0; i < node->childCount(); ++i) {
-      auto child = node->childAt(i);
-      if (child->type() != PAGXNodeType::Fill && child->type() != PAGXNodeType::Stroke) {
-        auto childElement = convertVectorElement(child);
-        if (childElement) {
-          group->addChild(childElement);
-        }
-      }
-    }
-    return group;
-  }
+  std::shared_ptr<tgfx::FillStyle> convertFill(const FillNode* node) {
+    auto fill = std::make_shared<tgfx::FillStyle>();
 
-  std::shared_ptr<tgfx::FillStyle> convertFill(const PAGXNode* node) {
-    auto fill = tgfx::FillStyle::Make();
-
-    // Try to get color source from reference
-    std::string colorSourceRef = node->getAttribute("colorSourceRef");
-    if (!colorSourceRef.empty()) {
-      auto colorSource = convertColorSourceFromRef(colorSourceRef);
-      if (colorSource) {
-        fill->setColorSource(colorSource);
-      }
-    } else {
-      // Use solid color
-      auto color = node->getColorAttribute("color", Color::Black());
-      auto solidColor = tgfx::SolidColor::Make(ToTGFX(color));
-      fill->setColorSource(solidColor);
+    std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
+    if (node->colorSource) {
+      colorSource = convertColorSource(node->colorSource.get());
+    } else if (!node->color.empty()) {
+      auto color = Color::Parse(node->color);
+      colorSource = tgfx::SolidColor::Make(ToTGFX(color));
     }
 
+    if (colorSource) {
+      fill->setColorSource(colorSource);
+    }
+
+    fill->setAlpha(node->alpha);
     return fill;
   }
 
-  std::shared_ptr<tgfx::StrokeStyle> convertStroke(const PAGXNode* node) {
-    auto stroke = tgfx::StrokeStyle::Make();
+  std::shared_ptr<tgfx::StrokeStyle> convertStroke(const StrokeNode* node) {
+    auto stroke = std::make_shared<tgfx::StrokeStyle>();
 
-    // Color source
-    std::string colorSourceRef = node->getAttribute("colorSourceRef");
-    if (!colorSourceRef.empty()) {
-      auto colorSource = convertColorSourceFromRef(colorSourceRef);
-      if (colorSource) {
-        stroke->setColorSource(colorSource);
-      }
-    } else {
-      auto color = node->getColorAttribute("color", Color::Black());
-      auto solidColor = tgfx::SolidColor::Make(ToTGFX(color));
-      stroke->setColorSource(solidColor);
+    std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
+    if (node->colorSource) {
+      colorSource = convertColorSource(node->colorSource.get());
+    } else if (!node->color.empty()) {
+      auto color = Color::Parse(node->color);
+      colorSource = tgfx::SolidColor::Make(ToTGFX(color));
     }
 
-    // Stroke properties
-    float width = node->getFloatAttribute("width", 1);
-    stroke->setStrokeWidth(width);
-
-    std::string lineCap = node->getAttribute("lineCap", "butt");
-    if (lineCap == "round") {
-      stroke->setLineCap(tgfx::LineCap::Round);
-    } else if (lineCap == "square") {
-      stroke->setLineCap(tgfx::LineCap::Square);
-    } else {
-      stroke->setLineCap(tgfx::LineCap::Butt);
+    if (colorSource) {
+      stroke->setColorSource(colorSource);
     }
 
-    std::string lineJoin = node->getAttribute("lineJoin", "miter");
-    if (lineJoin == "round") {
-      stroke->setLineJoin(tgfx::LineJoin::Round);
-    } else if (lineJoin == "bevel") {
-      stroke->setLineJoin(tgfx::LineJoin::Bevel);
-    } else {
-      stroke->setLineJoin(tgfx::LineJoin::Miter);
-    }
-
-    float miterLimit = node->getFloatAttribute("miterLimit", 4);
-    stroke->setMiterLimit(miterLimit);
+    stroke->setStrokeWidth(node->strokeWidth);
+    stroke->setAlpha(node->alpha);
+    stroke->setLineCap(ToTGFX(node->cap));
+    stroke->setLineJoin(ToTGFX(node->join));
+    stroke->setMiterLimit(node->miterLimit);
 
     return stroke;
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertColorSourceFromRef(const std::string& refId) {
-    auto it = _resourceNodes.find(refId);
-    if (it == _resourceNodes.end()) {
-      return nullptr;
-    }
-    return convertColorSource(it->second);
-  }
-
-  std::shared_ptr<tgfx::ColorSource> convertColorSource(const PAGXNode* node) {
+  std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSourceNode* node) {
     if (!node) {
       return nullptr;
     }
 
     switch (node->type()) {
-      case PAGXNodeType::SolidColor: {
-        auto color = node->getColorAttribute("color", Color::Black());
-        return tgfx::SolidColor::Make(ToTGFX(color));
+      case NodeType::SolidColor: {
+        auto solid = static_cast<const SolidColorNode*>(node);
+        return tgfx::SolidColor::Make(ToTGFX(solid->color));
       }
-      case PAGXNodeType::LinearGradient: {
-        return convertLinearGradient(node);
+      case NodeType::LinearGradient: {
+        auto grad = static_cast<const LinearGradientNode*>(node);
+        return convertLinearGradient(grad);
       }
-      case PAGXNodeType::RadialGradient: {
-        return convertRadialGradient(node);
+      case NodeType::RadialGradient: {
+        auto grad = static_cast<const RadialGradientNode*>(node);
+        return convertRadialGradient(grad);
       }
       default:
         return nullptr;
     }
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const PAGXNode* node) {
-    float x1 = node->getFloatAttribute("x1", 0);
-    float y1 = node->getFloatAttribute("y1", 0);
-    float x2 = node->getFloatAttribute("x2", 1);
-    float y2 = node->getFloatAttribute("y2", 0);
-
-    int stopCount = node->getIntAttribute("stopCount", 0);
+  std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradientNode* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
 
-    for (int i = 0; i < stopCount; ++i) {
-      std::string prefix = "stop" + std::to_string(i) + "_";
-      float offset = node->getFloatAttribute(prefix + "offset", 0);
-      auto color = node->getColorAttribute(prefix + "color", Color::Black());
-      colors.push_back(ToTGFX(color));
-      positions.push_back(offset);
+    for (const auto& stop : node->colorStops) {
+      colors.push_back(ToTGFX(stop.color));
+      positions.push_back(stop.offset);
     }
 
     if (colors.empty()) {
@@ -471,27 +357,19 @@ class LayerBuilderImpl {
       positions = {0.0f, 1.0f};
     }
 
-    auto startPoint = tgfx::Point::Make(x1, y1);
-    auto endPoint = tgfx::Point::Make(x2, y2);
+    auto startPoint = tgfx::Point::Make(node->startX, node->startY);
+    auto endPoint = tgfx::Point::Make(node->endX, node->endY);
 
     return tgfx::Gradient::MakeLinear(startPoint, endPoint, colors, positions);
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const PAGXNode* node) {
-    float cx = node->getFloatAttribute("cx", 0.5f);
-    float cy = node->getFloatAttribute("cy", 0.5f);
-    float r = node->getFloatAttribute("r", 0.5f);
-
-    int stopCount = node->getIntAttribute("stopCount", 0);
+  std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradientNode* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
 
-    for (int i = 0; i < stopCount; ++i) {
-      std::string prefix = "stop" + std::to_string(i) + "_";
-      float offset = node->getFloatAttribute(prefix + "offset", 0);
-      auto color = node->getColorAttribute(prefix + "color", Color::Black());
-      colors.push_back(ToTGFX(color));
-      positions.push_back(offset);
+    for (const auto& stop : node->colorStops) {
+      colors.push_back(ToTGFX(stop.color));
+      positions.push_back(stop.offset);
     }
 
     if (colors.empty()) {
@@ -499,122 +377,126 @@ class LayerBuilderImpl {
       positions = {0.0f, 1.0f};
     }
 
-    auto center = tgfx::Point::Make(cx, cy);
-    return tgfx::Gradient::MakeRadial(center, r, colors, positions);
+    auto center = tgfx::Point::Make(node->centerX, node->centerY);
+    return tgfx::Gradient::MakeRadial(center, node->radius, colors, positions);
   }
 
-  std::shared_ptr<tgfx::TrimPath> convertTrimPath(const PAGXNode* node) {
-    auto trim = tgfx::TrimPath::Make();
-    trim->setStart(node->getFloatAttribute("start", 0));
-    trim->setEnd(node->getFloatAttribute("end", 1));
-    trim->setOffset(node->getFloatAttribute("offset", 0));
+  std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPathNode* node) {
+    auto trim = std::make_shared<tgfx::TrimPath>();
+    trim->setStart(node->start);
+    trim->setEnd(node->end);
+    trim->setOffset(node->offset);
     return trim;
   }
 
-  std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const PAGXNode* node) {
-    auto round = tgfx::RoundCorner::Make();
-    round->setRadius(node->getFloatAttribute("radius", 0));
+  std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCornerNode* node) {
+    auto round = std::make_shared<tgfx::RoundCorner>();
+    round->setRadius(node->radius);
     return round;
   }
 
-  std::shared_ptr<tgfx::MergePath> convertMergePath(const PAGXNode* node) {
-    auto merge = tgfx::MergePath::Make();
-    std::string mode = node->getAttribute("mode", "Merge");
-    // Set merge mode based on string
+  std::shared_ptr<tgfx::MergePath> convertMergePath(const MergePathNode*) {
+    auto merge = std::make_shared<tgfx::MergePath>();
     return merge;
   }
 
-  std::shared_ptr<tgfx::Repeater> convertRepeater(const PAGXNode* node) {
-    auto repeater = tgfx::Repeater::Make();
-    repeater->setCopies(node->getFloatAttribute("copies", 1));
-    repeater->setOffset(node->getFloatAttribute("offset", 0));
+  std::shared_ptr<tgfx::Repeater> convertRepeater(const RepeaterNode* node) {
+    auto repeater = std::make_shared<tgfx::Repeater>();
+    repeater->setCopies(node->copies);
+    repeater->setOffset(node->offset);
     return repeater;
   }
 
-  std::shared_ptr<tgfx::Layer> convertImage(const PAGXNode* node) {
-    std::string href = node->getAttribute("href");
-    if (href.empty()) {
-      return nullptr;
+  std::shared_ptr<tgfx::VectorGroup> convertGroup(const GroupNode* node) {
+    auto group = std::make_shared<tgfx::VectorGroup>();
+    std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
+
+    for (const auto& element : node->elements) {
+      auto tgfxElement = convertVectorElement(element.get());
+      if (tgfxElement) {
+        elements.push_back(tgfxElement);
+      }
     }
 
-    std::string imagePath = href;
-    if (!_options.basePath.empty() && href[0] != '/' && href.find("://") == std::string::npos) {
-      imagePath = _options.basePath + href;
-    }
-
-    auto image = tgfx::Image::MakeFromFile(imagePath);
-    if (!image) {
-      return nullptr;
-    }
-
-    auto layer = tgfx::Layer::Make();
-    // Note: Image rendering would typically use ImageLayer or similar
-    // For now, we just create a placeholder layer
-
-    return layer;
+    group->setElements(elements);
+    return group;
   }
 
-  void applyCommonAttributes(const PAGXNode* node, tgfx::Layer* layer) {
-    // Transform
-    if (node->hasAttribute("transform")) {
-      auto matrix = node->getMatrixAttribute("transform");
-      layer->setMatrix(ToTGFX(matrix));
-    }
+  void applyLayerAttributes(const LayerNode* node, tgfx::Layer* layer) {
+    layer->setVisible(node->visible);
+    layer->setAlpha(node->alpha);
 
-    // Opacity
-    if (node->hasAttribute("opacity")) {
-      layer->setAlpha(node->getFloatAttribute("opacity", 1.0f));
-    }
-
-    // Visibility
-    if (node->hasAttribute("visible")) {
-      layer->setVisible(node->getBoolAttribute("visible", true));
-    }
-
-    // Filters
-    for (size_t i = 0; i < node->childCount(); ++i) {
-      auto child = node->childAt(i);
-      if (child->type() == PAGXNodeType::BlurFilter) {
-        float radius = child->getFloatAttribute("blurRadius", 0);
-        auto filter = tgfx::BlurFilter::Make(radius, radius);
-        layer->setFilter(filter);
-      } else if (child->type() == PAGXNodeType::DropShadowFilter) {
-        float dx = child->getFloatAttribute("dx", 0);
-        float dy = child->getFloatAttribute("dy", 0);
-        float blur = child->getFloatAttribute("blurRadius", 0);
-        auto color = child->getColorAttribute("color", Color::Black());
-        auto filter = tgfx::DropShadowFilter::Make(dx, dy, blur, blur, ToTGFX(color));
-        layer->setFilter(filter);
-      }
+    if (!node->matrix.isIdentity()) {
+      layer->setMatrix(ToTGFX(node->matrix));
     }
 
     // Layer styles
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
-    for (size_t i = 0; i < node->childCount(); ++i) {
-      auto child = node->childAt(i);
-      if (child->type() == PAGXNodeType::DropShadowStyle) {
-        float dx = child->getFloatAttribute("dx", 0);
-        float dy = child->getFloatAttribute("dy", 0);
-        float blur = child->getFloatAttribute("blurRadius", 0);
-        auto color = child->getColorAttribute("color", Color::Black());
-        auto style = tgfx::DropShadowStyle::Make(dx, dy, blur, blur, ToTGFX(color));
-        styles.push_back(style);
-      } else if (child->type() == PAGXNodeType::InnerShadowStyle) {
-        float dx = child->getFloatAttribute("dx", 0);
-        float dy = child->getFloatAttribute("dy", 0);
-        float blur = child->getFloatAttribute("blurRadius", 0);
-        auto color = child->getColorAttribute("color", Color::Black());
-        auto style = tgfx::InnerShadowStyle::Make(dx, dy, blur, blur, ToTGFX(color));
-        styles.push_back(style);
+    for (const auto& style : node->styles) {
+      auto tgfxStyle = convertLayerStyle(style.get());
+      if (tgfxStyle) {
+        styles.push_back(tgfxStyle);
       }
     }
     if (!styles.empty()) {
       layer->setLayerStyles(styles);
     }
+
+    // Layer filters
+    std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
+    for (const auto& filter : node->filters) {
+      auto tgfxFilter = convertLayerFilter(filter.get());
+      if (tgfxFilter) {
+        filters.push_back(tgfxFilter);
+      }
+    }
+    if (!filters.empty()) {
+      layer->setFilters(filters);
+    }
+  }
+
+  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyleNode* node) {
+    if (!node) {
+      return nullptr;
+    }
+
+    switch (node->type()) {
+      case NodeType::DropShadowStyle: {
+        auto style = static_cast<const DropShadowStyleNode*>(node);
+        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
+                                           style->blurrinessY, ToTGFX(style->color));
+      }
+      case NodeType::InnerShadowStyle: {
+        auto style = static_cast<const InnerShadowStyleNode*>(node);
+        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
+                                            style->blurrinessY, ToTGFX(style->color));
+      }
+      default:
+        return nullptr;
+    }
+  }
+
+  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilterNode* node) {
+    if (!node) {
+      return nullptr;
+    }
+
+    switch (node->type()) {
+      case NodeType::BlurFilter: {
+        auto filter = static_cast<const BlurFilterNode*>(node);
+        return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
+      }
+      case NodeType::DropShadowFilter: {
+        auto filter = static_cast<const DropShadowFilterNode*>(node);
+        return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
+                                            filter->blurrinessY, ToTGFX(filter->color));
+      }
+      default:
+        return nullptr;
+    }
   }
 
   LayerBuilder::Options _options = {};
-  std::unordered_map<std::string, const PAGXNode*> _resourceNodes = {};
 };
 
 // Public API implementation

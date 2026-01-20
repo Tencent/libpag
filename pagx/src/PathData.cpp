@@ -81,18 +81,18 @@ void PathData::close() {
 }
 
 void PathData::addRect(const Rect& rect) {
-  moveTo(rect.left, rect.top);
-  lineTo(rect.right, rect.top);
-  lineTo(rect.right, rect.bottom);
-  lineTo(rect.left, rect.bottom);
+  moveTo(rect.left(), rect.top());
+  lineTo(rect.right(), rect.top());
+  lineTo(rect.right(), rect.bottom());
+  lineTo(rect.left(), rect.bottom());
   close();
 }
 
 void PathData::addOval(const Rect& rect) {
-  float cx = rect.left + rect.width() * 0.5f;
-  float cy = rect.top + rect.height() * 0.5f;
-  float rx = rect.width() * 0.5f;
-  float ry = rect.height() * 0.5f;
+  float cx = rect.left() + rect.width * 0.5f;
+  float cy = rect.top() + rect.height * 0.5f;
+  float rx = rect.width * 0.5f;
+  float ry = rect.height * 0.5f;
 
   float dx = rx * CUBIC_ARC_FACTOR;
   float dy = ry * CUBIC_ARC_FACTOR;
@@ -111,27 +111,27 @@ void PathData::addRoundRect(const Rect& rect, float radiusX, float radiusY) {
     return;
   }
 
-  float maxRadiusX = rect.width() * 0.5f;
-  float maxRadiusY = rect.height() * 0.5f;
+  float maxRadiusX = rect.width * 0.5f;
+  float maxRadiusY = rect.height * 0.5f;
   radiusX = std::min(radiusX, maxRadiusX);
   radiusY = std::min(radiusY, maxRadiusY);
 
   float dx = radiusX * CUBIC_ARC_FACTOR;
   float dy = radiusY * CUBIC_ARC_FACTOR;
 
-  moveTo(rect.left + radiusX, rect.top);
-  lineTo(rect.right - radiusX, rect.top);
-  cubicTo(rect.right - radiusX + dx, rect.top, rect.right, rect.top + radiusY - dy, rect.right,
-          rect.top + radiusY);
-  lineTo(rect.right, rect.bottom - radiusY);
-  cubicTo(rect.right, rect.bottom - radiusY + dy, rect.right - radiusX + dx, rect.bottom,
-          rect.right - radiusX, rect.bottom);
-  lineTo(rect.left + radiusX, rect.bottom);
-  cubicTo(rect.left + radiusX - dx, rect.bottom, rect.left, rect.bottom - radiusY + dy, rect.left,
-          rect.bottom - radiusY);
-  lineTo(rect.left, rect.top + radiusY);
-  cubicTo(rect.left, rect.top + radiusY - dy, rect.left + radiusX - dx, rect.top,
-          rect.left + radiusX, rect.top);
+  moveTo(rect.left() + radiusX, rect.top());
+  lineTo(rect.right() - radiusX, rect.top());
+  cubicTo(rect.right() - radiusX + dx, rect.top(), rect.right(), rect.top() + radiusY - dy,
+          rect.right(), rect.top() + radiusY);
+  lineTo(rect.right(), rect.bottom() - radiusY);
+  cubicTo(rect.right(), rect.bottom() - radiusY + dy, rect.right() - radiusX + dx, rect.bottom(),
+          rect.right() - radiusX, rect.bottom());
+  lineTo(rect.left() + radiusX, rect.bottom());
+  cubicTo(rect.left() + radiusX - dx, rect.bottom(), rect.left(), rect.bottom() - radiusY + dy,
+          rect.left(), rect.bottom() - radiusY);
+  lineTo(rect.left(), rect.top() + radiusY);
+  cubicTo(rect.left(), rect.top() + radiusY - dy, rect.left() + radiusX - dx, rect.top(),
+          rect.left() + radiusX, rect.top());
   close();
 }
 

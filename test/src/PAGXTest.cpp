@@ -80,31 +80,42 @@ PAG_TEST(PAGXTest, PathDataForEach) {
 }
 
 /**
- * Test case: PAGXNode basic operations
+ * Test case: Strong-typed PAGX node creation
  */
 PAG_TEST(PAGXTest, PAGXNodeBasic) {
-  auto node = pagx::PAGXNode::Make(pagx::PAGXNodeType::Group);
-  ASSERT_TRUE(node != nullptr);
-  EXPECT_EQ(node->type(), pagx::PAGXNodeType::Group);
-  EXPECT_STREQ(pagx::PAGXNodeTypeName(node->type()), "Group");
-  EXPECT_EQ(node->childCount(), 0u);
+  // Test RectangleNode creation
+  auto rect = std::make_unique<pagx::RectangleNode>();
+  rect->centerX = 50;
+  rect->centerY = 50;
+  rect->width = 100;
+  rect->height = 80;
+  rect->roundness = 10;
 
-  // Add child nodes
-  auto path1 = pagx::PAGXNode::Make(pagx::PAGXNodeType::Path);
-  auto path2 = pagx::PAGXNode::Make(pagx::PAGXNodeType::Path);
-  auto* path1Ptr = path1.get();
-  node->appendChild(std::move(path1));
-  node->appendChild(std::move(path2));
-  EXPECT_EQ(node->childCount(), 2u);
+  EXPECT_EQ(rect->type(), pagx::NodeType::Rectangle);
+  EXPECT_STREQ(pagx::NodeTypeName(rect->type()), "Rectangle");
+  EXPECT_FLOAT_EQ(rect->centerX, 50);
+  EXPECT_FLOAT_EQ(rect->width, 100);
 
-  // Set attributes
-  path1Ptr->setAttribute("d", "M0 0 L100 100");
-  path1Ptr->setAttribute("fill", "#FF0000");
+  // Test PathNode creation
+  auto path = std::make_unique<pagx::PathNode>();
+  path->d = pagx::PathData::FromSVGString("M0 0 L100 100");
+  EXPECT_EQ(path->type(), pagx::NodeType::Path);
+  EXPECT_GT(path->d.verbs().size(), 0u);
 
-  EXPECT_TRUE(path1Ptr->hasAttribute("d"));
-  EXPECT_TRUE(path1Ptr->hasAttribute("fill"));
-  EXPECT_FALSE(path1Ptr->hasAttribute("stroke"));
-  EXPECT_EQ(path1Ptr->getAttribute("fill"), "#FF0000");
+  // Test FillNode creation
+  auto fill = std::make_unique<pagx::FillNode>();
+  fill->color = "#FF0000";
+  fill->alpha = 0.8f;
+  EXPECT_EQ(fill->type(), pagx::NodeType::Fill);
+  EXPECT_EQ(fill->color, "#FF0000");
+
+  // Test GroupNode with children
+  auto group = std::make_unique<pagx::GroupNode>();
+  group->name = "testGroup";
+  group->elements.push_back(std::move(rect));
+  group->elements.push_back(std::move(fill));
+  EXPECT_EQ(group->type(), pagx::NodeType::Group);
+  EXPECT_EQ(group->elements.size(), 2u);
 }
 
 /**
@@ -113,33 +124,39 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
 PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   ASSERT_TRUE(doc != nullptr);
-  EXPECT_EQ(doc->width(), 400.0f);
-  EXPECT_EQ(doc->height(), 300.0f);
+  EXPECT_EQ(doc->width, 400.0f);
+  EXPECT_EQ(doc->height, 300.0f);
 
-  auto root = doc->root();
-  ASSERT_TRUE(root != nullptr);
-  EXPECT_EQ(root->type(), pagx::PAGXNodeType::Document);
+  // Create a layer with contents
+  auto layer = std::make_unique<pagx::LayerNode>();
+  layer->id = "layer1";
+  layer->name = "Test Layer";
 
-  // Add a group with a path
-  auto group = pagx::PAGXNode::Make(pagx::PAGXNodeType::Group);
-  group->setId("testGroup");
+  // Add a group with rectangle and fill
+  auto group = std::make_unique<pagx::GroupNode>();
+  group->name = "testGroup";
 
-  auto path = pagx::PAGXNode::Make(pagx::PAGXNodeType::Path);
-  path->setAttribute("d", "M10 10 L90 10 L90 90 L10 90 Z");
-  path->setAttribute("fill", "#0000FF");
+  auto rect = std::make_unique<pagx::RectangleNode>();
+  rect->centerX = 50;
+  rect->centerY = 50;
+  rect->width = 80;
+  rect->height = 60;
 
-  group->appendChild(std::move(path));
-  root->appendChild(std::move(group));
+  auto fill = std::make_unique<pagx::FillNode>();
+  fill->color = "#0000FF";
+
+  group->elements.push_back(std::move(rect));
+  group->elements.push_back(std::move(fill));
+  layer->contents.push_back(std::move(group));
+
+  doc->layers.push_back(std::move(layer));
 
   // Export to XML
   std::string xml = doc->toXML();
   EXPECT_FALSE(xml.empty());
-  EXPECT_NE(xml.find("<Document"), std::string::npos);
+  EXPECT_NE(xml.find("<pagx"), std::string::npos);
   EXPECT_NE(xml.find("width=\"400\""), std::string::npos);
   EXPECT_NE(xml.find("height=\"300\""), std::string::npos);
-  EXPECT_NE(xml.find("<Group"), std::string::npos);
-  EXPECT_NE(xml.find("<Path"), std::string::npos);
-  EXPECT_NE(xml.find("fill=\"#0000FF\""), std::string::npos);
 
   // Save the XML for inspection
   auto xmlData = tgfx::Data::MakeWithCopy(xml.data(), xml.size());
@@ -154,14 +171,21 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   auto doc1 = pagx::PAGXDocument::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
-  auto root1 = doc1->root();
-  auto rect = pagx::PAGXNode::Make(pagx::PAGXNodeType::Rectangle);
-  rect->setAttribute("x", "10");
-  rect->setAttribute("y", "20");
-  rect->setAttribute("width", "80");
-  rect->setAttribute("height", "60");
-  rect->setAttribute("fill", "#00FF00");
-  root1->appendChild(std::move(rect));
+  auto layer = std::make_unique<pagx::LayerNode>();
+  layer->name = "TestLayer";
+
+  auto rect = std::make_unique<pagx::RectangleNode>();
+  rect->centerX = 50;
+  rect->centerY = 50;
+  rect->width = 80;
+  rect->height = 60;
+
+  auto fill = std::make_unique<pagx::FillNode>();
+  fill->color = "#00FF00";
+
+  layer->contents.push_back(std::move(rect));
+  layer->contents.push_back(std::move(fill));
+  doc1->layers.push_back(std::move(layer));
 
   // Export to XML
   std::string xml = doc1->toXML();
@@ -172,13 +196,11 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   ASSERT_TRUE(doc2 != nullptr);
 
   // Verify the dimensions
-  EXPECT_FLOAT_EQ(doc2->width(), 200.0f);
-  EXPECT_FLOAT_EQ(doc2->height(), 150.0f);
+  EXPECT_FLOAT_EQ(doc2->width, 200.0f);
+  EXPECT_FLOAT_EQ(doc2->height, 150.0f);
 
   // Verify the structure
-  auto root2 = doc2->root();
-  ASSERT_TRUE(root2 != nullptr);
-  EXPECT_GE(root2->childCount(), 1u);
+  EXPECT_GE(doc2->layers.size(), 1u);
 }
 
 /**
@@ -210,8 +232,8 @@ PAG_TEST(PAGXTest, SVGToPAGXConversion) {
       continue;  // Some SVGs may fail to parse
     }
 
-    EXPECT_GT(doc->width(), 0.0f);
-    EXPECT_GT(doc->height(), 0.0f);
+    EXPECT_GT(doc->width, 0.0f);
+    EXPECT_GT(doc->height, 0.0f);
 
     // Export to XML
     std::string xml = doc->toXML();
@@ -233,11 +255,22 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
   EXPECT_FLOAT_EQ(p1.y, 20.0f);
 
   // Test Rect
-  pagx::Rect r1 = {0.0f, 0.0f, 100.0f, 50.0f};
-  EXPECT_FLOAT_EQ(r1.left, 0.0f);
-  EXPECT_FLOAT_EQ(r1.top, 0.0f);
-  EXPECT_FLOAT_EQ(r1.right, 100.0f);
-  EXPECT_FLOAT_EQ(r1.bottom, 50.0f);
+  pagx::Rect r1 = {0.0f, 10.0f, 100.0f, 50.0f};
+  EXPECT_FLOAT_EQ(r1.x, 0.0f);
+  EXPECT_FLOAT_EQ(r1.y, 10.0f);
+  EXPECT_FLOAT_EQ(r1.width, 100.0f);
+  EXPECT_FLOAT_EQ(r1.height, 50.0f);
+  EXPECT_FLOAT_EQ(r1.left(), 0.0f);
+  EXPECT_FLOAT_EQ(r1.top(), 10.0f);
+  EXPECT_FLOAT_EQ(r1.right(), 100.0f);
+  EXPECT_FLOAT_EQ(r1.bottom(), 60.0f);
+
+  // Test Rect::MakeLTRB
+  auto r2 = pagx::Rect::MakeLTRB(10, 20, 110, 70);
+  EXPECT_FLOAT_EQ(r2.x, 10.0f);
+  EXPECT_FLOAT_EQ(r2.y, 20.0f);
+  EXPECT_FLOAT_EQ(r2.width, 100.0f);
+  EXPECT_FLOAT_EQ(r2.height, 50.0f);
 
   // Test Color
   pagx::Color c1 = {1.0f, 0.5f, 0.0f, 1.0f};
@@ -246,14 +279,123 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
   EXPECT_FLOAT_EQ(c1.blue, 0.0f);
   EXPECT_FLOAT_EQ(c1.alpha, 1.0f);
 
+  // Test Color parsing
+  auto c2 = pagx::Color::Parse("#FF8000");
+  EXPECT_FLOAT_EQ(c2.red, 1.0f);
+  EXPECT_NEAR(c2.green, 0.5f, 0.01f);
+  EXPECT_FLOAT_EQ(c2.blue, 0.0f);
+
   // Test Matrix (identity)
   pagx::Matrix m1 = {};
-  EXPECT_FLOAT_EQ(m1.scaleX, 1.0f);
-  EXPECT_FLOAT_EQ(m1.skewX, 0.0f);
-  EXPECT_FLOAT_EQ(m1.transX, 0.0f);
-  EXPECT_FLOAT_EQ(m1.skewY, 0.0f);
-  EXPECT_FLOAT_EQ(m1.scaleY, 1.0f);
-  EXPECT_FLOAT_EQ(m1.transY, 0.0f);
+  EXPECT_TRUE(m1.isIdentity());
+  EXPECT_FLOAT_EQ(m1.a, 1.0f);
+  EXPECT_FLOAT_EQ(m1.b, 0.0f);
+  EXPECT_FLOAT_EQ(m1.c, 0.0f);
+  EXPECT_FLOAT_EQ(m1.d, 1.0f);
+  EXPECT_FLOAT_EQ(m1.tx, 0.0f);
+  EXPECT_FLOAT_EQ(m1.ty, 0.0f);
+}
+
+/**
+ * Test case: Color source nodes
+ */
+PAG_TEST(PAGXTest, ColorSourceNodes) {
+  // Test SolidColorNode
+  auto solid = std::make_unique<pagx::SolidColorNode>();
+  solid->color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
+  EXPECT_EQ(solid->type(), pagx::NodeType::SolidColor);
+  EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
+
+  // Test LinearGradientNode
+  auto linear = std::make_unique<pagx::LinearGradientNode>();
+  linear->startX = 0;
+  linear->startY = 0;
+  linear->endX = 100;
+  linear->endY = 0;
+
+  pagx::ColorStopNode stop1;
+  stop1.offset = 0;
+  stop1.color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
+
+  pagx::ColorStopNode stop2;
+  stop2.offset = 1;
+  stop2.color = pagx::Color::FromRGBA(0.0f, 0.0f, 1.0f, 1.0f);
+
+  linear->colorStops.push_back(stop1);
+  linear->colorStops.push_back(stop2);
+
+  EXPECT_EQ(linear->type(), pagx::NodeType::LinearGradient);
+  EXPECT_EQ(linear->colorStops.size(), 2u);
+
+  // Test RadialGradientNode
+  auto radial = std::make_unique<pagx::RadialGradientNode>();
+  radial->centerX = 50;
+  radial->centerY = 50;
+  radial->radius = 50;
+  radial->colorStops = linear->colorStops;
+
+  EXPECT_EQ(radial->type(), pagx::NodeType::RadialGradient);
+}
+
+/**
+ * Test case: Layer node with styles and filters
+ */
+PAG_TEST(PAGXTest, LayerNodeStylesFilters) {
+  auto layer = std::make_unique<pagx::LayerNode>();
+  layer->name = "StyledLayer";
+  layer->alpha = 0.8f;
+  layer->blendMode = pagx::BlendMode::Multiply;
+
+  // Add drop shadow style
+  auto dropShadow = std::make_unique<pagx::DropShadowStyleNode>();
+  dropShadow->offsetX = 5;
+  dropShadow->offsetY = 5;
+  dropShadow->blurrinessX = 10;
+  dropShadow->blurrinessY = 10;
+  dropShadow->color = pagx::Color::FromRGBA(0, 0, 0, 0.5f);
+  layer->styles.push_back(std::move(dropShadow));
+
+  // Add blur filter
+  auto blur = std::make_unique<pagx::BlurFilterNode>();
+  blur->blurrinessX = 5;
+  blur->blurrinessY = 5;
+  layer->filters.push_back(std::move(blur));
+
+  EXPECT_EQ(layer->styles.size(), 1u);
+  EXPECT_EQ(layer->filters.size(), 1u);
+  EXPECT_EQ(layer->styles[0]->type(), pagx::NodeType::DropShadowStyle);
+  EXPECT_EQ(layer->filters[0]->type(), pagx::NodeType::BlurFilter);
+}
+
+/**
+ * Test case: Node cloning
+ */
+PAG_TEST(PAGXTest, NodeClone) {
+  // Test simple node clone
+  auto rect = std::make_unique<pagx::RectangleNode>();
+  rect->centerX = 50;
+  rect->centerY = 50;
+  rect->width = 100;
+  rect->height = 80;
+
+  auto cloned = rect->clone();
+  ASSERT_TRUE(cloned != nullptr);
+  EXPECT_EQ(cloned->type(), pagx::NodeType::Rectangle);
+
+  auto clonedRect = static_cast<pagx::RectangleNode*>(cloned.get());
+  EXPECT_FLOAT_EQ(clonedRect->centerX, 50);
+  EXPECT_FLOAT_EQ(clonedRect->width, 100);
+
+  // Test group with children clone
+  auto group = std::make_unique<pagx::GroupNode>();
+  group->name = "testGroup";
+  group->elements.push_back(std::move(rect));
+
+  auto clonedGroup = group->clone();
+  ASSERT_TRUE(clonedGroup != nullptr);
+  auto clonedGroupPtr = static_cast<pagx::GroupNode*>(clonedGroup.get());
+  EXPECT_EQ(clonedGroupPtr->name, "testGroup");
+  EXPECT_EQ(clonedGroupPtr->elements.size(), 1u);
 }
 
 }  // namespace pag

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -24,14 +24,10 @@
 
 namespace pagx {
 
-std::shared_ptr<PAGXDocument> PAGXDocument::Make(float width, float height) {
+std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
-  doc->_width = width;
-  doc->_height = height;
-  doc->_root = PAGXNode::Make(PAGXNodeType::Document);
-  doc->_root->setFloatAttribute("width", width);
-  doc->_root->setFloatAttribute("height", height);
-  doc->_resources = PAGXNode::Make(PAGXNodeType::Resources);
+  doc->width = docWidth;
+  doc->height = docHeight;
   return doc;
 }
 
@@ -40,17 +36,13 @@ std::shared_ptr<PAGXDocument> PAGXDocument::FromFile(const std::string& filePath
   if (!file.is_open()) {
     return nullptr;
   }
-
-  std::stringstream buffer;
+  std::stringstream buffer = {};
   buffer << file.rdbuf();
-  std::string content = buffer.str();
-
-  auto doc = FromXML(content);
+  auto doc = FromXML(buffer.str());
   if (doc) {
-    // Extract base path from file path
     auto lastSlash = filePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
-      doc->_basePath = filePath.substr(0, lastSlash + 1);
+      doc->basePath = filePath.substr(0, lastSlash + 1);
     }
   }
   return doc;
@@ -64,62 +56,62 @@ std::shared_ptr<PAGXDocument> PAGXDocument::FromXML(const uint8_t* data, size_t 
   return PAGXXMLParser::Parse(data, length);
 }
 
-void PAGXDocument::setSize(float width, float height) {
-  _width = width;
-  _height = height;
-  if (_root) {
-    _root->setFloatAttribute("width", width);
-    _root->setFloatAttribute("height", height);
+std::string PAGXDocument::toXML() const {
+  return PAGXXMLWriter::Write(*this);
+}
+
+std::shared_ptr<PAGXDocument> PAGXDocument::clone() const {
+  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
+  doc->version = version;
+  doc->width = width;
+  doc->height = height;
+  doc->basePath = basePath;
+  for (const auto& resource : resources) {
+    doc->resources.push_back(
+        std::unique_ptr<ResourceNode>(static_cast<ResourceNode*>(resource->clone().release())));
   }
+  for (const auto& layer : layers) {
+    doc->layers.push_back(
+        std::unique_ptr<LayerNode>(static_cast<LayerNode*>(layer->clone().release())));
+  }
+  doc->resourceMapDirty = true;
+  return doc;
 }
 
-void PAGXDocument::setRoot(std::unique_ptr<PAGXNode> root) {
-  _root = std::move(root);
+ResourceNode* PAGXDocument::findResource(const std::string& id) const {
+  if (resourceMapDirty) {
+    rebuildResourceMap();
+  }
+  auto it = resourceMap.find(id);
+  return it != resourceMap.end() ? it->second : nullptr;
 }
 
-std::unique_ptr<PAGXNode> PAGXDocument::createNode(PAGXNodeType type) {
-  return PAGXNode::Make(type);
+LayerNode* PAGXDocument::findLayer(const std::string& id) const {
+  return findLayerRecursive(layers, id);
 }
 
-PAGXNode* PAGXDocument::getResourceById(const std::string& id) const {
-  auto it = _resourceMap.find(id);
-  if (it != _resourceMap.end()) {
-    return it->second;
+void PAGXDocument::rebuildResourceMap() const {
+  resourceMap.clear();
+  for (const auto& resource : resources) {
+    if (!resource->id.empty()) {
+      resourceMap[resource->id] = resource.get();
+    }
+  }
+  resourceMapDirty = false;
+}
+
+LayerNode* PAGXDocument::findLayerRecursive(const std::vector<std::unique_ptr<LayerNode>>& layers,
+                                            const std::string& id) {
+  for (const auto& layer : layers) {
+    if (layer->id == id) {
+      return layer.get();
+    }
+    auto found = findLayerRecursive(layer->children, id);
+    if (found) {
+      return found;
+    }
   }
   return nullptr;
-}
-
-void PAGXDocument::addResource(std::unique_ptr<PAGXNode> resource) {
-  if (!resource || resource->id().empty()) {
-    return;
-  }
-  auto id = resource->id();
-  auto* rawPtr = resource.get();
-  _resources->appendChild(std::move(resource));
-  _resourceMap[id] = rawPtr;
-}
-
-std::vector<std::string> PAGXDocument::getResourceIds() const {
-  std::vector<std::string> ids;
-  ids.reserve(_resourceMap.size());
-  for (const auto& pair : _resourceMap) {
-    ids.push_back(pair.first);
-  }
-  return ids;
-}
-
-std::string PAGXDocument::toXML() const {
-  return PAGXXMLWriter::Write(this);
-}
-
-bool PAGXDocument::saveToFile(const std::string& filePath) const {
-  std::string xml = toXML();
-  std::ofstream file(filePath, std::ios::binary);
-  if (!file.is_open()) {
-    return false;
-  }
-  file.write(xml.data(), static_cast<std::streamsize>(xml.size()));
-  return file.good();
 }
 
 }  // namespace pagx

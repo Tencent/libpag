@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 Tencent. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -24,14 +24,14 @@
 namespace pagx {
 
 /**
- * Writes PAGXDocument to XML format.
+ * Writer for PAGX XML format.
  */
 class PAGXXMLWriter {
  public:
   /**
-   * Converts a PAGXDocument to XML string.
+   * Writes a PAGXDocument to XML string.
    */
-  static std::string Write(const PAGXDocument* document);
+  static std::string Write(const PAGXDocument& doc);
 };
 
 }  // namespace pagx
