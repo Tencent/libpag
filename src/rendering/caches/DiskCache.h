@@ -51,6 +51,7 @@ class DiskCache {
 
  private:
   std::mutex locker = {};
+  std::string customCacheDir;
   std::string configPath;
   std::string cacheFolder;
   uint32_t fileIDCount = 1;
@@ -63,8 +64,10 @@ class DiskCache {
 
   static DiskCache* GetInstance();
 
-  DiskCache();
+  std::string getCacheDir();
+  void setCacheDir(const std::string& dir);
 
+  DiskCache();
   size_t getMaxDiskSize();
   void setMaxDiskSize(size_t size);
   void removeAll();
