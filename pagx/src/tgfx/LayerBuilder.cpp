@@ -394,6 +394,10 @@ class LayerBuilderImpl {
     stroke->setLineCap(ToTGFX(node->cap));
     stroke->setLineJoin(ToTGFX(node->join));
     stroke->setMiterLimit(node->miterLimit);
+    if (!node->dashes.empty()) {
+      stroke->setDashes(node->dashes);
+      stroke->setDashOffset(node->dashOffset);
+    }
 
     return stroke;
   }

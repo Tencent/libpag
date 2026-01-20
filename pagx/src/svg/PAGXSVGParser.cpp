@@ -557,9 +557,20 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
   float patternWidth = parseLength(getAttribute(element, "width"), 1.0f);
   float patternHeight = parseLength(getAttribute(element, "height"), 1.0f);
 
-  // Check patternContentUnits - objectBoundingBox means content coordinates are 0-1 ratios.
-  std::string contentUnits = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
-  bool isObjectBoundingBox = (contentUnits == "objectBoundingBox");
+  // Check patternUnits - determines how pattern x/y/width/height are interpreted.
+  // Default is objectBoundingBox, meaning values are relative to the shape bounds.
+  std::string patternUnitsStr = getAttribute(element, "patternUnits", "objectBoundingBox");
+  bool patternUnitsOBB = (patternUnitsStr == "objectBoundingBox");
+
+  // Check patternContentUnits - determines how pattern content coordinates are interpreted.
+  // Default is userSpaceOnUse, meaning content uses absolute coordinates.
+  std::string contentUnitsStr = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
+  bool contentUnitsOBB = (contentUnitsStr == "objectBoundingBox");
+
+  // Calculate the actual tile size in user space.
+  // When patternUnits is objectBoundingBox, pattern dimensions are 0-1 ratios of shape bounds.
+  float tileWidth = patternUnitsOBB ? patternWidth * shapeBounds.width : patternWidth;
+  float tileHeight = patternUnitsOBB ? patternHeight * shapeBounds.height : patternHeight;
 
   // Look for image reference inside the pattern.
   auto child = element->getFirstChild();
@@ -581,7 +592,7 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
 
         pattern->image = imageHref;
 
-        // Get image dimensions from SVG.
+        // Get image display dimensions from SVG (these are the dimensions in pattern content space).
         float imageWidth = parseLength(getAttribute(imgIt->second, "width"), 1.0f);
         float imageHeight = parseLength(getAttribute(imgIt->second, "height"), 1.0f);
 
@@ -589,20 +600,36 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
         std::string useTransform = getAttribute(child, "transform");
         Matrix useMatrix = useTransform.empty() ? Matrix::Identity() : parseTransform(useTransform);
 
-        if (isObjectBoundingBox) {
-          // For objectBoundingBox, the pattern content is in 0-1 space.
-          // The use transform (e.g., scale(0.005)) maps image to 0-1 space.
-          // We need to scale from image space to shape bounds.
-          // Final scale: imageSize * useScale * shapeBounds
-          float scaleX = imageWidth * useMatrix.a * shapeBounds.width;
-          float scaleY = imageHeight * useMatrix.d * shapeBounds.height;
-          pattern->matrix = Matrix::Scale(scaleX, scaleY);
+        // Calculate the image's actual size in user space (considering content units and transform).
+        float imageSizeInUserSpaceX = 0;
+        float imageSizeInUserSpaceY = 0;
+        if (contentUnitsOBB) {
+          // When patternContentUnits is objectBoundingBox, image dimensions are 0-1 ratios.
+          // Apply use transform (e.g., scale(0.005)) to map image to content space,
+          // then scale by shape bounds to get user space size.
+          imageSizeInUserSpaceX = imageWidth * useMatrix.a * shapeBounds.width;
+          imageSizeInUserSpaceY = imageHeight * useMatrix.d * shapeBounds.height;
         } else {
-          // For userSpaceOnUse, use the transform directly.
-          float scaleX = imageWidth * useMatrix.a;
-          float scaleY = imageHeight * useMatrix.d;
-          pattern->matrix = Matrix::Scale(scaleX, scaleY);
+          // When patternContentUnits is userSpaceOnUse, image dimensions are in user space.
+          imageSizeInUserSpaceX = imageWidth * useMatrix.a;
+          imageSizeInUserSpaceY = imageHeight * useMatrix.d;
         }
+
+        // The ImagePattern shader tiles the original image pixels.
+        // We need to scale the image so it renders at the correct size within the tile.
+        // Since tgfx ImagePattern uses the image's original pixel dimensions as the base,
+        // the matrix should scale the image to match imageSizeInUserSpace.
+        // Note: imageWidth here is the SVG display size, which equals original pixel size
+        // when the image is embedded at 1:1 scale.
+        float scaleX = imageSizeInUserSpaceX / imageWidth;
+        float scaleY = imageSizeInUserSpaceY / imageHeight;
+
+        // PAGX ImagePattern coordinates are relative to the geometry's local origin (0,0).
+        // SVG pattern with objectBoundingBox is relative to the shape's bounding box.
+        // We need to translate the pattern to align with the shape bounds.
+        // Matrix multiplication order: translate first, then scale (right to left).
+        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
+                          Matrix::Scale(scaleX, scaleY);
       }
     } else if (child->name == "image") {
       // Direct image element inside pattern.
@@ -615,12 +642,13 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
       float imageWidth = parseLength(getAttribute(child, "width"), 1.0f);
       float imageHeight = parseLength(getAttribute(child, "height"), 1.0f);
 
-      if (isObjectBoundingBox) {
-        // Scale image to shape bounds.
-        pattern->matrix = Matrix::Scale(imageWidth * shapeBounds.width,
-                                        imageHeight * shapeBounds.height);
+      if (contentUnitsOBB) {
+        // Image dimensions are 0-1 ratios, scale by shape bounds.
+        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
+                          Matrix::Scale(shapeBounds.width, shapeBounds.height);
       } else {
-        pattern->matrix = Matrix::Scale(imageWidth, imageHeight);
+        // Image dimensions are absolute, translate to shape bounds origin.
+        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y);
       }
     }
     child = child->getNextSibling();
@@ -753,12 +781,19 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string dashArray = getAttribute(element, "stroke-dasharray");
     if (!dashArray.empty() && dashArray != "none") {
-      std::istringstream iss(dashArray);
-      float val = 0;
-      char sep = 0;
-      while (iss >> val) {
-        strokeNode->dashes.push_back(val);
-        iss >> sep;
+      // Parse dash array values, which may contain units (e.g., "2px,2px" or "2,2").
+      // Use parseLength to handle both numeric values and values with units.
+      std::string token;
+      for (size_t i = 0; i <= dashArray.size(); i++) {
+        char c = (i < dashArray.size()) ? dashArray[i] : ',';
+        if (c == ',' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+          if (!token.empty()) {
+            strokeNode->dashes.push_back(parseLength(token, _viewBoxWidth));
+            token.clear();
+          }
+        } else {
+          token += c;
+        }
       }
     }
 
