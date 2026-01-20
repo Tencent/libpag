@@ -19,10 +19,12 @@
 
 import { fileURLToPath } from 'url';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
+import { createRequire } from 'module';
 import path from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
 
 process.chdir(__dirname);
 
@@ -34,8 +36,8 @@ process.argv.push("-p");
 process.argv.push("web");
 process.argv.push("pagx-viewer");
 
-// Use build_tgfx from third_party/tgfx
-const buildTgfx = await import("../../../../third_party/tgfx/build_tgfx");
+// Use vendor_tools from libpag
+require("../../../third_party/vendor_tools/lib-build");
 
 // Copy wasm files to viewer/wasm-mt/ directory
 const srcDir = path.resolve(__dirname, 'wasm-mt');
