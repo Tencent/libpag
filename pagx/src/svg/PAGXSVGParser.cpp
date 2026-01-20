@@ -752,7 +752,7 @@ Color SVGParserImpl::parseColor(const std::string& value) {
     }
   }
 
-  // SVG named colors (complete list from SVG 1.1 specification).
+  // SVG/CSS named colors (CSS Color 3 + CSS Color 4 rebeccapurple).
   // clang-format off
   static const std::unordered_map<std::string, uint32_t> namedColors = {
       {"aliceblue", 0xF0F8FF},
@@ -903,6 +903,8 @@ Color SVGParserImpl::parseColor(const std::string& value) {
       {"whitesmoke", 0xF5F5F5},
       {"yellow", 0xFFFF00},
       {"yellowgreen", 0x9ACD32},
+      // CSS Color 4 addition
+      {"rebeccapurple", 0x663399},
   };
   // clang-format on
 
