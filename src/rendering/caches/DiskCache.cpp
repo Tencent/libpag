@@ -92,13 +92,6 @@ bool DiskCache::WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> da
 }
 
 DiskCache::DiskCache() {
-}
-
-void DiskCache::checkInitialized() {
-  if (initialized) {
-    return;
-  }
-  initialized = true;
   auto cacheDir = getCacheDir();
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
@@ -117,7 +110,6 @@ size_t DiskCache::getMaxDiskSize() {
 
 void DiskCache::setMaxDiskSize(size_t size) {
   std::lock_guard<std::mutex> autoLock(locker);
-  checkInitialized();
   if (maxDiskSize == size) {
     return;
   }
@@ -129,7 +121,6 @@ void DiskCache::setMaxDiskSize(size_t size) {
 
 void DiskCache::removeAll() {
   std::lock_guard<std::mutex> autoLock(locker);
-  checkInitialized();
   if (cacheFolder.empty()) {
     return;
   }
@@ -152,7 +143,6 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
     const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
     const std::vector<TimeRange>& staticTimeRanges) {
   std::lock_guard<std::mutex> autoLock(locker);
-  checkInitialized();
   if (cacheFolder.empty()) {
     return nullptr;
   }
@@ -194,7 +184,6 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
 
 std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
   std::lock_guard<std::mutex> autoLock(locker);
-  checkInitialized();
   if (cacheFolder.empty() || key.empty()) {
     return nullptr;
   }
@@ -214,7 +203,6 @@ std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
 
 bool DiskCache::writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data) {
   std::lock_guard<std::mutex> autoLock(locker);
-  checkInitialized();
   if (cacheFolder.empty() || key.empty() || data == nullptr) {
     return false;
   }
