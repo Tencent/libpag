@@ -149,6 +149,12 @@ static std::string pointToString(const Point& p) {
   return oss.str();
 }
 
+static std::string sizeToString(const Size& s) {
+  std::ostringstream oss = {};
+  oss << s.width << "," << s.height;
+  return oss.str();
+}
+
 static std::string rectToString(const Rect& r) {
   std::ostringstream oss = {};
   oss << r.x << "," << r.y << "," << r.width << "," << r.height;
@@ -189,10 +195,12 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
       auto grad = static_cast<const LinearGradientNode*>(node);
       xml.openElement("LinearGradient");
       xml.addAttribute("id", grad->id);
-      xml.addAttribute("startX", grad->startX);
-      xml.addAttribute("startY", grad->startY);
-      xml.addAttribute("endX", grad->endX);
-      xml.addAttribute("endY", grad->endY);
+      if (grad->startPoint.x != 0 || grad->startPoint.y != 0) {
+        xml.addAttribute("startPoint", pointToString(grad->startPoint));
+      }
+      if (grad->endPoint.x != 0 || grad->endPoint.y != 0) {
+        xml.addAttribute("endPoint", pointToString(grad->endPoint));
+      }
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", grad->matrix.toString());
       }
@@ -209,8 +217,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
       auto grad = static_cast<const RadialGradientNode*>(node);
       xml.openElement("RadialGradient");
       xml.addAttribute("id", grad->id);
-      xml.addAttribute("centerX", grad->centerX);
-      xml.addAttribute("centerY", grad->centerY);
+      if (grad->center.x != 0 || grad->center.y != 0) {
+        xml.addAttribute("center", pointToString(grad->center));
+      }
       xml.addAttribute("radius", grad->radius);
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", grad->matrix.toString());
@@ -228,8 +237,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
       auto grad = static_cast<const ConicGradientNode*>(node);
       xml.openElement("ConicGradient");
       xml.addAttribute("id", grad->id);
-      xml.addAttribute("centerX", grad->centerX);
-      xml.addAttribute("centerY", grad->centerY);
+      if (grad->center.x != 0 || grad->center.y != 0) {
+        xml.addAttribute("center", pointToString(grad->center));
+      }
       xml.addAttribute("startAngle", grad->startAngle);
       xml.addAttribute("endAngle", grad->endAngle, 360.0f);
       if (!grad->matrix.isIdentity()) {
@@ -248,8 +258,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
       auto grad = static_cast<const DiamondGradientNode*>(node);
       xml.openElement("DiamondGradient");
       xml.addAttribute("id", grad->id);
-      xml.addAttribute("centerX", grad->centerX);
-      xml.addAttribute("centerY", grad->centerY);
+      if (grad->center.x != 0 || grad->center.y != 0) {
+        xml.addAttribute("center", pointToString(grad->center));
+      }
       xml.addAttribute("halfDiagonal", grad->halfDiagonal);
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", grad->matrix.toString());
@@ -293,10 +304,12 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::Rectangle: {
       auto rect = static_cast<const RectangleNode*>(node);
       xml.openElement("Rectangle");
-      xml.addAttribute("centerX", rect->centerX);
-      xml.addAttribute("centerY", rect->centerY);
-      xml.addAttribute("width", rect->width);
-      xml.addAttribute("height", rect->height);
+      if (rect->center.x != 0 || rect->center.y != 0) {
+        xml.addAttribute("center", pointToString(rect->center));
+      }
+      if (rect->size.width != 0 || rect->size.height != 0) {
+        xml.addAttribute("size", sizeToString(rect->size));
+      }
       xml.addAttribute("roundness", rect->roundness);
       xml.addAttribute("reversed", rect->reversed);
       xml.closeElementSelfClosing();
@@ -305,10 +318,12 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const EllipseNode*>(node);
       xml.openElement("Ellipse");
-      xml.addAttribute("centerX", ellipse->centerX);
-      xml.addAttribute("centerY", ellipse->centerY);
-      xml.addAttribute("width", ellipse->width);
-      xml.addAttribute("height", ellipse->height);
+      if (ellipse->center.x != 0 || ellipse->center.y != 0) {
+        xml.addAttribute("center", pointToString(ellipse->center));
+      }
+      if (ellipse->size.width != 0 || ellipse->size.height != 0) {
+        xml.addAttribute("size", sizeToString(ellipse->size));
+      }
       xml.addAttribute("reversed", ellipse->reversed);
       xml.closeElementSelfClosing();
       break;
@@ -316,10 +331,11 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::Polystar: {
       auto polystar = static_cast<const PolystarNode*>(node);
       xml.openElement("Polystar");
-      xml.addAttribute("centerX", polystar->centerX);
-      xml.addAttribute("centerY", polystar->centerY);
-      xml.addAttribute("type", PolystarTypeToString(polystar->polystarType));
-      xml.addAttribute("points", polystar->points, 5.0f);
+      if (polystar->center.x != 0 || polystar->center.y != 0) {
+        xml.addAttribute("center", pointToString(polystar->center));
+      }
+      xml.addAttribute("polystarType", PolystarTypeToString(polystar->polystarType));
+      xml.addAttribute("pointCount", polystar->pointCount, 5.0f);
       xml.addAttribute("outerRadius", polystar->outerRadius, 100.0f);
       xml.addAttribute("innerRadius", polystar->innerRadius, 50.0f);
       xml.addAttribute("rotation", polystar->rotation);
@@ -332,8 +348,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::Path: {
       auto path = static_cast<const PathNode*>(node);
       xml.openElement("Path");
-      if (!path->d.isEmpty()) {
-        xml.addAttribute("d", path->d.toSVGString());
+      if (!path->data.isEmpty()) {
+        xml.addAttribute("data", path->data.toSVGString());
       }
       xml.addAttribute("reversed", path->reversed);
       xml.closeElementSelfClosing();
@@ -437,8 +453,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::MergePath: {
       auto merge = static_cast<const MergePathNode*>(node);
       xml.openElement("MergePath");
-      if (merge->op != PathOp::Append) {
-        xml.addAttribute("op", PathOpToString(merge->op));
+      if (merge->mode != MergePathMode::Append) {
+        xml.addAttribute("mode", MergePathModeToString(merge->mode));
       }
       xml.closeElementSelfClosing();
       break;
@@ -446,8 +462,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifierNode*>(node);
       xml.openElement("TextModifier");
-      if (modifier->anchor.x != 0.5f || modifier->anchor.y != 0.5f) {
-        xml.addAttribute("anchor", pointToString(modifier->anchor));
+      if (modifier->anchorPoint.x != 0.5f || modifier->anchorPoint.y != 0.5f) {
+        xml.addAttribute("anchorPoint", pointToString(modifier->anchorPoint));
       }
       if (modifier->position.x != 0 || modifier->position.y != 0) {
         xml.addAttribute("position", pointToString(modifier->position));
@@ -485,8 +501,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
             xml.addAttribute("mode", SelectorModeToString(selector.mode));
           }
           xml.addAttribute("weight", selector.weight, 1.0f);
-          xml.addAttribute("randomize", selector.randomize);
-          xml.addAttribute("seed", selector.seed);
+          xml.addAttribute("randomizeOrder", selector.randomizeOrder);
+          xml.addAttribute("randomSeed", selector.randomSeed);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();
@@ -535,8 +551,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       if (repeater->order != RepeaterOrder::BelowOriginal) {
         xml.addAttribute("order", RepeaterOrderToString(repeater->order));
       }
-      if (repeater->anchor.x != 0 || repeater->anchor.y != 0) {
-        xml.addAttribute("anchor", pointToString(repeater->anchor));
+      if (repeater->anchorPoint.x != 0 || repeater->anchorPoint.y != 0) {
+        xml.addAttribute("anchorPoint", pointToString(repeater->anchorPoint));
       }
       if (repeater->position.x != 100 || repeater->position.y != 100) {
         xml.addAttribute("position", pointToString(repeater->position));
@@ -554,8 +570,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       auto group = static_cast<const GroupNode*>(node);
       xml.openElement("Group");
       xml.addAttribute("name", group->name);
-      if (group->anchor.x != 0 || group->anchor.y != 0) {
-        xml.addAttribute("anchor", pointToString(group->anchor));
+      if (group->anchorPoint.x != 0 || group->anchorPoint.y != 0) {
+        xml.addAttribute("anchorPoint", pointToString(group->anchorPoint));
       }
       if (group->position.x != 0 || group->position.y != 0) {
         xml.addAttribute("position", pointToString(group->position));

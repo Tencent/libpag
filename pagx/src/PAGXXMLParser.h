@@ -108,6 +108,7 @@ class PAGXXMLParser {
   static bool getBoolAttribute(const XMLNode* node, const std::string& name,
                                bool defaultValue = false);
   static Point parsePoint(const std::string& str);
+  static Size parseSize(const std::string& str);
   static Rect parseRect(const std::string& str);
   static std::vector<float> parseFloatList(const std::string& str);
 };

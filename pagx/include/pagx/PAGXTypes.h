@@ -41,6 +41,22 @@ struct Point {
 };
 
 /**
+ * A size with width and height.
+ */
+struct Size {
+  float width = 0;
+  float height = 0;
+
+  bool operator==(const Size& other) const {
+    return width == other.width && height == other.height;
+  }
+
+  bool operator!=(const Size& other) const {
+    return !(*this == other);
+  }
+};
+
+/**
  * A rectangle defined by position and size.
  */
 struct Rect {
@@ -235,7 +251,7 @@ enum class BlendMode {
   Saturation,
   Color,
   Luminosity,
-  Add
+  PlusLighter
 };
 
 /**
@@ -326,9 +342,9 @@ enum class TrimType {
 };
 
 /**
- * Path boolean operations.
+ * Path merge modes (boolean operations).
  */
-enum class PathOp {
+enum class MergePathMode {
   Append,
   Union,
   Intersect,
@@ -458,8 +474,8 @@ PolystarType PolystarTypeFromString(const std::string& str);
 std::string TrimTypeToString(TrimType type);
 TrimType TrimTypeFromString(const std::string& str);
 
-std::string PathOpToString(PathOp op);
-PathOp PathOpFromString(const std::string& str);
+std::string MergePathModeToString(MergePathMode mode);
+MergePathMode MergePathModeFromString(const std::string& str);
 
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);

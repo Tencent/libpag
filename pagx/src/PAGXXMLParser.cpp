@@ -532,10 +532,10 @@ std::unique_ptr<LayerFilterNode> PAGXXMLParser::parseLayerFilter(const XMLNode* 
 
 std::unique_ptr<RectangleNode> PAGXXMLParser::parseRectangle(const XMLNode* node) {
   auto rect = std::make_unique<RectangleNode>();
-  rect->centerX = getFloatAttribute(node, "centerX", 0);
-  rect->centerY = getFloatAttribute(node, "centerY", 0);
-  rect->width = getFloatAttribute(node, "width", 0);
-  rect->height = getFloatAttribute(node, "height", 0);
+  auto centerStr = getAttribute(node, "center", "0,0");
+  rect->center = parsePoint(centerStr);
+  auto sizeStr = getAttribute(node, "size", "0,0");
+  rect->size = parseSize(sizeStr);
   rect->roundness = getFloatAttribute(node, "roundness", 0);
   rect->reversed = getBoolAttribute(node, "reversed", false);
   return rect;
@@ -543,20 +543,20 @@ std::unique_ptr<RectangleNode> PAGXXMLParser::parseRectangle(const XMLNode* node
 
 std::unique_ptr<EllipseNode> PAGXXMLParser::parseEllipse(const XMLNode* node) {
   auto ellipse = std::make_unique<EllipseNode>();
-  ellipse->centerX = getFloatAttribute(node, "centerX", 0);
-  ellipse->centerY = getFloatAttribute(node, "centerY", 0);
-  ellipse->width = getFloatAttribute(node, "width", 0);
-  ellipse->height = getFloatAttribute(node, "height", 0);
+  auto centerStr = getAttribute(node, "center", "0,0");
+  ellipse->center = parsePoint(centerStr);
+  auto sizeStr = getAttribute(node, "size", "0,0");
+  ellipse->size = parseSize(sizeStr);
   ellipse->reversed = getBoolAttribute(node, "reversed", false);
   return ellipse;
 }
 
 std::unique_ptr<PolystarNode> PAGXXMLParser::parsePolystar(const XMLNode* node) {
   auto polystar = std::make_unique<PolystarNode>();
-  polystar->centerX = getFloatAttribute(node, "centerX", 0);
-  polystar->centerY = getFloatAttribute(node, "centerY", 0);
-  polystar->polystarType = PolystarTypeFromString(getAttribute(node, "type", "star"));
-  polystar->points = getFloatAttribute(node, "points", 5);
+  auto centerStr = getAttribute(node, "center", "0,0");
+  polystar->center = parsePoint(centerStr);
+  polystar->polystarType = PolystarTypeFromString(getAttribute(node, "polystarType", "star"));
+  polystar->pointCount = getFloatAttribute(node, "pointCount", 5);
   polystar->outerRadius = getFloatAttribute(node, "outerRadius", 100);
   polystar->innerRadius = getFloatAttribute(node, "innerRadius", 50);
   polystar->rotation = getFloatAttribute(node, "rotation", 0);
@@ -568,9 +568,9 @@ std::unique_ptr<PolystarNode> PAGXXMLParser::parsePolystar(const XMLNode* node) 
 
 std::unique_ptr<PathNode> PAGXXMLParser::parsePath(const XMLNode* node) {
   auto path = std::make_unique<PathNode>();
-  auto dAttr = getAttribute(node, "d");
-  if (!dAttr.empty()) {
-    path->d = PathData::FromSVGString(dAttr);
+  auto dataAttr = getAttribute(node, "data");
+  if (!dataAttr.empty()) {
+    path->data = PathData::FromSVGString(dataAttr);
   }
   path->reversed = getBoolAttribute(node, "reversed", false);
   return path;
@@ -662,14 +662,14 @@ std::unique_ptr<RoundCornerNode> PAGXXMLParser::parseRoundCorner(const XMLNode* 
 
 std::unique_ptr<MergePathNode> PAGXXMLParser::parseMergePath(const XMLNode* node) {
   auto merge = std::make_unique<MergePathNode>();
-  merge->op = PathOpFromString(getAttribute(node, "op", "append"));
+  merge->mode = MergePathModeFromString(getAttribute(node, "mode", "append"));
   return merge;
 }
 
 std::unique_ptr<TextModifierNode> PAGXXMLParser::parseTextModifier(const XMLNode* node) {
   auto modifier = std::make_unique<TextModifierNode>();
-  auto anchorStr = getAttribute(node, "anchor", "0.5,0.5");
-  modifier->anchor = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchorPoint", "0.5,0.5");
+  modifier->anchorPoint = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   modifier->position = parsePoint(positionStr);
   modifier->rotation = getFloatAttribute(node, "rotation", 0);
@@ -720,8 +720,8 @@ std::unique_ptr<RepeaterNode> PAGXXMLParser::parseRepeater(const XMLNode* node) 
   repeater->copies = getFloatAttribute(node, "copies", 3);
   repeater->offset = getFloatAttribute(node, "offset", 0);
   repeater->order = RepeaterOrderFromString(getAttribute(node, "order", "belowOriginal"));
-  auto anchorStr = getAttribute(node, "anchor", "0,0");
-  repeater->anchor = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
+  repeater->anchorPoint = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "100,100");
   repeater->position = parsePoint(positionStr);
   repeater->rotation = getFloatAttribute(node, "rotation", 0);
@@ -735,8 +735,8 @@ std::unique_ptr<RepeaterNode> PAGXXMLParser::parseRepeater(const XMLNode* node) 
 std::unique_ptr<GroupNode> PAGXXMLParser::parseGroup(const XMLNode* node) {
   auto group = std::make_unique<GroupNode>();
   group->name = getAttribute(node, "name");
-  auto anchorStr = getAttribute(node, "anchor", "0,0");
-  group->anchor = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
+  group->anchorPoint = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   group->position = parsePoint(positionStr);
   group->rotation = getFloatAttribute(node, "rotation", 0);
@@ -767,8 +767,8 @@ RangeSelectorNode PAGXXMLParser::parseRangeSelector(const XMLNode* node) {
   selector.easeOut = getFloatAttribute(node, "easeOut", 0);
   selector.mode = SelectorModeFromString(getAttribute(node, "mode", "add"));
   selector.weight = getFloatAttribute(node, "weight", 1);
-  selector.randomize = getBoolAttribute(node, "randomize", false);
-  selector.seed = getIntAttribute(node, "seed", 0);
+  selector.randomizeOrder = getBoolAttribute(node, "randomizeOrder", false);
+  selector.randomSeed = getIntAttribute(node, "randomSeed", 0);
   return selector;
 }
 
@@ -789,10 +789,10 @@ std::unique_ptr<SolidColorNode> PAGXXMLParser::parseSolidColor(const XMLNode* no
 std::unique_ptr<LinearGradientNode> PAGXXMLParser::parseLinearGradient(const XMLNode* node) {
   auto gradient = std::make_unique<LinearGradientNode>();
   gradient->id = getAttribute(node, "id");
-  gradient->startX = getFloatAttribute(node, "startX", 0);
-  gradient->startY = getFloatAttribute(node, "startY", 0);
-  gradient->endX = getFloatAttribute(node, "endX", 0);
-  gradient->endY = getFloatAttribute(node, "endY", 0);
+  auto startPointStr = getAttribute(node, "startPoint", "0,0");
+  gradient->startPoint = parsePoint(startPointStr);
+  auto endPointStr = getAttribute(node, "endPoint", "0,0");
+  gradient->endPoint = parsePoint(endPointStr);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     gradient->matrix = Matrix::Parse(matrixStr);
@@ -808,8 +808,8 @@ std::unique_ptr<LinearGradientNode> PAGXXMLParser::parseLinearGradient(const XML
 std::unique_ptr<RadialGradientNode> PAGXXMLParser::parseRadialGradient(const XMLNode* node) {
   auto gradient = std::make_unique<RadialGradientNode>();
   gradient->id = getAttribute(node, "id");
-  gradient->centerX = getFloatAttribute(node, "centerX", 0);
-  gradient->centerY = getFloatAttribute(node, "centerY", 0);
+  auto centerStr = getAttribute(node, "center", "0,0");
+  gradient->center = parsePoint(centerStr);
   gradient->radius = getFloatAttribute(node, "radius", 0);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
@@ -826,8 +826,8 @@ std::unique_ptr<RadialGradientNode> PAGXXMLParser::parseRadialGradient(const XML
 std::unique_ptr<ConicGradientNode> PAGXXMLParser::parseConicGradient(const XMLNode* node) {
   auto gradient = std::make_unique<ConicGradientNode>();
   gradient->id = getAttribute(node, "id");
-  gradient->centerX = getFloatAttribute(node, "centerX", 0);
-  gradient->centerY = getFloatAttribute(node, "centerY", 0);
+  auto centerStr = getAttribute(node, "center", "0,0");
+  gradient->center = parsePoint(centerStr);
   gradient->startAngle = getFloatAttribute(node, "startAngle", 0);
   gradient->endAngle = getFloatAttribute(node, "endAngle", 360);
   auto matrixStr = getAttribute(node, "matrix");
@@ -845,8 +845,8 @@ std::unique_ptr<ConicGradientNode> PAGXXMLParser::parseConicGradient(const XMLNo
 std::unique_ptr<DiamondGradientNode> PAGXXMLParser::parseDiamondGradient(const XMLNode* node) {
   auto gradient = std::make_unique<DiamondGradientNode>();
   gradient->id = getAttribute(node, "id");
-  gradient->centerX = getFloatAttribute(node, "centerX", 0);
-  gradient->centerY = getFloatAttribute(node, "centerY", 0);
+  auto centerStr = getAttribute(node, "center", "0,0");
+  gradient->center = parsePoint(centerStr);
   gradient->halfDiagonal = getFloatAttribute(node, "halfDiagonal", 0);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
@@ -1078,6 +1078,26 @@ Point PAGXXMLParser::parsePoint(const std::string& str) {
     point.y = values[1];
   }
   return point;
+}
+
+Size PAGXXMLParser::parseSize(const std::string& str) {
+  Size size = {};
+  std::istringstream iss(str);
+  std::string token = {};
+  std::vector<float> values = {};
+  while (std::getline(iss, token, ',')) {
+    auto trimmed = token;
+    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
+    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
+    if (!trimmed.empty()) {
+      values.push_back(std::stof(trimmed));
+    }
+  }
+  if (values.size() >= 2) {
+    size.width = values[0];
+    size.height = values[1];
+  }
+  return size;
 }
 
 Rect PAGXXMLParser::parseRect(const std::string& str) {

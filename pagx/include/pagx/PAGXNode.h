@@ -178,10 +178,8 @@ struct SolidColorNode : public ColorSourceNode {
  * A linear gradient.
  */
 struct LinearGradientNode : public ColorSourceNode {
-  float startX = 0;
-  float startY = 0;
-  float endX = 0;
-  float endY = 0;
+  Point startPoint = {};
+  Point endPoint = {};
   Matrix matrix = {};
   std::vector<ColorStopNode> colorStops = {};
 
@@ -198,8 +196,7 @@ struct LinearGradientNode : public ColorSourceNode {
  * A radial gradient.
  */
 struct RadialGradientNode : public ColorSourceNode {
-  float centerX = 0;
-  float centerY = 0;
+  Point center = {};
   float radius = 0;
   Matrix matrix = {};
   std::vector<ColorStopNode> colorStops = {};
@@ -217,8 +214,7 @@ struct RadialGradientNode : public ColorSourceNode {
  * A conic (sweep) gradient.
  */
 struct ConicGradientNode : public ColorSourceNode {
-  float centerX = 0;
-  float centerY = 0;
+  Point center = {};
   float startAngle = 0;
   float endAngle = 360;
   Matrix matrix = {};
@@ -237,8 +233,7 @@ struct ConicGradientNode : public ColorSourceNode {
  * A diamond gradient.
  */
 struct DiamondGradientNode : public ColorSourceNode {
-  float centerX = 0;
-  float centerY = 0;
+  Point center = {};
   float halfDiagonal = 0;
   Matrix matrix = {};
   std::vector<ColorStopNode> colorStops = {};
@@ -284,10 +279,8 @@ class VectorElementNode : public PAGXNode {};
  * A rectangle shape.
  */
 struct RectangleNode : public VectorElementNode {
-  float centerX = 0;
-  float centerY = 0;
-  float width = 0;
-  float height = 0;
+  Point center = {};
+  Size size = {};
   float roundness = 0;
   bool reversed = false;
 
@@ -304,10 +297,8 @@ struct RectangleNode : public VectorElementNode {
  * An ellipse shape.
  */
 struct EllipseNode : public VectorElementNode {
-  float centerX = 0;
-  float centerY = 0;
-  float width = 0;
-  float height = 0;
+  Point center = {};
+  Size size = {};
   bool reversed = false;
 
   NodeType type() const override {
@@ -323,10 +314,9 @@ struct EllipseNode : public VectorElementNode {
  * A polygon or star shape.
  */
 struct PolystarNode : public VectorElementNode {
-  float centerX = 0;
-  float centerY = 0;
+  Point center = {};
   PolystarType polystarType = PolystarType::Star;
-  float points = 5;
+  float pointCount = 5;
   float outerRadius = 100;
   float innerRadius = 50;
   float rotation = 0;
@@ -347,7 +337,7 @@ struct PolystarNode : public VectorElementNode {
  * A path shape.
  */
 struct PathNode : public VectorElementNode {
-  PathData d = {};
+  PathData data = {};
   bool reversed = false;
 
   NodeType type() const override {
@@ -499,7 +489,7 @@ struct RoundCornerNode : public VectorElementNode {
  * Merge path modifier.
  */
 struct MergePathNode : public VectorElementNode {
-  PathOp op = PathOp::Append;
+  MergePathMode mode = MergePathMode::Append;
 
   NodeType type() const override {
     return NodeType::MergePath;
@@ -527,8 +517,8 @@ struct RangeSelectorNode : public PAGXNode {
   float easeOut = 0;
   SelectorMode mode = SelectorMode::Add;
   float weight = 1;
-  bool randomize = false;
-  int seed = 0;
+  bool randomizeOrder = false;
+  int randomSeed = 0;
 
   NodeType type() const override {
     return NodeType::RangeSelector;
@@ -543,7 +533,7 @@ struct RangeSelectorNode : public PAGXNode {
  * Text modifier.
  */
 struct TextModifierNode : public VectorElementNode {
-  Point anchor = {0.5f, 0.5f};
+  Point anchorPoint = {0.5f, 0.5f};
   Point position = {};
   float rotation = 0;
   Point scale = {1, 1};
@@ -617,7 +607,7 @@ struct RepeaterNode : public VectorElementNode {
   float copies = 3;
   float offset = 0;
   RepeaterOrder order = RepeaterOrder::BelowOriginal;
-  Point anchor = {};
+  Point anchorPoint = {};
   Point position = {100, 100};
   float rotation = 0;
   Point scale = {1, 1};
@@ -642,7 +632,7 @@ struct RepeaterNode : public VectorElementNode {
  */
 struct GroupNode : public VectorElementNode {
   std::string name = {};
-  Point anchor = {};
+  Point anchorPoint = {};
   Point position = {};
   float rotation = 0;
   Point scale = {1, 1};
@@ -658,7 +648,7 @@ struct GroupNode : public VectorElementNode {
   std::unique_ptr<PAGXNode> clone() const override {
     auto node = std::make_unique<GroupNode>();
     node->name = name;
-    node->anchor = anchor;
+    node->anchorPoint = anchorPoint;
     node->position = position;
     node->rotation = rotation;
     node->scale = scale;

@@ -246,7 +246,7 @@ DEFINE_ENUM_CONVERSION(BlendMode,
     {BlendMode::Saturation, "saturation"},
     {BlendMode::Color, "color"},
     {BlendMode::Luminosity, "luminosity"},
-    {BlendMode::Add, "add"})
+    {BlendMode::PlusLighter, "plusLighter"})
 
 DEFINE_ENUM_CONVERSION(LineCap,
     {LineCap::Butt, "butt"},
@@ -295,12 +295,12 @@ DEFINE_ENUM_CONVERSION(TrimType,
     {TrimType::Separate, "separate"},
     {TrimType::Continuous, "continuous"})
 
-DEFINE_ENUM_CONVERSION(PathOp,
-    {PathOp::Append, "append"},
-    {PathOp::Union, "union"},
-    {PathOp::Intersect, "intersect"},
-    {PathOp::Xor, "xor"},
-    {PathOp::Difference, "difference"})
+DEFINE_ENUM_CONVERSION(MergePathMode,
+    {MergePathMode::Append, "append"},
+    {MergePathMode::Union, "union"},
+    {MergePathMode::Intersect, "intersect"},
+    {MergePathMode::Xor, "xor"},
+    {MergePathMode::Difference, "difference"})
 
 DEFINE_ENUM_CONVERSION(TextAlign,
     {TextAlign::Left, "left"},

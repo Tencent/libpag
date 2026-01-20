@@ -292,10 +292,10 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertRect(
   }
 
   auto rect = std::make_unique<RectangleNode>();
-  rect->centerX = x + width / 2;
-  rect->centerY = y + height / 2;
-  rect->width = width;
-  rect->height = height;
+  rect->center.x = x + width / 2;
+  rect->center.y = y + height / 2;
+  rect->size.width = width;
+  rect->size.height = height;
   rect->roundness = std::max(rx, ry);
 
   return rect;
@@ -308,10 +308,10 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertCircle(
   float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
 
   auto ellipse = std::make_unique<EllipseNode>();
-  ellipse->centerX = cx;
-  ellipse->centerY = cy;
-  ellipse->width = r * 2;
-  ellipse->height = r * 2;
+  ellipse->center.x = cx;
+  ellipse->center.y = cy;
+  ellipse->size.width = r * 2;
+  ellipse->size.height = r * 2;
 
   return ellipse;
 }
@@ -324,10 +324,10 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertEllipse(
   float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
   auto ellipse = std::make_unique<EllipseNode>();
-  ellipse->centerX = cx;
-  ellipse->centerY = cy;
-  ellipse->width = rx * 2;
-  ellipse->height = ry * 2;
+  ellipse->center.x = cx;
+  ellipse->center.y = cy;
+  ellipse->size.width = rx * 2;
+  ellipse->size.height = ry * 2;
 
   return ellipse;
 }
@@ -340,8 +340,8 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertLine(
   float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
 
   auto path = std::make_unique<PathNode>();
-  path->d.moveTo(x1, y1);
-  path->d.lineTo(x2, y2);
+  path->data.moveTo(x1, y1);
+  path->data.lineTo(x2, y2);
 
   return path;
 }
@@ -349,14 +349,14 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertLine(
 std::unique_ptr<VectorElementNode> SVGParserImpl::convertPolyline(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<PathNode>();
-  path->d = parsePoints(getAttribute(element, "points"), false);
+  path->data = parsePoints(getAttribute(element, "points"), false);
   return path;
 }
 
 std::unique_ptr<VectorElementNode> SVGParserImpl::convertPolygon(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<PathNode>();
-  path->d = parsePoints(getAttribute(element, "points"), true);
+  path->data = parsePoints(getAttribute(element, "points"), true);
   return path;
 }
 
@@ -365,7 +365,7 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertPath(
   auto path = std::make_unique<PathNode>();
   std::string d = getAttribute(element, "d");
   if (!d.empty()) {
-    path->d = PathData::FromSVGString(d);
+    path->data = PathData::FromSVGString(d);
   }
   return path;
 }
@@ -449,10 +449,10 @@ std::unique_ptr<LinearGradientNode> SVGParserImpl::convertLinearGradient(
   auto gradient = std::make_unique<LinearGradientNode>();
 
   gradient->id = getAttribute(element, "id");
-  gradient->startX = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
-  gradient->startY = parseLength(getAttribute(element, "y1", "0%"), 1.0f);
-  gradient->endX = parseLength(getAttribute(element, "x2", "100%"), 1.0f);
-  gradient->endY = parseLength(getAttribute(element, "y2", "0%"), 1.0f);
+  gradient->startPoint.x = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
+  gradient->startPoint.y = parseLength(getAttribute(element, "y1", "0%"), 1.0f);
+  gradient->endPoint.x = parseLength(getAttribute(element, "x2", "100%"), 1.0f);
+  gradient->endPoint.y = parseLength(getAttribute(element, "y2", "0%"), 1.0f);
 
   // Parse stops.
   auto child = element->getFirstChild();
@@ -476,8 +476,8 @@ std::unique_ptr<RadialGradientNode> SVGParserImpl::convertRadialGradient(
   auto gradient = std::make_unique<RadialGradientNode>();
 
   gradient->id = getAttribute(element, "id");
-  gradient->centerX = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
-  gradient->centerY = parseLength(getAttribute(element, "cy", "50%"), 1.0f);
+  gradient->center.x = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
+  gradient->center.y = parseLength(getAttribute(element, "cy", "50%"), 1.0f);
   gradient->radius = parseLength(getAttribute(element, "r", "50%"), 1.0f);
 
   // Parse stops.

@@ -212,8 +212,8 @@ class LayerBuilderImpl {
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const RectangleNode* node) {
     auto rect = std::make_shared<tgfx::Rectangle>();
-    rect->setCenter(tgfx::Point::Make(node->centerX, node->centerY));
-    rect->setSize({node->width, node->height});
+    rect->setCenter(ToTGFX(node->center));
+    rect->setSize({node->size.width, node->size.height});
     rect->setRoundness(node->roundness);
     rect->setReversed(node->reversed);
     return rect;
@@ -221,16 +221,16 @@ class LayerBuilderImpl {
 
   std::shared_ptr<tgfx::Ellipse> convertEllipse(const EllipseNode* node) {
     auto ellipse = std::make_shared<tgfx::Ellipse>();
-    ellipse->setCenter(tgfx::Point::Make(node->centerX, node->centerY));
-    ellipse->setSize({node->width, node->height});
+    ellipse->setCenter(ToTGFX(node->center));
+    ellipse->setSize({node->size.width, node->size.height});
     ellipse->setReversed(node->reversed);
     return ellipse;
   }
 
   std::shared_ptr<tgfx::Polystar> convertPolystar(const PolystarNode* node) {
     auto polystar = std::make_shared<tgfx::Polystar>();
-    polystar->setCenter(tgfx::Point::Make(node->centerX, node->centerY));
-    polystar->setPointCount(node->points);
+    polystar->setCenter(ToTGFX(node->center));
+    polystar->setPointCount(node->pointCount);
     polystar->setOuterRadius(node->outerRadius);
     polystar->setInnerRadius(node->innerRadius);
     polystar->setOuterRoundness(node->outerRoundness);
@@ -247,7 +247,7 @@ class LayerBuilderImpl {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const PathNode* node) {
     auto shapePath = std::make_shared<tgfx::ShapePath>();
-    auto tgfxPath = ToTGFX(node->d);
+    auto tgfxPath = ToTGFX(node->data);
     shapePath->setPath(tgfxPath);
     return shapePath;
   }
@@ -357,10 +357,8 @@ class LayerBuilderImpl {
       positions = {0.0f, 1.0f};
     }
 
-    auto startPoint = tgfx::Point::Make(node->startX, node->startY);
-    auto endPoint = tgfx::Point::Make(node->endX, node->endY);
-
-    return tgfx::Gradient::MakeLinear(startPoint, endPoint, colors, positions);
+    return tgfx::Gradient::MakeLinear(ToTGFX(node->startPoint), ToTGFX(node->endPoint), colors,
+                                      positions);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradientNode* node) {
@@ -377,8 +375,7 @@ class LayerBuilderImpl {
       positions = {0.0f, 1.0f};
     }
 
-    auto center = tgfx::Point::Make(node->centerX, node->centerY);
-    return tgfx::Gradient::MakeRadial(center, node->radius, colors, positions);
+    return tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPathNode* node) {
