@@ -22,7 +22,7 @@
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
-#include "pagx/layers/LayerBuilder.h"
+#include "pagx/LayerBuilder.h"
 
 namespace pagx {
 

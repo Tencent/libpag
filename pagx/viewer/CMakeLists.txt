@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAGXViewer)
 
+# Include vendor tools from libpag root
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
+
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
 

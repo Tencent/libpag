@@ -19,14 +19,14 @@
 #include "PAGXView.h"
 #include <emscripten/html5.h>
 #include "GridBackground.h"
-#include "pagx/layers/TextLayouter.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 using namespace emscripten;
 
 namespace pagx {
+
+static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
 
 static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
@@ -54,7 +54,7 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
+  fallbackTypefaces.clear();
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
@@ -69,7 +69,6 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
-  TextLayouter::SetFallbackTypefaces(fallbackTypefaces);
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -77,11 +76,9 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!data) {
     return;
   }
-  auto stream = tgfx::Stream::MakeFromData(data);
-  if (!stream) {
-    return;
-  }
-  auto content = pagx::LayerBuilder::FromStream(*stream);
+  LayerBuilder::Options options;
+  options.fallbackTypefaces = fallbackTypefaces;
+  auto content = pagx::LayerBuilder::FromData(data->bytes(), data->size(), options);
   if (!content.root) {
     return;
   }
