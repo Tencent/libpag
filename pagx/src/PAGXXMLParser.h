@@ -18,36 +18,21 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
-#include <string>
-#include <vector>
-#include "tgfx/core/Font.h"
-#include "tgfx/core/TextBlob.h"
-#include "tgfx/core/Typeface.h"
+#include "pagx/PAGXDocument.h"
 
 namespace pagx {
 
 /**
- * TextLayouter provides simple text layout functionality for PAGX text rendering.
- * It handles font fallback and basic horizontal text layout.
+ * Parses PAGX XML documents into PAGXDocument.
  */
-class TextLayouter {
+class PAGXXMLParser {
  public:
   /**
-   * Sets the fallback typefaces for PAGX text rendering.
-   * When a character cannot be rendered by the primary typeface, the fallback typefaces
-   * are tried in order until one that supports the character is found.
+   * Parses XML data and creates a PAGXDocument.
    */
-  static void SetFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
-
-  /**
-   * Creates a TextBlob from the given text with basic horizontal layout.
-   * Supports font fallback for characters not available in the primary typeface.
-   */
-  static std::shared_ptr<tgfx::TextBlob> Layout(const std::string& text, const tgfx::Font& font);
-
- private:
-  static std::vector<std::shared_ptr<tgfx::Typeface>> GetFallbackTypefaces();
+  static std::shared_ptr<PAGXDocument> Parse(const uint8_t* data, size_t length);
 };
 
 }  // namespace pagx

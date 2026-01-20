@@ -18,12 +18,20 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
-#include "tgfx/core/Data.h"
+#include "pagx/PAGXDocument.h"
 
 namespace pagx {
 
-std::shared_ptr<tgfx::Data> Base64Decode(const std::string& encodedString);
+/**
+ * Writes PAGXDocument to XML format.
+ */
+class PAGXXMLWriter {
+ public:
+  /**
+   * Converts a PAGXDocument to XML string.
+   */
+  static std::string Write(const PAGXDocument* document);
+};
 
 }  // namespace pagx
