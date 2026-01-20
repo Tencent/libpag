@@ -17,18 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <filesystem>
+#include "pagx/LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXNode.h"
 #include "pagx/PAGXSVGParser.h"
 #include "pagx/PAGXTypes.h"
 #include "pagx/PathData.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/core/Typeface.h"
+#include "tgfx/svg/SVGDOM.h"
+#include "tgfx/svg/TextShaper.h"
+#include "utils/Baseline.h"
+#include "utils/DevicePool.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
+using namespace tgfx;
 
-static void SaveFile(const std::shared_ptr<tgfx::Data>& data, const std::string& key) {
+static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
+  static std::vector<std::shared_ptr<Typeface>> typefaces;
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    auto regularTypeface =
+        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+    if (regularTypeface) {
+      typefaces.push_back(regularTypeface);
+    }
+    auto emojiTypeface =
+        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+    if (emojiTypeface) {
+      typefaces.push_back(emojiTypeface);
+    }
+  }
+  return typefaces;
+}
+
+static void SaveFile(const std::shared_ptr<Data>& data, const std::string& key) {
   if (!data) {
     return;
   }
@@ -42,6 +70,82 @@ static void SaveFile(const std::shared_ptr<tgfx::Data>& data, const std::string&
     fwrite(data->data(), 1, data->size(), file);
     fclose(file);
   }
+}
+
+/**
+ * Test case: Convert all SVG files in apitest/SVG directory to PAGX format and render them.
+ */
+PAG_TEST(PAGXTest, SVGToPAGXAll) {
+  std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
+  std::vector<std::string> svgFiles = {};
+
+  for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
+    if (entry.path().extension() == ".svg") {
+      svgFiles.push_back(entry.path().string());
+    }
+  }
+
+  std::sort(svgFiles.begin(), svgFiles.end());
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create text shaper for SVG rendering
+  auto textShaper = TextShaper::Make(GetFallbackTypefaces());
+
+  for (const auto& svgPath : svgFiles) {
+    std::string baseName = std::filesystem::path(svgPath).stem().string();
+
+    // Load original SVG with text shaper
+    auto svgStream = Stream::MakeFromFile(svgPath);
+    if (svgStream == nullptr) {
+      continue;
+    }
+    auto svgDOM = SVGDOM::Make(*svgStream, textShaper);
+    if (svgDOM == nullptr) {
+      continue;
+    }
+
+    auto containerSize = svgDOM->getContainerSize();
+    int width = static_cast<int>(containerSize.width);
+    int height = static_cast<int>(containerSize.height);
+    if (width <= 0 || height <= 0) {
+      continue;
+    }
+
+    // Render original SVG
+    auto svgSurface = Surface::Make(context, width, height);
+    auto svgCanvas = svgSurface->getCanvas();
+    svgDOM->render(svgCanvas);
+    EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
+
+    // Convert to PAGX using new API
+    pagx::LayerBuilder::Options options;
+    options.fallbackTypefaces = GetFallbackTypefaces();
+    auto content = pagx::LayerBuilder::FromSVGFile(svgPath, options);
+    if (content.root == nullptr) {
+      continue;
+    }
+
+    // Save PAGX file to output directory
+    pagx::PAGXSVGParser::Options parserOptions;
+    auto doc = pagx::PAGXSVGParser::Parse(svgPath, parserOptions);
+    if (doc) {
+      std::string xml = doc->toXML();
+      auto pagxData = Data::MakeWithCopy(xml.data(), xml.size());
+      SaveFile(pagxData, "PAGXTest/" + baseName + ".pagx");
+    }
+
+    // Render PAGX
+    auto pagxSurface = Surface::Make(context, width, height);
+    auto pagxCanvas = pagxSurface->getCanvas();
+    content.root->draw(pagxCanvas);
+    EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
+  }
+
+  device->unlock();
 }
 
 /**
@@ -201,48 +305,6 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
 
   // Verify the structure
   EXPECT_GE(doc2->layers.size(), 1u);
-}
-
-/**
- * Test case: Convert SVG files to PAGX format
- */
-PAG_TEST(PAGXTest, SVGToPAGXConversion) {
-  std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
-
-  if (!std::filesystem::exists(svgDir)) {
-    return;  // Skip if directory doesn't exist
-  }
-
-  std::vector<std::string> svgFiles = {};
-  for (const auto& entry : std::filesystem::directory_iterator(svgDir)) {
-    if (entry.path().extension() == ".svg") {
-      svgFiles.push_back(entry.path().string());
-    }
-  }
-  std::sort(svgFiles.begin(), svgFiles.end());
-
-  pagx::PAGXSVGParser::Options options;
-
-  for (const auto& svgPath : svgFiles) {
-    std::string baseName = std::filesystem::path(svgPath).stem().string();
-
-    // Parse SVG to PAGX document
-    auto doc = pagx::PAGXSVGParser::Parse(svgPath, options);
-    if (doc == nullptr) {
-      continue;  // Some SVGs may fail to parse
-    }
-
-    EXPECT_GT(doc->width, 0.0f);
-    EXPECT_GT(doc->height, 0.0f);
-
-    // Export to XML
-    std::string xml = doc->toXML();
-    EXPECT_FALSE(xml.empty());
-
-    // Save PAGX file to output directory
-    auto pagxData = tgfx::Data::MakeWithCopy(xml.data(), xml.size());
-    SaveFile(pagxData, "PAGXTest/" + baseName + ".pagx");
-  }
 }
 
 /**
