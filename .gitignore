@@ -83,3 +83,10 @@ mac/PAG
 linux/vendor/
 /PAG
 .cache
+
+# PAGX Viewer
+pagx/viewer/wasm-mt
+pagx/viewer/build-pagx
+pagx/viewer/.pagx.wasm-mt.md5
+pagx/viewer/node_modules
+pagx/viewer/package-lock.json
