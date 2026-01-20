@@ -100,7 +100,8 @@ std::shared_ptr<tgfx::RenderPipeline> RuntimeFilter::createPipeline(tgfx::GPU* g
   }
 
   tgfx::RenderPipelineDescriptor descriptor = {};
-  descriptor.vertex = tgfx::VertexDescriptor(vertexAttributes());
+  tgfx::VertexBufferLayout vertexLayout(vertexAttributes());
+  descriptor.vertex.bufferLayouts = {vertexLayout};
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   tgfx::PipelineColorAttachment colorAttachment = {};
@@ -257,7 +258,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
   memcpy(data, vertices.data(), vertices.size() * sizeof(float));
   vertexBuffer->unmap();
 
-  renderPass->setVertexBuffer(vertexBuffer);
+  renderPass->setVertexBuffer(0, vertexBuffer);
   renderPass->setTexture(0, inputTextures[0], resources->sampler);
 
   for (size_t i = 1; i < inputTextures.size(); i++) {
@@ -266,7 +267,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
 
   onUpdateUniforms(renderPass.get(), gpu, inputTextures, offset);
 
-  renderPass->draw(tgfx::PrimitiveType::TriangleStrip, 0, vertexCount());
+  renderPass->draw(tgfx::PrimitiveType::TriangleStrip, static_cast<uint32_t>(vertexCount()));
   renderPass->end();
   return true;
 }
