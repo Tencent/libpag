@@ -51,18 +51,10 @@ target_include_directories(pagx PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# expat include directory (use tgfx's expat if available, otherwise use libpag's)
-if (TARGET tgfx)
-    # Use tgfx's expat directory
-    target_include_directories(pagx PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tgfx/third_party/expat
-    )
-else()
-    # Use libpag's expat directory
-    target_include_directories(pagx PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat
-    )
-endif()
+# expat include directory
+target_include_directories(pagx PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat/expat/lib
+)
 
 # Windows requires XML_STATIC definition for static expat
 if(WIN32)
@@ -81,3 +73,10 @@ if (PAGX_BUILD_TGFX_ADAPTER)
     )
     target_link_libraries(pagx PUBLIC tgfx)
 endif()
+
+# ============== Vendor (expat) ==============
+# Build expat and merge into pagx static library
+add_vendor_target(pagx-vendor STATIC_VENDORS expat CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
+find_vendor_libraries(pagx-vendor STATIC PAGX_VENDOR_STATIC_LIBRARIES)
+add_dependencies(pagx pagx-vendor)
+merge_libraries_into(pagx ${PAGX_VENDOR_STATIC_LIBRARIES})

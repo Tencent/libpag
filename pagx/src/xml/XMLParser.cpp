@@ -22,7 +22,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include "expat/lib/expat.h"
+#include "expat.h"
 
 namespace pagx {
 
