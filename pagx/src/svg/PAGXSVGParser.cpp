@@ -173,6 +173,9 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   }
   _maskLayers.clear();
 
+  // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
+  mergeAdjacentLayers(convertedLayers);
+
   // If viewBox transform is needed, wrap in a root layer with the transform.
   // Otherwise, add layers directly to document (no root wrapper).
   if (needsViewBoxTransform) {
@@ -738,7 +741,9 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
           imageHref = getAttribute(imgIt->second, "href");
         }
 
-        pattern->image = imageHref;
+        // Register the image resource and use the reference ID.
+        std::string resourceId = registerImageResource(imageHref);
+        pattern->image = "#" + resourceId;
 
         // Get image display dimensions from SVG (these are the dimensions in pattern content space).
         float imageWidth = parseLength(getAttribute(imgIt->second, "width"), 1.0f);
@@ -785,7 +790,10 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
       if (imageHref.empty()) {
         imageHref = getAttribute(child, "href");
       }
-      pattern->image = imageHref;
+
+      // Register the image resource and use the reference ID.
+      std::string resourceId = registerImageResource(imageHref);
+      pattern->image = "#" + resourceId;
 
       float imageWidth = parseLength(getAttribute(child, "width"), 1.0f);
       float imageHeight = parseLength(getAttribute(child, "height"), 1.0f);
@@ -1425,6 +1433,159 @@ std::string SVGParserImpl::resolveUrl(const std::string& url) {
     return url.substr(1);
   }
   return url;
+}
+
+std::string SVGParserImpl::registerImageResource(const std::string& imageSource) {
+  if (imageSource.empty()) {
+    return "";
+  }
+
+  // Check if this image source has already been registered.
+  auto it = _imageSourceToId.find(imageSource);
+  if (it != _imageSourceToId.end()) {
+    return it->second;
+  }
+
+  // Generate a new image ID.
+  std::string imageId = "image" + std::to_string(_nextImageId++);
+
+  // Create and add the image resource to the document.
+  auto imageNode = std::make_unique<ImageNode>();
+  imageNode->id = imageId;
+  imageNode->source = imageSource;
+  _document->resources.push_back(std::move(imageNode));
+
+  // Cache the mapping.
+  _imageSourceToId[imageSource] = imageId;
+
+  return imageId;
+}
+
+// Helper function to check if two VectorElement nodes are the same geometry.
+static bool isSameGeometry(const VectorElementNode* a, const VectorElementNode* b) {
+  if (!a || !b || a->type() != b->type()) {
+    return false;
+  }
+
+  switch (a->type()) {
+    case NodeType::Rectangle: {
+      auto rectA = static_cast<const RectangleNode*>(a);
+      auto rectB = static_cast<const RectangleNode*>(b);
+      return rectA->center.x == rectB->center.x && rectA->center.y == rectB->center.y &&
+             rectA->size.width == rectB->size.width && rectA->size.height == rectB->size.height &&
+             rectA->roundness == rectB->roundness;
+    }
+    case NodeType::Ellipse: {
+      auto ellipseA = static_cast<const EllipseNode*>(a);
+      auto ellipseB = static_cast<const EllipseNode*>(b);
+      return ellipseA->center.x == ellipseB->center.x && ellipseA->center.y == ellipseB->center.y &&
+             ellipseA->size.width == ellipseB->size.width &&
+             ellipseA->size.height == ellipseB->size.height;
+    }
+    case NodeType::Path: {
+      auto pathA = static_cast<const PathNode*>(a);
+      auto pathB = static_cast<const PathNode*>(b);
+      return pathA->data.toSVGString() == pathB->data.toSVGString();
+    }
+    default:
+      return false;
+  }
+}
+
+// Check if a layer is a simple shape layer (contains exactly one geometry and one Fill or Stroke).
+static bool isSimpleShapeLayer(const LayerNode* layer, const VectorElementNode*& outGeometry,
+                               const VectorElementNode*& outPainter) {
+  if (!layer || layer->contents.size() != 2) {
+    return false;
+  }
+  if (!layer->children.empty() || !layer->filters.empty() || !layer->styles.empty()) {
+    return false;
+  }
+  if (!layer->matrix.isIdentity() || layer->alpha != 1.0f) {
+    return false;
+  }
+
+  const auto* first = layer->contents[0].get();
+  const auto* second = layer->contents[1].get();
+
+  // Check if first is geometry and second is painter.
+  bool firstIsGeometry = (first->type() == NodeType::Rectangle ||
+                          first->type() == NodeType::Ellipse || first->type() == NodeType::Path);
+  bool secondIsPainter =
+      (second->type() == NodeType::Fill || second->type() == NodeType::Stroke);
+
+  if (firstIsGeometry && secondIsPainter) {
+    outGeometry = first;
+    outPainter = second;
+    return true;
+  }
+  return false;
+}
+
+void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<LayerNode>>& layers) {
+  if (layers.size() < 2) {
+    return;
+  }
+
+  std::vector<std::unique_ptr<LayerNode>> merged;
+  size_t i = 0;
+
+  while (i < layers.size()) {
+    const VectorElementNode* geomA = nullptr;
+    const VectorElementNode* painterA = nullptr;
+
+    if (isSimpleShapeLayer(layers[i].get(), geomA, painterA)) {
+      // Check if the next layer has the same geometry.
+      if (i + 1 < layers.size()) {
+        const VectorElementNode* geomB = nullptr;
+        const VectorElementNode* painterB = nullptr;
+
+        if (isSimpleShapeLayer(layers[i + 1].get(), geomB, painterB) &&
+            isSameGeometry(geomA, geomB)) {
+          // Merge: one has Fill, the other has Stroke.
+          bool aHasFill = (painterA->type() == NodeType::Fill);
+          bool bHasFill = (painterB->type() == NodeType::Fill);
+
+          if (aHasFill != bHasFill) {
+            // Create merged layer.
+            auto mergedLayer = std::make_unique<LayerNode>();
+
+            // Keep geometry from first layer.
+            auto geomClone = layers[i]->contents[0]->clone();
+            mergedLayer->contents.push_back(
+                std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(geomClone.release())));
+
+            // Add Fill first, then Stroke (standard order).
+            if (aHasFill) {
+              auto fillClone = layers[i]->contents[1]->clone();
+              mergedLayer->contents.push_back(
+                  std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(fillClone.release())));
+              auto strokeClone = layers[i + 1]->contents[1]->clone();
+              mergedLayer->contents.push_back(
+                  std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(strokeClone.release())));
+            } else {
+              auto fillClone = layers[i + 1]->contents[1]->clone();
+              mergedLayer->contents.push_back(
+                  std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(fillClone.release())));
+              auto strokeClone = layers[i]->contents[1]->clone();
+              mergedLayer->contents.push_back(
+                  std::unique_ptr<VectorElementNode>(static_cast<VectorElementNode*>(strokeClone.release())));
+            }
+
+            merged.push_back(std::move(mergedLayer));
+            i += 2;  // Skip both layers.
+            continue;
+          }
+        }
+      }
+    }
+
+    // No merge, keep the layer as is.
+    merged.push_back(std::move(layers[i]));
+    i++;
+  }
+
+  layers = std::move(merged);
 }
 
 std::unique_ptr<LayerNode> SVGParserImpl::convertMaskElement(

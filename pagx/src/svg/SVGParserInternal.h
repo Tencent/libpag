@@ -106,10 +106,20 @@ class SVGParserImpl {
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "") const;
 
+  // Register an image resource and return its reference ID (e.g., "#image0").
+  // If the image source (data URI or path) has already been registered, returns the existing ID.
+  std::string registerImageResource(const std::string& imageSource);
+
+  // Merge adjacent layers that have the same shape geometry.
+  // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
+  void mergeAdjacentLayers(std::vector<std::unique_ptr<LayerNode>>& layers);
+
   PAGXSVGParser::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
   std::vector<std::unique_ptr<LayerNode>> _maskLayers = {};
+  std::unordered_map<std::string, std::string> _imageSourceToId = {};  // Maps image source to resource ID.
+  int _nextImageId = 0;
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 };
