@@ -128,6 +128,30 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   auto rootLayer = std::make_unique<LayerNode>();
   rootLayer->name = "root";
 
+  // Apply viewBox transform if the viewBox differs from the viewport dimensions.
+  // Default preserveAspectRatio is "xMidYMid meet": uniform scale, centered.
+  if (viewBox.size() >= 4) {
+    float viewBoxX = viewBox[0];
+    float viewBoxY = viewBox[1];
+    float viewBoxW = viewBox[2];
+    float viewBoxH = viewBox[3];
+
+    if (viewBoxW > 0 && viewBoxH > 0 &&
+        (viewBoxX != 0 || viewBoxY != 0 || viewBoxW != width || viewBoxH != height)) {
+      // Calculate uniform scale (meet behavior: fit inside viewport).
+      float scaleX = width / viewBoxW;
+      float scaleY = height / viewBoxH;
+      float scale = std::min(scaleX, scaleY);
+
+      // Calculate translation to center content (xMidYMid).
+      float translateX = (width - viewBoxW * scale) / 2.0f - viewBoxX * scale;
+      float translateY = (height - viewBoxH * scale) / 2.0f - viewBoxY * scale;
+
+      // Build the transform matrix: scale then translate.
+      rootLayer->matrix = Matrix::Translate(translateX, translateY) * Matrix::Scale(scale, scale);
+    }
+  }
+
   // Compute initial inherited style from the root <svg> element.
   InheritedStyle rootStyle = {};
   rootStyle = computeInheritedStyle(root, rootStyle);
@@ -1225,8 +1249,6 @@ std::vector<float> SVGParserImpl::parseViewBox(const std::string& value) {
   float num = 0;
   while (iss >> num) {
     result.push_back(num);
-    char c = 0;
-    iss >> c;  // Skip separator.
   }
 
   return result;
