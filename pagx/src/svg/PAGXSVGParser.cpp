@@ -128,10 +128,14 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   auto rootLayer = std::make_unique<LayerNode>();
   rootLayer->name = "root";
 
+  // Compute initial inherited style from the root <svg> element.
+  InheritedStyle rootStyle = {};
+  rootStyle = computeInheritedStyle(root, rootStyle);
+
   child = root->getFirstChild();
   while (child) {
     if (child->name != "defs") {
-      auto layer = convertToLayer(child);
+      auto layer = convertToLayer(child, rootStyle);
       if (layer) {
         rootLayer->children.push_back(std::move(layer));
       }
@@ -141,6 +145,38 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
 
   _document->layers.push_back(std::move(rootLayer));
   return _document;
+}
+
+InheritedStyle SVGParserImpl::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
+                                                    const InheritedStyle& parentStyle) {
+  InheritedStyle style = parentStyle;
+
+  std::string fill = getAttribute(element, "fill");
+  if (!fill.empty()) {
+    style.fill = fill;
+  }
+
+  std::string stroke = getAttribute(element, "stroke");
+  if (!stroke.empty()) {
+    style.stroke = stroke;
+  }
+
+  std::string fillOpacity = getAttribute(element, "fill-opacity");
+  if (!fillOpacity.empty()) {
+    style.fillOpacity = fillOpacity;
+  }
+
+  std::string strokeOpacity = getAttribute(element, "stroke-opacity");
+  if (!strokeOpacity.empty()) {
+    style.strokeOpacity = strokeOpacity;
+  }
+
+  std::string fillRule = getAttribute(element, "fill-rule");
+  if (!fillRule.empty()) {
+    style.fillRule = fillRule;
+  }
+
+  return style;
 }
 
 void SVGParserImpl::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
@@ -158,13 +194,17 @@ void SVGParserImpl::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
   }
 }
 
-std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNode>& element) {
+std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNode>& element,
+                                                        const InheritedStyle& parentStyle) {
   const auto& tag = element->name;
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
       tag == "mask" || tag == "clipPath" || tag == "filter") {
     return nullptr;
   }
+
+  // Compute inherited style for this element.
+  InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
 
   auto layer = std::make_unique<LayerNode>();
 
@@ -197,7 +237,7 @@ std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<D
     // Group: convert children as child layers.
     auto child = element->getFirstChild();
     while (child) {
-      auto childLayer = convertToLayer(child);
+      auto childLayer = convertToLayer(child, inheritedStyle);
       if (childLayer) {
         layer->children.push_back(std::move(childLayer));
       }
@@ -205,20 +245,21 @@ std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<D
     }
   } else {
     // Shape element: convert to vector contents.
-    convertChildren(element, layer->contents);
+    convertChildren(element, layer->contents, inheritedStyle);
   }
 
   return layer;
 }
 
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
-                                    std::vector<std::unique_ptr<VectorElementNode>>& contents) {
+                                    std::vector<std::unique_ptr<VectorElementNode>>& contents,
+                                    const InheritedStyle& inheritedStyle) {
   auto shapeElement = convertElement(element);
   if (shapeElement) {
     contents.push_back(std::move(shapeElement));
   }
 
-  addFillStroke(element, contents);
+  addFillStroke(element, contents, inheritedStyle);
 }
 
 std::unique_ptr<VectorElementNode> SVGParserImpl::convertElement(
@@ -246,7 +287,11 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertElement(
   return nullptr;
 }
 
-std::unique_ptr<GroupNode> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& element) {
+std::unique_ptr<GroupNode> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& element,
+                                                   const InheritedStyle& parentStyle) {
+  // Compute inherited style for this group element.
+  InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
+
   auto group = std::make_unique<GroupNode>();
 
   group->name = getAttribute(element, "id");
@@ -271,7 +316,7 @@ std::unique_ptr<GroupNode> SVGParserImpl::convertG(const std::shared_ptr<DOMNode
     if (childElement) {
       group->elements.push_back(std::move(childElement));
     }
-    addFillStroke(child, group->elements);
+    addFillStroke(child, group->elements, inheritedStyle);
     child = child->getNextSibling();
   }
 
@@ -370,7 +415,8 @@ std::unique_ptr<VectorElementNode> SVGParserImpl::convertPath(
   return path;
 }
 
-std::unique_ptr<GroupNode> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>& element) {
+std::unique_ptr<GroupNode> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>& element,
+                                                      const InheritedStyle& inheritedStyle) {
   auto group = std::make_unique<GroupNode>();
 
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
@@ -405,7 +451,7 @@ std::unique_ptr<GroupNode> SVGParserImpl::convertText(const std::shared_ptr<DOMN
     group->elements.push_back(std::move(textSpan));
   }
 
-  addFillStroke(element, group->elements);
+  addFillStroke(element, group->elements, inheritedStyle);
   return group;
 }
 
@@ -497,48 +543,143 @@ std::unique_ptr<RadialGradientNode> SVGParserImpl::convertRadialGradient(
   return gradient;
 }
 
-void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
-                                  std::vector<std::unique_ptr<VectorElementNode>>& contents) {
-  std::string fill = getAttribute(element, "fill");
-  if (!fill.empty() && fill != "none") {
-    auto fillNode = std::make_unique<FillNode>();
+std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
+    const std::shared_ptr<DOMNode>& element) {
+  auto pattern = std::make_unique<ImagePatternNode>();
 
-    if (fill.find("url(") == 0) {
+  pattern->id = getAttribute(element, "id");
+
+  // SVG patterns use repeat by default.
+  pattern->tileModeX = TileMode::Repeat;
+  pattern->tileModeY = TileMode::Repeat;
+
+  // Parse pattern dimensions for calculating tile scale.
+  float patternWidth = parseLength(getAttribute(element, "width"), 1.0f);
+  float patternHeight = parseLength(getAttribute(element, "height"), 1.0f);
+
+  // Check patternContentUnits - objectBoundingBox means dimensions are 0-1 ratios.
+  std::string patternUnits = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
+  bool isObjectBoundingBox = (patternUnits == "objectBoundingBox");
+
+  // Look for image reference inside the pattern.
+  // Pattern may contain <use xlink:href="#imageId"/> or direct <image> element.
+  auto child = element->getFirstChild();
+  while (child) {
+    if (child->name == "use") {
+      std::string href = getAttribute(child, "xlink:href");
+      if (href.empty()) {
+        href = getAttribute(child, "href");
+      }
+      std::string imageId = resolveUrl(href);
+
+      // Find the referenced image in defs.
+      auto imgIt = _defs.find(imageId);
+      if (imgIt != _defs.end() && imgIt->second->name == "image") {
+        std::string imageHref = getAttribute(imgIt->second, "xlink:href");
+        if (imageHref.empty()) {
+          imageHref = getAttribute(imgIt->second, "href");
+        }
+
+        // Store the image reference or data URI.
+        pattern->image = imageHref;
+
+        // Get image dimensions.
+        float imageWidth = parseLength(getAttribute(imgIt->second, "width"), 1.0f);
+        float imageHeight = parseLength(getAttribute(imgIt->second, "height"), 1.0f);
+
+        // Parse transform from the use element to get scaling.
+        std::string useTransform = getAttribute(child, "transform");
+        if (!useTransform.empty()) {
+          Matrix useMatrix = parseTransform(useTransform);
+          // The use transform typically scales the image.
+          // Combine with image dimensions: scaleX = useMatrix.a * imageWidth
+          float scaleX = useMatrix.a * imageWidth;
+          float scaleY = useMatrix.d * imageHeight;
+          pattern->matrix = {scaleX, 0, 0, scaleY, 0, 0};
+        }
+      }
+    } else if (child->name == "image") {
+      // Direct image element inside pattern.
+      std::string imageHref = getAttribute(child, "xlink:href");
+      if (imageHref.empty()) {
+        imageHref = getAttribute(child, "href");
+      }
+      pattern->image = imageHref;
+    }
+    child = child->getNextSibling();
+  }
+
+  return pattern;
+}
+
+void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
+                                  std::vector<std::unique_ptr<VectorElementNode>>& contents,
+                                  const InheritedStyle& inheritedStyle) {
+  // Determine effective fill value (element attribute overrides inherited).
+  std::string fill = getAttribute(element, "fill");
+  if (fill.empty()) {
+    fill = inheritedStyle.fill;
+  }
+
+  // Only add fill if we have an effective fill value that is not "none".
+  // If fill is empty and no inherited value, SVG default is black fill.
+  // But if inherited value is "none", we skip fill entirely.
+  if (fill != "none") {
+    if (fill.empty()) {
+      // No fill specified anywhere - use SVG default black.
+      auto fillNode = std::make_unique<FillNode>();
+      fillNode->color = "#000000";
+      contents.push_back(std::move(fillNode));
+    } else if (fill.find("url(") == 0) {
+      auto fillNode = std::make_unique<FillNode>();
       std::string refId = resolveUrl(fill);
       fillNode->color = "#" + refId;
 
-      // Try to inline the gradient.
+      // Try to inline the gradient or pattern.
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
           fillNode->colorSource = convertLinearGradient(it->second);
         } else if (it->second->name == "radialGradient") {
           fillNode->colorSource = convertRadialGradient(it->second);
+        } else if (it->second->name == "pattern") {
+          fillNode->colorSource = convertPattern(it->second);
         }
       }
+      contents.push_back(std::move(fillNode));
     } else {
+      auto fillNode = std::make_unique<FillNode>();
       Color color = parseColor(fill);
+
+      // Determine effective fill-opacity.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
+      if (fillOpacity.empty()) {
+        fillOpacity = inheritedStyle.fillOpacity;
+      }
       if (!fillOpacity.empty()) {
         color.alpha = std::stof(fillOpacity);
       }
       fillNode->color = color.toHexString(color.alpha < 1);
-    }
 
-    std::string fillRule = getAttribute(element, "fill-rule");
-    if (fillRule == "evenodd") {
-      fillNode->fillRule = FillRule::EvenOdd;
-    }
+      // Determine effective fill-rule.
+      std::string fillRule = getAttribute(element, "fill-rule");
+      if (fillRule.empty()) {
+        fillRule = inheritedStyle.fillRule;
+      }
+      if (fillRule == "evenodd") {
+        fillNode->fillRule = FillRule::EvenOdd;
+      }
 
-    contents.push_back(std::move(fillNode));
-  } else if (fill.empty()) {
-    // SVG default is black fill.
-    auto fillNode = std::make_unique<FillNode>();
-    fillNode->color = "#000000";
-    contents.push_back(std::move(fillNode));
+      contents.push_back(std::move(fillNode));
+    }
   }
 
+  // Determine effective stroke value (element attribute overrides inherited).
   std::string stroke = getAttribute(element, "stroke");
+  if (stroke.empty()) {
+    stroke = inheritedStyle.stroke;
+  }
+
   if (!stroke.empty() && stroke != "none") {
     auto strokeNode = std::make_unique<StrokeNode>();
 
@@ -552,11 +693,18 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
           strokeNode->colorSource = convertLinearGradient(it->second);
         } else if (it->second->name == "radialGradient") {
           strokeNode->colorSource = convertRadialGradient(it->second);
+        } else if (it->second->name == "pattern") {
+          strokeNode->colorSource = convertPattern(it->second);
         }
       }
     } else {
       Color color = parseColor(stroke);
+
+      // Determine effective stroke-opacity.
       std::string strokeOpacity = getAttribute(element, "stroke-opacity");
+      if (strokeOpacity.empty()) {
+        strokeOpacity = inheritedStyle.strokeOpacity;
+      }
       if (!strokeOpacity.empty()) {
         color.alpha = std::stof(strokeOpacity);
       }

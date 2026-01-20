@@ -29,6 +29,17 @@
 namespace pagx {
 
 /**
+ * Inherited SVG style properties that cascade down the element tree.
+ */
+struct InheritedStyle {
+  std::string fill = "";           // Empty means not set, "none" means no fill.
+  std::string stroke = "";         // Empty means not set.
+  std::string fillOpacity = "";    // Empty means not set.
+  std::string strokeOpacity = "";  // Empty means not set.
+  std::string fillRule = "";       // Empty means not set.
+};
+
+/**
  * Internal SVG parser implementation using expat-based XML DOM parsing.
  */
 class SVGParserImpl {
@@ -43,11 +54,14 @@ class SVGParserImpl {
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
-  std::unique_ptr<LayerNode> convertToLayer(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<LayerNode> convertToLayer(const std::shared_ptr<DOMNode>& element,
+                                            const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
-                       std::vector<std::unique_ptr<VectorElementNode>>& contents);
+                       std::vector<std::unique_ptr<VectorElementNode>>& contents,
+                       const InheritedStyle& inheritedStyle);
   std::unique_ptr<VectorElementNode> convertElement(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<GroupNode> convertG(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<GroupNode> convertG(const std::shared_ptr<DOMNode>& element,
+                                      const InheritedStyle& inheritedStyle);
   std::unique_ptr<VectorElementNode> convertRect(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<VectorElementNode> convertCircle(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<VectorElementNode> convertEllipse(const std::shared_ptr<DOMNode>& element);
@@ -55,16 +69,22 @@ class SVGParserImpl {
   std::unique_ptr<VectorElementNode> convertPolyline(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<VectorElementNode> convertPolygon(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<VectorElementNode> convertPath(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<GroupNode> convertText(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<GroupNode> convertText(const std::shared_ptr<DOMNode>& element,
+                                         const InheritedStyle& inheritedStyle);
   std::unique_ptr<VectorElementNode> convertUse(const std::shared_ptr<DOMNode>& element);
 
   std::unique_ptr<LinearGradientNode> convertLinearGradient(
       const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<RadialGradientNode> convertRadialGradient(
       const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<ImagePatternNode> convertPattern(const std::shared_ptr<DOMNode>& element);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
-                     std::vector<std::unique_ptr<VectorElementNode>>& contents);
+                     std::vector<std::unique_ptr<VectorElementNode>>& contents,
+                     const InheritedStyle& inheritedStyle);
+
+  InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
+                                       const InheritedStyle& parentStyle);
 
   Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
