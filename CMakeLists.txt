@@ -102,6 +102,8 @@ if (PAG_BUILD_TESTS)
     set(PAG_USE_HARFBUZZ ON)
     set(PAG_USE_SYSTEM_LZ4 OFF)
     set(PAG_BUILD_SHARED OFF)
+    set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_LAYERS ON)
 endif ()
 
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")
@@ -504,6 +506,8 @@ else ()
     set(TGFX_ENABLE_PROFILING ${PAG_ENABLE_PROFILING})
     set(TGFX_USE_THREADS ${PAG_USE_THREADS})
     set(TGFX_USE_TEXT_GAMMA_CORRECTION ON)
+    set(TGFX_BUILD_SVG ${PAG_BUILD_SVG})
+    set(TGFX_BUILD_LAYERS ${PAG_BUILD_LAYERS})
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
     add_subdirectory(${TGFX_DIR} tgfx EXCLUDE_FROM_ALL)
     list(APPEND PAG_STATIC_LIBS $<TARGET_FILE:tgfx>)
@@ -633,13 +637,17 @@ if (PAG_BUILD_TESTS)
         endif ()
     endif ()
 
+    # Add pagx library for testing
+    add_subdirectory(pagx)
+
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(APPEND PAG_TEST_FILES ${SRC_FILES})
-    list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
+    list(APPEND PAG_TEST_LIBS pagx pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
             ${GOOGLE_TEST_DIR} ${GOOGLE_TEST_DIR}/include
-            ${TGFX_DIR}/third_party/json/include)
+            ${TGFX_DIR}/third_party/json/include
+            pagx/include pagx/src/layers pagx/src/svg)
 
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)

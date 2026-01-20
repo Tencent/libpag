@@ -1,0 +1,167 @@
+html, body {
+    padding: 0;
+    border: 0;
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.container {
+    position: relative;
+    overflow: hidden;
+    margin: auto;
+    width: 100%;
+    height: 100%;
+    background: #1a1a2e;
+}
+
+.canvas {
+    cursor: grab;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+}
+
+.canvas:active {
+    cursor: grabbing;
+}
+
+.drop-zone {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 26, 46, 0.95);
+    transition: background 0.3s ease;
+}
+
+.drop-zone.drag-over {
+    background: rgba(26, 26, 46, 0.98);
+}
+
+.drop-zone.drag-over .drop-zone-content {
+    border-color: #4a90d9;
+    transform: scale(1.02);
+}
+
+.drop-zone.hidden {
+    display: none;
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 80px;
+    border: 2px dashed #555;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    transition: all 0.3s ease;
+}
+
+.drop-icon {
+    width: 64px;
+    height: 64px;
+    color: #888;
+    margin-bottom: 20px;
+}
+
+.drop-text {
+    color: #ccc;
+    font-size: 20px;
+    margin: 0 0 8px 0;
+}
+
+.drop-subtext {
+    color: #666;
+    font-size: 14px;
+    margin: 0 0 16px 0;
+}
+
+.file-btn {
+    padding: 12px 32px;
+    font-size: 16px;
+    color: #fff;
+    background: #4a90d9;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.file-btn:hover {
+    background: #5a9ee9;
+}
+
+.file-btn:active {
+    background: #3a80c9;
+}
+
+.toolbar {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+}
+
+.toolbar.hidden {
+    display: none;
+}
+
+.toolbar-btn {
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.toolbar-btn svg {
+    width: 100%;
+    height: 100%;
+    color: #ccc;
+}
+
+.toolbar-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-btn:hover svg {
+    color: #fff;
+}
+
+.toolbar-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.file-name {
+    color: #aaa;
+    font-size: 14px;
+    padding-left: 12px;
+    padding-right: 8px;
+    margin-left: 4px;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
