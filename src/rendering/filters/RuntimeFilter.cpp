@@ -266,7 +266,7 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder* encoder,
 
   onUpdateUniforms(renderPass.get(), gpu, inputTextures, offset);
 
-  renderPass->draw(tgfx::PrimitiveType::TriangleStrip, vertexCount());
+  renderPass->draw(tgfx::PrimitiveType::TriangleStrip, static_cast<uint32_t>(vertexCount()));
   renderPass->end();
   return true;
 }
