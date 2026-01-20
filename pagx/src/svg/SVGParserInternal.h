@@ -80,6 +80,11 @@ class SVGParserImpl {
   std::unique_ptr<ImagePatternNode> convertPattern(const std::shared_ptr<DOMNode>& element,
                                                     const Rect& shapeBounds);
 
+  std::unique_ptr<LayerNode> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
+                                                const InheritedStyle& parentStyle);
+  void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
+                            std::vector<std::unique_ptr<LayerFilterNode>>& filters);
+
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
                      std::vector<std::unique_ptr<VectorElementNode>>& contents,
                      const InheritedStyle& inheritedStyle);
@@ -104,6 +109,7 @@ class SVGParserImpl {
   PAGXSVGParser::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
+  std::vector<std::unique_ptr<LayerNode>> _maskLayers = {};
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 };

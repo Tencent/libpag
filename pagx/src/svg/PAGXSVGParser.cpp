@@ -124,12 +124,9 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
     child = child->getNextSibling();
   }
 
-  // Second pass: convert elements to a root layer.
-  auto rootLayer = std::make_unique<LayerNode>();
-  rootLayer->name = "root";
-
-  // Apply viewBox transform if the viewBox differs from the viewport dimensions.
-  // Default preserveAspectRatio is "xMidYMid meet": uniform scale, centered.
+  // Check if we need a viewBox transform.
+  bool needsViewBoxTransform = false;
+  Matrix viewBoxMatrix = Matrix::Identity();
   if (viewBox.size() >= 4) {
     float viewBoxX = viewBox[0];
     float viewBoxY = viewBox[1];
@@ -148,7 +145,8 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
       float translateY = (height - viewBoxH * scale) / 2.0f - viewBoxY * scale;
 
       // Build the transform matrix: scale then translate.
-      rootLayer->matrix = Matrix::Translate(translateX, translateY) * Matrix::Scale(scale, scale);
+      viewBoxMatrix = Matrix::Translate(translateX, translateY) * Matrix::Scale(scale, scale);
+      needsViewBoxTransform = true;
     }
   }
 
@@ -156,18 +154,40 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   InheritedStyle rootStyle = {};
   rootStyle = computeInheritedStyle(root, rootStyle);
 
+  // Collect converted layers.
+  std::vector<std::unique_ptr<LayerNode>> convertedLayers;
   child = root->getFirstChild();
   while (child) {
     if (child->name != "defs") {
       auto layer = convertToLayer(child, rootStyle);
       if (layer) {
-        rootLayer->children.push_back(std::move(layer));
+        convertedLayers.push_back(std::move(layer));
       }
     }
     child = child->getNextSibling();
   }
 
-  _document->layers.push_back(std::move(rootLayer));
+  // Add collected mask layers (invisible, used as mask references).
+  for (auto& maskLayer : _maskLayers) {
+    convertedLayers.insert(convertedLayers.begin(), std::move(maskLayer));
+  }
+  _maskLayers.clear();
+
+  // If viewBox transform is needed, wrap in a root layer with the transform.
+  // Otherwise, add layers directly to document (no root wrapper).
+  if (needsViewBoxTransform) {
+    auto rootLayer = std::make_unique<LayerNode>();
+    rootLayer->matrix = viewBoxMatrix;
+    for (auto& layer : convertedLayers) {
+      rootLayer->children.push_back(std::move(layer));
+    }
+    _document->layers.push_back(std::move(rootLayer));
+  } else {
+    for (auto& layer : convertedLayers) {
+      _document->layers.push_back(std::move(layer));
+    }
+  }
+
   return _document;
 }
 
@@ -256,6 +276,32 @@ std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<D
     layer->visible = false;
   }
 
+  // Handle mask attribute.
+  std::string maskAttr = getAttribute(element, "mask");
+  if (!maskAttr.empty() && maskAttr != "none") {
+    std::string maskId = resolveUrl(maskAttr);
+    auto maskIt = _defs.find(maskId);
+    if (maskIt != _defs.end()) {
+      // Convert mask element to a mask layer.
+      auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
+      if (maskLayer) {
+        layer->mask = "#" + maskLayer->id;
+        // Add mask layer as invisible layer to the document.
+        _maskLayers.push_back(std::move(maskLayer));
+      }
+    }
+  }
+
+  // Handle filter attribute.
+  std::string filterAttr = getAttribute(element, "filter");
+  if (!filterAttr.empty() && filterAttr != "none") {
+    std::string filterId = resolveUrl(filterAttr);
+    auto filterIt = _defs.find(filterId);
+    if (filterIt != _defs.end()) {
+      convertFilterElement(filterIt->second, layer->filters);
+    }
+  }
+
   // Convert contents.
   if (tag == "g" || tag == "svg") {
     // Group: convert children as child layers.
@@ -278,6 +324,17 @@ std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<D
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
                                     std::vector<std::unique_ptr<VectorElementNode>>& contents,
                                     const InheritedStyle& inheritedStyle) {
+  const auto& tag = element->name;
+
+  // Handle text element specially - it returns a GroupNode with TextSpan.
+  if (tag == "text") {
+    auto textGroup = convertText(element, inheritedStyle);
+    if (textGroup) {
+      contents.push_back(std::move(textGroup));
+    }
+    return;
+  }
+
   auto shapeElement = convertElement(element);
   if (shapeElement) {
     contents.push_back(std::move(shapeElement));
@@ -519,10 +576,42 @@ std::unique_ptr<LinearGradientNode> SVGParserImpl::convertLinearGradient(
   auto gradient = std::make_unique<LinearGradientNode>();
 
   gradient->id = getAttribute(element, "id");
-  gradient->startPoint.x = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
-  gradient->startPoint.y = parseLength(getAttribute(element, "y1", "0%"), 1.0f);
-  gradient->endPoint.x = parseLength(getAttribute(element, "x2", "100%"), 1.0f);
-  gradient->endPoint.y = parseLength(getAttribute(element, "y2", "0%"), 1.0f);
+
+  // Check gradientUnits - determines how gradient coordinates are interpreted.
+  // Default is objectBoundingBox, meaning values are 0-1 ratios of the shape bounds.
+  std::string gradientUnits = getAttribute(element, "gradientUnits", "objectBoundingBox");
+  bool useOBB = (gradientUnits == "objectBoundingBox");
+
+  // Parse gradient coordinates.
+  float x1 = parseLength(getAttribute(element, "x1", "0%"), 1.0f);
+  float y1 = parseLength(getAttribute(element, "y1", "0%"), 1.0f);
+  float x2 = parseLength(getAttribute(element, "x2", "100%"), 1.0f);
+  float y2 = parseLength(getAttribute(element, "y2", "0%"), 1.0f);
+
+  // Parse gradientTransform.
+  std::string gradientTransform = getAttribute(element, "gradientTransform");
+  Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
+                                                     : parseTransform(gradientTransform);
+
+  if (useOBB) {
+    // For objectBoundingBox, coordinates are normalized 0-1.
+    // Apply gradient transform to normalized points.
+    Point start = {x1, y1};
+    Point end = {x2, y2};
+    start = transformMatrix.mapPoint(start);
+    end = transformMatrix.mapPoint(end);
+    gradient->startPoint = start;
+    gradient->endPoint = end;
+  } else {
+    // For userSpaceOnUse, coordinates are in user space.
+    // Apply gradient transform to user space points.
+    Point start = {x1, y1};
+    Point end = {x2, y2};
+    start = transformMatrix.mapPoint(start);
+    end = transformMatrix.mapPoint(end);
+    gradient->startPoint = start;
+    gradient->endPoint = end;
+  }
 
   // Parse stops.
   auto child = element->getFirstChild();
@@ -546,9 +635,44 @@ std::unique_ptr<RadialGradientNode> SVGParserImpl::convertRadialGradient(
   auto gradient = std::make_unique<RadialGradientNode>();
 
   gradient->id = getAttribute(element, "id");
-  gradient->center.x = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
-  gradient->center.y = parseLength(getAttribute(element, "cy", "50%"), 1.0f);
-  gradient->radius = parseLength(getAttribute(element, "r", "50%"), 1.0f);
+
+  // Check gradientUnits - determines how gradient coordinates are interpreted.
+  std::string gradientUnits = getAttribute(element, "gradientUnits", "objectBoundingBox");
+  bool useOBB = (gradientUnits == "objectBoundingBox");
+
+  // Parse gradient coordinates.
+  float cx = parseLength(getAttribute(element, "cx", "50%"), 1.0f);
+  float cy = parseLength(getAttribute(element, "cy", "50%"), 1.0f);
+  float r = parseLength(getAttribute(element, "r", "50%"), 1.0f);
+
+  // Parse gradientTransform.
+  std::string gradientTransform = getAttribute(element, "gradientTransform");
+  Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
+                                                     : parseTransform(gradientTransform);
+
+  if (useOBB || !gradientTransform.empty()) {
+    // Apply gradientTransform to center point.
+    Point center = {cx, cy};
+    center = transformMatrix.mapPoint(center);
+    gradient->center = center;
+
+    // For radius, we need to account for scaling in the transform.
+    // Use the average of X and Y scale factors.
+    float scaleX = std::sqrt(transformMatrix.a * transformMatrix.a +
+                             transformMatrix.b * transformMatrix.b);
+    float scaleY = std::sqrt(transformMatrix.c * transformMatrix.c +
+                             transformMatrix.d * transformMatrix.d);
+    gradient->radius = r * (scaleX + scaleY) / 2.0f;
+
+    // Store the matrix for non-uniform scaling (rotation, skew, etc.).
+    if (!transformMatrix.isIdentity()) {
+      gradient->matrix = transformMatrix;
+    }
+  } else {
+    gradient->center.x = cx;
+    gradient->center.y = cy;
+    gradient->radius = r;
+  }
 
   // Parse stops.
   auto child = element->getFirstChild();
@@ -705,9 +829,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
     } else if (fill.find("url(") == 0) {
       auto fillNode = std::make_unique<FillNode>();
       std::string refId = resolveUrl(fill);
-      fillNode->color = "#" + refId;
 
       // Try to inline the gradient or pattern.
+      // Don't set fillNode->color when using colorSource.
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
@@ -757,8 +881,8 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     if (stroke.find("url(") == 0) {
       std::string refId = resolveUrl(stroke);
-      strokeNode->color = "#" + refId;
 
+      // Don't set strokeNode->color when using colorSource.
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
@@ -1301,6 +1425,59 @@ std::string SVGParserImpl::resolveUrl(const std::string& url) {
     return url.substr(1);
   }
   return url;
+}
+
+std::unique_ptr<LayerNode> SVGParserImpl::convertMaskElement(
+    const std::shared_ptr<DOMNode>& maskElement, const InheritedStyle& parentStyle) {
+  auto maskLayer = std::make_unique<LayerNode>();
+  maskLayer->id = getAttribute(maskElement, "id");
+  maskLayer->name = maskLayer->id;
+  maskLayer->visible = false;
+
+  // Parse mask contents.
+  auto child = maskElement->getFirstChild();
+  while (child) {
+    if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
+        child->name == "path" || child->name == "polygon" || child->name == "polyline") {
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      convertChildren(child, maskLayer->contents, inheritedStyle);
+    } else if (child->name == "g") {
+      // Handle group inside mask.
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      auto groupChild = child->getFirstChild();
+      while (groupChild) {
+        convertChildren(groupChild, maskLayer->contents, inheritedStyle);
+        groupChild = groupChild->getNextSibling();
+      }
+    }
+    child = child->getNextSibling();
+  }
+
+  return maskLayer;
+}
+
+void SVGParserImpl::convertFilterElement(
+    const std::shared_ptr<DOMNode>& filterElement,
+    std::vector<std::unique_ptr<LayerFilterNode>>& filters) {
+  // Parse filter children to find effect elements.
+  auto child = filterElement->getFirstChild();
+  while (child) {
+    if (child->name == "feGaussianBlur") {
+      auto blurFilter = std::make_unique<BlurFilterNode>();
+      std::string stdDeviation = getAttribute(child, "stdDeviation", "0");
+      // stdDeviation can be one value (both X and Y) or two values (X Y).
+      std::istringstream iss(stdDeviation);
+      float devX = 0, devY = 0;
+      iss >> devX;
+      if (!(iss >> devY)) {
+        devY = devX;
+      }
+      blurFilter->blurrinessX = devX;
+      blurFilter->blurrinessY = devY;
+      filters.push_back(std::move(blurFilter));
+    }
+    child = child->getNextSibling();
+  }
 }
 
 }  // namespace pagx
