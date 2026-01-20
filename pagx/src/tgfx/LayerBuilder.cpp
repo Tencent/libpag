@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/LayerBuilder.h"
+#include <array>
 #include "pagx/PAGXSVGParser.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
@@ -46,6 +48,82 @@
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 namespace pagx {
+
+// Decode base64 encoded string to binary data.
+static std::shared_ptr<tgfx::Data> Base64Decode(const std::string& encodedString) {
+  static const std::array<unsigned char, 128> decodingTable = {
+      64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+      64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62,
+      64, 64, 64, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64, 64, 0,
+      1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+      23, 24, 25, 64, 64, 64, 64, 64, 64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+      39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64};
+
+  size_t inputLength = encodedString.size();
+  if (inputLength % 4 != 0) {
+    return nullptr;
+  }
+
+  size_t outputLength = inputLength / 4 * 3;
+  if (inputLength >= 1 && encodedString[inputLength - 1] == '=') {
+    outputLength--;
+  }
+  if (inputLength >= 2 && encodedString[inputLength - 2] == '=') {
+    outputLength--;
+  }
+
+  auto output = static_cast<unsigned char*>(malloc(outputLength));
+  if (!output) {
+    return nullptr;
+  }
+
+  for (size_t i = 0, j = 0; i < inputLength;) {
+    auto a = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
+    auto b = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
+    auto c = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
+    auto d = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
+
+    uint32_t triple = (a << 3 * 6) + (b << 2 * 6) + (c << 1 * 6) + (d << 0 * 6);
+
+    if (j < outputLength) {
+      output[j++] = (triple >> 2 * 8) & 0xFF;
+    }
+    if (j < outputLength) {
+      output[j++] = (triple >> 1 * 8) & 0xFF;
+    }
+    if (j < outputLength) {
+      output[j++] = (triple >> 0 * 8) & 0xFF;
+    }
+  }
+
+  return tgfx::Data::MakeAdopted(output, outputLength, tgfx::Data::FreeProc);
+}
+
+// Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
+static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
+  if (dataURI.find("data:") != 0) {
+    return nullptr;
+  }
+
+  auto commaPos = dataURI.find(',');
+  if (commaPos == std::string::npos) {
+    return nullptr;
+  }
+
+  auto header = dataURI.substr(0, commaPos);
+  auto base64Data = dataURI.substr(commaPos + 1);
+
+  if (header.find(";base64") == std::string::npos) {
+    return nullptr;
+  }
+
+  auto data = Base64Decode(base64Data);
+  if (!data) {
+    return nullptr;
+  }
+
+  return tgfx::Image::MakeFromEncoded(data);
+}
 
 // Type converters from pagx to tgfx
 static tgfx::Point ToTGFX(const Point& p) {
@@ -338,6 +416,10 @@ class LayerBuilderImpl {
         auto grad = static_cast<const RadialGradientNode*>(node);
         return convertRadialGradient(grad);
       }
+      case NodeType::ImagePattern: {
+        auto pattern = static_cast<const ImagePatternNode*>(node);
+        return convertImagePattern(pattern);
+      }
       default:
         return nullptr;
     }
@@ -376,6 +458,50 @@ class LayerBuilderImpl {
     }
 
     return tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
+  }
+
+  std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePatternNode* node) {
+    if (!node || node->image.empty()) {
+      return nullptr;
+    }
+
+    // Load image from data URI or file path.
+    std::shared_ptr<tgfx::Image> image = nullptr;
+    if (node->image.find("data:") == 0) {
+      image = ImageFromDataURI(node->image);
+    } else {
+      // Try as file path.
+      std::string imagePath = node->image;
+      if (!_options.basePath.empty() && imagePath[0] != '/') {
+        imagePath = _options.basePath + imagePath;
+      }
+      image = tgfx::Image::MakeFromFile(imagePath);
+    }
+
+    if (!image) {
+      return nullptr;
+    }
+
+    // Convert tile modes.
+    auto tileModeX = tgfx::TileMode::Clamp;
+    auto tileModeY = tgfx::TileMode::Clamp;
+    if (node->tileModeX == TileMode::Repeat) {
+      tileModeX = tgfx::TileMode::Repeat;
+    } else if (node->tileModeX == TileMode::Mirror) {
+      tileModeX = tgfx::TileMode::Mirror;
+    }
+    if (node->tileModeY == TileMode::Repeat) {
+      tileModeY = tgfx::TileMode::Repeat;
+    } else if (node->tileModeY == TileMode::Mirror) {
+      tileModeY = tgfx::TileMode::Mirror;
+    }
+
+    auto pattern = tgfx::ImagePattern::Make(image, tileModeX, tileModeY);
+    if (pattern && !node->matrix.isIdentity()) {
+      pattern->setMatrix(ToTGFX(node->matrix));
+    }
+
+    return pattern;
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPathNode* node) {

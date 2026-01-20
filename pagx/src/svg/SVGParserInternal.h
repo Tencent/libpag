@@ -77,11 +77,15 @@ class SVGParserImpl {
       const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<RadialGradientNode> convertRadialGradient(
       const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<ImagePatternNode> convertPattern(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<ImagePatternNode> convertPattern(const std::shared_ptr<DOMNode>& element,
+                                                    const Rect& shapeBounds);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
                      std::vector<std::unique_ptr<VectorElementNode>>& contents,
                      const InheritedStyle& inheritedStyle);
+
+  // Compute shape bounds from SVG element attributes.
+  Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
 
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);

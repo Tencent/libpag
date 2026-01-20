@@ -544,7 +544,7 @@ std::unique_ptr<RadialGradientNode> SVGParserImpl::convertRadialGradient(
 }
 
 std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
-    const std::shared_ptr<DOMNode>& element) {
+    const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
   auto pattern = std::make_unique<ImagePatternNode>();
 
   pattern->id = getAttribute(element, "id");
@@ -553,16 +553,15 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
   pattern->tileModeX = TileMode::Repeat;
   pattern->tileModeY = TileMode::Repeat;
 
-  // Parse pattern dimensions for calculating tile scale.
+  // Parse pattern dimensions from SVG attributes.
   float patternWidth = parseLength(getAttribute(element, "width"), 1.0f);
   float patternHeight = parseLength(getAttribute(element, "height"), 1.0f);
 
-  // Check patternContentUnits - objectBoundingBox means dimensions are 0-1 ratios.
-  std::string patternUnits = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
-  bool isObjectBoundingBox = (patternUnits == "objectBoundingBox");
+  // Check patternContentUnits - objectBoundingBox means content coordinates are 0-1 ratios.
+  std::string contentUnits = getAttribute(element, "patternContentUnits", "userSpaceOnUse");
+  bool isObjectBoundingBox = (contentUnits == "objectBoundingBox");
 
   // Look for image reference inside the pattern.
-  // Pattern may contain <use xlink:href="#imageId"/> or direct <image> element.
   auto child = element->getFirstChild();
   while (child) {
     if (child->name == "use") {
@@ -580,22 +579,29 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
           imageHref = getAttribute(imgIt->second, "href");
         }
 
-        // Store the image reference or data URI.
         pattern->image = imageHref;
 
-        // Get image dimensions.
+        // Get image dimensions from SVG.
         float imageWidth = parseLength(getAttribute(imgIt->second, "width"), 1.0f);
         float imageHeight = parseLength(getAttribute(imgIt->second, "height"), 1.0f);
 
-        // Parse transform from the use element to get scaling.
+        // Parse transform on the use element.
         std::string useTransform = getAttribute(child, "transform");
-        if (!useTransform.empty()) {
-          Matrix useMatrix = parseTransform(useTransform);
-          // The use transform typically scales the image.
-          // Combine with image dimensions: scaleX = useMatrix.a * imageWidth
-          float scaleX = useMatrix.a * imageWidth;
-          float scaleY = useMatrix.d * imageHeight;
-          pattern->matrix = {scaleX, 0, 0, scaleY, 0, 0};
+        Matrix useMatrix = useTransform.empty() ? Matrix::Identity() : parseTransform(useTransform);
+
+        if (isObjectBoundingBox) {
+          // For objectBoundingBox, the pattern content is in 0-1 space.
+          // The use transform (e.g., scale(0.005)) maps image to 0-1 space.
+          // We need to scale from image space to shape bounds.
+          // Final scale: imageSize * useScale * shapeBounds
+          float scaleX = imageWidth * useMatrix.a * shapeBounds.width;
+          float scaleY = imageHeight * useMatrix.d * shapeBounds.height;
+          pattern->matrix = Matrix::Scale(scaleX, scaleY);
+        } else {
+          // For userSpaceOnUse, use the transform directly.
+          float scaleX = imageWidth * useMatrix.a;
+          float scaleY = imageHeight * useMatrix.d;
+          pattern->matrix = Matrix::Scale(scaleX, scaleY);
         }
       }
     } else if (child->name == "image") {
@@ -605,6 +611,17 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
         imageHref = getAttribute(child, "href");
       }
       pattern->image = imageHref;
+
+      float imageWidth = parseLength(getAttribute(child, "width"), 1.0f);
+      float imageHeight = parseLength(getAttribute(child, "height"), 1.0f);
+
+      if (isObjectBoundingBox) {
+        // Scale image to shape bounds.
+        pattern->matrix = Matrix::Scale(imageWidth * shapeBounds.width,
+                                        imageHeight * shapeBounds.height);
+      } else {
+        pattern->matrix = Matrix::Scale(imageWidth, imageHeight);
+      }
     }
     child = child->getNextSibling();
   }
@@ -615,6 +632,9 @@ std::unique_ptr<ImagePatternNode> SVGParserImpl::convertPattern(
 void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
                                   std::vector<std::unique_ptr<VectorElementNode>>& contents,
                                   const InheritedStyle& inheritedStyle) {
+  // Get shape bounds for pattern calculations (computed once, used if needed).
+  Rect shapeBounds = getShapeBounds(element);
+
   // Determine effective fill value (element attribute overrides inherited).
   std::string fill = getAttribute(element, "fill");
   if (fill.empty()) {
@@ -643,7 +663,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         } else if (it->second->name == "radialGradient") {
           fillNode->colorSource = convertRadialGradient(it->second);
         } else if (it->second->name == "pattern") {
-          fillNode->colorSource = convertPattern(it->second);
+          fillNode->colorSource = convertPattern(it->second, shapeBounds);
         }
       }
       contents.push_back(std::move(fillNode));
@@ -694,7 +714,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         } else if (it->second->name == "radialGradient") {
           strokeNode->colorSource = convertRadialGradient(it->second);
         } else if (it->second->name == "pattern") {
-          strokeNode->colorSource = convertPattern(it->second);
+          strokeNode->colorSource = convertPattern(it->second, shapeBounds);
         }
       }
     } else {
@@ -749,6 +769,64 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     contents.push_back(std::move(strokeNode));
   }
+}
+
+Rect SVGParserImpl::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
+  const auto& tag = element->name;
+
+  if (tag == "rect") {
+    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+    float width = parseLength(getAttribute(element, "width"), _viewBoxWidth);
+    float height = parseLength(getAttribute(element, "height"), _viewBoxHeight);
+    return Rect::MakeXYWH(x, y, width, height);
+  }
+
+  if (tag == "circle") {
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
+    return Rect::MakeXYWH(cx - r, cy - r, r * 2, r * 2);
+  }
+
+  if (tag == "ellipse") {
+    float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
+    float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
+    float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
+    float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
+    return Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2);
+  }
+
+  if (tag == "line") {
+    float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
+    float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
+    float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
+    float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
+    float minX = std::min(x1, x2);
+    float minY = std::min(y1, y2);
+    float maxX = std::max(x1, x2);
+    float maxY = std::max(y1, y2);
+    return Rect::MakeXYWH(minX, minY, maxX - minX, maxY - minY);
+  }
+
+  if (tag == "path") {
+    std::string d = getAttribute(element, "d");
+    if (!d.empty()) {
+      auto pathData = PathData::FromSVGString(d);
+      return pathData.getBounds();
+    }
+  }
+
+  // For polyline and polygon, parse points and compute bounds.
+  if (tag == "polyline" || tag == "polygon") {
+    std::string pointsStr = getAttribute(element, "points");
+    if (!pointsStr.empty()) {
+      auto pathData = parsePoints(pointsStr, tag == "polygon");
+      return pathData.getBounds();
+    }
+  }
+
+  return Rect::MakeXYWH(0, 0, 0, 0);
 }
 
 Matrix SVGParserImpl::parseTransform(const std::string& value) {
