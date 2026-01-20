@@ -20,6 +20,10 @@ file(GLOB PAGX_CORE_SOURCES
 )
 list(APPEND PAGX_SOURCES ${PAGX_CORE_SOURCES})
 
+# XML parser sources (based on expat)
+file(GLOB PAGX_XML_SOURCES src/xml/*.cpp)
+list(APPEND PAGX_SOURCES ${PAGX_XML_SOURCES})
+
 # SVG parser (also independent of tgfx)
 if (PAGX_BUILD_SVG)
     file(GLOB PAGX_SVG_SOURCES src/svg/*.cpp)
@@ -46,6 +50,24 @@ target_include_directories(pagx PUBLIC
 target_include_directories(pagx PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# expat include directory (use tgfx's expat if available, otherwise use libpag's)
+if (TARGET tgfx)
+    # Use tgfx's expat directory
+    target_include_directories(pagx PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tgfx/third_party/expat
+    )
+else()
+    # Use libpag's expat directory
+    target_include_directories(pagx PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat
+    )
+endif()
+
+# Windows requires XML_STATIC definition for static expat
+if(WIN32)
+    target_compile_definitions(pagx PRIVATE XML_STATIC)
+endif()
 
 if (PAGX_BUILD_SVG)
     target_include_directories(pagx PRIVATE

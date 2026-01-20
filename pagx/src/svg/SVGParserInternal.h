@@ -24,56 +24,47 @@
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXSVGParser.h"
+#include "xml/XMLDOM.h"
 
 namespace pagx {
 
 /**
- * Internal XML node representation for SVG parsing.
- */
-struct SVGXMLNode {
-  std::string tagName = {};
-  std::unordered_map<std::string, std::string> attributes = {};
-  std::vector<std::unique_ptr<SVGXMLNode>> children = {};
-  std::string textContent = {};
-
-  std::string getAttribute(const std::string& name, const std::string& defaultValue = "") const {
-    auto it = attributes.find(name);
-    return it != attributes.end() ? it->second : defaultValue;
-  }
-};
-
-/**
- * Internal SVG parser implementation.
+ * Internal SVG parser implementation using expat-based XML DOM parsing.
  */
 class SVGParserImpl {
  public:
   explicit SVGParserImpl(const PAGXSVGParser::Options& options);
 
   std::shared_ptr<PAGXDocument> parse(const uint8_t* data, size_t length);
+  std::shared_ptr<PAGXDocument> parseFile(const std::string& filePath);
 
  private:
-  std::unique_ptr<SVGXMLNode> parseXML(const char* data, size_t length);
+  std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<DOM>& dom);
 
-  void parseDefs(SVGXMLNode* defsNode);
+  void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
-  std::unique_ptr<LayerNode> convertToLayer(SVGXMLNode* element);
-  void convertChildren(SVGXMLNode* element, std::vector<std::unique_ptr<VectorElementNode>>& contents);
-  std::unique_ptr<VectorElementNode> convertElement(SVGXMLNode* element);
-  std::unique_ptr<GroupNode> convertG(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertRect(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertCircle(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertEllipse(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertLine(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertPolyline(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertPolygon(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertPath(SVGXMLNode* element);
-  std::unique_ptr<GroupNode> convertText(SVGXMLNode* element);
-  std::unique_ptr<VectorElementNode> convertUse(SVGXMLNode* element);
+  std::unique_ptr<LayerNode> convertToLayer(const std::shared_ptr<DOMNode>& element);
+  void convertChildren(const std::shared_ptr<DOMNode>& element,
+                       std::vector<std::unique_ptr<VectorElementNode>>& contents);
+  std::unique_ptr<VectorElementNode> convertElement(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<GroupNode> convertG(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertRect(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertCircle(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertEllipse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertLine(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertPolyline(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertPolygon(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertPath(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<GroupNode> convertText(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElementNode> convertUse(const std::shared_ptr<DOMNode>& element);
 
-  std::unique_ptr<LinearGradientNode> convertLinearGradient(SVGXMLNode* element);
-  std::unique_ptr<RadialGradientNode> convertRadialGradient(SVGXMLNode* element);
+  std::unique_ptr<LinearGradientNode> convertLinearGradient(
+      const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<RadialGradientNode> convertRadialGradient(
+      const std::shared_ptr<DOMNode>& element);
 
-  void addFillStroke(SVGXMLNode* element, std::vector<std::unique_ptr<VectorElementNode>>& contents);
+  void addFillStroke(const std::shared_ptr<DOMNode>& element,
+                     std::vector<std::unique_ptr<VectorElementNode>>& contents);
 
   Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
@@ -82,9 +73,13 @@ class SVGParserImpl {
   PathData parsePoints(const std::string& value, bool closed);
   std::string resolveUrl(const std::string& url);
 
+  // Helper to get attribute from DOMNode.
+  std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
+                           const std::string& defaultValue = "") const;
+
   PAGXSVGParser::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
-  std::unordered_map<std::string, SVGXMLNode*> _defs = {};
+  std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 };
