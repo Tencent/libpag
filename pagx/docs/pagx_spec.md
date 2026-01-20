@@ -183,7 +183,7 @@ PAGX 支持多种颜色格式：
 线性渐变沿起点到终点的方向插值。
 
 ```xml
-<LinearGradient id="grad1" startX="0" startY="0" endX="100" endY="0">
+<LinearGradient id="grad1" startPoint="0,0" endPoint="100,0">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </LinearGradient>
@@ -192,10 +192,8 @@ PAGX 支持多种颜色格式：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | string | - | 唯一标识 |
-| `startX` | float | 0 | 起点 X |
-| `startY` | float | 0 | 起点 Y |
-| `endX` | float | - | 终点 X |
-| `endY` | float | - | 终点 Y |
+| `startPoint` | point | 0,0 | 起点 |
+| `endPoint` | point | - | 终点 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
@@ -205,7 +203,7 @@ PAGX 支持多种颜色格式：
 径向渐变从中心向外辐射。
 
 ```xml
-<RadialGradient id="grad2" centerX="50" centerY="50" radius="50">
+<RadialGradient id="grad2" center="50,50" radius="50">
   <ColorStop offset="0" color="#FFFFFF"/>
   <ColorStop offset="1" color="#000000"/>
 </RadialGradient>
@@ -214,8 +212,7 @@ PAGX 支持多种颜色格式：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | string | - | 唯一标识 |
-| `centerX` | float | 0 | 中心点 X |
-| `centerY` | float | 0 | 中心点 Y |
+| `center` | point | 0,0 | 中心点 |
 | `radius` | float | - | 渐变半径 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
@@ -226,7 +223,7 @@ PAGX 支持多种颜色格式：
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
 ```xml
-<ConicGradient id="grad3" centerX="50" centerY="50" startAngle="0" endAngle="360">
+<ConicGradient id="grad3" center="50,50" startAngle="0" endAngle="360">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </ConicGradient>
@@ -235,8 +232,7 @@ PAGX 支持多种颜色格式：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | string | - | 唯一标识 |
-| `centerX` | float | 0 | 中心点 X |
-| `centerY` | float | 0 | 中心点 Y |
+| `center` | point | 0,0 | 中心点 |
 | `startAngle` | float | 0 | 起始角度 |
 | `endAngle` | float | 360 | 结束角度 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
@@ -248,7 +244,7 @@ PAGX 支持多种颜色格式：
 菱形渐变从中心向四角辐射。
 
 ```xml
-<DiamondGradient id="grad4" centerX="50" centerY="50" halfDiagonal="50">
+<DiamondGradient id="grad4" center="50,50" halfDiagonal="50">
   <ColorStop offset="0" color="#FFFFFF"/>
   <ColorStop offset="1" color="#000000"/>
 </DiamondGradient>
@@ -257,8 +253,7 @@ PAGX 支持多种颜色格式：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | string | - | 唯一标识 |
-| `centerX` | float | 0 | 中心点 X |
-| `centerY` | float | 0 | 中心点 Y |
+| `center` | point | 0,0 | 中心点 |
 | `halfDiagonal` | float | - | 半对角线长度 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
@@ -298,21 +293,21 @@ PAGX 支持多种颜色格式：
 **示例**：在 100×100 的区域内绘制一个从左到右的线性渐变：
 
 ```xml
-<LinearGradient id="grad" startX="0" startY="0" endX="100" endY="0">
+<LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </LinearGradient>
 
 <Layer>
   <contents>
-    <Rectangle centerX="50" centerY="50" width="100" height="100"/>
+    <Rectangle center="50,50" size="100,100"/>
     <Fill color="#grad"/>
   </contents>
 </Layer>
 ```
 
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
-- 直接将 Rectangle 的 width/height 改为 200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
+- 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
 #### 2.9.7 ImagePattern（图片图案）
 
@@ -407,7 +402,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 <Resources>
   <Image id="img1" source="photo.png"/>
   <SolidColor id="brandRed" color="#FF0000"/>
-  <LinearGradient id="skyGradient" startX="0" startY="0" endX="0" endY="100">
+  <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,100">
     <ColorStop offset="0" color="#87CEEB"/>
     <ColorStop offset="1" color="#E0F6FF"/>
   </LinearGradient>
@@ -439,7 +434,7 @@ Resources 中可定义以下颜色源类型（详见 2.9 节）：
 <Composition id="buttonComp" width="100" height="50">
   <Layer name="button">
     <contents>
-      <Rectangle centerX="50" centerY="25" width="100" height="50" roundness="10"/>
+      <Rectangle center="50,25" size="100,50" roundness="10"/>
       <Fill color="#007AFF"/>
     </contents>
   </Layer>
@@ -559,7 +554,7 @@ PAGX 文档采用层级结构组织内容：
 | `saturation` | D 的色相和亮度 + S 的饱和度 | 饱和度 |
 | `color` | D 的亮度 + S 的色相和饱和度 | 颜色 |
 | `luminosity` | S 的亮度 + D 的色相和饱和度 | 亮度 |
-| `add` | S + D | 相加 |
+| `plusLighter` | S + D | 相加（趋向白色） |
 
 #### 图层渲染流程
 
@@ -611,8 +606,8 @@ PAGX 文档采用层级结构组织内容：
 3. 将图层 alpha 通道替换为 `color` 的颜色
 
 **showBehindLayer**：
-- `true`：阴影绘制在图层内容下方
-- `false`：阴影绘制在图层内容上方
+- `true`：阴影完整显示，包括被图层内容遮挡的部分
+- `false`：阴影被图层内容遮挡的部分会被挖空（仅显示图层轮廓外的阴影）
 
 #### 4.2.2 InnerShadowStyle（内阴影）
 
@@ -742,7 +737,7 @@ PAGX 文档采用层级结构组织内容：
 ```xml
 <Layer id="maskShape" visible="false">
   <contents>
-    <Ellipse centerX="100" centerY="100" width="150" height="150"/>
+    <Ellipse center="100,100" size="150,150"/>
     <Fill color="#FFFFFF"/>
   </contents>
 </Layer>
@@ -845,29 +840,27 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 矩形从中心点定义，支持统一圆角。
 
 ```xml
-<Rectangle centerX="100" centerY="100" width="200" height="150" roundness="10" reversed="false"/>
+<Rectangle center="100,100" size="200,150" roundness="10" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `centerX` | float | 0 | 中心 X |
-| `centerY` | float | 0 | 中心 Y |
-| `width` | float | 0 | 宽度 |
-| `height` | float | 0 | 高度 |
+| `center` | point | 0,0 | 中心点 |
+| `size` | size | 0,0 | 尺寸 "width,height" |
 | `roundness` | float | 0 | 圆角半径 |
 | `reversed` | bool | false | 反转路径方向 |
 
 **计算规则**：
 ```
-rect.left   = centerX - width / 2
-rect.top    = centerY - height / 2
-rect.right  = centerX + width / 2
-rect.bottom = centerY + height / 2
+rect.left   = center.x - size.width / 2
+rect.top    = center.y - size.height / 2
+rect.right  = center.x + size.width / 2
+rect.bottom = center.y + size.height / 2
 ```
 
 **圆角处理**：
-- `roundness` 值自动限制为 `min(roundness, width/2, height/2)`
-- 当 `roundness >= min(width, height) / 2` 时，短边方向呈半圆形
+- `roundness` 值自动限制为 `min(roundness, size.width/2, size.height/2)`
+- 当 `roundness >= min(size.width, size.height) / 2` 时，短边方向呈半圆形
 
 **路径起点**：矩形路径从**右上角**开始，顺时针方向绘制（`reversed="false"` 时）。
 
@@ -876,23 +869,21 @@ rect.bottom = centerY + height / 2
 椭圆从中心点定义。
 
 ```xml
-<Ellipse centerX="100" centerY="100" width="100" height="60" reversed="false"/>
+<Ellipse center="100,100" size="100,60" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `centerX` | float | 0 | 中心 X |
-| `centerY` | float | 0 | 中心 Y |
-| `width` | float | 0 | 宽度 |
-| `height` | float | 0 | 高度 |
+| `center` | point | 0,0 | 中心点 |
+| `size` | size | 0,0 | 尺寸 "width,height" |
 | `reversed` | bool | false | 反转路径方向 |
 
 **计算规则**：
 ```
-boundingRect.left   = centerX - width / 2
-boundingRect.top    = centerY - height / 2
-boundingRect.right  = centerX + width / 2
-boundingRect.bottom = centerY + height / 2
+boundingRect.left   = center.x - size.width / 2
+boundingRect.top    = center.y - size.height / 2
+boundingRect.right  = center.x + size.width / 2
+boundingRect.bottom = center.y + size.height / 2
 ```
 
 **路径起点**：椭圆路径从**右侧中点**（3 点钟方向）开始。
@@ -902,15 +893,14 @@ boundingRect.bottom = centerY + height / 2
 支持正多边形和星形两种模式。
 
 ```xml
-<Polystar centerX="100" centerY="100" type="star" points="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+<Polystar center="100,100" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `centerX` | float | 0 | 中心 X |
-| `centerY` | float | 0 | 中心 Y |
-| `type` | PolystarType | star | 类型（见下方） |
-| `points` | float | 5 | 顶点数（支持小数） |
+| `center` | point | 0,0 | 中心点 |
+| `polystarType` | PolystarType | star | 类型（见下方） |
+| `pointCount` | float | 5 | 顶点数（支持小数） |
 | `outerRadius` | float | 100 | 外半径 |
 | `innerRadius` | float | 50 | 内半径（仅星形） |
 | `rotation` | float | 0 | 旋转角度 |
@@ -936,15 +926,15 @@ boundingRect.bottom = centerY + height / 2
 
 **顶点计算**（第 i 个外顶点）：
 ```
-angle = rotation + (i / points) * 360°
-x = centerX + outerRadius * cos(angle)
-y = centerY + outerRadius * sin(angle)
+angle = rotation + (i / pointCount) * 360°
+x = center.x + outerRadius * cos(angle)
+y = center.y + outerRadius * sin(angle)
 ```
 
 **小数点数**：
-- `points` 支持小数值（如 `5.5`）
+- `pointCount` 支持小数值（如 `5.5`）
 - 小数部分表示最后一个顶点的"完成度"，产生不完整的最后一个角
-- `points <= 0` 时不生成任何路径
+- `pointCount <= 0` 时不生成任何路径
 
 **圆度处理**：
 - `outerRoundness` 和 `innerRoundness` 取值范围 0~1
@@ -956,12 +946,12 @@ y = centerY + outerRadius * sin(angle)
 使用 SVG 路径语法定义任意形状。
 
 ```xml
-<Path d="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
+<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `d` | string | "" | SVG 路径数据（语法见 2.7 节） |
+| `data` | string | "" | SVG 路径数据（语法见 2.7 节） |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -1010,7 +1000,7 @@ y = centerY + outerRadius * sin(angle)
 
 <!-- 内联线性渐变（仅使用一次时推荐） -->
 <Fill>
-  <LinearGradient startX="0" startY="0" endX="100" endY="0">
+  <LinearGradient startPoint="0,0" endPoint="100,0">
     <ColorStop offset="0" color="#FF0000"/>
     <ColorStop offset="1" color="#0000FF"/>
   </LinearGradient>
@@ -1055,7 +1045,7 @@ y = centerY + outerRadius * sin(angle)
 
 <!-- 内联渐变描边 -->
 <Stroke width="3">
-  <LinearGradient startX="0" startY="0" endX="100" endY="0">
+  <LinearGradient startPoint="0,0" endPoint="100,0">
     <ColorStop offset="0" color="#FF0000"/>
     <ColorStop offset="1" color="#0000FF"/>
   </LinearGradient>
@@ -1177,14 +1167,14 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 将所有形状合并为单个形状。
 
 ```xml
-<MergePath op="union"/>
+<MergePath mode="union"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `op` | PathOp | append | 合并操作（见下方） |
+| `mode` | MergePathOp | append | 合并操作（见下方） |
 
-**PathOp（路径合并操作）**：
+**MergePathOp（路径合并操作）**：
 
 | 值 | 说明 |
 |------|------|
@@ -1204,7 +1194,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <Rectangle .../>
 <Fill color="red"/>
 <Ellipse .../>
-<MergePath op="Union"/>
+<MergePath mode="union"/>
 <Fill color="blue"/>
 ```
 
@@ -1275,14 +1265,14 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。
 
 ```xml
-<TextModifier anchor="0.5,0.5" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
-  <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomize="false" seed="0"/>
+<TextModifier anchorPoint="0.5,0.5" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+  <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
 </TextModifier>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchor` | point | 0.5,0.5 | 锚点（归一化） |
+| `anchorPoint` | point | 0.5,0.5 | 锚点（归一化） |
 | `position` | point | 0,0 | 位置偏移 |
 | `rotation` | float | 0 | 旋转 |
 | `scale` | point | 1,1 | 缩放 |
@@ -1306,11 +1296,11 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 factor = clamp(selectorFactor × weight, -1, 1)
 
 // 位置和旋转：线性应用 factor
-transform = translate(-anchor × factor) 
+transform = translate(-anchorPoint × factor) 
           × scale(1 + (scale - 1) × factor)  // 缩放从 1 插值到目标值
           × skew(skew × factor, skewAxis)
           × rotate(rotation × factor)
-          × translate(anchor × factor)
+          × translate(anchorPoint × factor)
           × translate(position × factor)
 
 // 透明度：使用 factor 的绝对值
@@ -1332,7 +1322,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 范围选择器定义 TextModifier 影响的字形范围和影响程度。
 
 ```xml
-<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomize="false" seed="0"/>
+<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1346,8 +1336,8 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `easeOut` | float | 0 | 缓出量 |
 | `mode` | SelectorMode | add | 组合模式（见下方） |
 | `weight` | float | 1 | 选择器权重 |
-| `randomize` | bool | false | 随机顺序 |
-| `seed` | int | 0 | 随机种子 |
+| `randomizeOrder` | bool | false | 随机顺序 |
+| `randomSeed` | int | 0 | 随机种子 |
 
 **SelectorUnit（单位）**：
 
@@ -1490,7 +1480,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
 
 ```xml
-<Repeater copies="5" offset="1" order="belowOriginal" anchor="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+<Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1498,7 +1488,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `copies` | float | 3 | 副本数 |
 | `offset` | float | 0 | 起始偏移 |
 | `order` | RepeaterOrder | belowOriginal | 堆叠顺序（见下方） |
-| `anchor` | point | 0,0 | 锚点 |
+| `anchorPoint` | point | 0,0 | 锚点 |
 | `position` | point | 100,100 | 每个副本的位置偏移 |
 | `rotation` | float | 0 | 每个副本的旋转 |
 | `scale` | point | 1,1 | 每个副本的缩放 |
@@ -1508,11 +1498,11 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 **变换计算**（第 i 个副本，i 从 0 开始）：
 ```
 progress = i + offset
-matrix = translate(-anchor) 
+matrix = translate(-anchorPoint) 
        × scale(scale^progress)      // 指数缩放
        × rotate(rotation × progress) // 线性旋转
        × translate(position × progress) // 线性位移
-       × translate(anchor)
+       × translate(anchorPoint)
 ```
 
 **透明度插值**：
@@ -1564,7 +1554,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 Group 是带变换属性的矢量元素容器。
 
 ```xml
-<Group name="myGroup" anchor="50,50" position="100,200" rotation="45" scale="1,1" skew="0" skewAxis="0" alpha="1">
+<Group name="myGroup" anchorPoint="50,50" position="100,200" rotation="45" scale="1,1" skew="0" skewAxis="0" alpha="1">
   <!-- 子元素 -->
 </Group>
 ```
@@ -1572,7 +1562,7 @@ Group 是带变换属性的矢量元素容器。
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `name` | string | "" | 组名称 |
-| `anchor` | point | 0,0 | 锚点 "x,y" |
+| `anchorPoint` | point | 0,0 | 锚点 "x,y" |
 | `position` | point | 0,0 | 位置 "x,y" |
 | `rotation` | float | 0 | 旋转角度 |
 | `scale` | point | 1,1 | 缩放 "sx,sy" |
@@ -1584,7 +1574,7 @@ Group 是带变换属性的矢量元素容器。
 
 变换按以下顺序应用（后应用的变换先计算）：
 
-1. 平移到锚点的负方向（`translate(-anchor)`）
+1. 平移到锚点的负方向（`translate(-anchorPoint)`）
 2. 缩放（`scale`）
 3. 倾斜（`skew` 沿 `skewAxis` 方向）
 4. 旋转（`rotation`）
@@ -1592,7 +1582,7 @@ Group 是带变换属性的矢量元素容器。
 
 **变换矩阵**：
 ```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
+M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchorPoint)
 ```
 
 **倾斜变换**：
@@ -1655,7 +1645,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **示例 4 - 多重填充**：
 ```xml
-<Rectangle centerX="100" centerY="100" width="200" height="100" roundness="10"/>
+<Rectangle center="100,100" size="200,100" roundness="10"/>
 <Fill>
   <ImagePattern image="#checkerboard" tileModeX="repeat" tileModeY="repeat"/>
 </Fill>
@@ -1672,9 +1662,9 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **示例 6 - 混合叠加**：
 ```xml
-<Ellipse centerX="100" centerY="100" width="180" height="180"/>
+<Ellipse center="100,100" size="180,180"/>
 <Fill>
-  <RadialGradient centerX="100" centerY="100" radius="90">
+  <RadialGradient center="100,100" radius="90">
     <ColorStop offset="0" color="#FFFFFF"/>
     <ColorStop offset="1" color="#3366FF"/>
   </RadialGradient>
@@ -1717,7 +1707,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 <pagx version="1.0" width="400" height="300">
   
   <Resources>
-    <LinearGradient id="skyGradient" startX="0" startY="0" endX="0" endY="300">
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,300">
       <ColorStop offset="0" color="#87CEEB"/>
       <ColorStop offset="1" color="#E0F6FF"/>
     </LinearGradient>
@@ -1725,7 +1715,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
     <Composition id="star" width="50" height="50">
       <Layer name="starLayer">
         <contents>
-          <Polystar centerX="25" centerY="25" type="star" points="5"
+          <Polystar center="25,25" polystarType="star" pointCount="5"
                     outerRadius="25" innerRadius="10"/>
           <Fill color="#FFD700"/>
         </contents>
@@ -1736,7 +1726,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
   <!-- 背景 -->
   <Layer name="Background">
     <contents>
-      <Rectangle centerX="200" centerY="150" width="400" height="300"/>
+      <Rectangle center="200,150" size="400,300"/>
       <Fill color="#skyGradient"/>
     </contents>
   </Layer>
@@ -1744,7 +1734,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
   <!-- 标题：使用 Group 是因为需要整体变换 -->
   <Layer name="Title">
     <contents>
-      <Group anchor="100,20" position="200,50">
+      <Group anchorPoint="100,20" position="200,50">
         <TextSpan x="0" y="32" font="Helvetica" fontSize="32" fontWeight="700">
           <![CDATA[Hello PAGX!]]>
         </TextSpan>
@@ -1764,14 +1754,14 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
   <!-- 遮罩示例 -->
   <Layer id="maskShape" name="Mask" visible="false">
     <contents>
-      <Ellipse centerX="200" centerY="200" width="150" height="150"/>
+      <Ellipse center="200,200" size="150,150"/>
       <Fill color="#FFFFFF"/>
     </contents>
   </Layer>
   
   <Layer name="MaskedContent" mask="#maskShape" maskType="alpha">
     <contents>
-      <Rectangle centerX="200" centerY="200" width="200" height="200"/>
+      <Rectangle center="200,200" size="200,200"/>
       <Fill color="#FF6B6B"/>
     </contents>
   </Layer>
