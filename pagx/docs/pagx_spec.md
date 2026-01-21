@@ -1265,14 +1265,14 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。
 
 ```xml
-<TextModifier anchorPoint="0.5,0.5" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
   <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
 </TextModifier>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchorPoint` | point | 0,0 | 锚点（归一化） |
+| `anchorPoint` | point | 0,0 | 锚点偏移 |
 | `position` | point | 0,0 | 位置偏移 |
 | `rotation` | float | 0 | 旋转 |
 | `scale` | point | 1,1 | 缩放 |
