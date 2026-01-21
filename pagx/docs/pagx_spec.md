@@ -201,7 +201,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 **路径解析规则**：
 
 - **相对路径**：相对于 PAGX 文件所在目录解析，支持 `../` 引用父目录
-- **数据 URI**：以 `data:` 开头，格式为 `data:<mediatype>;base64,<data>`
+- **数据 URI**：以 `data:` 开头，格式为 `data:<mediatype>;base64,<data>`，仅支持 base64 编码
 - 路径分隔符统一使用 `/`（正斜杠），不支持 `\`（反斜杠）
 
 ### 2.11 Image（图片）
