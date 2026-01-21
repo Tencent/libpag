@@ -193,6 +193,9 @@ class LayerBuilderImpl {
   }
 
   PAGXContent build(const PAGXDocument& document) {
+    // Cache resources for later lookup.
+    _resources = &document.resources;
+
     PAGXContent content;
     content.width = document.width;
     content.height = document.height;
@@ -207,6 +210,7 @@ class LayerBuilderImpl {
     }
 
     content.root = rootLayer;
+    _resources = nullptr;
     return content;
   }
 
@@ -469,9 +473,13 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    // Load image from data URI or file path.
+    // Load image from data URI, resource reference, or file path.
     std::shared_ptr<tgfx::Image> image = nullptr;
-    if (node->image.find("data:") == 0) {
+    if (node->image.find("#") == 0) {
+      // Resource reference (e.g., "#image0") - look up in document resources.
+      std::string resourceId = node->image.substr(1);
+      image = findImageResource(resourceId);
+    } else if (node->image.find("data:") == 0) {
       image = ImageFromDataURI(node->image);
     } else {
       // Try as file path.
@@ -508,6 +516,28 @@ class LayerBuilderImpl {
     return pattern;
   }
 
+  std::shared_ptr<tgfx::Image> findImageResource(const std::string& resourceId) {
+    if (!_resources) {
+      return nullptr;
+    }
+    for (const auto& resource : *_resources) {
+      if (resource->type() == NodeType::Image) {
+        auto imageNode = static_cast<const ImageNode*>(resource.get());
+        if (imageNode->id == resourceId) {
+          if (imageNode->source.find("data:") == 0) {
+            return ImageFromDataURI(imageNode->source);
+          } else {
+            std::string imagePath = imageNode->source;
+            if (!_options.basePath.empty() && imagePath[0] != '/') {
+              imagePath = _options.basePath + imagePath;
+            }
+            return tgfx::Image::MakeFromFile(imagePath);
+          }
+        }
+      }
+    }
+    return nullptr;
+  }
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPathNode* node) {
     auto trim = std::make_shared<tgfx::TrimPath>();
     trim->setStart(node->start);
@@ -624,6 +654,7 @@ class LayerBuilderImpl {
   }
 
   LayerBuilder::Options _options = {};
+  const std::vector<std::unique_ptr<ResourceNode>>* _resources = nullptr;
 };
 
 // Public API implementation

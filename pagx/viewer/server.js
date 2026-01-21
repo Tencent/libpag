@@ -45,7 +45,7 @@ app.get('/', (req, res) => {
   res.redirect('/index.html');
 });
 
-const port = 8082;
+const port = 8080;
 app.listen(port, () => {
   const url = `http://localhost:${port}/`;
   const start = (process.platform === 'darwin' ? 'open' : 'start');
