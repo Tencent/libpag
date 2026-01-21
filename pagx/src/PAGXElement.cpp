@@ -32,18 +32,6 @@ const char* ResourceTypeName(ResourceType type) {
       return "PathData";
     case ResourceType::Composition:
       return "Composition";
-    case ResourceType::SolidColor:
-      return "SolidColor";
-    case ResourceType::LinearGradient:
-      return "LinearGradient";
-    case ResourceType::RadialGradient:
-      return "RadialGradient";
-    case ResourceType::ConicGradient:
-      return "ConicGradient";
-    case ResourceType::DiamondGradient:
-      return "DiamondGradient";
-    case ResourceType::ImagePattern:
-      return "ImagePattern";
     default:
       return "Unknown";
   }

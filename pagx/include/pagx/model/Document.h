@@ -22,7 +22,9 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/model/Model.h"
+#include "pagx/model/ColorSource.h"
+#include "pagx/model/Layer.h"
+#include "pagx/model/Resource.h"
 
 namespace pagx {
 
@@ -51,10 +53,16 @@ class Document {
   float height = 0;
 
   /**
-   * Resources (images, gradients, compositions, etc.).
+   * Resources (images, paths, compositions).
    * These can be referenced by "#id" in the document.
    */
   std::vector<std::unique_ptr<Resource>> resources = {};
+
+  /**
+   * Color sources (gradients, solid colors, patterns).
+   * These can be referenced by "#id" in fills and strokes.
+   */
+  std::vector<std::unique_ptr<ColorSource>> colorSources = {};
 
   /**
    * Top-level layers.
@@ -101,6 +109,12 @@ class Document {
   Resource* findResource(const std::string& id) const;
 
   /**
+   * Finds a color source by ID.
+   * Returns nullptr if not found.
+   */
+  ColorSource* findColorSource(const std::string& id) const;
+
+  /**
    * Finds a layer by ID (searches recursively).
    * Returns nullptr if not found.
    */
@@ -111,6 +125,7 @@ class Document {
   Document() = default;
 
   mutable std::unordered_map<std::string, Resource*> resourceMap = {};
+  mutable std::unordered_map<std::string, ColorSource*> colorSourceMap = {};
   mutable bool resourceMapDirty = true;
 
   void rebuildResourceMap() const;

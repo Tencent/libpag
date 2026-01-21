@@ -18,16 +18,56 @@
 
 #pragma once
 
-#include "pagx/model/types/SelectorMode.h"
-#include "pagx/model/types/SelectorShape.h"
-#include "pagx/model/types/SelectorUnit.h"
+#include <string>
+#include "pagx/model/TextSelector.h"
 
 namespace pagx {
 
 /**
+ * Range selector unit.
+ */
+enum class SelectorUnit {
+  Index,
+  Percentage
+};
+
+std::string SelectorUnitToString(SelectorUnit unit);
+SelectorUnit SelectorUnitFromString(const std::string& str);
+
+/**
+ * Range selector shape.
+ */
+enum class SelectorShape {
+  Square,
+  RampUp,
+  RampDown,
+  Triangle,
+  Round,
+  Smooth
+};
+
+std::string SelectorShapeToString(SelectorShape shape);
+SelectorShape SelectorShapeFromString(const std::string& str);
+
+/**
+ * Range selector combination mode.
+ */
+enum class SelectorMode {
+  Add,
+  Subtract,
+  Intersect,
+  Min,
+  Max,
+  Difference
+};
+
+std::string SelectorModeToString(SelectorMode mode);
+SelectorMode SelectorModeFromString(const std::string& str);
+
+/**
  * Range selector for text modifier.
  */
-class RangeSelector {
+class RangeSelector : public TextSelector {
  public:
   float start = 0;
   float end = 1;
@@ -40,6 +80,10 @@ class RangeSelector {
   float weight = 1;
   bool randomizeOrder = false;
   int randomSeed = 0;
+
+  TextSelectorType type() const override {
+    return TextSelectorType::RangeSelector;
+  }
 };
 
 }  // namespace pagx

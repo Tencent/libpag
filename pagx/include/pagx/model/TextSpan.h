@@ -20,7 +20,6 @@
 
 #include <string>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/FontStyle.h"
 
 namespace pagx {
 
@@ -56,9 +55,9 @@ class TextSpan : public Element {
   int fontWeight = 400;
 
   /**
-   * The font style (Normal, Italic, or Oblique). The default value is Normal.
+   * The font style (e.g., "normal", "italic", "oblique"). The default value is "normal".
    */
-  FontStyle fontStyle = FontStyle::Normal;
+  std::string fontStyle = "normal";
 
   /**
    * The tracking value that adjusts spacing between characters. The default value is 0.

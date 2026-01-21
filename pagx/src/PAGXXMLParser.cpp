@@ -293,9 +293,16 @@ void PAGXXMLParser::parseDocument(const XMLNode* root, Document* doc) {
 
 void PAGXXMLParser::parseResources(const XMLNode* node, Document* doc) {
   for (const auto& child : node->children) {
+    // Try to parse as a resource first
     auto resource = parseResource(child.get());
     if (resource) {
       doc->resources.push_back(std::move(resource));
+      continue;
+    }
+    // Try to parse as a color source
+    auto colorSource = parseColorSource(child.get());
+    if (colorSource) {
+      doc->colorSources.push_back(std::move(colorSource));
     }
   }
 }
@@ -306,24 +313,6 @@ std::unique_ptr<Resource> PAGXXMLParser::parseResource(const XMLNode* node) {
   }
   if (node->tag == "PathData") {
     return parsePathData(node);
-  }
-  if (node->tag == "SolidColor") {
-    return parseSolidColor(node);
-  }
-  if (node->tag == "LinearGradient") {
-    return parseLinearGradient(node);
-  }
-  if (node->tag == "RadialGradient") {
-    return parseRadialGradient(node);
-  }
-  if (node->tag == "ConicGradient") {
-    return parseConicGradient(node);
-  }
-  if (node->tag == "DiamondGradient") {
-    return parseDiamondGradient(node);
-  }
-  if (node->tag == "ImagePattern") {
-    return parseImagePattern(node);
   }
   if (node->tag == "Composition") {
     return parseComposition(node);
@@ -575,7 +564,7 @@ std::unique_ptr<TextSpan> PAGXXMLParser::parseTextSpan(const XMLNode* node) {
   textSpan->font = getAttribute(node, "font");
   textSpan->fontSize = getFloatAttribute(node, "fontSize", 12);
   textSpan->fontWeight = getIntAttribute(node, "fontWeight", 400);
-  textSpan->fontStyle = FontStyleFromString(getAttribute(node, "fontStyle", "normal"));
+  textSpan->fontStyle = getAttribute(node, "fontStyle", "normal");
   textSpan->tracking = getFloatAttribute(node, "tracking", 0);
   textSpan->baselineShift = getFloatAttribute(node, "baselineShift", 0);
   textSpan->text = node->text;
@@ -592,7 +581,7 @@ std::unique_ptr<Fill> PAGXXMLParser::parseFill(const XMLNode* node) {
   fill->alpha = getFloatAttribute(node, "alpha", 1);
   fill->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   fill->fillRule = FillRuleFromString(getAttribute(node, "fillRule", "winding"));
-  fill->placement = PlacementFromString(getAttribute(node, "placement", "background"));
+  fill->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
 
   for (const auto& child : node->children) {
     auto colorSource = parseColorSource(child.get());
@@ -620,7 +609,7 @@ std::unique_ptr<Stroke> PAGXXMLParser::parseStroke(const XMLNode* node) {
   }
   stroke->dashOffset = getFloatAttribute(node, "dashOffset", 0);
   stroke->align = StrokeAlignFromString(getAttribute(node, "align", "center"));
-  stroke->placement = PlacementFromString(getAttribute(node, "placement", "background"));
+  stroke->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
 
   for (const auto& child : node->children) {
     auto colorSource = parseColorSource(child.get());
@@ -676,7 +665,7 @@ std::unique_ptr<TextModifier> PAGXXMLParser::parseTextModifier(const XMLNode* no
 
   for (const auto& child : node->children) {
     if (child->tag == "RangeSelector") {
-      modifier->rangeSelectors.push_back(parseRangeSelector(child.get()));
+      modifier->selectors.push_back(std::make_unique<RangeSelector>(parseRangeSelector(child.get())));
     }
   }
 

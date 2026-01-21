@@ -23,7 +23,20 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/model/BlurFilter.h"
 #include "pagx/model/Document.h"
+#include "pagx/model/Ellipse.h"
+#include "pagx/model/Fill.h"
+#include "pagx/model/Group.h"
+#include "pagx/model/Image.h"
+#include "pagx/model/ImagePattern.h"
+#include "pagx/model/LinearGradient.h"
+#include "pagx/model/Path.h"
+#include "pagx/model/PathData.h"
+#include "pagx/model/RadialGradient.h"
+#include "pagx/model/Rectangle.h"
+#include "pagx/model/Stroke.h"
+#include "pagx/model/TextSpan.h"
 #include "pagx/PAGXSVGParser.h"
 #include "xml/XMLDOM.h"
 

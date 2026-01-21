@@ -21,7 +21,7 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
-#include "pagx/PAGXModel.h"
+#include "pagx/model/Document.h"
 #include "SVGParserInternal.h"
 #include "xml/XMLDOM.h"
 

@@ -19,8 +19,17 @@
 #include <filesystem>
 #include "pagx/LayerBuilder.h"
 #include "pagx/model/Document.h"
+#include "pagx/model/DropShadowStyle.h"
+#include "pagx/model/BlurFilter.h"
+#include "pagx/model/Ellipse.h"
+#include "pagx/model/Fill.h"
+#include "pagx/model/Group.h"
+#include "pagx/model/LinearGradient.h"
+#include "pagx/model/Path.h"
+#include "pagx/model/RadialGradient.h"
+#include "pagx/model/Rectangle.h"
+#include "pagx/model/SolidColor.h"
 #include "pagx/PAGXSVGParser.h"
-#include "pagx/PAGXModel.h"
 #include "pagx/model/PathData.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
@@ -364,7 +373,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   // Test SolidColor
   auto solid = std::make_unique<pagx::SolidColor>();
   solid->color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
-  EXPECT_EQ(solid->colorSourceType(), pagx::ColorSourceType::SolidColor);
+  EXPECT_EQ(solid->type(), pagx::ColorSourceType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
   // Test LinearGradient
@@ -385,7 +394,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   linear->colorStops.push_back(stop1);
   linear->colorStops.push_back(stop2);
 
-  EXPECT_EQ(linear->colorSourceType(), pagx::ColorSourceType::LinearGradient);
+  EXPECT_EQ(linear->type(), pagx::ColorSourceType::LinearGradient);
   EXPECT_EQ(linear->colorStops.size(), 2u);
 
   // Test RadialGradient
@@ -395,7 +404,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   radial->radius = 50;
   radial->colorStops = linear->colorStops;
 
-  EXPECT_EQ(radial->colorSourceType(), pagx::ColorSourceType::RadialGradient);
+  EXPECT_EQ(radial->type(), pagx::ColorSourceType::RadialGradient);
 }
 
 /**

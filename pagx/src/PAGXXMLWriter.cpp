@@ -20,7 +20,40 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
-#include "pagx/model/Model.h"
+#include "pagx/model/BackgroundBlurStyle.h"
+#include "pagx/model/BlendFilter.h"
+#include "pagx/model/BlurFilter.h"
+#include "pagx/model/ColorMatrixFilter.h"
+#include "pagx/model/Composition.h"
+#include "pagx/model/ConicGradient.h"
+#include "pagx/model/DiamondGradient.h"
+#include "pagx/model/Document.h"
+#include "pagx/model/DropShadowFilter.h"
+#include "pagx/model/DropShadowStyle.h"
+#include "pagx/model/Ellipse.h"
+#include "pagx/model/Fill.h"
+#include "pagx/model/Group.h"
+#include "pagx/model/Image.h"
+#include "pagx/model/ImagePattern.h"
+#include "pagx/model/InnerShadowFilter.h"
+#include "pagx/model/InnerShadowStyle.h"
+#include "pagx/model/LinearGradient.h"
+#include "pagx/model/MergePath.h"
+#include "pagx/model/Path.h"
+#include "pagx/model/PathDataResource.h"
+#include "pagx/model/Polystar.h"
+#include "pagx/model/RadialGradient.h"
+#include "pagx/model/RangeSelector.h"
+#include "pagx/model/Rectangle.h"
+#include "pagx/model/Repeater.h"
+#include "pagx/model/RoundCorner.h"
+#include "pagx/model/SolidColor.h"
+#include "pagx/model/Stroke.h"
+#include "pagx/model/TextLayout.h"
+#include "pagx/model/TextModifier.h"
+#include "pagx/model/TextPath.h"
+#include "pagx/model/TextSpan.h"
+#include "pagx/model/TrimPath.h"
 
 namespace pagx {
 
@@ -193,7 +226,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
     return "";
   }
   std::ostringstream oss = {};
-  switch (node->colorSourceType()) {
+  switch (node->type()) {
     case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       oss << "SolidColor:" << solid->color.toHexString(true);
@@ -415,7 +448,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
 }
 
 static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writeId) {
-  switch (node->colorSourceType()) {
+  switch (node->type()) {
     case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
@@ -543,7 +576,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
 // Write ColorSource with assigned id (for Resources section)
 static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
                                    const std::string& id) {
-  switch (node->colorSourceType()) {
+  switch (node->type()) {
     case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
@@ -733,8 +766,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.addAttribute("font", text->font);
       xml.addAttribute("fontSize", text->fontSize, 12.0f);
       xml.addAttribute("fontWeight", text->fontWeight, 400);
-      if (text->fontStyle != FontStyle::Normal) {
-        xml.addAttribute("fontStyle", FontStyleToString(text->fontStyle));
+      if (text->fontStyle != "normal" && !text->fontStyle.empty()) {
+        xml.addAttribute("fontStyle", text->fontStyle);
       }
       xml.addAttribute("tracking", text->tracking);
       xml.addAttribute("baselineShift", text->baselineShift);
@@ -764,8 +797,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       if (fill->fillRule != FillRule::Winding) {
         xml.addAttribute("fillRule", FillRuleToString(fill->fillRule));
       }
-      if (fill->placement != Placement::Background) {
-        xml.addAttribute("placement", PlacementToString(fill->placement));
+      if (fill->placement != LayerPlacement::Background) {
+        xml.addAttribute("placement", LayerPlacementToString(fill->placement));
       }
       // Inline ColorSource only if not extracted to Resources
       if (fill->colorSource && ctx.getColorSourceId(fill->colorSource.get()).empty()) {
@@ -810,8 +843,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       if (stroke->align != StrokeAlign::Center) {
         xml.addAttribute("align", StrokeAlignToString(stroke->align));
       }
-      if (stroke->placement != Placement::Background) {
-        xml.addAttribute("placement", PlacementToString(stroke->placement));
+      if (stroke->placement != LayerPlacement::Background) {
+        xml.addAttribute("placement", LayerPlacementToString(stroke->placement));
       }
       // Inline ColorSource only if not extracted to Resources
       if (stroke->colorSource && ctx.getColorSourceId(stroke->colorSource.get()).empty()) {
@@ -872,29 +905,33 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       if (modifier->strokeWidth >= 0) {
         xml.addAttribute("strokeWidth", modifier->strokeWidth);
       }
-      if (modifier->rangeSelectors.empty()) {
+      if (modifier->selectors.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
-        for (const auto& selector : modifier->rangeSelectors) {
+        for (const auto& selector : modifier->selectors) {
+          if (selector->type() != TextSelectorType::RangeSelector) {
+            continue;
+          }
+          auto rangeSelector = static_cast<const RangeSelector*>(selector.get());
           xml.openElement("RangeSelector");
-          xml.addAttribute("start", selector.start);
-          xml.addAttribute("end", selector.end, 1.0f);
-          xml.addAttribute("offset", selector.offset);
-          if (selector.unit != SelectorUnit::Percentage) {
-            xml.addAttribute("unit", SelectorUnitToString(selector.unit));
+          xml.addAttribute("start", rangeSelector->start);
+          xml.addAttribute("end", rangeSelector->end, 1.0f);
+          xml.addAttribute("offset", rangeSelector->offset);
+          if (rangeSelector->unit != SelectorUnit::Percentage) {
+            xml.addAttribute("unit", SelectorUnitToString(rangeSelector->unit));
           }
-          if (selector.shape != SelectorShape::Square) {
-            xml.addAttribute("shape", SelectorShapeToString(selector.shape));
+          if (rangeSelector->shape != SelectorShape::Square) {
+            xml.addAttribute("shape", SelectorShapeToString(rangeSelector->shape));
           }
-          xml.addAttribute("easeIn", selector.easeIn);
-          xml.addAttribute("easeOut", selector.easeOut);
-          if (selector.mode != SelectorMode::Add) {
-            xml.addAttribute("mode", SelectorModeToString(selector.mode));
+          xml.addAttribute("easeIn", rangeSelector->easeIn);
+          xml.addAttribute("easeOut", rangeSelector->easeOut);
+          if (rangeSelector->mode != SelectorMode::Add) {
+            xml.addAttribute("mode", SelectorModeToString(rangeSelector->mode));
           }
-          xml.addAttribute("weight", selector.weight, 1.0f);
-          xml.addAttribute("randomizeOrder", selector.randomizeOrder);
-          xml.addAttribute("randomSeed", selector.randomSeed);
+          xml.addAttribute("weight", rangeSelector->weight, 1.0f);
+          xml.addAttribute("randomizeOrder", rangeSelector->randomizeOrder);
+          xml.addAttribute("randomSeed", rangeSelector->randomSeed);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();
@@ -1147,14 +1184,6 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
       }
       break;
     }
-    case ResourceType::SolidColor:
-    case ResourceType::LinearGradient:
-    case ResourceType::RadialGradient:
-    case ResourceType::ConicGradient:
-    case ResourceType::DiamondGradient:
-    case ResourceType::ImagePattern:
-      writeColorSource(xml, static_cast<const ColorSource*>(node), true);
-      break;
     default:
       break;
   }

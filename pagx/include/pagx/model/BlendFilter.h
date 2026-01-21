@@ -20,7 +20,7 @@
 
 #include "pagx/model/LayerFilter.h"
 #include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Color.h"
 
 namespace pagx {
 

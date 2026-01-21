@@ -18,10 +18,21 @@
 
 #pragma once
 
+#include <string>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/TrimType.h"
 
 namespace pagx {
+
+/**
+ * Trim path types.
+ */
+enum class TrimType {
+  Separate,
+  Continuous
+};
+
+std::string TrimTypeToString(TrimType type);
+TrimType TrimTypeFromString(const std::string& str);
 
 /**
  * TrimPath is a path modifier that trims paths to a specified range. It can be used to animate

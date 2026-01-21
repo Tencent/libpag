@@ -22,7 +22,8 @@
 #include <vector>
 #include "pagx/model/ColorSource.h"
 #include "pagx/model/ColorStop.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Matrix.h"
+#include "pagx/model/types/Point.h"
 
 namespace pagx {
 
@@ -37,16 +38,8 @@ class LinearGradient : public ColorSource {
   Matrix matrix = {};
   std::vector<ColorStop> colorStops = {};
 
-  ColorSourceType colorSourceType() const override {
+  ColorSourceType type() const override {
     return ColorSourceType::LinearGradient;
-  }
-
-  ResourceType type() const override {
-    return ResourceType::LinearGradient;
-  }
-
-  const std::string& resourceId() const override {
-    return id;
   }
 };
 

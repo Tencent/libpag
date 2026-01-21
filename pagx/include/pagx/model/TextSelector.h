@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,27 +18,19 @@
 
 #pragma once
 
-#include "pagx/model/LayerStyle.h"
-#include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/Color.h"
-
 namespace pagx {
 
-/**
- * Inner shadow style.
- */
-class InnerShadowStyle : public LayerStyle {
- public:
-  float offsetX = 0;
-  float offsetY = 0;
-  float blurrinessX = 0;
-  float blurrinessY = 0;
-  Color color = {};
-  BlendMode blendMode = BlendMode::Normal;
+enum class TextSelectorType {
+  RangeSelector
+};
 
-  LayerStyleType type() const override {
-    return LayerStyleType::InnerShadowStyle;
-  }
+class TextSelector {
+ public:
+  virtual ~TextSelector() = default;
+  virtual TextSelectorType type() const = 0;
+
+ protected:
+  TextSelector() = default;
 };
 
 }  // namespace pagx

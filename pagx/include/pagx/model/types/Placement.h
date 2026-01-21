@@ -25,12 +25,12 @@ namespace pagx {
 /**
  * Placement of fill/stroke relative to child layers.
  */
-enum class Placement {
+enum class LayerPlacement {
   Background,
   Foreground
 };
 
-std::string PlacementToString(Placement placement);
-Placement PlacementFromString(const std::string& str);
+std::string LayerPlacementToString(LayerPlacement placement);
+LayerPlacement LayerPlacementFromString(const std::string& str);
 
 }  // namespace pagx

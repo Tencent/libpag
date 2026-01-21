@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pagx/model/Resource.h"
-
 namespace pagx {
 
 /**
@@ -41,14 +39,16 @@ const char* ColorSourceTypeName(ColorSourceType type);
 
 /**
  * Base class for color sources (SolidColor, gradients, ImagePattern).
- * ColorSource can be used both inline in painters and as standalone resources.
+ * ColorSource can be used both inline in painters and as standalone resources in defs.
  */
-class ColorSource : public Resource {
+class ColorSource {
  public:
+  virtual ~ColorSource() = default;
+
   /**
    * Returns the color source type of this color source.
    */
-  virtual ColorSourceType colorSourceType() const = 0;
+  virtual ColorSourceType type() const = 0;
 
  protected:
   ColorSource() = default;

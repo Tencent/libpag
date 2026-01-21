@@ -18,10 +18,24 @@
 
 #pragma once
 
+#include <string>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/MergePathMode.h"
 
 namespace pagx {
+
+/**
+ * Path merge modes (boolean operations).
+ */
+enum class MergePathMode {
+  Append,
+  Union,
+  Intersect,
+  Xor,
+  Difference
+};
+
+std::string MergePathModeToString(MergePathMode mode);
+MergePathMode MergePathModeFromString(const std::string& str);
 
 /**
  * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,

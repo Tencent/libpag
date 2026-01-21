@@ -20,7 +20,32 @@
 #include <array>
 #include <tuple>
 #include <unordered_map>
-#include "pagx/model/Model.h"
+#include "pagx/model/BlurFilter.h"
+#include "pagx/model/Composition.h"
+#include "pagx/model/ConicGradient.h"
+#include "pagx/model/DiamondGradient.h"
+#include "pagx/model/DropShadowFilter.h"
+#include "pagx/model/DropShadowStyle.h"
+#include "pagx/model/Ellipse.h"
+#include "pagx/model/Fill.h"
+#include "pagx/model/Group.h"
+#include "pagx/model/Image.h"
+#include "pagx/model/ImagePattern.h"
+#include "pagx/model/InnerShadowFilter.h"
+#include "pagx/model/InnerShadowStyle.h"
+#include "pagx/model/Layer.h"
+#include "pagx/model/LinearGradient.h"
+#include "pagx/model/MergePath.h"
+#include "pagx/model/Path.h"
+#include "pagx/model/Polystar.h"
+#include "pagx/model/RadialGradient.h"
+#include "pagx/model/Rectangle.h"
+#include "pagx/model/Repeater.h"
+#include "pagx/model/RoundCorner.h"
+#include "pagx/model/SolidColor.h"
+#include "pagx/model/Stroke.h"
+#include "pagx/model/TextSpan.h"
+#include "pagx/model/TrimPath.h"
 #include "pagx/PAGXSVGParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
@@ -476,7 +501,7 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    switch (node->colorSourceType()) {
+    switch (node->type()) {
       case ColorSourceType::SolidColor: {
         auto solid = static_cast<const SolidColor*>(node);
         return tgfx::SolidColor::Make(ToTGFX(solid->color));
@@ -705,7 +730,7 @@ class LayerBuilderImpl {
 
     switch (node->type()) {
       case LayerFilterType::BlurFilter: {
-        auto filter = static_cast<const BlurFilter*>(node);
+        auto filter = static_cast<const pagx::BlurFilter*>(node);
         return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
       }
       case LayerFilterType::DropShadowFilter: {

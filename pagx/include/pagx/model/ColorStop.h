@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Color.h"
 
 namespace pagx {
 

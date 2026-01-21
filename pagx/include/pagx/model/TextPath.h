@@ -20,9 +20,20 @@
 
 #include <string>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/TextPathAlign.h"
 
 namespace pagx {
+
+/**
+ * Text path alignment.
+ */
+enum class TextPathAlign {
+  Start,
+  Center,
+  End
+};
+
+std::string TextPathAlignToString(TextPathAlign align);
+TextPathAlign TextPathAlignFromString(const std::string& str);
 
 /**
  * TextPath is a text animator that places text along a path. It allows text to follow the contour

@@ -26,10 +26,22 @@
 #include "pagx/model/LayerFilter.h"
 #include "pagx/model/LayerStyle.h"
 #include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/MaskType.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Matrix.h"
+#include "pagx/model/types/Rect.h"
 
 namespace pagx {
+
+/**
+ * Mask types for layer masking.
+ */
+enum class MaskType {
+  Alpha,
+  Luminance,
+  Contour
+};
+
+std::string MaskTypeToString(MaskType type);
+MaskType MaskTypeFromString(const std::string& str);
 
 /**
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child

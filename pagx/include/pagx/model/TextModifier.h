@@ -18,11 +18,12 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "pagx/model/Element.h"
-#include "pagx/model/RangeSelector.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/TextSelector.h"
+#include "pagx/model/types/Point.h"
 
 namespace pagx {
 
@@ -85,9 +86,9 @@ class TextModifier : public Element {
   float strokeWidth = -1;
 
   /**
-   * The range selectors that determine which characters are affected by this modifier.
+   * The selectors that determine which characters are affected by this modifier.
    */
-  std::vector<RangeSelector> rangeSelectors = {};
+  std::vector<std::unique_ptr<TextSelector>> selectors = {};
 
   ElementType type() const override {
     return ElementType::TextModifier;

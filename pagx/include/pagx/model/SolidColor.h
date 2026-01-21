@@ -20,7 +20,7 @@
 
 #include <string>
 #include "pagx/model/ColorSource.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Color.h"
 
 namespace pagx {
 
@@ -32,16 +32,8 @@ class SolidColor : public ColorSource {
   std::string id = {};
   Color color = {};
 
-  ColorSourceType colorSourceType() const override {
+  ColorSourceType type() const override {
     return ColorSourceType::SolidColor;
-  }
-
-  ResourceType type() const override {
-    return ResourceType::SolidColor;
-  }
-
-  const std::string& resourceId() const override {
-    return id;
   }
 };
 

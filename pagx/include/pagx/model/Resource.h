@@ -37,31 +37,7 @@ enum class ResourceType {
   /**
    * A composition resource containing layers.
    */
-  Composition,
-  /**
-   * A solid color resource.
-   */
-  SolidColor,
-  /**
-   * A linear gradient resource.
-   */
-  LinearGradient,
-  /**
-   * A radial gradient resource.
-   */
-  RadialGradient,
-  /**
-   * A conic gradient resource.
-   */
-  ConicGradient,
-  /**
-   * A diamond gradient resource.
-   */
-  DiamondGradient,
-  /**
-   * An image pattern resource.
-   */
-  ImagePattern
+  Composition
 };
 
 /**
@@ -71,7 +47,7 @@ const char* ResourceTypeName(ResourceType type);
 
 /**
  * Resource is the base class for all resources in a PAGX document. Resources are reusable items
- * that can be referenced by ID (e.g., "#imageId", "#gradientId").
+ * that can be referenced by ID (e.g., "#imageId").
  */
 class Resource {
  public:

@@ -23,10 +23,20 @@
 #include "pagx/model/ColorSource.h"
 #include "pagx/model/Element.h"
 #include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/FillRule.h"
 #include "pagx/model/types/Placement.h"
 
 namespace pagx {
+
+/**
+ * Fill rules for paths.
+ */
+enum class FillRule {
+  Winding,
+  EvenOdd
+};
+
+std::string FillRuleToString(FillRule rule);
+FillRule FillRuleFromString(const std::string& str);
 
 /**
  * Fill represents a fill painter that fills shapes with a solid color, gradient, or pattern. The
@@ -67,7 +77,7 @@ class Fill : public Element {
    * The placement of the fill relative to strokes (Background or Foreground). The default value is
    * Background.
    */
-  Placement placement = Placement::Background;
+  LayerPlacement placement = LayerPlacement::Background;
 
   ElementType type() const override {
     return ElementType::Fill;

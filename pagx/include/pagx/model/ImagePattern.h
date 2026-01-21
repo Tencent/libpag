@@ -20,11 +20,22 @@
 
 #include <string>
 #include "pagx/model/ColorSource.h"
-#include "pagx/model/types/SamplingMode.h"
+#include "pagx/model/types/Matrix.h"
 #include "pagx/model/types/TileMode.h"
-#include "pagx/model/types/Types.h"
 
 namespace pagx {
+
+/**
+ * Sampling modes for images.
+ */
+enum class SamplingMode {
+  Nearest,
+  Linear,
+  Mipmap
+};
+
+std::string SamplingModeToString(SamplingMode mode);
+SamplingMode SamplingModeFromString(const std::string& str);
 
 /**
  * An image pattern.
@@ -38,16 +49,8 @@ class ImagePattern : public ColorSource {
   SamplingMode sampling = SamplingMode::Linear;
   Matrix matrix = {};
 
-  ColorSourceType colorSourceType() const override {
+  ColorSourceType type() const override {
     return ColorSourceType::ImagePattern;
-  }
-
-  ResourceType type() const override {
-    return ResourceType::ImagePattern;
-  }
-
-  const std::string& resourceId() const override {
-    return id;
   }
 };
 

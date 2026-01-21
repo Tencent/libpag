@@ -132,7 +132,7 @@ class Stroke : public Element {
    * The placement of the stroke relative to fills (Background or Foreground). The default value is
    * Background.
    */
-  Placement placement = Placement::Background;
+  LayerPlacement placement = LayerPlacement::Background;
 
   ElementType type() const override {
     return ElementType::Stroke;

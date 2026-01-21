@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Point.h"
 
 namespace pagx {
 

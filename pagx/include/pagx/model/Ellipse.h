@@ -19,7 +19,8 @@
 #pragma once
 
 #include "pagx/model/Element.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Point.h"
+#include "pagx/model/types/Size.h"
 
 namespace pagx {
 

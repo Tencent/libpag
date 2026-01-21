@@ -18,12 +18,47 @@
 
 #pragma once
 
+#include <string>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/Overflow.h"
-#include "pagx/model/types/TextAlign.h"
-#include "pagx/model/types/VerticalAlign.h"
 
 namespace pagx {
+
+/**
+ * Text horizontal alignment.
+ */
+enum class TextAlign {
+  Left,
+  Center,
+  Right,
+  Justify
+};
+
+std::string TextAlignToString(TextAlign align);
+TextAlign TextAlignFromString(const std::string& str);
+
+/**
+ * Text vertical alignment.
+ */
+enum class VerticalAlign {
+  Top,
+  Center,
+  Bottom
+};
+
+std::string VerticalAlignToString(VerticalAlign align);
+VerticalAlign VerticalAlignFromString(const std::string& str);
+
+/**
+ * Text overflow handling.
+ */
+enum class Overflow {
+  Clip,
+  Visible,
+  Ellipsis
+};
+
+std::string OverflowToString(Overflow overflow);
+Overflow OverflowFromString(const std::string& str);
 
 /**
  * TextLayout is a text animator that controls text layout within a bounding box. It provides

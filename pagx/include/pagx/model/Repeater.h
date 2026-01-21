@@ -18,11 +18,22 @@
 
 #pragma once
 
+#include <string>
 #include "pagx/model/Element.h"
-#include "pagx/model/types/RepeaterOrder.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Point.h"
 
 namespace pagx {
+
+/**
+ * Repeater stacking order.
+ */
+enum class RepeaterOrder {
+  BelowOriginal,
+  AboveOriginal
+};
+
+std::string RepeaterOrderToString(RepeaterOrder order);
+RepeaterOrder RepeaterOrderFromString(const std::string& str);
 
 /**
  * Repeater is a modifier that creates multiple copies of preceding elements with progressive
