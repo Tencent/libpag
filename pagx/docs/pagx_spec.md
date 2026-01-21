@@ -925,7 +925,7 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 矩形从中心点定义，支持统一圆角。
 
 ```xml
-<Rectangle center="100,100" size="200,150" roundness="10"/>
+<Rectangle center="0,0" size="100,100" roundness="0" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -954,7 +954,7 @@ rect.bottom = center.y + size.height / 2
 椭圆从中心点定义。
 
 ```xml
-<Ellipse center="100,100" size="100,60"/>
+<Ellipse center="0,0" size="100,100" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -978,7 +978,7 @@ boundingRect.bottom = center.y + size.height / 2
 支持正多边形和星形两种模式。
 
 ```xml
-<Polystar center="100,100" outerRadius="100" innerRadius="50"/>
+<Polystar center="0,0" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1031,11 +1031,7 @@ y = center.y + outerRadius * sin(angle)
 使用 SVG 路径语法定义任意形状，支持内联数据或引用 Resources 中定义的 PathData。
 
 ```xml
-<!-- 内联路径数据 -->
-<Path data="M 0 0 L 100 0 L 100 100 Z"/>
-
-<!-- 引用 PathData 资源 -->
-<Path data="#curvePath"/>
+<Path data="" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1048,7 +1044,7 @@ y = center.y + outerRadius * sin(angle)
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
 ```xml
-<TextSpan x="100" y="200" font="Arial" fontSize="24">
+<TextSpan x="0" y="0" font="Arial" fontSize="12" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0" textAnchor="start">
   <![CDATA[Hello World]]>
 </TextSpan>
 ```
@@ -1091,8 +1087,7 @@ y = center.y + outerRadius * sin(angle)
 填充使用指定的颜色源绘制几何的内部区域。
 
 ```xml
-<!-- 纯色填充 -->
-<Fill color="#FF0000" alpha="0.8"/>
+<Fill color="#000000" alpha="1" blendMode="normal" fillRule="winding" placement="background"/>
 
 <!-- 引用共享颜色源 -->
 <Fill color="#grad1"/>
@@ -1136,11 +1131,7 @@ y = center.y + outerRadius * sin(angle)
 描边沿几何边界绘制线条。
 
 ```xml
-<!-- 基础描边 -->
-<Stroke color="#000000" width="2" cap="round"/>
-
-<!-- 虚线描边 -->
-<Stroke color="#0000FF" dashes="5,3" dashOffset="2"/>
+<Stroke color="#000000" width="1" alpha="1" blendMode="normal" cap="butt" join="miter" miterLimit="4" dashOffset="0" align="center" placement="background"/>
 
 <!-- 内联渐变描边 -->
 <Stroke width="3">
@@ -1215,7 +1206,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 裁剪路径到指定的起止范围。
 
 ```xml
-<TrimPath end="0.5"/>
+<TrimPath start="0" end="1" offset="0" type="separate"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1266,7 +1257,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 将所有形状合并为单个形状。
 
 ```xml
-<MergePath mode="union"/>
+<MergePath mode="append"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1364,7 +1355,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。
 
 ```xml
-<TextModifier fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1">
   <RangeSelector/>
 </TextModifier>
 ```
@@ -1421,7 +1412,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 范围选择器定义 TextModifier 影响的字形范围和影响程度。
 
 ```xml
-<RangeSelector/>
+<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1472,7 +1463,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 将文本沿指定路径排列。
 
 ```xml
-<TextPath path="#curvePath"/>
+<TextPath path="#curvePath" align="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false" forceAlignment="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1513,13 +1504,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。转换为 PAG 二进制格式时，TextLayout 会被预排版展开，字形位置直接写入 TextSpan。
 
 ```xml
-<Group>
-  <TextSpan font="Arial" fontSize="16">第一段内容...</TextSpan>
-  <TextSpan font="Arial" fontSize="16" fontWeight="700">粗体</TextSpan>
-  <TextSpan font="Arial" fontSize="16">普通文本。</TextSpan>
-  <TextLayout width="300" height="200" lineHeight="1.5" indent="20"/>
-  <Fill color="#333333"/>
-</Group>
+<TextLayout width="300" height="200" align="left" verticalAlign="top" lineHeight="1.2" indent="0" overflow="clip"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1574,7 +1559,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
 
 ```xml
-<Repeater copies="5" offset="1" position="50,0" endAlpha="0.2"/>
+<Repeater copies="3" offset="0" order="belowOriginal" anchorPoint="0,0" position="100,100" rotation="0" scale="1,1" startAlpha="1" endAlpha="1"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1648,7 +1633,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 Group 是带变换属性的矢量元素容器。
 
 ```xml
-<Group anchorPoint="50,50" position="100,200" rotation="45">
+<Group name="" anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1">
   <!-- 子元素 -->
 </Group>
 ```
