@@ -1240,33 +1240,22 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const ResourceContext
 
   xml.closeElementStart();
 
-  if (!node->contents.empty()) {
-    xml.openElement("contents");
-    xml.closeElementStart();
-    for (const auto& element : node->contents) {
-      writeVectorElement(xml, element.get(), ctx);
-    }
-    xml.closeElement();
+  // Write VectorElement (contents) directly without container node.
+  for (const auto& element : node->contents) {
+    writeVectorElement(xml, element.get(), ctx);
   }
 
-  if (!node->styles.empty()) {
-    xml.openElement("styles");
-    xml.closeElementStart();
-    for (const auto& style : node->styles) {
-      writeLayerStyle(xml, style.get());
-    }
-    xml.closeElement();
+  // Write LayerStyle (styles) directly without container node.
+  for (const auto& style : node->styles) {
+    writeLayerStyle(xml, style.get());
   }
 
-  if (!node->filters.empty()) {
-    xml.openElement("filters");
-    xml.closeElementStart();
-    for (const auto& filter : node->filters) {
-      writeLayerFilter(xml, filter.get());
-    }
-    xml.closeElement();
+  // Write LayerFilter (filters) directly without container node.
+  for (const auto& filter : node->filters) {
+    writeLayerFilter(xml, filter.get());
   }
 
+  // Write child Layers.
   for (const auto& child : node->children) {
     writeLayer(xml, child.get(), ctx);
   }

@@ -638,7 +638,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
+| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 
 #### 4.2.1 投影阴影（DropShadowStyle）
 
@@ -745,7 +745,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `color` | color | (必填) | 混合颜色 |
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
+| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 
 #### 4.3.5 颜色矩阵滤镜（ColorMatrixFilter）
 
@@ -1054,9 +1054,9 @@ y = center.y + outerRadius * sin(angle)
 |------|------|--------|------|
 | `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `alpha` | float | 1 | 透明度 0~1 |
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
+| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
-| `placement` | LayerPlacement | background | 绘制位置（见 5.3.3） |
+| `placement` | LayerPlacement | background | 绘制位置（见 5.3.3 节） |
 
 **FillRule（填充规则）**：
 
@@ -1095,14 +1095,14 @@ y = center.y + outerRadius * sin(angle)
 | `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `width` | float | 1 | 描边宽度 |
 | `alpha` | float | 1 | 透明度 0~1 |
-| `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
+| `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 | `cap` | LineCap | butt | 线帽样式（见下方） |
 | `join` | LineJoin | miter | 线连接样式（见下方） |
 | `miterLimit` | float | 4 | 斜接限制 |
 | `dashes` | string | - | 虚线模式 "d1,d2,..." |
 | `dashOffset` | float | 0 | 虚线偏移 |
 | `align` | StrokeAlign | center | 描边对齐（见下方） |
-| `placement` | LayerPlacement | background | 绘制位置（见 5.3.3） |
+| `placement` | LayerPlacement | background | 绘制位置（见 5.3.3 节） |
 
 **LineCap（线帽样式）**：
 

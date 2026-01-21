@@ -360,17 +360,43 @@ std::unique_ptr<Layer> PAGXXMLParser::parseLayer(const XMLNode* node) {
   }
 
   for (const auto& child : node->children) {
+    // Legacy format: support container nodes for backward compatibility.
     if (child->tag == "contents") {
       parseContents(child.get(), layer.get());
-    } else if (child->tag == "styles") {
+      continue;
+    }
+    if (child->tag == "styles") {
       parseStyles(child.get(), layer.get());
-    } else if (child->tag == "filters") {
+      continue;
+    }
+    if (child->tag == "filters") {
       parseFilters(child.get(), layer.get());
-    } else if (child->tag == "Layer") {
+      continue;
+    }
+    // New format: direct child elements without container nodes.
+    if (child->tag == "Layer") {
       auto childLayer = parseLayer(child.get());
       if (childLayer) {
         layer->children.push_back(std::move(childLayer));
       }
+      continue;
+    }
+    // Try to parse as VectorElement.
+    auto element = parseElement(child.get());
+    if (element) {
+      layer->contents.push_back(std::move(element));
+      continue;
+    }
+    // Try to parse as LayerStyle.
+    auto style = parseLayerStyle(child.get());
+    if (style) {
+      layer->styles.push_back(std::move(style));
+      continue;
+    }
+    // Try to parse as LayerFilter.
+    auto filter = parseLayerFilter(child.get());
+    if (filter) {
+      layer->filters.push_back(std::move(filter));
     }
   }
 
