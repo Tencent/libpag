@@ -1014,7 +1014,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color/idref | - | 颜色值或颜色源引用 |
+| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
@@ -1054,7 +1054,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color/idref | - | 颜色值或颜色源引用 |
+| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `width` | float | 2 | 描边宽度 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
