@@ -435,9 +435,9 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="1920" height="1080">
-  <Resources>...</Resources>
   <Layer name="background">...</Layer>
   <Layer name="content">...</Layer>
+  <Resources>...</Resources>
 </pagx>
 ```
 
@@ -502,30 +502,30 @@ PAGX 文档采用层级结构组织内容：
 
 ```
 <pagx>                          ← 根元素（定义画布尺寸）
-├── <Resources>                 ← 资源区（可选，定义可复用资源）
-│   ├── <Image>                 ← 图片资源
-│   ├── <PathData>              ← 路径数据资源
-│   ├── <SolidColor>            ← 纯色定义
-│   ├── <LinearGradient>        ← 渐变定义
-│   ├── <ImagePattern>          ← 图片图案定义
-│   └── <Composition>           ← 合成定义
-│       └── <Layer>             ← 合成内的图层
+├── <Layer>                     ← 图层（可多个）
+│   ├── <contents>              ← 矢量内容（VectorElement 系统）
+│   │   ├── 几何元素            ← Rectangle、Ellipse、Path、TextSpan 等
+│   │   ├── 修改器              ← TrimPath、RoundCorner、TextModifier 等
+│   │   ├── 绘制器              ← Fill、Stroke
+│   │   └── <Group>             ← 矢量元素容器（可嵌套）
+│   │
+│   ├── <styles>                 ← 图层样式
+│   │   └── <DropShadowStyle>   ← 投影、内阴影等
+│   │
+│   ├── <filters>               ← 滤镜
+│   │   └── <BlurFilter>        ← 模糊、颜色矩阵等
+│   │
+│   └── <Layer>                 ← 子图层（递归结构）
+│       └── ...
 │
-└── <Layer>                     ← 图层（可多个）
-    ├── <contents>              ← 矢量内容（VectorElement 系统）
-    │   ├── 几何元素            ← Rectangle、Ellipse、Path、TextSpan 等
-    │   ├── 修改器              ← TrimPath、RoundCorner、TextModifier 等
-    │   ├── 绘制器              ← Fill、Stroke
-    │   └── <Group>             ← 矢量元素容器（可嵌套）
-    │
-    ├── <styles>                 ← 图层样式
-    │   └── <DropShadowStyle>   ← 投影、内阴影等
-    │
-    ├── <filters>               ← 滤镜
-    │   └── <BlurFilter>        ← 模糊、颜色矩阵等
-    │
-    └── <Layer>                 ← 子图层（递归结构）
-        └── ...
+└── <Resources>                 ← 资源区（可选，定义可复用资源）
+    ├── <Image>                 ← 图片资源
+    ├── <PathData>              ← 路径数据资源
+    ├── <SolidColor>            ← 纯色定义
+    ├── <LinearGradient>        ← 渐变定义
+    ├── <ImagePattern>          ← 图片图案定义
+    └── <Composition>           ← 合成定义
+        └── <Layer>             ← 合成内的图层
 ```
 
 ---
@@ -2239,23 +2239,6 @@ contents / Group
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="400" height="300">
   
-  <Resources>
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,300">
-      <ColorStop offset="0" color="#87CEEB"/>
-      <ColorStop offset="1" color="#E0F6FF"/>
-    </LinearGradient>
-    
-    <Composition id="star" width="50" height="50">
-      <Layer name="starLayer">
-        <contents>
-          <Polystar center="25,25" polystarType="star" pointCount="5"
-                    outerRadius="25" innerRadius="10"/>
-          <Fill color="#FFD700"/>
-        </contents>
-      </Layer>
-    </Composition>
-  </Resources>
-  
   <!-- 背景 -->
   <Layer name="Background">
     <contents>
@@ -2298,6 +2281,23 @@ contents / Group
       <Fill color="#FF6B6B"/>
     </contents>
   </Layer>
+  
+  <Resources>
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,300">
+      <ColorStop offset="0" color="#87CEEB"/>
+      <ColorStop offset="1" color="#E0F6FF"/>
+    </LinearGradient>
+    
+    <Composition id="star" width="50" height="50">
+      <Layer name="starLayer">
+        <contents>
+          <Polystar center="25,25" polystarType="star" pointCount="5"
+                    outerRadius="25" innerRadius="10"/>
+          <Fill color="#FFD700"/>
+        </contents>
+      </Layer>
+    </Composition>
+  </Resources>
   
 </pagx>
 ```
