@@ -84,7 +84,10 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 
 ```xml
 <ShapeLayer data-name="背景图层" data-figma-id="12:34" data-exported-by="PAGExporter">
-  ...
+  <contents>
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </contents>
 </ShapeLayer>
 ```
 
@@ -435,9 +438,9 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="1920" height="1080">
-  <Layer name="background">...</Layer>
-  <Layer name="content">...</Layer>
-  <Resources>...</Resources>
+  <Layer name="background"><!-- 图层内容 --></Layer>
+  <Layer name="content"><!-- 图层内容 --></Layer>
+  <Resources><!-- 资源定义 --></Resources>
 </pagx>
 ```
 
@@ -465,7 +468,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
     <ColorStop offset="1" color="#E0F6FF"/>
   </LinearGradient>
   <ImagePattern id="texture" image="#img1" tileModeX="repeat" tileModeY="repeat"/>
-  <Composition id="buttonComp" width="100" height="50">...</Composition>
+  <Composition id="buttonComp" width="100" height="50"><!-- 合成内容 --></Composition>
 </Resources>
 ```
 
@@ -541,8 +544,8 @@ PAGX 文档采用层级结构组织内容：
 ```xml
 <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
   <contents>
-    <Rectangle .../>
-    <Fill .../>
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
   </contents>
   <styles>
     <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
@@ -550,7 +553,12 @@ PAGX 文档采用层级结构组织内容：
   <filters>
     <BlurFilter blurrinessX="10" blurrinessY="10"/>
   </filters>
-  <Layer name="Child">...</Layer>
+  <Layer name="Child">
+    <contents>
+      <Ellipse center="50,50" size="80,80"/>
+      <Fill color="#00FF00"/>
+    </contents>
+  </Layer>
 </Layer>
 <Layer composition="#buttonComp" x="100" y="200"/>
 ```
@@ -774,7 +782,10 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <Layer scrollRect="0,0,100,100">
-  ...
+  <contents>
+    <Rectangle center="50,50" size="200,200"/>
+    <Fill color="#FF0000"/>
+  </contents>
 </Layer>
 ```
 
@@ -789,7 +800,12 @@ PAGX 文档采用层级结构组织内容：
     <Fill color="#FFFFFF"/>
   </contents>
 </Layer>
-<Layer mask="#maskShape" maskType="alpha">...</Layer>
+<Layer mask="#maskShape" maskType="alpha">
+  <contents>
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#FF0000"/>
+  </contents>
+</Layer>
 ```
 
 **遮罩类型**：MaskType 定义见 4.1 节。
@@ -1245,9 +1261,9 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 **示例**：
 ```xml
-<Rectangle .../>
+<Rectangle center="50,50" size="100,100"/>
 <Fill color="red"/>
-<Ellipse .../>
+<Ellipse center="100,100" size="80,80"/>
 <MergePath mode="union"/>
 <Fill color="blue"/>
 ```
@@ -1264,8 +1280,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <Group>
   <TextSpan text="Hello"/>
   <TextSpan text="World"/>
-  <TextModifier .../>
-  <Fill .../>
+  <TextModifier position="0,-10"/>
+  <Fill color="#333333"/>
 </Group>
 ```
 
@@ -1309,8 +1325,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <Group>
   <TextSpan text="Hello 😀"/>
   <TrimPath start="0" end="0.5"/>
-  <TextModifier .../>
-  <Fill .../>
+  <TextModifier position="0,-10"/>
+  <Fill color="#333333"/>
 </Group>
 ```
 
@@ -1597,9 +1613,9 @@ alpha = lerp(startAlpha, endAlpha, t)
 ```xml
 <Group>
   <TextSpan text="Hi"/>  <!-- 累积字形列表 -->
-  <Fill .../>            <!-- 渲染填充 -->
+  <Fill color="#333333"/>            <!-- 渲染填充 -->
   <Repeater copies="3"/> <!-- 复制字形列表和已渲染的填充 -->
-  <TextModifier .../>    <!-- 仍可对复制后的字形列表生效 -->
+  <TextModifier position="0,-5"/>    <!-- 仍可对复制后的字形列表生效 -->
 </Group>
 ```
 
@@ -1664,10 +1680,10 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 **示例 1 - 基本隔离**：
 ```xml
 <Group alpha="0.5">
-  <Rectangle .../>    <!-- 只在组内累积 -->
+  <Rectangle center="50,50" size="100,100"/>    <!-- 只在组内累积 -->
   <Fill color="red"/> <!-- 只填充组内的矩形，alpha=0.5 -->
 </Group>
-<Ellipse .../>        <!-- 在组外累积 -->
+<Ellipse center="150,50" size="80,80"/>        <!-- 在组外累积 -->
 <Fill color="blue"/>  <!-- 只填充椭圆，alpha=1.0 -->
 ```
 
@@ -1675,11 +1691,11 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 ```xml
 <contents>
   <Group>
-    <Rectangle .../>    <!-- 累积矩形 -->
+    <Rectangle center="50,50" size="100,100"/>    <!-- 累积矩形 -->
     <Fill color="red"/> <!-- 填充矩形 -->
   </Group>
   <Group>
-    <Ellipse .../>       <!-- 累积椭圆 -->
+    <Ellipse center="150,50" size="80,80"/>       <!-- 累积椭圆 -->
     <Fill color="green"/> <!-- 填充椭圆 -->
   </Group>
   <Fill color="blue"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
@@ -1688,7 +1704,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **示例 3 - 多个绘制器复用几何**：
 ```xml
-<Rectangle .../>
+<Rectangle center="50,50" size="100,100"/>
 <Fill color="red"/>    <!-- 填充矩形 -->
 <Stroke color="black"/> <!-- 描边同一矩形（几何未清空） -->
 ```
