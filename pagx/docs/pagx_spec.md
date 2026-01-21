@@ -2223,10 +2223,10 @@ pagx
 
 ### C.3 VectorElement 包含关系
 
-`contents` 和 `Group` 可包含以下 VectorElement：
+`Layer.contents` 和 `Group` 可包含以下 VectorElement：
 
 ```
-contents / Group
+Layer.contents / Group
 ├── Rectangle
 ├── Ellipse
 ├── Polystar
