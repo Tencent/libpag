@@ -2033,7 +2033,9 @@ Layer.contents / Group
 
 #### pagx
 
-`<pagx version="1.0" width="1920" height="1080">...</pagx>`
+```xml
+<pagx version="1.0" width="1920" height="1080">...</pagx>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2043,7 +2045,9 @@ Layer.contents / Group
 
 #### Composition
 
-`<Composition id="comp1" width="100" height="100">...</Composition>`
+```xml
+<Composition width="100" height="100">...</Composition>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2054,7 +2058,9 @@ Layer.contents / Group
 
 #### Image
 
-`<Image id="img1" source="photo.png"/>`
+```xml
+<Image source="photo.png"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2062,7 +2068,9 @@ Layer.contents / Group
 
 #### PathData
 
-`<PathData id="curve" data="M 0 0 C 50 0 50 100 100 100"/>`
+```xml
+<PathData data="M 0 0 L 100 0 L 100 100 Z"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2070,7 +2078,9 @@ Layer.contents / Group
 
 #### SolidColor
 
-`<SolidColor id="red" color="#FF0000"/>`
+```xml
+<SolidColor color="#FF0000"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2078,7 +2088,12 @@ Layer.contents / Group
 
 #### LinearGradient
 
-`<LinearGradient id="grad" startPoint="0,0" endPoint="100,0">...</LinearGradient>`
+```xml
+<LinearGradient startPoint="0,0" endPoint="100,0" matrix="1,0,0,1,0,0">
+  <ColorStop offset="0" color="#FF0000"/>
+  <ColorStop offset="1" color="#0000FF"/>
+</LinearGradient>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2088,7 +2103,12 @@ Layer.contents / Group
 
 #### RadialGradient
 
-`<RadialGradient id="grad" center="50,50" radius="50">...</RadialGradient>`
+```xml
+<RadialGradient center="0,0" radius="100" matrix="1,0,0,1,0,0">
+  <ColorStop offset="0" color="#FFFFFF"/>
+  <ColorStop offset="1" color="#000000"/>
+</RadialGradient>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2098,7 +2118,12 @@ Layer.contents / Group
 
 #### ConicGradient
 
-`<ConicGradient id="grad" center="50,50" startAngle="0" endAngle="360">...</ConicGradient>`
+```xml
+<ConicGradient center="0,0" startAngle="0" endAngle="360" matrix="1,0,0,1,0,0">
+  <ColorStop offset="0" color="#FF0000"/>
+  <ColorStop offset="1" color="#0000FF"/>
+</ConicGradient>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2109,7 +2134,12 @@ Layer.contents / Group
 
 #### DiamondGradient
 
-`<DiamondGradient id="grad" center="50,50" halfDiagonal="50">...</DiamondGradient>`
+```xml
+<DiamondGradient center="0,0" halfDiagonal="50" matrix="1,0,0,1,0,0">
+  <ColorStop offset="0" color="#FFFFFF"/>
+  <ColorStop offset="1" color="#000000"/>
+</DiamondGradient>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2119,7 +2149,9 @@ Layer.contents / Group
 
 #### ColorStop
 
-`<ColorStop offset="0.5" color="#FF0000"/>`
+```xml
+<ColorStop offset="0" color="#FF0000"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2128,7 +2160,9 @@ Layer.contents / Group
 
 #### ImagePattern
 
-`<ImagePattern id="pattern" image="#img1" tileModeX="repeat" tileModeY="repeat"/>`
+```xml
+<ImagePattern image="#img1" tileModeX="clamp" tileModeY="clamp" sampling="linear" matrix="1,0,0,1,0,0"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2142,7 +2176,13 @@ Layer.contents / Group
 
 #### Layer
 
-`<Layer name="MyLayer" x="100" y="200" alpha="0.8">...</Layer>`
+```xml
+<Layer name="" visible="true" alpha="1" blendMode="normal" x="0" y="0" matrix="1,0,0,1,0,0"
+       preserve3D="false" antiAlias="true" groupOpacity="false" passThroughBackground="true"
+       excludeChildEffectsInLayerStyle="false" maskType="alpha">
+  ...
+</Layer>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2168,7 +2208,10 @@ Layer.contents / Group
 
 #### DropShadowStyle
 
-`<DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>`
+```xml
+<DropShadowStyle offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
+                 color="#000000" showBehindLayer="true" blendMode="normal"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2182,7 +2225,10 @@ Layer.contents / Group
 
 #### InnerShadowStyle
 
-`<InnerShadowStyle offsetX="2" offsetY="2" blurrinessX="5" blurrinessY="5" color="#00000040"/>`
+```xml
+<InnerShadowStyle offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
+                  color="#000000" blendMode="normal"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2195,7 +2241,9 @@ Layer.contents / Group
 
 #### BackgroundBlurStyle
 
-`<BackgroundBlurStyle blurrinessX="20" blurrinessY="20"/>`
+```xml
+<BackgroundBlurStyle blurrinessX="0" blurrinessY="0" tileMode="mirror" blendMode="normal"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2208,7 +2256,9 @@ Layer.contents / Group
 
 #### BlurFilter
 
-`<BlurFilter blurrinessX="10" blurrinessY="10"/>`
+```xml
+<BlurFilter blurrinessX="10" blurrinessY="10" tileMode="decal"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2218,7 +2268,10 @@ Layer.contents / Group
 
 #### DropShadowFilter
 
-`<DropShadowFilter offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>`
+```xml
+<DropShadowFilter offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
+                  color="#000000" shadowOnly="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2231,7 +2284,10 @@ Layer.contents / Group
 
 #### InnerShadowFilter
 
-`<InnerShadowFilter offsetX="2" offsetY="2" blurrinessX="5" blurrinessY="5" color="#00000040"/>`
+```xml
+<InnerShadowFilter offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
+                   color="#000000" shadowOnly="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2244,7 +2300,9 @@ Layer.contents / Group
 
 #### BlendFilter
 
-`<BlendFilter color="#FF000080" blendMode="multiply"/>`
+```xml
+<BlendFilter color="#FF0000" blendMode="normal"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2253,7 +2311,9 @@ Layer.contents / Group
 
 #### ColorMatrixFilter
 
-`<ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>`
+```xml
+<ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2263,7 +2323,9 @@ Layer.contents / Group
 
 #### Rectangle
 
-`<Rectangle center="50,50" size="100,100" roundness="10"/>`
+```xml
+<Rectangle center="0,0" size="100,100" roundness="0" reversed="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2274,7 +2336,9 @@ Layer.contents / Group
 
 #### Ellipse
 
-`<Ellipse center="50,50" size="100,80"/>`
+```xml
+<Ellipse center="0,0" size="100,100" reversed="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2284,7 +2348,10 @@ Layer.contents / Group
 
 #### Polystar
 
-`<Polystar center="50,50" polystarType="star" pointCount="5" outerRadius="50" innerRadius="25"/>`
+```xml
+<Polystar center="0,0" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50"
+          rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2300,7 +2367,9 @@ Layer.contents / Group
 
 #### Path
 
-`<Path data="M 0 0 L 100 0 L 100 100 Z"/>`
+```xml
+<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2309,7 +2378,10 @@ Layer.contents / Group
 
 #### TextSpan
 
-`<TextSpan x="0" y="24" font="Arial" fontSize="24"><![CDATA[Hello]]></TextSpan>`
+```xml
+<TextSpan x="0" y="0" font="Arial" fontSize="12" fontWeight="400" fontStyle="normal"
+          tracking="0" baselineShift="0"><![CDATA[Hello]]></TextSpan>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2326,7 +2398,9 @@ Layer.contents / Group
 
 #### Fill
 
-`<Fill color="#FF0000" alpha="0.8"/>`
+```xml
+<Fill color="#000000" alpha="1" blendMode="normal" fillRule="winding" placement="background"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2338,7 +2412,10 @@ Layer.contents / Group
 
 #### Stroke
 
-`<Stroke color="#000000" width="2" cap="round" join="round"/>`
+```xml
+<Stroke color="#000000" width="1" alpha="1" blendMode="normal" cap="butt" join="miter"
+        miterLimit="4" dashOffset="0" align="center" placement="background"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2358,7 +2435,9 @@ Layer.contents / Group
 
 #### TrimPath
 
-`<TrimPath start="0" end="0.5" type="separate"/>`
+```xml
+<TrimPath start="0" end="1" offset="0" type="separate"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2369,7 +2448,9 @@ Layer.contents / Group
 
 #### RoundCorner
 
-`<RoundCorner radius="10"/>`
+```xml
+<RoundCorner radius="10"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2377,7 +2458,9 @@ Layer.contents / Group
 
 #### MergePath
 
-`<MergePath mode="union"/>`
+```xml
+<MergePath mode="append"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2387,7 +2470,12 @@ Layer.contents / Group
 
 #### TextModifier
 
-`<TextModifier position="0,-10" rotation="5">...</TextModifier>`
+```xml
+<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1"
+              skew="0" skewAxis="0" alpha="1">
+  <RangeSelector .../>
+</TextModifier>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2404,7 +2492,11 @@ Layer.contents / Group
 
 #### RangeSelector
 
-`<RangeSelector start="0" end="1" shape="triangle"/>`
+```xml
+<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square"
+               easeIn="0" easeOut="0" mode="add" weight="1"
+               randomizeOrder="false" randomSeed="0"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2422,7 +2514,10 @@ Layer.contents / Group
 
 #### TextPath
 
-`<TextPath path="#curvePath" align="center"/>`
+```xml
+<TextPath path="#pathId" align="start" firstMargin="0" lastMargin="0"
+          perpendicularToPath="true" reversed="false" forceAlignment="false"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2436,7 +2531,10 @@ Layer.contents / Group
 
 #### TextLayout
 
-`<TextLayout width="300" height="200" align="left" lineHeight="1.5"/>`
+```xml
+<TextLayout width="300" height="200" align="left" verticalAlign="top"
+            lineHeight="1.2" indent="0" overflow="clip"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2452,7 +2550,10 @@ Layer.contents / Group
 
 #### Repeater
 
-`<Repeater copies="5" position="50,0" rotation="0" startAlpha="1" endAlpha="0.2"/>`
+```xml
+<Repeater copies="3" offset="0" order="belowOriginal" anchorPoint="0,0"
+          position="100,100" rotation="0" scale="1,1" startAlpha="1" endAlpha="1"/>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2468,7 +2569,12 @@ Layer.contents / Group
 
 #### Group
 
-`<Group anchorPoint="50,50" position="100,100" rotation="45">...</Group>`
+```xml
+<Group anchorPoint="0,0" position="0,0" rotation="0" scale="1,1"
+       skew="0" skewAxis="0" alpha="1">
+  ...
+</Group>
+```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
