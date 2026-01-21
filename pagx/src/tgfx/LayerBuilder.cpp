@@ -21,6 +21,8 @@
 #include <tuple>
 #include <unordered_map>
 #include "pagx/model/BlurFilter.h"
+#include "pagx/model/types/ColorSpace.h"
+#include "tgfx/core/ColorSpace.h"
 #include "pagx/model/Composition.h"
 #include "pagx/model/ConicGradient.h"
 #include "pagx/model/DiamondGradient.h"
@@ -163,6 +165,21 @@ static tgfx::Point ToTGFX(const Point& p) {
 }
 
 static tgfx::Color ToTGFX(const Color& c) {
+  // tgfx::Color is always in sRGB color space. If source color is in Display P3,
+  // we need to convert it to sRGB for correct rendering.
+  if (c.colorSpace == ColorSpace::DisplayP3) {
+    // Convert Display P3 to sRGB using tgfx::ColorSpace
+    tgfx::ColorMatrix33 p3ToSRGB = {};
+    tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &p3ToSRGB);
+
+    float r = c.red * p3ToSRGB.values[0][0] + c.green * p3ToSRGB.values[0][1] +
+              c.blue * p3ToSRGB.values[0][2];
+    float g = c.red * p3ToSRGB.values[1][0] + c.green * p3ToSRGB.values[1][1] +
+              c.blue * p3ToSRGB.values[1][2];
+    float b = c.red * p3ToSRGB.values[2][0] + c.green * p3ToSRGB.values[2][1] +
+              c.blue * p3ToSRGB.values[2][2];
+    return {r, g, b, c.alpha};
+  }
   return {c.red, c.green, c.blue, c.alpha};
 }
 
@@ -457,11 +474,10 @@ class LayerBuilderImpl {
     auto fill = std::make_shared<tgfx::FillStyle>();
 
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
-    if (node->colorSource) {
-      colorSource = convertColorSource(node->colorSource.get());
-    } else if (!node->color.empty()) {
-      auto color = Color::Parse(node->color);
-      colorSource = tgfx::SolidColor::Make(ToTGFX(color));
+    if (node->color) {
+      colorSource = convertColorSource(node->color.get());
+    } else if (!node->colorRef.empty()) {
+      // TODO: Resolve color reference from resources
     }
 
     if (colorSource) {
@@ -476,11 +492,10 @@ class LayerBuilderImpl {
     auto stroke = std::make_shared<tgfx::StrokeStyle>();
 
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
-    if (node->colorSource) {
-      colorSource = convertColorSource(node->colorSource.get());
-    } else if (!node->color.empty()) {
-      auto color = Color::Parse(node->color);
-      colorSource = tgfx::SolidColor::Make(ToTGFX(color));
+    if (node->color) {
+      colorSource = convertColorSource(node->color.get());
+    } else if (!node->colorRef.empty()) {
+      // TODO: Resolve color reference from resources
     }
 
     if (colorSource) {

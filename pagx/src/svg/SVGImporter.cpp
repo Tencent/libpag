@@ -21,7 +21,9 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include "PAGXEnumUtils.h"
 #include "pagx/model/Document.h"
+#include "pagx/model/SolidColor.h"
 #include "SVGParserInternal.h"
 #include "xml/XMLDOM.h"
 
@@ -884,22 +886,23 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
     if (fill.empty()) {
       // No fill specified anywhere - use SVG default black.
       auto fillNode = std::make_unique<Fill>();
-      fillNode->color = "#000000";
+      auto solidColor = std::make_unique<SolidColor>();
+      solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
+      fillNode->color = std::move(solidColor);
       contents.push_back(std::move(fillNode));
     } else if (fill.find("url(") == 0) {
       auto fillNode = std::make_unique<Fill>();
       std::string refId = resolveUrl(fill);
 
       // Try to inline the gradient or pattern.
-      // Don't set fillNode->color when using colorSource.
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
-          fillNode->colorSource = convertLinearGradient(it->second, shapeBounds);
+          fillNode->color = convertLinearGradient(it->second, shapeBounds);
         } else if (it->second->name == "radialGradient") {
-          fillNode->colorSource = convertRadialGradient(it->second, shapeBounds);
+          fillNode->color = convertRadialGradient(it->second, shapeBounds);
         } else if (it->second->name == "pattern") {
-          fillNode->colorSource = convertPattern(it->second, shapeBounds);
+          fillNode->color = convertPattern(it->second, shapeBounds);
         }
       }
       contents.push_back(std::move(fillNode));
@@ -915,9 +918,11 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillNode->alpha = std::stof(fillOpacity);
       }
 
-      // Convert color to hex format for PAGX compatibility.
-      // Named colors (e.g., "black", "red") are converted to their hex values.
-      fillNode->color = colorToHex(fill);
+      // Convert color to SolidColor for PAGX compatibility.
+      Color parsedColor = parseColor(fill);
+      auto solidColor = std::make_unique<SolidColor>();
+      solidColor->color = parsedColor;
+      fillNode->color = std::move(solidColor);
 
       // Determine effective fill-rule.
       std::string fillRule = getAttribute(element, "fill-rule");
@@ -944,15 +949,14 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
     if (stroke.find("url(") == 0) {
       std::string refId = resolveUrl(stroke);
 
-      // Don't set strokeNode->color when using colorSource.
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
-          strokeNode->colorSource = convertLinearGradient(it->second, shapeBounds);
+          strokeNode->color = convertLinearGradient(it->second, shapeBounds);
         } else if (it->second->name == "radialGradient") {
-          strokeNode->colorSource = convertRadialGradient(it->second, shapeBounds);
+          strokeNode->color = convertRadialGradient(it->second, shapeBounds);
         } else if (it->second->name == "pattern") {
-          strokeNode->colorSource = convertPattern(it->second, shapeBounds);
+          strokeNode->color = convertPattern(it->second, shapeBounds);
         }
       }
     } else {
@@ -965,9 +969,11 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         strokeNode->alpha = std::stof(strokeOpacity);
       }
 
-      // Convert color to hex format for PAGX compatibility.
-      // Named colors (e.g., "black", "red") are converted to their hex values.
-      strokeNode->color = colorToHex(stroke);
+      // Convert color to SolidColor for PAGX compatibility.
+      Color parsedColor = parseColor(stroke);
+      auto solidColor = std::make_unique<SolidColor>();
+      solidColor->color = parsedColor;
+      strokeNode->color = std::move(solidColor);
     }
 
     std::string strokeWidth = getAttribute(element, "stroke-width");
@@ -1186,11 +1192,13 @@ Matrix SVGParserImpl::parseTransform(const std::string& value) {
 
 Color SVGParserImpl::parseColor(const std::string& value) {
   if (value.empty() || value == "none") {
-    return {0, 0, 0, 0};
+    return {0, 0, 0, 0, ColorSpace::SRGB};
   }
 
   if (value[0] == '#') {
     uint32_t hex = 0;
+    Color color = {};
+    color.colorSpace = ColorSpace::SRGB;
     if (value.length() == 4) {
       // #RGB -> #RRGGBB
       char r = value[1];
@@ -1198,13 +1206,25 @@ Color SVGParserImpl::parseColor(const std::string& value) {
       char b = value[3];
       std::string expanded = std::string() + r + r + g + g + b + b;
       hex = std::stoul(expanded, nullptr, 16);
-      return Color::FromHex(hex);
+      color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
+      color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
+      color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
     } else if (value.length() == 7) {
       hex = std::stoul(value.substr(1), nullptr, 16);
-      return Color::FromHex(hex);
+      color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
+      color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
+      color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
     } else if (value.length() == 9) {
       hex = std::stoul(value.substr(1), nullptr, 16);
-      return Color::FromHex(hex, true);
+      color.red = static_cast<float>((hex >> 24) & 0xFF) / 255.0f;
+      color.green = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
+      color.blue = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
+      color.alpha = static_cast<float>(hex & 0xFF) / 255.0f;
+      return color;
     }
   }
 
@@ -1220,7 +1240,68 @@ Color SVGParserImpl::parseColor(const std::string& value) {
       if (value.find("rgba") == 0) {
         iss >> comma >> a;
       }
-      return Color::FromRGBA(r / 255.0f, g / 255.0f, b / 255.0f, a);
+      return {r / 255.0f, g / 255.0f, b / 255.0f, a, ColorSpace::SRGB};
+    }
+  }
+
+  // CSS Color Level 4: color(display-p3 r g b) or color(display-p3 r g b / a)
+  if (value.find("color(") == 0) {
+    auto start = value.find('(');
+    auto end = value.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = value.substr(start + 1, end - start - 1);
+      // Trim leading whitespace
+      inner.erase(0, inner.find_first_not_of(" \t"));
+
+      // Detect color space identifier
+      ColorSpace colorSpace = ColorSpace::SRGB;
+      if (inner.find("display-p3") == 0) {
+        colorSpace = ColorSpace::DisplayP3;
+        inner = inner.substr(10);  // Skip "display-p3"
+      } else if (inner.find("a98-rgb") == 0) {
+        // Adobe RGB 1998 - convert to sRGB approximation
+        colorSpace = ColorSpace::SRGB;
+        inner = inner.substr(7);  // Skip "a98-rgb"
+      } else if (inner.find("rec2020") == 0) {
+        // Rec.2020 - convert to sRGB approximation
+        colorSpace = ColorSpace::SRGB;
+        inner = inner.substr(7);  // Skip "rec2020"
+      } else if (inner.find("srgb") == 0) {
+        colorSpace = ColorSpace::SRGB;
+        inner = inner.substr(4);  // Skip "srgb"
+      }
+
+      // Trim whitespace after color space name
+      inner.erase(0, inner.find_first_not_of(" \t"));
+      inner.erase(inner.find_last_not_of(" \t") + 1);
+
+      // Parse space-separated values and optional "/ alpha"
+      std::istringstream iss(inner);
+      std::vector<float> components = {};
+      std::string token = {};
+      float alpha = 1.0f;
+      bool foundSlash = false;
+      while (iss >> token) {
+        if (token == "/") {
+          foundSlash = true;
+          continue;
+        }
+        float val = std::stof(token);
+        if (foundSlash) {
+          alpha = val;
+        } else {
+          components.push_back(val);
+        }
+      }
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = alpha;
+        color.colorSpace = colorSpace;
+        return color;
+      }
     }
   }
 
@@ -1382,14 +1463,17 @@ Color SVGParserImpl::parseColor(const std::string& value) {
 
   auto it = namedColors.find(value);
   if (it != namedColors.end()) {
-    auto color = Color::FromHex(it->second);
-    if (value == "transparent") {
-      color.alpha = 0;
-    }
+    uint32_t hex = it->second;
+    Color color = {};
+    color.red = static_cast<float>((hex >> 16) & 0xFF) / 255.0f;
+    color.green = static_cast<float>((hex >> 8) & 0xFF) / 255.0f;
+    color.blue = static_cast<float>(hex & 0xFF) / 255.0f;
+    color.alpha = (value == "transparent") ? 0.0f : 1.0f;
+    color.colorSpace = ColorSpace::SRGB;
     return color;
   }
 
-  return {0, 0, 0, 1};
+  return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
 std::string SVGParserImpl::colorToHex(const std::string& value) {
@@ -1400,13 +1484,73 @@ std::string SVGParserImpl::colorToHex(const std::string& value) {
   if (value[0] == '#') {
     return value;
   }
+  // Already a PAGX p3() color, return as-is.
+  if (value.substr(0, 3) == "p3(") {
+    return value;
+  }
+  // Already a PAGX srgb() color, return as-is.
+  if (value.substr(0, 5) == "srgb(") {
+    return value;
+  }
   // url() references should be returned as-is.
   if (value.find("url(") == 0) {
     return value;
   }
+  // CSS Color Level 4: color(display-p3 r g b) -> p3(r, g, b)
+  if (value.find("color(display-p3") == 0) {
+    auto start = value.find("display-p3");
+    auto end = value.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = value.substr(start + 10, end - start - 10);  // skip "display-p3"
+      // Trim whitespace
+      inner.erase(0, inner.find_first_not_of(" \t"));
+      inner.erase(inner.find_last_not_of(" \t") + 1);
+      // Parse space-separated values and optional "/ alpha"
+      std::istringstream iss(inner);
+      std::vector<float> components = {};
+      std::string token = {};
+      float alpha = 1.0f;
+      bool foundSlash = false;
+      while (iss >> token) {
+        if (token == "/") {
+          foundSlash = true;
+          continue;
+        }
+        float val = std::stof(token);
+        if (foundSlash) {
+          alpha = val;
+        } else {
+          components.push_back(val);
+        }
+      }
+      if (components.size() >= 3) {
+        char buf[64] = {};
+        if (alpha < 1.0f) {
+          snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g, %.4g)", components[0], components[1],
+                   components[2], alpha);
+        } else {
+          snprintf(buf, sizeof(buf), "p3(%.4g, %.4g, %.4g)", components[0], components[1],
+                   components[2]);
+        }
+        return std::string(buf);
+      }
+    }
+  }
   // Parse the color (handles named colors, rgb, rgba, etc.) and convert to hex.
   Color color = parseColor(value);
-  return color.toHexString(color.alpha < 1.0f);
+  // Convert to hex string.
+  auto toHex = [](float v) {
+    int i = static_cast<int>(std::round(v * 255.0f));
+    i = std::max(0, std::min(255, i));
+    char buf[3] = {};
+    snprintf(buf, sizeof(buf), "%02X", i);
+    return std::string(buf);
+  };
+  std::string result = "#" + toHex(color.red) + toHex(color.green) + toHex(color.blue);
+  if (color.alpha < 1.0f) {
+    result += toHex(color.alpha);
+  }
+  return result;
 }
 
 float SVGParserImpl::parseLength(const std::string& value, float containerSize) {
