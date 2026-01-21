@@ -1,5 +1,6 @@
 package libpag.pagviewer;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
@@ -11,6 +12,7 @@ import android.opengl.EGLContext;
 import android.opengl.EGLDisplay;
 import android.opengl.EGLSurface;
 import android.opengl.GLES20;
+import android.opengl.GLSurfaceView;
 import android.opengl.GLUtils;
 import android.os.Build;
 import android.os.Bundle;
@@ -20,7 +22,9 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,257 +39,114 @@ import org.libpag.PAGView;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, PAGView.PAGViewListener {
-    RelativeLayout containerView;
-    Button btPlayFirst;
-    Button btPlaySecond;
+public class MainActivity extends Activity {
 
-    PAGView pagView;
-    RelativeLayout pagImageViewGroup;
+    private static final String TAG = "PAGAsyncDemo";
+    private static final String PAG_FILE_NAME = "zuanshi_bmp.pag";
 
-    private EGLDisplay eglDisplay = null;
-    private EGLSurface eglSurface = null;
-    private EGLContext eglContext = null;
-    private int textureID = 0;
+    // PAG 文件列表（可根据需要添加更多）
+    private static final String[] PAG_FILES = {
+            "zuanshi_bmp.pag",
+            "diamonds_bmp.pag",
+            "Light_lian.pag"
+    };
+    private int currentPagIndex = 0;
+
+    private GLSurfaceView glSurfaceView;
+    private PAGDemoRenderer renderer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        setContentView(R.layout.activity_main);
 
-        containerView = findViewById(R.id.container_view);
-        BackgroundView backgroundView = new BackgroundView(this);
-        backgroundView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        containerView.addView(backgroundView);
+        Log.i(TAG, "===========================================");
+        Log.i(TAG, "PAG 异步渲染问题复现 Demo");
+        Log.i(TAG, "===========================================");
+        Log.i(TAG, "说明：");
+        Log.i(TAG, "1. 观察 logcat 中是否出现 EGL_BAD_ACCESS (0x3002) 错误");
+        Log.i(TAG, "2. 点击按钮切换是否使用 glFinish 修复");
+        Log.i(TAG, "===========================================");
 
-        btPlayFirst = findViewById(R.id.play_first);
-        if (btPlayFirst == null) {
-            return;
-        }
-        btPlayFirst.setOnClickListener(this);
-        btPlaySecond = findViewById(R.id.play_second);
-        if (btPlaySecond == null) {
-            return;
-        }
-        btPlaySecond.setOnClickListener(this);
+        // 创建布局
+        LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
 
-        addPAGViewAndPlay();
-        activatedView(btPlayFirst.getId());
+        // 创建状态文本
+        TextView statusText = new TextView(this);
+        statusText.setText("PAG Async Demo - 查看 logcat 输出");
+        statusText.setPadding(16, 16, 16, 16);
+        rootLayout.addView(statusText);
+
+        // 创建切换按钮
+        Button toggleButton = new Button(this);
+        toggleButton.setText("切换 PAG 文件: " + PAG_FILE_NAME);
+        toggleButton.setOnClickListener(v -> {
+            // 切换到下一个 PAG 文件
+            currentPagIndex = (currentPagIndex + 1) % PAG_FILES.length;
+            String newPagFile = PAG_FILES[currentPagIndex];
+
+            Log.i(TAG, "切换 PAG 文件: " + newPagFile);
+            toggleButton.setText("切换 PAG 文件: " + newPagFile);
+
+            // 通知 Renderer 加载新的 PAG 文件
+            if (renderer != null) {
+                renderer.switchPagFile(newPagFile);
+            }
+        });
+
+        rootLayout.addView(toggleButton);
+
+        // 创建 GLSurfaceView
+        glSurfaceView = new GLSurfaceView(this);
+        glSurfaceView.setEGLContextClientVersion(3); // 使用 OpenGL ES 3.0
+
+        // 创建 Renderer
+        renderer = new PAGDemoRenderer(this, PAG_FILE_NAME);
+
+        glSurfaceView.setRenderer(renderer);
+        glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
+
+        // 设置 GLSurfaceView 的布局参数
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1.0f // weight
+        );
+        glSurfaceView.setLayoutParams(params);
+        rootLayout.addView(glSurfaceView);
+
+        setContentView(rootLayout);
     }
 
-    private void addPAGViewAndPlay() {
-        if (pagView == null) {
-            eglSetup();
-            pagView = new PAGView(this, eglContext);
-            pagView.addListener(this);
-            pagView.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-            PAGFile pagFile = PAGFile.Load(getAssets(), "alpha.pag");
-            if (pagFile.numTexts() > 0) {
-                PAGText pagText = pagFile.getTextData(0);
-                pagText.text = "hahhha哈哈哈😆哈哈哈";
-                pagText.fauxItalic = true;
-                pagFile.replaceText(0, pagText);
-            }
-            if (pagFile.numImages() > 0) {
-//                PAGImage pagImage = PAGImage.FromAssets(this.getAssets(), "mountain.jpg");
-//                PAGImage pagImage = makePAGImage(this, "mountain.jpg");
-                Bitmap bitmap = createBitmap(this, "mountain.jpg", true);
-                Bitmap.Config config = bitmap.getConfig();
-                PAGImage pagImage = PAGImage.FromBitmap(bitmap);
-                pagFile.replaceImage(0, pagImage);
-            }
-            pagView.setComposition(pagFile);
-            pagView.setRepeatCount(0);
-            pagView.setOnClickListener(v -> {
-                if (pagView.isPlaying()) {
-                    pagView.pause();
-                } else {
-                    pagView.play();
-                }
-            });
-            containerView.addView(pagView);
-            pagView.play();
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (glSurfaceView != null) {
+            glSurfaceView.onResume();
         }
     }
 
-    private void addPAGImageViewsAndPlay() {
-        if (pagImageViewGroup == null) {
-            pagImageViewGroup = new RelativeLayout(this);
-            pagImageViewGroup.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            containerView.addView(pagImageViewGroup);
-            pagImageViewGroup.setOnClickListener(v -> {
-                PAGDiskCache.RemoveAll();
-                Toast.makeText(getApplicationContext(), "Disk Cache Removed!", Toast.LENGTH_SHORT).show();
-            });
-
-            Display display = getWindowManager().getDefaultDisplay();
-            Point point = new Point();
-            display.getSize(point);
-            int sceenWidth = point.x;
-            int itemWidth = sceenWidth / 4;
-            int itemHeight = sceenWidth / 4;
-
-            for (int i = 0; i < 20; i++) {
-                PAGImageView pagImageView = new PAGImageView(this);
-                String path = "assets://list/" + i + ".pag";
-                pagImageView.setPath(path);
-
-                pagImageViewGroup.addView(pagImageView);
-                RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) pagImageView.getLayoutParams();
-                params.width = itemWidth;
-                params.height = itemHeight;
-                pagImageView.setLayoutParams(params);
-
-                pagImageView.setY((i >> 2) * itemWidth + 300);
-                pagImageView.setX((i % 4) * itemHeight);
-
-                pagImageView.setRepeatCount(-1);
-                pagImageView.setCacheAllFramesInMemory(false);
-                pagImageView.play();
-            }
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (glSurfaceView != null) {
+            glSurfaceView.onPause();
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (pagView != null) {
-            pagView.freeCache();
-            onRelease();
+        if (renderer != null) {
+            // 在 GL 线程释放资源
+            glSurfaceView.queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    renderer.release();
+                }
+            });
         }
-        if (pagImageViewGroup != null) {
-            pagImageViewGroup.removeAllViews();
-        }
-    }
-
-    private void activatedView(int viewId) {
-        if (viewId == R.id.play_first) {
-            btPlayFirst.setActivated(true);
-            btPlaySecond.setActivated(false);
-        } else if (viewId == R.id.play_second) {
-            btPlayFirst.setActivated(false);
-            btPlaySecond.setActivated(true);
-        }
-    }
-
-    @Override
-    public void onClick(View v) {
-        if (v.getId() == R.id.play_second) {
-            if (pagView != null) {
-                containerView.removeView(pagView);
-                pagView.freeCache();
-                pagView = null;
-            }
-            if (pagImageViewGroup == null) {
-                addPAGImageViewsAndPlay();
-            }
-            activatedView(R.id.play_second);
-        } else {
-            if (pagImageViewGroup != null) {
-                containerView.removeView(pagImageViewGroup);
-                pagImageViewGroup.removeAllViews();
-                pagImageViewGroup = null;
-            }
-            if (pagView == null) {
-                addPAGViewAndPlay();
-            }
-            activatedView(R.id.play_first);
-        }
-    }
-
-    private void eglSetup() {
-        eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
-        int[] version = new int[2];
-        EGL14.eglInitialize(eglDisplay, version, 0, version, 1);
-        EGL14.eglBindAPI(EGL14.EGL_OPENGL_ES_API);
-        int[] attributeList = {EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT, EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8, EGL14.EGL_BLUE_SIZE, 8, EGL14.EGL_ALPHA_SIZE, 8, EGL14.EGL_STENCIL_SIZE, 8, EGL14.EGL_SAMPLE_BUFFERS, 1, EGL14.EGL_SAMPLES, 4, EGL14.EGL_NONE};
-        EGLConfig[] configs = new EGLConfig[1];
-        int[] numConfigs = new int[1];
-        EGL14.eglChooseConfig(eglDisplay, attributeList, 0, configs, 0, configs.length, numConfigs, 0);
-
-        int[] attribute_list = {EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE};
-
-        eglContext = EGL14.eglCreateContext(eglDisplay, configs[0], EGL14.EGL_NO_CONTEXT, attribute_list, 0);
-
-        int[] surfaceAttributes = {EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE};
-        eglSurface = EGL14.eglCreatePbufferSurface(eglDisplay, configs[0], surfaceAttributes, 0);
-    }
-
-    private Bitmap createBitmap(Context context, String filePath, boolean tryHardware) {
-        try {
-            InputStream stream = context.getAssets().open(filePath);
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            if (tryHardware && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                options.inPreferredConfig = Bitmap.Config.HARDWARE;
-            }
-            return BitmapFactory.decodeStream(stream, null, options);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    private PAGImage makePAGImage(Context context, String filePath) {
-        if (eglContext == null || !EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-            return null;
-        }
-        AssetManager assetManager = context.getAssets();
-        InputStream stream;
-        Bitmap bitmap = null;
-        try {
-            stream = assetManager.open(filePath);
-            bitmap = BitmapFactory.decodeStream(stream);
-        } catch (IOException e) {
-            // handle exception
-        }
-        if (bitmap == null) {
-            return null;
-        }
-        int[] mTexturesBitmap = {0};
-        GLES20.glGenTextures(1, mTexturesBitmap, 0);
-        textureID = mTexturesBitmap[0];
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureID);
-        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST);
-        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
-        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-        return PAGImage.FromTexture(mTexturesBitmap[0], GLES20.GL_TEXTURE_2D, bitmap.getWidth(), bitmap.getHeight());
-    }
-
-    public void onRelease() {
-        if (eglContext != null && EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-            if (textureID > 0) {
-                int[] textures = {textureID};
-                GLES20.glDeleteTextures(1, textures, 0);
-            }
-            EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
-            EGL14.eglDestroySurface(eglDisplay, eglSurface);
-            EGL14.eglDestroyContext(eglDisplay, eglContext);
-            eglSurface = null;
-            eglContext = null;
-        }
-    }
-
-    public void onAnimationStart(PAGView view) {
-        Log.i("PAGView", "onAnimationStart");
-    }
-
-    public void onAnimationEnd(PAGView view) {
-        Log.i("PAGView", "onAnimationEnd");
-    }
-
-    public void onAnimationCancel(PAGView view) {
-        Log.i("PAGView", "onAnimationCancel");
-    }
-
-    public void onAnimationRepeat(PAGView view) {
-        Log.i("PAGView", "onAnimationRepeat");
-    }
-
-    public void onAnimationUpdate(PAGView view) {
     }
 }
