@@ -1302,11 +1302,12 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 #### 5.5.3 文本变换器（TextModifier）
 
-对选定范围内的字形应用变换和样式覆盖。
+对选定范围内的字形应用变换和样式覆盖。TextModifier 可包含多个 RangeSelector 子元素，用于定义不同的选择范围和影响因子。
 
 ```xml
 <TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
-  <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
+  <RangeSelector start="0" end="0.5" shape="rampUp"/>
+  <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
 ```
 
@@ -1735,7 +1736,8 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 | **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `TextSpan` |
 | **绘制器** | `Fill`, `Stroke` |
 | **形状修改器** | `TrimPath`, `RoundCorner`, `MergePath` |
-| **文本修改器** | `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout` |
+| **文本修改器** | `TextModifier`, `TextPath`, `TextLayout` |
+| **选择器** | `RangeSelector`（TextModifier 子元素） |
 | **其他** | `Repeater`, `Group` |
 
 ### A.2 文档包含关系
@@ -1754,27 +1756,24 @@ pagx
 │   └── Composition → Layer*
 │
 └── Layer*
-    ├── contents
-    │   └── VectorElement*（见下方）
-    ├── styles
-    │   ├── DropShadowStyle
-    │   ├── InnerShadowStyle
-    │   └── BackgroundBlurStyle
-    ├── filters
-    │   ├── BlurFilter
-    │   ├── DropShadowFilter
-    │   ├── InnerShadowFilter
-    │   ├── BlendFilter
-    │   └── ColorMatrixFilter
+    ├── VectorElement*（见 A.3）
+    ├── DropShadowStyle*
+    ├── InnerShadowStyle*
+    ├── BackgroundBlurStyle*
+    ├── BlurFilter*
+    ├── DropShadowFilter*
+    ├── InnerShadowFilter*
+    ├── BlendFilter*
+    ├── ColorMatrixFilter*
     └── Layer*（子图层）
 ```
 
 ### A.3 VectorElement 包含关系
 
-`Layer.contents` 和 `Group` 可包含以下 VectorElement：
+`Layer` 和 `Group` 可包含以下 VectorElement：
 
 ```
-Layer.contents / Group
+Layer / Group
 ├── Rectangle
 ├── Ellipse
 ├── Polystar
