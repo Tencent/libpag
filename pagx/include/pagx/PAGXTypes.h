@@ -437,6 +437,15 @@ enum class RepeaterOrder {
   AboveOriginal
 };
 
+/**
+ * Text anchor for horizontal alignment.
+ */
+enum class TextAnchor {
+  Start,
+  Middle,
+  End
+};
+
 //==============================================================================
 // Enum string conversion utilities
 //==============================================================================
@@ -503,5 +512,8 @@ SelectorMode SelectorModeFromString(const std::string& str);
 
 std::string RepeaterOrderToString(RepeaterOrder order);
 RepeaterOrder RepeaterOrderFromString(const std::string& str);
+
+std::string TextAnchorToString(TextAnchor anchor);
+TextAnchor TextAnchorFromString(const std::string& str);
 
 }  // namespace pagx

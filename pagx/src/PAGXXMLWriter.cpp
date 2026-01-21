@@ -368,6 +368,9 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       }
       xml.addAttribute("tracking", text->tracking);
       xml.addAttribute("baselineShift", text->baselineShift);
+      if (text->textAnchor != TextAnchor::Start) {
+        xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
+      }
       xml.closeElementStart();
       xml.addTextContent(text->text);
       xml.closeElement();

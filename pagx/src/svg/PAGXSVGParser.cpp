@@ -506,6 +506,15 @@ std::unique_ptr<GroupNode> SVGParserImpl::convertText(const std::shared_ptr<DOMN
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
+  // Parse text-anchor attribute.
+  TextAnchor textAnchor = TextAnchor::Start;
+  std::string anchor = getAttribute(element, "text-anchor");
+  if (anchor == "middle") {
+    textAnchor = TextAnchor::Middle;
+  } else if (anchor == "end") {
+    textAnchor = TextAnchor::End;
+  }
+
   // Get text content from child text nodes.
   std::string textContent;
   auto child = element->getFirstChild();
@@ -521,6 +530,7 @@ std::unique_ptr<GroupNode> SVGParserImpl::convertText(const std::shared_ptr<DOMN
     textSpan->x = x;
     textSpan->y = y;
     textSpan->text = textContent;
+    textSpan->textAnchor = textAnchor;
 
     std::string fontFamily = getAttribute(element, "font-family");
     if (!fontFamily.empty()) {

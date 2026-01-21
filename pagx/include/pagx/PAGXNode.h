@@ -361,6 +361,7 @@ struct TextSpanNode : public VectorElementNode {
   FontStyle fontStyle = FontStyle::Normal;
   float tracking = 0;
   float baselineShift = 0;
+  TextAnchor textAnchor = TextAnchor::Start;
   std::string text = {};
 
   NodeType type() const override {

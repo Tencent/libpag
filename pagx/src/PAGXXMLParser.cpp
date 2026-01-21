@@ -586,6 +586,7 @@ std::unique_ptr<TextSpanNode> PAGXXMLParser::parseTextSpan(const XMLNode* node) 
   textSpan->fontStyle = FontStyleFromString(getAttribute(node, "fontStyle", "normal"));
   textSpan->tracking = getFloatAttribute(node, "tracking", 0);
   textSpan->baselineShift = getFloatAttribute(node, "baselineShift", 0);
+  textSpan->textAnchor = TextAnchorFromString(getAttribute(node, "textAnchor", "start"));
   textSpan->text = node->text;
   return textSpan;
 }

@@ -959,7 +959,7 @@ y = center.y + outerRadius * sin(angle)
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
 ```xml
-<TextSpan x="100" y="200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0">
+<TextSpan x="100" y="200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0" textAnchor="start">
   <![CDATA[Hello World]]>
 </TextSpan>
 ```
@@ -974,12 +974,22 @@ y = center.y + outerRadius * sin(angle)
 | `fontStyle` | enum | normal | normal 或 italic |
 | `tracking` | float | 0 | 字距 |
 | `baselineShift` | float | 0 | 基线偏移 |
+| `textAnchor` | TextAnchor | start | 文本锚点（见下方） |
+
+**TextAnchor（文本锚点）**：
+
+| 值 | 说明 |
+|------|------|
+| `start` | 文本从 x 位置开始（默认） |
+| `middle` | 文本以 x 位置为中心 |
+| `end` | 文本以 x 位置为结束 |
 
 **处理流程**：
 1. 根据 `font`、`fontSize`、`fontWeight`、`fontStyle` 查找字体
 2. 应用 `tracking`（字距调整）
 3. 将文本塑形（shaping）为字形列表
-4. 按 `x`、`y` 位置放置
+4. 根据 `textAnchor` 计算水平偏移
+5. 按 `x`、`y` 位置和偏移放置
 
 **字体回退**：当指定字体不可用时，按平台默认字体回退链选择替代字体。
 

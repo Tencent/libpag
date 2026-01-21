@@ -336,7 +336,6 @@ class LayerBuilderImpl {
 
   std::shared_ptr<tgfx::TextSpan> convertTextSpan(const TextSpanNode* node) {
     auto textSpan = std::make_shared<tgfx::TextSpan>();
-    textSpan->setPosition(tgfx::Point::Make(node->x, node->y));
 
     std::shared_ptr<tgfx::Typeface> typeface = nullptr;
     if (!node->font.empty() && !_options.fallbackTypefaces.empty()) {
@@ -350,12 +349,25 @@ class LayerBuilderImpl {
     if (!typeface && !_options.fallbackTypefaces.empty()) {
       typeface = _options.fallbackTypefaces[0];
     }
+
+    float xOffset = 0;
     if (typeface && !node->text.empty()) {
       auto font = tgfx::Font(typeface, node->fontSize);
       auto textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
       textSpan->setTextBlob(textBlob);
+
+      // Apply text-anchor offset based on text width.
+      if (textBlob && node->textAnchor != TextAnchor::Start) {
+        auto bounds = textBlob->getTightBounds();
+        if (node->textAnchor == TextAnchor::Middle) {
+          xOffset = -bounds.width() * 0.5f;
+        } else if (node->textAnchor == TextAnchor::End) {
+          xOffset = -bounds.width();
+        }
+      }
     }
 
+    textSpan->setPosition(tgfx::Point::Make(node->x + xOffset, node->y));
     return textSpan;
   }
 
