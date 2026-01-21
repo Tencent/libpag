@@ -87,7 +87,22 @@ ResourceNode* PAGXDocument::findResource(const std::string& id) const {
 }
 
 LayerNode* PAGXDocument::findLayer(const std::string& id) const {
-  return findLayerRecursive(layers, id);
+  // First search in top-level layers
+  auto found = findLayerRecursive(layers, id);
+  if (found) {
+    return found;
+  }
+  // Then search in Composition resources
+  for (const auto& resource : resources) {
+    if (resource->type() == NodeType::Composition) {
+      auto comp = static_cast<const CompositionNode*>(resource.get());
+      found = findLayerRecursive(comp->layers, id);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return nullptr;
 }
 
 void PAGXDocument::rebuildResourceMap() const {
