@@ -136,7 +136,20 @@ PAGX 支持多种颜色格式：
 
 **示例**：`"M 0 0 L 100 0 L 100 100 Z"`
 
-### 2.8 图片（Image）
+### 2.8 PathData（路径数据资源）
+
+PathData 定义可在文档中引用的路径数据，支持路径复用。
+
+```xml
+<PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
+```
+
+| 属性 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 是 | 唯一标识 |
+| `data` | string | 是 | SVG 路径数据（语法见 2.7 节） |
+
+### 2.9 Image（图片）
 
 图片资源定义可在文档中引用的位图数据。
 
@@ -155,7 +168,7 @@ PAGX 支持多种颜色格式：
 
 **支持格式**：PNG、JPEG、WebP、GIF
 
-### 2.9 颜色源（Color Source）
+### 2.10 颜色源（Color Source）
 
 颜色源定义可用于渲染的颜色，支持两种定义方式：
 
@@ -167,7 +180,7 @@ PAGX 支持多种颜色格式：
 - 被多处引用的颜色源应定义在 Resources 中以便复用
 - ImagePattern 使用 objectBoundingBox 时（tile 尺寸依赖形状尺寸），通常需要内联定义，因为不同形状需要不同的 matrix
 
-#### 2.9.1 SolidColor（纯色）
+#### 2.10.1 SolidColor（纯色）
 
 ```xml
 <SolidColor id="red" color="#FF0000"/>
@@ -178,7 +191,7 @@ PAGX 支持多种颜色格式：
 | `id` | string | 是（Resources 中） | 唯一标识 |
 | `color` | color | 是 | 颜色值 |
 
-#### 2.9.2 LinearGradient（线性渐变）
+#### 2.10.2 LinearGradient（线性渐变）
 
 线性渐变沿起点到终点的方向插值。
 
@@ -198,7 +211,7 @@ PAGX 支持多种颜色格式：
 
 **计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
 
-#### 2.9.3 RadialGradient（径向渐变）
+#### 2.10.3 RadialGradient（径向渐变）
 
 径向渐变从中心向外辐射。
 
@@ -218,7 +231,7 @@ PAGX 支持多种颜色格式：
 
 **计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
 
-#### 2.9.4 ConicGradient（锥形渐变）
+#### 2.10.4 ConicGradient（锥形渐变）
 
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
@@ -239,7 +252,7 @@ PAGX 支持多种颜色格式：
 
 **计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
 
-#### 2.9.5 DiamondGradient（菱形渐变）
+#### 2.10.5 DiamondGradient（菱形渐变）
 
 菱形渐变从中心向四角辐射。
 
@@ -259,7 +272,7 @@ PAGX 支持多种颜色格式：
 
 **计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
 
-#### 2.9.6 ColorStop（渐变色标）
+#### 2.10.6 ColorStop（渐变色标）
 
 ```xml
 <ColorStop offset="0.5" color="#FF0000"/>
@@ -280,7 +293,7 @@ PAGX 支持多种颜色格式：
   - 如果没有 `offset = 1` 的色标，使用最后一个色标的颜色填充
 - **渐变变换**：`matrix` 属性对渐变坐标系应用变换
 
-#### 2.9.8 颜色源坐标系统
+#### 2.10.7 颜色源坐标系统
 
 所有颜色源（渐变、图案）的坐标系是**相对于几何元素的局部坐标系原点**。
 
@@ -309,7 +322,7 @@ PAGX 支持多种颜色格式：
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-#### 2.9.7 ImagePattern（图片图案）
+#### 2.10.8 ImagePattern（图片图案）
 
 图片图案使用图片作为颜色源。
 
@@ -396,11 +409,12 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 ### 3.3 Resources（资源区）
 
-`<Resources>` 定义可复用的资源，包括图片、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `#id` 形式引用。
+`<Resources>` 定义可复用的资源，包括图片、路径数据、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `#id` 形式引用。
 
 ```xml
 <Resources>
   <Image id="img1" source="photo.png"/>
+  <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
   <SolidColor id="brandRed" color="#FF0000"/>
   <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,100">
     <ColorStop offset="0" color="#87CEEB"/>
@@ -413,11 +427,15 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 #### 3.3.1 Image（图片）
 
-图片资源定义见 2.8 节。
+图片资源定义见 2.9 节。
 
-#### 3.3.2 颜色源
+#### 3.3.2 PathData（路径数据）
 
-Resources 中可定义以下颜色源类型（详见 2.9 节）：
+路径数据资源定义见 2.8 节。可被 Path 元素和 TextPath 修改器引用。
+
+#### 3.3.3 颜色源
+
+Resources 中可定义以下颜色源类型（详见 2.10 节）：
 
 - `SolidColor`：纯色
 - `LinearGradient`：线性渐变
@@ -426,7 +444,7 @@ Resources 中可定义以下颜色源类型（详见 2.9 节）：
 - `DiamondGradient`：菱形渐变
 - `ImagePattern`：图片图案
 
-#### 3.3.3 Composition（合成）
+#### 3.3.4 Composition（合成）
 
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
 
@@ -455,6 +473,7 @@ PAGX 文档采用层级结构组织内容：
 <pagx>                          ← 根元素（定义画布尺寸）
 ├── <Resources>                 ← 资源区（可选，定义可复用资源）
 │   ├── <Image>                 ← 图片资源
+│   ├── <PathData>              ← 路径数据资源
 │   ├── <SolidColor>            ← 纯色定义
 │   ├── <LinearGradient>        ← 渐变定义
 │   ├── <ImagePattern>          ← 图片图案定义
@@ -943,15 +962,19 @@ y = center.y + outerRadius * sin(angle)
 
 #### 5.2.4 Path（路径）
 
-使用 SVG 路径语法定义任意形状。
+使用 SVG 路径语法定义任意形状，支持内联数据或引用 Resources 中定义的 PathData。
 
 ```xml
+<!-- 内联路径数据 -->
 <Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
+
+<!-- 引用 PathData 资源 -->
+<Path data="#curvePath" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string | "" | SVG 路径数据（语法见 2.7 节） |
+| `data` | string/idref | "" | SVG 路径数据（语法见 2.7 节）或 PathData 引用 "#id" |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -1388,7 +1411,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | - | 路径引用 "#id" |
+| `path` | idref | - | PathData 资源引用 "#id"（见 2.8 节） |
 | `align` | TextPathAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
