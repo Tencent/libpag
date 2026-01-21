@@ -61,8 +61,8 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 | 默认值格式 | 含义 |
 |------------|------|
 | `(必填)` | 属性必须指定，没有默认值 |
-| `(Resources 中必填)` | 仅在 Resources 中定义时必填，内联使用时可省略 |
 | 具体值（如 `0`、`true`、`normal`） | 属性可选，未指定时使用该默认值 |
+| `-` | 属性可选，未指定时不生效 |
 
 ### 2.3 基本数值类型
 
@@ -205,7 +205,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | (Resources 中必填) | 唯一标识 |
+| `id` | string | - | 唯一标识 |
 | `color` | color | (必填) | 颜色值 |
 
 #### 2.11.2 LinearGradient（线性渐变）
@@ -221,7 +221,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | (Resources 中必填) | 唯一标识 |
+| `id` | string | - | 唯一标识 |
 | `startPoint` | point | 0,0 | 起点 |
 | `endPoint` | point | (必填) | 终点 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
@@ -241,7 +241,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | (Resources 中必填) | 唯一标识 |
+| `id` | string | - | 唯一标识 |
 | `center` | point | 0,0 | 中心点 |
 | `radius` | float | (必填) | 渐变半径 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
@@ -261,7 +261,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | (Resources 中必填) | 唯一标识 |
+| `id` | string | - | 唯一标识 |
 | `center` | point | 0,0 | 中心点 |
 | `startAngle` | float | 0 | 起始角度 |
 | `endAngle` | float | 360 | 结束角度 |
@@ -282,7 +282,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | (Resources 中必填) | 唯一标识 |
+| `id` | string | - | 唯一标识 |
 | `center` | point | 0,0 | 中心点 |
 | `halfDiagonal` | float | (必填) | 半对角线长度 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
@@ -349,7 +349,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | (Resources 中必填) | 唯一标识 |
+| `id` | string | - | 唯一标识 |
 | `image` | idref | (必填) | 图片引用 "#id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式（见下方） |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式（见下方） |
@@ -1815,13 +1815,13 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### SolidColor
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `id` | string | (Resources 中必填) |
+| `id` | string | - |
 | `color` | color | (必填) |
 
 #### LinearGradient
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `id` | string | (Resources 中必填) |
+| `id` | string | - |
 | `startPoint` | point | 0,0 |
 | `endPoint` | point | (必填) |
 | `matrix` | string | 单位矩阵 |
@@ -1829,7 +1829,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### RadialGradient
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `id` | string | (Resources 中必填) |
+| `id` | string | - |
 | `center` | point | 0,0 |
 | `radius` | float | (必填) |
 | `matrix` | string | 单位矩阵 |
@@ -1837,7 +1837,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### ConicGradient
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `id` | string | (Resources 中必填) |
+| `id` | string | - |
 | `center` | point | 0,0 |
 | `startAngle` | float | 0 |
 | `endAngle` | float | 360 |
@@ -1846,7 +1846,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### DiamondGradient
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `id` | string | (Resources 中必填) |
+| `id` | string | - |
 | `center` | point | 0,0 |
 | `halfDiagonal` | float | (必填) |
 | `matrix` | string | 单位矩阵 |
@@ -1860,7 +1860,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### ImagePattern
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `id` | string | (Resources 中必填) |
+| `id` | string | - |
 | `image` | idref | (必填) |
 | `tileModeX` | TileMode | clamp |
 | `tileModeY` | TileMode | clamp |
