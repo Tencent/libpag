@@ -88,6 +88,7 @@ enum class NodeType {
 
   // Resources
   Image,
+  PathData,
   Composition,
 
   // Layer
@@ -845,6 +846,21 @@ struct ImageNode : public ResourceNode {
 
   std::unique_ptr<PAGXNode> clone() const override {
     return std::make_unique<ImageNode>(*this);
+  }
+};
+
+/**
+ * PathData resource - stores reusable path data.
+ */
+struct PathDataNode : public ResourceNode {
+  std::string data = {};  // SVG path data string
+
+  NodeType type() const override {
+    return NodeType::PathData;
+  }
+
+  std::unique_ptr<PAGXNode> clone() const override {
+    return std::make_unique<PathDataNode>(*this);
   }
 };
 

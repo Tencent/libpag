@@ -88,6 +88,7 @@ class PAGXXMLParser {
   static ColorStopNode parseColorStop(const XMLNode* node);
 
   static std::unique_ptr<ImageNode> parseImage(const XMLNode* node);
+  static std::unique_ptr<PathDataNode> parsePathData(const XMLNode* node);
   static std::unique_ptr<CompositionNode> parseComposition(const XMLNode* node);
 
   static std::unique_ptr<DropShadowStyleNode> parseDropShadowStyle(const XMLNode* node);

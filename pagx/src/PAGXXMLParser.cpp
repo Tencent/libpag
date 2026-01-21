@@ -304,6 +304,9 @@ std::unique_ptr<ResourceNode> PAGXXMLParser::parseResource(const XMLNode* node) 
   if (node->tag == "Image") {
     return parseImage(node);
   }
+  if (node->tag == "PathData") {
+    return parsePathData(node);
+  }
   if (node->tag == "SolidColor") {
     auto solidColor = parseSolidColor(node);
     auto resource = std::make_unique<SolidColorNode>();
@@ -894,6 +897,13 @@ std::unique_ptr<ImageNode> PAGXXMLParser::parseImage(const XMLNode* node) {
   image->id = getAttribute(node, "id");
   image->source = getAttribute(node, "source");
   return image;
+}
+
+std::unique_ptr<PathDataNode> PAGXXMLParser::parsePathData(const XMLNode* node) {
+  auto pathData = std::make_unique<PathDataNode>();
+  pathData->id = getAttribute(node, "id");
+  pathData->data = getAttribute(node, "data");
+  return pathData;
 }
 
 std::unique_ptr<CompositionNode> PAGXXMLParser::parseComposition(const XMLNode* node) {
