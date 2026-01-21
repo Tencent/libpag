@@ -49,7 +49,6 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 |------|------|------|
 | 元素名 | PascalCase，不缩写 | `Group`、`Rectangle`、`Fill` |
 | 属性名 | camelCase，尽量简短 | `antiAlias`、`blendMode`、`fontSize` |
-| 属性节点 | camelCase | `<contents>`、`<styles>`、`<filters>` |
 | 默认单位 | 像素（无需标注） | `width="100"` |
 | 角度单位 | 度 | `rotation="45"` |
 
@@ -82,12 +81,10 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 **示例**：
 
 ```xml
-<ShapeLayer data-name="背景图层" data-figma-id="12:34" data-exported-by="PAGExporter">
-  <contents>
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-  </contents>
-</ShapeLayer>
+<Layer data-name="背景图层" data-figma-id="12:34" data-exported-by="PAGExporter">
+  <Rectangle center="50,50" size="100,100"/>
+  <Fill color="#FF0000"/>
+</Layer>
 ```
 
 ### 2.4 基本数值类型
@@ -437,10 +434,8 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 </Resources>
 
 <Layer>
-  <contents>
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#grad"/>
-  </contents>
+  <Rectangle center="50,50" size="100,100"/>
+  <Fill color="#grad"/>
 </Layer>
 ```
 
@@ -454,10 +449,8 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 ```xml
 <Composition id="buttonComp" width="100" height="50">
   <Layer name="button">
-    <contents>
-      <Rectangle center="50,25" size="100,50" roundness="10"/>
-      <Fill color="#007AFF"/>
-    </contents>
+    <Rectangle center="50,25" size="100,50" roundness="10"/>
+    <Fill color="#007AFF"/>
   </Layer>
 </Composition>
 ```
@@ -474,18 +467,12 @@ PAGX 文档采用层级结构组织内容：
 ```
 <pagx>                          ← 根元素（定义画布尺寸）
 ├── <Layer>                     ← 图层（可多个）
-│   ├── <contents>              ← 矢量内容（VectorElement 系统）
-│   │   ├── 几何元素            ← Rectangle、Ellipse、Path、TextSpan 等
-│   │   ├── 修改器              ← TrimPath、RoundCorner、TextModifier 等
-│   │   ├── 绘制器              ← Fill、Stroke
-│   │   └── <Group>             ← 矢量元素容器（可嵌套）
-│   │
-│   ├── <styles>                 ← 图层样式
-│   │   └── <DropShadowStyle>   ← 投影、内阴影等
-│   │
-│   ├── <filters>               ← 滤镜
-│   │   └── <BlurFilter>        ← 模糊、颜色矩阵等
-│   │
+│   ├── 几何元素                ← Rectangle、Ellipse、Path、TextSpan 等
+│   ├── 修改器                  ← TrimPath、RoundCorner、TextModifier 等
+│   ├── 绘制器                  ← Fill、Stroke
+│   ├── <Group>                 ← 矢量元素容器（可嵌套）
+│   ├── LayerStyle              ← DropShadowStyle、InnerShadowStyle 等
+│   ├── LayerFilter             ← BlurFilter、ColorMatrixFilter 等
 │   └── <Layer>                 ← 子图层（递归结构）
 │       └── ...
 │
@@ -511,29 +498,30 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
-  <contents>
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-  </contents>
-  <styles>
-    <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
-  </styles>
-  <filters>
-    <BlurFilter blurrinessX="10" blurrinessY="10"/>
-  </filters>
+  <Rectangle center="50,50" size="100,100"/>
+  <Fill color="#FF0000"/>
+  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
+  <BlurFilter blurrinessX="10" blurrinessY="10"/>
   <Layer name="Child">
-    <contents>
-      <Ellipse center="50,50" size="80,80"/>
-      <Fill color="#00FF00"/>
-    </contents>
+    <Ellipse center="50,50" size="80,80"/>
+    <Fill color="#00FF00"/>
   </Layer>
 </Layer>
 <Layer composition="#buttonComp" x="100" y="200"/>
 ```
 
-#### contents 子节点
+#### 子元素
 
-`<contents>` 是图层的矢量内容容器，本身相当于一个不带变换属性的 Group，可直接包含几何元素、修改器、绘制器等 VectorElement。
+Layer 的子元素按类型自动归类为四个集合：
+
+| 子元素类型 | 归类 | 说明 |
+|-----------|------|------|
+| VectorElement | contents | 几何元素、修改器、绘制器（参与累积处理） |
+| LayerStyle | styles | DropShadowStyle、InnerShadowStyle、BackgroundBlurStyle |
+| LayerFilter | filters | BlurFilter、DropShadowFilter 等滤镜 |
+| Layer | children | 嵌套子图层 |
+
+**建议顺序**：虽然子元素顺序不影响解析结果，但建议按 VectorElement → LayerStyle → LayerFilter → 子Layer 的顺序书写，以提高可读性。
 
 #### 图层属性
 
@@ -624,13 +612,9 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <Layer name="InvisibleShadow">
-  <contents>
-    <Rectangle center="100,100" size="200,200"/>
-    <Fill color="#000000" alpha="0"/>  <!-- 透明填充，不可见但参与轮廓 -->
-  </contents>
-  <styles>
-    <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
-  </styles>
+  <Rectangle center="100,100" size="200,200"/>
+  <Fill color="#000000" alpha="0"/>  <!-- 透明填充，不可见但参与轮廓 -->
+  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
 </Layer>
 ```
 
@@ -641,11 +625,13 @@ PAGX 文档采用层级结构组织内容：
 图层样式在图层内容渲染完成后应用。
 
 ```xml
-<styles>
+<Layer>
+  <Rectangle center="50,50" size="100,100"/>
+  <Fill color="#FF0000"/>
   <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080" showBehindLayer="true"/>
   <InnerShadowStyle offsetX="2" offsetY="2" blurrinessX="5" blurrinessY="5" color="#00000040"/>
   <BackgroundBlurStyle blurrinessX="20" blurrinessY="20" tileMode="mirror"/>
-</styles>
+</Layer>
 ```
 
 **所有 LayerStyle 共有属性**：
@@ -713,11 +699,13 @@ PAGX 文档采用层级结构组织内容：
 滤镜按文档顺序链式应用，每个滤镜的输出作为下一个滤镜的输入。
 
 ```xml
-<filters>
+<Layer>
+  <Rectangle center="50,50" size="100,100"/>
+  <Fill color="#FF0000"/>
   <BlurFilter blurrinessX="10" blurrinessY="10"/>
   <DropShadowFilter offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
   <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
-</filters>
+</Layer>
 ```
 
 #### 4.3.1 模糊滤镜（BlurFilter）
@@ -784,10 +772,8 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <Layer scrollRect="0,0,100,100">
-  <contents>
-    <Rectangle center="50,50" size="200,200"/>
-    <Fill color="#FF0000"/>
-  </contents>
+  <Rectangle center="50,50" size="200,200"/>
+  <Fill color="#FF0000"/>
 </Layer>
 ```
 
@@ -797,16 +783,14 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <Layer id="maskShape" visible="false">
-  <contents>
-    <Ellipse center="100,100" size="150,150"/>
-    <Fill color="#FFFFFF"/>
-  </contents>
+  <Ellipse center="100,100" size="150,150"/>
+  <Fill color="#FFFFFF"/>
 </Layer>
 <Layer mask="#maskShape" maskType="alpha">
-  <contents>
-    <Rectangle center="100,100" size="200,200"/>
-    <Fill color="#FF0000"/>
-  </contents>
+  <Rectangle center="100,100" size="200,200"/>
+  <Fill color="#FF0000"/>
+</Layer>
+```
 </Layer>
 ```
 
@@ -818,7 +802,7 @@ PAGX 文档采用层级结构组织内容：
 
 ## 5. 矢量元素系统（VectorElement System）
 
-矢量元素系统定义了图层 `<contents>` 内的矢量内容如何被处理和渲染。
+矢量元素系统定义了 Layer 内的矢量内容如何被处理和渲染。
 
 ### 5.1 处理模型（Processing Model）
 
@@ -1674,17 +1658,15 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **示例 2 - 子 Group 几何向上累积**：
 ```xml
-<contents>
-  <Group>
-    <Rectangle center="50,50" size="100,100"/>    <!-- 累积矩形 -->
-    <Fill color="#FF0000"/> <!-- 填充矩形 -->
-  </Group>
-  <Group>
-    <Ellipse center="150,50" size="80,80"/>       <!-- 累积椭圆 -->
-    <Fill color="#00FF00"/> <!-- 填充椭圆 -->
-  </Group>
-  <Fill color="#0000FF"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
-</contents>
+<Group>
+  <Rectangle center="50,50" size="100,100"/>    <!-- 累积矩形 -->
+  <Fill color="#FF0000"/> <!-- 填充矩形 -->
+</Group>
+<Group>
+  <Ellipse center="150,50" size="80,80"/>       <!-- 累积椭圆 -->
+  <Fill color="#00FF00"/> <!-- 填充椭圆 -->
+</Group>
+<Fill color="#0000FF"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
 ```
 
 **示例 3 - 多个绘制器复用几何**：
@@ -1823,26 +1805,20 @@ Layer.contents / Group
   
   <!-- 背景 -->
   <Layer name="Background">
-    <contents>
-      <Rectangle center="200,150" size="400,300"/>
-      <Fill color="#skyGradient"/>
-    </contents>
+    <Rectangle center="200,150" size="400,300"/>
+    <Fill color="#skyGradient"/>
   </Layer>
   
   <!-- 标题：使用 Group 是因为需要整体变换 -->
   <Layer name="Title">
-    <contents>
-      <Group anchorPoint="100,20" position="200,50">
-        <TextSpan x="0" y="32" font="Helvetica" fontSize="32" fontWeight="700">
-          <![CDATA[Hello PAGX!]]>
-        </TextSpan>
-        <Fill color="#333333"/>
-        <Stroke color="#FFFFFF" width="2" placement="foreground"/>
-      </Group>
-    </contents>
-    <styles>
-      <DropShadowStyle offsetX="2" offsetY="2" blurrinessX="4" blurrinessY="4" color="#00000040"/>
-    </styles>
+    <Group anchorPoint="100,20" position="200,50">
+      <TextSpan x="0" y="32" font="Helvetica" fontSize="32" fontWeight="700">
+        <![CDATA[Hello PAGX!]]>
+      </TextSpan>
+      <Fill color="#333333"/>
+      <Stroke color="#FFFFFF" width="2" placement="foreground"/>
+    </Group>
+    <DropShadowStyle offsetX="2" offsetY="2" blurrinessX="4" blurrinessY="4" color="#00000040"/>
   </Layer>
   
   <!-- 使用合成的星星 -->
@@ -1851,17 +1827,13 @@ Layer.contents / Group
   
   <!-- 遮罩示例 -->
   <Layer id="maskShape" name="Mask" visible="false">
-    <contents>
-      <Ellipse center="200,200" size="150,150"/>
-      <Fill color="#FFFFFF"/>
-    </contents>
+    <Ellipse center="200,200" size="150,150"/>
+    <Fill color="#FFFFFF"/>
   </Layer>
   
   <Layer name="MaskedContent" mask="#maskShape" maskType="alpha">
-    <contents>
-      <Rectangle center="200,200" size="200,200"/>
-      <Fill color="#FF6B6B"/>
-    </contents>
+    <Rectangle center="200,200" size="200,200"/>
+    <Fill color="#FF6B6B"/>
   </Layer>
   
   <Resources>
@@ -1872,11 +1844,9 @@ Layer.contents / Group
     
     <Composition id="star" width="50" height="50">
       <Layer name="starLayer">
-        <contents>
-          <Polystar center="25,25" polystarType="star" pointCount="5"
-                    outerRadius="25" innerRadius="10"/>
-          <Fill color="#FFD700"/>
-        </contents>
+        <Polystar center="25,25" polystarType="star" pointCount="5"
+                  outerRadius="25" innerRadius="10"/>
+        <Fill color="#FFD700"/>
       </Layer>
     </Composition>
   </Resources>
