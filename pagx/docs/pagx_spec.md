@@ -147,15 +147,37 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 
 ### 2.8 颜色（Color）
 
-PAGX 支持多种颜色格式：
+PAGX 支持两种颜色表示方式：
+
+#### HEX 格式（十六进制）
+
+HEX 格式用于表示 sRGB 色域的颜色，使用 `#` 前缀的十六进制值：
 
 | 格式 | 示例 | 说明 |
 |------|------|------|
-| HEX | `#RGB`、`#RRGGBB`、`#RRGGBBAA` | 十六进制 |
-| RGB | `rgb(255,0,0)`、`rgba(255,0,0,0.5)` | RGB 带可选透明度 |
-| HSL | `hsl(0,100%,50%)`、`hsla(0,100%,50%,0.5)` | HSL 带可选透明度 |
-| 色域 | `color(display-p3 1 0 0)` | 广色域颜色 |
-| 引用 | `@resourceId` | 引用 Resources 中定义的颜色源 |
+| `#RGB` | `#F00` | 3 位简写，每位扩展为两位（等价于 `#FF0000`） |
+| `#RRGGBB` | `#FF0000` | 6 位标准格式，不透明 |
+| `#RRGGBBAA` | `#FF000080` | 8 位带 Alpha，Alpha 在末尾（与 CSS 一致） |
+
+#### 浮点数格式
+
+浮点数格式使用 `色域(r, g, b)` 或 `色域(r, g, b, a)` 的形式表示颜色，支持 sRGB 和 Display P3 两种色域：
+
+| 色域 | 格式 | 示例 | 说明 |
+|------|------|------|------|
+| sRGB | `srgb(r, g, b)` | `srgb(1.0, 0.5, 0.2)` | sRGB 色域，各分量 0.0~1.0 |
+| sRGB | `srgb(r, g, b, a)` | `srgb(1.0, 0.5, 0.2, 0.8)` | 带透明度 |
+| Display P3 | `p3(r, g, b)` | `p3(1.0, 0.5, 0.2)` | Display P3 广色域 |
+| Display P3 | `p3(r, g, b, a)` | `p3(1.0, 0.5, 0.2, 0.8)` | 带透明度 |
+
+**注意**：
+- 色域标识符（`srgb` 或 `p3`）和括号**不能省略**
+- 广色域颜色（Display P3）的分量值可以超出 [0, 1] 范围，以表示超出 sRGB 色域的颜色
+- sRGB 浮点格式与 HEX 格式表示相同的色域，可根据需要选择
+
+#### 颜色源引用
+
+使用 `@resourceId` 引用 Resources 中定义的颜色源（渐变、图案等）。
 
 ### 2.9 路径数据语法（Path Data Syntax）
 
@@ -289,12 +311,18 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 ##### 纯色（SolidColor）
 
 ```xml
-<SolidColor color="#FF0000"/>
+<SolidColor red="1.0" green="0" blue="0"/>
+<SolidColor red="1.0" green="0.5" blue="0.2" alpha="0.8"/>
+<SolidColor red="1.0" green="0.5" blue="0.2" colorSpace="displayP3"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color | (必填) | 颜色值 |
+| `red` | float | 0 | 红色分量，sRGB 为 0.0~1.0，广色域可超出 |
+| `green` | float | 0 | 绿色分量 |
+| `blue` | float | 0 | 蓝色分量 |
+| `alpha` | float | 1 | 透明度，0.0~1.0 |
+| `colorSpace` | ColorSpace | sRGB | 色域：`sRGB` 或 `displayP3` |
 
 ##### 线性渐变（LinearGradient）
 
@@ -997,15 +1025,14 @@ y = center.y + outerRadius * sin(angle)
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
 ```xml
-<TextSpan x="100" y="200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0">
+<TextSpan position="100,200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0">
   <![CDATA[Hello World]]>
 </TextSpan>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `x` | float | 0 | X 位置 |
-| `y` | float | 0 | Y 位置 |
+| `position` | point | 0,0 | 文本位置 |
 | `font` | string | (必填) | 字体族 |
 | `fontSize` | float | 12 | 字号 |
 | `fontWeight` | int | 400 | 字重（100-900） |
@@ -1031,7 +1058,9 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 纯色填充 -->
-<Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
+<Fill alpha="0.8" blendMode="normal" fillRule="winding" placement="background">
+  <SolidColor red="1.0" green="0" blue="0"/>
+</Fill>
 
 <!-- 引用共享颜色源 -->
 <Fill color="@grad1"/>
@@ -1052,11 +1081,13 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
+| `color` | idref | - | 颜色源引用（如 `@gradientId`） |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
 | `placement` | LayerPlacement | background | 绘制位置（见 5.3.3 节） |
+
+子元素：可内嵌一个颜色源（SolidColor、LinearGradient、RadialGradient、ConicGradient、DiamondGradient、ImagePattern）
 
 **FillRule（填充规则）**：
 
@@ -1076,10 +1107,14 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 基础描边 -->
-<Stroke color="#000000" width="2" cap="round" join="miter" miterLimit="4"/>
+<Stroke width="2" cap="round" join="miter" miterLimit="4">
+  <SolidColor red="0" green="0" blue="0"/>
+</Stroke>
 
 <!-- 虚线描边 -->
-<Stroke color="#0000FF" width="1" dashes="5,3" dashOffset="2"/>
+<Stroke width="1" dashes="5,3" dashOffset="2">
+  <SolidColor red="0" green="0" blue="1.0"/>
+</Stroke>
 
 <!-- 内联渐变描边 -->
 <Stroke width="3">
@@ -1092,7 +1127,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
+| `color` | idref | - | 颜色源引用（如 `@gradientId`） |
 | `width` | float | 1 | 描边宽度 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
@@ -1412,26 +1447,26 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 将文本沿指定路径排列。
 
 ```xml
-<TextPath path="@curvePath" align="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false" forceAlignment="false"/>
+<TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `path` | idref | (必填) | PathData 资源引用 "@id" |
-| `align` | TextPathAlign | start | 对齐模式（见下方） |
+| `textAlign` | TextAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
 | `perpendicularToPath` | bool | true | 垂直于路径 |
 | `reversed` | bool | false | 反转方向 |
-| `forceAlignment` | bool | false | 强制对齐 |
 
-**TextPathAlign（对齐模式）**：
+**TextAlign 在 TextPath 中的含义**：
 
 | 值 | 说明 |
 |------|------|
 | `start` | 从路径起点开始排列 |
 | `center` | 文本居中于路径 |
 | `end` | 文本结束于路径终点 |
+| `justify` | 强制填满路径，自动调整字间距以填满可用路径长度（减去边距） |
 
 **边距**：
 - `firstMargin`：起点边距（从路径起点向内偏移）
@@ -1444,46 +1479,55 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 **闭合路径**：对于闭合路径，超出范围的字形会环绕到路径另一端。
 
-**强制对齐**：`forceAlignment="true"` 时，自动调整字间距以填满可用路径长度（减去边距）。
-
 #### 5.5.6 文本排版（TextLayout）
 
-文本排版修改器对累积的文本元素应用段落排版，是 PAGX 格式特有的元素。与 TextPath 类似，TextLayout 作用于累积的字形列表，为其应用自动换行和对齐。
+文本排版修改器对累积的文本元素应用段落排版，是 PAGX 格式特有的元素。TextLayout 支持两种模式：
+
+- **Point Text 模式**（`width=0`）：单行文本，(x, y) 作为锚点，textAlign 控制文本相对于锚点的对齐
+- **Box Text 模式**（`width>0`）：多行文本框，支持自动换行、垂直对齐等
 
 渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。转换为 PAG 二进制格式时，TextLayout 会被预排版展开，字形位置直接写入 TextSpan。
 
 ```xml
+<!-- Point Text 模式：单行文本居中对齐 -->
+<Group>
+  <TextSpan font="Arial" fontSize="24">Hello World</TextSpan>
+  <TextLayout x="150" y="100" textAlign="center"/>
+  <Fill color="#333333"/>
+</Group>
+
+<!-- Box Text 模式：多行文本框 -->
 <Group>
   <TextSpan font="Arial" fontSize="16">第一段内容...</TextSpan>
   <TextSpan font="Arial" fontSize="16" fontWeight="700">粗体</TextSpan>
   <TextSpan font="Arial" fontSize="16">普通文本。</TextSpan>
-  <TextLayout width="300" height="200"
-              align="left"
+  <TextLayout x="50" y="50" width="300" height="200"
+              textAlign="start"
               verticalAlign="top"
-              lineHeight="1.5"
-              indent="20"
-              overflow="clip"/>
+              lineHeight="1.5"/>
   <Fill color="#333333"/>
 </Group>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `width` | float | (必填) | 文本框宽度 |
-| `height` | float | (必填) | 文本框高度 |
-| `align` | TextAlign | left | 水平对齐（见下方） |
+| `x` | float | 0 | 文本布局原点 x 坐标 |
+| `y` | float | 0 | 文本布局原点 y 坐标 |
+| `width` | float | 0 | 文本框宽度（0 = Point Text 模式） |
+| `height` | float | 0 | 文本框高度（0 = 高度自适应） |
+| `textAlign` | TextAlign | start | 水平对齐（见下方） |
+| `textAlignLast` | TextAlign | start | 最后一行对齐（仅 Justify 时生效） |
 | `verticalAlign` | VerticalAlign | top | 垂直对齐（见下方） |
 | `lineHeight` | float | 1.2 | 行高倍数 |
-| `indent` | float | 0 | 首行缩进 |
-| `overflow` | Overflow | clip | 溢出处理（见下方） |
+| `direction` | TextDirection | horizontal | 文本方向（见下方） |
 
 **TextAlign（水平对齐）**：
 
 | 值 | 说明 |
 |------|------|
-| `left` | 左对齐 |
+| `start` | 起始对齐（LTR 为左对齐，RTL 为右对齐） |
 | `center` | 居中对齐 |
-| `right` | 右对齐 |
+| `end` | 结束对齐（LTR 为右对齐，RTL 为左对齐） |
 | `justify` | 两端对齐 |
 
 **VerticalAlign（垂直对齐）**：
@@ -1494,13 +1538,12 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `center` | 垂直居中 |
 | `bottom` | 底部对齐 |
 
-**Overflow（溢出处理）**：
+**TextDirection（文本方向）**：
 
 | 值 | 说明 |
 |------|------|
-| `clip` | 裁剪：超出部分不显示 |
-| `visible` | 可见：超出部分仍然显示 |
-| `ellipsis` | 省略：超出部分显示省略号 |
+| `horizontal` | 横排文本 |
+| `vertical` | 竖排文本 |
 
 #### 5.5.7 富文本
 
@@ -1508,8 +1551,8 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 ```xml
 <Group>
-  <TextSpan x="0" y="24" font="Arial" fontSize="24">Hello </TextSpan>
-  <TextSpan x="60" y="24" font="Arial" fontSize="24" fontWeight="700">World</TextSpan>
+  <TextSpan position="0,24" font="Arial" fontSize="24">Hello </TextSpan>
+  <TextSpan position="60,24" font="Arial" fontSize="24" fontWeight="700">World</TextSpan>
   <Fill color="#000000"/>
 </Group>
 ```
@@ -1808,7 +1851,7 @@ Layer / Group
   <!-- 标题：使用 Group 是因为需要整体变换 -->
   <Layer name="Title">
     <Group anchorPoint="100,20" position="200,50">
-      <TextSpan x="0" y="32" font="Helvetica" fontSize="32" fontWeight="700">
+      <TextSpan position="0,32" font="Helvetica" fontSize="32" fontWeight="700">
         <![CDATA[Hello PAGX!]]>
       </TextSpan>
       <Fill color="#333333"/>
@@ -1907,7 +1950,7 @@ Layer / Group
 
 ```xml
 <!-- 波浪文字：逐字上下偏移 -->
-<TextSpan x="0" y="50" font="Arial" fontSize="32">
+<TextSpan position="0,50" font="Arial" fontSize="32">
   <![CDATA[WAVE TEXT]]>
 </TextSpan>
 <TextModifier position="0,-20">
@@ -1916,7 +1959,7 @@ Layer / Group
 <Fill color="#333333"/>
 
 <!-- 颜色渐变文字 -->
-<TextSpan x="0" y="100" font="Arial" fontSize="32">
+<TextSpan position="0,100" font="Arial" fontSize="32">
   <![CDATA[GRADIENT]]>
 </TextSpan>
 <TextModifier fillColor="#FF0000">
@@ -1928,13 +1971,21 @@ Layer / Group
 #### B.2.5 TextLayout 富文本排版
 
 ```xml
+<!-- Point Text 模式：单行居中文本 -->
+<Group>
+  <TextSpan font="Arial" fontSize="24">Centered Text</TextSpan>
+  <TextLayout x="200" y="50" textAlign="center"/>
+  <Fill color="#333333"/>
+</Group>
+
+<!-- Box Text 模式：多行文本框 -->
 <Group>
   <TextSpan font="Arial" fontSize="16">This is </TextSpan>
   <TextSpan font="Arial" fontSize="16" fontWeight="700">bold</TextSpan>
   <TextSpan font="Arial" fontSize="16"> and </TextSpan>
   <TextSpan font="Arial" fontSize="16" fontStyle="italic">italic</TextSpan>
   <TextSpan font="Arial" fontSize="16"> text in a paragraph that will automatically wrap to fit the container width.</TextSpan>
-  <TextLayout width="200" height="150" align="justify" lineHeight="1.5" indent="20"/>
+  <TextLayout x="50" y="100" width="200" height="150" textAlign="justify" lineHeight="1.5"/>
   <Fill color="#333333"/>
 </Group>
 ```
@@ -1943,11 +1994,19 @@ Layer / Group
 
 ```xml
 <!-- 需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/> -->
+<!-- 居中对齐 -->
 <TextSpan font="Arial" fontSize="18">
   <![CDATA[Text along a curved path]]>
 </TextSpan>
-<TextPath path="@arc" align="center"/>
+<TextPath path="@arc" textAlign="center"/>
 <Fill color="#336699"/>
+
+<!-- 强制填满路径（Justify 模式） -->
+<TextSpan font="Arial" fontSize="18">
+  <![CDATA[Justified Text]]>
+</TextSpan>
+<TextPath path="@arc" textAlign="justify" firstMargin="20" lastMargin="20"/>
+<Fill color="#996633"/>
 ```
 
 ---
@@ -1993,7 +2052,11 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color | (必填) |
+| `red` | float | 0 |
+| `green` | float | 0 |
+| `blue` | float | 0 |
+| `alpha` | float | 1 |
+| `colorSpace` | ColorSpace | sRGB |
 
 #### LinearGradient
 
@@ -2202,8 +2265,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `x` | float | 0 |
-| `y` | float | 0 |
+| `position` | point | 0,0 |
 | `font` | string | (必填) |
 | `fontSize` | float | 12 |
 | `fontWeight` | int | 400 |
@@ -2219,17 +2281,19 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color/idref | #000000 |
+| `color` | idref | - |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
 | `fillRule` | FillRule | winding |
 | `placement` | LayerPlacement | background |
 
+子元素：ColorSource（SolidColor、LinearGradient 等）
+
 #### Stroke
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color/idref | #000000 |
+| `color` | idref | - |
 | `width` | float | 1 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
@@ -2240,6 +2304,8 @@ Layer / Group
 | `dashOffset` | float | 0 |
 | `align` | StrokeAlign | center |
 | `placement` | LayerPlacement | background |
+
+子元素：ColorSource（SolidColor、LinearGradient 等）
 
 ### C.8 形状修改器节点
 
@@ -2304,24 +2370,25 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `path` | idref | (必填) |
-| `align` | TextPathAlign | start |
+| `textAlign` | TextAlign | start |
 | `firstMargin` | float | 0 |
 | `lastMargin` | float | 0 |
 | `perpendicularToPath` | bool | true |
 | `reversed` | bool | false |
-| `forceAlignment` | bool | false |
 
 #### TextLayout
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `width` | float | (必填) |
-| `height` | float | (必填) |
-| `align` | TextAlign | left |
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `width` | float | 0 |
+| `height` | float | 0 |
+| `textAlign` | TextAlign | start |
+| `textAlignLast` | TextAlign | start |
 | `verticalAlign` | VerticalAlign | top |
 | `lineHeight` | float | 1.2 |
-| `indent` | float | 0 |
-| `overflow` | Overflow | clip |
+| `direction` | TextDirection | horizontal |
 
 ### C.10 其他节点
 
@@ -2364,6 +2431,12 @@ Layer / Group
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **SamplingMode** | `nearest`, `linear`, `mipmap` |
 
+#### 颜色相关
+
+| 枚举 | 值 |
+|------|------|
+| **ColorSpace** | `sRGB`, `displayP3` |
+
 #### 绘制器相关
 
 | 枚举 | 值 |
@@ -2389,8 +2462,7 @@ Layer / Group
 | **SelectorUnit** | `index`, `percentage` |
 | **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` |
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
-| **TextPathAlign** | `start`, `center`, `end` |
-| **TextAlign** | `left`, `center`, `right`, `justify` |
+| **TextAlign** | `start`, `center`, `end`, `justify` |
 | **VerticalAlign** | `top`, `center`, `bottom` |
-| **Overflow** | `clip`, `visible`, `ellipsis` |
+| **TextDirection** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |

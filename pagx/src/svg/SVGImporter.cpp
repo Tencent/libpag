@@ -130,6 +130,10 @@ std::shared_ptr<Document> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& do
     child = child->getNextSibling();
   }
 
+  // Second pass: count references to gradients/patterns.
+  // This determines which ColorSources should be extracted to resources.
+  countColorSourceReferences(root);
+
   // Check if we need a viewBox transform.
   bool needsViewBoxTransform = false;
   Matrix viewBoxMatrix = Matrix::Identity();
@@ -532,8 +536,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
 
   if (!textContent.empty()) {
     auto textSpan = std::make_unique<TextSpan>();
-    textSpan->x = x;
-    textSpan->y = y;
+    textSpan->position = {x, y};
     textSpan->text = textContent;
 
     std::string fontFamily = getAttribute(element, "font-family");
@@ -893,18 +896,8 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
     } else if (fill.find("url(") == 0) {
       auto fillNode = std::make_unique<Fill>();
       std::string refId = resolveUrl(fill);
-
-      // Try to inline the gradient or pattern.
-      auto it = _defs.find(refId);
-      if (it != _defs.end()) {
-        if (it->second->name == "linearGradient") {
-          fillNode->color = convertLinearGradient(it->second, shapeBounds);
-        } else if (it->second->name == "radialGradient") {
-          fillNode->color = convertRadialGradient(it->second, shapeBounds);
-        } else if (it->second->name == "pattern") {
-          fillNode->color = convertPattern(it->second, shapeBounds);
-        }
-      }
+      // Use getColorSourceForRef which handles reference counting.
+      fillNode->color = getColorSourceForRef(refId, shapeBounds);
       contents.push_back(std::move(fillNode));
     } else {
       auto fillNode = std::make_unique<Fill>();
@@ -919,6 +912,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       }
 
       // Convert color to SolidColor for PAGX compatibility.
+      // SolidColor is always inlined (no id).
       Color parsedColor = parseColor(fill);
       auto solidColor = std::make_unique<SolidColor>();
       solidColor->color = parsedColor;
@@ -948,17 +942,8 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     if (stroke.find("url(") == 0) {
       std::string refId = resolveUrl(stroke);
-
-      auto it = _defs.find(refId);
-      if (it != _defs.end()) {
-        if (it->second->name == "linearGradient") {
-          strokeNode->color = convertLinearGradient(it->second, shapeBounds);
-        } else if (it->second->name == "radialGradient") {
-          strokeNode->color = convertRadialGradient(it->second, shapeBounds);
-        } else if (it->second->name == "pattern") {
-          strokeNode->color = convertPattern(it->second, shapeBounds);
-        }
-      }
+      // Use getColorSourceForRef which handles reference counting.
+      strokeNode->color = getColorSourceForRef(refId, shapeBounds);
     } else {
       // Determine effective stroke-opacity.
       std::string strokeOpacity = getAttribute(element, "stroke-opacity");
@@ -970,6 +955,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       }
 
       // Convert color to SolidColor for PAGX compatibility.
+      // SolidColor is always inlined (no id).
       Color parsedColor = parseColor(stroke);
       auto solidColor = std::make_unique<SolidColor>();
       solidColor->color = parsedColor;
@@ -1888,6 +1874,169 @@ void SVGParserImpl::parseCustomData(const std::shared_ptr<DOMNode>& element, Lay
       layer->customData[key] = attr.value;
     }
   }
+}
+
+void SVGParserImpl::countColorSourceReferences(const std::shared_ptr<DOMNode>& root) {
+  // Traverse all elements and count references to gradients/patterns.
+  auto child = root->getFirstChild();
+  while (child) {
+    if (child->name != "defs") {
+      countColorSourceReferencesInElement(child);
+    }
+    child = child->getNextSibling();
+  }
+}
+
+void SVGParserImpl::countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element) {
+  if (!element) {
+    return;
+  }
+
+  // Check fill attribute for url() references.
+  std::string fill = getAttribute(element, "fill");
+  if (!fill.empty() && fill.find("url(") == 0) {
+    std::string refId = resolveUrl(fill);
+    auto it = _defs.find(refId);
+    if (it != _defs.end()) {
+      // Only count gradients and patterns, not masks/clipPaths/filters.
+      const auto& defName = it->second->name;
+      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
+        _colorSourceRefCount[refId]++;
+      }
+    }
+  }
+
+  // Check stroke attribute for url() references.
+  std::string stroke = getAttribute(element, "stroke");
+  if (!stroke.empty() && stroke.find("url(") == 0) {
+    std::string refId = resolveUrl(stroke);
+    auto it = _defs.find(refId);
+    if (it != _defs.end()) {
+      const auto& defName = it->second->name;
+      if (defName == "linearGradient" || defName == "radialGradient" || defName == "pattern") {
+        _colorSourceRefCount[refId]++;
+      }
+    }
+  }
+
+  // Recurse into children.
+  auto child = element->getFirstChild();
+  while (child) {
+    countColorSourceReferencesInElement(child);
+    child = child->getNextSibling();
+  }
+}
+
+std::string SVGParserImpl::generateColorSourceId() {
+  std::string id;
+  do {
+    id = "color" + std::to_string(_nextColorSourceId++);
+  } while (_existingIds.count(id) > 0);
+  _existingIds.insert(id);
+  return id;
+}
+
+std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::string& refId,
+                                                                  const Rect& shapeBounds) {
+  auto defIt = _defs.find(refId);
+  if (defIt == _defs.end()) {
+    return nullptr;
+  }
+
+  const auto& defNode = defIt->second;
+  const auto& defName = defNode->name;
+
+  // Check if this reference is used multiple times.
+  int refCount = 0;
+  auto countIt = _colorSourceRefCount.find(refId);
+  if (countIt != _colorSourceRefCount.end()) {
+    refCount = countIt->second;
+  }
+
+  // If refCount > 1, we need to create/reuse a resource with an ID.
+  if (refCount > 1) {
+    // Check if we already created a resource for this ref.
+    auto idIt = _colorSourceIdMap.find(refId);
+    if (idIt != _colorSourceIdMap.end()) {
+      // Return a new ColorSource instance that references the existing resource.
+      // The caller should check if colorSource->id is non-empty to know it's a reference.
+      // We need to create a "stub" ColorSource with just the id set.
+      // Actually, the PAGXExporter uses colorSource->id to determine if it's a reference.
+      // So we create a new instance with just the id filled in.
+      
+      // For proper behavior, we create a copy of the cached ColorSource with the same id.
+      auto cacheIt = _colorSourceCache.find(refId);
+      if (cacheIt != _colorSourceCache.end()) {
+        // Clone the cached ColorSource
+        ColorSource* cached = cacheIt->second;
+        if (defName == "linearGradient") {
+          auto grad = std::make_unique<LinearGradient>();
+          auto* src = static_cast<LinearGradient*>(cached);
+          grad->id = src->id;
+          grad->startPoint = src->startPoint;
+          grad->endPoint = src->endPoint;
+          grad->matrix = src->matrix;
+          grad->colorStops = src->colorStops;
+          return grad;
+        } else if (defName == "radialGradient") {
+          auto grad = std::make_unique<RadialGradient>();
+          auto* src = static_cast<RadialGradient*>(cached);
+          grad->id = src->id;
+          grad->center = src->center;
+          grad->radius = src->radius;
+          grad->matrix = src->matrix;
+          grad->colorStops = src->colorStops;
+          return grad;
+        } else if (defName == "pattern") {
+          auto pattern = std::make_unique<ImagePattern>();
+          auto* src = static_cast<ImagePattern*>(cached);
+          pattern->id = src->id;
+          pattern->image = src->image;
+          pattern->tileModeX = src->tileModeX;
+          pattern->tileModeY = src->tileModeY;
+          pattern->sampling = src->sampling;
+          pattern->matrix = src->matrix;
+          return pattern;
+        }
+      }
+      return nullptr;
+    }
+
+    // First time seeing this multi-referenced def, create the resource.
+    std::string colorSourceId = generateColorSourceId();
+    _colorSourceIdMap[refId] = colorSourceId;
+
+    std::unique_ptr<ColorSource> colorSource;
+    if (defName == "linearGradient") {
+      colorSource = convertLinearGradient(defNode, shapeBounds);
+    } else if (defName == "radialGradient") {
+      colorSource = convertRadialGradient(defNode, shapeBounds);
+    } else if (defName == "pattern") {
+      colorSource = convertPattern(defNode, shapeBounds);
+    }
+
+    if (colorSource) {
+      colorSource->id = colorSourceId;
+      // Cache the raw pointer before moving to resources.
+      _colorSourceCache[refId] = colorSource.get();
+      _document->resources.push_back(std::move(colorSource));
+      
+      // Now return a clone with the same id (as a reference).
+      return getColorSourceForRef(refId, shapeBounds);
+    }
+    return nullptr;
+  }
+
+  // refCount <= 1: inline the ColorSource (no id).
+  if (defName == "linearGradient") {
+    return convertLinearGradient(defNode, shapeBounds);
+  } else if (defName == "radialGradient") {
+    return convertRadialGradient(defNode, shapeBounds);
+  } else if (defName == "pattern") {
+    return convertPattern(defNode, shapeBounds);
+  }
+
+  return nullptr;
 }
 
 }  // namespace pagx

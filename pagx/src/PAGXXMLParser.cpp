@@ -19,6 +19,7 @@
 #include "PAGXXMLParser.h"
 #include <cstring>
 #include <sstream>
+#include "PAGXEnumUtils.h"
 
 namespace pagx {
 
@@ -293,16 +294,16 @@ void PAGXXMLParser::parseDocument(const XMLNode* root, Document* doc) {
 
 void PAGXXMLParser::parseResources(const XMLNode* node, Document* doc) {
   for (const auto& child : node->children) {
-    // Try to parse as a resource first
+    // Try to parse as a resource (including color sources)
     auto resource = parseResource(child.get());
     if (resource) {
       doc->resources.push_back(std::move(resource));
       continue;
     }
-    // Try to parse as a color source
+    // Try to parse as a color source (which is also a Node)
     auto colorSource = parseColorSource(child.get());
     if (colorSource) {
-      doc->colorSources.push_back(std::move(colorSource));
+      doc->resources.push_back(std::move(colorSource));
     }
   }
 }
@@ -585,8 +586,8 @@ std::unique_ptr<Path> PAGXXMLParser::parsePath(const XMLNode* node) {
 
 std::unique_ptr<TextSpan> PAGXXMLParser::parseTextSpan(const XMLNode* node) {
   auto textSpan = std::make_unique<TextSpan>();
-  textSpan->x = getFloatAttribute(node, "x", 0);
-  textSpan->y = getFloatAttribute(node, "y", 0);
+  auto positionStr = getAttribute(node, "position", "0,0");
+  textSpan->position = parsePoint(positionStr);
   textSpan->font = getAttribute(node, "font");
   textSpan->fontSize = getFloatAttribute(node, "fontSize", 12);
   textSpan->fontWeight = getIntAttribute(node, "fontWeight", 400);
@@ -603,7 +604,7 @@ std::unique_ptr<TextSpan> PAGXXMLParser::parseTextSpan(const XMLNode* node) {
 
 std::unique_ptr<Fill> PAGXXMLParser::parseFill(const XMLNode* node) {
   auto fill = std::make_unique<Fill>();
-  fill->color = getAttribute(node, "color");
+  fill->colorRef = getAttribute(node, "color");
   fill->alpha = getFloatAttribute(node, "alpha", 1);
   fill->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   fill->fillRule = FillRuleFromString(getAttribute(node, "fillRule", "winding"));
@@ -612,7 +613,7 @@ std::unique_ptr<Fill> PAGXXMLParser::parseFill(const XMLNode* node) {
   for (const auto& child : node->children) {
     auto colorSource = parseColorSource(child.get());
     if (colorSource) {
-      fill->colorSource = std::move(colorSource);
+      fill->color = std::move(colorSource);
       break;
     }
   }
@@ -622,7 +623,7 @@ std::unique_ptr<Fill> PAGXXMLParser::parseFill(const XMLNode* node) {
 
 std::unique_ptr<Stroke> PAGXXMLParser::parseStroke(const XMLNode* node) {
   auto stroke = std::make_unique<Stroke>();
-  stroke->color = getAttribute(node, "color");
+  stroke->colorRef = getAttribute(node, "color");
   stroke->width = getFloatAttribute(node, "width", 1);
   stroke->alpha = getFloatAttribute(node, "alpha", 1);
   stroke->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
@@ -640,7 +641,7 @@ std::unique_ptr<Stroke> PAGXXMLParser::parseStroke(const XMLNode* node) {
   for (const auto& child : node->children) {
     auto colorSource = parseColorSource(child.get());
     if (colorSource) {
-      stroke->colorSource = std::move(colorSource);
+      stroke->color = std::move(colorSource);
       break;
     }
   }
@@ -786,10 +787,11 @@ RangeSelector PAGXXMLParser::parseRangeSelector(const XMLNode* node) {
 std::unique_ptr<SolidColor> PAGXXMLParser::parseSolidColor(const XMLNode* node) {
   auto solid = std::make_unique<SolidColor>();
   solid->id = getAttribute(node, "id");
-  auto colorStr = getAttribute(node, "color");
-  if (!colorStr.empty()) {
-    solid->color = Color::Parse(colorStr);
-  }
+  solid->color.red = getFloatAttribute(node, "red", 0);
+  solid->color.green = getFloatAttribute(node, "green", 0);
+  solid->color.blue = getFloatAttribute(node, "blue", 0);
+  solid->color.alpha = getFloatAttribute(node, "alpha", 1);
+  solid->color.colorSpace = ColorSpaceFromString(getAttribute(node, "colorSpace", "sRGB"));
   return solid;
 }
 
@@ -886,7 +888,7 @@ ColorStop PAGXXMLParser::parseColorStop(const XMLNode* node) {
   stop.offset = getFloatAttribute(node, "offset", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    stop.color = Color::Parse(colorStr);
+    stop.color = parseColor(colorStr);
   }
   return stop;
 }
@@ -902,10 +904,10 @@ std::unique_ptr<Image> PAGXXMLParser::parseImage(const XMLNode* node) {
   return image;
 }
 
-std::unique_ptr<PathDataResource> PAGXXMLParser::parsePathData(const XMLNode* node) {
-  auto pathData = std::make_unique<PathDataResource>();
+std::unique_ptr<PathData> PAGXXMLParser::parsePathData(const XMLNode* node) {
+  auto data = getAttribute(node, "data");
+  auto pathData = std::make_unique<PathData>(PathData::FromSVGString(data));
   pathData->id = getAttribute(node, "id");
-  pathData->data = getAttribute(node, "data");
   return pathData;
 }
 
@@ -938,7 +940,7 @@ std::unique_ptr<DropShadowStyle> PAGXXMLParser::parseDropShadowStyle(const XMLNo
   style->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    style->color = Color::Parse(colorStr);
+    style->color = parseColor(colorStr);
   }
   style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true);
   return style;
@@ -953,7 +955,7 @@ std::unique_ptr<InnerShadowStyle> PAGXXMLParser::parseInnerShadowStyle(const XML
   style->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    style->color = Color::Parse(colorStr);
+    style->color = parseColor(colorStr);
   }
   return style;
 }
@@ -988,7 +990,7 @@ std::unique_ptr<DropShadowFilter> PAGXXMLParser::parseDropShadowFilter(const XML
   filter->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    filter->color = Color::Parse(colorStr);
+    filter->color = parseColor(colorStr);
   }
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false);
   return filter;
@@ -1002,7 +1004,7 @@ std::unique_ptr<InnerShadowFilter> PAGXXMLParser::parseInnerShadowFilter(const X
   filter->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    filter->color = Color::Parse(colorStr);
+    filter->color = parseColor(colorStr);
   }
   filter->shadowOnly = getBoolAttribute(node, "shadowOnly", false);
   return filter;
@@ -1012,7 +1014,7 @@ std::unique_ptr<BlendFilter> PAGXXMLParser::parseBlendFilter(const XMLNode* node
   auto filter = std::make_unique<BlendFilter>();
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
-    filter->color = Color::Parse(colorStr);
+    filter->color = parseColor(colorStr);
   }
   filter->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   return filter;
@@ -1134,6 +1136,121 @@ Rect PAGXXMLParser::parseRect(const std::string& str) {
     rect.height = values[3];
   }
   return rect;
+}
+
+namespace {
+int parseHexDigit(char c) {
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+  if (c >= 'A' && c <= 'F') {
+    return c - 'A' + 10;
+  }
+  return 0;
+}
+}  // namespace
+
+Color PAGXXMLParser::parseColor(const std::string& str) {
+  if (str.empty()) {
+    return {};
+  }
+  // Hex format: #RGB, #RRGGBB, #RRGGBBAA (sRGB)
+  if (str[0] == '#') {
+    auto hex = str.substr(1);
+    Color color = {};
+    color.colorSpace = ColorSpace::SRGB;
+    if (hex.size() == 3) {
+      int r = parseHexDigit(hex[0]);
+      int g = parseHexDigit(hex[1]);
+      int b = parseHexDigit(hex[2]);
+      color.red = static_cast<float>(r * 17) / 255.0f;
+      color.green = static_cast<float>(g * 17) / 255.0f;
+      color.blue = static_cast<float>(b * 17) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
+    }
+    if (hex.size() == 6) {
+      int r = parseHexDigit(hex[0]) * 16 + parseHexDigit(hex[1]);
+      int g = parseHexDigit(hex[2]) * 16 + parseHexDigit(hex[3]);
+      int b = parseHexDigit(hex[4]) * 16 + parseHexDigit(hex[5]);
+      color.red = static_cast<float>(r) / 255.0f;
+      color.green = static_cast<float>(g) / 255.0f;
+      color.blue = static_cast<float>(b) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
+    }
+    if (hex.size() == 8) {
+      int r = parseHexDigit(hex[0]) * 16 + parseHexDigit(hex[1]);
+      int g = parseHexDigit(hex[2]) * 16 + parseHexDigit(hex[3]);
+      int b = parseHexDigit(hex[4]) * 16 + parseHexDigit(hex[5]);
+      int a = parseHexDigit(hex[6]) * 16 + parseHexDigit(hex[7]);
+      color.red = static_cast<float>(r) / 255.0f;
+      color.green = static_cast<float>(g) / 255.0f;
+      color.blue = static_cast<float>(b) / 255.0f;
+      color.alpha = static_cast<float>(a) / 255.0f;
+      return color;
+    }
+  }
+  // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
+  if (str.substr(0, 5) == "srgb(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      std::istringstream iss(inner);
+      std::string token = {};
+      std::vector<float> components = {};
+      while (std::getline(iss, token, ',')) {
+        auto trimmed = token;
+        trimmed.erase(0, trimmed.find_first_not_of(" \t"));
+        trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
+        if (!trimmed.empty()) {
+          components.push_back(std::stof(trimmed));
+        }
+      }
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+        color.colorSpace = ColorSpace::SRGB;
+        return color;
+      }
+    }
+  }
+  // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
+  if (str.substr(0, 3) == "p3(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      std::istringstream iss(inner);
+      std::string token = {};
+      std::vector<float> components = {};
+      while (std::getline(iss, token, ',')) {
+        auto trimmed = token;
+        trimmed.erase(0, trimmed.find_first_not_of(" \t"));
+        trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
+        if (!trimmed.empty()) {
+          components.push_back(std::stof(trimmed));
+        }
+      }
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+        color.colorSpace = ColorSpace::DisplayP3;
+        return color;
+      }
+    }
+  }
+  return {};
 }
 
 std::vector<float> PAGXXMLParser::parseFloatList(const std::string& str) {

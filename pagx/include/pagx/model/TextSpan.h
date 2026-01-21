@@ -20,6 +20,7 @@
 
 #include <string>
 #include "pagx/model/Element.h"
+#include "pagx/model/types/Point.h"
 
 namespace pagx {
 
@@ -30,14 +31,9 @@ namespace pagx {
 class TextSpan : public Element {
  public:
   /**
-   * The x-coordinate of the text baseline starting point. The default value is 0.
+   * The position of the text blob.
    */
-  float x = 0;
-
-  /**
-   * The y-coordinate of the text baseline starting point. The default value is 0.
-   */
-  float y = 0;
+  Point position = {};
 
   /**
    * The font family name.

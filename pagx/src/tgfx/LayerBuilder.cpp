@@ -466,7 +466,7 @@ class LayerBuilderImpl {
       textSpan->setTextBlob(textBlob);
     }
 
-    textSpan->setPosition(tgfx::Point::Make(node->x, node->y));
+    textSpan->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     return textSpan;
   }
 
@@ -774,10 +774,10 @@ class LayerBuilderImpl {
               break;
           }
 
-          tgfxTextSpan->setPosition(tgfx::Point::Make(span->x + xOffset, span->y));
+          tgfxTextSpan->setPosition(tgfx::Point::Make(span->position.x + xOffset, span->position.y));
         } else {
           // No blob, use original position.
-          tgfxTextSpan->setPosition(tgfx::Point::Make(span->x, span->y));
+          tgfxTextSpan->setPosition(tgfx::Point::Make(span->position.x, span->position.y));
         }
 
         elements.push_back(tgfxTextSpan);
