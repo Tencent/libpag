@@ -16,42 +16,120 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/nodes/VectorElement.h"
+#include "pagx/model/ColorSource.h"
+#include "pagx/model/Element.h"
+#include "pagx/model/LayerFilter.h"
+#include "pagx/model/LayerStyle.h"
+#include "pagx/model/Resource.h"
 
 namespace pagx {
 
-const char* VectorElementTypeName(VectorElementType type) {
+const char* ResourceTypeName(ResourceType type) {
   switch (type) {
-    case VectorElementType::Rectangle:
+    case ResourceType::Image:
+      return "Image";
+    case ResourceType::PathData:
+      return "PathData";
+    case ResourceType::Composition:
+      return "Composition";
+    case ResourceType::SolidColor:
+      return "SolidColor";
+    case ResourceType::LinearGradient:
+      return "LinearGradient";
+    case ResourceType::RadialGradient:
+      return "RadialGradient";
+    case ResourceType::ConicGradient:
+      return "ConicGradient";
+    case ResourceType::DiamondGradient:
+      return "DiamondGradient";
+    case ResourceType::ImagePattern:
+      return "ImagePattern";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* ElementTypeName(ElementType type) {
+  switch (type) {
+    case ElementType::Rectangle:
       return "Rectangle";
-    case VectorElementType::Ellipse:
+    case ElementType::Ellipse:
       return "Ellipse";
-    case VectorElementType::Polystar:
+    case ElementType::Polystar:
       return "Polystar";
-    case VectorElementType::Path:
+    case ElementType::Path:
       return "Path";
-    case VectorElementType::TextSpan:
+    case ElementType::TextSpan:
       return "TextSpan";
-    case VectorElementType::Fill:
+    case ElementType::Fill:
       return "Fill";
-    case VectorElementType::Stroke:
+    case ElementType::Stroke:
       return "Stroke";
-    case VectorElementType::TrimPath:
+    case ElementType::TrimPath:
       return "TrimPath";
-    case VectorElementType::RoundCorner:
+    case ElementType::RoundCorner:
       return "RoundCorner";
-    case VectorElementType::MergePath:
+    case ElementType::MergePath:
       return "MergePath";
-    case VectorElementType::TextModifier:
+    case ElementType::TextModifier:
       return "TextModifier";
-    case VectorElementType::TextPath:
+    case ElementType::TextPath:
       return "TextPath";
-    case VectorElementType::TextLayout:
+    case ElementType::TextLayout:
       return "TextLayout";
-    case VectorElementType::Group:
+    case ElementType::Group:
       return "Group";
-    case VectorElementType::Repeater:
+    case ElementType::Repeater:
       return "Repeater";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* ColorSourceTypeName(ColorSourceType type) {
+  switch (type) {
+    case ColorSourceType::SolidColor:
+      return "SolidColor";
+    case ColorSourceType::LinearGradient:
+      return "LinearGradient";
+    case ColorSourceType::RadialGradient:
+      return "RadialGradient";
+    case ColorSourceType::ConicGradient:
+      return "ConicGradient";
+    case ColorSourceType::DiamondGradient:
+      return "DiamondGradient";
+    case ColorSourceType::ImagePattern:
+      return "ImagePattern";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* LayerStyleTypeName(LayerStyleType type) {
+  switch (type) {
+    case LayerStyleType::DropShadowStyle:
+      return "DropShadowStyle";
+    case LayerStyleType::InnerShadowStyle:
+      return "InnerShadowStyle";
+    case LayerStyleType::BackgroundBlurStyle:
+      return "BackgroundBlurStyle";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* LayerFilterTypeName(LayerFilterType type) {
+  switch (type) {
+    case LayerFilterType::BlurFilter:
+      return "BlurFilter";
+    case LayerFilterType::DropShadowFilter:
+      return "DropShadowFilter";
+    case LayerFilterType::InnerShadowFilter:
+      return "InnerShadowFilter";
+    case LayerFilterType::BlendFilter:
+      return "BlendFilter";
+    case LayerFilterType::ColorMatrixFilter:
+      return "ColorMatrixFilter";
     default:
       return "Unknown";
   }

@@ -20,6 +20,7 @@
 #include <array>
 #include <tuple>
 #include <unordered_map>
+#include "pagx/model/Model.h"
 #include "pagx/PAGXSVGParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
@@ -214,7 +215,7 @@ class LayerBuilderImpl {
     }
   }
 
-  PAGXContent build(const PAGXDocument& document) {
+  PAGXContent build(const Document& document) {
     // Cache resources for later lookup.
     _resources = &document.resources;
 
@@ -313,7 +314,7 @@ class LayerBuilderImpl {
     return layer;
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Node* node) {
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Element* node) {
     if (!node) {
       return nullptr;
     }
@@ -470,7 +471,7 @@ class LayerBuilderImpl {
     return stroke;
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertColorSource(const Node* node) {
+  std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
     if (!node) {
       return nullptr;
     }
@@ -676,7 +677,7 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const Node* node) {
+  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {
     if (!node) {
       return nullptr;
     }
@@ -697,7 +698,7 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const Node* node) {
+  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
     if (!node) {
       return nullptr;
     }
@@ -718,7 +719,7 @@ class LayerBuilderImpl {
   }
 
   LayerBuilder::Options _options = {};
-  const std::vector<std::unique_ptr<Node>>* _resources = nullptr;
+  const std::vector<std::unique_ptr<Resource>>* _resources = nullptr;
   std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
   std::unordered_map<std::string, std::shared_ptr<tgfx::Layer>> _layerById = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, std::string, tgfx::LayerMaskType>>
@@ -727,13 +728,13 @@ class LayerBuilderImpl {
 
 // Public API implementation
 
-PAGXContent LayerBuilder::Build(const PAGXDocument& document, const Options& options) {
+PAGXContent LayerBuilder::Build(const Document& document, const Options& options) {
   LayerBuilderImpl builder(options);
   return builder.build(document);
 }
 
 PAGXContent LayerBuilder::FromFile(const std::string& filePath, const Options& options) {
-  auto document = PAGXDocument::FromFile(filePath);
+  auto document = Document::FromFile(filePath);
   if (!document) {
     return {};
   }
@@ -750,7 +751,7 @@ PAGXContent LayerBuilder::FromFile(const std::string& filePath, const Options& o
 }
 
 PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Options& options) {
-  auto document = PAGXDocument::FromXML(data, length);
+  auto document = Document::FromXML(data, length);
   if (!document) {
     return {};
   }

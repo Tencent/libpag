@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "pagx/PAGXDocument.h"
+#include "pagx/model/Document.h"
 
 namespace pagx {
 
@@ -31,7 +31,7 @@ class PAGXXMLWriter {
   /**
    * Writes a PAGXDocument to XML string.
    */
-  static std::string Write(const PAGXDocument& doc);
+  static std::string Write(const Document& doc);
 };
 
 }  // namespace pagx

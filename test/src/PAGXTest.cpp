@@ -18,10 +18,10 @@
 
 #include <filesystem>
 #include "pagx/LayerBuilder.h"
-#include "pagx/PAGXDocument.h"
+#include "pagx/model/Document.h"
 #include "pagx/PAGXSVGParser.h"
 #include "pagx/PAGXModel.h"
-#include "pagx/PathData.h"
+#include "pagx/model/PathData.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
@@ -226,7 +226,7 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
  * Test case: PAGXDocument creation and XML export
  */
 PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
-  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto doc = pagx::Document::Make(400, 300);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_EQ(doc->width, 400.0f);
   EXPECT_EQ(doc->height, 300.0f);
@@ -271,7 +271,7 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
  */
 PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   // Create a document
-  auto doc1 = pagx::PAGXDocument::Make(200, 150);
+  auto doc1 = pagx::Document::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
   auto layer = std::make_unique<pagx::Layer>();
@@ -295,7 +295,7 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   EXPECT_FALSE(xml.empty());
 
   // Parse the XML back
-  auto doc2 = pagx::PAGXDocument::FromXML(xml);
+  auto doc2 = pagx::Document::FromXML(xml);
   ASSERT_TRUE(doc2 != nullptr);
 
   // Verify the dimensions

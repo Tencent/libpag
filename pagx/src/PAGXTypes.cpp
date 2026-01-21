@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGXTypes.h"
+#include "pagx/model/types/Types.h"
+#include "pagx/model/types/Enums.h"
+#include "pagx/model/NodeType.h"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -427,5 +429,81 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder,
     {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
 #undef DEFINE_ENUM_CONVERSION
+
+const char* NodeTypeName(NodeType type) {
+  switch (type) {
+    case NodeType::SolidColor:
+      return "SolidColor";
+    case NodeType::LinearGradient:
+      return "LinearGradient";
+    case NodeType::RadialGradient:
+      return "RadialGradient";
+    case NodeType::ConicGradient:
+      return "ConicGradient";
+    case NodeType::DiamondGradient:
+      return "DiamondGradient";
+    case NodeType::ImagePattern:
+      return "ImagePattern";
+    case NodeType::ColorStop:
+      return "ColorStop";
+    case NodeType::Rectangle:
+      return "Rectangle";
+    case NodeType::Ellipse:
+      return "Ellipse";
+    case NodeType::Polystar:
+      return "Polystar";
+    case NodeType::Path:
+      return "Path";
+    case NodeType::TextSpan:
+      return "TextSpan";
+    case NodeType::Fill:
+      return "Fill";
+    case NodeType::Stroke:
+      return "Stroke";
+    case NodeType::TrimPath:
+      return "TrimPath";
+    case NodeType::RoundCorner:
+      return "RoundCorner";
+    case NodeType::MergePath:
+      return "MergePath";
+    case NodeType::TextModifier:
+      return "TextModifier";
+    case NodeType::TextPath:
+      return "TextPath";
+    case NodeType::TextLayout:
+      return "TextLayout";
+    case NodeType::RangeSelector:
+      return "RangeSelector";
+    case NodeType::Repeater:
+      return "Repeater";
+    case NodeType::Group:
+      return "Group";
+    case NodeType::DropShadowStyle:
+      return "DropShadowStyle";
+    case NodeType::InnerShadowStyle:
+      return "InnerShadowStyle";
+    case NodeType::BackgroundBlurStyle:
+      return "BackgroundBlurStyle";
+    case NodeType::BlurFilter:
+      return "BlurFilter";
+    case NodeType::DropShadowFilter:
+      return "DropShadowFilter";
+    case NodeType::InnerShadowFilter:
+      return "InnerShadowFilter";
+    case NodeType::BlendFilter:
+      return "BlendFilter";
+    case NodeType::ColorMatrixFilter:
+      return "ColorMatrixFilter";
+    case NodeType::Image:
+      return "Image";
+    case NodeType::PathData:
+      return "PathData";
+    case NodeType::Composition:
+      return "Composition";
+    case NodeType::Layer:
+      return "Layer";
+  }
+  return "Unknown";
+}
 
 }  // namespace pagx

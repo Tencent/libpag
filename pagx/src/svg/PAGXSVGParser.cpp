@@ -21,12 +21,13 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include "pagx/PAGXModel.h"
 #include "SVGParserInternal.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {
 
-std::shared_ptr<PAGXDocument> PAGXSVGParser::Parse(const std::string& filePath,
+std::shared_ptr<Document> PAGXSVGParser::Parse(const std::string& filePath,
                                                    const Options& options) {
   SVGParserImpl parser(options);
   auto doc = parser.parseFile(filePath);
@@ -39,13 +40,13 @@ std::shared_ptr<PAGXDocument> PAGXSVGParser::Parse(const std::string& filePath,
   return doc;
 }
 
-std::shared_ptr<PAGXDocument> PAGXSVGParser::Parse(const uint8_t* data, size_t length,
+std::shared_ptr<Document> PAGXSVGParser::Parse(const uint8_t* data, size_t length,
                                                    const Options& options) {
   SVGParserImpl parser(options);
   return parser.parse(data, length);
 }
 
-std::shared_ptr<PAGXDocument> PAGXSVGParser::ParseString(const std::string& svgContent,
+std::shared_ptr<Document> PAGXSVGParser::ParseString(const std::string& svgContent,
                                                          const Options& options) {
   return Parse(reinterpret_cast<const uint8_t*>(svgContent.data()), svgContent.size(), options);
 }
@@ -55,7 +56,7 @@ std::shared_ptr<PAGXDocument> PAGXSVGParser::ParseString(const std::string& svgC
 SVGParserImpl::SVGParserImpl(const PAGXSVGParser::Options& options) : _options(options) {
 }
 
-std::shared_ptr<PAGXDocument> SVGParserImpl::parse(const uint8_t* data, size_t length) {
+std::shared_ptr<Document> SVGParserImpl::parse(const uint8_t* data, size_t length) {
   if (!data || length == 0) {
     return nullptr;
   }
@@ -68,7 +69,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parse(const uint8_t* data, size_t l
   return parseDOM(dom);
 }
 
-std::shared_ptr<PAGXDocument> SVGParserImpl::parseFile(const std::string& filePath) {
+std::shared_ptr<Document> SVGParserImpl::parseFile(const std::string& filePath) {
   auto dom = DOM::MakeFromFile(filePath);
   if (!dom) {
     return nullptr;
@@ -84,7 +85,7 @@ std::string SVGParserImpl::getAttribute(const std::shared_ptr<DOMNode>& node,
   return found ? value : defaultValue;
 }
 
-std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& dom) {
+std::shared_ptr<Document> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
     return nullptr;
@@ -113,7 +114,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
     return nullptr;
   }
 
-  _document = PAGXDocument::Make(width, height);
+  _document = Document::Make(width, height);
 
   // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
   collectAllIds(root);
@@ -332,7 +333,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
 }
 
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
-                                    std::vector<std::unique_ptr<Node>>& contents,
+                                    std::vector<std::unique_ptr<Element>>& contents,
                                     const InheritedStyle& inheritedStyle) {
   const auto& tag = element->name;
 
@@ -353,7 +354,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   addFillStroke(element, contents, inheritedStyle);
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertElement(
+std::unique_ptr<Element> SVGParserImpl::convertElement(
     const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
@@ -414,7 +415,7 @@ std::unique_ptr<Group> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& e
   return group;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertRect(
+std::unique_ptr<Element> SVGParserImpl::convertRect(
     const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
@@ -437,7 +438,7 @@ std::unique_ptr<Node> SVGParserImpl::convertRect(
   return rect;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertCircle(
+std::unique_ptr<Element> SVGParserImpl::convertCircle(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
@@ -452,7 +453,7 @@ std::unique_ptr<Node> SVGParserImpl::convertCircle(
   return ellipse;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertEllipse(
+std::unique_ptr<Element> SVGParserImpl::convertEllipse(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
@@ -468,7 +469,7 @@ std::unique_ptr<Node> SVGParserImpl::convertEllipse(
   return ellipse;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertLine(
+std::unique_ptr<Element> SVGParserImpl::convertLine(
     const std::shared_ptr<DOMNode>& element) {
   float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
   float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
@@ -482,21 +483,21 @@ std::unique_ptr<Node> SVGParserImpl::convertLine(
   return path;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertPolyline(
+std::unique_ptr<Element> SVGParserImpl::convertPolyline(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
   path->data = parsePoints(getAttribute(element, "points"), false);
   return path;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertPolygon(
+std::unique_ptr<Element> SVGParserImpl::convertPolygon(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
   path->data = parsePoints(getAttribute(element, "points"), true);
   return path;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertPath(
+std::unique_ptr<Element> SVGParserImpl::convertPath(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
   std::string d = getAttribute(element, "d");
@@ -555,7 +556,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   return group;
 }
 
-std::unique_ptr<Node> SVGParserImpl::convertUse(
+std::unique_ptr<Element> SVGParserImpl::convertUse(
     const std::shared_ptr<DOMNode>& element) {
   std::string href = getAttribute(element, "xlink:href");
   if (href.empty()) {
@@ -853,7 +854,7 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
 }
 
 void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
-                                  std::vector<std::unique_ptr<Node>>& contents,
+                                  std::vector<std::unique_ptr<Element>>& contents,
                                   const InheritedStyle& inheritedStyle) {
   // Get shape bounds for pattern calculations (computed once, used if needed).
   Rect shapeBounds = getShapeBounds(element);
@@ -1502,7 +1503,7 @@ std::string SVGParserImpl::registerImageResource(const std::string& imageSource)
 }
 
 // Helper function to check if two VectorElement nodes are the same geometry.
-static bool isSameGeometry(const Node* a, const Node* b) {
+static bool isSameGeometry(const Element* a, const Element* b) {
   if (!a || !b || a->type() != b->type()) {
     return false;
   }
@@ -1533,8 +1534,8 @@ static bool isSameGeometry(const Node* a, const Node* b) {
 }
 
 // Check if a layer is a simple shape layer (contains exactly one geometry and one Fill or Stroke).
-static bool isSimpleShapeLayer(const Layer* layer, const Node*& outGeometry,
-                               const Node*& outPainter) {
+static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
+                               const Element*& outPainter) {
   if (!layer || layer->contents.size() != 2) {
     return false;
   }
@@ -1571,14 +1572,14 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
   size_t i = 0;
 
   while (i < layers.size()) {
-    const Node* geomA = nullptr;
-    const Node* painterA = nullptr;
+    const Element* geomA = nullptr;
+    const Element* painterA = nullptr;
 
     if (isSimpleShapeLayer(layers[i].get(), geomA, painterA)) {
       // Check if the next layer has the same geometry.
       if (i + 1 < layers.size()) {
-        const Node* geomB = nullptr;
-        const Node* painterB = nullptr;
+        const Element* geomB = nullptr;
+        const Element* painterB = nullptr;
 
         if (isSimpleShapeLayer(layers[i + 1].get(), geomB, painterB) &&
             isSameGeometry(geomA, geomB)) {
@@ -1649,7 +1650,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
 
 void SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
-    std::vector<std::unique_ptr<Node>>& filters) {
+    std::vector<std::unique_ptr<LayerFilter>>& filters) {
   // Parse filter children to find effect elements.
   auto child = filterElement->getFirstChild();
   while (child) {

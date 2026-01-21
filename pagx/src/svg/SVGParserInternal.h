@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "pagx/PAGXDocument.h"
+#include "pagx/model/Document.h"
 #include "pagx/PAGXSVGParser.h"
 #include "xml/XMLDOM.h"
 
@@ -47,32 +47,32 @@ class SVGParserImpl {
  public:
   explicit SVGParserImpl(const PAGXSVGParser::Options& options);
 
-  std::shared_ptr<PAGXDocument> parse(const uint8_t* data, size_t length);
-  std::shared_ptr<PAGXDocument> parseFile(const std::string& filePath);
+  std::shared_ptr<Document> parse(const uint8_t* data, size_t length);
+  std::shared_ptr<Document> parseFile(const std::string& filePath);
 
  private:
-  std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<DOM>& dom);
+  std::shared_ptr<Document> parseDOM(const std::shared_ptr<DOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
   std::unique_ptr<Layer> convertToLayer(const std::shared_ptr<DOMNode>& element,
                                             const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
-                       std::vector<std::unique_ptr<Node>>& contents,
+                       std::vector<std::unique_ptr<Element>>& contents,
                        const InheritedStyle& inheritedStyle);
-  std::unique_ptr<Node> convertElement(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertElement(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
-  std::unique_ptr<Node> convertRect(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Node> convertCircle(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Node> convertEllipse(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Node> convertLine(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Node> convertPolyline(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Node> convertPolygon(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Node> convertPath(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertRect(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertCircle(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertEllipse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertLine(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertPolyline(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertPolygon(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertPath(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertText(const std::shared_ptr<DOMNode>& element,
                                          const InheritedStyle& inheritedStyle);
-  std::unique_ptr<Node> convertUse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Element> convertUse(const std::shared_ptr<DOMNode>& element);
 
   std::unique_ptr<LinearGradient> convertLinearGradient(
       const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
@@ -84,10 +84,10 @@ class SVGParserImpl {
   std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
   void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
-                            std::vector<std::unique_ptr<Node>>& filters);
+                            std::vector<std::unique_ptr<LayerFilter>>& filters);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
-                     std::vector<std::unique_ptr<Node>>& contents,
+                     std::vector<std::unique_ptr<Element>>& contents,
                      const InheritedStyle& inheritedStyle);
 
   // Compute shape bounds from SVG element attributes.
@@ -125,7 +125,7 @@ class SVGParserImpl {
   void parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer);
 
   PAGXSVGParser::Options _options = {};
-  std::shared_ptr<PAGXDocument> _document = nullptr;
+  std::shared_ptr<Document> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
   std::vector<std::unique_ptr<Layer>> _maskLayers = {};
   std::unordered_map<std::string, std::string> _imageSourceToId = {};  // Maps image source to resource ID.

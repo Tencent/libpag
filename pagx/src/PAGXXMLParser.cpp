@@ -259,12 +259,12 @@ class XMLTokenizer {
 // PAGXXMLParser implementation
 //==============================================================================
 
-std::shared_ptr<PAGXDocument> PAGXXMLParser::Parse(const uint8_t* data, size_t length) {
+std::shared_ptr<Document> PAGXXMLParser::Parse(const uint8_t* data, size_t length) {
   auto root = parseXML(data, length);
   if (!root || root->tag != "pagx") {
     return nullptr;
   }
-  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
+  auto doc = std::shared_ptr<Document>(new Document());
   parseDocument(root.get(), doc.get());
   return doc;
 }
@@ -274,7 +274,7 @@ std::unique_ptr<XMLNode> PAGXXMLParser::parseXML(const uint8_t* data, size_t len
   return tokenizer.parse();
 }
 
-void PAGXXMLParser::parseDocument(const XMLNode* root, PAGXDocument* doc) {
+void PAGXXMLParser::parseDocument(const XMLNode* root, Document* doc) {
   doc->version = getAttribute(root, "version", "1.0");
   doc->width = getFloatAttribute(root, "width", 0);
   doc->height = getFloatAttribute(root, "height", 0);
@@ -291,7 +291,7 @@ void PAGXXMLParser::parseDocument(const XMLNode* root, PAGXDocument* doc) {
   }
 }
 
-void PAGXXMLParser::parseResources(const XMLNode* node, PAGXDocument* doc) {
+void PAGXXMLParser::parseResources(const XMLNode* node, Document* doc) {
   for (const auto& child : node->children) {
     auto resource = parseResource(child.get());
     if (resource) {
@@ -300,7 +300,7 @@ void PAGXXMLParser::parseResources(const XMLNode* node, PAGXDocument* doc) {
   }
 }
 
-std::unique_ptr<Node> PAGXXMLParser::parseResource(const XMLNode* node) {
+std::unique_ptr<Resource> PAGXXMLParser::parseResource(const XMLNode* node) {
   if (node->tag == "Image") {
     return parseImage(node);
   }
@@ -308,40 +308,22 @@ std::unique_ptr<Node> PAGXXMLParser::parseResource(const XMLNode* node) {
     return parsePathData(node);
   }
   if (node->tag == "SolidColor") {
-    auto solidColor = parseSolidColor(node);
-    auto resource = std::make_unique<SolidColor>();
-    *resource = *solidColor;
-    return resource;
+    return parseSolidColor(node);
   }
   if (node->tag == "LinearGradient") {
-    auto gradient = parseLinearGradient(node);
-    auto resource = std::make_unique<LinearGradient>();
-    *resource = *gradient;
-    return resource;
+    return parseLinearGradient(node);
   }
   if (node->tag == "RadialGradient") {
-    auto gradient = parseRadialGradient(node);
-    auto resource = std::make_unique<RadialGradient>();
-    *resource = *gradient;
-    return resource;
+    return parseRadialGradient(node);
   }
   if (node->tag == "ConicGradient") {
-    auto gradient = parseConicGradient(node);
-    auto resource = std::make_unique<ConicGradient>();
-    *resource = *gradient;
-    return resource;
+    return parseConicGradient(node);
   }
   if (node->tag == "DiamondGradient") {
-    auto gradient = parseDiamondGradient(node);
-    auto resource = std::make_unique<DiamondGradient>();
-    *resource = *gradient;
-    return resource;
+    return parseDiamondGradient(node);
   }
   if (node->tag == "ImagePattern") {
-    auto pattern = parseImagePattern(node);
-    auto resource = std::make_unique<ImagePattern>();
-    *resource = *pattern;
-    return resource;
+    return parseImagePattern(node);
   }
   if (node->tag == "Composition") {
     return parseComposition(node);
@@ -408,7 +390,7 @@ std::unique_ptr<Layer> PAGXXMLParser::parseLayer(const XMLNode* node) {
 
 void PAGXXMLParser::parseContents(const XMLNode* node, Layer* layer) {
   for (const auto& child : node->children) {
-    auto element = parseVectorElement(child.get());
+    auto element = parseElement(child.get());
     if (element) {
       layer->contents.push_back(std::move(element));
     }
@@ -433,7 +415,7 @@ void PAGXXMLParser::parseFilters(const XMLNode* node, Layer* layer) {
   }
 }
 
-std::unique_ptr<Node> PAGXXMLParser::parseVectorElement(const XMLNode* node) {
+std::unique_ptr<Element> PAGXXMLParser::parseElement(const XMLNode* node) {
   if (node->tag == "Rectangle") {
     return parseRectangle(node);
   }
@@ -482,7 +464,7 @@ std::unique_ptr<Node> PAGXXMLParser::parseVectorElement(const XMLNode* node) {
   return nullptr;
 }
 
-std::unique_ptr<Node> PAGXXMLParser::parseColorSource(const XMLNode* node) {
+std::unique_ptr<ColorSource> PAGXXMLParser::parseColorSource(const XMLNode* node) {
   if (node->tag == "SolidColor") {
     return parseSolidColor(node);
   }
@@ -504,7 +486,7 @@ std::unique_ptr<Node> PAGXXMLParser::parseColorSource(const XMLNode* node) {
   return nullptr;
 }
 
-std::unique_ptr<Node> PAGXXMLParser::parseLayerStyle(const XMLNode* node) {
+std::unique_ptr<LayerStyle> PAGXXMLParser::parseLayerStyle(const XMLNode* node) {
   if (node->tag == "DropShadowStyle") {
     return parseDropShadowStyle(node);
   }
@@ -517,7 +499,7 @@ std::unique_ptr<Node> PAGXXMLParser::parseLayerStyle(const XMLNode* node) {
   return nullptr;
 }
 
-std::unique_ptr<Node> PAGXXMLParser::parseLayerFilter(const XMLNode* node) {
+std::unique_ptr<LayerFilter> PAGXXMLParser::parseLayerFilter(const XMLNode* node) {
   if (node->tag == "BlurFilter") {
     return parseBlurFilter(node);
   }
@@ -757,7 +739,7 @@ std::unique_ptr<Group> PAGXXMLParser::parseGroup(const XMLNode* node) {
   group->alpha = getFloatAttribute(node, "alpha", 1);
 
   for (const auto& child : node->children) {
-    auto element = parseVectorElement(child.get());
+    auto element = parseElement(child.get());
     if (element) {
       group->elements.push_back(std::move(element));
     }

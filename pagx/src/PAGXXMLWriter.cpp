@@ -20,6 +20,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include "pagx/model/Model.h"
 
 namespace pagx {
 
@@ -187,7 +188,7 @@ static std::string floatListToString(const std::vector<float>& values) {
 // ColorSource serialization helper
 //==============================================================================
 
-static std::string colorSourceToKey(const Node* node) {
+static std::string colorSourceToKey(const ColorSource* node) {
   if (!node) {
     return "";
   }
@@ -263,13 +264,13 @@ class ResourceContext {
   std::vector<std::pair<std::string, std::string>> pathDataResources = {};  // id -> svg string
 
   // All extracted ColorSource resources (ordered)
-  std::vector<std::pair<std::string, const Node*>> colorSourceResources = {};
+  std::vector<std::pair<std::string, const ColorSource*>> colorSourceResources = {};;
 
   int nextPathId = 1;
   int nextColorId = 1;
 
   // First pass: collect and count all resources
-  void collectFromDocument(const PAGXDocument& doc) {
+  void collectFromDocument(const Document& doc) {
     for (const auto& layer : doc.layers) {
       collectFromLayer(layer.get());
     }
@@ -296,7 +297,7 @@ class ResourceContext {
   }
 
   // Register ColorSource usage (for counting)
-  void registerColorSource(const Node* node) {
+  void registerColorSource(const ColorSource* node) {
     if (!node) {
       return;
     }
@@ -322,7 +323,7 @@ class ResourceContext {
   }
 
   // Check if ColorSource should be extracted to Resources
-  bool shouldExtractColorSource(const Node* node) const {
+  bool shouldExtractColorSource(const ColorSource* node) const {
     if (!node) {
       return false;
     }
@@ -332,7 +333,7 @@ class ResourceContext {
   }
 
   // Get ColorSource resource id (empty if should inline)
-  std::string getColorSourceId(const Node* node) const {
+  std::string getColorSourceId(const ColorSource* node) const {
     if (!node) {
       return "";
     }
@@ -354,7 +355,7 @@ class ResourceContext {
     }
   }
 
-  void collectFromVectorElement(const Node* element) {
+  void collectFromVectorElement(const Element* element) {
     switch (element->type()) {
       case NodeType::Path: {
         auto path = static_cast<const Path*>(element);
@@ -394,12 +395,12 @@ class ResourceContext {
 // Forward declarations
 //==============================================================================
 
-static void writeColorSource(XMLBuilder& xml, const Node* node, bool writeId);
-static void writeVectorElement(XMLBuilder& xml, const Node* node,
+static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writeId);
+static void writeVectorElement(XMLBuilder& xml, const Element* node,
                                const ResourceContext& ctx);
-static void writeLayerStyle(XMLBuilder& xml, const Node* node);
-static void writeLayerFilter(XMLBuilder& xml, const Node* node);
-static void writeResource(XMLBuilder& xml, const Node* node, const ResourceContext& ctx);
+static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node);
+static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node);
+static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx);
 static void writeLayer(XMLBuilder& xml, const Layer* node, const ResourceContext& ctx);
 
 //==============================================================================
@@ -415,7 +416,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   }
 }
 
-static void writeColorSource(XMLBuilder& xml, const Node* node, bool writeId) {
+static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writeId) {
   switch (node->type()) {
     case NodeType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
@@ -544,7 +545,7 @@ static void writeColorSource(XMLBuilder& xml, const Node* node, bool writeId) {
 }
 
 // Write ColorSource with assigned id (for Resources section)
-static void writeColorSourceWithId(XMLBuilder& xml, const Node* node,
+static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
                                    const std::string& id) {
   switch (node->type()) {
     case NodeType::SolidColor: {
@@ -665,7 +666,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const Node* node,
 // VectorElement writing
 //==============================================================================
 
-static void writeVectorElement(XMLBuilder& xml, const Node* node,
+static void writeVectorElement(XMLBuilder& xml, const Element* node,
                                const ResourceContext& ctx) {
   switch (node->type()) {
     case NodeType::Rectangle: {
@@ -999,7 +1000,7 @@ static void writeVectorElement(XMLBuilder& xml, const Node* node,
 // LayerStyle writing
 //==============================================================================
 
-static void writeLayerStyle(XMLBuilder& xml, const Node* node) {
+static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
   switch (node->type()) {
     case NodeType::DropShadowStyle: {
       auto style = static_cast<const DropShadowStyle*>(node);
@@ -1053,7 +1054,7 @@ static void writeLayerStyle(XMLBuilder& xml, const Node* node) {
 // LayerFilter writing
 //==============================================================================
 
-static void writeLayerFilter(XMLBuilder& xml, const Node* node) {
+static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
   switch (node->type()) {
     case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
@@ -1117,7 +1118,7 @@ static void writeLayerFilter(XMLBuilder& xml, const Node* node) {
 // Resource writing
 //==============================================================================
 
-static void writeResource(XMLBuilder& xml, const Node* node, const ResourceContext& ctx) {
+static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx) {
   switch (node->type()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
@@ -1158,7 +1159,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const ResourceConte
     case NodeType::ConicGradient:
     case NodeType::DiamondGradient:
     case NodeType::ImagePattern:
-      writeColorSource(xml, static_cast<const Node*>(node), true);
+      writeColorSource(xml, static_cast<const ColorSource*>(node), true);
       break;
     default:
       break;
@@ -1254,7 +1255,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node, const ResourceContext
 // Main Write function
 //==============================================================================
 
-std::string PAGXXMLWriter::Write(const PAGXDocument& doc) {
+std::string PAGXXMLWriter::Write(const Document& doc) {
   // First pass: collect resources and count references
   ResourceContext ctx = {};
   ctx.collectFromDocument(doc);
@@ -1262,7 +1263,7 @@ std::string PAGXXMLWriter::Write(const PAGXDocument& doc) {
 
   // Build ColorSource resources list (only those with multiple references)
   // We need to store pointers to actual ColorSource nodes for writing
-  std::unordered_map<std::string, const Node*> colorSourceByKey = {};
+  std::unordered_map<std::string, const ColorSource*> colorSourceByKey = {};
   for (const auto& layer : doc.layers) {
     std::function<void(const Layer*)> collectColorSources = [&](const Layer* layer) {
       for (const auto& element : layer->contents) {

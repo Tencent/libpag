@@ -22,7 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/PAGXDocument.h"
+#include "pagx/model/Document.h"
 
 namespace pagx {
 
@@ -44,23 +44,23 @@ class PAGXXMLParser {
   /**
    * Parses XML data into a PAGXDocument.
    */
-  static std::shared_ptr<PAGXDocument> Parse(const uint8_t* data, size_t length);
+  static std::shared_ptr<Document> Parse(const uint8_t* data, size_t length);
 
  private:
   static std::unique_ptr<XMLNode> parseXML(const uint8_t* data, size_t length);
 
-  static void parseDocument(const XMLNode* root, PAGXDocument* doc);
-  static void parseResources(const XMLNode* node, PAGXDocument* doc);
-  static std::unique_ptr<Node> parseResource(const XMLNode* node);
+  static void parseDocument(const XMLNode* root, Document* doc);
+  static void parseResources(const XMLNode* node, Document* doc);
+  static std::unique_ptr<Resource> parseResource(const XMLNode* node);
   static std::unique_ptr<Layer> parseLayer(const XMLNode* node);
   static void parseContents(const XMLNode* node, Layer* layer);
   static void parseStyles(const XMLNode* node, Layer* layer);
   static void parseFilters(const XMLNode* node, Layer* layer);
 
-  static std::unique_ptr<Node> parseVectorElement(const XMLNode* node);
-  static std::unique_ptr<Node> parseColorSource(const XMLNode* node);
-  static std::unique_ptr<Node> parseLayerStyle(const XMLNode* node);
-  static std::unique_ptr<Node> parseLayerFilter(const XMLNode* node);
+  static std::unique_ptr<Element> parseElement(const XMLNode* node);
+  static std::unique_ptr<ColorSource> parseColorSource(const XMLNode* node);
+  static std::unique_ptr<LayerStyle> parseLayerStyle(const XMLNode* node);
+  static std::unique_ptr<LayerFilter> parseLayerFilter(const XMLNode* node);
 
   static std::unique_ptr<Rectangle> parseRectangle(const XMLNode* node);
   static std::unique_ptr<Ellipse> parseEllipse(const XMLNode* node);
