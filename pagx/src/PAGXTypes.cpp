@@ -114,6 +114,80 @@ Color Color::Parse(const std::string& str) {
       }
     }
   }
+  // CSS Color Level 4: color(colorspace r g b) or color(colorspace r g b / a)
+  // Supported colorspaces: display-p3, a98-rgb, rec2020, srgb
+  if (str.substr(0, 6) == "color(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      // Trim whitespace
+      inner.erase(0, inner.find_first_not_of(" \t"));
+      inner.erase(inner.find_last_not_of(" \t") + 1);
+
+      // Parse colorspace and values (space-separated)
+      std::istringstream iss(inner);
+      std::string colorspace = {};
+      iss >> colorspace;
+
+      std::vector<float> components = {};
+      std::string token = {};
+      float alpha = 1.0f;
+      bool foundSlash = false;
+
+      while (iss >> token) {
+        if (token == "/") {
+          foundSlash = true;
+          continue;
+        }
+        float value = std::stof(token);
+        if (foundSlash) {
+          alpha = value;
+        } else {
+          components.push_back(value);
+        }
+      }
+
+      if (components.size() >= 3) {
+        float r = components[0];
+        float g = components[1];
+        float b = components[2];
+
+        // Convert from wide gamut colorspace to sRGB (approximate clipping).
+        // For display-p3, a98-rgb, rec2020: values are in 0-1 range.
+        // We do a simplified conversion by clamping to sRGB gamut.
+        // A proper implementation would use ICC profiles or matrix transforms.
+        if (colorspace == "display-p3") {
+          // Display P3 to sRGB approximate conversion matrix.
+          float sR = 1.2249f * r - 0.2247f * g - 0.0002f * b;
+          float sG = -0.0420f * r + 1.0419f * g + 0.0001f * b;
+          float sB = -0.0197f * r - 0.0786f * g + 1.0983f * b;
+          r = std::max(0.0f, std::min(1.0f, sR));
+          g = std::max(0.0f, std::min(1.0f, sG));
+          b = std::max(0.0f, std::min(1.0f, sB));
+        } else if (colorspace == "a98-rgb") {
+          // Adobe RGB to sRGB approximate conversion.
+          float sR = 1.3982f * r - 0.3982f * g + 0.0f * b;
+          float sG = 0.0f * r + 1.0f * g + 0.0f * b;
+          float sB = 0.0f * r - 0.0429f * g + 1.0429f * b;
+          r = std::max(0.0f, std::min(1.0f, sR));
+          g = std::max(0.0f, std::min(1.0f, sG));
+          b = std::max(0.0f, std::min(1.0f, sB));
+        } else if (colorspace == "rec2020") {
+          // Rec.2020 to sRGB approximate conversion.
+          float sR = 1.6605f * r - 0.5877f * g - 0.0728f * b;
+          float sG = -0.1246f * r + 1.1330f * g - 0.0084f * b;
+          float sB = -0.0182f * r - 0.1006f * g + 1.1188f * b;
+          r = std::max(0.0f, std::min(1.0f, sR));
+          g = std::max(0.0f, std::min(1.0f, sG));
+          b = std::max(0.0f, std::min(1.0f, sB));
+        }
+        // For "srgb" or unknown colorspaces, use values directly.
+
+        return Color::FromRGBA(r, g, b, alpha);
+      }
+    }
+  }
   return {};
 }
 

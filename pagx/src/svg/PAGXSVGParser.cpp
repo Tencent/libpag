@@ -892,7 +892,6 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       contents.push_back(std::move(fillNode));
     } else {
       auto fillNode = std::make_unique<Fill>();
-      Color color = parseColor(fill);
 
       // Determine effective fill-opacity.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
@@ -900,9 +899,11 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillOpacity = inheritedStyle.fillOpacity;
       }
       if (!fillOpacity.empty()) {
-        color.alpha = std::stof(fillOpacity);
+        fillNode->alpha = std::stof(fillOpacity);
       }
-      fillNode->color = color.toHexString(color.alpha < 1);
+
+      // Store the original color string for later parsing in LayerBuilder.
+      fillNode->color = fill;
 
       // Determine effective fill-rule.
       std::string fillRule = getAttribute(element, "fill-rule");
@@ -941,17 +942,17 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         }
       }
     } else {
-      Color color = parseColor(stroke);
-
       // Determine effective stroke-opacity.
       std::string strokeOpacity = getAttribute(element, "stroke-opacity");
       if (strokeOpacity.empty()) {
         strokeOpacity = inheritedStyle.strokeOpacity;
       }
       if (!strokeOpacity.empty()) {
-        color.alpha = std::stof(strokeOpacity);
+        strokeNode->alpha = std::stof(strokeOpacity);
       }
-      strokeNode->color = color.toHexString(color.alpha < 1);
+
+      // Store the original color string for later parsing in LayerBuilder.
+      strokeNode->color = stroke;
     }
 
     std::string strokeWidth = getAttribute(element, "stroke-width");

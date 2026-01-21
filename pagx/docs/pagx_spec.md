@@ -160,19 +160,11 @@ PAGX 支持多种颜色格式：
 | 色域 | `color(display-p3 1 0 0)` | 广色域颜色 |
 | 引用 | `#resourceId` | 引用 Resources 中定义的颜色源 |
 
-### 2.9 PathData（路径数据）
+### 2.9 路径数据语法（Path Data Syntax）
 
-PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素和 TextPath 修改器引用。
+路径数据使用 SVG 路径语法，由一系列命令和坐标组成。
 
-```xml
-<PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `data` | string | (必填) | SVG 路径数据 |
-
-**路径命令**（SVG 路径语法）：
+**路径命令**：
 
 | 命令 | 参数 | 说明 |
 |------|------|------|
@@ -205,214 +197,6 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 - **相对路径**：相对于 PAGX 文件所在目录解析，支持 `../` 引用父目录
 - **数据 URI**：以 `data:` 开头，格式为 `data:<mediatype>;base64,<data>`，仅支持 base64 编码
 - 路径分隔符统一使用 `/`（正斜杠），不支持 `\`（反斜杠）
-
-### 2.11 Image（图片）
-
-图片资源定义可在文档中引用的位图数据。
-
-```xml
-<Image source="photo.png"/>
-<Image source="data:image/png;base64,..."/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `source` | string | (必填) | 文件路径或数据 URI（见 2.10 节） |
-
-**支持格式**：PNG、JPEG、WebP、GIF
-
-### 2.12 颜色源（Color Source）
-
-颜色源定义可用于渲染的颜色，支持两种定义方式：
-
-1. **共享定义**：在 `<Resources>` 中预定义，通过 `#id` 引用。适用于**被多处引用**的颜色源。
-2. **内联定义**：直接嵌套在 `<Fill>` 或 `<Stroke>` 元素内部。适用于**仅使用一次**的颜色源，更简洁。
-
-#### 2.12.1 SolidColor（纯色）
-
-```xml
-<SolidColor color="#FF0000"/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `color` | color | (必填) | 颜色值 |
-
-#### 2.12.2 LinearGradient（线性渐变）
-
-线性渐变沿起点到终点的方向插值。
-
-```xml
-<LinearGradient startPoint="0,0" endPoint="100,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</LinearGradient>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `startPoint` | point | (必填) | 起点 |
-| `endPoint` | point | (必填) | 终点 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
-
-#### 2.12.3 RadialGradient（径向渐变）
-
-径向渐变从中心向外辐射。
-
-```xml
-<RadialGradient center="50,50" radius="50">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</RadialGradient>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
-| `radius` | float | (必填) | 渐变半径 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
-
-#### 2.12.4 ConicGradient（锥形渐变）
-
-锥形渐变（也称扫描渐变）沿圆周方向插值。
-
-```xml
-<ConicGradient center="50,50" startAngle="0" endAngle="360">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</ConicGradient>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
-| `startAngle` | float | 0 | 起始角度 |
-| `endAngle` | float | 360 | 结束角度 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
-
-#### 2.12.5 DiamondGradient（菱形渐变）
-
-菱形渐变从中心向四角辐射。
-
-```xml
-<DiamondGradient center="50,50" halfDiagonal="50">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</DiamondGradient>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
-| `halfDiagonal` | float | (必填) | 半对角线长度 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
-
-#### 2.12.6 ColorStop（渐变色标）
-
-```xml
-<ColorStop offset="0.5" color="#FF0000"/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `offset` | float | (必填) | 位置 0.0~1.0 |
-| `color` | color | (必填) | 色标颜色 |
-
-**渐变通用规则**：
-
-- **色标插值**：相邻色标之间使用线性插值
-- **色标边界**：
-  - `offset < 0` 的色标被视为 `offset = 0`
-  - `offset > 1` 的色标被视为 `offset = 1`
-  - 如果没有 `offset = 0` 的色标，使用第一个色标的颜色填充
-  - 如果没有 `offset = 1` 的色标，使用最后一个色标的颜色填充
-- **渐变变换**：`matrix` 属性对渐变坐标系应用变换
-
-#### 2.12.7 颜色源坐标系统
-
-所有颜色源（渐变、图案）的坐标系是**相对于几何元素的局部坐标系原点**。
-
-**变换行为**：
-
-1. **外部变换会同时作用于几何和颜色源**：Group 的变换、Layer 的矩阵等外部变换会整体作用于几何元素及其颜色源，两者一起缩放、旋转、平移。
-
-2. **修改几何属性不影响颜色源**：直接修改几何元素的属性（如 Rectangle 的 width/height、Path 的路径数据）只改变几何内容本身，不会影响颜色源的坐标系。
-
-**示例**：在 100×100 的区域内绘制一个从左到右的线性渐变：
-
-```xml
-<Resources>
-  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Resources>
-
-<Layer>
-  <contents>
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#grad"/>
-  </contents>
-</Layer>
-```
-
-- 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
-- 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
-
-#### 2.12.8 ImagePattern（图片图案）
-
-图片图案使用图片作为颜色源。
-
-```xml
-<ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `image` | idref | (必填) | 图片引用 "#id" |
-| `tileModeX` | TileMode | clamp | X 方向平铺模式（见下方） |
-| `tileModeY` | TileMode | clamp | Y 方向平铺模式（见下方） |
-| `sampling` | SamplingMode | linear | 采样模式（见下方） |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**TileMode（平铺模式）**：
-
-| 值 | 说明 |
-|------|------|
-| `clamp` | 钳制：超出边界使用边缘像素颜色 |
-| `repeat` | 重复：平铺图片 |
-| `mirror` | 镜像：交替翻转平铺 |
-| `decal` | 贴花：超出边界为透明 |
-
-**SamplingMode（采样模式）**：
-
-| 值 | 说明 |
-|------|------|
-| `nearest` | 最近邻：取最近像素，锐利但有锯齿 |
-| `linear` | 双线性：平滑插值 |
-| `mipmap` | 多级渐远：根据缩放级别选择合适的 mip 层 |
-
-**图案变换**：
-
-`matrix` 属性对图案应用变换，效果与对普通图形元素的变换一致：
-
-- `matrix="2,0,0,2,0,0"`（缩放 2 倍）：图案视觉上**放大** 2 倍
-- `matrix="0.5,0,0,0.5,0,0"`（缩放 0.5 倍）：图案视觉上**缩小**到原来的 1/2
-
-**示例**：假设有一个 12×12 像素的棋盘格图片，希望每个 tile 显示为 24×24 像素：
-
-```xml
-<!-- 图片原始尺寸 12x12，显示为 24x24 需要放大 2 倍，因此 matrix 使用 2 缩放 -->
-<ImagePattern image="#checker12" tileModeX="repeat" tileModeY="repeat" matrix="2,0,0,2,0,0"/>
-```
 
 ---
 
@@ -471,14 +255,202 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 </Resources>
 ```
 
-**支持的资源类型**：
+#### 3.3.1 Image（图片）
 
-- `Image`：图片资源（见 2.11 节）
-- `PathData`：路径数据（见 2.9 节），可被 Path 元素和 TextPath 修改器引用
-- 颜色源（见 2.12 节）：`SolidColor`、`LinearGradient`、`RadialGradient`、`ConicGradient`、`DiamondGradient`、`ImagePattern`
-- `Composition`：合成（见下方）
+图片资源定义可在文档中引用的位图数据。
 
-#### 3.3.1 Composition（合成）
+```xml
+<Image source="photo.png"/>
+<Image source="data:image/png;base64,..."/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `source` | string | (必填) | 文件路径或数据 URI |
+
+**支持格式**：PNG、JPEG、WebP、GIF
+
+#### 3.3.2 PathData（路径数据）
+
+PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器引用。
+
+```xml
+<PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `data` | string | (必填) | SVG 路径数据 |
+
+#### 3.3.3 颜色源（Color Source）
+
+颜色源定义可用于填充和描边的颜色，支持两种使用方式：
+
+1. **共享定义**：在 `<Resources>` 中预定义，通过 `#id` 引用。适用于**被多处引用**的颜色源。
+2. **内联定义**：直接嵌套在 `<Fill>` 或 `<Stroke>` 元素内部。适用于**仅使用一次**的颜色源，更简洁。
+
+##### SolidColor（纯色）
+
+```xml
+<SolidColor color="#FF0000"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `color` | color | (必填) | 颜色值 |
+
+##### LinearGradient（线性渐变）
+
+线性渐变沿起点到终点的方向插值。
+
+```xml
+<LinearGradient startPoint="0,0" endPoint="100,0">
+  <ColorStop offset="0" color="#FF0000"/>
+  <ColorStop offset="1" color="#0000FF"/>
+</LinearGradient>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `startPoint` | point | (必填) | 起点 |
+| `endPoint` | point | (必填) | 终点 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
+
+##### RadialGradient（径向渐变）
+
+径向渐变从中心向外辐射。
+
+```xml
+<RadialGradient center="50,50" radius="50">
+  <ColorStop offset="0" color="#FFFFFF"/>
+  <ColorStop offset="1" color="#000000"/>
+</RadialGradient>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `center` | point | 0,0 | 中心点 |
+| `radius` | float | (必填) | 渐变半径 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
+
+##### ConicGradient（锥形渐变）
+
+锥形渐变（也称扫描渐变）沿圆周方向插值。
+
+```xml
+<ConicGradient center="50,50" startAngle="0" endAngle="360">
+  <ColorStop offset="0" color="#FF0000"/>
+  <ColorStop offset="1" color="#0000FF"/>
+</ConicGradient>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `center` | point | 0,0 | 中心点 |
+| `startAngle` | float | 0 | 起始角度 |
+| `endAngle` | float | 360 | 结束角度 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
+
+##### DiamondGradient（菱形渐变）
+
+菱形渐变从中心向四角辐射。
+
+```xml
+<DiamondGradient center="50,50" halfDiagonal="50">
+  <ColorStop offset="0" color="#FFFFFF"/>
+  <ColorStop offset="1" color="#000000"/>
+</DiamondGradient>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `center` | point | 0,0 | 中心点 |
+| `halfDiagonal` | float | (必填) | 半对角线长度 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
+
+##### ColorStop（渐变色标）
+
+```xml
+<ColorStop offset="0.5" color="#FF0000"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `offset` | float | (必填) | 位置 0.0~1.0 |
+| `color` | color | (必填) | 色标颜色 |
+
+**渐变通用规则**：
+
+- **色标插值**：相邻色标之间使用线性插值
+- **色标边界**：
+  - `offset < 0` 的色标被视为 `offset = 0`
+  - `offset > 1` 的色标被视为 `offset = 1`
+  - 如果没有 `offset = 0` 的色标，使用第一个色标的颜色填充
+  - 如果没有 `offset = 1` 的色标，使用最后一个色标的颜色填充
+- **渐变变换**：`matrix` 属性对渐变坐标系应用变换
+
+##### 颜色源坐标系统
+
+所有颜色源（渐变、图案）的坐标系是**相对于几何元素的局部坐标系原点**。
+
+**变换行为**：
+
+1. **外部变换会同时作用于几何和颜色源**：Group 的变换、Layer 的矩阵等外部变换会整体作用于几何元素及其颜色源，两者一起缩放、旋转、平移。
+
+2. **修改几何属性不影响颜色源**：直接修改几何元素的属性（如 Rectangle 的 width/height、Path 的路径数据）只改变几何内容本身，不会影响颜色源的坐标系。
+
+**示例**：在 100×100 的区域内绘制一个从左到右的线性渐变：
+
+```xml
+<Resources>
+  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
+    <ColorStop offset="0" color="#FF0000"/>
+    <ColorStop offset="1" color="#0000FF"/>
+  </LinearGradient>
+</Resources>
+
+<Layer>
+  <contents>
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#grad"/>
+  </contents>
+</Layer>
+```
+
+- 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
+- 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
+
+##### ImagePattern（图片图案）
+
+图片图案使用图片作为颜色源。
+
+```xml
+<ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `image` | idref | (必填) | 图片引用 "#id" |
+| `tileModeX` | TileMode | clamp | X 方向平铺模式 |
+| `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
+| `sampling` | SamplingMode | linear | 采样模式 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
+
+**SamplingMode（采样模式）**：`nearest`（最近邻）、`linear`（双线性）、`mipmap`（多级渐远）
+
+**图案变换**：`matrix` 属性对图案应用变换，`matrix="2,0,0,2,0,0"` 使图案视觉上放大 2 倍。
+
+#### 3.3.4 Composition（合成）
 
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
 
@@ -573,7 +545,7 @@ PAGX 文档采用层级结构组织内容：
 | `name` | string | "" | 显示名称 |
 | `visible` | bool | true | 是否可见 |
 | `alpha` | float | 1 | 透明度 0~1 |
-| `blendMode` | BlendMode | normal | 混合模式（见下方） |
+| `blendMode` | BlendMode | normal | 混合模式 |
 | `x` | float | 0 | X 位置 |
 | `y` | float | 0 | Y 位置 |
 | `matrix` | string | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
@@ -585,8 +557,13 @@ PAGX 文档采用层级结构组织内容：
 | `excludeChildEffectsInLayerStyle` | bool | false | 图层样式是否排除子图层效果 |
 | `scrollRect` | string | - | 滚动裁剪区域 "x,y,w,h" |
 | `mask` | idref | - | 遮罩图层引用 "#id" |
-| `maskType` | MaskType | alpha | 遮罩类型（见下方） |
+| `maskType` | MaskType | alpha | 遮罩类型 |
 | `composition` | idref | - | 合成引用 "#id" |
+
+**变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
+- 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
+- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值
+- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 和 `x`/`y` 的值
 
 **MaskType（遮罩类型）**：
 
@@ -727,7 +704,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blurrinessX` | float | 0 | X 模糊半径 |
 | `blurrinessY` | float | 0 | Y 模糊半径 |
-| `tileMode` | TileMode | mirror | 平铺模式（见 2.12.8） |
+| `tileMode` | TileMode | mirror | 平铺模式 |
 
 **渲染步骤**：
 1. 获取图层边界下方的背景内容
@@ -752,7 +729,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blurrinessX` | float | (必填) | X 模糊半径 |
 | `blurrinessY` | float | (必填) | Y 模糊半径 |
-| `tileMode` | TileMode | decal | 平铺模式（见 2.12.8） |
+| `tileMode` | TileMode | decal | 平铺模式 |
 
 #### 4.3.2 DropShadowFilter（投影阴影滤镜）
 
@@ -836,7 +813,7 @@ PAGX 文档采用层级结构组织内容：
 </Layer>
 ```
 
-**遮罩类型**：MaskType 定义见 4.1 节。
+**遮罩类型**：MaskType 枚举见 Layer 属性定义。
 
 **遮罩规则**：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
@@ -1035,7 +1012,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "#id"（语法见 2.9 节） |
+| `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "#id" |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -1462,7 +1439,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | (必填) | PathData 资源引用 "#id"（见 2.9 节） |
+| `path` | idref | (必填) | PathData 资源引用 "#id" |
 | `align` | TextPathAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
@@ -1762,15 +1739,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 ---
 
-## 6. Conformance（一致性）
-
-### 6.1 解析规则
-
-- 未知元素跳过不报错（向前兼容）
-- 未知属性忽略
-- 缺失的可选属性使用默认值
-- 无效值尽可能回退到默认值
-
 ---
 
 ## Appendix A. Node Hierarchy（节点层级与包含关系）
@@ -1809,8 +1777,7 @@ pagx
 │
 └── Layer*
     ├── contents
-    │   └── VectorElement*（见下方）
-    ├── styles
+    │   └── VectorElement*    ├── styles
     │   ├── DropShadowStyle
     │   ├── InnerShadowStyle
     │   └── BackgroundBlurStyle
