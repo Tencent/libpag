@@ -20,12 +20,13 @@
 #include "pagx/LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXSVGParser.h"
-#include "pagx/model/Model.h"
+#include "pagx/PAGXModel.h"
 #include "pagx/PathData.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/layers/DisplayList.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
@@ -137,10 +138,11 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       SaveFile(pagxData, "PAGXTest/" + baseName + ".pagx");
     }
 
-    // Render PAGX
+    // Render PAGX using DisplayList (required for mask to work).
     auto pagxSurface = Surface::Make(context, width, height);
-    auto pagxCanvas = pagxSurface->getCanvas();
-    content.root->draw(pagxCanvas);
+    DisplayList displayList;
+    displayList.root()->addChild(content.root);
+    displayList.render(pagxSurface.get(), false);
     EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
   }
 
@@ -214,7 +216,6 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
 
   // Test Group with children
   auto group = std::make_unique<pagx::Group>();
-  group->name = "testGroup";
   group->elements.push_back(std::move(rect));
   group->elements.push_back(std::move(fill));
   EXPECT_EQ(group->type(), pagx::NodeType::Group);
@@ -237,7 +238,6 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
 
   // Add a group with rectangle and fill
   auto group = std::make_unique<pagx::Group>();
-  group->name = "testGroup";
 
   auto rect = std::make_unique<pagx::Rectangle>();
   rect->center.x = 50;
@@ -426,37 +426,6 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
   EXPECT_EQ(layer->filters.size(), 1u);
   EXPECT_EQ(layer->styles[0]->type(), pagx::NodeType::DropShadowStyle);
   EXPECT_EQ(layer->filters[0]->type(), pagx::NodeType::BlurFilter);
-}
-
-/**
- * Test case: Node cloning
- */
-PAG_TEST(PAGXTest, NodeClone) {
-  // Test simple node clone
-  auto rect = std::make_unique<pagx::Rectangle>();
-  rect->center.x = 50;
-  rect->center.y = 50;
-  rect->size.width = 100;
-  rect->size.height = 80;
-
-  auto cloned = rect->clone();
-  ASSERT_TRUE(cloned != nullptr);
-  EXPECT_EQ(cloned->type(), pagx::NodeType::Rectangle);
-
-  auto clonedRect = static_cast<pagx::Rectangle*>(cloned.get());
-  EXPECT_FLOAT_EQ(clonedRect->center.x, 50);
-  EXPECT_FLOAT_EQ(clonedRect->size.width, 100);
-
-  // Test group with children clone
-  auto group = std::make_unique<pagx::Group>();
-  group->name = "testGroup";
-  group->elements.push_back(std::move(rect));
-
-  auto clonedGroup = group->clone();
-  ASSERT_TRUE(clonedGroup != nullptr);
-  auto clonedGroupPtr = static_cast<pagx::Group*>(clonedGroup.get());
-  EXPECT_EQ(clonedGroupPtr->name, "testGroup");
-  EXPECT_EQ(clonedGroupPtr->elements.size(), 1u);
 }
 
 }  // namespace pag

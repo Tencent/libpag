@@ -187,7 +187,7 @@ static std::string floatListToString(const std::vector<float>& values) {
 // ColorSource serialization helper
 //==============================================================================
 
-static std::string colorSourceToKey(const ColorSource* node) {
+static std::string colorSourceToKey(const Node* node) {
   if (!node) {
     return "";
   }
@@ -263,7 +263,7 @@ class ResourceContext {
   std::vector<std::pair<std::string, std::string>> pathDataResources = {};  // id -> svg string
 
   // All extracted ColorSource resources (ordered)
-  std::vector<std::pair<std::string, const ColorSource*>> colorSourceResources = {};
+  std::vector<std::pair<std::string, const Node*>> colorSourceResources = {};
 
   int nextPathId = 1;
   int nextColorId = 1;
@@ -296,7 +296,7 @@ class ResourceContext {
   }
 
   // Register ColorSource usage (for counting)
-  void registerColorSource(const ColorSource* node) {
+  void registerColorSource(const Node* node) {
     if (!node) {
       return;
     }
@@ -322,7 +322,7 @@ class ResourceContext {
   }
 
   // Check if ColorSource should be extracted to Resources
-  bool shouldExtractColorSource(const ColorSource* node) const {
+  bool shouldExtractColorSource(const Node* node) const {
     if (!node) {
       return false;
     }
@@ -332,7 +332,7 @@ class ResourceContext {
   }
 
   // Get ColorSource resource id (empty if should inline)
-  std::string getColorSourceId(const ColorSource* node) const {
+  std::string getColorSourceId(const Node* node) const {
     if (!node) {
       return "";
     }
@@ -354,7 +354,7 @@ class ResourceContext {
     }
   }
 
-  void collectFromVectorElement(const VectorElement* element) {
+  void collectFromVectorElement(const Node* element) {
     switch (element->type()) {
       case NodeType::Path: {
         auto path = static_cast<const Path*>(element);
@@ -394,12 +394,12 @@ class ResourceContext {
 // Forward declarations
 //==============================================================================
 
-static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writeId);
-static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
+static void writeColorSource(XMLBuilder& xml, const Node* node, bool writeId);
+static void writeVectorElement(XMLBuilder& xml, const Node* node,
                                const ResourceContext& ctx);
-static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node);
-static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx);
+static void writeLayerStyle(XMLBuilder& xml, const Node* node);
+static void writeLayerFilter(XMLBuilder& xml, const Node* node);
+static void writeResource(XMLBuilder& xml, const Node* node, const ResourceContext& ctx);
 static void writeLayer(XMLBuilder& xml, const Layer* node, const ResourceContext& ctx);
 
 //==============================================================================
@@ -415,7 +415,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   }
 }
 
-static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writeId) {
+static void writeColorSource(XMLBuilder& xml, const Node* node, bool writeId) {
   switch (node->type()) {
     case NodeType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
@@ -544,7 +544,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
 }
 
 // Write ColorSource with assigned id (for Resources section)
-static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
+static void writeColorSourceWithId(XMLBuilder& xml, const Node* node,
                                    const std::string& id) {
   switch (node->type()) {
     case NodeType::SolidColor: {
@@ -665,7 +665,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
 // VectorElement writing
 //==============================================================================
 
-static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
+static void writeVectorElement(XMLBuilder& xml, const Node* node,
                                const ResourceContext& ctx) {
   switch (node->type()) {
     case NodeType::Rectangle: {
@@ -743,9 +743,6 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
       }
       xml.addAttribute("tracking", text->tracking);
       xml.addAttribute("baselineShift", text->baselineShift);
-      if (text->textAnchor != TextAnchor::Start) {
-        xml.addAttribute("textAnchor", TextAnchorToString(text->textAnchor));
-      }
       xml.closeElementStart();
       xml.addTextContent(text->text);
       xml.closeElement();
@@ -799,7 +796,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
       } else {
         xml.addAttribute("color", stroke->color);
       }
-      xml.addAttribute("width", stroke->strokeWidth, 1.0f);
+      xml.addAttribute("width", stroke->width, 1.0f);
       xml.addAttribute("alpha", stroke->alpha, 1.0f);
       if (stroke->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(stroke->blendMode));
@@ -913,8 +910,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
       xml.addAttribute("path", textPath->path);
-      if (textPath->textPathAlign != TextPathAlign::Start) {
-        xml.addAttribute("align", TextPathAlignToString(textPath->textPathAlign));
+      if (textPath->pathAlign != TextPathAlign::Start) {
+        xml.addAttribute("align", TextPathAlignToString(textPath->pathAlign));
       }
       xml.addAttribute("firstMargin", textPath->firstMargin);
       xml.addAttribute("lastMargin", textPath->lastMargin);
@@ -969,7 +966,6 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
     case NodeType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
-      xml.addAttribute("name", group->name);
       if (group->anchorPoint.x != 0 || group->anchorPoint.y != 0) {
         xml.addAttribute("anchorPoint", pointToString(group->anchorPoint));
       }
@@ -1003,7 +999,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElement* node,
 // LayerStyle writing
 //==============================================================================
 
-static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
+static void writeLayerStyle(XMLBuilder& xml, const Node* node) {
   switch (node->type()) {
     case NodeType::DropShadowStyle: {
       auto style = static_cast<const DropShadowStyle*>(node);
@@ -1057,7 +1053,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
 // LayerFilter writing
 //==============================================================================
 
-static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
+static void writeLayerFilter(XMLBuilder& xml, const Node* node) {
   switch (node->type()) {
     case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
@@ -1098,8 +1094,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
       xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
-      if (filter->filterBlendMode != BlendMode::Normal) {
-        xml.addAttribute("blendMode", BlendModeToString(filter->filterBlendMode));
+      if (filter->blendMode != BlendMode::Normal) {
+        xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
       }
       xml.closeElementSelfClosing();
       break;
@@ -1121,7 +1117,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
-static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx) {
+static void writeResource(XMLBuilder& xml, const Node* node, const ResourceContext& ctx) {
   switch (node->type()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
@@ -1162,7 +1158,7 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
     case NodeType::ConicGradient:
     case NodeType::DiamondGradient:
     case NodeType::ImagePattern:
-      writeColorSource(xml, static_cast<const ColorSource*>(node), true);
+      writeColorSource(xml, static_cast<const Node*>(node), true);
       break;
     default:
       break;
@@ -1266,7 +1262,7 @@ std::string PAGXXMLWriter::Write(const PAGXDocument& doc) {
 
   // Build ColorSource resources list (only those with multiple references)
   // We need to store pointers to actual ColorSource nodes for writing
-  std::unordered_map<std::string, const ColorSource*> colorSourceByKey = {};
+  std::unordered_map<std::string, const Node*> colorSourceByKey = {};
   for (const auto& layer : doc.layers) {
     std::function<void(const Layer*)> collectColorSources = [&](const Layer* layer) {
       for (const auto& element : layer->contents) {

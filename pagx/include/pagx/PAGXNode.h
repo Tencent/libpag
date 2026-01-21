@@ -18,4 +18,4 @@
 
 #pragma once
 
-#include "pagx/model/Model.h"
+#include "pagx/PAGXModel.h"

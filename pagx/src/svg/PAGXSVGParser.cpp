@@ -294,6 +294,8 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
       auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
       if (maskLayer) {
         layer->mask = "#" + maskLayer->id;
+        // SVG masks use luminance by default.
+        layer->maskType = MaskType::Luminance;
         // Add mask layer as invisible layer to the document.
         _maskLayers.push_back(std::move(maskLayer));
       }
@@ -330,7 +332,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
 }
 
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
-                                    std::vector<std::unique_ptr<VectorElement>>& contents,
+                                    std::vector<std::unique_ptr<Node>>& contents,
                                     const InheritedStyle& inheritedStyle) {
   const auto& tag = element->name;
 
@@ -351,7 +353,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   addFillStroke(element, contents, inheritedStyle);
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertElement(
+std::unique_ptr<Node> SVGParserImpl::convertElement(
     const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
@@ -383,7 +385,7 @@ std::unique_ptr<Group> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& e
 
   auto group = std::make_unique<Group>();
 
-  group->name = getAttribute(element, "id");
+  // group->name (removed) = getAttribute(element, "id");
 
   std::string transform = getAttribute(element, "transform");
   if (!transform.empty()) {
@@ -412,7 +414,7 @@ std::unique_ptr<Group> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& e
   return group;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertRect(
+std::unique_ptr<Node> SVGParserImpl::convertRect(
     const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
@@ -435,7 +437,7 @@ std::unique_ptr<VectorElement> SVGParserImpl::convertRect(
   return rect;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertCircle(
+std::unique_ptr<Node> SVGParserImpl::convertCircle(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
@@ -450,7 +452,7 @@ std::unique_ptr<VectorElement> SVGParserImpl::convertCircle(
   return ellipse;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertEllipse(
+std::unique_ptr<Node> SVGParserImpl::convertEllipse(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
@@ -466,7 +468,7 @@ std::unique_ptr<VectorElement> SVGParserImpl::convertEllipse(
   return ellipse;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertLine(
+std::unique_ptr<Node> SVGParserImpl::convertLine(
     const std::shared_ptr<DOMNode>& element) {
   float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
   float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
@@ -480,21 +482,21 @@ std::unique_ptr<VectorElement> SVGParserImpl::convertLine(
   return path;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertPolyline(
+std::unique_ptr<Node> SVGParserImpl::convertPolyline(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
   path->data = parsePoints(getAttribute(element, "points"), false);
   return path;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertPolygon(
+std::unique_ptr<Node> SVGParserImpl::convertPolygon(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
   path->data = parsePoints(getAttribute(element, "points"), true);
   return path;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertPath(
+std::unique_ptr<Node> SVGParserImpl::convertPath(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
   std::string d = getAttribute(element, "d");
@@ -511,14 +513,14 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
-  // Parse text-anchor attribute.
-  TextAnchor textAnchor = TextAnchor::Start;
+  // Parse text-anchor attribute for x position adjustment.
+  // SVG text-anchor affects horizontal alignment: start (default), middle, end.
+  // Since PAGX TextSpan doesn't have text-anchor, we'll note this for future
+  // position adjustment after text shaping (requires knowing text width).
   std::string anchor = getAttribute(element, "text-anchor");
-  if (anchor == "middle") {
-    textAnchor = TextAnchor::Middle;
-  } else if (anchor == "end") {
-    textAnchor = TextAnchor::End;
-  }
+  // Note: text-anchor adjustment would require knowing the text width after shaping.
+  // For now, we store the x position as-is. A full implementation would need to
+  // adjust x based on anchor after calculating the text bounds.
 
   // Get text content from child text nodes.
   std::string textContent;
@@ -535,7 +537,6 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
     textSpan->x = x;
     textSpan->y = y;
     textSpan->text = textContent;
-    textSpan->textAnchor = textAnchor;
 
     std::string fontFamily = getAttribute(element, "font-family");
     if (!fontFamily.empty()) {
@@ -554,7 +555,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   return group;
 }
 
-std::unique_ptr<VectorElement> SVGParserImpl::convertUse(
+std::unique_ptr<Node> SVGParserImpl::convertUse(
     const std::shared_ptr<DOMNode>& element) {
   std::string href = getAttribute(element, "xlink:href");
   if (href.empty()) {
@@ -585,12 +586,12 @@ std::unique_ptr<VectorElement> SVGParserImpl::convertUse(
 
   // For non-expanded use references, just create an empty group for now.
   auto group = std::make_unique<Group>();
-  group->name = "_useRef:" + refId;
+  // group->name (removed) = "_useRef:" + refId;
   return group;
 }
 
 std::unique_ptr<LinearGradient> SVGParserImpl::convertLinearGradient(
-    const std::shared_ptr<DOMNode>& element) {
+    const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
   auto gradient = std::make_unique<LinearGradient>();
 
   gradient->id = getAttribute(element, "id");
@@ -613,9 +614,10 @@ std::unique_ptr<LinearGradient> SVGParserImpl::convertLinearGradient(
 
   if (useOBB) {
     // For objectBoundingBox, coordinates are normalized 0-1.
-    // Apply gradient transform to normalized points.
-    Point start = {x1, y1};
-    Point end = {x2, y2};
+    // Convert to actual coordinates based on shape bounds.
+    Point start = {shapeBounds.x + x1 * shapeBounds.width, shapeBounds.y + y1 * shapeBounds.height};
+    Point end = {shapeBounds.x + x2 * shapeBounds.width, shapeBounds.y + y2 * shapeBounds.height};
+    // Apply gradient transform after converting to actual coordinates.
     start = transformMatrix.mapPoint(start);
     end = transformMatrix.mapPoint(end);
     gradient->startPoint = start;
@@ -649,7 +651,7 @@ std::unique_ptr<LinearGradient> SVGParserImpl::convertLinearGradient(
 }
 
 std::unique_ptr<RadialGradient> SVGParserImpl::convertRadialGradient(
-    const std::shared_ptr<DOMNode>& element) {
+    const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
   auto gradient = std::make_unique<RadialGradient>();
 
   gradient->id = getAttribute(element, "id");
@@ -668,28 +670,50 @@ std::unique_ptr<RadialGradient> SVGParserImpl::convertRadialGradient(
   Matrix transformMatrix = gradientTransform.empty() ? Matrix::Identity()
                                                      : parseTransform(gradientTransform);
 
-  if (useOBB || !gradientTransform.empty()) {
-    // Apply gradientTransform to center point.
-    Point center = {cx, cy};
-    center = transformMatrix.mapPoint(center);
-    gradient->center = center;
+  if (useOBB) {
+    // For objectBoundingBox, convert normalized coordinates to actual coordinates.
+    Point center = {shapeBounds.x + cx * shapeBounds.width,
+                    shapeBounds.y + cy * shapeBounds.height};
+    // Radius is scaled by the average of width and height.
+    float actualRadius = r * (shapeBounds.width + shapeBounds.height) / 2.0f;
 
-    // For radius, we need to account for scaling in the transform.
-    // Use the average of X and Y scale factors.
+    // Apply gradientTransform after converting to actual coordinates.
+    center = transformMatrix.mapPoint(center);
+    // For radius, account for scaling in the transform.
     float scaleX = std::sqrt(transformMatrix.a * transformMatrix.a +
                              transformMatrix.b * transformMatrix.b);
     float scaleY = std::sqrt(transformMatrix.c * transformMatrix.c +
                              transformMatrix.d * transformMatrix.d);
-    gradient->radius = r * (scaleX + scaleY) / 2.0f;
+    actualRadius *= (scaleX + scaleY) / 2.0f;
+
+    gradient->center = center;
+    gradient->radius = actualRadius;
 
     // Store the matrix for non-uniform scaling (rotation, skew, etc.).
     if (!transformMatrix.isIdentity()) {
       gradient->matrix = transformMatrix;
     }
   } else {
-    gradient->center.x = cx;
-    gradient->center.y = cy;
-    gradient->radius = r;
+    // For userSpaceOnUse, coordinates are in user space.
+    if (!gradientTransform.empty()) {
+      Point center = {cx, cy};
+      center = transformMatrix.mapPoint(center);
+      gradient->center = center;
+
+      float scaleX = std::sqrt(transformMatrix.a * transformMatrix.a +
+                               transformMatrix.b * transformMatrix.b);
+      float scaleY = std::sqrt(transformMatrix.c * transformMatrix.c +
+                               transformMatrix.d * transformMatrix.d);
+      gradient->radius = r * (scaleX + scaleY) / 2.0f;
+
+      if (!transformMatrix.isIdentity()) {
+        gradient->matrix = transformMatrix;
+      }
+    } else {
+      gradient->center.x = cx;
+      gradient->center.y = cy;
+      gradient->radius = r;
+    }
   }
 
   // Parse stops.
@@ -829,7 +853,7 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
 }
 
 void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
-                                  std::vector<std::unique_ptr<VectorElement>>& contents,
+                                  std::vector<std::unique_ptr<Node>>& contents,
                                   const InheritedStyle& inheritedStyle) {
   // Get shape bounds for pattern calculations (computed once, used if needed).
   Rect shapeBounds = getShapeBounds(element);
@@ -858,9 +882,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
-          fillNode->colorSource = convertLinearGradient(it->second);
+          fillNode->colorSource = convertLinearGradient(it->second, shapeBounds);
         } else if (it->second->name == "radialGradient") {
-          fillNode->colorSource = convertRadialGradient(it->second);
+          fillNode->colorSource = convertRadialGradient(it->second, shapeBounds);
         } else if (it->second->name == "pattern") {
           fillNode->colorSource = convertPattern(it->second, shapeBounds);
         }
@@ -909,9 +933,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       auto it = _defs.find(refId);
       if (it != _defs.end()) {
         if (it->second->name == "linearGradient") {
-          strokeNode->colorSource = convertLinearGradient(it->second);
+          strokeNode->colorSource = convertLinearGradient(it->second, shapeBounds);
         } else if (it->second->name == "radialGradient") {
-          strokeNode->colorSource = convertRadialGradient(it->second);
+          strokeNode->colorSource = convertRadialGradient(it->second, shapeBounds);
         } else if (it->second->name == "pattern") {
           strokeNode->colorSource = convertPattern(it->second, shapeBounds);
         }
@@ -932,7 +956,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
 
     std::string strokeWidth = getAttribute(element, "stroke-width");
     if (!strokeWidth.empty()) {
-      strokeNode->strokeWidth = parseLength(strokeWidth, _viewBoxWidth);
+      strokeNode->width = parseLength(strokeWidth, _viewBoxWidth);
     }
 
     std::string strokeLinecap = getAttribute(element, "stroke-linecap");
@@ -1477,7 +1501,7 @@ std::string SVGParserImpl::registerImageResource(const std::string& imageSource)
 }
 
 // Helper function to check if two VectorElement nodes are the same geometry.
-static bool isSameGeometry(const VectorElement* a, const VectorElement* b) {
+static bool isSameGeometry(const Node* a, const Node* b) {
   if (!a || !b || a->type() != b->type()) {
     return false;
   }
@@ -1508,8 +1532,8 @@ static bool isSameGeometry(const VectorElement* a, const VectorElement* b) {
 }
 
 // Check if a layer is a simple shape layer (contains exactly one geometry and one Fill or Stroke).
-static bool isSimpleShapeLayer(const Layer* layer, const VectorElement*& outGeometry,
-                               const VectorElement*& outPainter) {
+static bool isSimpleShapeLayer(const Layer* layer, const Node*& outGeometry,
+                               const Node*& outPainter) {
   if (!layer || layer->contents.size() != 2) {
     return false;
   }
@@ -1546,14 +1570,14 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
   size_t i = 0;
 
   while (i < layers.size()) {
-    const VectorElement* geomA = nullptr;
-    const VectorElement* painterA = nullptr;
+    const Node* geomA = nullptr;
+    const Node* painterA = nullptr;
 
     if (isSimpleShapeLayer(layers[i].get(), geomA, painterA)) {
       // Check if the next layer has the same geometry.
       if (i + 1 < layers.size()) {
-        const VectorElement* geomB = nullptr;
-        const VectorElement* painterB = nullptr;
+        const Node* geomB = nullptr;
+        const Node* painterB = nullptr;
 
         if (isSimpleShapeLayer(layers[i + 1].get(), geomB, painterB) &&
             isSameGeometry(geomA, geomB)) {
@@ -1565,26 +1589,16 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
             // Create merged layer.
             auto mergedLayer = std::make_unique<Layer>();
 
-            // Keep geometry from first layer.
-            auto geomClone = layers[i]->contents[0]->clone();
-            mergedLayer->contents.push_back(
-                std::unique_ptr<VectorElement>(static_cast<VectorElement*>(geomClone.release())));
+            // Move geometry from first layer.
+            mergedLayer->contents.push_back(std::move(layers[i]->contents[0]));
 
             // Add Fill first, then Stroke (standard order).
             if (aHasFill) {
-              auto fillClone = layers[i]->contents[1]->clone();
-              mergedLayer->contents.push_back(
-                  std::unique_ptr<VectorElement>(static_cast<VectorElement*>(fillClone.release())));
-              auto strokeClone = layers[i + 1]->contents[1]->clone();
-              mergedLayer->contents.push_back(
-                  std::unique_ptr<VectorElement>(static_cast<VectorElement*>(strokeClone.release())));
+              mergedLayer->contents.push_back(std::move(layers[i]->contents[1]));
+              mergedLayer->contents.push_back(std::move(layers[i + 1]->contents[1]));
             } else {
-              auto fillClone = layers[i + 1]->contents[1]->clone();
-              mergedLayer->contents.push_back(
-                  std::unique_ptr<VectorElement>(static_cast<VectorElement*>(fillClone.release())));
-              auto strokeClone = layers[i]->contents[1]->clone();
-              mergedLayer->contents.push_back(
-                  std::unique_ptr<VectorElement>(static_cast<VectorElement*>(strokeClone.release())));
+              mergedLayer->contents.push_back(std::move(layers[i + 1]->contents[1]));
+              mergedLayer->contents.push_back(std::move(layers[i]->contents[1]));
             }
 
             merged.push_back(std::move(mergedLayer));
@@ -1634,7 +1648,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
 
 void SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
-    std::vector<std::unique_ptr<LayerFilter>>& filters) {
+    std::vector<std::unique_ptr<Node>>& filters) {
   // Parse filter children to find effect elements.
   auto child = filterElement->getFirstChild();
   while (child) {

@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <memory>
-
 namespace pagx {
 
 /**
@@ -100,11 +98,6 @@ class Node {
    * Returns the type of this node.
    */
   virtual NodeType type() const = 0;
-
-  /**
-   * Creates a deep copy of this node.
-   */
-  virtual std::unique_ptr<Node> clone() const = 0;
 
  protected:
   Node() = default;

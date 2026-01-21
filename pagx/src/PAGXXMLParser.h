@@ -51,16 +51,16 @@ class PAGXXMLParser {
 
   static void parseDocument(const XMLNode* root, PAGXDocument* doc);
   static void parseResources(const XMLNode* node, PAGXDocument* doc);
-  static std::unique_ptr<Resource> parseResource(const XMLNode* node);
+  static std::unique_ptr<Node> parseResource(const XMLNode* node);
   static std::unique_ptr<Layer> parseLayer(const XMLNode* node);
   static void parseContents(const XMLNode* node, Layer* layer);
   static void parseStyles(const XMLNode* node, Layer* layer);
   static void parseFilters(const XMLNode* node, Layer* layer);
 
-  static std::unique_ptr<VectorElement> parseVectorElement(const XMLNode* node);
-  static std::unique_ptr<ColorSource> parseColorSource(const XMLNode* node);
-  static std::unique_ptr<LayerStyle> parseLayerStyle(const XMLNode* node);
-  static std::unique_ptr<LayerFilter> parseLayerFilter(const XMLNode* node);
+  static std::unique_ptr<Node> parseVectorElement(const XMLNode* node);
+  static std::unique_ptr<Node> parseColorSource(const XMLNode* node);
+  static std::unique_ptr<Node> parseLayerStyle(const XMLNode* node);
+  static std::unique_ptr<Node> parseLayerFilter(const XMLNode* node);
 
   static std::unique_ptr<Rectangle> parseRectangle(const XMLNode* node);
   static std::unique_ptr<Ellipse> parseEllipse(const XMLNode* node);

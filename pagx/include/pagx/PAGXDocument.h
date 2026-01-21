@@ -22,7 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/PAGXNode.h"
+#include "pagx/PAGXModel.h"
 
 namespace pagx {
 
@@ -54,7 +54,7 @@ class PAGXDocument {
    * Resources (images, gradients, compositions, etc.).
    * These can be referenced by "#id" in the document.
    */
-  std::vector<std::unique_ptr<Resource>> resources = {};
+  std::vector<std::unique_ptr<Node>> resources = {};
 
   /**
    * Top-level layers.
@@ -95,15 +95,10 @@ class PAGXDocument {
   std::string toXML() const;
 
   /**
-   * Returns a deep clone of this document.
-   */
-  std::shared_ptr<PAGXDocument> clone() const;
-
-  /**
    * Finds a resource by ID.
    * Returns nullptr if not found.
    */
-  Resource* findResource(const std::string& id) const;
+  Node* findResource(const std::string& id) const;
 
   /**
    * Finds a layer by ID (searches recursively).
@@ -115,7 +110,7 @@ class PAGXDocument {
   friend class PAGXXMLParser;
   PAGXDocument() = default;
 
-  mutable std::unordered_map<std::string, Resource*> resourceMap = {};
+  mutable std::unordered_map<std::string, Node*> resourceMap = {};
   mutable bool resourceMapDirty = true;
 
   void rebuildResourceMap() const;

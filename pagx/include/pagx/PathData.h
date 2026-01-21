@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include "pagx/model/types/Types.h"
+#include "pagx/types/Types.h"
 
 namespace pagx {
 

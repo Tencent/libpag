@@ -352,11 +352,6 @@ DEFINE_ENUM_CONVERSION(RepeaterOrder,
     {RepeaterOrder::BelowOriginal, "belowOriginal"},
     {RepeaterOrder::AboveOriginal, "aboveOriginal"})
 
-DEFINE_ENUM_CONVERSION(TextAnchor,
-    {TextAnchor::Start, "start"},
-    {TextAnchor::Middle, "middle"},
-    {TextAnchor::End, "end"})
-
 #undef DEFINE_ENUM_CONVERSION
 
 }  // namespace pagx

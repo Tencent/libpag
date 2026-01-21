@@ -24,6 +24,32 @@
 
 namespace pagx {
 
+// Helper function to get id from a resource node
+static std::string getResourceId(const Node* node) {
+  switch (node->type()) {
+    case NodeType::Image:
+      return static_cast<const Image*>(node)->id;
+    case NodeType::PathData:
+      return static_cast<const PathDataResource*>(node)->id;
+    case NodeType::SolidColor:
+      return static_cast<const SolidColor*>(node)->id;
+    case NodeType::LinearGradient:
+      return static_cast<const LinearGradient*>(node)->id;
+    case NodeType::RadialGradient:
+      return static_cast<const RadialGradient*>(node)->id;
+    case NodeType::ConicGradient:
+      return static_cast<const ConicGradient*>(node)->id;
+    case NodeType::DiamondGradient:
+      return static_cast<const DiamondGradient*>(node)->id;
+    case NodeType::ImagePattern:
+      return static_cast<const ImagePattern*>(node)->id;
+    case NodeType::Composition:
+      return static_cast<const Composition*>(node)->id;
+    default:
+      return {};
+  }
+}
+
 std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   doc->width = docWidth;
@@ -60,25 +86,7 @@ std::string PAGXDocument::toXML() const {
   return PAGXXMLWriter::Write(*this);
 }
 
-std::shared_ptr<PAGXDocument> PAGXDocument::clone() const {
-  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
-  doc->version = version;
-  doc->width = width;
-  doc->height = height;
-  doc->basePath = basePath;
-  for (const auto& resource : resources) {
-    doc->resources.push_back(
-        std::unique_ptr<Resource>(static_cast<Resource*>(resource->clone().release())));
-  }
-  for (const auto& layer : layers) {
-    doc->layers.push_back(
-        std::unique_ptr<Layer>(static_cast<Layer*>(layer->clone().release())));
-  }
-  doc->resourceMapDirty = true;
-  return doc;
-}
-
-Resource* PAGXDocument::findResource(const std::string& id) const {
+Node* PAGXDocument::findResource(const std::string& id) const {
   if (resourceMapDirty) {
     rebuildResourceMap();
   }
@@ -108,8 +116,9 @@ Layer* PAGXDocument::findLayer(const std::string& id) const {
 void PAGXDocument::rebuildResourceMap() const {
   resourceMap.clear();
   for (const auto& resource : resources) {
-    if (!resource->id.empty()) {
-      resourceMap[resource->id] = resource.get();
+    auto id = getResourceId(resource.get());
+    if (!id.empty()) {
+      resourceMap[id] = resource.get();
     }
   }
   resourceMapDirty = false;

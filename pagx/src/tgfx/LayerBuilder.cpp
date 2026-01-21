@@ -18,6 +18,8 @@
 
 #include "pagx/LayerBuilder.h"
 #include <array>
+#include <tuple>
+#include <unordered_map>
 #include "pagx/PAGXSVGParser.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
@@ -25,6 +27,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
@@ -187,6 +190,18 @@ static tgfx::LineJoin ToTGFX(LineJoin join) {
   return tgfx::LineJoin::Miter;
 }
 
+static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
+  switch (type) {
+    case MaskType::Alpha:
+      return tgfx::LayerMaskType::Alpha;
+    case MaskType::Luminance:
+      return tgfx::LayerMaskType::Luminance;
+    case MaskType::Contour:
+      return tgfx::LayerMaskType::Contour;
+  }
+  return tgfx::LayerMaskType::Alpha;
+}
+
 // Internal builder class
 class LayerBuilderImpl {
  public:
@@ -203,11 +218,15 @@ class LayerBuilderImpl {
     // Cache resources for later lookup.
     _resources = &document.resources;
 
+    // Clear layer mappings from previous builds.
+    _layerById.clear();
+    _pendingMasks.clear();
+
     PAGXContent content;
     content.width = document.width;
     content.height = document.height;
 
-    // Build layer tree
+    // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     for (const auto& layer : document.layers) {
       auto childLayer = convertLayer(layer.get());
@@ -216,8 +235,23 @@ class LayerBuilderImpl {
       }
     }
 
+    // Apply masks after all layers are built (second pass).
+    for (const auto& [layer, maskId, maskType] : _pendingMasks) {
+      auto it = _layerById.find(maskId);
+      if (it != _layerById.end()) {
+        auto maskLayer = it->second;
+        // tgfx requires mask layer to be visible for hasValidMask() check.
+        // The mask layer won't be drawn because maskOwner is set.
+        maskLayer->setVisible(true);
+        layer->setMask(maskLayer);
+        layer->setMaskType(maskType);
+      }
+    }
+
     content.root = rootLayer;
     _resources = nullptr;
+    _layerById.clear();
+    _pendingMasks.clear();
     return content;
   }
 
@@ -236,7 +270,22 @@ class LayerBuilderImpl {
     }
 
     if (layer) {
+      // Register layer by ID for mask lookups.
+      if (!node->id.empty()) {
+        _layerById[node->id] = layer;
+      }
+
       applyLayerAttributes(node, layer.get());
+
+      // Queue mask to be applied in second pass.
+      if (!node->mask.empty()) {
+        std::string maskId = node->mask;
+        // Remove leading '#' if present.
+        if (!maskId.empty() && maskId[0] == '#') {
+          maskId = maskId.substr(1);
+        }
+        _pendingMasks.emplace_back(layer, maskId, ToTGFXMaskType(node->maskType));
+      }
 
       for (const auto& child : node->children) {
         auto childLayer = convertLayer(child.get());
@@ -264,7 +313,7 @@ class LayerBuilderImpl {
     return layer;
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const VectorElement* node) {
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const Node* node) {
     if (!node) {
       return nullptr;
     }
@@ -368,16 +417,6 @@ class LayerBuilderImpl {
         textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
       }
       textSpan->setTextBlob(textBlob);
-
-      // Apply text-anchor offset based on text width.
-      if (textBlob && node->textAnchor != TextAnchor::Start) {
-        auto bounds = textBlob->getTightBounds();
-        if (node->textAnchor == TextAnchor::Middle) {
-          xOffset = -bounds.width() * 0.5f;
-        } else if (node->textAnchor == TextAnchor::End) {
-          xOffset = -bounds.width();
-        }
-      }
     }
 
     textSpan->setPosition(tgfx::Point::Make(node->x + xOffset, node->y));
@@ -418,7 +457,7 @@ class LayerBuilderImpl {
       stroke->setColorSource(colorSource);
     }
 
-    stroke->setStrokeWidth(node->strokeWidth);
+    stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
     stroke->setLineCap(ToTGFX(node->cap));
     stroke->setLineJoin(ToTGFX(node->join));
@@ -431,7 +470,7 @@ class LayerBuilderImpl {
     return stroke;
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
+  std::shared_ptr<tgfx::ColorSource> convertColorSource(const Node* node) {
     if (!node) {
       return nullptr;
     }
@@ -637,7 +676,7 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {
+  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const Node* node) {
     if (!node) {
       return nullptr;
     }
@@ -658,7 +697,7 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
+  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const Node* node) {
     if (!node) {
       return nullptr;
     }
@@ -679,8 +718,11 @@ class LayerBuilderImpl {
   }
 
   LayerBuilder::Options _options = {};
-  const std::vector<std::unique_ptr<Resource>>* _resources = nullptr;
+  const std::vector<std::unique_ptr<Node>>* _resources = nullptr;
   std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Layer>> _layerById = {};
+  std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, std::string, tgfx::LayerMaskType>>
+      _pendingMasks = {};
 };
 
 // Public API implementation

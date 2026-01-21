@@ -2033,10 +2033,6 @@ Layer.contents / Group
 
 #### pagx
 
-```xml
-<pagx version="1.0" width="1920" height="1080">...</pagx>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `version` | string | (必填) |
@@ -2044,10 +2040,6 @@ Layer.contents / Group
 | `height` | float | (必填) |
 
 #### Composition
-
-```xml
-<Composition width="100" height="100">...</Composition>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2058,19 +2050,11 @@ Layer.contents / Group
 
 #### Image
 
-```xml
-<Image source="photo.png"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `source` | string | (必填) |
 
 #### PathData
-
-```xml
-<PathData data="M 0 0 L 100 0 L 100 100 Z"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2078,22 +2062,11 @@ Layer.contents / Group
 
 #### SolidColor
 
-```xml
-<SolidColor color="#FF0000"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `color` | color | (必填) |
 
 #### LinearGradient
-
-```xml
-<LinearGradient startPoint="0,0" endPoint="100,0" matrix="1,0,0,1,0,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</LinearGradient>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2101,14 +2074,9 @@ Layer.contents / Group
 | `endPoint` | point | (必填) |
 | `matrix` | string | 单位矩阵 |
 
-#### RadialGradient
+子元素：`ColorStop`+
 
-```xml
-<RadialGradient center="0,0" radius="100" matrix="1,0,0,1,0,0">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</RadialGradient>
-```
+#### RadialGradient
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2116,14 +2084,9 @@ Layer.contents / Group
 | `radius` | float | (必填) |
 | `matrix` | string | 单位矩阵 |
 
-#### ConicGradient
+子元素：`ColorStop`+
 
-```xml
-<ConicGradient center="0,0" startAngle="0" endAngle="360" matrix="1,0,0,1,0,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</ConicGradient>
-```
+#### ConicGradient
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2132,14 +2095,9 @@ Layer.contents / Group
 | `endAngle` | float | 360 |
 | `matrix` | string | 单位矩阵 |
 
-#### DiamondGradient
+子元素：`ColorStop`+
 
-```xml
-<DiamondGradient center="0,0" halfDiagonal="50" matrix="1,0,0,1,0,0">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</DiamondGradient>
-```
+#### DiamondGradient
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2147,11 +2105,9 @@ Layer.contents / Group
 | `halfDiagonal` | float | (必填) |
 | `matrix` | string | 单位矩阵 |
 
-#### ColorStop
+子元素：`ColorStop`+
 
-```xml
-<ColorStop offset="0" color="#FF0000"/>
-```
+#### ColorStop
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2159,10 +2115,6 @@ Layer.contents / Group
 | `color` | color | (必填) |
 
 #### ImagePattern
-
-```xml
-<ImagePattern image="#img1" tileModeX="clamp" tileModeY="clamp" sampling="linear" matrix="1,0,0,1,0,0"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2175,14 +2127,6 @@ Layer.contents / Group
 ### C.3 图层节点
 
 #### Layer
-
-```xml
-<Layer name="" visible="true" alpha="1" blendMode="normal" x="0" y="0" matrix="1,0,0,1,0,0"
-       preserve3D="false" antiAlias="true" groupOpacity="false" passThroughBackground="true"
-       excludeChildEffectsInLayerStyle="false" maskType="alpha">
-  ...
-</Layer>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2208,11 +2152,6 @@ Layer.contents / Group
 
 #### DropShadowStyle
 
-```xml
-<DropShadowStyle offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
-                 color="#000000" showBehindLayer="true" blendMode="normal"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `offsetX` | float | 0 |
@@ -2225,11 +2164,6 @@ Layer.contents / Group
 
 #### InnerShadowStyle
 
-```xml
-<InnerShadowStyle offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
-                  color="#000000" blendMode="normal"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `offsetX` | float | 0 |
@@ -2240,10 +2174,6 @@ Layer.contents / Group
 | `blendMode` | BlendMode | normal |
 
 #### BackgroundBlurStyle
-
-```xml
-<BackgroundBlurStyle blurrinessX="0" blurrinessY="0" tileMode="mirror" blendMode="normal"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2256,10 +2186,6 @@ Layer.contents / Group
 
 #### BlurFilter
 
-```xml
-<BlurFilter blurrinessX="10" blurrinessY="10" tileMode="decal"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `blurrinessX` | float | (必填) |
@@ -2267,11 +2193,6 @@ Layer.contents / Group
 | `tileMode` | TileMode | decal |
 
 #### DropShadowFilter
-
-```xml
-<DropShadowFilter offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
-                  color="#000000" shadowOnly="false"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2284,11 +2205,6 @@ Layer.contents / Group
 
 #### InnerShadowFilter
 
-```xml
-<InnerShadowFilter offsetX="0" offsetY="0" blurrinessX="0" blurrinessY="0"
-                   color="#000000" shadowOnly="false"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `offsetX` | float | 0 |
@@ -2300,20 +2216,12 @@ Layer.contents / Group
 
 #### BlendFilter
 
-```xml
-<BlendFilter color="#FF0000" blendMode="normal"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `color` | color | (必填) |
 | `blendMode` | BlendMode | normal |
 
 #### ColorMatrixFilter
-
-```xml
-<ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2322,10 +2230,6 @@ Layer.contents / Group
 ### C.6 几何元素节点
 
 #### Rectangle
-
-```xml
-<Rectangle center="0,0" size="100,100" roundness="0" reversed="false"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2336,10 +2240,6 @@ Layer.contents / Group
 
 #### Ellipse
 
-```xml
-<Ellipse center="0,0" size="100,100" reversed="false"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `center` | point | 0,0 |
@@ -2347,11 +2247,6 @@ Layer.contents / Group
 | `reversed` | bool | false |
 
 #### Polystar
-
-```xml
-<Polystar center="0,0" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50"
-          rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2367,21 +2262,12 @@ Layer.contents / Group
 
 #### Path
 
-```xml
-<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `data` | string/idref | (必填) |
 | `reversed` | bool | false |
 
 #### TextSpan
-
-```xml
-<TextSpan x="0" y="0" font="Arial" fontSize="12" fontWeight="400" fontStyle="normal"
-          tracking="0" baselineShift="0"><![CDATA[Hello]]></TextSpan>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2394,13 +2280,11 @@ Layer.contents / Group
 | `tracking` | float | 0 |
 | `baselineShift` | float | 0 |
 
+内容：`CDATA` 文本
+
 ### C.7 绘制器节点
 
 #### Fill
-
-```xml
-<Fill color="#000000" alpha="1" blendMode="normal" fillRule="winding" placement="background"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2411,11 +2295,6 @@ Layer.contents / Group
 | `placement` | LayerPlacement | background |
 
 #### Stroke
-
-```xml
-<Stroke color="#000000" width="1" alpha="1" blendMode="normal" cap="butt" join="miter"
-        miterLimit="4" dashOffset="0" align="center" placement="background"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2435,10 +2314,6 @@ Layer.contents / Group
 
 #### TrimPath
 
-```xml
-<TrimPath start="0" end="1" offset="0" type="separate"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `start` | float | 0 |
@@ -2448,19 +2323,11 @@ Layer.contents / Group
 
 #### RoundCorner
 
-```xml
-<RoundCorner radius="10"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `radius` | float | 10 |
 
 #### MergePath
-
-```xml
-<MergePath mode="append"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2469,13 +2336,6 @@ Layer.contents / Group
 ### C.9 文本修改器节点
 
 #### TextModifier
-
-```xml
-<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1"
-              skew="0" skewAxis="0" alpha="1">
-  <RangeSelector .../>
-</TextModifier>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2490,13 +2350,9 @@ Layer.contents / Group
 | `strokeColor` | color | - |
 | `strokeWidth` | float | - |
 
-#### RangeSelector
+子元素：`RangeSelector`*
 
-```xml
-<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square"
-               easeIn="0" easeOut="0" mode="add" weight="1"
-               randomizeOrder="false" randomSeed="0"/>
-```
+#### RangeSelector
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2514,11 +2370,6 @@ Layer.contents / Group
 
 #### TextPath
 
-```xml
-<TextPath path="#pathId" align="start" firstMargin="0" lastMargin="0"
-          perpendicularToPath="true" reversed="false" forceAlignment="false"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `path` | idref | (必填) |
@@ -2530,11 +2381,6 @@ Layer.contents / Group
 | `forceAlignment` | bool | false |
 
 #### TextLayout
-
-```xml
-<TextLayout width="300" height="200" align="left" verticalAlign="top"
-            lineHeight="1.2" indent="0" overflow="clip"/>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
@@ -2550,11 +2396,6 @@ Layer.contents / Group
 
 #### Repeater
 
-```xml
-<Repeater copies="3" offset="0" order="belowOriginal" anchorPoint="0,0"
-          position="100,100" rotation="0" scale="1,1" startAlpha="1" endAlpha="1"/>
-```
-
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `copies` | float | 3 |
@@ -2568,13 +2409,6 @@ Layer.contents / Group
 | `endAlpha` | float | 1 |
 
 #### Group
-
-```xml
-<Group anchorPoint="0,0" position="0,0" rotation="0" scale="1,1"
-       skew="0" skewAxis="0" alpha="1">
-  ...
-</Group>
-```
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|

@@ -40,6 +40,5 @@ struct Composition : public Node {
     return NodeType::Composition;
   }
 };
-};
 
 }  // namespace pagx

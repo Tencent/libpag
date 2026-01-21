@@ -18,5 +18,5 @@
 
 #pragma once
 
-#include "pagx/model/types/Enums.h"
-#include "pagx/model/types/Types.h"
+#include "pagx/types/Enums.h"
+#include "pagx/types/Types.h"

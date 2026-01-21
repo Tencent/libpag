@@ -18,34 +18,37 @@
 
 #pragma once
 
-#include <memory>
-#include "pagx/model/types/Types.h"
-#include "pagx/model/nodes/VectorElement.h"
-#include "pagx/model/types/enums/RepeaterOrder.h"
+// Layer related
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/MaskType.h"
 
-namespace pagx {
+// Painter related
+#include "pagx/types/FillRule.h"
+#include "pagx/types/LineCap.h"
+#include "pagx/types/LineJoin.h"
+#include "pagx/types/Placement.h"
+#include "pagx/types/StrokeAlign.h"
 
-/**
- * Repeater modifier.
- */
-struct Repeater : public VectorElement {
-  float copies = 3;
-  float offset = 0;
-  RepeaterOrder order = RepeaterOrder::BelowOriginal;
-  Point anchorPoint = {};
-  Point position = {100, 100};
-  float rotation = 0;
-  Point scale = {1, 1};
-  float startAlpha = 1;
-  float endAlpha = 1;
+// Color source related
+#include "pagx/types/SamplingMode.h"
+#include "pagx/types/TileMode.h"
 
-  NodeType type() const override {
-    return NodeType::Repeater;
-  }
+// Geometry related
+#include "pagx/types/PolystarType.h"
 
-  std::unique_ptr<Node> clone() const override {
-    return std::make_unique<Repeater>(*this);
-  }
-};
+// Path modifier related
+#include "pagx/types/MergePathMode.h"
+#include "pagx/types/TrimType.h"
 
-}  // namespace pagx
+// Text modifier related
+#include "pagx/types/FontStyle.h"
+#include "pagx/types/Overflow.h"
+#include "pagx/types/SelectorMode.h"
+#include "pagx/types/SelectorShape.h"
+#include "pagx/types/SelectorUnit.h"
+#include "pagx/types/TextAlign.h"
+#include "pagx/types/TextPathAlign.h"
+#include "pagx/types/VerticalAlign.h"
+
+// Repeater related
+#include "pagx/types/RepeaterOrder.h"

@@ -58,36 +58,36 @@ class SVGParserImpl {
   std::unique_ptr<Layer> convertToLayer(const std::shared_ptr<DOMNode>& element,
                                             const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
-                       std::vector<std::unique_ptr<VectorElement>>& contents,
+                       std::vector<std::unique_ptr<Node>>& contents,
                        const InheritedStyle& inheritedStyle);
-  std::unique_ptr<VectorElement> convertElement(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertElement(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
-  std::unique_ptr<VectorElement> convertRect(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElement> convertCircle(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElement> convertEllipse(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElement> convertLine(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElement> convertPolyline(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElement> convertPolygon(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElement> convertPath(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertRect(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertCircle(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertEllipse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertLine(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertPolyline(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertPolygon(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertPath(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertText(const std::shared_ptr<DOMNode>& element,
                                          const InheritedStyle& inheritedStyle);
-  std::unique_ptr<VectorElement> convertUse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Node> convertUse(const std::shared_ptr<DOMNode>& element);
 
   std::unique_ptr<LinearGradient> convertLinearGradient(
-      const std::shared_ptr<DOMNode>& element);
+      const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
   std::unique_ptr<RadialGradient> convertRadialGradient(
-      const std::shared_ptr<DOMNode>& element);
+      const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
   std::unique_ptr<ImagePattern> convertPattern(const std::shared_ptr<DOMNode>& element,
                                                     const Rect& shapeBounds);
 
   std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
   void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
-                            std::vector<std::unique_ptr<LayerFilter>>& filters);
+                            std::vector<std::unique_ptr<Node>>& filters);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
-                     std::vector<std::unique_ptr<VectorElement>>& contents,
+                     std::vector<std::unique_ptr<Node>>& contents,
                      const InheritedStyle& inheritedStyle);
 
   // Compute shape bounds from SVG element attributes.

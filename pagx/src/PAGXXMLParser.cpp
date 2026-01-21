@@ -300,7 +300,7 @@ void PAGXXMLParser::parseResources(const XMLNode* node, PAGXDocument* doc) {
   }
 }
 
-std::unique_ptr<Resource> PAGXXMLParser::parseResource(const XMLNode* node) {
+std::unique_ptr<Node> PAGXXMLParser::parseResource(const XMLNode* node) {
   if (node->tag == "Image") {
     return parseImage(node);
   }
@@ -433,7 +433,7 @@ void PAGXXMLParser::parseFilters(const XMLNode* node, Layer* layer) {
   }
 }
 
-std::unique_ptr<VectorElement> PAGXXMLParser::parseVectorElement(const XMLNode* node) {
+std::unique_ptr<Node> PAGXXMLParser::parseVectorElement(const XMLNode* node) {
   if (node->tag == "Rectangle") {
     return parseRectangle(node);
   }
@@ -482,7 +482,7 @@ std::unique_ptr<VectorElement> PAGXXMLParser::parseVectorElement(const XMLNode* 
   return nullptr;
 }
 
-std::unique_ptr<ColorSource> PAGXXMLParser::parseColorSource(const XMLNode* node) {
+std::unique_ptr<Node> PAGXXMLParser::parseColorSource(const XMLNode* node) {
   if (node->tag == "SolidColor") {
     return parseSolidColor(node);
   }
@@ -504,7 +504,7 @@ std::unique_ptr<ColorSource> PAGXXMLParser::parseColorSource(const XMLNode* node
   return nullptr;
 }
 
-std::unique_ptr<LayerStyle> PAGXXMLParser::parseLayerStyle(const XMLNode* node) {
+std::unique_ptr<Node> PAGXXMLParser::parseLayerStyle(const XMLNode* node) {
   if (node->tag == "DropShadowStyle") {
     return parseDropShadowStyle(node);
   }
@@ -517,7 +517,7 @@ std::unique_ptr<LayerStyle> PAGXXMLParser::parseLayerStyle(const XMLNode* node) 
   return nullptr;
 }
 
-std::unique_ptr<LayerFilter> PAGXXMLParser::parseLayerFilter(const XMLNode* node) {
+std::unique_ptr<Node> PAGXXMLParser::parseLayerFilter(const XMLNode* node) {
   if (node->tag == "BlurFilter") {
     return parseBlurFilter(node);
   }
@@ -596,7 +596,6 @@ std::unique_ptr<TextSpan> PAGXXMLParser::parseTextSpan(const XMLNode* node) {
   textSpan->fontStyle = FontStyleFromString(getAttribute(node, "fontStyle", "normal"));
   textSpan->tracking = getFloatAttribute(node, "tracking", 0);
   textSpan->baselineShift = getFloatAttribute(node, "baselineShift", 0);
-  textSpan->textAnchor = TextAnchorFromString(getAttribute(node, "textAnchor", "start"));
   textSpan->text = node->text;
   return textSpan;
 }
@@ -627,7 +626,7 @@ std::unique_ptr<Fill> PAGXXMLParser::parseFill(const XMLNode* node) {
 std::unique_ptr<Stroke> PAGXXMLParser::parseStroke(const XMLNode* node) {
   auto stroke = std::make_unique<Stroke>();
   stroke->color = getAttribute(node, "color");
-  stroke->strokeWidth = getFloatAttribute(node, "width", 1);
+  stroke->width = getFloatAttribute(node, "width", 1);
   stroke->alpha = getFloatAttribute(node, "alpha", 1);
   stroke->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   stroke->cap = LineCapFromString(getAttribute(node, "cap", "butt"));
@@ -705,7 +704,7 @@ std::unique_ptr<TextModifier> PAGXXMLParser::parseTextModifier(const XMLNode* no
 std::unique_ptr<TextPath> PAGXXMLParser::parseTextPath(const XMLNode* node) {
   auto textPath = std::make_unique<TextPath>();
   textPath->path = getAttribute(node, "path");
-  textPath->textPathAlign = TextPathAlignFromString(getAttribute(node, "align", "start"));
+  textPath->pathAlign = TextPathAlignFromString(getAttribute(node, "align", "start"));
   textPath->firstMargin = getFloatAttribute(node, "firstMargin", 0);
   textPath->lastMargin = getFloatAttribute(node, "lastMargin", 0);
   textPath->perpendicularToPath = getBoolAttribute(node, "perpendicularToPath", true);
@@ -745,7 +744,7 @@ std::unique_ptr<Repeater> PAGXXMLParser::parseRepeater(const XMLNode* node) {
 
 std::unique_ptr<Group> PAGXXMLParser::parseGroup(const XMLNode* node) {
   auto group = std::make_unique<Group>();
-  group->name = getAttribute(node, "name");
+  // group->name (removed) = getAttribute(node, "name");
   auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
   group->anchorPoint = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
@@ -1018,7 +1017,7 @@ std::unique_ptr<BlendFilter> PAGXXMLParser::parseBlendFilter(const XMLNode* node
   if (!colorStr.empty()) {
     filter->color = Color::Parse(colorStr);
   }
-  filter->filterBlendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
+  filter->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   return filter;
 }
 
