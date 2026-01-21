@@ -2081,6 +2081,8 @@ Layer / Group
 | `maskType` | MaskType | alpha |
 | `composition` | idref | - |
 
+子元素：`VectorElement`*、`LayerStyle`*、`LayerFilter`*、`Layer`*（按类型自动归类）
+
 ### C.4 图层样式节点
 
 #### DropShadowStyle
@@ -2352,6 +2354,8 @@ Layer / Group
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |
+
+子元素：`VectorElement`*（递归包含 Group）
 
 ### C.11 枚举类型
 
