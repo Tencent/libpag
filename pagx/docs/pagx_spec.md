@@ -31,6 +31,13 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 3. **图层系统**：定义图层及其相关特性（样式、滤镜、遮罩）
 4. **矢量元素系统**：定义图层内容的矢量元素及其处理模型
 
+**附录**（方便速查）：
+
+- **附录 A**：枚举类型汇总
+- **附录 B**：节点定义速查
+- **附录 C**：节点分类与包含关系
+- **附录 D**：完整示例
+
 ---
 
 ## 2. Basic Data Types（基础数据类型）
@@ -157,7 +164,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | string | (必填) | 唯一标识 |
-| `data` | string | (必填) | SVG 路径数据（语法见 2.11 节） |
+| `data` | string | (必填) | SVG 路径数据（语法见 2.8 节） |
 
 ### 2.10 Image（图片）
 
@@ -421,7 +428,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 `<Resources>` 定义可复用的资源，包括图片、路径数据、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `#id` 形式引用。
 
-**元素位置**：Resources 元素可放置在根元素内的任意位置。为便于阅读和理解，推荐在可能的情况下，将被引用的元素定义在引用它的元素之前，并将所有资源集中在靠近文件顶部的单个 Resources 元素内。解析器必须支持前向引用，即元素可以引用在文档后面定义的资源或图层。
+**元素位置**：Resources 元素可放置在根元素内的任意位置，对位置没有限制。解析器必须支持元素引用在文档后面定义的资源或图层（即前向引用）。
 
 ```xml
 <Resources>
@@ -437,26 +444,14 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 </Resources>
 ```
 
-#### 3.3.1 Image（图片）
+**支持的资源类型**：
 
-图片资源定义见 2.11 节。
+- `Image`：图片资源（见 2.10 节）
+- `PathData`：路径数据（见 2.9 节），可被 Path 元素和 TextPath 修改器引用
+- 颜色源（见 2.11 节）：`SolidColor`、`LinearGradient`、`RadialGradient`、`ConicGradient`、`DiamondGradient`、`ImagePattern`
+- `Composition`：合成（见下方）
 
-#### 3.3.2 PathData（路径数据）
-
-路径数据资源定义见 2.11 节。可被 Path 元素和 TextPath 修改器引用。
-
-#### 3.3.3 颜色源
-
-Resources 中可定义以下颜色源类型（详见 2.11 节）：
-
-- `SolidColor`：纯色
-- `LinearGradient`：线性渐变
-- `RadialGradient`：径向渐变
-- `ConicGradient`：锥形渐变
-- `DiamondGradient`：菱形渐变
-- `ImagePattern`：图片图案
-
-#### 3.3.4 Composition（合成）
+#### 3.3.1 Composition（合成）
 
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
 
@@ -560,8 +555,16 @@ PAGX 文档采用层级结构组织内容：
 | `excludeChildEffectsInLayerStyle` | bool | false | 图层样式是否排除子图层效果 |
 | `scrollRect` | string | - | 滚动裁剪区域 "x,y,w,h" |
 | `mask` | idref | - | 遮罩图层引用 "#id" |
-| `maskType` | MaskType | alpha | 遮罩类型（见 4.4.2） |
+| `maskType` | MaskType | alpha | 遮罩类型（见下方） |
 | `composition` | idref | - | 合成引用 "#id" |
+
+**MaskType（遮罩类型）**：
+
+| 值 | 说明 |
+|------|------|
+| `alpha` | Alpha 遮罩：使用遮罩的 alpha 通道 |
+| `luminance` | 亮度遮罩：使用遮罩的亮度值 |
+| `contour` | 轮廓遮罩：使用遮罩的轮廓进行裁剪 |
 
 **BlendMode（混合模式）**：
 
@@ -665,16 +668,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blurrinessX` | float | 0 | X 模糊半径 |
 | `blurrinessY` | float | 0 | Y 模糊半径 |
-| `tileMode` | TileMode | mirror | 平铺模式（见下方） |
-
-**TileMode（平铺模式）**：
-
-| 值 | 说明 |
-|------|------|
-| `clamp` | 钳制：超出边界使用边缘像素颜色 |
-| `repeat` | 重复：平铺图片 |
-| `mirror` | 镜像：交替翻转平铺 |
-| `decal` | 贴花：超出边界为透明 |
+| `tileMode` | TileMode | mirror | 平铺模式（见 2.11.8） |
 
 **渲染步骤**：
 1. 获取图层边界下方的背景内容
@@ -699,7 +693,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blurrinessX` | float | (必填) | X 模糊半径 |
 | `blurrinessY` | float | (必填) | Y 模糊半径 |
-| `tileMode` | TileMode | decal | 平铺模式（见 4.2.3） |
+| `tileMode` | TileMode | decal | 平铺模式（见 2.11.8） |
 
 #### 4.3.2 DropShadowFilter（投影阴影滤镜）
 
@@ -775,15 +769,7 @@ PAGX 文档采用层级结构组织内容：
 <Layer mask="#maskShape" maskType="alpha">...</Layer>
 ```
 
-**遮罩类型**：
-
-**MaskType（遮罩类型）**：
-
-| 值 | 说明 |
-|------|------|
-| `alpha` | Alpha 遮罩：使用遮罩的 alpha 通道 |
-| `luminance` | 亮度遮罩：使用遮罩的亮度值 |
-| `contour` | 轮廓遮罩：使用遮罩的轮廓进行裁剪 |
+**遮罩类型**：MaskType 定义见 4.1 节。
 
 **遮罩规则**：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
@@ -986,7 +972,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string/idref | "" | SVG 路径数据（语法见 2.11 节）或 PathData 引用 "#id" |
+| `data` | string/idref | "" | SVG 路径数据（语法见 2.8 节）或 PathData 资源引用 "#id"（见 2.9 节） |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -1423,7 +1409,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | (必填) | PathData 资源引用 "#id"（见 2.11 节） |
+| `path` | idref | (必填) | PathData 资源引用 "#id"（见 2.9 节） |
 | `align` | TextPathAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
@@ -1745,7 +1731,494 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 ---
 
-## Appendix A. Complete Example（完整示例）
+## Appendix A. Enumerations（枚举类型汇总）
+
+本附录汇总规范中所有枚举类型，方便速查。
+
+### A.1 图层相关
+
+| 枚举 | 值 | 定义位置 |
+|------|------|----------|
+| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter` | 4.1 |
+| **MaskType** | `alpha`, `luminance`, `contour` | 4.1 |
+| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` | 2.11.8 |
+| **SamplingMode** | `nearest`, `linear`, `mipmap` | 2.11.8 |
+
+### A.2 绘制器相关
+
+| 枚举 | 值 | 定义位置 |
+|------|------|----------|
+| **FillRule** | `winding`, `evenOdd` | 5.3.1 |
+| **LineCap** | `butt`, `round`, `square` | 5.3.2 |
+| **LineJoin** | `miter`, `round`, `bevel` | 5.3.2 |
+| **StrokeAlign** | `center`, `inside`, `outside` | 5.3.2 |
+| **LayerPlacement** | `background`, `foreground` | 5.3.3 |
+
+### A.3 几何元素相关
+
+| 枚举 | 值 | 定义位置 |
+|------|------|----------|
+| **PolystarType** | `polygon`, `star` | 5.2.3 |
+| **TextAnchor** | `start`, `middle`, `end` | 5.2.5 |
+
+### A.4 修改器相关
+
+| 枚举 | 值 | 定义位置 |
+|------|------|----------|
+| **TrimType** | `separate`, `continuous` | 5.4.1 |
+| **MergePathOp** | `append`, `union`, `intersect`, `xor`, `difference` | 5.4.3 |
+| **SelectorUnit** | `index`, `percentage` | 5.5.4 |
+| **SelectorShape** | `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth` | 5.5.4 |
+| **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` | 5.5.4 |
+| **TextPathAlign** | `start`, `center`, `end` | 5.5.5 |
+| **TextAlign** | `left`, `center`, `right`, `justify` | 5.5.6 |
+| **VerticalAlign** | `top`, `center`, `bottom` | 5.5.6 |
+| **Overflow** | `clip`, `visible`, `ellipsis` | 5.5.6 |
+| **RepeaterOrder** | `belowOriginal`, `aboveOriginal` | 5.6 |
+
+---
+
+## Appendix B. Node Reference（节点定义速查）
+
+本附录列出所有节点的属性定义，省略详细说明。
+
+### B.1 文档结构节点
+
+#### pagx
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `version` | string | (必填) |
+| `width` | float | (必填) |
+| `height` | float | (必填) |
+
+#### Composition
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (必填) |
+| `width` | float | (必填) |
+| `height` | float | (必填) |
+
+### B.2 资源节点
+
+#### Image
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (必填) |
+| `source` | string | (必填) |
+
+#### PathData
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (必填) |
+| `data` | string | (必填) |
+
+#### SolidColor
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (Resources 中必填) |
+| `color` | color | (必填) |
+
+#### LinearGradient
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (Resources 中必填) |
+| `startPoint` | point | 0,0 |
+| `endPoint` | point | (必填) |
+| `matrix` | string | 单位矩阵 |
+
+#### RadialGradient
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (Resources 中必填) |
+| `center` | point | 0,0 |
+| `radius` | float | (必填) |
+| `matrix` | string | 单位矩阵 |
+
+#### ConicGradient
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (Resources 中必填) |
+| `center` | point | 0,0 |
+| `startAngle` | float | 0 |
+| `endAngle` | float | 360 |
+| `matrix` | string | 单位矩阵 |
+
+#### DiamondGradient
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (Resources 中必填) |
+| `center` | point | 0,0 |
+| `halfDiagonal` | float | (必填) |
+| `matrix` | string | 单位矩阵 |
+
+#### ColorStop
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offset` | float | (必填) |
+| `color` | color | (必填) |
+
+#### ImagePattern
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | (Resources 中必填) |
+| `image` | idref | (必填) |
+| `tileModeX` | TileMode | clamp |
+| `tileModeY` | TileMode | clamp |
+| `sampling` | SamplingMode | linear |
+| `matrix` | string | 单位矩阵 |
+
+### B.3 图层节点
+
+#### Layer
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `id` | string | - |
+| `name` | string | "" |
+| `visible` | bool | true |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `matrix` | string | 单位矩阵 |
+| `matrix3D` | string | - |
+| `preserve3D` | bool | false |
+| `antiAlias` | bool | true |
+| `groupOpacity` | bool | false |
+| `passThroughBackground` | bool | true |
+| `excludeChildEffectsInLayerStyle` | bool | false |
+| `scrollRect` | string | - |
+| `mask` | idref | - |
+| `maskType` | MaskType | alpha |
+| `composition` | idref | - |
+
+### B.4 图层样式节点
+
+#### DropShadowStyle
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurrinessX` | float | 0 |
+| `blurrinessY` | float | 0 |
+| `color` | color | #000000 |
+| `showBehindLayer` | bool | true |
+| `blendMode` | BlendMode | normal |
+
+#### InnerShadowStyle
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurrinessX` | float | 0 |
+| `blurrinessY` | float | 0 |
+| `color` | color | #000000 |
+| `blendMode` | BlendMode | normal |
+
+#### BackgroundBlurStyle
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `blurrinessX` | float | 0 |
+| `blurrinessY` | float | 0 |
+| `tileMode` | TileMode | mirror |
+| `blendMode` | BlendMode | normal |
+
+### B.5 滤镜节点
+
+#### BlurFilter
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `blurrinessX` | float | (必填) |
+| `blurrinessY` | float | (必填) |
+| `tileMode` | TileMode | decal |
+
+#### DropShadowFilter
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurrinessX` | float | 0 |
+| `blurrinessY` | float | 0 |
+| `color` | color | #000000 |
+| `shadowOnly` | bool | false |
+
+#### InnerShadowFilter
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `offsetX` | float | 0 |
+| `offsetY` | float | 0 |
+| `blurrinessX` | float | 0 |
+| `blurrinessY` | float | 0 |
+| `color` | color | #000000 |
+| `shadowOnly` | bool | false |
+
+#### BlendFilter
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | color | (必填) |
+| `blendMode` | BlendMode | normal |
+
+#### ColorMatrixFilter
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `matrix` | string | (必填) |
+
+### B.6 几何元素节点
+
+#### Rectangle
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | point | 0,0 |
+| `size` | size | 100,100 |
+| `roundness` | float | 0 |
+| `reversed` | bool | false |
+
+#### Ellipse
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | point | 0,0 |
+| `size` | size | 100,100 |
+| `reversed` | bool | false |
+
+#### Polystar
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `center` | point | 0,0 |
+| `polystarType` | PolystarType | star |
+| `pointCount` | float | 5 |
+| `outerRadius` | float | 100 |
+| `innerRadius` | float | 50 |
+| `rotation` | float | 0 |
+| `outerRoundness` | float | 0 |
+| `innerRoundness` | float | 0 |
+| `reversed` | bool | false |
+
+#### Path
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `data` | string/idref | "" |
+| `reversed` | bool | false |
+
+#### TextSpan
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `x` | float | 0 |
+| `y` | float | 0 |
+| `font` | string | (必填) |
+| `fontSize` | float | 12 |
+| `fontWeight` | int | 400 |
+| `fontStyle` | enum | normal |
+| `tracking` | float | 0 |
+| `baselineShift` | float | 0 |
+| `textAnchor` | TextAnchor | start |
+
+### B.7 绘制器节点
+
+#### Fill
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | color/idref | #000000 |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `fillRule` | FillRule | winding |
+| `placement` | LayerPlacement | background |
+
+#### Stroke
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `color` | color/idref | #000000 |
+| `width` | float | 1 |
+| `alpha` | float | 1 |
+| `blendMode` | BlendMode | normal |
+| `cap` | LineCap | butt |
+| `join` | LineJoin | miter |
+| `miterLimit` | float | 4 |
+| `dashes` | string | - |
+| `dashOffset` | float | 0 |
+| `align` | StrokeAlign | center |
+| `placement` | LayerPlacement | background |
+
+### B.8 形状修改器节点
+
+#### TrimPath
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `start` | float | 0 |
+| `end` | float | 1 |
+| `offset` | float | 0 |
+| `type` | TrimType | separate |
+
+#### RoundCorner
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `radius` | float | 10 |
+
+#### MergePath
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `mode` | MergePathOp | append |
+
+### B.9 文本修改器节点
+
+#### TextModifier
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `anchorPoint` | point | 0,0 |
+| `position` | point | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+| `fillColor` | color | - |
+| `strokeColor` | color | - |
+| `strokeWidth` | float | - |
+
+#### RangeSelector
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `start` | float | 0 |
+| `end` | float | 1 |
+| `offset` | float | 0 |
+| `unit` | SelectorUnit | percentage |
+| `shape` | SelectorShape | square |
+| `easeIn` | float | 0 |
+| `easeOut` | float | 0 |
+| `mode` | SelectorMode | add |
+| `weight` | float | 1 |
+| `randomizeOrder` | bool | false |
+| `randomSeed` | int | 0 |
+
+#### TextPath
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `path` | idref | (必填) |
+| `align` | TextPathAlign | start |
+| `firstMargin` | float | 0 |
+| `lastMargin` | float | 0 |
+| `perpendicularToPath` | bool | true |
+| `reversed` | bool | false |
+| `forceAlignment` | bool | false |
+
+#### TextLayout
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `width` | float | (必填) |
+| `height` | float | (必填) |
+| `align` | TextAlign | left |
+| `verticalAlign` | VerticalAlign | top |
+| `lineHeight` | float | 1.2 |
+| `indent` | float | 0 |
+| `overflow` | Overflow | clip |
+
+### B.10 其他节点
+
+#### Repeater
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `copies` | float | 3 |
+| `offset` | float | 0 |
+| `order` | RepeaterOrder | belowOriginal |
+| `anchorPoint` | point | 0,0 |
+| `position` | point | 100,100 |
+| `rotation` | float | 0 |
+| `scale` | point | 1,1 |
+| `startAlpha` | float | 1 |
+| `endAlpha` | float | 1 |
+
+#### Group
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `name` | string | "" |
+| `anchorPoint` | point | 0,0 |
+| `position` | point | 0,0 |
+| `rotation` | float | 0 |
+| `scale` | point | 1,1 |
+| `skew` | float | 0 |
+| `skewAxis` | float | 0 |
+| `alpha` | float | 1 |
+
+---
+
+## Appendix C. Node Hierarchy（节点分类与包含关系）
+
+本附录描述节点的分类和嵌套规则。
+
+### C.1 节点分类
+
+| 分类 | 节点 |
+|------|------|
+| **文档根** | `pagx` |
+| **资源** | `Resources`, `Image`, `PathData`, `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ColorStop`, `ImagePattern`, `Composition` |
+| **图层** | `Layer` |
+| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
+| **滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
+| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `TextSpan` |
+| **绘制器** | `Fill`, `Stroke` |
+| **形状修改器** | `TrimPath`, `RoundCorner`, `MergePath` |
+| **文本修改器** | `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout` |
+| **其他** | `Repeater`, `Group` |
+
+### C.2 包含关系
+
+```
+pagx
+├── Resources
+│   ├── Image
+│   ├── PathData
+│   ├── SolidColor
+│   ├── LinearGradient → ColorStop*
+│   ├── RadialGradient → ColorStop*
+│   ├── ConicGradient → ColorStop*
+│   ├── DiamondGradient → ColorStop*
+│   ├── ImagePattern
+│   └── Composition → Layer*
+│
+└── Layer*
+    ├── contents
+    │   └── VectorElement*（见下方）
+    ├── styles
+    │   ├── DropShadowStyle
+    │   ├── InnerShadowStyle
+    │   └── BackgroundBlurStyle
+    ├── filters
+    │   ├── BlurFilter
+    │   ├── DropShadowFilter
+    │   ├── InnerShadowFilter
+    │   ├── BlendFilter
+    │   └── ColorMatrixFilter
+    └── Layer*（子图层）
+```
+
+### C.3 VectorElement 包含关系
+
+`contents` 和 `Group` 可包含以下 VectorElement：
+
+```
+contents / Group
+├── Rectangle
+├── Ellipse
+├── Polystar
+├── Path
+├── TextSpan
+├── Fill（可内嵌颜色源）
+│   └── SolidColor / LinearGradient / RadialGradient / ConicGradient / DiamondGradient / ImagePattern
+├── Stroke（可内嵌颜色源）
+│   └── SolidColor / LinearGradient / RadialGradient / ConicGradient / DiamondGradient / ImagePattern
+├── TrimPath
+├── RoundCorner
+├── MergePath
+├── TextModifier → RangeSelector*
+├── TextPath
+├── TextLayout
+├── Repeater
+└── Group*（递归）
+```
+
+---
+
+## Appendix D. Examples（示例）
+
+### D.1 Complete Example（完整示例）
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1812,4 +2285,104 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
   </Layer>
   
 </pagx>
+```
+
+### D.2 Feature Examples（功能示例）
+
+以下示例省略外层 `<?xml>`、`<pagx>`、`<Resources>` 等样板代码，仅展示核心片段。
+
+#### D.2.1 多重填充/描边
+
+```xml
+<!-- 多重填充：棋盘格图案 + 半透明红色覆盖 -->
+<Rectangle center="100,100" size="200,100" roundness="10"/>
+<Fill>
+  <ImagePattern image="#checkerboard" tileModeX="repeat" tileModeY="repeat"/>
+</Fill>
+<Fill color="#FF000080"/>
+
+<!-- 多重描边：由粗到细渐变发光效果 -->
+<Path data="M10,50 Q50,10 90,50 T170,50"/>
+<Stroke color="#0088FF40" width="12" cap="round" join="round"/>
+<Stroke color="#0088FF80" width="6" cap="round" join="round"/>
+<Stroke color="#0088FF" width="2" cap="round" join="round"/>
+```
+
+#### D.2.2 TrimPath 路径裁剪
+
+```xml
+<!-- 独立模式：每个形状独立裁剪 50% -->
+<Rectangle center="50,50" size="80,80"/>
+<Ellipse center="150,50" size="80,80"/>
+<TrimPath start="0" end="0.5" type="separate"/>
+<Stroke color="#333333" width="3"/>
+
+<!-- 连续模式：所有路径视为整体，显示中间 50% -->
+<Path data="M0,100 L100,100"/>
+<Path data="M0,120 L100,120"/>
+<TrimPath start="0.25" end="0.75" type="continuous"/>
+<Stroke color="#FF6600" width="2"/>
+```
+
+#### D.2.3 Repeater 阵列效果
+
+```xml
+<!-- 放射阵列：12 个圆点围成圆形 -->
+<Group>
+  <Ellipse center="80,0" size="10,10"/>
+  <Fill color="#3366FF"/>
+  <Repeater copies="12" position="0,0" rotation="30" anchorPoint="0,0"/>
+</Group>
+
+<!-- 渐隐阵列：透明度从 1 渐变到 0.2 -->
+<Rectangle center="0,0" size="30,30"/>
+<Fill color="#FF3366"/>
+<Repeater copies="5" position="40,0" startAlpha="1" endAlpha="0.2"/>
+```
+
+#### D.2.4 TextModifier 逐字变换
+
+```xml
+<!-- 波浪文字：逐字上下偏移 -->
+<TextSpan x="0" y="50" font="Arial" fontSize="32">
+  <![CDATA[WAVE TEXT]]>
+</TextSpan>
+<TextModifier position="0,-20">
+  <RangeSelector start="0" end="1" shape="triangle"/>
+</TextModifier>
+<Fill color="#333333"/>
+
+<!-- 颜色渐变文字 -->
+<TextSpan x="0" y="100" font="Arial" fontSize="32">
+  <![CDATA[GRADIENT]]>
+</TextSpan>
+<TextModifier fillColor="#FF0000">
+  <RangeSelector start="0" end="1" shape="rampUp"/>
+</TextModifier>
+<Fill color="#0000FF"/>
+```
+
+#### D.2.5 TextLayout 富文本排版
+
+```xml
+<Group>
+  <TextSpan font="Arial" fontSize="16">This is </TextSpan>
+  <TextSpan font="Arial" fontSize="16" fontWeight="700">bold</TextSpan>
+  <TextSpan font="Arial" fontSize="16"> and </TextSpan>
+  <TextSpan font="Arial" fontSize="16" fontStyle="italic">italic</TextSpan>
+  <TextSpan font="Arial" fontSize="16"> text in a paragraph that will automatically wrap to fit the container width.</TextSpan>
+  <TextLayout width="200" height="150" align="justify" lineHeight="1.5" indent="20"/>
+  <Fill color="#333333"/>
+</Group>
+```
+
+#### D.2.6 TextPath 沿路径文本
+
+```xml
+<!-- 需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/> -->
+<TextSpan font="Arial" fontSize="18">
+  <![CDATA[Text along a curved path]]>
+</TextSpan>
+<TextPath path="#arc" align="center"/>
+<Fill color="#336699"/>
 ```
