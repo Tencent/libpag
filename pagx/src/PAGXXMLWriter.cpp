@@ -45,6 +45,14 @@ class XMLBuilder {
     }
   }
 
+  void addRequiredAttribute(const std::string& name, float value) {
+    buffer << " " << name << "=\"" << formatFloat(value) << "\"";
+  }
+
+  void addRequiredAttribute(const std::string& name, const std::string& value) {
+    buffer << " " << name << "=\"" << escapeXML(value) << "\"";
+  }
+
   void addAttribute(const std::string& name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
       buffer << " " << name << "=\"" << value << "\"";
@@ -175,8 +183,8 @@ static std::string floatListToString(const std::vector<float>& values) {
 static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStopNode>& stops) {
   for (const auto& stop : stops) {
     xml.openElement("ColorStop");
-    xml.addAttribute("offset", stop.offset);
-    xml.addAttribute("color", stop.color.toHexString(stop.color.alpha < 1.0f));
+    xml.addRequiredAttribute("offset", stop.offset);
+    xml.addRequiredAttribute("color", stop.color.toHexString(stop.color.alpha < 1.0f));
     xml.closeElementSelfClosing();
   }
 }
@@ -202,9 +210,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node, bool 
       if (grad->startPoint.x != 0 || grad->startPoint.y != 0) {
         xml.addAttribute("startPoint", pointToString(grad->startPoint));
       }
-      if (grad->endPoint.x != 0 || grad->endPoint.y != 0) {
-        xml.addAttribute("endPoint", pointToString(grad->endPoint));
-      }
+      xml.addRequiredAttribute("endPoint", pointToString(grad->endPoint));
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", grad->matrix.toString());
       }
@@ -226,7 +232,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node, bool 
       if (grad->center.x != 0 || grad->center.y != 0) {
         xml.addAttribute("center", pointToString(grad->center));
       }
-      xml.addAttribute("radius", grad->radius);
+      xml.addRequiredAttribute("radius", grad->radius);
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", grad->matrix.toString());
       }
@@ -271,7 +277,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node, bool 
       if (grad->center.x != 0 || grad->center.y != 0) {
         xml.addAttribute("center", pointToString(grad->center));
       }
-      xml.addAttribute("halfDiagonal", grad->halfDiagonal);
+      xml.addRequiredAttribute("halfDiagonal", grad->halfDiagonal);
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", grad->matrix.toString());
       }
@@ -542,8 +548,8 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::TextLayout: {
       auto layout = static_cast<const TextLayoutNode*>(node);
       xml.openElement("TextLayout");
-      xml.addAttribute("width", layout->width);
-      xml.addAttribute("height", layout->height);
+      xml.addRequiredAttribute("width", layout->width);
+      xml.addRequiredAttribute("height", layout->height);
       if (layout->textAlign != TextAlign::Left) {
         xml.addAttribute("align", TextAlignToString(layout->textAlign));
       }
@@ -669,8 +675,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilterNode* node) {
     case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilterNode*>(node);
       xml.openElement("BlurFilter");
-      xml.addAttribute("blurrinessX", filter->blurrinessX);
-      xml.addAttribute("blurrinessY", filter->blurrinessY);
+      xml.addRequiredAttribute("blurrinessX", filter->blurrinessX);
+      xml.addRequiredAttribute("blurrinessY", filter->blurrinessY);
       if (filter->tileMode != TileMode::Decal) {
         xml.addAttribute("tileMode", TileModeToString(filter->tileMode));
       }
@@ -738,8 +744,8 @@ static void writeResource(XMLBuilder& xml, const ResourceNode* node) {
       auto comp = static_cast<const CompositionNode*>(node);
       xml.openElement("Composition");
       xml.addAttribute("id", comp->id);
-      xml.addAttribute("width", comp->width);
-      xml.addAttribute("height", comp->height);
+      xml.addRequiredAttribute("width", static_cast<float>(comp->width));
+      xml.addRequiredAttribute("height", static_cast<float>(comp->height));
       if (comp->layers.empty()) {
         xml.closeElementSelfClosing();
       } else {
