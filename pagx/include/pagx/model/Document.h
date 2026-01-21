@@ -22,13 +22,12 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/model/ColorSource.h"
 #include "pagx/model/Layer.h"
 #include "pagx/model/Node.h"
 
 namespace pagx {
 
-class PAGXXMLParser;
+class PAGXImporter;
 
 /**
  * Document is the root container for a PAGX document.
@@ -53,16 +52,10 @@ class Document {
   float height = 0;
 
   /**
-   * Resources (images, compositions, etc.).
-   * These can be referenced by "#id" in the document.
+   * Resources (images, compositions, color sources, etc.).
+   * These can be referenced by "@id" in the document.
    */
   std::vector<std::unique_ptr<Node>> resources = {};
-
-  /**
-   * Color sources (gradients, solid colors, patterns).
-   * These can be referenced by "#id" in fills and strokes.
-   */
-  std::vector<std::unique_ptr<ColorSource>> colorSources = {};
 
   /**
    * Top-level layers.
@@ -100,19 +93,13 @@ class Document {
   /**
    * Exports the document to XML format.
    */
-  std::string toXML() const;
+  std::string toXML();
 
   /**
    * Finds a resource by ID.
    * Returns nullptr if not found.
    */
-  Node* findResource(const std::string& id) const;
-
-  /**
-   * Finds a color source by ID.
-   * Returns nullptr if not found.
-   */
-  ColorSource* findColorSource(const std::string& id) const;
+  Node* findResource(const std::string& id);
 
   /**
    * Finds a layer by ID (searches recursively).
@@ -121,14 +108,13 @@ class Document {
   Layer* findLayer(const std::string& id) const;
 
  private:
-  friend class PAGXXMLParser;
+  friend class PAGXImporter;
   Document() = default;
 
-  mutable std::unordered_map<std::string, Node*> resourceMap = {};
-  mutable std::unordered_map<std::string, ColorSource*> colorSourceMap = {};
-  mutable bool resourceMapDirty = true;
+  std::unordered_map<std::string, Node*> resourceMap = {};
+  bool resourceMapDirty = true;
 
-  void rebuildResourceMap() const;
+  void rebuildResourceMap();
   static Layer* findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
                                    const std::string& id);
 };

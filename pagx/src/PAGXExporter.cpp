@@ -18,7 +18,7 @@
 
 #include "PAGXExporter.h"
 #include <sstream>
-#include "PAGXEnumUtils.h"
+#include "PAGXStringUtils.h"
 #include "pagx/model/BackgroundBlurStyle.h"
 #include "pagx/model/BlendFilter.h"
 #include "pagx/model/BlurFilter.h"

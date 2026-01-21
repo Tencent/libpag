@@ -20,8 +20,8 @@
 #include <fstream>
 #include <sstream>
 #include "pagx/model/Composition.h"
-#include "PAGXXMLParser.h"
-#include "PAGXXMLWriter.h"
+#include "PAGXExporter.h"
+#include "PAGXImporter.h"
 
 namespace pagx {
 
@@ -54,24 +54,19 @@ std::shared_ptr<Document> Document::FromXML(const std::string& xmlContent) {
 }
 
 std::shared_ptr<Document> Document::FromXML(const uint8_t* data, size_t length) {
-  return PAGXXMLParser::Parse(data, length);
+  return PAGXImporter::Parse(data, length);
 }
 
-std::string Document::toXML() const {
-  return PAGXXMLWriter::Write(*this);
+std::string Document::toXML() {
+  return PAGXExporter::Export(*this);
 }
 
-Node* Document::findResource(const std::string& id) const {
+Node* Document::findResource(const std::string& id) {
   if (resourceMapDirty) {
     rebuildResourceMap();
   }
   auto it = resourceMap.find(id);
   return it != resourceMap.end() ? it->second : nullptr;
-}
-
-ColorSource* Document::findColorSource(const std::string& id) const {
-  auto it = colorSourceMap.find(id);
-  return it != colorSourceMap.end() ? it->second : nullptr;
 }
 
 Layer* Document::findLayer(const std::string& id) const {
@@ -93,7 +88,7 @@ Layer* Document::findLayer(const std::string& id) const {
   return nullptr;
 }
 
-void Document::rebuildResourceMap() const {
+void Document::rebuildResourceMap() {
   resourceMap.clear();
   for (const auto& resource : resources) {
     if (!resource->id.empty()) {

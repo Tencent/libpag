@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGXEnumUtils.h"
+#include "PAGXStringUtils.h"
 #include <cmath>
 #include <sstream>
 #include <unordered_map>

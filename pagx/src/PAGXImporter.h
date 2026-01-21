@@ -42,7 +42,7 @@
 #include "pagx/model/LinearGradient.h"
 #include "pagx/model/MergePath.h"
 #include "pagx/model/Path.h"
-#include "pagx/model/PathDataResource.h"
+#include "pagx/model/PathData.h"
 #include "pagx/model/Polystar.h"
 #include "pagx/model/RadialGradient.h"
 #include "pagx/model/RangeSelector.h"
@@ -56,6 +56,7 @@
 #include "pagx/model/TextPath.h"
 #include "pagx/model/TextSpan.h"
 #include "pagx/model/TrimPath.h"
+#include "pagx/model/types/Color.h"
 
 namespace pagx {
 
@@ -72,7 +73,7 @@ struct XMLNode {
 /**
  * Parser for PAGX XML format.
  */
-class PAGXXMLParser {
+class PAGXImporter {
  public:
   /**
    * Parses XML data into a PAGXDocument.
@@ -121,7 +122,7 @@ class PAGXXMLParser {
   static ColorStop parseColorStop(const XMLNode* node);
 
   static std::unique_ptr<Image> parseImage(const XMLNode* node);
-  static std::unique_ptr<PathDataResource> parsePathData(const XMLNode* node);
+  static std::unique_ptr<PathData> parsePathData(const XMLNode* node);
   static std::unique_ptr<Composition> parseComposition(const XMLNode* node);
 
   static std::unique_ptr<DropShadowStyle> parseDropShadowStyle(const XMLNode* node);
@@ -144,6 +145,7 @@ class PAGXXMLParser {
   static Point parsePoint(const std::string& str);
   static Size parseSize(const std::string& str);
   static Rect parseRect(const std::string& str);
+  static Color parseColor(const std::string& str);
   static std::vector<float> parseFloatList(const std::string& str);
 };
 

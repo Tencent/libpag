@@ -21,7 +21,7 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
-#include "PAGXEnumUtils.h"
+#include "PAGXStringUtils.h"
 #include "pagx/model/Document.h"
 #include "pagx/model/SolidColor.h"
 #include "SVGParserInternal.h"
@@ -555,15 +555,15 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
     // SVG text-anchor maps to PAGX TextLayout.textAlign:
     //   start  -> Left (default, no TextLayout needed)
     //   middle -> Center
-    //   end    -> Right
+    //   end    -> End
     if (!anchor.empty() && anchor != "start") {
       auto textLayout = std::make_unique<TextLayout>();
-      textLayout->width = 0;   // auto-width
+      textLayout->width = 0;   // auto-width (Point Text mode)
       textLayout->height = 0;  // auto-height
       if (anchor == "middle") {
         textLayout->textAlign = TextAlign::Center;
       } else if (anchor == "end") {
-        textLayout->textAlign = TextAlign::Right;
+        textLayout->textAlign = TextAlign::End;
       }
       group->elements.push_back(std::move(textLayout));
     }
@@ -1665,26 +1665,26 @@ std::string SVGParserImpl::registerImageResource(const std::string& imageSource)
 
 // Helper function to check if two VectorElement nodes are the same geometry.
 static bool isSameGeometry(const Element* a, const Element* b) {
-  if (!a || !b || a->type() != b->type()) {
+  if (!a || !b || a->nodeType() != b->nodeType()) {
     return false;
   }
 
-  switch (a->type()) {
-    case ElementType::Rectangle: {
+  switch (a->nodeType()) {
+    case NodeType::Rectangle: {
       auto rectA = static_cast<const Rectangle*>(a);
       auto rectB = static_cast<const Rectangle*>(b);
       return rectA->center.x == rectB->center.x && rectA->center.y == rectB->center.y &&
              rectA->size.width == rectB->size.width && rectA->size.height == rectB->size.height &&
              rectA->roundness == rectB->roundness;
     }
-    case ElementType::Ellipse: {
+    case NodeType::Ellipse: {
       auto ellipseA = static_cast<const Ellipse*>(a);
       auto ellipseB = static_cast<const Ellipse*>(b);
       return ellipseA->center.x == ellipseB->center.x && ellipseA->center.y == ellipseB->center.y &&
              ellipseA->size.width == ellipseB->size.width &&
              ellipseA->size.height == ellipseB->size.height;
     }
-    case ElementType::Path: {
+    case NodeType::Path: {
       auto pathA = static_cast<const Path*>(a);
       auto pathB = static_cast<const Path*>(b);
       return pathA->data.toSVGString() == pathB->data.toSVGString();
@@ -1711,10 +1711,10 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   const auto* second = layer->contents[1].get();
 
   // Check if first is geometry and second is painter.
-  bool firstIsGeometry = (first->type() == ElementType::Rectangle ||
-                          first->type() == ElementType::Ellipse || first->type() == ElementType::Path);
+  bool firstIsGeometry = (first->nodeType() == NodeType::Rectangle ||
+                          first->nodeType() == NodeType::Ellipse || first->nodeType() == NodeType::Path);
   bool secondIsPainter =
-      (second->type() == ElementType::Fill || second->type() == ElementType::Stroke);
+      (second->nodeType() == NodeType::Fill || second->nodeType() == NodeType::Stroke);
 
   if (firstIsGeometry && secondIsPainter) {
     outGeometry = first;
@@ -1745,8 +1745,8 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
         if (isSimpleShapeLayer(layers[i + 1].get(), geomB, painterB) &&
             isSameGeometry(geomA, geomB)) {
           // Merge: one has Fill, the other has Stroke.
-          bool aHasFill = (painterA->type() == ElementType::Fill);
-          bool bHasFill = (painterB->type() == ElementType::Fill);
+          bool aHasFill = (painterA->nodeType() == NodeType::Fill);
+          bool bHasFill = (painterB->nodeType() == NodeType::Fill);
 
           if (aHasFill != bHasFill) {
             // Create merged layer.
