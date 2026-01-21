@@ -1031,7 +1031,11 @@ y = center.y + outerRadius * sin(angle)
 使用 SVG 路径语法定义任意形状，支持内联数据或引用 Resources 中定义的 PathData。
 
 ```xml
-<Path data="" reversed="false"/>
+<!-- 内联路径数据 -->
+<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
+
+<!-- 引用 PathData 资源 -->
+<Path data="#curvePath" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1298,8 +1302,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 ```xml
 <Group>
-  <TextSpan text="Hello"/>
-  <TextSpan text="World"/>
+  <TextSpan font="Arial" fontSize="24"><![CDATA[Hello]]></TextSpan>
+  <TextSpan font="Arial" fontSize="24"><![CDATA[World]]></TextSpan>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
 </Group>
@@ -1343,7 +1347,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 **示例**：
 ```xml
 <Group>
-  <TextSpan text="Hello 😀"/>
+  <TextSpan font="Arial" fontSize="24"><![CDATA[Hello 😀]]></TextSpan>
   <TrimPath end="0.5"/>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
@@ -1621,7 +1625,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 ```xml
 <Group>
-  <TextSpan text="Hi"/>  <!-- 累积字形列表 -->
+  <TextSpan font="Arial" fontSize="24"><![CDATA[Hi]]></TextSpan>  <!-- 累积字形列表 -->
   <Fill color="#333333"/>            <!-- 渲染填充 -->
   <Repeater copies="3"/> <!-- 复制字形列表和已渲染的填充 -->
   <TextModifier position="0,-5"/>    <!-- 仍可对复制后的字形列表生效 -->
