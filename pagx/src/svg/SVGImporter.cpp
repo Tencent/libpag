@@ -508,7 +508,7 @@ std::unique_ptr<Element> SVGParserImpl::convertPath(
   auto path = std::make_unique<Path>();
   std::string d = getAttribute(element, "d");
   if (!d.empty()) {
-    path->data = PathData::FromSVGString(d);
+    path->data = PathDataFromSVGString(d);
   }
   return path;
 }
@@ -1050,7 +1050,7 @@ Rect SVGParserImpl::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   if (tag == "path") {
     std::string d = getAttribute(element, "d");
     if (!d.empty()) {
-      auto pathData = PathData::FromSVGString(d);
+      auto pathData = PathDataFromSVGString(d);
       return pathData.getBounds();
     }
   }
@@ -1687,7 +1687,7 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Path: {
       auto pathA = static_cast<const Path*>(a);
       auto pathB = static_cast<const Path*>(b);
-      return pathA->data.toSVGString() == pathB->data.toSVGString();
+      return PathDataToSVGString(pathA->data) == PathDataToSVGString(pathB->data);
     }
     default:
       return false;

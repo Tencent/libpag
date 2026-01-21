@@ -161,33 +161,38 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
 }
 
 /**
- * Test case: PathData SVG string parsing and round-trip conversion
+ * Test case: PathData public API for path construction
  */
-PAG_TEST(PAGXTest, PathDataSVGRoundTrip) {
-  // Test basic path commands
-  std::string pathStr = "M10 20 L30 40 H50 V60 C70 80 90 100 110 120 S130 140 150 160 "
-                        "Q170 180 190 200 T210 220 A10 20 30 1 0 230 240 Z";
+PAG_TEST(PAGXTest, PathDataConstruction) {
+  // Test basic path commands using public API
+  pagx::PathData pathData;
+  pathData.moveTo(10, 20);
+  pathData.lineTo(30, 40);
+  pathData.lineTo(50, 60);
+  pathData.cubicTo(70, 80, 90, 100, 110, 120);
+  pathData.quadTo(130, 140, 150, 160);
+  pathData.close();
 
-  auto pathData = pagx::PathData::FromSVGString(pathStr);
   EXPECT_GT(pathData.verbs().size(), 0u);
   EXPECT_GT(pathData.countPoints(), 0u);
+  EXPECT_EQ(pathData.verbs().size(), 6u);  // M, L, L, C, Q, Z
 
-  // Verify round-trip conversion
-  std::string outputStr = pathData.toSVGString();
-  EXPECT_FALSE(outputStr.empty());
-
-  // Parse the output string and verify it produces the same structure
-  auto pathData2 = pagx::PathData::FromSVGString(outputStr);
-  EXPECT_EQ(pathData.verbs().size(), pathData2.verbs().size());
+  // Test bounds calculation
+  auto bounds = pathData.getBounds();
+  EXPECT_FALSE(pathData.isEmpty());
+  EXPECT_GT(bounds.width, 0.0f);
 }
 
 /**
  * Test case: PathData forEach iteration
  */
 PAG_TEST(PAGXTest, PathDataForEach) {
-  std::string pathStr = "M0 0 L100 0 L100 100 L0 100 Z";
-
-  auto pathData = pagx::PathData::FromSVGString(pathStr);
+  pagx::PathData pathData;
+  pathData.moveTo(0, 0);
+  pathData.lineTo(100, 0);
+  pathData.lineTo(100, 100);
+  pathData.lineTo(0, 100);
+  pathData.close();
 
   int verbCount = 0;
   pathData.forEach([&verbCount](pagx::PathVerb, const float*) { verbCount++; });
@@ -213,7 +218,8 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
 
   // Test Path creation
   auto path = std::make_unique<pagx::Path>();
-  path->data = pagx::PathData::FromSVGString("M0 0 L100 100");
+  path->data.moveTo(0, 0);
+  path->data.lineTo(100, 100);
   EXPECT_EQ(path->nodeType(), pagx::NodeType::Path);
   EXPECT_GT(path->data.verbs().size(), 0u);
 

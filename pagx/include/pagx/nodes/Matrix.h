@@ -19,9 +19,6 @@
 #pragma once
 
 #include <cmath>
-#include <sstream>
-#include <string>
-#include <vector>
 #include "pagx/nodes/Point.h"
 
 namespace pagx {
@@ -104,42 +101,6 @@ struct Matrix {
     m.c = -sinVal;
     m.d = cosVal;
     return m;
-  }
-
-  /**
-   * Parses a matrix string "a,b,c,d,tx,ty".
-   */
-  static Matrix Parse(const std::string& str) {
-    Matrix m = {};
-    std::istringstream iss(str);
-    std::string token = {};
-    std::vector<float> values = {};
-    while (std::getline(iss, token, ',')) {
-      auto trimmed = token;
-      trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-      trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-      if (!trimmed.empty()) {
-        values.push_back(std::stof(trimmed));
-      }
-    }
-    if (values.size() >= 6) {
-      m.a = values[0];
-      m.b = values[1];
-      m.c = values[2];
-      m.d = values[3];
-      m.tx = values[4];
-      m.ty = values[5];
-    }
-    return m;
-  }
-
-  /**
-   * Returns the matrix as a string "a,b,c,d,tx,ty".
-   */
-  std::string toString() const {
-    std::ostringstream oss = {};
-    oss << a << "," << b << "," << c << "," << d << "," << tx << "," << ty;
-    return oss.str();
   }
 
   /**

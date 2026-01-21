@@ -28,6 +28,7 @@
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Repeater.h"
@@ -42,6 +43,8 @@
 #include "pagx/nodes/FilterMode.h"
 #include "pagx/nodes/MipmapMode.h"
 #include "pagx/nodes/TileMode.h"
+#include "pagx/nodes/Matrix.h"
+#include "pagx/nodes/PathData.h"
 
 namespace pagx {
 
@@ -157,5 +160,17 @@ SelectorMode SelectorModeFromString(const std::string& str);
 // Color
 //==============================================================================
 std::string ColorToHexString(const Color& color, bool withAlpha = false);
+
+//==============================================================================
+// Matrix - encoding/decoding for PAGX format
+//==============================================================================
+std::string MatrixToString(const Matrix& matrix);
+Matrix MatrixFromString(const std::string& str);
+
+//==============================================================================
+// PathData
+//==============================================================================
+PathData PathDataFromSVGString(const std::string& d);
+std::string PathDataToSVGString(const PathData& path);
 
 }  // namespace pagx
