@@ -620,6 +620,7 @@ PAGX 文档采用层级结构组织内容：
 | `color` | D 的亮度 + S 的色相和饱和度 | 颜色 |
 | `luminosity` | S 的亮度 + D 的色相和饱和度 | 亮度 |
 | `plusLighter` | S + D | 相加（趋向白色） |
+| `plusDarker` | S + D - 1 | 相加减一（趋向黑色） |
 
 #### 图层渲染流程
 
@@ -1778,7 +1779,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 | 枚举 | 值 | 定义位置 |
 |------|------|----------|
-| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter` | 4.1 |
+| **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` | 4.1 |
 | **MaskType** | `alpha`, `luminance`, `contour` | 4.1 |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` | 2.12.8 |
 | **SamplingMode** | `nearest`, `linear`, `mipmap` | 2.12.8 |

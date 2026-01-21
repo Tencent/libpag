@@ -251,7 +251,8 @@ enum class BlendMode {
   Saturation,
   Color,
   Luminosity,
-  PlusLighter
+  PlusLighter,
+  PlusDarker
 };
 
 /**

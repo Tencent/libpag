@@ -246,7 +246,8 @@ DEFINE_ENUM_CONVERSION(BlendMode,
     {BlendMode::Saturation, "saturation"},
     {BlendMode::Color, "color"},
     {BlendMode::Luminosity, "luminosity"},
-    {BlendMode::PlusLighter, "plusLighter"})
+    {BlendMode::PlusLighter, "plusLighter"},
+    {BlendMode::PlusDarker, "plusDarker"})
 
 DEFINE_ENUM_CONVERSION(LineCap,
     {LineCap::Butt, "butt"},
