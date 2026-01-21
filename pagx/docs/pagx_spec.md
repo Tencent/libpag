@@ -244,7 +244,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 线性渐变沿起点到终点的方向插值。
 
 ```xml
-<LinearGradient endPoint="100,0">
+<LinearGradient startPoint="0,0" endPoint="100,0">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </LinearGradient>
@@ -252,7 +252,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `startPoint` | point | 0,0 | 起点 |
+| `startPoint` | point | (必填) | 起点 |
 | `endPoint` | point | (必填) | 终点 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
@@ -351,7 +351,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 
 ```xml
 <Resources>
-  <LinearGradient id="grad" endPoint="100,0">
+  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
     <ColorStop offset="0" color="#FF0000"/>
     <ColorStop offset="1" color="#0000FF"/>
   </LinearGradient>
@@ -463,7 +463,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
   <Image id="img1" source="photo.png"/>
   <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
   <SolidColor id="brandRed" color="#FF0000"/>
-  <LinearGradient id="skyGradient" endPoint="0,100">
+  <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,100">
     <ColorStop offset="0" color="#87CEEB"/>
     <ColorStop offset="1" color="#E0F6FF"/>
   </LinearGradient>
@@ -1867,7 +1867,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### LinearGradient
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `startPoint` | point | 0,0 |
+| `startPoint` | point | (必填) |
 | `endPoint` | point | (必填) |
 | `matrix` | string | 单位矩阵 |
 
@@ -2308,7 +2308,7 @@ contents / Group
   </Layer>
   
   <Resources>
-    <LinearGradient id="skyGradient" endPoint="0,300">
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,300">
       <ColorStop offset="0" color="#87CEEB"/>
       <ColorStop offset="1" color="#E0F6FF"/>
     </LinearGradient>
