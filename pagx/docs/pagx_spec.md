@@ -191,11 +191,11 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 
 ```xml
 <!-- 相对路径引用 -->
-<Image id="img1" source="photo.png"/>
-<Image id="img2" source="assets/icons/logo.png"/>
+<Image source="photo.png"/>
+<Image source="assets/icons/logo.png"/>
 
 <!-- 数据 URI 内嵌 -->
-<Image id="img3" source="data:image/png;base64,iVBORw0KGgo..."/>
+<Image source="data:image/png;base64,iVBORw0KGgo..."/>
 ```
 
 **路径解析规则**：
@@ -210,8 +210,8 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 图片资源定义可在文档中引用的位图数据。
 
 ```xml
-<Image id="img1" source="photo.png"/>
-<Image id="img2" source="data:image/png;base64,..."/>
+<Image source="photo.png"/>
+<Image source="data:image/png;base64,..."/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -227,15 +227,10 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 1. **共享定义**：在 `<Resources>` 中预定义，通过 `#id` 引用。适用于**被多处引用**的颜色源。
 2. **内联定义**：直接嵌套在 `<Fill>` 或 `<Stroke>` 元素内部。适用于**仅使用一次**的颜色源，更简洁。
 
-**最佳实践**：
-- 只使用一次的颜色源应内联定义，避免在 Resources 中增加不必要的条目
-- 被多处引用的颜色源应定义在 Resources 中以便复用
-- ImagePattern 使用 objectBoundingBox 时（tile 尺寸依赖形状尺寸），通常需要内联定义，因为不同形状需要不同的 matrix
-
 #### 2.12.1 SolidColor（纯色）
 
 ```xml
-<SolidColor id="red" color="#FF0000"/>
+<SolidColor color="#FF0000"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -247,7 +242,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 线性渐变沿起点到终点的方向插值。
 
 ```xml
-<LinearGradient id="grad1" startPoint="0,0" endPoint="100,0">
+<LinearGradient startPoint="0,0" endPoint="100,0">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </LinearGradient>
@@ -266,7 +261,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 径向渐变从中心向外辐射。
 
 ```xml
-<RadialGradient id="grad2" center="50,50" radius="50">
+<RadialGradient center="50,50" radius="50">
   <ColorStop offset="0" color="#FFFFFF"/>
   <ColorStop offset="1" color="#000000"/>
 </RadialGradient>
@@ -285,7 +280,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
 ```xml
-<ConicGradient id="grad3" center="50,50" startAngle="0" endAngle="360">
+<ConicGradient center="50,50" startAngle="0" endAngle="360">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </ConicGradient>
@@ -305,7 +300,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 菱形渐变从中心向四角辐射。
 
 ```xml
-<DiamondGradient id="grad4" center="50,50" halfDiagonal="50">
+<DiamondGradient center="50,50" halfDiagonal="50">
   <ColorStop offset="0" color="#FFFFFF"/>
   <ColorStop offset="1" color="#000000"/>
 </DiamondGradient>
@@ -353,10 +348,12 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 **示例**：在 100×100 的区域内绘制一个从左到右的线性渐变：
 
 ```xml
-<LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</LinearGradient>
+<Resources>
+  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
+    <ColorStop offset="0" color="#FF0000"/>
+    <ColorStop offset="1" color="#0000FF"/>
+  </LinearGradient>
+</Resources>
 
 <Layer>
   <contents>
@@ -374,7 +371,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 图片图案使用图片作为颜色源。
 
 ```xml
-<ImagePattern id="pattern1" image="#img1" tileModeX="repeat" tileModeY="repeat" sampling="linear" matrix="1,0,0,1,0,0"/>
+<ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -413,7 +410,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 
 ```xml
 <!-- 图片原始尺寸 12x12，显示为 24x24 需要放大 2 倍，因此 matrix 使用 2 缩放 -->
-<ImagePattern id="checkerboard" image="#checker12" tileModeX="repeat" tileModeY="repeat" matrix="2,0,0,2,0,0"/>
+<ImagePattern image="#checker12" tileModeX="repeat" tileModeY="repeat" matrix="2,0,0,2,0,0"/>
 ```
 
 ---
@@ -543,7 +540,7 @@ PAGX 文档采用层级结构组织内容：
 `<Layer>` 是内容和子图层的基本容器。
 
 ```xml
-<Layer id="layer1" name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" matrix="1,0,0,1,0,0" antiAlias="true" groupOpacity="false" scrollRect="0,0,100,100" mask="#maskLayer" maskType="alpha" preserve3D="false">
+<Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
   <contents>
     <Rectangle .../>
     <Fill .../>
