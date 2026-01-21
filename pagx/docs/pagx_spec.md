@@ -1091,7 +1091,8 @@ y = center.y + outerRadius * sin(angle)
 填充使用指定的颜色源绘制几何的内部区域。
 
 ```xml
-<Fill color="#000000" alpha="1" blendMode="normal" fillRule="winding" placement="background"/>
+<!-- 纯色填充 -->
+<Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
 
 <!-- 引用共享颜色源 -->
 <Fill color="#grad1"/>
@@ -1135,7 +1136,11 @@ y = center.y + outerRadius * sin(angle)
 描边沿几何边界绘制线条。
 
 ```xml
-<Stroke color="#000000" width="1" alpha="1" blendMode="normal" cap="butt" join="miter" miterLimit="4" dashOffset="0" align="center" placement="background"/>
+<!-- 基础描边 -->
+<Stroke color="#000000" width="2" cap="round" join="miter" miterLimit="4"/>
+
+<!-- 虚线描边 -->
+<Stroke color="#0000FF" width="1" dashes="5,3" dashOffset="2"/>
 
 <!-- 内联渐变描边 -->
 <Stroke width="3">
@@ -1210,7 +1215,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 裁剪路径到指定的起止范围。
 
 ```xml
-<TrimPath start="0" end="1" offset="0" type="separate"/>
+<TrimPath start="0" end="0.5" offset="0" type="separate"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1286,10 +1291,10 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 **示例**：
 ```xml
 <Rectangle center="50,50" size="100,100"/>
-<Fill color="red"/>
+<Fill color="#FF0000"/>
 <Ellipse center="100,100" size="80,80"/>
 <MergePath mode="union"/>
-<Fill color="blue"/>
+<Fill color="#0000FF"/>
 ```
 
 ### 5.5 Text Modifiers（文本修改器）
@@ -1348,7 +1353,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 ```xml
 <Group>
   <TextSpan font="Arial" fontSize="24"><![CDATA[Hello 😀]]></TextSpan>
-  <TrimPath end="0.5"/>
+  <TrimPath start="0" end="0.5"/>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
 </Group>
@@ -1359,8 +1364,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。
 
 ```xml
-<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1">
-  <RangeSelector/>
+<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+  <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
 </TextModifier>
 ```
 
@@ -1508,7 +1513,18 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。转换为 PAG 二进制格式时，TextLayout 会被预排版展开，字形位置直接写入 TextSpan。
 
 ```xml
-<TextLayout width="300" height="200" align="left" verticalAlign="top" lineHeight="1.2" indent="0" overflow="clip"/>
+<Group>
+  <TextSpan font="Arial" fontSize="16">第一段内容...</TextSpan>
+  <TextSpan font="Arial" fontSize="16" fontWeight="700">粗体</TextSpan>
+  <TextSpan font="Arial" fontSize="16">普通文本。</TextSpan>
+  <TextLayout width="300" height="200"
+              align="left"
+              verticalAlign="top"
+              lineHeight="1.5"
+              indent="20"
+              overflow="clip"/>
+  <Fill color="#333333"/>
+</Group>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1552,9 +1568,9 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 ```xml
 <Group>
-  <TextSpan y="24" font="Arial" fontSize="24">Hello </TextSpan>
+  <TextSpan x="0" y="24" font="Arial" fontSize="24">Hello </TextSpan>
   <TextSpan x="60" y="24" font="Arial" fontSize="24" fontWeight="700">World</TextSpan>
-  <Fill/>
+  <Fill color="#000000"/>
 </Group>
 ```
 
@@ -1563,7 +1579,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
 
 ```xml
-<Repeater copies="3" offset="0" order="belowOriginal" anchorPoint="0,0" position="100,100" rotation="0" scale="1,1" startAlpha="1" endAlpha="1"/>
+<Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1637,14 +1653,13 @@ alpha = lerp(startAlpha, endAlpha, t)
 Group 是带变换属性的矢量元素容器。
 
 ```xml
-<Group name="" anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1">
+<Group anchorPoint="50,50" position="100,200" rotation="45" scale="1,1" skew="0" skewAxis="0" alpha="1">
   <!-- 子元素 -->
 </Group>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `name` | string | "" | 组名称 |
 | `anchorPoint` | point | 0,0 | 锚点 "x,y" |
 | `position` | point | 0,0 | 位置 "x,y" |
 | `rotation` | float | 0 | 旋转角度 |
@@ -1694,10 +1709,10 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 ```xml
 <Group alpha="0.5">
   <Rectangle center="50,50" size="100,100"/>    <!-- 只在组内累积 -->
-  <Fill color="red"/> <!-- 只填充组内的矩形，alpha=0.5 -->
+  <Fill color="#FF0000"/> <!-- 只填充组内的矩形，alpha=0.5 -->
 </Group>
 <Ellipse center="150,50" size="80,80"/>        <!-- 在组外累积 -->
-<Fill color="blue"/>  <!-- 只填充椭圆，alpha=1.0 -->
+<Fill color="#0000FF"/>  <!-- 只填充椭圆，alpha=1.0 -->
 ```
 
 **示例 2 - 子 Group 几何向上累积**：
@@ -1705,21 +1720,21 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 <contents>
   <Group>
     <Rectangle center="50,50" size="100,100"/>    <!-- 累积矩形 -->
-    <Fill color="red"/> <!-- 填充矩形 -->
+    <Fill color="#FF0000"/> <!-- 填充矩形 -->
   </Group>
   <Group>
     <Ellipse center="150,50" size="80,80"/>       <!-- 累积椭圆 -->
-    <Fill color="green"/> <!-- 填充椭圆 -->
+    <Fill color="#00FF00"/> <!-- 填充椭圆 -->
   </Group>
-  <Fill color="blue"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
+  <Fill color="#0000FF"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
 </contents>
 ```
 
 **示例 3 - 多个绘制器复用几何**：
 ```xml
 <Rectangle center="50,50" size="100,100"/>
-<Fill color="red"/>    <!-- 填充矩形 -->
-<Stroke/>              <!-- 描边同一矩形（几何未清空） -->
+<Fill color="#FF0000"/>    <!-- 填充矩形 -->
+<Stroke color="#000000"/> <!-- 描边同一矩形（几何未清空） -->
 ```
 
 #### 多重填充与描边
@@ -2172,7 +2187,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `name` | string | "" |
 | `anchorPoint` | point | 0,0 |
 | `position` | point | 0,0 |
 | `rotation` | float | 0 |
