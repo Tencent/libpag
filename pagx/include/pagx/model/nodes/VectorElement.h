@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/model/Node.h"
+#include "pagx/model/nodes/Node.h"
 
 namespace pagx {
 

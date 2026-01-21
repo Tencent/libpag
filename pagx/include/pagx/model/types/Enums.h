@@ -19,37 +19,37 @@
 #pragma once
 
 // Layer related
-#include "pagx/model/enums/BlendMode.h"
-#include "pagx/model/enums/MaskType.h"
+#include "pagx/model/types/enums/BlendMode.h"
+#include "pagx/model/types/enums/MaskType.h"
 
 // Painter related
-#include "pagx/model/enums/FillRule.h"
-#include "pagx/model/enums/LineCap.h"
-#include "pagx/model/enums/LineJoin.h"
-#include "pagx/model/enums/Placement.h"
-#include "pagx/model/enums/StrokeAlign.h"
+#include "pagx/model/types/enums/FillRule.h"
+#include "pagx/model/types/enums/LineCap.h"
+#include "pagx/model/types/enums/LineJoin.h"
+#include "pagx/model/types/enums/Placement.h"
+#include "pagx/model/types/enums/StrokeAlign.h"
 
 // Color source related
-#include "pagx/model/enums/SamplingMode.h"
-#include "pagx/model/enums/TileMode.h"
+#include "pagx/model/types/enums/SamplingMode.h"
+#include "pagx/model/types/enums/TileMode.h"
 
 // Geometry related
-#include "pagx/model/enums/PolystarType.h"
-#include "pagx/model/enums/TextAnchor.h"
+#include "pagx/model/types/enums/PolystarType.h"
+#include "pagx/model/types/enums/TextAnchor.h"
 
 // Shape modifier related
-#include "pagx/model/enums/MergePathMode.h"
-#include "pagx/model/enums/TrimType.h"
+#include "pagx/model/types/enums/MergePathMode.h"
+#include "pagx/model/types/enums/TrimType.h"
 
 // Text modifier related
-#include "pagx/model/enums/FontStyle.h"
-#include "pagx/model/enums/Overflow.h"
-#include "pagx/model/enums/SelectorMode.h"
-#include "pagx/model/enums/SelectorShape.h"
-#include "pagx/model/enums/SelectorUnit.h"
-#include "pagx/model/enums/TextAlign.h"
-#include "pagx/model/enums/TextPathAlign.h"
-#include "pagx/model/enums/VerticalAlign.h"
+#include "pagx/model/types/enums/FontStyle.h"
+#include "pagx/model/types/enums/Overflow.h"
+#include "pagx/model/types/enums/SelectorMode.h"
+#include "pagx/model/types/enums/SelectorShape.h"
+#include "pagx/model/types/enums/SelectorUnit.h"
+#include "pagx/model/types/enums/TextAlign.h"
+#include "pagx/model/types/enums/TextPathAlign.h"
+#include "pagx/model/types/enums/VerticalAlign.h"
 
 // Repeater related
-#include "pagx/model/enums/RepeaterOrder.h"
+#include "pagx/model/types/enums/RepeaterOrder.h"

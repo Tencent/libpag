@@ -21,11 +21,11 @@
 #include <memory>
 #include <string>
 #include "pagx/PathData.h"
-#include "pagx/model/Types.h"
-#include "pagx/model/VectorElement.h"
-#include "pagx/model/enums/FontStyle.h"
-#include "pagx/model/enums/PolystarType.h"
-#include "pagx/model/enums/TextAnchor.h"
+#include "pagx/model/types/Types.h"
+#include "pagx/model/nodes/VectorElement.h"
+#include "pagx/model/types/enums/FontStyle.h"
+#include "pagx/model/types/enums/PolystarType.h"
+#include "pagx/model/types/enums/TextAnchor.h"
 
 namespace pagx {
 

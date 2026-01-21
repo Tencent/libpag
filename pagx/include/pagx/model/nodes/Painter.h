@@ -21,14 +21,14 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/model/ColorSource.h"
-#include "pagx/model/VectorElement.h"
-#include "pagx/model/enums/BlendMode.h"
-#include "pagx/model/enums/FillRule.h"
-#include "pagx/model/enums/LineCap.h"
-#include "pagx/model/enums/LineJoin.h"
-#include "pagx/model/enums/Placement.h"
-#include "pagx/model/enums/StrokeAlign.h"
+#include "pagx/model/nodes/ColorSource.h"
+#include "pagx/model/nodes/VectorElement.h"
+#include "pagx/model/types/enums/BlendMode.h"
+#include "pagx/model/types/enums/FillRule.h"
+#include "pagx/model/types/enums/LineCap.h"
+#include "pagx/model/types/enums/LineJoin.h"
+#include "pagx/model/types/enums/Placement.h"
+#include "pagx/model/types/enums/StrokeAlign.h"
 
 namespace pagx {
 

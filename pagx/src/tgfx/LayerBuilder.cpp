@@ -46,6 +46,7 @@
 #include "tgfx/layers/vectors/TextSpan.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
+#include "tgfx/svg/TextShaper.h"
 
 namespace pagx {
 
@@ -190,6 +191,12 @@ static tgfx::LineJoin ToTGFX(LineJoin join) {
 class LayerBuilderImpl {
  public:
   explicit LayerBuilderImpl(const LayerBuilder::Options& options) : _options(options) {
+    // Create text shaper from options or fallback typefaces.
+    if (_options.textShaper) {
+      _textShaper = _options.textShaper;
+    } else if (!_options.fallbackTypefaces.empty()) {
+      _textShaper = tgfx::TextShaper::Make(_options.fallbackTypefaces);
+    }
   }
 
   PAGXContent build(const PAGXDocument& document) {
@@ -351,9 +358,15 @@ class LayerBuilderImpl {
     }
 
     float xOffset = 0;
-    if (typeface && !node->text.empty()) {
-      auto font = tgfx::Font(typeface, node->fontSize);
-      auto textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
+    if (!node->text.empty()) {
+      std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+      // Use TextShaper for fallback support (including emoji).
+      if (_textShaper) {
+        textBlob = _textShaper->shape(node->text, typeface, node->fontSize);
+      } else if (typeface) {
+        auto font = tgfx::Font(typeface, node->fontSize);
+        textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
+      }
       textSpan->setTextBlob(textBlob);
 
       // Apply text-anchor offset based on text width.
@@ -667,6 +680,7 @@ class LayerBuilderImpl {
 
   LayerBuilder::Options _options = {};
   const std::vector<std::unique_ptr<Resource>>* _resources = nullptr;
+  std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
 };
 
 // Public API implementation

@@ -19,46 +19,57 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include <vector>
-#include "pagx/model/Types.h"
-#include "pagx/model/VectorElement.h"
+#include "pagx/model/nodes/VectorElement.h"
+#include "pagx/model/types/enums/MergePathMode.h"
+#include "pagx/model/types/enums/TrimType.h"
 
 namespace pagx {
 
 /**
- * Group container.
+ * Trim path modifier.
  */
-struct Group : public VectorElement {
-  std::string name = {};
-  Point anchorPoint = {};
-  Point position = {};
-  float rotation = 0;
-  Point scale = {1, 1};
-  float skew = 0;
-  float skewAxis = 0;
-  float alpha = 1;
-  std::vector<std::unique_ptr<VectorElement>> elements = {};
+struct TrimPath : public VectorElement {
+  float start = 0;
+  float end = 1;
+  float offset = 0;
+  TrimType trimType = TrimType::Separate;
 
   NodeType type() const override {
-    return NodeType::Group;
+    return NodeType::TrimPath;
   }
 
   std::unique_ptr<Node> clone() const override {
-    auto node = std::make_unique<Group>();
-    node->name = name;
-    node->anchorPoint = anchorPoint;
-    node->position = position;
-    node->rotation = rotation;
-    node->scale = scale;
-    node->skew = skew;
-    node->skewAxis = skewAxis;
-    node->alpha = alpha;
-    for (const auto& element : elements) {
-      node->elements.push_back(
-          std::unique_ptr<VectorElement>(static_cast<VectorElement*>(element->clone().release())));
-    }
-    return node;
+    return std::make_unique<TrimPath>(*this);
+  }
+};
+
+/**
+ * Round corner modifier.
+ */
+struct RoundCorner : public VectorElement {
+  float radius = 0;
+
+  NodeType type() const override {
+    return NodeType::RoundCorner;
+  }
+
+  std::unique_ptr<Node> clone() const override {
+    return std::make_unique<RoundCorner>(*this);
+  }
+};
+
+/**
+ * Merge path modifier.
+ */
+struct MergePath : public VectorElement {
+  MergePathMode mode = MergePathMode::Append;
+
+  NodeType type() const override {
+    return NodeType::MergePath;
+  }
+
+  std::unique_ptr<Node> clone() const override {
+    return std::make_unique<MergePath>(*this);
   }
 };
 

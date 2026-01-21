@@ -25,6 +25,10 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/Layer.h"
 
+namespace tgfx {
+class TextShaper;
+}
+
 namespace pagx {
 
 /**
@@ -60,11 +64,17 @@ class LayerBuilder {
     std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
 
     /**
+     * Text shaper for text rendering with fallback support.
+     * If not provided, a default TextShaper will be created from fallbackTypefaces.
+     */
+    std::shared_ptr<tgfx::TextShaper> textShaper;
+
+    /**
      * Base path for resolving relative resource paths.
      */
     std::string basePath;
 
-    Options() : fallbackTypefaces(), basePath() {
+    Options() : fallbackTypefaces(), textShaper(nullptr), basePath() {
     }
   };
 

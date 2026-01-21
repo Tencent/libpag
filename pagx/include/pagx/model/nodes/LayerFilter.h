@@ -20,10 +20,10 @@
 
 #include <array>
 #include <memory>
-#include "pagx/model/Node.h"
-#include "pagx/model/Types.h"
-#include "pagx/model/enums/BlendMode.h"
-#include "pagx/model/enums/TileMode.h"
+#include "pagx/model/nodes/Node.h"
+#include "pagx/model/types/Types.h"
+#include "pagx/model/types/enums/BlendMode.h"
+#include "pagx/model/types/enums/TileMode.h"
 
 namespace pagx {
 

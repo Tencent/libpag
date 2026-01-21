@@ -22,13 +22,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/model/LayerFilter.h"
-#include "pagx/model/LayerStyle.h"
-#include "pagx/model/Node.h"
-#include "pagx/model/Types.h"
-#include "pagx/model/VectorElement.h"
-#include "pagx/model/enums/BlendMode.h"
-#include "pagx/model/enums/MaskType.h"
+#include "pagx/model/nodes/LayerFilter.h"
+#include "pagx/model/nodes/LayerStyle.h"
+#include "pagx/model/nodes/Node.h"
+#include "pagx/model/types/Types.h"
+#include "pagx/model/nodes/VectorElement.h"
+#include "pagx/model/types/enums/BlendMode.h"
+#include "pagx/model/types/enums/MaskType.h"
 
 namespace pagx {
 

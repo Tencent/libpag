@@ -19,31 +19,31 @@
 #pragma once
 
 // Basic types and enums
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+#include "pagx/model/types/Enums.h"
+#include "pagx/model/types/Types.h"
 
 // Base classes
-#include "pagx/model/Node.h"
-#include "pagx/model/VectorElement.h"
+#include "pagx/model/nodes/Node.h"
+#include "pagx/model/nodes/VectorElement.h"
 
 // Color sources
-#include "pagx/model/ColorSource.h"
+#include "pagx/model/nodes/ColorSource.h"
 
 // Layer styles and filters
-#include "pagx/model/LayerFilter.h"
-#include "pagx/model/LayerStyle.h"
+#include "pagx/model/nodes/LayerFilter.h"
+#include "pagx/model/nodes/LayerStyle.h"
 
 // Vector elements
-#include "pagx/model/Geometry.h"
-#include "pagx/model/Group.h"
-#include "pagx/model/Painter.h"
-#include "pagx/model/Repeater.h"
-#include "pagx/model/ShapeModifier.h"
-#include "pagx/model/TextModifier.h"
+#include "pagx/model/nodes/Geometry.h"
+#include "pagx/model/nodes/Group.h"
+#include "pagx/model/nodes/Painter.h"
+#include "pagx/model/nodes/Repeater.h"
+#include "pagx/model/nodes/ShapeModifier.h"
+#include "pagx/model/nodes/TextModifier.h"
 
 // Resources and Layer
-#include "pagx/model/Layer.h"
-#include "pagx/model/Resource.h"
+#include "pagx/model/nodes/Layer.h"
+#include "pagx/model/nodes/Resource.h"
 
 namespace pagx {
 

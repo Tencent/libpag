@@ -19,33 +19,66 @@
 #pragma once
 
 #include <memory>
-#include "pagx/model/Types.h"
-#include "pagx/model/VectorElement.h"
-#include "pagx/model/enums/RepeaterOrder.h"
+#include <string>
+#include <vector>
+#include "pagx/model/nodes/Node.h"
 
 namespace pagx {
 
+struct Layer;
+
 /**
- * Repeater modifier.
+ * Base class for resource nodes.
+ * Resources are nodes that can be defined in the Resources section and referenced by id.
  */
-struct Repeater : public VectorElement {
-  float copies = 3;
-  float offset = 0;
-  RepeaterOrder order = RepeaterOrder::BelowOriginal;
-  Point anchorPoint = {};
-  Point position = {100, 100};
-  float rotation = 0;
-  Point scale = {1, 1};
-  float startAlpha = 1;
-  float endAlpha = 1;
+class Resource : public Node {
+ public:
+  std::string id = {};
+};
+
+/**
+ * Image resource.
+ */
+struct Image : public Resource {
+  std::string source = {};
 
   NodeType type() const override {
-    return NodeType::Repeater;
+    return NodeType::Image;
   }
 
   std::unique_ptr<Node> clone() const override {
-    return std::make_unique<Repeater>(*this);
+    return std::make_unique<Image>(*this);
   }
+};
+
+/**
+ * PathData resource - stores reusable path data.
+ */
+struct PathDataResource : public Resource {
+  std::string data = {};  // SVG path data string
+
+  NodeType type() const override {
+    return NodeType::PathData;
+  }
+
+  std::unique_ptr<Node> clone() const override {
+    return std::make_unique<PathDataResource>(*this);
+  }
+};
+
+/**
+ * Composition resource.
+ */
+struct Composition : public Resource {
+  float width = 0;
+  float height = 0;
+  std::vector<std::unique_ptr<Layer>> layers = {};
+
+  NodeType type() const override {
+    return NodeType::Composition;
+  }
+
+  std::unique_ptr<Node> clone() const override;
 };
 
 }  // namespace pagx

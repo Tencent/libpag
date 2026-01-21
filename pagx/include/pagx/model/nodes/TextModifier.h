@@ -21,16 +21,16 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/model/Node.h"
-#include "pagx/model/Types.h"
-#include "pagx/model/VectorElement.h"
-#include "pagx/model/enums/Overflow.h"
-#include "pagx/model/enums/SelectorMode.h"
-#include "pagx/model/enums/SelectorShape.h"
-#include "pagx/model/enums/SelectorUnit.h"
-#include "pagx/model/enums/TextAlign.h"
-#include "pagx/model/enums/TextPathAlign.h"
-#include "pagx/model/enums/VerticalAlign.h"
+#include "pagx/model/nodes/Node.h"
+#include "pagx/model/types/Types.h"
+#include "pagx/model/nodes/VectorElement.h"
+#include "pagx/model/types/enums/Overflow.h"
+#include "pagx/model/types/enums/SelectorMode.h"
+#include "pagx/model/types/enums/SelectorShape.h"
+#include "pagx/model/types/enums/SelectorUnit.h"
+#include "pagx/model/types/enums/TextAlign.h"
+#include "pagx/model/types/enums/TextPathAlign.h"
+#include "pagx/model/types/enums/VerticalAlign.h"
 
 namespace pagx {
 

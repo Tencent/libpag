@@ -21,11 +21,11 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/model/Node.h"
-#include "pagx/model/Resource.h"
-#include "pagx/model/Types.h"
-#include "pagx/model/enums/SamplingMode.h"
-#include "pagx/model/enums/TileMode.h"
+#include "pagx/model/nodes/Node.h"
+#include "pagx/model/nodes/Resource.h"
+#include "pagx/model/types/Types.h"
+#include "pagx/model/types/enums/SamplingMode.h"
+#include "pagx/model/types/enums/TileMode.h"
 
 namespace pagx {
 
