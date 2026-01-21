@@ -280,7 +280,7 @@ class VectorElementNode : public PAGXNode {};
  */
 struct RectangleNode : public VectorElementNode {
   Point center = {};
-  Size size = {};
+  Size size = {100, 100};
   float roundness = 0;
   bool reversed = false;
 
@@ -298,7 +298,7 @@ struct RectangleNode : public VectorElementNode {
  */
 struct EllipseNode : public VectorElementNode {
   Point center = {};
-  Size size = {};
+  Size size = {100, 100};
   bool reversed = false;
 
   NodeType type() const override {
@@ -474,7 +474,7 @@ struct TrimPathNode : public VectorElementNode {
  * Round corner modifier.
  */
 struct RoundCornerNode : public VectorElementNode {
-  float radius = 0;
+  float radius = 10;
 
   NodeType type() const override {
     return NodeType::RoundCorner;
@@ -533,7 +533,7 @@ struct RangeSelectorNode : public PAGXNode {
  * Text modifier.
  */
 struct TextModifierNode : public VectorElementNode {
-  Point anchorPoint = {0.5f, 0.5f};
+  Point anchorPoint = {};
   Point position = {};
   float rotation = 0;
   Point scale = {1, 1};

@@ -307,7 +307,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       if (rect->center.x != 0 || rect->center.y != 0) {
         xml.addAttribute("center", pointToString(rect->center));
       }
-      if (rect->size.width != 0 || rect->size.height != 0) {
+      if (rect->size.width != 100 || rect->size.height != 100) {
         xml.addAttribute("size", sizeToString(rect->size));
       }
       xml.addAttribute("roundness", rect->roundness);
@@ -321,7 +321,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       if (ellipse->center.x != 0 || ellipse->center.y != 0) {
         xml.addAttribute("center", pointToString(ellipse->center));
       }
-      if (ellipse->size.width != 0 || ellipse->size.height != 0) {
+      if (ellipse->size.width != 100 || ellipse->size.height != 100) {
         xml.addAttribute("size", sizeToString(ellipse->size));
       }
       xml.addAttribute("reversed", ellipse->reversed);
@@ -446,7 +446,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::RoundCorner: {
       auto round = static_cast<const RoundCornerNode*>(node);
       xml.openElement("RoundCorner");
-      xml.addAttribute("radius", round->radius);
+      xml.addAttribute("radius", round->radius, 10.0f);
       xml.closeElementSelfClosing();
       break;
     }
@@ -462,7 +462,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
     case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifierNode*>(node);
       xml.openElement("TextModifier");
-      if (modifier->anchorPoint.x != 0.5f || modifier->anchorPoint.y != 0.5f) {
+      if (modifier->anchorPoint.x != 0 || modifier->anchorPoint.y != 0) {
         xml.addAttribute("anchorPoint", pointToString(modifier->anchorPoint));
       }
       if (modifier->position.x != 0 || modifier->position.y != 0) {
