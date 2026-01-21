@@ -20,36 +20,37 @@
 #include <array>
 #include <tuple>
 #include <unordered_map>
-#include "pagx/model/BlurFilter.h"
-#include "pagx/model/types/ColorSpace.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorSpace.h"
 #include "tgfx/core/ColorSpace.h"
-#include "pagx/model/Composition.h"
-#include "pagx/model/ConicGradient.h"
-#include "pagx/model/DiamondGradient.h"
-#include "pagx/model/DropShadowFilter.h"
-#include "pagx/model/DropShadowStyle.h"
-#include "pagx/model/Ellipse.h"
-#include "pagx/model/Fill.h"
-#include "pagx/model/Group.h"
-#include "pagx/model/Image.h"
-#include "pagx/model/ImagePattern.h"
-#include "pagx/model/InnerShadowFilter.h"
-#include "pagx/model/InnerShadowStyle.h"
-#include "pagx/model/Layer.h"
-#include "pagx/model/LinearGradient.h"
-#include "pagx/model/MergePath.h"
-#include "pagx/model/Node.h"
-#include "pagx/model/Path.h"
-#include "pagx/model/Polystar.h"
-#include "pagx/model/RadialGradient.h"
-#include "pagx/model/Rectangle.h"
-#include "pagx/model/Repeater.h"
-#include "pagx/model/RoundCorner.h"
-#include "pagx/model/SolidColor.h"
-#include "pagx/model/Stroke.h"
-#include "pagx/model/TextLayout.h"
-#include "pagx/model/TextSpan.h"
-#include "pagx/model/TrimPath.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/SVGImporter.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
@@ -259,7 +260,7 @@ class LayerBuilderImpl {
     }
   }
 
-  PAGXContent build(const Document& document) {
+  PAGXContent build(const PAGXDocument& document) {
     // Cache resources for later lookup.
     _resources = &document.resources;
 
@@ -832,13 +833,13 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    switch (node->type()) {
-      case LayerStyleType::DropShadowStyle: {
+    switch (node->nodeType()) {
+      case NodeType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
         return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                            style->blurrinessY, ToTGFX(style->color));
       }
-      case LayerStyleType::InnerShadowStyle: {
+      case NodeType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
         return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                             style->blurrinessY, ToTGFX(style->color));
@@ -853,12 +854,12 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    switch (node->type()) {
-      case LayerFilterType::BlurFilter: {
+    switch (node->nodeType()) {
+      case NodeType::BlurFilter: {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
         return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
       }
-      case LayerFilterType::DropShadowFilter: {
+      case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
         return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
                                             filter->blurrinessY, ToTGFX(filter->color));
@@ -878,13 +879,13 @@ class LayerBuilderImpl {
 
 // Public API implementation
 
-PAGXContent LayerBuilder::Build(const Document& document, const Options& options) {
+PAGXContent LayerBuilder::Build(const PAGXDocument& document, const Options& options) {
   LayerBuilderImpl builder(options);
   return builder.build(document);
 }
 
 PAGXContent LayerBuilder::FromFile(const std::string& filePath, const Options& options) {
-  auto document = Document::FromFile(filePath);
+  auto document = PAGXImporter::FromFile(filePath);
   if (!document) {
     return {};
   }
@@ -901,7 +902,7 @@ PAGXContent LayerBuilder::FromFile(const std::string& filePath, const Options& o
 }
 
 PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Options& options) {
-  auto document = Document::FromXML(data, length);
+  auto document = PAGXImporter::FromXML(data, length);
   if (!document) {
     return {};
   }

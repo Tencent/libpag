@@ -23,21 +23,21 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "pagx/model/BlurFilter.h"
-#include "pagx/model/Document.h"
-#include "pagx/model/Ellipse.h"
-#include "pagx/model/Fill.h"
-#include "pagx/model/Group.h"
-#include "pagx/model/Image.h"
-#include "pagx/model/ImagePattern.h"
-#include "pagx/model/LinearGradient.h"
-#include "pagx/model/Path.h"
-#include "pagx/model/PathData.h"
-#include "pagx/model/RadialGradient.h"
-#include "pagx/model/Rectangle.h"
-#include "pagx/model/Stroke.h"
-#include "pagx/model/TextLayout.h"
-#include "pagx/model/TextSpan.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextSpan.h"
 #include "pagx/SVGImporter.h"
 #include "xml/XMLDOM.h"
 
@@ -61,11 +61,11 @@ class SVGParserImpl {
  public:
   explicit SVGParserImpl(const SVGImporter::Options& options);
 
-  std::shared_ptr<Document> parse(const uint8_t* data, size_t length);
-  std::shared_ptr<Document> parseFile(const std::string& filePath);
+  std::shared_ptr<PAGXDocument> parse(const uint8_t* data, size_t length);
+  std::shared_ptr<PAGXDocument> parseFile(const std::string& filePath);
 
  private:
-  std::shared_ptr<Document> parseDOM(const std::shared_ptr<DOM>& dom);
+  std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<DOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
@@ -134,21 +134,44 @@ class SVGParserImpl {
 
   // Collect all IDs from the SVG document to avoid conflicts when generating new IDs.
   void collectAllIds(const std::shared_ptr<DOMNode>& node);
+  
+  // First pass: count references to gradients/patterns in defs.
+  void countColorSourceReferences(const std::shared_ptr<DOMNode>& root);
+  void countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element);
 
   // Generate a unique ID that doesn't conflict with existing SVG IDs.
   std::string generateUniqueId(const std::string& prefix);
+  
+  // Generate a unique ColorSource ID for resources.
+  std::string generateColorSourceId();
 
   // Parse data-* attributes from element and add to layer's customData.
   void parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer);
+  
+  // Get or create ColorSource for a gradient/pattern reference.
+  // If the reference is used multiple times, the ColorSource is added to resources.
+  // Returns the ColorSource (either new inline instance or reference to resource).
+  std::unique_ptr<ColorSource> getColorSourceForRef(const std::string& refId,
+                                                     const Rect& shapeBounds);
 
   SVGImporter::Options _options = {};
-  std::shared_ptr<Document> _document = nullptr;
+  std::shared_ptr<PAGXDocument> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
   std::vector<std::unique_ptr<Layer>> _maskLayers = {};
   std::unordered_map<std::string, std::string> _imageSourceToId = {};  // Maps image source to resource ID.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
+  
+  // ColorSource reference counting for gradients and patterns.
+  // Key is the SVG def id (e.g., "gradient1"), value is the number of times it's referenced.
+  std::unordered_map<std::string, int> _colorSourceRefCount = {};
+  // Maps SVG def id to the PAGX resource id (only for those with refCount > 1).
+  std::unordered_map<std::string, std::string> _colorSourceIdMap = {};
+  // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
+  std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
+  
   int _nextImageId = 0;
   int _nextGeneratedId = 0;  // Counter for generating unique IDs.
+  int _nextColorSourceId = 0;  // Counter for generating ColorSource IDs.
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 };

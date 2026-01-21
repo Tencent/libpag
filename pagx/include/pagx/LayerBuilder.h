@@ -21,7 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/model/Document.h"
+#include "pagx/PAGXDocument.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/Layer.h"
 
@@ -81,7 +81,7 @@ class LayerBuilder {
   /**
    * Builds a layer tree from a PAGXDocument.
    */
-  static PAGXContent Build(const Document& document, const Options& options = Options());
+  static PAGXContent Build(const PAGXDocument& document, const Options& options = Options());
 
   /**
    * Builds a layer tree from a PAGX file.

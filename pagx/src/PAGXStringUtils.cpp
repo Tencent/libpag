@@ -70,6 +70,24 @@ const char* NodeTypeName(NodeType type) {
       return "DiamondGradient";
     case NodeType::ImagePattern:
       return "ImagePattern";
+    case NodeType::Layer:
+      return "Layer";
+    case NodeType::DropShadowStyle:
+      return "DropShadowStyle";
+    case NodeType::InnerShadowStyle:
+      return "InnerShadowStyle";
+    case NodeType::BackgroundBlurStyle:
+      return "BackgroundBlurStyle";
+    case NodeType::BlurFilter:
+      return "BlurFilter";
+    case NodeType::DropShadowFilter:
+      return "DropShadowFilter";
+    case NodeType::InnerShadowFilter:
+      return "InnerShadowFilter";
+    case NodeType::BlendFilter:
+      return "BlendFilter";
+    case NodeType::ColorMatrixFilter:
+      return "ColorMatrixFilter";
     case NodeType::Rectangle:
       return "Rectangle";
     case NodeType::Ellipse:
@@ -100,6 +118,8 @@ const char* NodeTypeName(NodeType type) {
       return "Group";
     case NodeType::Repeater:
       return "Repeater";
+    case NodeType::RangeSelector:
+      return "RangeSelector";
     default:
       return "Unknown";
   }
@@ -119,36 +139,6 @@ const char* ColorSourceTypeName(ColorSourceType type) {
       return "DiamondGradient";
     case ColorSourceType::ImagePattern:
       return "ImagePattern";
-    default:
-      return "Unknown";
-  }
-}
-
-const char* LayerStyleTypeName(LayerStyleType type) {
-  switch (type) {
-    case LayerStyleType::DropShadowStyle:
-      return "DropShadowStyle";
-    case LayerStyleType::InnerShadowStyle:
-      return "InnerShadowStyle";
-    case LayerStyleType::BackgroundBlurStyle:
-      return "BackgroundBlurStyle";
-    default:
-      return "Unknown";
-  }
-}
-
-const char* LayerFilterTypeName(LayerFilterType type) {
-  switch (type) {
-    case LayerFilterType::BlurFilter:
-      return "BlurFilter";
-    case LayerFilterType::DropShadowFilter:
-      return "DropShadowFilter";
-    case LayerFilterType::InnerShadowFilter:
-      return "InnerShadowFilter";
-    case LayerFilterType::BlendFilter:
-      return "BlendFilter";
-    case LayerFilterType::ColorMatrixFilter:
-      return "ColorMatrixFilter";
     default:
       return "Unknown";
   }

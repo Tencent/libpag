@@ -16,52 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/model/Document.h"
-#include <fstream>
-#include <sstream>
-#include "pagx/model/Composition.h"
-#include "PAGXExporter.h"
-#include "PAGXImporter.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Composition.h"
 
 namespace pagx {
 
-std::shared_ptr<Document> Document::Make(float docWidth, float docHeight) {
-  auto doc = std::shared_ptr<Document>(new Document());
+std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
+  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   doc->width = docWidth;
   doc->height = docHeight;
   return doc;
 }
 
-std::shared_ptr<Document> Document::FromFile(const std::string& filePath) {
-  std::ifstream file(filePath, std::ios::binary);
-  if (!file.is_open()) {
-    return nullptr;
-  }
-  std::stringstream buffer = {};
-  buffer << file.rdbuf();
-  auto doc = FromXML(buffer.str());
-  if (doc) {
-    auto lastSlash = filePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      doc->basePath = filePath.substr(0, lastSlash + 1);
-    }
-  }
-  return doc;
-}
-
-std::shared_ptr<Document> Document::FromXML(const std::string& xmlContent) {
-  return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size());
-}
-
-std::shared_ptr<Document> Document::FromXML(const uint8_t* data, size_t length) {
-  return PAGXImporter::Parse(data, length);
-}
-
-std::string Document::toXML() {
-  return PAGXExporter::Export(*this);
-}
-
-Node* Document::findResource(const std::string& id) {
+Node* PAGXDocument::findResource(const std::string& id) {
   if (resourceMapDirty) {
     rebuildResourceMap();
   }
@@ -69,7 +36,7 @@ Node* Document::findResource(const std::string& id) {
   return it != resourceMap.end() ? it->second : nullptr;
 }
 
-Layer* Document::findLayer(const std::string& id) const {
+Layer* PAGXDocument::findLayer(const std::string& id) const {
   // First search in top-level layers
   auto found = findLayerRecursive(layers, id);
   if (found) {
@@ -88,7 +55,7 @@ Layer* Document::findLayer(const std::string& id) const {
   return nullptr;
 }
 
-void Document::rebuildResourceMap() {
+void PAGXDocument::rebuildResourceMap() {
   resourceMap.clear();
   for (const auto& resource : resources) {
     if (!resource->id.empty()) {
@@ -98,8 +65,8 @@ void Document::rebuildResourceMap() {
   resourceMapDirty = false;
 }
 
-Layer* Document::findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
-                                    const std::string& id) {
+Layer* PAGXDocument::findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
+                                        const std::string& id) {
   for (const auto& layer : layers) {
     if (layer->id == id) {
       return layer.get();

@@ -16,42 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGXExporter.h"
+#include "PAGXExporterImpl.h"
 #include <sstream>
 #include "PAGXStringUtils.h"
-#include "pagx/model/BackgroundBlurStyle.h"
-#include "pagx/model/BlendFilter.h"
-#include "pagx/model/BlurFilter.h"
-#include "pagx/model/ColorMatrixFilter.h"
-#include "pagx/model/Composition.h"
-#include "pagx/model/ConicGradient.h"
-#include "pagx/model/DiamondGradient.h"
-#include "pagx/model/Document.h"
-#include "pagx/model/DropShadowFilter.h"
-#include "pagx/model/DropShadowStyle.h"
-#include "pagx/model/Ellipse.h"
-#include "pagx/model/Fill.h"
-#include "pagx/model/Group.h"
-#include "pagx/model/Image.h"
-#include "pagx/model/ImagePattern.h"
-#include "pagx/model/InnerShadowFilter.h"
-#include "pagx/model/InnerShadowStyle.h"
-#include "pagx/model/LinearGradient.h"
-#include "pagx/model/MergePath.h"
-#include "pagx/model/Path.h"
-#include "pagx/model/Polystar.h"
-#include "pagx/model/RadialGradient.h"
-#include "pagx/model/RangeSelector.h"
-#include "pagx/model/Rectangle.h"
-#include "pagx/model/Repeater.h"
-#include "pagx/model/RoundCorner.h"
-#include "pagx/model/SolidColor.h"
-#include "pagx/model/Stroke.h"
-#include "pagx/model/TextLayout.h"
-#include "pagx/model/TextModifier.h"
-#include "pagx/model/TextPath.h"
-#include "pagx/model/TextSpan.h"
-#include "pagx/model/TrimPath.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/TrimPath.h"
 
 namespace pagx {
 
@@ -560,7 +560,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       } else {
         xml.closeElementStart();
         for (const auto& selector : modifier->selectors) {
-          if (selector->type() != TextSelectorType::RangeSelector) {
+          if (selector->nodeType() != NodeType::RangeSelector) {
             continue;
           }
           auto rangeSelector = static_cast<const RangeSelector*>(selector.get());
@@ -685,8 +685,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
 //==============================================================================
 
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
-  switch (node->type()) {
-    case LayerStyleType::DropShadowStyle: {
+  switch (node->nodeType()) {
+    case NodeType::DropShadowStyle: {
       auto style = static_cast<const DropShadowStyle*>(node);
       xml.openElement("DropShadowStyle");
       if (style->blendMode != BlendMode::Normal) {
@@ -701,7 +701,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case LayerStyleType::InnerShadowStyle: {
+    case NodeType::InnerShadowStyle: {
       auto style = static_cast<const InnerShadowStyle*>(node);
       xml.openElement("InnerShadowStyle");
       if (style->blendMode != BlendMode::Normal) {
@@ -715,7 +715,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case LayerStyleType::BackgroundBlurStyle: {
+    case NodeType::BackgroundBlurStyle: {
       auto style = static_cast<const BackgroundBlurStyle*>(node);
       xml.openElement("BackgroundBlurStyle");
       if (style->blendMode != BlendMode::Normal) {
@@ -739,8 +739,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
 //==============================================================================
 
 static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
-  switch (node->type()) {
-    case LayerFilterType::BlurFilter: {
+  switch (node->nodeType()) {
+    case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
       xml.openElement("BlurFilter");
       xml.addRequiredAttribute("blurrinessX", filter->blurrinessX);
@@ -751,7 +751,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case LayerFilterType::DropShadowFilter: {
+    case NodeType::DropShadowFilter: {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
       xml.addAttribute("offsetX", filter->offsetX);
@@ -763,7 +763,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case LayerFilterType::InnerShadowFilter: {
+    case NodeType::InnerShadowFilter: {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
       xml.addAttribute("offsetX", filter->offsetX);
@@ -775,7 +775,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case LayerFilterType::BlendFilter: {
+    case NodeType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
       xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
@@ -785,7 +785,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case LayerFilterType::ColorMatrixFilter: {
+    case NodeType::ColorMatrixFilter: {
       auto filter = static_cast<const ColorMatrixFilter*>(node);
       xml.openElement("ColorMatrixFilter");
       std::vector<float> values(filter->matrix.begin(), filter->matrix.end());
@@ -926,7 +926,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
 // Main Export function
 //==============================================================================
 
-std::string PAGXExporter::Export(const Document& doc) {
+std::string PAGXExporterImpl::Export(const PAGXDocument& doc) {
   XMLBuilder xml = {};
   xml.appendDeclaration();
 

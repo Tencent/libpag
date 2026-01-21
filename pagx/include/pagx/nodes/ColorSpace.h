@@ -1,0 +1,40 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+namespace pagx {
+
+/**
+ * Color space enumeration for color values.
+ */
+enum class ColorSpace {
+  /**
+   * Standard RGB color space (sRGB). The most common color space for web and displays.
+   * Component values are typically in [0, 1] range.
+   */
+  SRGB,
+
+  /**
+   * Display P3 color space, a wide gamut color space used by Apple devices.
+   * Component values may exceed [0, 1] range to represent colors outside sRGB gamut.
+   */
+  DisplayP3
+};
+
+}  // namespace pagx

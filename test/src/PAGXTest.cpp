@@ -18,19 +18,21 @@
 
 #include <filesystem>
 #include "pagx/LayerBuilder.h"
-#include "pagx/model/Document.h"
-#include "pagx/model/DropShadowStyle.h"
-#include "pagx/model/BlurFilter.h"
-#include "pagx/model/Ellipse.h"
-#include "pagx/model/Fill.h"
-#include "pagx/model/Group.h"
-#include "pagx/model/LinearGradient.h"
-#include "pagx/model/Path.h"
-#include "pagx/model/RadialGradient.h"
-#include "pagx/model/Rectangle.h"
-#include "pagx/model/SolidColor.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/SolidColor.h"
 #include "pagx/SVGImporter.h"
-#include "pagx/model/PathData.h"
+#include "pagx/nodes/PathData.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
@@ -142,7 +144,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     pagx::SVGImporter::Options parserOptions;
     auto doc = pagx::SVGImporter::Parse(svgPath, parserOptions);
     if (doc) {
-      std::string xml = doc->toXML();
+      std::string xml = pagx::PAGXExporter::ToXML(*doc);
       auto pagxData = Data::MakeWithCopy(xml.data(), xml.size());
       SaveFile(pagxData, "PAGXTest/" + baseName + ".pagx");
     }
@@ -236,7 +238,7 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
  * Test case: PAGXDocument creation and XML export
  */
 PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
-  auto doc = pagx::Document::Make(400, 300);
+  auto doc = pagx::PAGXDocument::Make(400, 300);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_EQ(doc->width, 400.0f);
   EXPECT_EQ(doc->height, 300.0f);
@@ -267,7 +269,7 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
   doc->layers.push_back(std::move(layer));
 
   // Export to XML
-  std::string xml = doc->toXML();
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_FALSE(xml.empty());
   EXPECT_NE(xml.find("<pagx"), std::string::npos);
   EXPECT_NE(xml.find("width=\"400\""), std::string::npos);
@@ -283,7 +285,7 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
  */
 PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   // Create a document
-  auto doc1 = pagx::Document::Make(200, 150);
+  auto doc1 = pagx::PAGXDocument::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
   auto layer = std::make_unique<pagx::Layer>();
@@ -305,11 +307,11 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   doc1->layers.push_back(std::move(layer));
 
   // Export to XML
-  std::string xml = doc1->toXML();
+  std::string xml = pagx::PAGXExporter::ToXML(*doc1);
   EXPECT_FALSE(xml.empty());
 
   // Parse the XML back
-  auto doc2 = pagx::Document::FromXML(xml);
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc2 != nullptr);
 
   // Verify the dimensions
@@ -439,8 +441,8 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
 
   EXPECT_EQ(layer->styles.size(), 1u);
   EXPECT_EQ(layer->filters.size(), 1u);
-  EXPECT_EQ(layer->styles[0]->type(), pagx::LayerStyleType::DropShadowStyle);
-  EXPECT_EQ(layer->filters[0]->type(), pagx::LayerFilterType::BlurFilter);
+  EXPECT_EQ(layer->styles[0]->nodeType(), pagx::NodeType::DropShadowStyle);
+  EXPECT_EQ(layer->filters[0]->nodeType(), pagx::NodeType::BlurFilter);
 }
 
 }  // namespace pag

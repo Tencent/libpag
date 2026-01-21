@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/model/PathData.h"
+#include "pagx/nodes/PathData.h"
 #include <cctype>
 #include <cmath>
 #include <sstream>
@@ -155,7 +155,7 @@ void PathData::transform(const Matrix& matrix) {
   _boundsDirty = true;
 }
 
-Rect PathData::getBounds() const {
+Rect PathData::getBounds() {
   if (!_boundsDirty) {
     return _cachedBounds;
   }

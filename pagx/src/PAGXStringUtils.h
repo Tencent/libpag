@@ -19,27 +19,27 @@
 #pragma once
 
 #include <string>
-#include "pagx/model/ColorSource.h"
-#include "pagx/model/Element.h"
-#include "pagx/model/Fill.h"
-#include "pagx/model/ImagePattern.h"
-#include "pagx/model/Layer.h"
-#include "pagx/model/LayerFilter.h"
-#include "pagx/model/LayerStyle.h"
-#include "pagx/model/MergePath.h"
-#include "pagx/model/Node.h"
-#include "pagx/model/Polystar.h"
-#include "pagx/model/RangeSelector.h"
-#include "pagx/model/Repeater.h"
-#include "pagx/model/Stroke.h"
-#include "pagx/model/TextLayout.h"
-#include "pagx/model/TextPath.h"
-#include "pagx/model/TrimPath.h"
-#include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/Color.h"
-#include "pagx/model/types/ColorSpace.h"
-#include "pagx/model/types/LayerPlacement.h"
-#include "pagx/model/types/TileMode.h"
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LayerFilter.h"
+#include "pagx/nodes/LayerStyle.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RangeSelector.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/BlendMode.h"
+#include "pagx/nodes/Color.h"
+#include "pagx/nodes/ColorSpace.h"
+#include "pagx/nodes/LayerPlacement.h"
+#include "pagx/nodes/TileMode.h"
 
 namespace pagx {
 
@@ -52,16 +52,6 @@ const char* NodeTypeName(NodeType type);
 // ColorSource types
 //==============================================================================
 const char* ColorSourceTypeName(ColorSourceType type);
-
-//==============================================================================
-// LayerStyle types
-//==============================================================================
-const char* LayerStyleTypeName(LayerStyleType type);
-
-//==============================================================================
-// LayerFilter types
-//==============================================================================
-const char* LayerFilterTypeName(LayerFilterType type);
 
 //==============================================================================
 // BlendMode

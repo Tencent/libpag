@@ -22,14 +22,14 @@
 #include <fstream>
 #include <sstream>
 #include "PAGXStringUtils.h"
-#include "pagx/model/Document.h"
-#include "pagx/model/SolidColor.h"
+#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/SolidColor.h"
 #include "SVGParserInternal.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {
 
-std::shared_ptr<Document> SVGImporter::Parse(const std::string& filePath,
+std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                              const Options& options) {
   SVGParserImpl parser(options);
   auto doc = parser.parseFile(filePath);
@@ -42,13 +42,13 @@ std::shared_ptr<Document> SVGImporter::Parse(const std::string& filePath,
   return doc;
 }
 
-std::shared_ptr<Document> SVGImporter::Parse(const uint8_t* data, size_t length,
+std::shared_ptr<PAGXDocument> SVGImporter::Parse(const uint8_t* data, size_t length,
                                              const Options& options) {
   SVGParserImpl parser(options);
   return parser.parse(data, length);
 }
 
-std::shared_ptr<Document> SVGImporter::ParseString(const std::string& svgContent,
+std::shared_ptr<PAGXDocument> SVGImporter::ParseString(const std::string& svgContent,
                                                    const Options& options) {
   return Parse(reinterpret_cast<const uint8_t*>(svgContent.data()), svgContent.size(), options);
 }
@@ -58,7 +58,7 @@ std::shared_ptr<Document> SVGImporter::ParseString(const std::string& svgContent
 SVGParserImpl::SVGParserImpl(const SVGImporter::Options& options) : _options(options) {
 }
 
-std::shared_ptr<Document> SVGParserImpl::parse(const uint8_t* data, size_t length) {
+std::shared_ptr<PAGXDocument> SVGParserImpl::parse(const uint8_t* data, size_t length) {
   if (!data || length == 0) {
     return nullptr;
   }
@@ -71,7 +71,7 @@ std::shared_ptr<Document> SVGParserImpl::parse(const uint8_t* data, size_t lengt
   return parseDOM(dom);
 }
 
-std::shared_ptr<Document> SVGParserImpl::parseFile(const std::string& filePath) {
+std::shared_ptr<PAGXDocument> SVGParserImpl::parseFile(const std::string& filePath) {
   auto dom = DOM::MakeFromFile(filePath);
   if (!dom) {
     return nullptr;
@@ -87,7 +87,7 @@ std::string SVGParserImpl::getAttribute(const std::shared_ptr<DOMNode>& node,
   return found ? value : defaultValue;
 }
 
-std::shared_ptr<Document> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& dom) {
+std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
     return nullptr;
@@ -116,7 +116,7 @@ std::shared_ptr<Document> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& do
     return nullptr;
   }
 
-  _document = Document::Make(width, height);
+  _document = PAGXDocument::Make(width, height);
 
   // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
   collectAllIds(root);

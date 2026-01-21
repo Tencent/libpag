@@ -311,18 +311,12 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 ##### 纯色（SolidColor）
 
 ```xml
-<SolidColor red="1.0" green="0" blue="0"/>
-<SolidColor red="1.0" green="0.5" blue="0.2" alpha="0.8"/>
-<SolidColor red="1.0" green="0.5" blue="0.2" colorSpace="displayP3"/>
+<SolidColor color="#FF0000"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `red` | float | 0 | 红色分量，sRGB 为 0.0~1.0，广色域可超出 |
-| `green` | float | 0 | 绿色分量 |
-| `blue` | float | 0 | 蓝色分量 |
-| `alpha` | float | 1 | 透明度，0.0~1.0 |
-| `colorSpace` | ColorSpace | sRGB | 色域：`sRGB` 或 `displayP3` |
+| `color` | color | (必填) | 颜色值 |
 
 ##### 线性渐变（LinearGradient）
 
@@ -1058,9 +1052,7 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 纯色填充 -->
-<Fill alpha="0.8" blendMode="normal" fillRule="winding" placement="background">
-  <SolidColor red="1.0" green="0" blue="0"/>
-</Fill>
+<Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
 
 <!-- 引用共享颜色源 -->
 <Fill color="@grad1"/>
@@ -1081,7 +1073,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | idref | - | 颜色源引用（如 `@gradientId`） |
+| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
@@ -1107,14 +1099,10 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 基础描边 -->
-<Stroke width="2" cap="round" join="miter" miterLimit="4">
-  <SolidColor red="0" green="0" blue="0"/>
-</Stroke>
+<Stroke color="#000000" width="2" cap="round" join="miter" miterLimit="4"/>
 
 <!-- 虚线描边 -->
-<Stroke width="1" dashes="5,3" dashOffset="2">
-  <SolidColor red="0" green="0" blue="1.0"/>
-</Stroke>
+<Stroke color="#0000FF" width="1" dashes="5,3" dashOffset="2"/>
 
 <!-- 内联渐变描边 -->
 <Stroke width="3">
@@ -1127,7 +1115,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | idref | - | 颜色源引用（如 `@gradientId`） |
+| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `width` | float | 1 | 描边宽度 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
@@ -1196,7 +1184,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 |------|------|--------|------|
 | `start` | float | 0 | 起始位置 0~1 |
 | `end` | float | 1 | 结束位置 0~1 |
-| `offset` | float | 0 | 偏移量（度） |
+| `offset` | float | 0 | 偏移量（度），360 度表示完整路径长度的一个周期。例如，180 度将裁剪范围偏移半个路径长度 |
 | `type` | TrimType | separate | 裁剪类型（见下方） |
 
 **TrimType（裁剪类型）**：
@@ -2052,11 +2040,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `red` | float | 0 |
-| `green` | float | 0 |
-| `blue` | float | 0 |
-| `alpha` | float | 1 |
-| `colorSpace` | ColorSpace | sRGB |
+| `color` | color | (必填) |
 
 #### LinearGradient
 
@@ -2281,19 +2265,17 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | idref | - |
+| `color` | color/idref | #000000 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
 | `fillRule` | FillRule | winding |
 | `placement` | LayerPlacement | background |
 
-子元素：ColorSource（SolidColor、LinearGradient 等）
-
 #### Stroke
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | idref | - |
+| `color` | color/idref | #000000 |
 | `width` | float | 1 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
@@ -2304,8 +2286,6 @@ Layer / Group
 | `dashOffset` | float | 0 |
 | `align` | StrokeAlign | center |
 | `placement` | LayerPlacement | background |
-
-子元素：ColorSource（SolidColor、LinearGradient 等）
 
 ### C.8 形状修改器节点
 
