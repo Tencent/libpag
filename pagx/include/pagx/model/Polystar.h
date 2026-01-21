@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <string>
 #include "pagx/model/Element.h"
 #include "pagx/model/types/Point.h"
 
@@ -31,9 +30,6 @@ enum class PolystarType {
   Polygon,
   Star
 };
-
-std::string PolystarTypeToString(PolystarType type);
-PolystarType PolystarTypeFromString(const std::string& str);
 
 /**
  * Polystar represents a polygon or star shape with configurable points, radii, and roundness.

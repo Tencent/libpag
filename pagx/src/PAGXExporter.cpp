@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXExporter.h"
-#include <cmath>
 #include <sstream>
 #include "PAGXEnumUtils.h"
+#include "pagx/model/types/Color.h"
 #include "pagx/model/BackgroundBlurStyle.h"
 #include "pagx/model/BlendFilter.h"
 #include "pagx/model/BlurFilter.h"
@@ -216,21 +216,6 @@ static std::string floatListToString(const std::vector<float>& values) {
   return oss.str();
 }
 
-static std::string colorToHexString(const Color& color, bool includeAlpha = false) {
-  auto toHex = [](float value) {
-    int v = static_cast<int>(std::round(value * 255));
-    v = std::max(0, std::min(255, v));
-    char hex[3];
-    snprintf(hex, sizeof(hex), "%02X", v);
-    return std::string(hex);
-  };
-  std::string result = "#" + toHex(color.red) + toHex(color.green) + toHex(color.blue);
-  if (includeAlpha && color.alpha < 1.0f) {
-    result += toHex(color.alpha);
-  }
-  return result;
-}
-
 //==============================================================================
 // Forward declarations
 //==============================================================================
@@ -250,7 +235,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   for (const auto& stop : stops) {
     xml.openElement("ColorStop");
     xml.addRequiredAttribute("offset", stop.offset);
-    xml.addRequiredAttribute("color", colorToHexString(stop.color, stop.color.alpha < 1.0f));
+    xml.addRequiredAttribute("color", stop.color.toHexString(stop.color.alpha < 1.0f));
     xml.closeElementSelfClosing();
   }
 }
@@ -261,7 +246,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
       xml.addAttribute("id", solid->id);
-      xml.addAttribute("color", colorToHexString(solid->color, solid->color.alpha < 1.0f));
+      xml.addAttribute("color", solid->color.toHexString(solid->color.alpha < 1.0f));
       xml.closeElementSelfClosing();
       break;
     }
@@ -712,7 +697,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("offsetY", style->offsetY);
       xml.addAttribute("blurrinessX", style->blurrinessX);
       xml.addAttribute("blurrinessY", style->blurrinessY);
-      xml.addAttribute("color", colorToHexString(style->color, style->color.alpha < 1.0f));
+      xml.addAttribute("color", style->color.toHexString(style->color.alpha < 1.0f));
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
       xml.closeElementSelfClosing();
       break;
@@ -727,7 +712,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("offsetY", style->offsetY);
       xml.addAttribute("blurrinessX", style->blurrinessX);
       xml.addAttribute("blurrinessY", style->blurrinessY);
-      xml.addAttribute("color", colorToHexString(style->color, style->color.alpha < 1.0f));
+      xml.addAttribute("color", style->color.toHexString(style->color.alpha < 1.0f));
       xml.closeElementSelfClosing();
       break;
     }
@@ -774,7 +759,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.addAttribute("offsetY", filter->offsetY);
       xml.addAttribute("blurrinessX", filter->blurrinessX);
       xml.addAttribute("blurrinessY", filter->blurrinessY);
-      xml.addAttribute("color", colorToHexString(filter->color, filter->color.alpha < 1.0f));
+      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -786,7 +771,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.addAttribute("offsetY", filter->offsetY);
       xml.addAttribute("blurrinessX", filter->blurrinessX);
       xml.addAttribute("blurrinessY", filter->blurrinessY);
-      xml.addAttribute("color", colorToHexString(filter->color, filter->color.alpha < 1.0f));
+      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -794,7 +779,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case LayerFilterType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
-      xml.addAttribute("color", colorToHexString(filter->color, filter->color.alpha < 1.0f));
+      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
       if (filter->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
       }

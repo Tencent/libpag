@@ -23,7 +23,7 @@
 #include "pagx/model/ColorSource.h"
 #include "pagx/model/Element.h"
 #include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/Placement.h"
+#include "pagx/model/types/LayerPlacement.h"
 
 namespace pagx {
 
@@ -35,27 +35,24 @@ enum class FillRule {
   EvenOdd
 };
 
-std::string FillRuleToString(FillRule rule);
-FillRule FillRuleFromString(const std::string& str);
-
 /**
- * Fill represents a fill painter that fills shapes with a solid color, gradient, or pattern. The
- * color can be specified as a simple color string (e.g., "#FF0000"), a reference to a defined
- * color source (e.g., "#gradientId"), or an inline ColorSource node.
+ * Fill represents a fill painter that fills shapes with a solid color, gradient, or pattern.
+ * The color is specified through a ColorSource node (SolidColor, LinearGradient, etc.) or
+ * a reference to a defined color source (e.g., "@gradientId").
  */
 class Fill : public Element {
  public:
   /**
-   * The fill color as a string. Can be a hex color (e.g., "#FF0000"), a reference to a color
-   * source (e.g., "#gradientId"), or empty if colorSource is used.
+   * The color source for this fill. Can be a SolidColor, LinearGradient, RadialGradient,
+   * ConicGradient, DiamondGradient, or ImagePattern. If null, uses the colorRef reference.
    */
-  std::string color = {};
+  std::unique_ptr<ColorSource> color = nullptr;
 
   /**
-   * An inline color source node (SolidColor, LinearGradient, etc.) for complex fills. If provided,
-   * this takes precedence over the color string.
+   * A reference to a color source defined in Resources (e.g., "@gradientId").
+   * Only used if color is null.
    */
-  std::unique_ptr<ColorSource> colorSource = nullptr;
+  std::string colorRef = {};
 
   /**
    * The opacity of the fill, ranging from 0 (transparent) to 1 (opaque). The default value is 1.

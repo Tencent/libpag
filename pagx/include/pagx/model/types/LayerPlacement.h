@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <string>
-
 namespace pagx {
 
 /**
@@ -29,8 +27,5 @@ enum class LayerPlacement {
   Background,
   Foreground
 };
-
-std::string LayerPlacementToString(LayerPlacement placement);
-LayerPlacement LayerPlacementFromString(const std::string& str);
 
 }  // namespace pagx

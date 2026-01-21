@@ -24,7 +24,7 @@
 #include "pagx/model/ColorSource.h"
 #include "pagx/model/Element.h"
 #include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/Placement.h"
+#include "pagx/model/types/LayerPlacement.h"
 
 namespace pagx {
 
@@ -37,9 +37,6 @@ enum class LineCap {
   Square
 };
 
-std::string LineCapToString(LineCap cap);
-LineCap LineCapFromString(const std::string& str);
-
 /**
  * Line join styles for strokes.
  */
@@ -48,9 +45,6 @@ enum class LineJoin {
   Round,
   Bevel
 };
-
-std::string LineJoinToString(LineJoin join);
-LineJoin LineJoinFromString(const std::string& str);
 
 /**
  * Stroke alignment relative to path.
@@ -61,26 +55,25 @@ enum class StrokeAlign {
   Outside
 };
 
-std::string StrokeAlignToString(StrokeAlign align);
-StrokeAlign StrokeAlignFromString(const std::string& str);
-
 /**
  * Stroke represents a stroke painter that outlines shapes with a solid color, gradient, or
  * pattern. It supports various line cap styles, join styles, dash patterns, and stroke alignment.
+ * The color is specified through a ColorSource node (SolidColor, LinearGradient, etc.) or
+ * a reference to a defined color source (e.g., "@gradientId").
  */
 class Stroke : public Element {
  public:
   /**
-   * The stroke color as a string. Can be a hex color (e.g., "#FF0000"), a reference to a color
-   * source (e.g., "#gradientId"), or empty if colorSource is used.
+   * The color source for this stroke. Can be a SolidColor, LinearGradient, RadialGradient,
+   * ConicGradient, DiamondGradient, or ImagePattern. If null, uses the colorRef reference.
    */
-  std::string color = {};
+  std::unique_ptr<ColorSource> color = nullptr;
 
   /**
-   * An inline color source node (SolidColor, LinearGradient, etc.) for complex strokes. If
-   * provided, this takes precedence over the color string.
+   * A reference to a color source defined in Resources (e.g., "@gradientId").
+   * Only used if color is null.
    */
-  std::unique_ptr<ColorSource> colorSource = nullptr;
+  std::string colorRef = {};
 
   /**
    * The stroke width in pixels. The default value is 1.
