@@ -813,8 +813,6 @@ PAGX 文档采用层级结构组织内容：
 </Layer>
 ```
 
-**遮罩类型**：MaskType 枚举见 Layer 属性定义。
-
 **遮罩规则**：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
 - 遮罩图层的变换不影响被遮罩图层
@@ -1777,7 +1775,8 @@ pagx
 │
 └── Layer*
     ├── contents
-    │   └── VectorElement*    ├── styles
+    │   └── VectorElement*（见下方）
+    ├── styles
     │   ├── DropShadowStyle
     │   ├── InnerShadowStyle
     │   └── BackgroundBlurStyle

@@ -20,7 +20,8 @@
 
 #include <memory>
 #include <string>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Painter.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/FillRule.h"
 #include "pagx/types/Placement.h"
@@ -32,9 +33,9 @@ namespace pagx {
  * The color can be a simple color string ("#FF0000"), a reference ("#gradientId"),
  * or an inline color source node.
  */
-struct Fill : public Node {
+struct Fill : public Painter {
   std::string color = {};
-  std::unique_ptr<Node> colorSource = nullptr;
+  std::unique_ptr<ColorSource> colorSource = nullptr;
   float alpha = 1;
   BlendMode blendMode = BlendMode::Normal;
   FillRule fillRule = FillRule::Winding;

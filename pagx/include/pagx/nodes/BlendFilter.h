@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Filter.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Types.h"
 
@@ -27,7 +27,7 @@ namespace pagx {
 /**
  * Blend filter.
  */
-struct BlendFilter : public Node {
+struct BlendFilter : public Filter {
   Color color = {};
   BlendMode blendMode = BlendMode::Normal;
 

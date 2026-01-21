@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Geometry.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -26,7 +26,7 @@ namespace pagx {
 /**
  * An ellipse shape.
  */
-struct Ellipse : public Node {
+struct Ellipse : public Geometry {
   Point center = {};
   Size size = {100, 100};
   bool reversed = false;

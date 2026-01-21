@@ -19,14 +19,14 @@
 #pragma once
 
 #include "pagx/PathData.h"
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Geometry.h"
 
 namespace pagx {
 
 /**
  * A path shape.
  */
-struct Path : public Node {
+struct Path : public Geometry {
   PathData data = {};
   bool reversed = false;
 

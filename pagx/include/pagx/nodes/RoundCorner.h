@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/PathModifier.h"
 
 namespace pagx {
 
 /**
  * Round corner modifier.
  */
-struct RoundCorner : public Node {
+struct RoundCorner : public PathModifier {
   float radius = 10;
 
   NodeType type() const override {

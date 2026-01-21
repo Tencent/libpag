@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/LayerStyle.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/TileMode.h"
 
@@ -27,7 +27,7 @@ namespace pagx {
 /**
  * Background blur style.
  */
-struct BackgroundBlurStyle : public Node {
+struct BackgroundBlurStyle : public LayerStyle {
   float blurrinessX = 0;
   float blurrinessY = 0;
   TileMode tileMode = TileMode::Mirror;

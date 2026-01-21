@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Geometry.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -26,7 +26,7 @@ namespace pagx {
 /**
  * A rectangle shape.
  */
-struct Rectangle : public Node {
+struct Rectangle : public Geometry {
   Point center = {};
   Size size = {100, 100};
   float roundness = 0;

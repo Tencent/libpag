@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/ColorSource.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -27,7 +27,7 @@ namespace pagx {
 /**
  * A solid color.
  */
-struct SolidColor : public Node {
+struct SolidColor : public ColorSource {
   std::string id = {};
   Color color = {};
 

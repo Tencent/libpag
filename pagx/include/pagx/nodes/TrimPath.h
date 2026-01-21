@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/PathModifier.h"
 #include "pagx/types/TrimType.h"
 
 namespace pagx {
@@ -26,7 +26,7 @@ namespace pagx {
 /**
  * Trim path modifier.
  */
-struct TrimPath : public Node {
+struct TrimPath : public PathModifier {
   float start = 0;
   float end = 1;
   float offset = 0;

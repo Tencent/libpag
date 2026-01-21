@@ -18,27 +18,16 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-#include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/ColorStop.h"
-#include "pagx/types/Types.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
 /**
- * A radial gradient.
+ * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle).
  */
-struct RadialGradient : public ColorSource {
-  std::string id = {};
-  Point center = {};
-  float radius = 0;
-  Matrix matrix = {};
-  std::vector<ColorStop> colorStops = {};
-
-  NodeType type() const override {
-    return NodeType::RadialGradient;
-  }
+class LayerStyle : public Node {
+ protected:
+  LayerStyle() = default;
 };
 
 }  // namespace pagx

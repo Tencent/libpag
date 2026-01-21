@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Geometry.h"
 #include "pagx/types/FontStyle.h"
 
 namespace pagx {
@@ -27,7 +27,7 @@ namespace pagx {
 /**
  * A text span.
  */
-struct TextSpan : public Node {
+struct TextSpan : public Geometry {
   float x = 0;
   float y = 0;
   std::string font = {};

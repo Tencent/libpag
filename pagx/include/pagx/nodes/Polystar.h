@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Geometry.h"
 #include "pagx/types/PolystarType.h"
 #include "pagx/types/Types.h"
 
@@ -27,7 +27,7 @@ namespace pagx {
 /**
  * A polygon or star shape.
  */
-struct Polystar : public Node {
+struct Polystar : public Geometry {
   Point center = {};
   PolystarType polystarType = PolystarType::Star;
   float pointCount = 5;

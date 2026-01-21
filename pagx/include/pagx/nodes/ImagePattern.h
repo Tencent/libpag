@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/ColorSource.h"
 #include "pagx/types/SamplingMode.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/types/Types.h"
@@ -29,7 +29,7 @@ namespace pagx {
 /**
  * An image pattern.
  */
-struct ImagePattern : public Node {
+struct ImagePattern : public ColorSource {
   std::string id = {};
   std::string image = {};
   TileMode tileModeX = TileMode::Clamp;

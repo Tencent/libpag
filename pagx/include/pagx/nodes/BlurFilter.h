@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Filter.h"
 #include "pagx/types/TileMode.h"
 
 namespace pagx {
@@ -26,7 +26,7 @@ namespace pagx {
 /**
  * Blur filter.
  */
-struct BlurFilter : public Node {
+struct BlurFilter : public Filter {
   float blurrinessX = 0;
   float blurrinessY = 0;
   TileMode tileMode = TileMode::Decal;

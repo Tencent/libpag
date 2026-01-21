@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/PathModifier.h"
 #include "pagx/types/MergePathMode.h"
 
 namespace pagx {
@@ -26,7 +26,7 @@ namespace pagx {
 /**
  * Merge path modifier.
  */
-struct MergePath : public Node {
+struct MergePath : public PathModifier {
   MergePathMode mode = MergePathMode::Append;
 
   NodeType type() const override {

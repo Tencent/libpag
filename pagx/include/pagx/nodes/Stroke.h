@@ -21,7 +21,8 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Painter.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/LineCap.h"
 #include "pagx/types/LineJoin.h"
@@ -33,9 +34,9 @@ namespace pagx {
 /**
  * A stroke painter.
  */
-struct Stroke : public Node {
+struct Stroke : public Painter {
   std::string color = {};
-  std::unique_ptr<Node> colorSource = nullptr;
+  std::unique_ptr<ColorSource> colorSource = nullptr;
   float width = 1;
   float alpha = 1;
   BlendMode blendMode = BlendMode::Normal;

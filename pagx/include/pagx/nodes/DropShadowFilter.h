@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Filter.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -26,7 +26,7 @@ namespace pagx {
 /**
  * Drop shadow filter.
  */
-struct DropShadowFilter : public Node {
+struct DropShadowFilter : public Filter {
   float offsetX = 0;
   float offsetY = 0;
   float blurrinessX = 0;

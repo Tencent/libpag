@@ -20,8 +20,8 @@
 
 #include <string>
 #include <vector>
+#include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
-#include "pagx/nodes/Node.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -29,7 +29,7 @@ namespace pagx {
 /**
  * A conic (sweep) gradient.
  */
-struct ConicGradient : public Node {
+struct ConicGradient : public ColorSource {
   std::string id = {};
   Point center = {};
   float startAngle = 0;

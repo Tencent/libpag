@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/LayerStyle.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Types.h"
 
@@ -27,7 +27,7 @@ namespace pagx {
 /**
  * Inner shadow style.
  */
-struct InnerShadowStyle : public Node {
+struct InnerShadowStyle : public LayerStyle {
   float offsetX = 0;
   float offsetY = 0;
   float blurrinessX = 0;
