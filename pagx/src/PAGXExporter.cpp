@@ -341,8 +341,14 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (pattern->tileModeY != TileMode::Clamp) {
         xml.addAttribute("tileModeY", TileModeToString(pattern->tileModeY));
       }
-      if (pattern->sampling != SamplingMode::Linear) {
-        xml.addAttribute("sampling", SamplingModeToString(pattern->sampling));
+      if (pattern->minFilterMode != FilterMode::Linear) {
+        xml.addAttribute("minFilterMode", FilterModeToString(pattern->minFilterMode));
+      }
+      if (pattern->magFilterMode != FilterMode::Linear) {
+        xml.addAttribute("magFilterMode", FilterModeToString(pattern->magFilterMode));
+      }
+      if (pattern->mipmapMode != MipmapMode::Linear) {
+        xml.addAttribute("mipmapMode", MipmapModeToString(pattern->mipmapMode));
       }
       if (!pattern->matrix.isIdentity()) {
         xml.addAttribute("matrix", pattern->matrix.toString());

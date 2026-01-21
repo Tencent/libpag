@@ -428,12 +428,16 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `image` | idref | (必填) | 图片引用 "@id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式 |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
-| `sampling` | SamplingMode | linear | 采样模式 |
+| `minFilterMode` | FilterMode | linear | 缩小滤镜模式 |
+| `magFilterMode` | FilterMode | linear | 放大滤镜模式 |
+| `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
 **TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
 
-**SamplingMode（采样模式）**：`nearest`（最近邻）、`linear`（双线性）、`mipmap`（多级渐远）
+**FilterMode（滤镜模式）**：`nearest`（最近邻）、`linear`（双线性插值）
+
+**MipmapMode（多级渐远模式）**：`none`（禁用）、`nearest`（最近级别）、`linear`（线性插值）
 
 ##### 颜色源坐标系统
 
@@ -2097,7 +2101,9 @@ Layer / Group
 | `image` | idref | (必填) |
 | `tileModeX` | TileMode | clamp |
 | `tileModeY` | TileMode | clamp |
-| `sampling` | SamplingMode | linear |
+| `minFilterMode` | FilterMode | linear |
+| `magFilterMode` | FilterMode | linear |
+| `mipmapMode` | MipmapMode | linear |
 | `matrix` | string | 单位矩阵 |
 
 ### C.3 图层节点
@@ -2409,7 +2415,8 @@ Layer / Group
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
 | **MaskType** | `alpha`, `luminance`, `contour` |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
-| **SamplingMode** | `nearest`, `linear`, `mipmap` |
+| **FilterMode** | `nearest`, `linear` |
+| **MipmapMode** | `none`, `nearest`, `linear` |
 
 #### 颜色相关
 

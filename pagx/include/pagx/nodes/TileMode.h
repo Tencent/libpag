@@ -21,12 +21,24 @@
 namespace pagx {
 
 /**
- * Tile modes for patterns and gradients.
+ * Tile modes for patterns, gradients, and filters.
  */
 enum class TileMode {
+  /**
+   * Clamp to the edge color, extending the edge pixels outward.
+   */
   Clamp,
+  /**
+   * Repeat the pattern by tiling it.
+   */
   Repeat,
+  /**
+   * Repeat the pattern by mirroring it at the edges.
+   */
   Mirror,
+  /**
+   * Render transparent pixels outside the bounds.
+   */
   Decal
 };
 

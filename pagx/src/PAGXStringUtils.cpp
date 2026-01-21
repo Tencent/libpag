@@ -197,10 +197,14 @@ DEFINE_ENUM_CONVERSION(TileMode,
     {TileMode::Mirror, "mirror"},
     {TileMode::Decal, "decal"})
 
-DEFINE_ENUM_CONVERSION(SamplingMode,
-    {SamplingMode::Nearest, "nearest"},
-    {SamplingMode::Linear, "linear"},
-    {SamplingMode::Mipmap, "mipmap"})
+DEFINE_ENUM_CONVERSION(FilterMode,
+    {FilterMode::Nearest, "nearest"},
+    {FilterMode::Linear, "linear"})
+
+DEFINE_ENUM_CONVERSION(MipmapMode,
+    {MipmapMode::None, "none"},
+    {MipmapMode::Nearest, "nearest"},
+    {MipmapMode::Linear, "linear"})
 
 DEFINE_ENUM_CONVERSION(MaskType,
     {MaskType::Alpha, "alpha"},

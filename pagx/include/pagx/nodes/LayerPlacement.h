@@ -21,10 +21,16 @@
 namespace pagx {
 
 /**
- * Placement of fill/stroke relative to child layers.
+ * Placement of fill or stroke relative to other painters.
  */
 enum class LayerPlacement {
+  /**
+   * Place behind other painters (rendered first).
+   */
   Background,
+  /**
+   * Place in front of other painters (rendered last).
+   */
   Foreground
 };
 

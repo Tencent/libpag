@@ -39,6 +39,8 @@
 #include "pagx/nodes/Color.h"
 #include "pagx/nodes/ColorSpace.h"
 #include "pagx/nodes/LayerPlacement.h"
+#include "pagx/nodes/FilterMode.h"
+#include "pagx/nodes/MipmapMode.h"
 #include "pagx/nodes/TileMode.h"
 
 namespace pagx {
@@ -118,10 +120,12 @@ std::string MergePathModeToString(MergePathMode mode);
 MergePathMode MergePathModeFromString(const std::string& str);
 
 //==============================================================================
-// SamplingMode
+// FilterMode, MipmapMode
 //==============================================================================
-std::string SamplingModeToString(SamplingMode mode);
-SamplingMode SamplingModeFromString(const std::string& str);
+std::string FilterModeToString(FilterMode mode);
+FilterMode FilterModeFromString(const std::string& str);
+std::string MipmapModeToString(MipmapMode mode);
+MipmapMode MipmapModeFromString(const std::string& str);
 
 //==============================================================================
 // TextAlign, VerticalAlign, Overflow

@@ -29,7 +29,7 @@ namespace pagx {
 /**
  * Path command types.
  */
-enum class PathVerb : uint8_t {
+enum class PathVerb {
   Move,   // 1 point: destination
   Line,   // 1 point: end point
   Quad,   // 2 points: control point, end point
@@ -45,11 +45,6 @@ enum class PathVerb : uint8_t {
 class PathData : public Node {
  public:
   PathData() = default;
-
-  /**
-   * Creates a PathData from an SVG path data string (d attribute).
-   */
-  static PathData FromSVGString(const std::string& d);
 
   /**
    * Starts a new contour at the specified point.
@@ -136,11 +131,6 @@ class PathData : public Node {
       pointIndex += PointsPerVerb(verb) * 2;
     }
   }
-
-  /**
-   * Converts the path to an SVG path data string.
-   */
-  std::string toSVGString() const;
 
   /**
    * Returns the bounding rectangle of the path.

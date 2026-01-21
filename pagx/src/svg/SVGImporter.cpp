@@ -1994,7 +1994,9 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
           pattern->image = src->image;
           pattern->tileModeX = src->tileModeX;
           pattern->tileModeY = src->tileModeY;
-          pattern->sampling = src->sampling;
+          pattern->minFilterMode = src->minFilterMode;
+          pattern->magFilterMode = src->magFilterMode;
+          pattern->mipmapMode = src->mipmapMode;
           pattern->matrix = src->matrix;
           return pattern;
         }
