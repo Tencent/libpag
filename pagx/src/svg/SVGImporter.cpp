@@ -514,14 +514,9 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
-  // Parse text-anchor attribute for x position adjustment.
-  // SVG text-anchor affects horizontal alignment: start (default), middle, end.
-  // Since PAGX TextSpan doesn't have text-anchor, we'll note this for future
-  // position adjustment after text shaping (requires knowing text width).
+  // Parse text-anchor attribute for horizontal alignment.
+  // SVG values: start (default), middle, end.
   std::string anchor = getAttribute(element, "text-anchor");
-  // Note: text-anchor adjustment would require knowing the text width after shaping.
-  // For now, we store the x position as-is. A full implementation would need to
-  // adjust x based on anchor after calculating the text bounds.
 
   // Get text content from child text nodes.
   std::string textContent;
@@ -550,6 +545,23 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
     }
 
     group->elements.push_back(std::move(textSpan));
+
+    // Add TextLayout modifier if text-anchor requires alignment.
+    // SVG text-anchor maps to PAGX TextLayout.textAlign:
+    //   start  -> Left (default, no TextLayout needed)
+    //   middle -> Center
+    //   end    -> Right
+    if (!anchor.empty() && anchor != "start") {
+      auto textLayout = std::make_unique<TextLayout>();
+      textLayout->width = 0;   // auto-width
+      textLayout->height = 0;  // auto-height
+      if (anchor == "middle") {
+        textLayout->textAlign = TextAlign::Center;
+      } else if (anchor == "end") {
+        textLayout->textAlign = TextAlign::Right;
+      }
+      group->elements.push_back(std::move(textLayout));
+    }
   }
 
   addFillStroke(element, group->elements, inheritedStyle);
@@ -903,8 +915,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillNode->alpha = std::stof(fillOpacity);
       }
 
-      // Store the original color string for later parsing in LayerBuilder.
-      fillNode->color = fill;
+      // Convert color to hex format for PAGX compatibility.
+      // Named colors (e.g., "black", "red") are converted to their hex values.
+      fillNode->color = colorToHex(fill);
 
       // Determine effective fill-rule.
       std::string fillRule = getAttribute(element, "fill-rule");
@@ -952,8 +965,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         strokeNode->alpha = std::stof(strokeOpacity);
       }
 
-      // Store the original color string for later parsing in LayerBuilder.
-      strokeNode->color = stroke;
+      // Convert color to hex format for PAGX compatibility.
+      // Named colors (e.g., "black", "red") are converted to their hex values.
+      strokeNode->color = colorToHex(stroke);
     }
 
     std::string strokeWidth = getAttribute(element, "stroke-width");
@@ -1376,6 +1390,23 @@ Color SVGParserImpl::parseColor(const std::string& value) {
   }
 
   return {0, 0, 0, 1};
+}
+
+std::string SVGParserImpl::colorToHex(const std::string& value) {
+  if (value.empty() || value == "none") {
+    return value;
+  }
+  // Already a hex color, return as-is.
+  if (value[0] == '#') {
+    return value;
+  }
+  // url() references should be returned as-is.
+  if (value.find("url(") == 0) {
+    return value;
+  }
+  // Parse the color (handles named colors, rgb, rgba, etc.) and convert to hex.
+  Color color = parseColor(value);
+  return color.toHexString(color.alpha < 1.0f);
 }
 
 float SVGParserImpl::parseLength(const std::string& value, float containerSize) {

@@ -45,6 +45,7 @@
 #include "pagx/model/RoundCorner.h"
 #include "pagx/model/SolidColor.h"
 #include "pagx/model/Stroke.h"
+#include "pagx/model/TextLayout.h"
 #include "pagx/model/TextSpan.h"
 #include "pagx/model/TrimPath.h"
 #include "pagx/SVGImporter.h"
@@ -370,6 +371,9 @@ class LayerBuilderImpl {
         return convertRepeater(static_cast<const Repeater*>(node));
       case ElementType::Group:
         return convertGroup(static_cast<const Group*>(node));
+      case ElementType::TextLayout:
+        // TextLayout is handled in convertGroup, not converted directly.
+        return nullptr;
       default:
         return nullptr;
     }
@@ -433,7 +437,6 @@ class LayerBuilderImpl {
       typeface = _options.fallbackTypefaces[0];
     }
 
-    float xOffset = 0;
     if (!node->text.empty()) {
       std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
       // Use TextShaper for fallback support (including emoji).
@@ -446,7 +449,7 @@ class LayerBuilderImpl {
       textSpan->setTextBlob(textBlob);
     }
 
-    textSpan->setPosition(tgfx::Point::Make(node->x + xOffset, node->y));
+    textSpan->setPosition(tgfx::Point::Make(node->x, node->y));
     return textSpan;
   }
 
@@ -659,7 +662,122 @@ class LayerBuilderImpl {
     auto group = std::make_shared<tgfx::VectorGroup>();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
 
+    // Check if group contains TextLayout modifier.
+    const TextLayout* textLayout = nullptr;
     for (const auto& element : node->elements) {
+      if (element->type() == ElementType::TextLayout) {
+        textLayout = static_cast<const TextLayout*>(element.get());
+        break;
+      }
+    }
+
+    // Collect TextSpan info for layout calculation if TextLayout is present.
+    struct TextSpanInfo {
+      const pagx::TextSpan* span = nullptr;
+      std::shared_ptr<tgfx::TextBlob> blob = nullptr;
+      tgfx::Rect bounds = {};
+    };
+    std::vector<TextSpanInfo> textSpans;
+
+    if (textLayout != nullptr) {
+      for (const auto& element : node->elements) {
+        if (element->type() == ElementType::TextSpan) {
+          auto span = static_cast<const pagx::TextSpan*>(element.get());
+          TextSpanInfo info;
+          info.span = span;
+
+          // Create TextBlob to measure bounds.
+          std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+          if (!span->font.empty() && !_options.fallbackTypefaces.empty()) {
+            for (const auto& tf : _options.fallbackTypefaces) {
+              if (tf && tf->fontFamily() == span->font) {
+                typeface = tf;
+                break;
+              }
+            }
+          }
+          if (!typeface && !_options.fallbackTypefaces.empty()) {
+            typeface = _options.fallbackTypefaces[0];
+          }
+
+          if (!span->text.empty()) {
+            if (_textShaper) {
+              info.blob = _textShaper->shape(span->text, typeface, span->fontSize);
+            } else if (typeface) {
+              auto font = tgfx::Font(typeface, span->fontSize);
+              info.blob = tgfx::TextBlob::MakeFrom(span->text, font);
+            }
+            if (info.blob) {
+              info.bounds = info.blob->getBounds();
+            }
+          }
+          textSpans.push_back(info);
+        }
+      }
+    }
+
+    for (const auto& element : node->elements) {
+      // Skip TextLayout modifier, it's handled by adjusting TextSpan positions.
+      if (element->type() == ElementType::TextLayout) {
+        continue;
+      }
+
+      // Handle TextSpan with layout adjustments.
+      if (element->type() == ElementType::TextSpan && textLayout != nullptr) {
+        auto span = static_cast<const pagx::TextSpan*>(element.get());
+        auto tgfxTextSpan = std::make_shared<tgfx::TextSpan>();
+
+        // Find the matching TextSpanInfo.
+        TextSpanInfo* info = nullptr;
+        for (auto& ts : textSpans) {
+          if (ts.span == span) {
+            info = &ts;
+            break;
+          }
+        }
+
+        if (info != nullptr && info->blob) {
+          tgfxTextSpan->setTextBlob(info->blob);
+
+          // Calculate x offset based on textAlign.
+          // TextBlob bounds are relative to the drawing origin (0, 0).
+          // When position is (x, y), text left edge is at x + bounds.left,
+          // and text right edge is at x + bounds.right.
+          //
+          // For textAlign:
+          //   Left:   text left edge at x → xOffset = -bounds.left
+          //   Center: text center at x    → xOffset = -(bounds.left + bounds.right) / 2
+          //   Right:  text right edge at x → xOffset = -bounds.right
+          float xOffset = 0;
+          switch (textLayout->textAlign) {
+            case TextAlign::Left:
+              // x is the left edge of text.
+              xOffset = -info->bounds.left;
+              break;
+            case TextAlign::Center:
+              // x is the center of text.
+              xOffset = -(info->bounds.left + info->bounds.right) / 2.0f;
+              break;
+            case TextAlign::Right:
+              // x is the right edge of text.
+              xOffset = -info->bounds.right;
+              break;
+            case TextAlign::Justify:
+              // Justify requires more complex handling, treat as left for now.
+              xOffset = -info->bounds.left;
+              break;
+          }
+
+          tgfxTextSpan->setPosition(tgfx::Point::Make(span->x + xOffset, span->y));
+        } else {
+          // No blob, use original position.
+          tgfxTextSpan->setPosition(tgfx::Point::Make(span->x, span->y));
+        }
+
+        elements.push_back(tgfxTextSpan);
+        continue;
+      }
+
       auto tgfxElement = convertVectorElement(element.get());
       if (tgfxElement) {
         elements.push_back(tgfxElement);

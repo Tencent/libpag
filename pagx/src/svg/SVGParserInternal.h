@@ -36,6 +36,7 @@
 #include "pagx/model/RadialGradient.h"
 #include "pagx/model/Rectangle.h"
 #include "pagx/model/Stroke.h"
+#include "pagx/model/TextLayout.h"
 #include "pagx/model/TextSpan.h"
 #include "pagx/SVGImporter.h"
 #include "xml/XMLDOM.h"
@@ -111,6 +112,9 @@ class SVGParserImpl {
 
   Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
+  // Convert a color string (hex, rgb, rgba, or named color) to hex format.
+  // Named colors are converted to their hex equivalents for PAGX compatibility.
+  std::string colorToHex(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
   std::vector<float> parseViewBox(const std::string& value);
   PathData parsePoints(const std::string& value, bool closed);
