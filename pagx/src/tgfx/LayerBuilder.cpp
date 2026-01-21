@@ -708,7 +708,7 @@ class LayerBuilderImpl {
               info.blob = tgfx::TextBlob::MakeFrom(span->text, font);
             }
             if (info.blob) {
-              info.bounds = info.blob->getBounds();
+              info.bounds = info.blob->getTightBounds();
             }
           }
           textSpans.push_back(info);
@@ -740,31 +740,22 @@ class LayerBuilderImpl {
           tgfxTextSpan->setTextBlob(info->blob);
 
           // Calculate x offset based on textAlign.
-          // TextBlob bounds are relative to the drawing origin (0, 0).
-          // When position is (x, y), text left edge is at x + bounds.left,
-          // and text right edge is at x + bounds.right.
-          //
-          // For textAlign:
-          //   Left:   text left edge at x → xOffset = -bounds.left
-          //   Center: text center at x    → xOffset = -(bounds.left + bounds.right) / 2
-          //   Right:  text right edge at x → xOffset = -bounds.right
+          // This follows tgfx SVG text-anchor handling: xOffset = alignmentFactor * width
+          // where alignmentFactor is: Left=0, Center=-0.5, Right=-1.0
           float xOffset = 0;
+          float textWidth = info->bounds.width();
           switch (textLayout->textAlign) {
             case TextAlign::Left:
-              // x is the left edge of text.
-              xOffset = -info->bounds.left;
+              // No offset needed.
               break;
             case TextAlign::Center:
-              // x is the center of text.
-              xOffset = -(info->bounds.left + info->bounds.right) / 2.0f;
+              xOffset = -0.5f * textWidth;
               break;
             case TextAlign::Right:
-              // x is the right edge of text.
-              xOffset = -info->bounds.right;
+              xOffset = -textWidth;
               break;
             case TextAlign::Justify:
               // Justify requires more complex handling, treat as left for now.
-              xOffset = -info->bounds.left;
               break;
           }
 
