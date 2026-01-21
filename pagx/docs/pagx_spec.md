@@ -1,6 +1,6 @@
 # PAGX 格式规范 v1.0
 
-## 1. Introduction（介绍）
+## 1. 介绍（Introduction）
 
 **PAGX**（Portable Animated Graphics XML）是一种基于 XML 的矢量动画标记语言。它提供了统一且强大的矢量图形与动画描述能力，旨在成为跨所有主要工具与运行时的矢量动画交换标准。
 
@@ -20,7 +20,7 @@
 
 ### 1.2 文件结构
 
-PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视频、音频、字体等），也支持通过数据 URI 内嵌资源。PAGX 与二进制 PAG 格式可双向互转：发布时转换为 PAG 以优化加载性能，调试时转换回 PAGX 以便阅读和编辑。
+PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视频、音频、字体等），也支持通过数据 URI 内嵌资源。PAGX 与二进制 PAG 格式可双向互转：发布时转换为 PAG 以优化加载性能；开发、审查或编辑时可使用 PAGX 格式以便阅读和修改。
 
 ### 1.3 文档组织
 
@@ -34,12 +34,12 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 **附录**（方便速查）：
 
 - **附录 A**：节点层级与包含关系
-- **附录 B**：示例
+- **附录 B**：常见用法示例
 - **附录 C**：节点与属性速查
 
 ---
 
-## 2. Basic Data Types（基础数据类型）
+## 2. 基础数据类型（Basic Data Types）
 
 本节定义 PAGX 文档中使用的基础数据类型和命名规范。
 
@@ -200,7 +200,7 @@ PAGX 支持多种颜色格式：
 
 ---
 
-## 3. Document Structure（文档结构）
+## 3. 文档结构（Document Structure）
 
 本节定义 PAGX 文档的整体结构。
 
@@ -235,7 +235,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 **图层渲染顺序**：图层按文档顺序依次渲染，文档中靠前的图层先渲染（位于下方），靠后的图层后渲染（位于上方）。
 
-### 3.3 Resources（资源区）
+### 3.3 资源区（Resources）
 
 `<Resources>` 定义可复用的资源，包括图片、路径数据、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `#id` 形式引用。
 
@@ -255,7 +255,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 </Resources>
 ```
 
-#### 3.3.1 Image（图片）
+#### 3.3.1 图片（Image）
 
 图片资源定义可在文档中引用的位图数据。
 
@@ -270,7 +270,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 **支持格式**：PNG、JPEG、WebP、GIF
 
-#### 3.3.2 PathData（路径数据）
+#### 3.3.2 路径数据（PathData）
 
 PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器引用。
 
@@ -289,7 +289,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 1. **共享定义**：在 `<Resources>` 中预定义，通过 `#id` 引用。适用于**被多处引用**的颜色源。
 2. **内联定义**：直接嵌套在 `<Fill>` 或 `<Stroke>` 元素内部。适用于**仅使用一次**的颜色源，更简洁。
 
-##### SolidColor（纯色）
+##### 纯色（SolidColor）
 
 ```xml
 <SolidColor color="#FF0000"/>
@@ -299,7 +299,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 |------|------|--------|------|
 | `color` | color | (必填) | 颜色值 |
 
-##### LinearGradient（线性渐变）
+##### 线性渐变（LinearGradient）
 
 线性渐变沿起点到终点的方向插值。
 
@@ -318,7 +318,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 **计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
 
-##### RadialGradient（径向渐变）
+##### 径向渐变（RadialGradient）
 
 径向渐变从中心向外辐射。
 
@@ -337,7 +337,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 **计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
 
-##### ConicGradient（锥形渐变）
+##### 锥形渐变（ConicGradient）
 
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
@@ -357,7 +357,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 **计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
 
-##### DiamondGradient（菱形渐变）
+##### 菱形渐变（DiamondGradient）
 
 菱形渐变从中心向四角辐射。
 
@@ -376,7 +376,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 **计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
 
-##### ColorStop（渐变色标）
+##### 渐变色标（ColorStop）
 
 ```xml
 <ColorStop offset="0.5" color="#FF0000"/>
@@ -395,11 +395,30 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
   - `offset > 1` 的色标被视为 `offset = 1`
   - 如果没有 `offset = 0` 的色标，使用第一个色标的颜色填充
   - 如果没有 `offset = 1` 的色标，使用最后一个色标的颜色填充
-- **渐变变换**：`matrix` 属性对渐变坐标系应用变换
+
+##### 图片填充（ImagePattern）
+
+图片图案使用图片作为颜色源。
+
+```xml
+<ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `image` | idref | (必填) | 图片引用 "#id" |
+| `tileModeX` | TileMode | clamp | X 方向平铺模式 |
+| `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
+| `sampling` | SamplingMode | linear | 采样模式 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
+
+**SamplingMode（采样模式）**：`nearest`（最近邻）、`linear`（双线性）、`mipmap`（多级渐远）
 
 ##### 颜色源坐标系统
 
-所有颜色源（渐变、图案）的坐标系是**相对于几何元素的局部坐标系原点**。
+除纯色外，所有颜色源（渐变、图片填充）都有坐标系的概念，其坐标系**相对于几何元素的局部坐标系原点**。可通过 `matrix` 属性对颜色源坐标系应用变换。
 
 **变换行为**：
 
@@ -428,29 +447,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-##### ImagePattern（图片图案）
-
-图片图案使用图片作为颜色源。
-
-```xml
-<ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `image` | idref | (必填) | 图片引用 "#id" |
-| `tileModeX` | TileMode | clamp | X 方向平铺模式 |
-| `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
-| `sampling` | SamplingMode | linear | 采样模式 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
-
-**SamplingMode（采样模式）**：`nearest`（最近邻）、`linear`（双线性）、`mipmap`（多级渐远）
-
-**图案变换**：`matrix` 属性对图案应用变换，`matrix="2,0,0,2,0,0"` 使图案视觉上放大 2 倍。
-
-#### 3.3.4 Composition（合成）
+#### 3.3.4 合成（Composition）
 
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
 
@@ -504,11 +501,11 @@ PAGX 文档采用层级结构组织内容：
 
 ---
 
-## 4. Layer System（图层系统）
+## 4. 图层系统（Layer System）
 
 图层（Layer）是 PAGX 内容组织的基本单元，提供了丰富的视觉效果控制能力。
 
-### 4.1 Layer（图层）
+### 4.1 图层（Layer）
 
 `<Layer>` 是内容和子图层的基本容器。
 
@@ -639,7 +636,7 @@ PAGX 文档采用层级结构组织内容：
 
 上例中，矩形填充完全透明不可见，但投影阴影仍然会基于矩形的轮廓生成。
 
-### 4.2 Layer Styles（图层样式）
+### 4.2 图层样式（Layer Styles）
 
 图层样式在图层内容渲染完成后应用。
 
@@ -657,7 +654,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
 
-#### 4.2.1 DropShadowStyle（投影阴影）
+#### 4.2.1 投影阴影（DropShadowStyle）
 
 在图层外部绘制投影阴影。
 
@@ -679,7 +676,7 @@ PAGX 文档采用层级结构组织内容：
 - `true`：阴影完整显示，包括被图层内容遮挡的部分
 - `false`：阴影被图层内容遮挡的部分会被挖空（仅显示图层轮廓外的阴影）
 
-#### 4.2.2 InnerShadowStyle（内阴影）
+#### 4.2.2 内阴影（InnerShadowStyle）
 
 在图层内部绘制内阴影。
 
@@ -696,7 +693,7 @@ PAGX 文档采用层级结构组织内容：
 2. 偏移并模糊
 3. 与图层内容求交集
 
-#### 4.2.3 BackgroundBlurStyle（背景模糊）
+#### 4.2.3 背景模糊（BackgroundBlurStyle）
 
 对图层下方的背景应用模糊效果。
 
@@ -711,7 +708,7 @@ PAGX 文档采用层级结构组织内容：
 2. 应用高斯模糊 `(blurrinessX, blurrinessY)`
 3. 使用图层轮廓作为遮罩裁剪模糊结果
 
-### 4.3 Filter Effects（滤镜效果）
+### 4.3 滤镜效果（Filter Effects）
 
 滤镜按文档顺序链式应用，每个滤镜的输出作为下一个滤镜的输入。
 
@@ -723,7 +720,7 @@ PAGX 文档采用层级结构组织内容：
 </filters>
 ```
 
-#### 4.3.1 BlurFilter（模糊滤镜）
+#### 4.3.1 模糊滤镜（BlurFilter）
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -731,7 +728,7 @@ PAGX 文档采用层级结构组织内容：
 | `blurrinessY` | float | (必填) | Y 模糊半径 |
 | `tileMode` | TileMode | decal | 平铺模式 |
 
-#### 4.3.2 DropShadowFilter（投影阴影滤镜）
+#### 4.3.2 投影阴影滤镜（DropShadowFilter）
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -742,7 +739,7 @@ PAGX 文档采用层级结构组织内容：
 | `color` | color | #000000 | 阴影颜色 |
 | `shadowOnly` | bool | false | 仅显示阴影 |
 
-#### 4.3.3 InnerShadowFilter（内阴影滤镜）
+#### 4.3.3 内阴影滤镜（InnerShadowFilter）
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -753,7 +750,7 @@ PAGX 文档采用层级结构组织内容：
 | `color` | color | #000000 | 阴影颜色 |
 | `shadowOnly` | bool | false | 仅显示阴影 |
 
-#### 4.3.4 BlendFilter（混合滤镜）
+#### 4.3.4 混合滤镜（BlendFilter）
 
 将指定颜色以指定混合模式叠加到图层上。
 
@@ -762,7 +759,7 @@ PAGX 文档采用层级结构组织内容：
 | `color` | color | (必填) | 混合颜色 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
 
-#### 4.3.5 ColorMatrixFilter（颜色矩阵滤镜）
+#### 4.3.5 颜色矩阵滤镜（ColorMatrixFilter）
 
 使用 4×5 颜色矩阵变换颜色。
 
@@ -779,7 +776,7 @@ PAGX 文档采用层级结构组织内容：
                                             | 1 |
 ```
 
-### 4.4 Clipping and Masking（裁剪与遮罩）
+### 4.4 裁剪与遮罩（Clipping and Masking）
 
 #### 4.4.1 scrollRect（滚动裁剪）
 
@@ -819,11 +816,11 @@ PAGX 文档采用层级结构组织内容：
 
 ---
 
-## 5. VectorElement System（矢量元素系统）
+## 5. 矢量元素系统（VectorElement System）
 
 矢量元素系统定义了图层 `<contents>` 内的矢量内容如何被处理和渲染。
 
-### 5.1 Processing Model（处理模型）
+### 5.1 处理模型（Processing Model）
 
 VectorElement 系统采用**累积-渲染**的处理模型：几何元素在渲染上下文中累积，修改器对累积的几何进行变换，绘制器触发最终渲染。
 
@@ -886,11 +883,11 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 | 文本修改器（TextModifier、TextPath、TextLayout） | 仅字形列表 | 对 Path 无效 |
 | 复制器（Repeater） | Path + 字形列表 | 同时作用于所有几何 |
 
-### 5.2 Geometry Elements（几何元素）
+### 5.2 几何元素（Geometry Elements）
 
 几何元素提供可渲染的形状。
 
-#### 5.2.1 Rectangle（矩形）
+#### 5.2.1 矩形（Rectangle）
 
 矩形从中心点定义，支持统一圆角。
 
@@ -919,7 +916,7 @@ rect.bottom = center.y + size.height / 2
 
 **路径起点**：矩形路径从**右上角**开始，顺时针方向绘制（`reversed="false"` 时）。
 
-#### 5.2.2 Ellipse（椭圆）
+#### 5.2.2 椭圆（Ellipse）
 
 椭圆从中心点定义。
 
@@ -943,7 +940,7 @@ boundingRect.bottom = center.y + size.height / 2
 
 **路径起点**：椭圆路径从**右侧中点**（3 点钟方向）开始。
 
-#### 5.2.3 Polystar（多边形/星形）
+#### 5.2.3 多边形/星形（Polystar）
 
 支持正多边形和星形两种模式。
 
@@ -996,7 +993,7 @@ y = center.y + outerRadius * sin(angle)
 - 0 表示尖角，1 表示完全圆滑
 - 圆度通过在顶点处添加贝塞尔控制点实现
 
-#### 5.2.4 Path（路径）
+#### 5.2.4 路径（Path）
 
 使用 SVG 路径语法定义任意形状，支持内联数据或引用 Resources 中定义的 PathData。
 
@@ -1013,7 +1010,7 @@ y = center.y + outerRadius * sin(angle)
 | `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "#id" |
 | `reversed` | bool | false | 反转路径方向 |
 
-#### 5.2.5 TextSpan（文本片段）
+#### 5.2.5 文本片段（TextSpan）
 
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
@@ -1042,11 +1039,11 @@ y = center.y + outerRadius * sin(angle)
 
 **字体回退**：当指定字体不可用时，按平台默认字体回退链选择替代字体。
 
-### 5.3 Painters（绘制器）
+### 5.3 绘制器（Painters）
 
 绘制器（Fill、Stroke）对**当前时刻**累积的所有几何（Path 和字形列表）进行渲染。
 
-#### 5.3.1 Fill（填充）
+#### 5.3.1 填充（Fill）
 
 填充使用指定的颜色源绘制几何的内部区域。
 
@@ -1091,7 +1088,7 @@ y = center.y + outerRadius * sin(angle)
 - 支持通过 TextModifier 对单个字形应用颜色覆盖
 - 颜色覆盖采用 alpha 混合：`finalColor = lerp(originalColor, overrideColor, overrideAlpha)`
 
-#### 5.3.2 Stroke（描边）
+#### 5.3.2 描边（Stroke）
 
 描边沿几何边界绘制线条。
 
@@ -1157,7 +1154,7 @@ y = center.y + outerRadius * sin(angle)
 - `dashes`：定义虚线段长度序列，如 `"5,3"` 表示 5px 实线 + 3px 空白
 - `dashOffset`：虚线起始偏移量
 
-#### 5.3.3 LayerPlacement（绘制位置）
+#### 5.3.3 绘制位置（LayerPlacement）
 
 Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
@@ -1166,11 +1163,11 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 | `background` | 在子图层**下方**绘制（默认） |
 | `foreground` | 在子图层**上方**绘制 |
 
-### 5.4 Shape Modifiers（形状修改器）
+### 5.4 形状修改器（Shape Modifiers）
 
 形状修改器对累积的 Path 进行**原地变换**，对字形列表则触发强制转换为 Path。
 
-#### 5.4.1 TrimPath（路径裁剪）
+#### 5.4.1 路径裁剪（TrimPath）
 
 裁剪路径到指定的起止范围。
 
@@ -1204,7 +1201,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <TrimPath start="0.25" end="0.75" type="continuous"/>
 ```
 
-#### 5.4.2 RoundCorner（圆角）
+#### 5.4.2 圆角（RoundCorner）
 
 将路径的尖角转换为圆角。
 
@@ -1221,7 +1218,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 - 圆角半径自动限制为不超过相邻边长度的一半
 - `radius <= 0` 时不执行任何操作
 
-#### 5.4.3 MergePath（路径合并）
+#### 5.4.3 路径合并（MergePath）
 
 将所有形状合并为单个形状。
 
@@ -1257,7 +1254,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <Fill color="#0000FF"/>
 ```
 
-### 5.5 Text Modifiers（文本修改器）
+### 5.5 文本修改器（Text Modifiers）
 
 文本修改器对文本中的独立字形进行变换。
 
@@ -1319,7 +1316,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 </Group>
 ```
 
-#### 5.5.3 TextModifier（文本变换器）
+#### 5.5.3 文本变换器（TextModifier）
 
 对选定范围内的字形应用变换和样式覆盖。
 
@@ -1376,7 +1373,7 @@ blendFactor = overrideColor.alpha × |factor|
 finalColor = blend(originalColor, overrideColor, blendFactor)
 ```
 
-#### 5.5.4 RangeSelector（范围选择器）
+#### 5.5.4 范围选择器（RangeSelector）
 
 范围选择器定义 TextModifier 影响的字形范围和影响程度。
 
@@ -1427,7 +1424,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `max` | 最大：取最大值 |
 | `difference` | 差值：取绝对差值 |
 
-#### 5.5.5 TextPath（文本路径）
+#### 5.5.5 文本路径（TextPath）
 
 将文本沿指定路径排列。
 
@@ -1466,7 +1463,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 **强制对齐**：`forceAlignment="true"` 时，自动调整字间距以填满可用路径长度（减去边距）。
 
-#### 5.5.6 TextLayout（文本排版）
+#### 5.5.6 文本排版（TextLayout）
 
 文本排版修改器对累积的文本元素应用段落排版，是 PAGX 格式特有的元素。与 TextPath 类似，TextLayout 作用于累积的字形列表，为其应用自动换行和对齐。
 
@@ -1534,7 +1531,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 </Group>
 ```
 
-### 5.6 Repeater（复制器）
+### 5.6 复制器（Repeater）
 
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
 
@@ -1608,7 +1605,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 </Group>
 ```
 
-### 5.7 Group（容器）
+### 5.7 容器（Group）
 
 Group 是带变换属性的矢量元素容器。
 
@@ -1739,7 +1736,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 ---
 
-## Appendix A. Node Hierarchy（节点层级与包含关系）
+## 附录 A. 节点层级与包含关系（Node Hierarchy）
 
 本附录描述节点的分类和嵌套规则。
 
@@ -1816,7 +1813,7 @@ Layer.contents / Group
 
 ---
 
-## Appendix B. Examples（示例）
+## 附录 B. 常见用法示例（Examples）
 
 ### B.1 完整示例
 
@@ -1989,7 +1986,7 @@ Layer.contents / Group
 
 ---
 
-## Appendix C. Node and Attribute Reference（节点与属性速查）
+## 附录 C. 节点与属性速查（Node and Attribute Reference）
 
 本附录列出所有节点的属性定义，省略详细说明。
 
