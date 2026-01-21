@@ -19,9 +19,8 @@
 #include <filesystem>
 #include "pagx/LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
-#include "pagx/PAGXNode.h"
 #include "pagx/PAGXSVGParser.h"
-#include "pagx/PAGXTypes.h"
+#include "pagx/model/Model.h"
 #include "pagx/PathData.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
@@ -187,8 +186,8 @@ PAG_TEST(PAGXTest, PathDataForEach) {
  * Test case: Strong-typed PAGX node creation
  */
 PAG_TEST(PAGXTest, PAGXNodeBasic) {
-  // Test RectangleNode creation
-  auto rect = std::make_unique<pagx::RectangleNode>();
+  // Test Rectangle creation
+  auto rect = std::make_unique<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 100;
@@ -200,21 +199,21 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
   EXPECT_FLOAT_EQ(rect->center.x, 50);
   EXPECT_FLOAT_EQ(rect->size.width, 100);
 
-  // Test PathNode creation
-  auto path = std::make_unique<pagx::PathNode>();
+  // Test Path creation
+  auto path = std::make_unique<pagx::Path>();
   path->data = pagx::PathData::FromSVGString("M0 0 L100 100");
   EXPECT_EQ(path->type(), pagx::NodeType::Path);
   EXPECT_GT(path->data.verbs().size(), 0u);
 
-  // Test FillNode creation
-  auto fill = std::make_unique<pagx::FillNode>();
+  // Test Fill creation
+  auto fill = std::make_unique<pagx::Fill>();
   fill->color = "#FF0000";
   fill->alpha = 0.8f;
   EXPECT_EQ(fill->type(), pagx::NodeType::Fill);
   EXPECT_EQ(fill->color, "#FF0000");
 
-  // Test GroupNode with children
-  auto group = std::make_unique<pagx::GroupNode>();
+  // Test Group with children
+  auto group = std::make_unique<pagx::Group>();
   group->name = "testGroup";
   group->elements.push_back(std::move(rect));
   group->elements.push_back(std::move(fill));
@@ -232,21 +231,21 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
   EXPECT_EQ(doc->height, 300.0f);
 
   // Create a layer with contents
-  auto layer = std::make_unique<pagx::LayerNode>();
+  auto layer = std::make_unique<pagx::Layer>();
   layer->id = "layer1";
   layer->name = "Test Layer";
 
   // Add a group with rectangle and fill
-  auto group = std::make_unique<pagx::GroupNode>();
+  auto group = std::make_unique<pagx::Group>();
   group->name = "testGroup";
 
-  auto rect = std::make_unique<pagx::RectangleNode>();
+  auto rect = std::make_unique<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 80;
   rect->size.height = 60;
 
-  auto fill = std::make_unique<pagx::FillNode>();
+  auto fill = std::make_unique<pagx::Fill>();
   fill->color = "#0000FF";
 
   group->elements.push_back(std::move(rect));
@@ -275,16 +274,16 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   auto doc1 = pagx::PAGXDocument::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
-  auto layer = std::make_unique<pagx::LayerNode>();
+  auto layer = std::make_unique<pagx::Layer>();
   layer->name = "TestLayer";
 
-  auto rect = std::make_unique<pagx::RectangleNode>();
+  auto rect = std::make_unique<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 80;
   rect->size.height = 60;
 
-  auto fill = std::make_unique<pagx::FillNode>();
+  auto fill = std::make_unique<pagx::Fill>();
   fill->color = "#00FF00";
 
   layer->contents.push_back(std::move(rect));
@@ -361,25 +360,25 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
 /**
  * Test case: Color source nodes
  */
-PAG_TEST(PAGXTest, ColorSourceNodes) {
-  // Test SolidColorNode
-  auto solid = std::make_unique<pagx::SolidColorNode>();
+PAG_TEST(PAGXTest, ColorSources) {
+  // Test SolidColor
+  auto solid = std::make_unique<pagx::SolidColor>();
   solid->color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
   EXPECT_EQ(solid->type(), pagx::NodeType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
-  // Test LinearGradientNode
-  auto linear = std::make_unique<pagx::LinearGradientNode>();
+  // Test LinearGradient
+  auto linear = std::make_unique<pagx::LinearGradient>();
   linear->startPoint.x = 0;
   linear->startPoint.y = 0;
   linear->endPoint.x = 100;
   linear->endPoint.y = 0;
 
-  pagx::ColorStopNode stop1;
+  pagx::ColorStop stop1;
   stop1.offset = 0;
   stop1.color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
 
-  pagx::ColorStopNode stop2;
+  pagx::ColorStop stop2;
   stop2.offset = 1;
   stop2.color = pagx::Color::FromRGBA(0.0f, 0.0f, 1.0f, 1.0f);
 
@@ -389,8 +388,8 @@ PAG_TEST(PAGXTest, ColorSourceNodes) {
   EXPECT_EQ(linear->type(), pagx::NodeType::LinearGradient);
   EXPECT_EQ(linear->colorStops.size(), 2u);
 
-  // Test RadialGradientNode
-  auto radial = std::make_unique<pagx::RadialGradientNode>();
+  // Test RadialGradient
+  auto radial = std::make_unique<pagx::RadialGradient>();
   radial->center.x = 50;
   radial->center.y = 50;
   radial->radius = 50;
@@ -402,14 +401,14 @@ PAG_TEST(PAGXTest, ColorSourceNodes) {
 /**
  * Test case: Layer node with styles and filters
  */
-PAG_TEST(PAGXTest, LayerNodeStylesFilters) {
-  auto layer = std::make_unique<pagx::LayerNode>();
+PAG_TEST(PAGXTest, LayerStylesFilters) {
+  auto layer = std::make_unique<pagx::Layer>();
   layer->name = "StyledLayer";
   layer->alpha = 0.8f;
   layer->blendMode = pagx::BlendMode::Multiply;
 
   // Add drop shadow style
-  auto dropShadow = std::make_unique<pagx::DropShadowStyleNode>();
+  auto dropShadow = std::make_unique<pagx::DropShadowStyle>();
   dropShadow->offsetX = 5;
   dropShadow->offsetY = 5;
   dropShadow->blurrinessX = 10;
@@ -418,7 +417,7 @@ PAG_TEST(PAGXTest, LayerNodeStylesFilters) {
   layer->styles.push_back(std::move(dropShadow));
 
   // Add blur filter
-  auto blur = std::make_unique<pagx::BlurFilterNode>();
+  auto blur = std::make_unique<pagx::BlurFilter>();
   blur->blurrinessX = 5;
   blur->blurrinessY = 5;
   layer->filters.push_back(std::move(blur));
@@ -434,7 +433,7 @@ PAG_TEST(PAGXTest, LayerNodeStylesFilters) {
  */
 PAG_TEST(PAGXTest, NodeClone) {
   // Test simple node clone
-  auto rect = std::make_unique<pagx::RectangleNode>();
+  auto rect = std::make_unique<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 100;
@@ -444,18 +443,18 @@ PAG_TEST(PAGXTest, NodeClone) {
   ASSERT_TRUE(cloned != nullptr);
   EXPECT_EQ(cloned->type(), pagx::NodeType::Rectangle);
 
-  auto clonedRect = static_cast<pagx::RectangleNode*>(cloned.get());
+  auto clonedRect = static_cast<pagx::Rectangle*>(cloned.get());
   EXPECT_FLOAT_EQ(clonedRect->center.x, 50);
   EXPECT_FLOAT_EQ(clonedRect->size.width, 100);
 
   // Test group with children clone
-  auto group = std::make_unique<pagx::GroupNode>();
+  auto group = std::make_unique<pagx::Group>();
   group->name = "testGroup";
   group->elements.push_back(std::move(rect));
 
   auto clonedGroup = group->clone();
   ASSERT_TRUE(clonedGroup != nullptr);
-  auto clonedGroupPtr = static_cast<pagx::GroupNode*>(clonedGroup.get());
+  auto clonedGroupPtr = static_cast<pagx::Group*>(clonedGroup.get());
   EXPECT_EQ(clonedGroupPtr->name, "testGroup");
   EXPECT_EQ(clonedGroupPtr->elements.size(), 1u);
 }

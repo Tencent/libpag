@@ -54,12 +54,12 @@ class PAGXDocument {
    * Resources (images, gradients, compositions, etc.).
    * These can be referenced by "#id" in the document.
    */
-  std::vector<std::unique_ptr<ResourceNode>> resources = {};
+  std::vector<std::unique_ptr<Resource>> resources = {};
 
   /**
    * Top-level layers.
    */
-  std::vector<std::unique_ptr<LayerNode>> layers = {};
+  std::vector<std::unique_ptr<Layer>> layers = {};
 
   /**
    * Base path for resolving relative resource paths.
@@ -103,23 +103,23 @@ class PAGXDocument {
    * Finds a resource by ID.
    * Returns nullptr if not found.
    */
-  ResourceNode* findResource(const std::string& id) const;
+  Resource* findResource(const std::string& id) const;
 
   /**
    * Finds a layer by ID (searches recursively).
    * Returns nullptr if not found.
    */
-  LayerNode* findLayer(const std::string& id) const;
+  Layer* findLayer(const std::string& id) const;
 
  private:
   friend class PAGXXMLParser;
   PAGXDocument() = default;
 
-  mutable std::unordered_map<std::string, ResourceNode*> resourceMap = {};
+  mutable std::unordered_map<std::string, Resource*> resourceMap = {};
   mutable bool resourceMapDirty = true;
 
   void rebuildResourceMap() const;
-  static LayerNode* findLayerRecursive(const std::vector<std::unique_ptr<LayerNode>>& layers,
+  static Layer* findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
                                        const std::string& id);
 };
 

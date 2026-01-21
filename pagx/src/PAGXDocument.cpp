@@ -68,17 +68,17 @@ std::shared_ptr<PAGXDocument> PAGXDocument::clone() const {
   doc->basePath = basePath;
   for (const auto& resource : resources) {
     doc->resources.push_back(
-        std::unique_ptr<ResourceNode>(static_cast<ResourceNode*>(resource->clone().release())));
+        std::unique_ptr<Resource>(static_cast<Resource*>(resource->clone().release())));
   }
   for (const auto& layer : layers) {
     doc->layers.push_back(
-        std::unique_ptr<LayerNode>(static_cast<LayerNode*>(layer->clone().release())));
+        std::unique_ptr<Layer>(static_cast<Layer*>(layer->clone().release())));
   }
   doc->resourceMapDirty = true;
   return doc;
 }
 
-ResourceNode* PAGXDocument::findResource(const std::string& id) const {
+Resource* PAGXDocument::findResource(const std::string& id) const {
   if (resourceMapDirty) {
     rebuildResourceMap();
   }
@@ -86,7 +86,7 @@ ResourceNode* PAGXDocument::findResource(const std::string& id) const {
   return it != resourceMap.end() ? it->second : nullptr;
 }
 
-LayerNode* PAGXDocument::findLayer(const std::string& id) const {
+Layer* PAGXDocument::findLayer(const std::string& id) const {
   // First search in top-level layers
   auto found = findLayerRecursive(layers, id);
   if (found) {
@@ -95,7 +95,7 @@ LayerNode* PAGXDocument::findLayer(const std::string& id) const {
   // Then search in Composition resources
   for (const auto& resource : resources) {
     if (resource->type() == NodeType::Composition) {
-      auto comp = static_cast<const CompositionNode*>(resource.get());
+      auto comp = static_cast<const Composition*>(resource.get());
       found = findLayerRecursive(comp->layers, id);
       if (found) {
         return found;
@@ -115,7 +115,7 @@ void PAGXDocument::rebuildResourceMap() const {
   resourceMapDirty = false;
 }
 
-LayerNode* PAGXDocument::findLayerRecursive(const std::vector<std::unique_ptr<LayerNode>>& layers,
+Layer* PAGXDocument::findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
                                             const std::string& id) {
   for (const auto& layer : layers) {
     if (layer->id == id) {

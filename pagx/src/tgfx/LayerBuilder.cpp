@@ -203,7 +203,7 @@ class LayerBuilderImpl {
     // Build layer tree
     auto rootLayer = tgfx::Layer::Make();
     for (const auto& layer : document.layers) {
-      auto childLayer = convertLayerNode(layer.get());
+      auto childLayer = convertLayer(layer.get());
       if (childLayer) {
         rootLayer->addChild(childLayer);
       }
@@ -215,7 +215,7 @@ class LayerBuilderImpl {
   }
 
  private:
-  std::shared_ptr<tgfx::Layer> convertLayerNode(const LayerNode* node) {
+  std::shared_ptr<tgfx::Layer> convertLayer(const Layer* node) {
     if (!node) {
       return nullptr;
     }
@@ -232,7 +232,7 @@ class LayerBuilderImpl {
       applyLayerAttributes(node, layer.get());
 
       for (const auto& child : node->children) {
-        auto childLayer = convertLayerNode(child.get());
+        auto childLayer = convertLayer(child.get());
         if (childLayer) {
           layer->addChild(childLayer);
         }
@@ -242,7 +242,7 @@ class LayerBuilderImpl {
     return layer;
   }
 
-  std::shared_ptr<tgfx::Layer> convertVectorLayer(const LayerNode* node) {
+  std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
     auto layer = tgfx::VectorLayer::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
 
@@ -257,42 +257,42 @@ class LayerBuilderImpl {
     return layer;
   }
 
-  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const VectorElementNode* node) {
+  std::shared_ptr<tgfx::VectorElement> convertVectorElement(const VectorElement* node) {
     if (!node) {
       return nullptr;
     }
 
     switch (node->type()) {
       case NodeType::Rectangle:
-        return convertRectangle(static_cast<const RectangleNode*>(node));
+        return convertRectangle(static_cast<const Rectangle*>(node));
       case NodeType::Ellipse:
-        return convertEllipse(static_cast<const EllipseNode*>(node));
+        return convertEllipse(static_cast<const Ellipse*>(node));
       case NodeType::Polystar:
-        return convertPolystar(static_cast<const PolystarNode*>(node));
+        return convertPolystar(static_cast<const Polystar*>(node));
       case NodeType::Path:
-        return convertPath(static_cast<const PathNode*>(node));
+        return convertPath(static_cast<const Path*>(node));
       case NodeType::TextSpan:
-        return convertTextSpan(static_cast<const TextSpanNode*>(node));
+        return convertTextSpan(static_cast<const TextSpan*>(node));
       case NodeType::Fill:
-        return convertFill(static_cast<const FillNode*>(node));
+        return convertFill(static_cast<const Fill*>(node));
       case NodeType::Stroke:
-        return convertStroke(static_cast<const StrokeNode*>(node));
+        return convertStroke(static_cast<const Stroke*>(node));
       case NodeType::TrimPath:
-        return convertTrimPath(static_cast<const TrimPathNode*>(node));
+        return convertTrimPath(static_cast<const TrimPath*>(node));
       case NodeType::RoundCorner:
-        return convertRoundCorner(static_cast<const RoundCornerNode*>(node));
+        return convertRoundCorner(static_cast<const RoundCorner*>(node));
       case NodeType::MergePath:
-        return convertMergePath(static_cast<const MergePathNode*>(node));
+        return convertMergePath(static_cast<const MergePath*>(node));
       case NodeType::Repeater:
-        return convertRepeater(static_cast<const RepeaterNode*>(node));
+        return convertRepeater(static_cast<const Repeater*>(node));
       case NodeType::Group:
-        return convertGroup(static_cast<const GroupNode*>(node));
+        return convertGroup(static_cast<const Group*>(node));
       default:
         return nullptr;
     }
   }
 
-  std::shared_ptr<tgfx::Rectangle> convertRectangle(const RectangleNode* node) {
+  std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
     auto rect = std::make_shared<tgfx::Rectangle>();
     rect->setCenter(ToTGFX(node->center));
     rect->setSize({node->size.width, node->size.height});
@@ -301,7 +301,7 @@ class LayerBuilderImpl {
     return rect;
   }
 
-  std::shared_ptr<tgfx::Ellipse> convertEllipse(const EllipseNode* node) {
+  std::shared_ptr<tgfx::Ellipse> convertEllipse(const Ellipse* node) {
     auto ellipse = std::make_shared<tgfx::Ellipse>();
     ellipse->setCenter(ToTGFX(node->center));
     ellipse->setSize({node->size.width, node->size.height});
@@ -309,7 +309,7 @@ class LayerBuilderImpl {
     return ellipse;
   }
 
-  std::shared_ptr<tgfx::Polystar> convertPolystar(const PolystarNode* node) {
+  std::shared_ptr<tgfx::Polystar> convertPolystar(const Polystar* node) {
     auto polystar = std::make_shared<tgfx::Polystar>();
     polystar->setCenter(ToTGFX(node->center));
     polystar->setPointCount(node->pointCount);
@@ -327,14 +327,14 @@ class LayerBuilderImpl {
     return polystar;
   }
 
-  std::shared_ptr<tgfx::ShapePath> convertPath(const PathNode* node) {
+  std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = std::make_shared<tgfx::ShapePath>();
     auto tgfxPath = ToTGFX(node->data);
     shapePath->setPath(tgfxPath);
     return shapePath;
   }
 
-  std::shared_ptr<tgfx::TextSpan> convertTextSpan(const TextSpanNode* node) {
+  std::shared_ptr<tgfx::TextSpan> convertTextSpan(const TextSpan* node) {
     auto textSpan = std::make_shared<tgfx::TextSpan>();
 
     std::shared_ptr<tgfx::Typeface> typeface = nullptr;
@@ -371,7 +371,7 @@ class LayerBuilderImpl {
     return textSpan;
   }
 
-  std::shared_ptr<tgfx::FillStyle> convertFill(const FillNode* node) {
+  std::shared_ptr<tgfx::FillStyle> convertFill(const Fill* node) {
     auto fill = std::make_shared<tgfx::FillStyle>();
 
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
@@ -390,7 +390,7 @@ class LayerBuilderImpl {
     return fill;
   }
 
-  std::shared_ptr<tgfx::StrokeStyle> convertStroke(const StrokeNode* node) {
+  std::shared_ptr<tgfx::StrokeStyle> convertStroke(const Stroke* node) {
     auto stroke = std::make_shared<tgfx::StrokeStyle>();
 
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
@@ -418,26 +418,26 @@ class LayerBuilderImpl {
     return stroke;
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSourceNode* node) {
+  std::shared_ptr<tgfx::ColorSource> convertColorSource(const ColorSource* node) {
     if (!node) {
       return nullptr;
     }
 
     switch (node->type()) {
       case NodeType::SolidColor: {
-        auto solid = static_cast<const SolidColorNode*>(node);
+        auto solid = static_cast<const SolidColor*>(node);
         return tgfx::SolidColor::Make(ToTGFX(solid->color));
       }
       case NodeType::LinearGradient: {
-        auto grad = static_cast<const LinearGradientNode*>(node);
+        auto grad = static_cast<const LinearGradient*>(node);
         return convertLinearGradient(grad);
       }
       case NodeType::RadialGradient: {
-        auto grad = static_cast<const RadialGradientNode*>(node);
+        auto grad = static_cast<const RadialGradient*>(node);
         return convertRadialGradient(grad);
       }
       case NodeType::ImagePattern: {
-        auto pattern = static_cast<const ImagePatternNode*>(node);
+        auto pattern = static_cast<const ImagePattern*>(node);
         return convertImagePattern(pattern);
       }
       default:
@@ -445,7 +445,7 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradientNode* node) {
+  std::shared_ptr<tgfx::ColorSource> convertLinearGradient(const LinearGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
 
@@ -463,7 +463,7 @@ class LayerBuilderImpl {
                                       positions);
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradientNode* node) {
+  std::shared_ptr<tgfx::ColorSource> convertRadialGradient(const RadialGradient* node) {
     std::vector<tgfx::Color> colors;
     std::vector<float> positions;
 
@@ -480,7 +480,7 @@ class LayerBuilderImpl {
     return tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
   }
 
-  std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePatternNode* node) {
+  std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
     if (!node || node->image.empty()) {
       return nullptr;
     }
@@ -534,7 +534,7 @@ class LayerBuilderImpl {
     }
     for (const auto& resource : *_resources) {
       if (resource->type() == NodeType::Image) {
-        auto imageNode = static_cast<const ImageNode*>(resource.get());
+        auto imageNode = static_cast<const Image*>(resource.get());
         if (imageNode->id == resourceId) {
           if (imageNode->source.find("data:") == 0) {
             return ImageFromDataURI(imageNode->source);
@@ -550,7 +550,7 @@ class LayerBuilderImpl {
     }
     return nullptr;
   }
-  std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPathNode* node) {
+  std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
     auto trim = std::make_shared<tgfx::TrimPath>();
     trim->setStart(node->start);
     trim->setEnd(node->end);
@@ -558,25 +558,25 @@ class LayerBuilderImpl {
     return trim;
   }
 
-  std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCornerNode* node) {
+  std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCorner* node) {
     auto round = std::make_shared<tgfx::RoundCorner>();
     round->setRadius(node->radius);
     return round;
   }
 
-  std::shared_ptr<tgfx::MergePath> convertMergePath(const MergePathNode*) {
+  std::shared_ptr<tgfx::MergePath> convertMergePath(const MergePath*) {
     auto merge = std::make_shared<tgfx::MergePath>();
     return merge;
   }
 
-  std::shared_ptr<tgfx::Repeater> convertRepeater(const RepeaterNode* node) {
+  std::shared_ptr<tgfx::Repeater> convertRepeater(const Repeater* node) {
     auto repeater = std::make_shared<tgfx::Repeater>();
     repeater->setCopies(node->copies);
     repeater->setOffset(node->offset);
     return repeater;
   }
 
-  std::shared_ptr<tgfx::VectorGroup> convertGroup(const GroupNode* node) {
+  std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
     auto group = std::make_shared<tgfx::VectorGroup>();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
 
@@ -591,7 +591,7 @@ class LayerBuilderImpl {
     return group;
   }
 
-  void applyLayerAttributes(const LayerNode* node, tgfx::Layer* layer) {
+  void applyLayerAttributes(const Layer* node, tgfx::Layer* layer) {
     layer->setVisible(node->visible);
     layer->setAlpha(node->alpha);
 
@@ -624,19 +624,19 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyleNode* node) {
+  std::shared_ptr<tgfx::LayerStyle> convertLayerStyle(const LayerStyle* node) {
     if (!node) {
       return nullptr;
     }
 
     switch (node->type()) {
       case NodeType::DropShadowStyle: {
-        auto style = static_cast<const DropShadowStyleNode*>(node);
+        auto style = static_cast<const DropShadowStyle*>(node);
         return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                            style->blurrinessY, ToTGFX(style->color));
       }
       case NodeType::InnerShadowStyle: {
-        auto style = static_cast<const InnerShadowStyleNode*>(node);
+        auto style = static_cast<const InnerShadowStyle*>(node);
         return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                             style->blurrinessY, ToTGFX(style->color));
       }
@@ -645,18 +645,18 @@ class LayerBuilderImpl {
     }
   }
 
-  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilterNode* node) {
+  std::shared_ptr<tgfx::LayerFilter> convertLayerFilter(const LayerFilter* node) {
     if (!node) {
       return nullptr;
     }
 
     switch (node->type()) {
       case NodeType::BlurFilter: {
-        auto filter = static_cast<const BlurFilterNode*>(node);
+        auto filter = static_cast<const BlurFilter*>(node);
         return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
       }
       case NodeType::DropShadowFilter: {
-        auto filter = static_cast<const DropShadowFilterNode*>(node);
+        auto filter = static_cast<const DropShadowFilter*>(node);
         return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
                                             filter->blurrinessY, ToTGFX(filter->color));
       }
@@ -666,7 +666,7 @@ class LayerBuilderImpl {
   }
 
   LayerBuilder::Options _options = {};
-  const std::vector<std::unique_ptr<ResourceNode>>* _resources = nullptr;
+  const std::vector<std::unique_ptr<Resource>>* _resources = nullptr;
 };
 
 // Public API implementation

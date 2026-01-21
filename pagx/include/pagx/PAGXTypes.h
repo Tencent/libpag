@@ -18,8 +18,5 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
-
 #include "pagx/model/Enums.h"
 #include "pagx/model/Types.h"

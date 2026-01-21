@@ -55,39 +55,39 @@ class SVGParserImpl {
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
-  std::unique_ptr<LayerNode> convertToLayer(const std::shared_ptr<DOMNode>& element,
+  std::unique_ptr<Layer> convertToLayer(const std::shared_ptr<DOMNode>& element,
                                             const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
-                       std::vector<std::unique_ptr<VectorElementNode>>& contents,
+                       std::vector<std::unique_ptr<VectorElement>>& contents,
                        const InheritedStyle& inheritedStyle);
-  std::unique_ptr<VectorElementNode> convertElement(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<GroupNode> convertG(const std::shared_ptr<DOMNode>& element,
+  std::unique_ptr<VectorElement> convertElement(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
-  std::unique_ptr<VectorElementNode> convertRect(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElementNode> convertCircle(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElementNode> convertEllipse(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElementNode> convertLine(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElementNode> convertPolyline(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElementNode> convertPolygon(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<VectorElementNode> convertPath(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<GroupNode> convertText(const std::shared_ptr<DOMNode>& element,
+  std::unique_ptr<VectorElement> convertRect(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertCircle(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertEllipse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertLine(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertPolyline(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertPolygon(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertPath(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<Group> convertText(const std::shared_ptr<DOMNode>& element,
                                          const InheritedStyle& inheritedStyle);
-  std::unique_ptr<VectorElementNode> convertUse(const std::shared_ptr<DOMNode>& element);
+  std::unique_ptr<VectorElement> convertUse(const std::shared_ptr<DOMNode>& element);
 
-  std::unique_ptr<LinearGradientNode> convertLinearGradient(
+  std::unique_ptr<LinearGradient> convertLinearGradient(
       const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<RadialGradientNode> convertRadialGradient(
+  std::unique_ptr<RadialGradient> convertRadialGradient(
       const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<ImagePatternNode> convertPattern(const std::shared_ptr<DOMNode>& element,
+  std::unique_ptr<ImagePattern> convertPattern(const std::shared_ptr<DOMNode>& element,
                                                     const Rect& shapeBounds);
 
-  std::unique_ptr<LayerNode> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
+  std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
   void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
-                            std::vector<std::unique_ptr<LayerFilterNode>>& filters);
+                            std::vector<std::unique_ptr<LayerFilter>>& filters);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
-                     std::vector<std::unique_ptr<VectorElementNode>>& contents,
+                     std::vector<std::unique_ptr<VectorElement>>& contents,
                      const InheritedStyle& inheritedStyle);
 
   // Compute shape bounds from SVG element attributes.
@@ -113,7 +113,7 @@ class SVGParserImpl {
 
   // Merge adjacent layers that have the same shape geometry.
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
-  void mergeAdjacentLayers(std::vector<std::unique_ptr<LayerNode>>& layers);
+  void mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& layers);
 
   // Collect all IDs from the SVG document to avoid conflicts when generating new IDs.
   void collectAllIds(const std::shared_ptr<DOMNode>& node);
@@ -122,12 +122,12 @@ class SVGParserImpl {
   std::string generateUniqueId(const std::string& prefix);
 
   // Parse data-* attributes from element and add to layer's customData.
-  void parseCustomData(const std::shared_ptr<DOMNode>& element, LayerNode* layer);
+  void parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer);
 
   PAGXSVGParser::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
-  std::vector<std::unique_ptr<LayerNode>> _maskLayers = {};
+  std::vector<std::unique_ptr<Layer>> _maskLayers = {};
   std::unordered_map<std::string, std::string> _imageSourceToId = {};  // Maps image source to resource ID.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
   int _nextImageId = 0;
