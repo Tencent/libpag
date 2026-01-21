@@ -20,6 +20,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include "PAGXEnumUtils.h"
 #include "pagx/model/BackgroundBlurStyle.h"
 #include "pagx/model/BlendFilter.h"
 #include "pagx/model/BlurFilter.h"
@@ -40,7 +41,7 @@
 #include "pagx/model/LinearGradient.h"
 #include "pagx/model/MergePath.h"
 #include "pagx/model/Path.h"
-#include "pagx/model/PathDataResource.h"
+#include "pagx/model/PathData.h"
 #include "pagx/model/Polystar.h"
 #include "pagx/model/RadialGradient.h"
 #include "pagx/model/RangeSelector.h"
@@ -56,6 +57,42 @@
 #include "pagx/model/TrimPath.h"
 
 namespace pagx {
+
+//==============================================================================
+// Color to string helper
+//==============================================================================
+
+static std::string colorToString(const Color& color) {
+  auto formatFloat = [](float value) -> std::string {
+    std::ostringstream oss = {};
+    oss << value;
+    auto str = oss.str();
+    if (str.find('.') != std::string::npos) {
+      while (str.back() == '0') {
+        str.pop_back();
+      }
+      if (str.back() == '.') {
+        str.pop_back();
+      }
+    }
+    return str;
+  };
+
+  std::ostringstream oss = {};
+  // 色域标识符使用小写: srgb(), p3()
+  if (color.colorSpace == ColorSpace::DisplayP3) {
+    oss << "p3(";
+  } else {
+    oss << "srgb(";
+  }
+  oss << formatFloat(color.red) << "," << formatFloat(color.green) << ","
+      << formatFloat(color.blue);
+  if (color.alpha < 1.0f) {
+    oss << "," << formatFloat(color.alpha);
+  }
+  oss << ")";
+  return oss.str();
+}
 
 //==============================================================================
 // XMLBuilder - XML generation helper
@@ -229,7 +266,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
   switch (node->type()) {
     case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
-      oss << "SolidColor:" << solid->color.toHexString(true);
+      oss << "SolidColor:" << colorToString(solid->color);
       break;
     }
     case ColorSourceType::LinearGradient: {
@@ -237,7 +274,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       oss << "LinearGradient:" << grad->startPoint.x << "," << grad->startPoint.y << ":"
           << grad->endPoint.x << "," << grad->endPoint.y << ":" << grad->matrix.toString() << ":";
       for (const auto& stop : grad->colorStops) {
-        oss << stop.offset << "=" << stop.color.toHexString(true) << ";";
+        oss << stop.offset << "=" << colorToString(stop.color) << ";";
       }
       break;
     }
@@ -246,7 +283,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       oss << "RadialGradient:" << grad->center.x << "," << grad->center.y << ":" << grad->radius
           << ":" << grad->matrix.toString() << ":";
       for (const auto& stop : grad->colorStops) {
-        oss << stop.offset << "=" << stop.color.toHexString(true) << ";";
+        oss << stop.offset << "=" << colorToString(stop.color) << ";";
       }
       break;
     }
@@ -255,7 +292,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       oss << "ConicGradient:" << grad->center.x << "," << grad->center.y << ":" << grad->startAngle
           << ":" << grad->endAngle << ":" << grad->matrix.toString() << ":";
       for (const auto& stop : grad->colorStops) {
-        oss << stop.offset << "=" << stop.color.toHexString(true) << ";";
+        oss << stop.offset << "=" << colorToString(stop.color) << ";";
       }
       break;
     }
@@ -264,7 +301,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       oss << "DiamondGradient:" << grad->center.x << "," << grad->center.y << ":"
           << grad->halfDiagonal << ":" << grad->matrix.toString() << ":";
       for (const auto& stop : grad->colorStops) {
-        oss << stop.offset << "=" << stop.color.toHexString(true) << ";";
+        oss << stop.offset << "=" << colorToString(stop.color) << ";";
       }
       break;
     }
@@ -328,8 +365,13 @@ class ResourceContext {
   }
 
   // Register ColorSource usage (for counting)
+  // SolidColor is skipped since it's always inlined
   void registerColorSource(const ColorSource* node) {
     if (!node) {
+      return;
+    }
+    // Skip SolidColor - always inlined, no need to track
+    if (node->type() == ColorSourceType::SolidColor) {
       return;
     }
     std::string key = colorSourceToKey(node);
@@ -354,8 +396,13 @@ class ResourceContext {
   }
 
   // Check if ColorSource should be extracted to Resources
+  // SolidColor is always inlined, never extracted to Resources
   bool shouldExtractColorSource(const ColorSource* node) const {
     if (!node) {
+      return false;
+    }
+    // SolidColor is always inlined for simplicity
+    if (node->type() == ColorSourceType::SolidColor) {
       return false;
     }
     std::string key = colorSourceToKey(node);
@@ -364,8 +411,13 @@ class ResourceContext {
   }
 
   // Get ColorSource resource id (empty if should inline)
+  // SolidColor always returns empty (always inlined)
   std::string getColorSourceId(const ColorSource* node) const {
     if (!node) {
+      return "";
+    }
+    // SolidColor is always inlined
+    if (node->type() == ColorSourceType::SolidColor) {
       return "";
     }
     std::string key = colorSourceToKey(node);
@@ -397,15 +449,15 @@ class ResourceContext {
       }
       case ElementType::Fill: {
         auto fill = static_cast<const Fill*>(element);
-        if (fill->colorSource) {
-          registerColorSource(fill->colorSource.get());
+        if (fill->color) {
+          registerColorSource(fill->color.get());
         }
         break;
       }
       case ElementType::Stroke: {
         auto stroke = static_cast<const Stroke*>(element);
-        if (stroke->colorSource) {
-          registerColorSource(stroke->colorSource.get());
+        if (stroke->color) {
+          registerColorSource(stroke->color.get());
         }
         break;
       }
@@ -442,7 +494,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   for (const auto& stop : stops) {
     xml.openElement("ColorStop");
     xml.addRequiredAttribute("offset", stop.offset);
-    xml.addRequiredAttribute("color", stop.color.toHexString(stop.color.alpha < 1.0f));
+    xml.addRequiredAttribute("color", colorToString(stop.color));
     xml.closeElementSelfClosing();
   }
 }
@@ -455,7 +507,13 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       if (writeId && !solid->id.empty()) {
         xml.addAttribute("id", solid->id);
       }
-      xml.addAttribute("color", solid->color.toHexString(solid->color.alpha < 1.0f));
+      xml.addRequiredAttribute("red", solid->color.red);
+      xml.addRequiredAttribute("green", solid->color.green);
+      xml.addRequiredAttribute("blue", solid->color.blue);
+      xml.addAttribute("alpha", solid->color.alpha, 1.0f);
+      if (solid->color.colorSpace != ColorSpace::SRGB) {
+        xml.addAttribute("colorSpace", ColorSpaceToString(solid->color.colorSpace));
+      }
       xml.closeElementSelfClosing();
       break;
     }
@@ -581,7 +639,13 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
       xml.addAttribute("id", id);
-      xml.addAttribute("color", solid->color.toHexString(solid->color.alpha < 1.0f));
+      xml.addRequiredAttribute("red", solid->color.red);
+      xml.addRequiredAttribute("green", solid->color.green);
+      xml.addRequiredAttribute("blue", solid->color.blue);
+      xml.addAttribute("alpha", solid->color.alpha, 1.0f);
+      if (solid->color.colorSpace != ColorSpace::SRGB) {
+        xml.addAttribute("colorSpace", ColorSpaceToString(solid->color.colorSpace));
+      }
       xml.closeElementSelfClosing();
       break;
     }
@@ -780,15 +844,15 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
       // Check if ColorSource should be referenced or inlined
-      if (fill->colorSource) {
-        std::string colorId = ctx.getColorSourceId(fill->colorSource.get());
+      if (fill->color) {
+        std::string colorId = ctx.getColorSourceId(fill->color.get());
         if (!colorId.empty()) {
           // Reference the ColorSource from Resources
-          xml.addAttribute("color", "#" + colorId);
+          xml.addAttribute("color", "@" + colorId);
         }
         // If colorId is empty, we'll inline it below
-      } else {
-        xml.addAttribute("color", fill->color);
+      } else if (!fill->colorRef.empty()) {
+        xml.addAttribute("color", fill->colorRef);
       }
       xml.addAttribute("alpha", fill->alpha, 1.0f);
       if (fill->blendMode != BlendMode::Normal) {
@@ -801,9 +865,9 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
         xml.addAttribute("placement", LayerPlacementToString(fill->placement));
       }
       // Inline ColorSource only if not extracted to Resources
-      if (fill->colorSource && ctx.getColorSourceId(fill->colorSource.get()).empty()) {
+      if (fill->color && ctx.getColorSourceId(fill->color.get()).empty()) {
         xml.closeElementStart();
-        writeColorSource(xml, fill->colorSource.get(), false);
+        writeColorSource(xml, fill->color.get(), false);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -814,15 +878,15 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
       // Check if ColorSource should be referenced or inlined
-      if (stroke->colorSource) {
-        std::string colorId = ctx.getColorSourceId(stroke->colorSource.get());
+      if (stroke->color) {
+        std::string colorId = ctx.getColorSourceId(stroke->color.get());
         if (!colorId.empty()) {
           // Reference the ColorSource from Resources
-          xml.addAttribute("color", "#" + colorId);
+          xml.addAttribute("color", "@" + colorId);
         }
         // If colorId is empty, we'll inline it below
-      } else {
-        xml.addAttribute("color", stroke->color);
+      } else if (!stroke->colorRef.empty()) {
+        xml.addAttribute("color", stroke->colorRef);
       }
       xml.addAttribute("width", stroke->width, 1.0f);
       xml.addAttribute("alpha", stroke->alpha, 1.0f);
@@ -847,9 +911,9 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
         xml.addAttribute("placement", LayerPlacementToString(stroke->placement));
       }
       // Inline ColorSource only if not extracted to Resources
-      if (stroke->colorSource && ctx.getColorSourceId(stroke->colorSource.get()).empty()) {
+      if (stroke->color && ctx.getColorSourceId(stroke->color.get()).empty()) {
         xml.closeElementStart();
-        writeColorSource(xml, stroke->colorSource.get(), false);
+        writeColorSource(xml, stroke->color.get(), false);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -1043,7 +1107,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("offsetY", style->offsetY);
       xml.addAttribute("blurrinessX", style->blurrinessX);
       xml.addAttribute("blurrinessY", style->blurrinessY);
-      xml.addAttribute("color", style->color.toHexString(style->color.alpha < 1.0f));
+      xml.addAttribute("color", colorToString(style->color));
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
       xml.closeElementSelfClosing();
       break;
@@ -1058,7 +1122,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("offsetY", style->offsetY);
       xml.addAttribute("blurrinessX", style->blurrinessX);
       xml.addAttribute("blurrinessY", style->blurrinessY);
-      xml.addAttribute("color", style->color.toHexString(style->color.alpha < 1.0f));
+      xml.addAttribute("color", colorToString(style->color));
       xml.closeElementSelfClosing();
       break;
     }
@@ -1105,7 +1169,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.addAttribute("offsetY", filter->offsetY);
       xml.addAttribute("blurrinessX", filter->blurrinessX);
       xml.addAttribute("blurrinessY", filter->blurrinessY);
-      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
+      xml.addAttribute("color", colorToString(filter->color));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -1117,7 +1181,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.addAttribute("offsetY", filter->offsetY);
       xml.addAttribute("blurrinessX", filter->blurrinessX);
       xml.addAttribute("blurrinessY", filter->blurrinessY);
-      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
+      xml.addAttribute("color", colorToString(filter->color));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -1125,7 +1189,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case LayerFilterType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
-      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
+      xml.addAttribute("color", colorToString(filter->color));
       if (filter->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
       }
@@ -1160,10 +1224,10 @@ static void writeResource(XMLBuilder& xml, const Node* node, const ResourceConte
       break;
     }
     case NodeType::PathData: {
-      auto pathData = static_cast<const PathDataResource*>(node);
+      auto pathData = static_cast<const PathData*>(node);
       xml.openElement("PathData");
       xml.addAttribute("id", pathData->id);
-      xml.addAttribute("data", pathData->data);
+      xml.addAttribute("data", pathData->toSVGString());
       xml.closeElementSelfClosing();
       break;
     }
@@ -1281,18 +1345,18 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
       for (const auto& element : layer->contents) {
         if (element->type() == ElementType::Fill) {
           auto fill = static_cast<const Fill*>(element.get());
-          if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
-            std::string key = colorSourceToKey(fill->colorSource.get());
+          if (fill->color && ctx.shouldExtractColorSource(fill->color.get())) {
+            std::string key = colorSourceToKey(fill->color.get());
             if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-              colorSourceByKey[key] = fill->colorSource.get();
+              colorSourceByKey[key] = fill->color.get();
             }
           }
         } else if (element->type() == ElementType::Stroke) {
           auto stroke = static_cast<const Stroke*>(element.get());
-          if (stroke->colorSource && ctx.shouldExtractColorSource(stroke->colorSource.get())) {
-            std::string key = colorSourceToKey(stroke->colorSource.get());
+          if (stroke->color && ctx.shouldExtractColorSource(stroke->color.get())) {
+            std::string key = colorSourceToKey(stroke->color.get());
             if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-              colorSourceByKey[key] = stroke->colorSource.get();
+              colorSourceByKey[key] = stroke->color.get();
             }
           }
         } else if (element->type() == ElementType::Group) {
@@ -1301,18 +1365,18 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
             for (const auto& child : g->elements) {
               if (child->type() == ElementType::Fill) {
                 auto fill = static_cast<const Fill*>(child.get());
-                if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
-                  std::string key = colorSourceToKey(fill->colorSource.get());
+                if (fill->color && ctx.shouldExtractColorSource(fill->color.get())) {
+                  std::string key = colorSourceToKey(fill->color.get());
                   if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-                    colorSourceByKey[key] = fill->colorSource.get();
+                    colorSourceByKey[key] = fill->color.get();
                   }
                 }
               } else if (child->type() == ElementType::Stroke) {
                 auto stroke = static_cast<const Stroke*>(child.get());
-                if (stroke->colorSource && ctx.shouldExtractColorSource(stroke->colorSource.get())) {
-                  std::string key = colorSourceToKey(stroke->colorSource.get());
+                if (stroke->color && ctx.shouldExtractColorSource(stroke->color.get())) {
+                  std::string key = colorSourceToKey(stroke->color.get());
                   if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-                    colorSourceByKey[key] = stroke->colorSource.get();
+                    colorSourceByKey[key] = stroke->color.get();
                   }
                 }
               } else if (child->type() == ElementType::Group) {
@@ -1338,18 +1402,18 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
         for (const auto& element : layer->contents) {
           if (element->type() == ElementType::Fill) {
             auto fill = static_cast<const Fill*>(element.get());
-            if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
-              std::string key = colorSourceToKey(fill->colorSource.get());
+            if (fill->color && ctx.shouldExtractColorSource(fill->color.get())) {
+              std::string key = colorSourceToKey(fill->color.get());
               if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-                colorSourceByKey[key] = fill->colorSource.get();
+                colorSourceByKey[key] = fill->color.get();
               }
             }
           } else if (element->type() == ElementType::Stroke) {
             auto stroke = static_cast<const Stroke*>(element.get());
-            if (stroke->colorSource && ctx.shouldExtractColorSource(stroke->colorSource.get())) {
-              std::string key = colorSourceToKey(stroke->colorSource.get());
+            if (stroke->color && ctx.shouldExtractColorSource(stroke->color.get())) {
+              std::string key = colorSourceToKey(stroke->color.get());
               if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-                colorSourceByKey[key] = stroke->colorSource.get();
+                colorSourceByKey[key] = stroke->color.get();
               }
             }
           } else if (element->type() == ElementType::Group) {
@@ -1358,19 +1422,18 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
               for (const auto& child : g->elements) {
                 if (child->type() == ElementType::Fill) {
                   auto fill = static_cast<const Fill*>(child.get());
-                  if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
-                    std::string key = colorSourceToKey(fill->colorSource.get());
+                  if (fill->color && ctx.shouldExtractColorSource(fill->color.get())) {
+                    std::string key = colorSourceToKey(fill->color.get());
                     if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-                      colorSourceByKey[key] = fill->colorSource.get();
+                      colorSourceByKey[key] = fill->color.get();
                     }
                   }
                 } else if (child->type() == ElementType::Stroke) {
                   auto stroke = static_cast<const Stroke*>(child.get());
-                  if (stroke->colorSource &&
-                      ctx.shouldExtractColorSource(stroke->colorSource.get())) {
-                    std::string key = colorSourceToKey(stroke->colorSource.get());
+                  if (stroke->color && ctx.shouldExtractColorSource(stroke->color.get())) {
+                    std::string key = colorSourceToKey(stroke->color.get());
                     if (colorSourceByKey.find(key) == colorSourceByKey.end()) {
-                      colorSourceByKey[key] = stroke->colorSource.get();
+                      colorSourceByKey[key] = stroke->color.get();
                     }
                   }
                 } else if (child->type() == ElementType::Group) {
