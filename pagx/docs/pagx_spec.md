@@ -244,7 +244,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 线性渐变沿起点到终点的方向插值。
 
 ```xml
-<LinearGradient startPoint="0,0" endPoint="100,0">
+<LinearGradient endPoint="100,0">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </LinearGradient>
@@ -282,7 +282,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
 ```xml
-<ConicGradient center="50,50" startAngle="0" endAngle="360">
+<ConicGradient center="50,50">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </ConicGradient>
@@ -351,7 +351,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 
 ```xml
 <Resources>
-  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
+  <LinearGradient id="grad" endPoint="100,0">
     <ColorStop offset="0" color="#FF0000"/>
     <ColorStop offset="1" color="#0000FF"/>
   </LinearGradient>
@@ -463,7 +463,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
   <Image id="img1" source="photo.png"/>
   <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
   <SolidColor id="brandRed" color="#FF0000"/>
-  <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,100">
+  <LinearGradient id="skyGradient" endPoint="0,100">
     <ColorStop offset="0" color="#87CEEB"/>
     <ColorStop offset="1" color="#E0F6FF"/>
   </LinearGradient>
@@ -542,7 +542,7 @@ PAGX 文档采用层级结构组织内容：
 `<Layer>` 是内容和子图层的基本容器。
 
 ```xml
-<Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
+<Layer name="MyLayer">
   <contents>
     <Rectangle center="50,50" size="100,100"/>
     <Fill color="#FF0000"/>
@@ -669,9 +669,9 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <styles>
-  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080" showBehindLayer="true"/>
+  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
   <InnerShadowStyle offsetX="2" offsetY="2" blurrinessX="5" blurrinessY="5" color="#00000040"/>
-  <BackgroundBlurStyle blurrinessX="20" blurrinessY="20" tileMode="mirror"/>
+  <BackgroundBlurStyle blurrinessX="20" blurrinessY="20"/>
 </styles>
 ```
 
@@ -829,7 +829,7 @@ PAGX 文档采用层级结构组织内容：
     <Fill color="#FFFFFF"/>
   </contents>
 </Layer>
-<Layer mask="#maskShape" maskType="alpha">
+<Layer mask="#maskShape">
   <contents>
     <Rectangle center="100,100" size="200,200"/>
     <Fill color="#FF0000"/>
@@ -925,7 +925,7 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 矩形从中心点定义，支持统一圆角。
 
 ```xml
-<Rectangle center="100,100" size="200,150" roundness="10" reversed="false"/>
+<Rectangle center="100,100" size="200,150" roundness="10"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -954,7 +954,7 @@ rect.bottom = center.y + size.height / 2
 椭圆从中心点定义。
 
 ```xml
-<Ellipse center="100,100" size="100,60" reversed="false"/>
+<Ellipse center="100,100" size="100,60"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -978,7 +978,7 @@ boundingRect.bottom = center.y + size.height / 2
 支持正多边形和星形两种模式。
 
 ```xml
-<Polystar center="100,100" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+<Polystar center="100,100" outerRadius="100" innerRadius="50"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1032,10 +1032,10 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 内联路径数据 -->
-<Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
+<Path data="M 0 0 L 100 0 L 100 100 Z"/>
 
 <!-- 引用 PathData 资源 -->
-<Path data="#curvePath" reversed="false"/>
+<Path data="#curvePath"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1048,7 +1048,7 @@ y = center.y + outerRadius * sin(angle)
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
 ```xml
-<TextSpan x="100" y="200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0" textAnchor="start">
+<TextSpan x="100" y="200" font="Arial" fontSize="24">
   <![CDATA[Hello World]]>
 </TextSpan>
 ```
@@ -1092,7 +1092,7 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 纯色填充 -->
-<Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
+<Fill color="#FF0000" alpha="0.8"/>
 
 <!-- 引用共享颜色源 -->
 <Fill color="#grad1"/>
@@ -1137,10 +1137,10 @@ y = center.y + outerRadius * sin(angle)
 
 ```xml
 <!-- 基础描边 -->
-<Stroke color="#000000" width="2" cap="round" join="miter" miterLimit="4"/>
+<Stroke color="#000000" width="2" cap="round"/>
 
 <!-- 虚线描边 -->
-<Stroke color="#0000FF" width="1" dashes="5,3" dashOffset="2"/>
+<Stroke color="#0000FF" dashes="5,3" dashOffset="2"/>
 
 <!-- 内联渐变描边 -->
 <Stroke width="3">
@@ -1215,7 +1215,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 裁剪路径到指定的起止范围。
 
 ```xml
-<TrimPath start="0" end="0.5" offset="0" type="separate"/>
+<TrimPath end="0.5"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1353,7 +1353,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 ```xml
 <Group>
   <TextSpan text="Hello 😀"/>
-  <TrimPath start="0" end="0.5"/>
+  <TrimPath end="0.5"/>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
 </Group>
@@ -1364,8 +1364,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。
 
 ```xml
-<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
-  <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
+<TextModifier fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+  <RangeSelector/>
 </TextModifier>
 ```
 
@@ -1421,7 +1421,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 范围选择器定义 TextModifier 影响的字形范围和影响程度。
 
 ```xml
-<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
+<RangeSelector/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1472,7 +1472,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 将文本沿指定路径排列。
 
 ```xml
-<TextPath path="#curvePath" align="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false" forceAlignment="false"/>
+<TextPath path="#curvePath"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1517,12 +1517,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
   <TextSpan font="Arial" fontSize="16">第一段内容...</TextSpan>
   <TextSpan font="Arial" fontSize="16" fontWeight="700">粗体</TextSpan>
   <TextSpan font="Arial" fontSize="16">普通文本。</TextSpan>
-  <TextLayout width="300" height="200"
-              align="left"
-              verticalAlign="top"
-              lineHeight="1.5"
-              indent="20"
-              overflow="clip"/>
+  <TextLayout width="300" height="200" lineHeight="1.5" indent="20"/>
   <Fill color="#333333"/>
 </Group>
 ```
@@ -1568,9 +1563,9 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 ```xml
 <Group>
-  <TextSpan x="0" y="24" font="Arial" fontSize="24">Hello </TextSpan>
+  <TextSpan y="24" font="Arial" fontSize="24">Hello </TextSpan>
   <TextSpan x="60" y="24" font="Arial" fontSize="24" fontWeight="700">World</TextSpan>
-  <Fill color="#000000"/>
+  <Fill/>
 </Group>
 ```
 
@@ -1579,7 +1574,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
 
 ```xml
-<Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+<Repeater copies="5" offset="1" position="50,0" endAlpha="0.2"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1653,7 +1648,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 Group 是带变换属性的矢量元素容器。
 
 ```xml
-<Group name="myGroup" anchorPoint="50,50" position="100,200" rotation="45" scale="1,1" skew="0" skewAxis="0" alpha="1">
+<Group anchorPoint="50,50" position="100,200" rotation="45">
   <!-- 子元素 -->
 </Group>
 ```
@@ -1735,7 +1730,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 ```xml
 <Rectangle center="50,50" size="100,100"/>
 <Fill color="red"/>    <!-- 填充矩形 -->
-<Stroke color="black"/> <!-- 描边同一矩形（几何未清空） -->
+<Stroke/>              <!-- 描边同一矩形（几何未清空） -->
 ```
 
 #### 多重填充与描边
@@ -2296,7 +2291,7 @@ contents / Group
   <Layer name="Title">
     <contents>
       <Group anchorPoint="100,20" position="200,50">
-        <TextSpan x="0" y="32" font="Helvetica" fontSize="32" fontWeight="700">
+        <TextSpan y="32" font="Helvetica" fontSize="32" fontWeight="700">
           <![CDATA[Hello PAGX!]]>
         </TextSpan>
         <Fill color="#333333"/>
@@ -2320,7 +2315,7 @@ contents / Group
     </contents>
   </Layer>
   
-  <Layer name="MaskedContent" mask="#maskShape" maskType="alpha">
+  <Layer name="MaskedContent" mask="#maskShape">
     <contents>
       <Rectangle center="200,200" size="200,200"/>
       <Fill color="#FF6B6B"/>
@@ -2328,7 +2323,7 @@ contents / Group
   </Layer>
   
   <Resources>
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,300">
+    <LinearGradient id="skyGradient" endPoint="0,300">
       <ColorStop offset="0" color="#87CEEB"/>
       <ColorStop offset="1" color="#E0F6FF"/>
     </LinearGradient>
@@ -2336,8 +2331,7 @@ contents / Group
     <Composition id="star" width="50" height="50">
       <Layer name="starLayer">
         <contents>
-          <Polystar center="25,25" polystarType="star" pointCount="5"
-                    outerRadius="25" innerRadius="10"/>
+          <Polystar center="25,25" outerRadius="25" innerRadius="10"/>
           <Fill color="#FFD700"/>
         </contents>
       </Layer>
@@ -2374,7 +2368,7 @@ contents / Group
 <!-- 独立模式：每个形状独立裁剪 50% -->
 <Rectangle center="50,50" size="80,80"/>
 <Ellipse center="150,50" size="80,80"/>
-<TrimPath start="0" end="0.5" type="separate"/>
+<TrimPath end="0.5"/>
 <Stroke color="#333333" width="3"/>
 
 <!-- 连续模式：所有路径视为整体，显示中间 50% -->
@@ -2391,33 +2385,33 @@ contents / Group
 <Group>
   <Ellipse center="80,0" size="10,10"/>
   <Fill color="#3366FF"/>
-  <Repeater copies="12" position="0,0" rotation="30" anchorPoint="0,0"/>
+  <Repeater copies="12" position="0,0" rotation="30"/>
 </Group>
 
 <!-- 渐隐阵列：透明度从 1 渐变到 0.2 -->
-<Rectangle center="0,0" size="30,30"/>
+<Rectangle size="30,30"/>
 <Fill color="#FF3366"/>
-<Repeater copies="5" position="40,0" startAlpha="1" endAlpha="0.2"/>
+<Repeater copies="5" position="40,0" endAlpha="0.2"/>
 ```
 
 #### D.2.4 TextModifier 逐字变换
 
 ```xml
 <!-- 波浪文字：逐字上下偏移 -->
-<TextSpan x="0" y="50" font="Arial" fontSize="32">
+<TextSpan y="50" font="Arial" fontSize="32">
   <![CDATA[WAVE TEXT]]>
 </TextSpan>
 <TextModifier position="0,-20">
-  <RangeSelector start="0" end="1" shape="triangle"/>
+  <RangeSelector shape="triangle"/>
 </TextModifier>
 <Fill color="#333333"/>
 
 <!-- 颜色渐变文字 -->
-<TextSpan x="0" y="100" font="Arial" fontSize="32">
+<TextSpan y="100" font="Arial" fontSize="32">
   <![CDATA[GRADIENT]]>
 </TextSpan>
 <TextModifier fillColor="#FF0000">
-  <RangeSelector start="0" end="1" shape="rampUp"/>
+  <RangeSelector shape="rampUp"/>
 </TextModifier>
 <Fill color="#0000FF"/>
 ```
