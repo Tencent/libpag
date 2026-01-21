@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * A diamond gradient.
  */
-struct DiamondGradient : public ColorSource {
+class DiamondGradient : public ColorSource {
+ public:
   std::string id = {};
   Point center = {};
   float halfDiagonal = 0;
@@ -38,6 +39,10 @@ struct DiamondGradient : public ColorSource {
 
   NodeType type() const override {
     return NodeType::DiamondGradient;
+  }
+
+  ColorSourceType colorSourceType() const override {
+    return ColorSourceType::DiamondGradient;
   }
 };
 

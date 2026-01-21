@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * Background blur style.
  */
-struct BackgroundBlurStyle : public LayerStyle {
+class BackgroundBlurStyle : public LayerStyle {
+ public:
   float blurrinessX = 0;
   float blurrinessY = 0;
   TileMode tileMode = TileMode::Mirror;
@@ -35,6 +36,10 @@ struct BackgroundBlurStyle : public LayerStyle {
 
   NodeType type() const override {
     return NodeType::BackgroundBlurStyle;
+  }
+
+  LayerStyleType layerStyleType() const override {
+    return LayerStyleType::BackgroundBlurStyle;
   }
 };
 

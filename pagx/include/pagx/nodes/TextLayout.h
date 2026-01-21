@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/TextAnimator.h"
 #include "pagx/types/Overflow.h"
 #include "pagx/types/TextAlign.h"
 #include "pagx/types/VerticalAlign.h"
@@ -28,7 +28,8 @@ namespace pagx {
 /**
  * Text layout modifier.
  */
-struct TextLayout : public Node {
+class TextLayout : public TextAnimator {
+ public:
   float width = 0;
   float height = 0;
   TextAlign textAlign = TextAlign::Left;
@@ -39,6 +40,10 @@ struct TextLayout : public Node {
 
   NodeType type() const override {
     return NodeType::TextLayout;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::TextLayout;
   }
 };
 

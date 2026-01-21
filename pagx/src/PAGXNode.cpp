@@ -16,7 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGXNode.h"
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/LayerFilter.h"
+#include "pagx/nodes/LayerStyle.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
@@ -92,6 +96,55 @@ const char* NodeTypeName(NodeType type) {
       return "Composition";
     case NodeType::Layer:
       return "Layer";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* ColorSourceTypeName(ColorSourceType type) {
+  switch (type) {
+    case ColorSourceType::SolidColor:
+      return "SolidColor";
+    case ColorSourceType::LinearGradient:
+      return "LinearGradient";
+    case ColorSourceType::RadialGradient:
+      return "RadialGradient";
+    case ColorSourceType::ConicGradient:
+      return "ConicGradient";
+    case ColorSourceType::DiamondGradient:
+      return "DiamondGradient";
+    case ColorSourceType::ImagePattern:
+      return "ImagePattern";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* LayerStyleTypeName(LayerStyleType type) {
+  switch (type) {
+    case LayerStyleType::DropShadowStyle:
+      return "DropShadowStyle";
+    case LayerStyleType::InnerShadowStyle:
+      return "InnerShadowStyle";
+    case LayerStyleType::BackgroundBlurStyle:
+      return "BackgroundBlurStyle";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* LayerFilterTypeName(LayerFilterType type) {
+  switch (type) {
+    case LayerFilterType::BlurFilter:
+      return "BlurFilter";
+    case LayerFilterType::DropShadowFilter:
+      return "DropShadowFilter";
+    case LayerFilterType::InnerShadowFilter:
+      return "InnerShadowFilter";
+    case LayerFilterType::BlendFilter:
+      return "BlendFilter";
+    case LayerFilterType::ColorMatrixFilter:
+      return "ColorMatrixFilter";
     default:
       return "Unknown";
   }

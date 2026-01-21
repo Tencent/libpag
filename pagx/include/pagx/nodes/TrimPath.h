@@ -26,7 +26,8 @@ namespace pagx {
 /**
  * Trim path modifier.
  */
-struct TrimPath : public PathModifier {
+class TrimPath : public PathModifier {
+ public:
   float start = 0;
   float end = 1;
   float offset = 0;
@@ -34,6 +35,10 @@ struct TrimPath : public PathModifier {
 
   NodeType type() const override {
     return NodeType::TrimPath;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::TrimPath;
   }
 };
 

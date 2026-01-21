@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * Inner shadow style.
  */
-struct InnerShadowStyle : public LayerStyle {
+class InnerShadowStyle : public LayerStyle {
+ public:
   float offsetX = 0;
   float offsetY = 0;
   float blurrinessX = 0;
@@ -37,6 +38,10 @@ struct InnerShadowStyle : public LayerStyle {
 
   NodeType type() const override {
     return NodeType::InnerShadowStyle;
+  }
+
+  LayerStyleType layerStyleType() const override {
+    return LayerStyleType::InnerShadowStyle;
   }
 };
 

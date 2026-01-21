@@ -20,8 +20,8 @@
 
 #include <string>
 #include <vector>
-#include "pagx/nodes/Node.h"
 #include "pagx/nodes/RangeSelector.h"
+#include "pagx/nodes/TextAnimator.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * Text modifier.
  */
-struct TextModifier : public Node {
+class TextModifier : public TextAnimator {
+ public:
   Point anchorPoint = {};
   Point position = {};
   float rotation = 0;
@@ -44,6 +45,10 @@ struct TextModifier : public Node {
 
   NodeType type() const override {
     return NodeType::TextModifier;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::TextModifier;
   }
 };
 

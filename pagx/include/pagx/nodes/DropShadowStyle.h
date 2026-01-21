@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * Drop shadow style.
  */
-struct DropShadowStyle : public LayerStyle {
+class DropShadowStyle : public LayerStyle {
+ public:
   float offsetX = 0;
   float offsetY = 0;
   float blurrinessX = 0;
@@ -38,6 +39,10 @@ struct DropShadowStyle : public LayerStyle {
 
   NodeType type() const override {
     return NodeType::DropShadowStyle;
+  }
+
+  LayerStyleType layerStyleType() const override {
+    return LayerStyleType::DropShadowStyle;
   }
 };
 

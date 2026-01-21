@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Element.h"
 
 namespace pagx {
 
 /**
  * Base class for geometry elements (Rectangle, Ellipse, Polystar, Path, TextSpan).
  */
-class Geometry : public Node {
+class Geometry : public Element {
  protected:
   Geometry() = default;
 };

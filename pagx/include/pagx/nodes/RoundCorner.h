@@ -25,11 +25,16 @@ namespace pagx {
 /**
  * Round corner modifier.
  */
-struct RoundCorner : public PathModifier {
+class RoundCorner : public PathModifier {
+ public:
   float radius = 10;
 
   NodeType type() const override {
     return NodeType::RoundCorner;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::RoundCorner;
   }
 };
 

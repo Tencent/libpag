@@ -23,9 +23,29 @@
 namespace pagx {
 
 /**
+ * Layer style types.
+ */
+enum class LayerStyleType {
+  DropShadowStyle,
+  InnerShadowStyle,
+  BackgroundBlurStyle
+};
+
+/**
+ * Returns the string name of a layer style type.
+ */
+const char* LayerStyleTypeName(LayerStyleType type);
+
+/**
  * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle).
  */
 class LayerStyle : public Node {
+ public:
+  /**
+   * Returns the layer style type of this layer style.
+   */
+  virtual LayerStyleType layerStyleType() const = 0;
+
  protected:
   LayerStyle() = default;
 };

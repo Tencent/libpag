@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * A linear gradient.
  */
-struct LinearGradient : public ColorSource {
+class LinearGradient : public ColorSource {
+ public:
   std::string id = {};
   Point startPoint = {};
   Point endPoint = {};
@@ -38,6 +39,10 @@ struct LinearGradient : public ColorSource {
 
   NodeType type() const override {
     return NodeType::LinearGradient;
+  }
+
+  ColorSourceType colorSourceType() const override {
+    return ColorSourceType::LinearGradient;
   }
 };
 

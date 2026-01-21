@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * A polygon or star shape.
  */
-struct Polystar : public Geometry {
+class Polystar : public Geometry {
+ public:
   Point center = {};
   PolystarType polystarType = PolystarType::Star;
   float pointCount = 5;
@@ -40,6 +41,10 @@ struct Polystar : public Geometry {
 
   NodeType type() const override {
     return NodeType::Polystar;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Polystar;
   }
 };
 

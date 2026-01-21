@@ -9,24 +9,17 @@ option(PAGX_BUILD_TGFX_ADAPTER "Build PAGX to tgfx adapter (LayerBuilder)" ON)
 
 # ============== Core PAGX Library (Independent, no tgfx dependency) ==============
 
-# Core sources
-file(GLOB PAGX_CORE_SOURCES
-    src/PAGXNode.cpp
-    src/PAGXTypes.cpp
-    src/PAGXDocument.cpp
-    src/PAGXXMLParser.cpp
-    src/PAGXXMLWriter.cpp
-    src/PathData.cpp
-)
+# Collect core sources (excluding subdirectories)
+file(GLOB PAGX_CORE_SOURCES src/*.cpp)
 list(APPEND PAGX_SOURCES ${PAGX_CORE_SOURCES})
 
 # XML parser sources (based on expat)
-file(GLOB PAGX_XML_SOURCES src/xml/*.cpp)
+file(GLOB_RECURSE PAGX_XML_SOURCES src/xml/*.cpp)
 list(APPEND PAGX_SOURCES ${PAGX_XML_SOURCES})
 
 # SVG parser (also independent of tgfx)
 if (PAGX_BUILD_SVG)
-    file(GLOB PAGX_SVG_SOURCES src/svg/*.cpp)
+    file(GLOB_RECURSE PAGX_SVG_SOURCES src/svg/*.cpp)
     list(APPEND PAGX_SOURCES ${PAGX_SVG_SOURCES})
 endif()
 
@@ -35,7 +28,7 @@ if (PAGX_BUILD_TGFX_ADAPTER)
     if (NOT TARGET tgfx)
         message(FATAL_ERROR "tgfx target not found. Set PAGX_BUILD_TGFX_ADAPTER=OFF to build without tgfx adapter.")
     endif()
-    file(GLOB PAGX_TGFX_SOURCES src/tgfx/*.cpp)
+    file(GLOB_RECURSE PAGX_TGFX_SOURCES src/tgfx/*.cpp)
     list(APPEND PAGX_SOURCES ${PAGX_TGFX_SOURCES})
 endif()
 

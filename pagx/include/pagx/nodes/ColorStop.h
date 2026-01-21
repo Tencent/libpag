@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -26,13 +25,10 @@ namespace pagx {
 /**
  * A color stop in a gradient.
  */
-struct ColorStop : public Node {
+class ColorStop {
+ public:
   float offset = 0;
   Color color = {};
-
-  NodeType type() const override {
-    return NodeType::ColorStop;
-  }
 };
 
 }  // namespace pagx

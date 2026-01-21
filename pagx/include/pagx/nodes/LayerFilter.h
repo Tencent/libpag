@@ -18,26 +18,38 @@
 
 #pragma once
 
-#include "pagx/PathData.h"
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
 /**
- * A path shape.
+ * Layer filter types.
  */
-class Path : public Geometry {
+enum class LayerFilterType {
+  BlurFilter,
+  DropShadowFilter,
+  InnerShadowFilter,
+  BlendFilter,
+  ColorMatrixFilter
+};
+
+/**
+ * Returns the string name of a layer filter type.
+ */
+const char* LayerFilterTypeName(LayerFilterType type);
+
+/**
+ * Base class for layer filters (BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter).
+ */
+class LayerFilter : public Node {
  public:
-  PathData data = {};
-  bool reversed = false;
+  /**
+   * Returns the layer filter type of this layer filter.
+   */
+  virtual LayerFilterType layerFilterType() const = 0;
 
-  NodeType type() const override {
-    return NodeType::Path;
-  }
-
-  ElementType elementType() const override {
-    return ElementType::Path;
-  }
+ protected:
+  LayerFilter() = default;
 };
 
 }  // namespace pagx

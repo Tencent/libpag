@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Filter.h"
+#include "pagx/nodes/LayerFilter.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Types.h"
 
@@ -27,12 +27,17 @@ namespace pagx {
 /**
  * Blend filter.
  */
-struct BlendFilter : public Filter {
+class BlendFilter : public LayerFilter {
+ public:
   Color color = {};
   BlendMode blendMode = BlendMode::Normal;
 
   NodeType type() const override {
     return NodeType::BlendFilter;
+  }
+
+  LayerFilterType layerFilterType() const override {
+    return LayerFilterType::BlendFilter;
   }
 };
 

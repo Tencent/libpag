@@ -22,8 +22,16 @@
 #include "pagx/types/Enums.h"
 #include "pagx/types/Types.h"
 
-// Base class
+// Base classes
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/LayerFilter.h"
+#include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/Painter.h"
+#include "pagx/nodes/PathModifier.h"
+#include "pagx/nodes/TextAnimator.h"
 
 // Color sources
 #include "pagx/nodes/ColorStop.h"
@@ -76,6 +84,7 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathDataResource.h"
+#include "pagx/nodes/Resource.h"
 
 // Layer
 #include "pagx/nodes/Layer.h"

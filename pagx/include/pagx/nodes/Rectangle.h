@@ -26,7 +26,8 @@ namespace pagx {
 /**
  * A rectangle shape.
  */
-struct Rectangle : public Geometry {
+class Rectangle : public Geometry {
+ public:
   Point center = {};
   Size size = {100, 100};
   float roundness = 0;
@@ -34,6 +35,10 @@ struct Rectangle : public Geometry {
 
   NodeType type() const override {
     return NodeType::Rectangle;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Rectangle;
   }
 };
 

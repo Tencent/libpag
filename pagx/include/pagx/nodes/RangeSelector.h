@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
 #include "pagx/types/SelectorMode.h"
 #include "pagx/types/SelectorShape.h"
 #include "pagx/types/SelectorUnit.h"
@@ -28,7 +27,8 @@ namespace pagx {
 /**
  * Range selector for text modifier.
  */
-struct RangeSelector : public Node {
+class RangeSelector {
+ public:
   float start = 0;
   float end = 1;
   float offset = 0;
@@ -40,10 +40,6 @@ struct RangeSelector : public Node {
   float weight = 1;
   bool randomizeOrder = false;
   int randomSeed = 0;
-
-  NodeType type() const override {
-    return NodeType::RangeSelector;
-  }
 };
 
 }  // namespace pagx

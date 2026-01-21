@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/TextAnimator.h"
 #include "pagx/types/TextPathAlign.h"
 
 namespace pagx {
@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * Text path modifier.
  */
-struct TextPath : public Node {
+class TextPath : public TextAnimator {
+ public:
   std::string path = {};
   TextPathAlign pathAlign = TextPathAlign::Start;
   float firstMargin = 0;
@@ -38,6 +39,10 @@ struct TextPath : public Node {
 
   NodeType type() const override {
     return NodeType::TextPath;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::TextPath;
   }
 };
 

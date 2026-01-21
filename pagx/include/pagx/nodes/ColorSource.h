@@ -23,9 +23,32 @@
 namespace pagx {
 
 /**
+ * Color source types.
+ */
+enum class ColorSourceType {
+  SolidColor,
+  LinearGradient,
+  RadialGradient,
+  ConicGradient,
+  DiamondGradient,
+  ImagePattern
+};
+
+/**
+ * Returns the string name of a color source type.
+ */
+const char* ColorSourceTypeName(ColorSourceType type);
+
+/**
  * Base class for color sources (SolidColor, gradients, ImagePattern).
  */
 class ColorSource : public Node {
+ public:
+  /**
+   * Returns the color source type of this color source.
+   */
+  virtual ColorSourceType colorSourceType() const = 0;
+
  protected:
   ColorSource() = default;
 };

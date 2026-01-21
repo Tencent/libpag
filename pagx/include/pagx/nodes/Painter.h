@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Element.h"
 
 namespace pagx {
 
 /**
  * Base class for painters (Fill, Stroke).
  */
-class Painter : public Node {
+class Painter : public Element {
  protected:
   Painter() = default;
 };

@@ -19,20 +19,18 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
 /**
  * PathData resource - stores reusable path data.
  */
-struct PathDataResource : public Node {
+class PathDataResource {
+ public:
+  virtual ~PathDataResource() = default;
+
   std::string id = {};
   std::string data = {};  // SVG path data string
-
-  NodeType type() const override {
-    return NodeType::PathData;
-  }
 };
 
 }  // namespace pagx

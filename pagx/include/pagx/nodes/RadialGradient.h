@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * A radial gradient.
  */
-struct RadialGradient : public ColorSource {
+class RadialGradient : public ColorSource {
+ public:
   std::string id = {};
   Point center = {};
   float radius = 0;
@@ -38,6 +39,10 @@ struct RadialGradient : public ColorSource {
 
   NodeType type() const override {
     return NodeType::RadialGradient;
+  }
+
+  ColorSourceType colorSourceType() const override {
+    return ColorSourceType::RadialGradient;
   }
 };
 

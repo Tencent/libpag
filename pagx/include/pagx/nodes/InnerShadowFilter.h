@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Filter.h"
+#include "pagx/nodes/LayerFilter.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -26,7 +26,8 @@ namespace pagx {
 /**
  * Inner shadow filter.
  */
-struct InnerShadowFilter : public Filter {
+class InnerShadowFilter : public LayerFilter {
+ public:
   float offsetX = 0;
   float offsetY = 0;
   float blurrinessX = 0;
@@ -36,6 +37,10 @@ struct InnerShadowFilter : public Filter {
 
   NodeType type() const override {
     return NodeType::InnerShadowFilter;
+  }
+
+  LayerFilterType layerFilterType() const override {
+    return LayerFilterType::InnerShadowFilter;
   }
 };
 

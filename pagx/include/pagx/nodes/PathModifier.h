@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Element.h"
 
 namespace pagx {
 
 /**
  * Base class for path modifiers (TrimPath, RoundCorner, MergePath).
  */
-class PathModifier : public Node {
+class PathModifier : public Element {
  protected:
   PathModifier() = default;
 };

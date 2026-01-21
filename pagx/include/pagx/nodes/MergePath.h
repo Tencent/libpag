@@ -26,11 +26,16 @@ namespace pagx {
 /**
  * Merge path modifier.
  */
-struct MergePath : public PathModifier {
+class MergePath : public PathModifier {
+ public:
   MergePathMode mode = MergePathMode::Append;
 
   NodeType type() const override {
     return NodeType::MergePath;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::MergePath;
   }
 };
 

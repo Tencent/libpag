@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * A text span.
  */
-struct TextSpan : public Geometry {
+class TextSpan : public Geometry {
+ public:
   float x = 0;
   float y = 0;
   std::string font = {};
@@ -40,6 +41,10 @@ struct TextSpan : public Geometry {
 
   NodeType type() const override {
     return NodeType::TextSpan;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::TextSpan;
   }
 };
 

@@ -26,13 +26,18 @@ namespace pagx {
 /**
  * An ellipse shape.
  */
-struct Ellipse : public Geometry {
+class Ellipse : public Geometry {
+ public:
   Point center = {};
   Size size = {100, 100};
   bool reversed = false;
 
   NodeType type() const override {
     return NodeType::Ellipse;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Ellipse;
   }
 };
 

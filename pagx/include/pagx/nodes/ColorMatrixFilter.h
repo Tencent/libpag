@@ -19,18 +19,23 @@
 #pragma once
 
 #include <array>
-#include "pagx/nodes/Filter.h"
+#include "pagx/nodes/LayerFilter.h"
 
 namespace pagx {
 
 /**
  * Color matrix filter.
  */
-struct ColorMatrixFilter : public Filter {
+class ColorMatrixFilter : public LayerFilter {
+ public:
   std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
 
   NodeType type() const override {
     return NodeType::ColorMatrixFilter;
+  }
+
+  LayerFilterType layerFilterType() const override {
+    return LayerFilterType::ColorMatrixFilter;
   }
 };
 

@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * A conic (sweep) gradient.
  */
-struct ConicGradient : public ColorSource {
+class ConicGradient : public ColorSource {
+ public:
   std::string id = {};
   Point center = {};
   float startAngle = 0;
@@ -39,6 +40,10 @@ struct ConicGradient : public ColorSource {
 
   NodeType type() const override {
     return NodeType::ConicGradient;
+  }
+
+  ColorSourceType colorSourceType() const override {
+    return ColorSourceType::ConicGradient;
   }
 };
 

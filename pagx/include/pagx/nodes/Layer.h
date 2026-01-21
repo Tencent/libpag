@@ -22,7 +22,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/nodes/Filter.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/BlendMode.h"
@@ -34,7 +35,8 @@ namespace pagx {
 /**
  * Layer node.
  */
-struct Layer : public Node {
+class Layer : public Node {
+ public:
   std::string id = {};
   std::string name = {};
   bool visible = true;
@@ -55,9 +57,9 @@ struct Layer : public Node {
   MaskType maskType = MaskType::Alpha;
   std::string composition = {};
 
-  std::vector<std::unique_ptr<Node>> contents = {};
+  std::vector<std::unique_ptr<Element>> contents = {};
   std::vector<std::unique_ptr<LayerStyle>> styles = {};
-  std::vector<std::unique_ptr<Filter>> filters = {};
+  std::vector<std::unique_ptr<LayerFilter>> filters = {};
   std::vector<std::unique_ptr<Layer>> children = {};
 
   // Custom data from SVG data-* attributes (key without "data-" prefix)

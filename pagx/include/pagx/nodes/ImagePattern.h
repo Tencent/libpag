@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * An image pattern.
  */
-struct ImagePattern : public ColorSource {
+class ImagePattern : public ColorSource {
+ public:
   std::string id = {};
   std::string image = {};
   TileMode tileModeX = TileMode::Clamp;
@@ -39,6 +40,10 @@ struct ImagePattern : public ColorSource {
 
   NodeType type() const override {
     return NodeType::ImagePattern;
+  }
+
+  ColorSourceType colorSourceType() const override {
+    return ColorSourceType::ImagePattern;
   }
 };
 

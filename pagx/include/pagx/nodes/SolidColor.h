@@ -27,12 +27,17 @@ namespace pagx {
 /**
  * A solid color.
  */
-struct SolidColor : public ColorSource {
+class SolidColor : public ColorSource {
+ public:
   std::string id = {};
   Color color = {};
 
   NodeType type() const override {
     return NodeType::SolidColor;
+  }
+
+  ColorSourceType colorSourceType() const override {
+    return ColorSourceType::SolidColor;
   }
 };
 

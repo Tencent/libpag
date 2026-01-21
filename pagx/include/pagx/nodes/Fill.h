@@ -33,7 +33,8 @@ namespace pagx {
  * The color can be a simple color string ("#FF0000"), a reference ("#gradientId"),
  * or an inline color source node.
  */
-struct Fill : public Painter {
+class Fill : public Painter {
+ public:
   std::string color = {};
   std::unique_ptr<ColorSource> colorSource = nullptr;
   float alpha = 1;
@@ -43,6 +44,10 @@ struct Fill : public Painter {
 
   NodeType type() const override {
     return NodeType::Fill;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Fill;
   }
 };
 

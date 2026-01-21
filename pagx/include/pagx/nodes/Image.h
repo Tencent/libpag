@@ -19,20 +19,18 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
 /**
  * Image resource.
  */
-struct Image : public Node {
+class Image {
+ public:
+  virtual ~Image() = default;
+
   std::string id = {};
   std::string source = {};
-
-  NodeType type() const override {
-    return NodeType::Image;
-  }
 };
 
 }  // namespace pagx

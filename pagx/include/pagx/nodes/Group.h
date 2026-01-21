@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <vector>
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
@@ -28,7 +28,8 @@ namespace pagx {
 /**
  * Group container.
  */
-struct Group : public Node {
+class Group : public Element {
+ public:
   Point anchorPoint = {};
   Point position = {};
   float rotation = 0;
@@ -36,10 +37,14 @@ struct Group : public Node {
   float skew = 0;
   float skewAxis = 0;
   float alpha = 1;
-  std::vector<std::unique_ptr<Node>> elements = {};
+  std::vector<std::unique_ptr<Element>> elements = {};
 
   NodeType type() const override {
     return NodeType::Group;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Group;
   }
 };
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,16 @@
 
 #pragma once
 
-#include "pagx/PathData.h"
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/Element.h"
 
 namespace pagx {
 
 /**
- * A path shape.
+ * Base class for text animators (TextModifier, TextPath, TextLayout).
  */
-class Path : public Geometry {
- public:
-  PathData data = {};
-  bool reversed = false;
-
-  NodeType type() const override {
-    return NodeType::Path;
-  }
-
-  ElementType elementType() const override {
-    return ElementType::Path;
-  }
+class TextAnimator : public Element {
+ protected:
+  TextAnimator() = default;
 };
 
 }  // namespace pagx

@@ -34,7 +34,8 @@ namespace pagx {
 /**
  * A stroke painter.
  */
-struct Stroke : public Painter {
+class Stroke : public Painter {
+ public:
   std::string color = {};
   std::unique_ptr<ColorSource> colorSource = nullptr;
   float width = 1;
@@ -50,6 +51,10 @@ struct Stroke : public Painter {
 
   NodeType type() const override {
     return NodeType::Stroke;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Stroke;
   }
 };
 

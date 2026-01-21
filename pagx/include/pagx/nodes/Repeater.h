@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Node.h"
+#include "pagx/nodes/Element.h"
 #include "pagx/types/RepeaterOrder.h"
 #include "pagx/types/Types.h"
 
@@ -27,7 +27,8 @@ namespace pagx {
 /**
  * Repeater modifier.
  */
-struct Repeater : public Node {
+class Repeater : public Element {
+ public:
   float copies = 3;
   float offset = 0;
   RepeaterOrder order = RepeaterOrder::BelowOriginal;
@@ -40,6 +41,10 @@ struct Repeater : public Node {
 
   NodeType type() const override {
     return NodeType::Repeater;
+  }
+
+  ElementType elementType() const override {
+    return ElementType::Repeater;
   }
 };
 
