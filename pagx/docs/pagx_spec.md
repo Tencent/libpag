@@ -927,13 +927,13 @@ boundingRect.bottom = center.y + size.height / 2
 支持正多边形和星形两种模式。
 
 ```xml
-<Polystar center="100,100" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+<Polystar center="100,100" type="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `center` | point | 0,0 | 中心点 |
-| `polystarType` | PolystarType | star | 类型（见下方） |
+| `type` | PolystarType | star | 类型（见下方） |
 | `pointCount` | float | 5 | 顶点数（支持小数） |
 | `outerRadius` | float | 100 | 外半径 |
 | `innerRadius` | float | 50 | 内半径（仅星形） |
@@ -949,11 +949,11 @@ boundingRect.bottom = center.y + size.height / 2
 | `polygon` | 正多边形：只使用外半径 |
 | `star` | 星形：使用外半径和内半径交替 |
 
-**多边形模式** (`polystarType="polygon"`)：
+**多边形模式** (`type="polygon"`):
 - 只使用 `outerRadius` 和 `outerRoundness`
 - `innerRadius` 和 `innerRoundness` 被忽略
 
-**星形模式** (`polystarType="star"`)：
+**星形模式** (`type="star"`):
 - 外顶点位于 `outerRadius` 处
 - 内顶点位于 `innerRadius` 处
 - 顶点交替连接形成星形
@@ -2182,7 +2182,7 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `center` | point | 0,0 |
-| `polystarType` | PolystarType | star |
+| `type` | PolystarType | star |
 | `pointCount` | float | 5 |
 | `outerRadius` | float | 100 |
 | `innerRadius` | float | 50 |
