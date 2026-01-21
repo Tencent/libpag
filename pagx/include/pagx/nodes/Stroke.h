@@ -29,29 +29,56 @@
 namespace pagx {
 
 /**
- * Line cap styles for strokes.
+ * Line cap styles that define the shape at the endpoints of open paths.
  */
 enum class LineCap {
+  /**
+   * A flat cap that ends exactly at the path endpoint.
+   */
   Butt,
+  /**
+   * A rounded cap that extends beyond the endpoint by half the stroke width.
+   */
   Round,
+  /**
+   * A square cap that extends beyond the endpoint by half the stroke width.
+   */
   Square
 };
 
 /**
- * Line join styles for strokes.
+ * Line join styles that define the shape at the corners of paths.
  */
 enum class LineJoin {
+  /**
+   * A sharp join that extends to a point.
+   */
   Miter,
+  /**
+   * A rounded join with a circular arc.
+   */
   Round,
+  /**
+   * A beveled join that cuts off the corner.
+   */
   Bevel
 };
 
 /**
- * Stroke alignment relative to path.
+ * Stroke alignment relative to the path.
  */
 enum class StrokeAlign {
+  /**
+   * Stroke is centered on the path.
+   */
   Center,
+  /**
+   * Stroke is drawn inside the path boundary.
+   */
   Inside,
+  /**
+   * Stroke is drawn outside the path boundary.
+   */
   Outside
 };
 

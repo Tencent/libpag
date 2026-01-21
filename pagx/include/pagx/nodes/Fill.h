@@ -28,10 +28,16 @@
 namespace pagx {
 
 /**
- * Fill rules for paths.
+ * Fill rules that determine the interior of self-intersecting paths.
  */
 enum class FillRule {
+  /**
+   * Non-zero winding rule. A point is inside if the winding number is non-zero.
+   */
   Winding,
+  /**
+   * Even-odd rule. A point is inside if the number of crossings is odd.
+   */
   EvenOdd
 };
 

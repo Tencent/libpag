@@ -23,10 +23,16 @@
 namespace pagx {
 
 /**
- * Trim path types.
+ * Trim path types that control how multiple paths are trimmed.
  */
 enum class TrimType {
+  /**
+   * Trim each path individually within the group.
+   */
   Separate,
+  /**
+   * Treat all paths as one continuous path and trim collectively.
+   */
   Continuous
 };
 

@@ -24,10 +24,16 @@
 namespace pagx {
 
 /**
- * Polystar types.
+ * Polystar shape types.
  */
 enum class PolystarType {
+  /**
+   * A regular polygon with equal-length sides.
+   */
   Polygon,
+  /**
+   * A star shape with alternating inner and outer points.
+   */
   Star
 };
 

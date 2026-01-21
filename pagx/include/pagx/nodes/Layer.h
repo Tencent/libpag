@@ -33,11 +33,20 @@
 namespace pagx {
 
 /**
- * Mask types for layer masking.
+ * Mask types that define how a mask layer affects its target.
  */
 enum class MaskType {
+  /**
+   * Use the alpha channel of the mask to determine visibility.
+   */
   Alpha,
+  /**
+   * Use the luminance (brightness) of the mask to determine visibility.
+   */
   Luminance,
+  /**
+   * Use the contour (outline) of the mask for masking.
+   */
   Contour
 };
 
