@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
@@ -29,14 +30,16 @@ class Layer;
 /**
  * Composition resource.
  */
-class Composition {
+class Composition : public Node {
  public:
-  virtual ~Composition() = default;
-
   std::string id = {};
   float width = 0;
   float height = 0;
   std::vector<std::unique_ptr<Layer>> layers = {};
+
+  NodeType type() const override {
+    return NodeType::Composition;
+  }
 };
 
 }  // namespace pagx

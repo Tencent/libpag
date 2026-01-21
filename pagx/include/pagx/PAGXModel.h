@@ -84,7 +84,6 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathDataResource.h"
-#include "pagx/nodes/Resource.h"
 
 // Layer
 #include "pagx/nodes/Layer.h"

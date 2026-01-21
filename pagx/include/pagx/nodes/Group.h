@@ -37,7 +37,7 @@ class Group : public Element {
   float skew = 0;
   float skewAxis = 0;
   float alpha = 1;
-  std::vector<std::unique_ptr<Element>> elements = {};
+  std::vector<std::unique_ptr<Node>> elements = {};
 
   NodeType type() const override {
     return NodeType::Group;

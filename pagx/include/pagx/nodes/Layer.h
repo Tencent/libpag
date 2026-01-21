@@ -57,9 +57,9 @@ class Layer : public Node {
   MaskType maskType = MaskType::Alpha;
   std::string composition = {};
 
-  std::vector<std::unique_ptr<Element>> contents = {};
-  std::vector<std::unique_ptr<LayerStyle>> styles = {};
-  std::vector<std::unique_ptr<LayerFilter>> filters = {};
+  std::vector<std::unique_ptr<Node>> contents = {};
+  std::vector<std::unique_ptr<Node>> styles = {};
+  std::vector<std::unique_ptr<Node>> filters = {};
   std::vector<std::unique_ptr<Layer>> children = {};
 
   // Custom data from SVG data-* attributes (key without "data-" prefix)

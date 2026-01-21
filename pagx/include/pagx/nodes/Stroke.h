@@ -37,7 +37,7 @@ namespace pagx {
 class Stroke : public Painter {
  public:
   std::string color = {};
-  std::unique_ptr<ColorSource> colorSource = nullptr;
+  std::unique_ptr<Node> colorSource = nullptr;
   float width = 1;
   float alpha = 1;
   BlendMode blendMode = BlendMode::Normal;

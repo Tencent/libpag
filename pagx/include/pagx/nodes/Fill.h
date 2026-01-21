@@ -36,7 +36,7 @@ namespace pagx {
 class Fill : public Painter {
  public:
   std::string color = {};
-  std::unique_ptr<ColorSource> colorSource = nullptr;
+  std::unique_ptr<Node> colorSource = nullptr;
   float alpha = 1;
   BlendMode blendMode = BlendMode::Normal;
   FillRule fillRule = FillRule::Winding;
