@@ -158,9 +158,19 @@ PAGX 支持多种颜色格式：
 | 色域 | `color(display-p3 1 0 0)` | 广色域颜色 |
 | 引用 | `#resourceId` | 引用 Resources 中定义的颜色源 |
 
-### 2.9 路径数据（Path Data）
+### 2.9 PathData（路径数据）
 
-路径数据使用 SVG 路径语法，支持以下命令：
+PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素和 TextPath 修改器引用。
+
+```xml
+<PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `data` | string | (必填) | SVG 路径数据 |
+
+**路径命令**（SVG 路径语法）：
 
 | 命令 | 参数 | 说明 |
 |------|------|------|
@@ -175,21 +185,7 @@ PAGX 支持多种颜色格式：
 | A/a | rx ry rotation large-arc sweep x y | 椭圆弧 |
 | Z/z | - | 闭合路径 |
 
-**示例**：`"M 0 0 L 100 0 L 100 100 Z"`
-
-### 2.10 PathData（路径数据资源）
-
-PathData 定义可在文档中引用的路径数据，支持路径复用。
-
-```xml
-<PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `data` | string | (必填) | SVG 路径数据（语法见 2.9 节） |
-
-### 2.11 Image（图片）
+### 2.10 Image（图片）
 
 图片资源定义可在文档中引用的位图数据。
 
@@ -207,7 +203,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 **支持格式**：PNG、JPEG、WebP、GIF
 
-### 2.12 颜色源（Color Source）
+### 2.11 颜色源（Color Source）
 
 颜色源定义可用于渲染的颜色，支持两种定义方式：
 
@@ -219,7 +215,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 - 被多处引用的颜色源应定义在 Resources 中以便复用
 - ImagePattern 使用 objectBoundingBox 时（tile 尺寸依赖形状尺寸），通常需要内联定义，因为不同形状需要不同的 matrix
 
-#### 2.12.1 SolidColor（纯色）
+#### 2.11.1 SolidColor（纯色）
 
 ```xml
 <SolidColor id="red" color="#FF0000"/>
@@ -229,7 +225,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 |------|------|--------|------|
 | `color` | color | (必填) | 颜色值 |
 
-#### 2.12.2 LinearGradient（线性渐变）
+#### 2.11.2 LinearGradient（线性渐变）
 
 线性渐变沿起点到终点的方向插值。
 
@@ -248,7 +244,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 **计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
 
-#### 2.12.3 RadialGradient（径向渐变）
+#### 2.11.3 RadialGradient（径向渐变）
 
 径向渐变从中心向外辐射。
 
@@ -267,7 +263,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 **计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
 
-#### 2.12.4 ConicGradient（锥形渐变）
+#### 2.11.4 ConicGradient（锥形渐变）
 
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
@@ -287,7 +283,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 **计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
 
-#### 2.12.5 DiamondGradient（菱形渐变）
+#### 2.11.5 DiamondGradient（菱形渐变）
 
 菱形渐变从中心向四角辐射。
 
@@ -306,7 +302,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 **计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
 
-#### 2.12.6 ColorStop（渐变色标）
+#### 2.11.6 ColorStop（渐变色标）
 
 ```xml
 <ColorStop offset="0.5" color="#FF0000"/>
@@ -327,7 +323,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
   - 如果没有 `offset = 1` 的色标，使用最后一个色标的颜色填充
 - **渐变变换**：`matrix` 属性对渐变坐标系应用变换
 
-#### 2.12.7 颜色源坐标系统
+#### 2.11.7 颜色源坐标系统
 
 所有颜色源（渐变、图案）的坐标系是**相对于几何元素的局部坐标系原点**。
 
@@ -356,7 +352,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-#### 2.12.8 ImagePattern（图片图案）
+#### 2.11.8 ImagePattern（图片图案）
 
 图片图案使用图片作为颜色源。
 
@@ -462,9 +458,9 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 **支持的资源类型**：
 
-- `Image`：图片资源（见 2.11 节）
-- `PathData`：路径数据（见 2.10 节），可被 Path 元素和 TextPath 修改器引用
-- 颜色源（见 2.12 节）：`SolidColor`、`LinearGradient`、`RadialGradient`、`ConicGradient`、`DiamondGradient`、`ImagePattern`
+- `Image`：图片资源（见 2.10 节）
+- `PathData`：路径数据（见 2.9 节），可被 Path 元素和 TextPath 修改器引用
+- 颜色源（见 2.11 节）：`SolidColor`、`LinearGradient`、`RadialGradient`、`ConicGradient`、`DiamondGradient`、`ImagePattern`
 - `Composition`：合成（见下方）
 
 #### 3.3.1 Composition（合成）
@@ -682,7 +678,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blurrinessX` | float | 0 | X 模糊半径 |
 | `blurrinessY` | float | 0 | Y 模糊半径 |
-| `tileMode` | TileMode | mirror | 平铺模式（见 2.12.8） |
+| `tileMode` | TileMode | mirror | 平铺模式（见 2.11.8） |
 
 **渲染步骤**：
 1. 获取图层边界下方的背景内容
@@ -707,7 +703,7 @@ PAGX 文档采用层级结构组织内容：
 |------|------|--------|------|
 | `blurrinessX` | float | (必填) | X 模糊半径 |
 | `blurrinessY` | float | (必填) | Y 模糊半径 |
-| `tileMode` | TileMode | decal | 平铺模式（见 2.12.8） |
+| `tileMode` | TileMode | decal | 平铺模式（见 2.11.8） |
 
 #### 4.3.2 DropShadowFilter（投影阴影滤镜）
 
@@ -986,7 +982,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string/idref | "" | SVG 路径数据（语法见 2.9 节）或 PathData 资源引用 "#id"（见 2.10 节） |
+| `data` | string/idref | "" | SVG 路径数据或 PathData 资源引用 "#id"（语法见 2.9 节） |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -1423,7 +1419,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | (必填) | PathData 资源引用 "#id"（见 2.10 节） |
+| `path` | idref | (必填) | PathData 资源引用 "#id"（见 2.9 节） |
 | `align` | TextPathAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
@@ -1755,8 +1751,8 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 |------|------|----------|
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter` | 4.1 |
 | **MaskType** | `alpha`, `luminance`, `contour` | 4.1 |
-| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` | 2.12.8 |
-| **SamplingMode** | `nearest`, `linear`, `mipmap` | 2.12.8 |
+| **TileMode** | `clamp`, `repeat`, `mirror`, `decal` | 2.11.8 |
+| **SamplingMode** | `nearest`, `linear`, `mipmap` | 2.11.8 |
 
 ### A.2 绘制器相关
 
