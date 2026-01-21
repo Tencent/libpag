@@ -18,8 +18,34 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
-
-#include "pagx/model/Enums.h"
+#include <memory>
 #include "pagx/model/Types.h"
+#include "pagx/model/VectorElement.h"
+#include "pagx/model/enums/RepeaterOrder.h"
+
+namespace pagx {
+
+/**
+ * Repeater modifier.
+ */
+struct Repeater : public VectorElement {
+  float copies = 3;
+  float offset = 0;
+  RepeaterOrder order = RepeaterOrder::BelowOriginal;
+  Point anchorPoint = {};
+  Point position = {100, 100};
+  float rotation = 0;
+  Point scale = {1, 1};
+  float startAlpha = 1;
+  float endAlpha = 1;
+
+  NodeType type() const override {
+    return NodeType::Repeater;
+  }
+
+  std::unique_ptr<Node> clone() const override {
+    return std::make_unique<Repeater>(*this);
+  }
+};
+
+}  // namespace pagx

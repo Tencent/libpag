@@ -18,8 +18,19 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Repeater stacking order.
+ */
+enum class RepeaterOrder {
+  BelowOriginal,
+  AboveOriginal
+};
+
+std::string RepeaterOrderToString(RepeaterOrder order);
+RepeaterOrder RepeaterOrderFromString(const std::string& str);
+
+}  // namespace pagx

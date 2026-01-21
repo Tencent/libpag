@@ -86,6 +86,8 @@ const char* NodeTypeName(NodeType type) {
       return "ColorMatrixFilter";
     case NodeType::Image:
       return "Image";
+    case NodeType::PathData:
+      return "PathData";
     case NodeType::Composition:
       return "Composition";
     case NodeType::Layer:

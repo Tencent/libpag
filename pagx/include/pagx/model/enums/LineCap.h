@@ -18,8 +18,20 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Line cap styles for strokes.
+ */
+enum class LineCap {
+  Butt,
+  Round,
+  Square
+};
+
+std::string LineCapToString(LineCap cap);
+LineCap LineCapFromString(const std::string& str);
+
+}  // namespace pagx

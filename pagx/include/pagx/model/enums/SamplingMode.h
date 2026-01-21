@@ -18,8 +18,20 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Sampling modes for images.
+ */
+enum class SamplingMode {
+  Nearest,
+  Linear,
+  Mipmap
+};
+
+std::string SamplingModeToString(SamplingMode mode);
+SamplingMode SamplingModeFromString(const std::string& str);
+
+}  // namespace pagx

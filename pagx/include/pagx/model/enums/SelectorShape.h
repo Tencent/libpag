@@ -18,8 +18,23 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Range selector shape.
+ */
+enum class SelectorShape {
+  Square,
+  RampUp,
+  RampDown,
+  Triangle,
+  Round,
+  Smooth
+};
+
+std::string SelectorShapeToString(SelectorShape shape);
+SelectorShape SelectorShapeFromString(const std::string& str);
+
+}  // namespace pagx

@@ -18,8 +18,21 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Text horizontal alignment.
+ */
+enum class TextAlign {
+  Left,
+  Center,
+  Right,
+  Justify
+};
+
+std::string TextAlignToString(TextAlign align);
+TextAlign TextAlignFromString(const std::string& str);
+
+}  // namespace pagx

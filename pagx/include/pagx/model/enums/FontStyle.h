@@ -18,8 +18,19 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Font style.
+ */
+enum class FontStyle {
+  Normal,
+  Italic
+};
+
+std::string FontStyleToString(FontStyle style);
+FontStyle FontStyleFromString(const std::string& str);
+
+}  // namespace pagx

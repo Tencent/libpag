@@ -18,8 +18,14 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include "pagx/model/Node.h"
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Base class for vector element nodes.
+ * VectorElements are nodes that can appear inside layer contents.
+ */
+class VectorElement : public Node {};
+
+}  // namespace pagx

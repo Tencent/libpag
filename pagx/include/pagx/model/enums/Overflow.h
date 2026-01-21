@@ -18,8 +18,20 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Text overflow handling.
+ */
+enum class Overflow {
+  Clip,
+  Visible,
+  Ellipsis
+};
+
+std::string OverflowToString(Overflow overflow);
+Overflow OverflowFromString(const std::string& str);
+
+}  // namespace pagx

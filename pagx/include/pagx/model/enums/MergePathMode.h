@@ -18,8 +18,22 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Path merge modes (boolean operations).
+ */
+enum class MergePathMode {
+  Append,
+  Union,
+  Intersect,
+  Xor,
+  Difference
+};
+
+std::string MergePathModeToString(MergePathMode mode);
+MergePathMode MergePathModeFromString(const std::string& str);
+
+}  // namespace pagx

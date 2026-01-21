@@ -18,8 +18,20 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Mask types for layer masking.
+ */
+enum class MaskType {
+  Alpha,
+  Luminance,
+  Contour
+};
+
+std::string MaskTypeToString(MaskType type);
+MaskType MaskTypeFromString(const std::string& str);
+
+}  // namespace pagx

@@ -18,8 +18,20 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Stroke alignment relative to path.
+ */
+enum class StrokeAlign {
+  Center,
+  Inside,
+  Outside
+};
+
+std::string StrokeAlignToString(StrokeAlign align);
+StrokeAlign StrokeAlignFromString(const std::string& str);
+
+}  // namespace pagx

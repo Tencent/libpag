@@ -18,8 +18,21 @@
 
 #pragma once
 
-// This file provides backward compatibility.
-// New code should include pagx/model/Types.h and pagx/model/Enums.h directly.
+#include <string>
 
-#include "pagx/model/Enums.h"
-#include "pagx/model/Types.h"
+namespace pagx {
+
+/**
+ * Tile modes for patterns and gradients.
+ */
+enum class TileMode {
+  Clamp,
+  Repeat,
+  Mirror,
+  Decal
+};
+
+std::string TileModeToString(TileMode mode);
+TileMode TileModeFromString(const std::string& str);
+
+}  // namespace pagx
