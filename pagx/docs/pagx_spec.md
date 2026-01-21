@@ -47,7 +47,17 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 | 默认单位 | 像素（无需标注） | `width="100"` |
 | 角度单位 | 度 | `rotation="45"` |
 
-### 2.2 基本数值类型
+### 2.2 属性表格约定
+
+本规范中的属性表格统一使用"默认值"列描述属性的必填性：
+
+| 默认值格式 | 含义 |
+|------------|------|
+| `(必填)` | 属性必须指定，没有默认值 |
+| `(Resources 中必填)` | 仅在 Resources 中定义时必填，内联使用时可省略 |
+| 具体值（如 `0`、`true`、`normal`） | 属性可选，未指定时使用该默认值 |
+
+### 2.3 基本数值类型
 
 | 类型 | 说明 | 示例 |
 |------|------|------|
@@ -58,7 +68,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 | `enum` | 枚举值 | `normal`、`multiply` |
 | `idref` | ID 引用 | `#gradientId`、`#maskLayer` |
 
-### 2.3 点（Point）
+### 2.4 点（Point）
 
 点使用逗号分隔的两个浮点数表示：
 
@@ -68,7 +78,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 
 **示例**：`"100,200"`、`"0.5,0.5"`、`"-50,100"`
 
-### 2.4 矩形（Rect）
+### 2.5 矩形（Rect）
 
 矩形使用逗号分隔的四个浮点数表示：
 
@@ -78,7 +88,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 
 **示例**：`"0,0,100,100"`、`"10,20,200,150"`
 
-### 2.5 变换矩阵（Matrix）
+### 2.6 变换矩阵（Matrix）
 
 #### 2D 变换矩阵
 
@@ -105,7 +115,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也
 "m00,m10,m20,m30,m01,m11,m21,m31,m02,m12,m22,m32,m03,m13,m23,m33"
 ```
 
-### 2.6 颜色（Color）
+### 2.7 颜色（Color）
 
 PAGX 支持多种颜色格式：
 
@@ -117,7 +127,7 @@ PAGX 支持多种颜色格式：
 | 色域 | `color(display-p3 1 0 0)` | 广色域颜色 |
 | 引用 | `#resourceId` | 引用 Resources 中定义的颜色源 |
 
-### 2.7 路径数据（Path Data）
+### 2.8 路径数据（Path Data）
 
 路径数据使用 SVG 路径语法，支持以下命令：
 
@@ -136,7 +146,7 @@ PAGX 支持多种颜色格式：
 
 **示例**：`"M 0 0 L 100 0 L 100 100 Z"`
 
-### 2.8 PathData（路径数据资源）
+### 2.9 PathData（路径数据资源）
 
 PathData 定义可在文档中引用的路径数据，支持路径复用。
 
@@ -144,12 +154,12 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
 ```
 
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | 是 | 唯一标识 |
-| `data` | string | 是 | SVG 路径数据（语法见 2.7 节） |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `id` | string | (必填) | 唯一标识 |
+| `data` | string | (必填) | SVG 路径数据（语法见 2.11 节） |
 
-### 2.9 Image（图片）
+### 2.10 Image（图片）
 
 图片资源定义可在文档中引用的位图数据。
 
@@ -161,14 +171,14 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 <Image id="img2" source="data:image/png;base64,..."/>
 ```
 
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | 是 | 唯一标识 |
-| `source` | string | 是 | 文件路径或数据 URI |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `id` | string | (必填) | 唯一标识 |
+| `source` | string | (必填) | 文件路径或数据 URI |
 
 **支持格式**：PNG、JPEG、WebP、GIF
 
-### 2.10 颜色源（Color Source）
+### 2.11 颜色源（Color Source）
 
 颜色源定义可用于渲染的颜色，支持两种定义方式：
 
@@ -180,18 +190,18 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 - 被多处引用的颜色源应定义在 Resources 中以便复用
 - ImagePattern 使用 objectBoundingBox 时（tile 尺寸依赖形状尺寸），通常需要内联定义，因为不同形状需要不同的 matrix
 
-#### 2.10.1 SolidColor（纯色）
+#### 2.11.1 SolidColor（纯色）
 
 ```xml
 <SolidColor id="red" color="#FF0000"/>
 ```
 
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | 是（Resources 中） | 唯一标识 |
-| `color` | color | 是 | 颜色值 |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `id` | string | (Resources 中必填) | 唯一标识 |
+| `color` | color | (必填) | 颜色值 |
 
-#### 2.10.2 LinearGradient（线性渐变）
+#### 2.11.2 LinearGradient（线性渐变）
 
 线性渐变沿起点到终点的方向插值。
 
@@ -204,14 +214,14 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | - | 唯一标识 |
+| `id` | string | (Resources 中必填) | 唯一标识 |
 | `startPoint` | point | 0,0 | 起点 |
-| `endPoint` | point | - | 终点 |
+| `endPoint` | point | (必填) | 终点 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
 
-#### 2.10.3 RadialGradient（径向渐变）
+#### 2.11.3 RadialGradient（径向渐变）
 
 径向渐变从中心向外辐射。
 
@@ -224,14 +234,14 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | - | 唯一标识 |
+| `id` | string | (Resources 中必填) | 唯一标识 |
 | `center` | point | 0,0 | 中心点 |
-| `radius` | float | - | 渐变半径 |
+| `radius` | float | (必填) | 渐变半径 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
 
-#### 2.10.4 ConicGradient（锥形渐变）
+#### 2.11.4 ConicGradient（锥形渐变）
 
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
@@ -244,7 +254,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | - | 唯一标识 |
+| `id` | string | (Resources 中必填) | 唯一标识 |
 | `center` | point | 0,0 | 中心点 |
 | `startAngle` | float | 0 | 起始角度 |
 | `endAngle` | float | 360 | 结束角度 |
@@ -252,7 +262,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 **计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
 
-#### 2.10.5 DiamondGradient（菱形渐变）
+#### 2.11.5 DiamondGradient（菱形渐变）
 
 菱形渐变从中心向四角辐射。
 
@@ -265,23 +275,23 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | - | 唯一标识 |
+| `id` | string | (Resources 中必填) | 唯一标识 |
 | `center` | point | 0,0 | 中心点 |
-| `halfDiagonal` | float | - | 半对角线长度 |
+| `halfDiagonal` | float | (必填) | 半对角线长度 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
 
-#### 2.10.6 ColorStop（渐变色标）
+#### 2.11.6 ColorStop（渐变色标）
 
 ```xml
 <ColorStop offset="0.5" color="#FF0000"/>
 ```
 
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `offset` | float | 是 | 位置 0.0~1.0 |
-| `color` | color | 是 | 色标颜色 |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `offset` | float | (必填) | 位置 0.0~1.0 |
+| `color` | color | (必填) | 色标颜色 |
 
 **渐变通用规则**：
 
@@ -293,7 +303,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
   - 如果没有 `offset = 1` 的色标，使用最后一个色标的颜色填充
 - **渐变变换**：`matrix` 属性对渐变坐标系应用变换
 
-#### 2.10.7 颜色源坐标系统
+#### 2.11.7 颜色源坐标系统
 
 所有颜色源（渐变、图案）的坐标系是**相对于几何元素的局部坐标系原点**。
 
@@ -322,7 +332,7 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-#### 2.10.8 ImagePattern（图片图案）
+#### 2.11.8 ImagePattern（图片图案）
 
 图片图案使用图片作为颜色源。
 
@@ -332,8 +342,8 @@ PathData 定义可在文档中引用的路径数据，支持路径复用。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `id` | string | - | 唯一标识 |
-| `image` | idref | - | 图片引用 "#id" |
+| `id` | string | (Resources 中必填) | 唯一标识 |
+| `image` | idref | (必填) | 图片引用 "#id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式（见下方） |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式（见下方） |
 | `sampling` | SamplingMode | linear | 采样模式（见下方） |
@@ -399,11 +409,11 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 </pagx>
 ```
 
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `version` | string | 是 | 格式版本 |
-| `width` | float | 是 | 画布宽度 |
-| `height` | float | 是 | 画布高度 |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `version` | string | (必填) | 格式版本 |
+| `width` | float | (必填) | 画布宽度 |
+| `height` | float | (必填) | 画布高度 |
 
 **图层渲染顺序**：图层按文档顺序依次渲染，文档中靠前的图层先渲染（位于下方），靠后的图层后渲染（位于上方）。
 
@@ -427,15 +437,15 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 #### 3.3.1 Image（图片）
 
-图片资源定义见 2.9 节。
+图片资源定义见 2.11 节。
 
 #### 3.3.2 PathData（路径数据）
 
-路径数据资源定义见 2.8 节。可被 Path 元素和 TextPath 修改器引用。
+路径数据资源定义见 2.11 节。可被 Path 元素和 TextPath 修改器引用。
 
 #### 3.3.3 颜色源
 
-Resources 中可定义以下颜色源类型（详见 2.10 节）：
+Resources 中可定义以下颜色源类型（详见 2.11 节）：
 
 - `SolidColor`：纯色
 - `LinearGradient`：线性渐变
@@ -459,11 +469,11 @@ Resources 中可定义以下颜色源类型（详见 2.10 节）：
 </Composition>
 ```
 
-| 属性 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | 是 | 唯一标识 |
-| `width` | float | 是 | 合成宽度 |
-| `height` | float | 是 | 合成高度 |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `id` | string | (必填) | 唯一标识 |
+| `width` | float | (必填) | 合成宽度 |
+| `height` | float | (必填) | 合成高度 |
 
 ### 3.4 文档层级结构
 
@@ -685,8 +695,8 @@ PAGX 文档采用层级结构组织内容：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `blurrinessX` | float | - | X 模糊半径 |
-| `blurrinessY` | float | - | Y 模糊半径 |
+| `blurrinessX` | float | (必填) | X 模糊半径 |
+| `blurrinessY` | float | (必填) | Y 模糊半径 |
 | `tileMode` | TileMode | decal | 平铺模式（见 4.2.3） |
 
 #### 4.3.2 DropShadowFilter（投影阴影滤镜）
@@ -717,7 +727,7 @@ PAGX 文档采用层级结构组织内容：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color | - | 混合颜色 |
+| `color` | color | (必填) | 混合颜色 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
 
 #### 4.3.5 ColorMatrixFilter（颜色矩阵滤镜）
@@ -726,7 +736,7 @@ PAGX 文档采用层级结构组织内容：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `matrix` | string | - | 4x5 颜色矩阵（20 个逗号分隔的浮点数） |
+| `matrix` | string | (必填) | 4x5 颜色矩阵（20 个逗号分隔的浮点数） |
 
 **矩阵格式**（20 个值，行优先）：
 ```
@@ -974,7 +984,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string/idref | "" | SVG 路径数据（语法见 2.7 节）或 PathData 引用 "#id" |
+| `data` | string/idref | "" | SVG 路径数据（语法见 2.11 节）或 PathData 引用 "#id" |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -991,7 +1001,7 @@ y = center.y + outerRadius * sin(angle)
 |------|------|--------|------|
 | `x` | float | 0 | X 位置 |
 | `y` | float | 0 | Y 位置 |
-| `font` | string | - | 字体族 |
+| `font` | string | (必填) | 字体族 |
 | `fontSize` | float | 12 | 字号 |
 | `fontWeight` | int | 400 | 字重（100-900） |
 | `fontStyle` | enum | normal | normal 或 italic |
@@ -1411,7 +1421,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | - | PathData 资源引用 "#id"（见 2.8 节） |
+| `path` | idref | (必填) | PathData 资源引用 "#id"（见 2.11 节） |
 | `align` | TextPathAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
@@ -1463,8 +1473,8 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `width` | float | - | 文本框宽度 |
-| `height` | float | - | 文本框高度 |
+| `width` | float | (必填) | 文本框宽度 |
+| `height` | float | (必填) | 文本框高度 |
 | `align` | TextAlign | left | 水平对齐（见下方） |
 | `verticalAlign` | VerticalAlign | top | 垂直对齐（见下方） |
 | `lineHeight` | float | 1.2 | 行高倍数 |
