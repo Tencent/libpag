@@ -803,7 +803,7 @@ PAGX 文档采用层级结构组织内容：
                                             | 1 |
 ```
 
-### 4.4 Clipping, Masking and Compositing（裁剪、遮罩与合成）
+### 4.4 Clipping and Masking（裁剪与遮罩）
 
 #### 4.4.1 scrollRect（滚动裁剪）
 
@@ -842,10 +842,6 @@ PAGX 文档采用层级结构组织内容：
 **遮罩规则**：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
 - 遮罩图层的变换不影响被遮罩图层
-
-#### 4.4.3 混合模式（Blend Modes）
-
-混合模式详见 4.1 BlendMode。
 
 ---
 
