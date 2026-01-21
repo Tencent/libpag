@@ -381,6 +381,13 @@ std::unique_ptr<LayerNode> PAGXXMLParser::parseLayer(const XMLNode* node) {
   layer->maskType = MaskTypeFromString(getAttribute(node, "maskType", "alpha"));
   layer->composition = getAttribute(node, "composition");
 
+  // Parse data-* custom attributes.
+  for (const auto& [key, value] : node->attributes) {
+    if (key.length() > 5 && key.substr(0, 5) == "data-") {
+      layer->customData[key.substr(5)] = value;
+    }
+  }
+
   for (const auto& child : node->children) {
     if (child->tag == "contents") {
       parseContents(child.get(), layer.get());

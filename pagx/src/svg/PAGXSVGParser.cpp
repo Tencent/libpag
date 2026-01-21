@@ -115,6 +115,9 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
 
   _document = PAGXDocument::Make(width, height);
 
+  // Collect all IDs from the SVG to avoid conflicts when generating new IDs.
+  collectAllIds(root);
+
   // First pass: collect defs.
   auto child = root->getFirstChild();
   while (child) {
@@ -257,7 +260,9 @@ std::unique_ptr<LayerNode> SVGParserImpl::convertToLayer(const std::shared_ptr<D
 
   // Parse common layer attributes.
   layer->id = getAttribute(element, "id");
-  layer->name = getAttribute(element, "id");
+
+  // Parse data-* custom attributes.
+  parseCustomData(element, layer.get());
 
   std::string transform = getAttribute(element, "transform");
   if (!transform.empty()) {
@@ -1456,8 +1461,8 @@ std::string SVGParserImpl::registerImageResource(const std::string& imageSource)
     return it->second;
   }
 
-  // Generate a new image ID.
-  std::string imageId = "image" + std::to_string(_nextImageId++);
+  // Generate a unique image ID that doesn't conflict with existing SVG IDs.
+  std::string imageId = generateUniqueId("image");
 
   // Create and add the image resource to the document.
   auto imageNode = std::make_unique<ImageNode>();
@@ -1648,6 +1653,49 @@ void SVGParserImpl::convertFilterElement(
       filters.push_back(std::move(blurFilter));
     }
     child = child->getNextSibling();
+  }
+}
+
+void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
+  if (!node) {
+    return;
+  }
+
+  // Collect id from this node.
+  auto [found, id] = node->findAttribute("id");
+  if (found && !id.empty()) {
+    _existingIds.insert(id);
+  }
+
+  // Recursively collect from children.
+  auto child = node->getFirstChild();
+  while (child) {
+    collectAllIds(child);
+    child = child->getNextSibling();
+  }
+}
+
+std::string SVGParserImpl::generateUniqueId(const std::string& prefix) {
+  std::string id;
+  do {
+    id = "_" + prefix + std::to_string(_nextGeneratedId++);
+  } while (_existingIds.count(id) > 0);
+  _existingIds.insert(id);
+  return id;
+}
+
+void SVGParserImpl::parseCustomData(const std::shared_ptr<DOMNode>& element, LayerNode* layer) {
+  if (!element || !layer) {
+    return;
+  }
+
+  // Iterate through all attributes and find data-* ones.
+  for (const auto& attr : element->attributes) {
+    if (attr.name.length() > 5 && attr.name.substr(0, 5) == "data-") {
+      // Remove "data-" prefix and store in customData.
+      std::string key = attr.name.substr(5);
+      layer->customData[key] = attr.value;
+    }
   }
 }
 

@@ -1206,6 +1206,11 @@ static void writeLayer(XMLBuilder& xml, const LayerNode* node, const ResourceCon
   }
   xml.addAttribute("composition", node->composition);
 
+  // Write custom data as data-* attributes.
+  for (const auto& [key, value] : node->customData) {
+    xml.addAttribute("data-" + key, value);
+  }
+
   bool hasChildren = !node->contents.empty() || !node->styles.empty() || !node->filters.empty() ||
                      !node->children.empty();
   if (!hasChildren) {
@@ -1387,7 +1392,12 @@ std::string PAGXXMLWriter::Write(const PAGXDocument& doc) {
   xml.addAttribute("height", doc.height);
   xml.closeElementStart();
 
-  // Write Resources section
+  // Write Layers first (for better readability)
+  for (const auto& layer : doc.layers) {
+    writeLayer(xml, layer.get(), ctx);
+  }
+
+  // Write Resources section at the end
   bool hasResources = !ctx.pathDataResources.empty() || !colorSourceByKey.empty() ||
                       !doc.resources.empty();
   if (hasResources) {
@@ -1416,11 +1426,6 @@ std::string PAGXXMLWriter::Write(const PAGXDocument& doc) {
     }
 
     xml.closeElement();
-  }
-
-  // Write Layers
-  for (const auto& layer : doc.layers) {
-    writeLayer(xml, layer.get(), ctx);
   }
 
   xml.closeElement();

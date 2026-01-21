@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "pagx/PAGXTypes.h"
 #include "pagx/PathData.h"
@@ -912,6 +913,9 @@ struct LayerNode : public PAGXNode {
   std::vector<std::unique_ptr<LayerFilterNode>> filters = {};
   std::vector<std::unique_ptr<LayerNode>> children = {};
 
+  // Custom data from SVG data-* attributes (key without "data-" prefix)
+  std::unordered_map<std::string, std::string> customData = {};
+
   NodeType type() const override {
     return NodeType::Layer;
   }
@@ -953,6 +957,7 @@ struct LayerNode : public PAGXNode {
       node->children.push_back(
           std::unique_ptr<LayerNode>(static_cast<LayerNode*>(child->clone().release())));
     }
+    node->customData = customData;
     return node;
   }
 };

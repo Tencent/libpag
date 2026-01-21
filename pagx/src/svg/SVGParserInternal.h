@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXSVGParser.h"
@@ -114,12 +115,23 @@ class SVGParserImpl {
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
   void mergeAdjacentLayers(std::vector<std::unique_ptr<LayerNode>>& layers);
 
+  // Collect all IDs from the SVG document to avoid conflicts when generating new IDs.
+  void collectAllIds(const std::shared_ptr<DOMNode>& node);
+
+  // Generate a unique ID that doesn't conflict with existing SVG IDs.
+  std::string generateUniqueId(const std::string& prefix);
+
+  // Parse data-* attributes from element and add to layer's customData.
+  void parseCustomData(const std::shared_ptr<DOMNode>& element, LayerNode* layer);
+
   PAGXSVGParser::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
   std::vector<std::unique_ptr<LayerNode>> _maskLayers = {};
   std::unordered_map<std::string, std::string> _imageSourceToId = {};  // Maps image source to resource ID.
+  std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
   int _nextImageId = 0;
+  int _nextGeneratedId = 0;  // Counter for generating unique IDs.
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 };
