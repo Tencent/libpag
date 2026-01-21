@@ -35,7 +35,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 
 - **附录 A**：节点层级与包含关系
 - **附录 B**：示例
-- **附录 C**：速查手册
+- **附录 C**：节点与属性速查
 
 ---
 
@@ -2023,7 +2023,7 @@ Layer.contents / Group
 
 ---
 
-## Appendix C. Quick Reference（速查手册）
+## Appendix C. Node and Attribute Reference（节点与属性速查）
 
 本附录列出所有节点的属性定义，省略详细说明。
 
