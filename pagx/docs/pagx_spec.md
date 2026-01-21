@@ -96,7 +96,7 @@ PAGX 是纯 XML 文件（`.pagx`），可引用外部资源文件（图片、视
 | `bool` | 布尔值 | `true`、`false` |
 | `string` | 字符串 | `"Arial"`、`"myLayer"` |
 | `enum` | 枚举值 | `normal`、`multiply` |
-| `idref` | ID 引用 | `#gradientId`、`#maskLayer` |
+| `idref` | ID 引用 | `@gradientId`、`@maskLayer` |
 
 ### 2.5 点（Point）
 
@@ -155,7 +155,7 @@ PAGX 支持多种颜色格式：
 | RGB | `rgb(255,0,0)`、`rgba(255,0,0,0.5)` | RGB 带可选透明度 |
 | HSL | `hsl(0,100%,50%)`、`hsla(0,100%,50%,0.5)` | HSL 带可选透明度 |
 | 色域 | `color(display-p3 1 0 0)` | 广色域颜色 |
-| 引用 | `#resourceId` | 引用 Resources 中定义的颜色源 |
+| 引用 | `@resourceId` | 引用 Resources 中定义的颜色源 |
 
 ### 2.9 路径数据语法（Path Data Syntax）
 
@@ -234,7 +234,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 ### 3.3 资源区（Resources）
 
-`<Resources>` 定义可复用的资源，包括图片、路径数据、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `#id` 形式引用。
+`<Resources>` 定义可复用的资源，包括图片、路径数据、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `@id` 形式引用。
 
 **元素位置**：Resources 元素可放置在根元素内的任意位置，对位置没有限制。解析器必须支持元素引用在文档后面定义的资源或图层（即前向引用）。
 
@@ -247,7 +247,7 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
     <ColorStop offset="0" color="#87CEEB"/>
     <ColorStop offset="1" color="#E0F6FF"/>
   </LinearGradient>
-  <ImagePattern id="texture" image="#img1" tileModeX="repeat" tileModeY="repeat"/>
+  <ImagePattern id="texture" image="@img1" tileModeX="repeat" tileModeY="repeat"/>
   <Composition id="buttonComp" width="100" height="50"><!-- 合成内容 --></Composition>
 </Resources>
 ```
@@ -283,7 +283,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 颜色源定义可用于填充和描边的颜色，支持两种使用方式：
 
-1. **共享定义**：在 `<Resources>` 中预定义，通过 `#id` 引用。适用于**被多处引用**的颜色源。
+1. **共享定义**：在 `<Resources>` 中预定义，通过 `@id` 引用。适用于**被多处引用**的颜色源。
 2. **内联定义**：直接嵌套在 `<Fill>` 或 `<Stroke>` 元素内部。适用于**仅使用一次**的颜色源，更简洁。
 
 ##### 纯色（SolidColor）
@@ -398,12 +398,12 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 图片图案使用图片作为颜色源。
 
 ```xml
-<ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
+<ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `image` | idref | (必填) | 图片引用 "#id" |
+| `image` | idref | (必填) | 图片引用 "@id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式 |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
 | `sampling` | SamplingMode | linear | 采样模式 |
@@ -435,7 +435,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 <Layer>
   <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#grad"/>
+  <Fill color="@grad"/>
 </Layer>
 ```
 
@@ -507,7 +507,7 @@ PAGX 文档采用层级结构组织内容：
     <Fill color="#00FF00"/>
   </Layer>
 </Layer>
-<Layer composition="#buttonComp" x="100" y="200"/>
+<Layer composition="@buttonComp" x="100" y="200"/>
 ```
 
 #### 子元素
@@ -541,9 +541,9 @@ Layer 的子元素按类型自动归类为四个集合：
 | `passThroughBackground` | bool | true | 是否允许背景透传给子图层 |
 | `excludeChildEffectsInLayerStyle` | bool | false | 图层样式是否排除子图层效果 |
 | `scrollRect` | string | - | 滚动裁剪区域 "x,y,w,h" |
-| `mask` | idref | - | 遮罩图层引用 "#id" |
+| `mask` | idref | - | 遮罩图层引用 "@id" |
 | `maskType` | MaskType | alpha | 遮罩类型 |
-| `composition` | idref | - | 合成引用 "#id" |
+| `composition` | idref | - | 合成引用 "@id" |
 
 **变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
 - 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
@@ -786,7 +786,7 @@ Layer 的子元素按类型自动归类为四个集合：
   <Ellipse center="100,100" size="150,150"/>
   <Fill color="#FFFFFF"/>
 </Layer>
-<Layer mask="#maskShape" maskType="alpha">
+<Layer mask="@maskShape" maskType="alpha">
   <Rectangle center="100,100" size="200,200"/>
   <Fill color="#FF0000"/>
 </Layer>
@@ -984,12 +984,12 @@ y = center.y + outerRadius * sin(angle)
 <Path data="M 0 0 L 100 0 L 100 100 Z" reversed="false"/>
 
 <!-- 引用 PathData 资源 -->
-<Path data="#curvePath" reversed="false"/>
+<Path data="@curvePath" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "#id" |
+| `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "@id" |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 文本片段（TextSpan）
@@ -1034,7 +1034,7 @@ y = center.y + outerRadius * sin(angle)
 <Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
 
 <!-- 引用共享颜色源 -->
-<Fill color="#grad1"/>
+<Fill color="@grad1"/>
 
 <!-- 内联线性渐变（仅使用一次时推荐） -->
 <Fill>
@@ -1046,7 +1046,7 @@ y = center.y + outerRadius * sin(angle)
 
 <!-- 内联图片图案 -->
 <Fill>
-  <ImagePattern image="#img1" tileModeX="repeat" tileModeY="repeat"/>
+  <ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
 </Fill>
 ```
 
@@ -1412,12 +1412,12 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 将文本沿指定路径排列。
 
 ```xml
-<TextPath path="#curvePath" align="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false" forceAlignment="false"/>
+<TextPath path="@curvePath" align="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false" forceAlignment="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | (必填) | PathData 资源引用 "#id" |
+| `path` | idref | (必填) | PathData 资源引用 "@id" |
 | `align` | TextPathAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
@@ -1684,7 +1684,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 ```xml
 <Rectangle center="100,100" size="200,100" roundness="10"/>
 <Fill>
-  <ImagePattern image="#checkerboard" tileModeX="repeat" tileModeY="repeat"/>
+  <ImagePattern image="@checkerboard" tileModeX="repeat" tileModeY="repeat"/>
 </Fill>
 <Fill color="#FF000080"/>
 ```
@@ -1707,7 +1707,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
   </RadialGradient>
 </Fill>
 <Fill alpha="0.3">
-  <ImagePattern image="#noiseTexture" tileModeX="repeat" tileModeY="repeat"/>
+  <ImagePattern image="@noiseTexture" tileModeX="repeat" tileModeY="repeat"/>
 </Fill>
 <Stroke color="#1a3366" width="3"/>
 ```
@@ -1802,7 +1802,7 @@ Layer / Group
   <!-- 背景 -->
   <Layer name="Background">
     <Rectangle center="200,150" size="400,300"/>
-    <Fill color="#skyGradient"/>
+    <Fill color="@skyGradient"/>
   </Layer>
   
   <!-- 标题：使用 Group 是因为需要整体变换 -->
@@ -1818,8 +1818,8 @@ Layer / Group
   </Layer>
   
   <!-- 使用合成的星星 -->
-  <Layer composition="#star" x="50" y="80"/>
-  <Layer composition="#star" x="320" y="100" alpha="0.7"/>
+  <Layer composition="@star" x="50" y="80"/>
+  <Layer composition="@star" x="320" y="100" alpha="0.7"/>
   
   <!-- 遮罩示例 -->
   <Layer id="maskShape" name="Mask" visible="false">
@@ -1827,7 +1827,7 @@ Layer / Group
     <Fill color="#FFFFFF"/>
   </Layer>
   
-  <Layer name="MaskedContent" mask="#maskShape" maskType="alpha">
+  <Layer name="MaskedContent" mask="@maskShape" maskType="alpha">
     <Rectangle center="200,200" size="200,200"/>
     <Fill color="#FF6B6B"/>
   </Layer>
@@ -1840,7 +1840,7 @@ Layer / Group
     
     <Composition id="star" width="50" height="50">
       <Layer name="starLayer">
-        <Polystar center="25,25" polystarType="star" pointCount="5"
+        <Polystar center="25,25" type="star" pointCount="5"
                   outerRadius="25" innerRadius="10"/>
         <Fill color="#FFD700"/>
       </Layer>
@@ -1860,7 +1860,7 @@ Layer / Group
 <!-- 多重填充：棋盘格图案 + 半透明红色覆盖 -->
 <Rectangle center="100,100" size="200,100" roundness="10"/>
 <Fill>
-  <ImagePattern image="#checkerboard" tileModeX="repeat" tileModeY="repeat"/>
+  <ImagePattern image="@checkerboard" tileModeX="repeat" tileModeY="repeat"/>
 </Fill>
 <Fill color="#FF000080"/>
 
@@ -1946,7 +1946,7 @@ Layer / Group
 <TextSpan font="Arial" fontSize="18">
   <![CDATA[Text along a curved path]]>
 </TextSpan>
-<TextPath path="#arc" align="center"/>
+<TextPath path="@arc" align="center"/>
 <Fill color="#336699"/>
 ```
 
