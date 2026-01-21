@@ -421,6 +421,8 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 `<Resources>` 定义可复用的资源，包括图片、路径数据、颜色源和合成。资源通过 `id` 属性标识，在文档其他位置通过 `#id` 形式引用。
 
+**元素位置**：Resources 元素可放置在根元素内的任意位置。为便于阅读和理解，推荐在可能的情况下，将被引用的元素定义在引用它的元素之前，并将所有资源集中在靠近文件顶部的单个 Resources 元素内。解析器必须支持前向引用，即元素可以引用在文档后面定义的资源或图层。
+
 ```xml
 <Resources>
   <Image id="img1" source="photo.png"/>
@@ -1061,7 +1063,7 @@ y = center.y + outerRadius * sin(angle)
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
-| `placement` | Placement | background | 绘制位置（见 5.3.3） |
+| `placement` | LayerPlacement | background | 绘制位置（见 5.3.3） |
 
 **FillRule（填充规则）**：
 
@@ -1107,7 +1109,7 @@ y = center.y + outerRadius * sin(angle)
 | `dashes` | string | - | 虚线模式 "d1,d2,..." |
 | `dashOffset` | float | 0 | 虚线偏移 |
 | `align` | StrokeAlign | center | 描边对齐（见下方） |
-| `placement` | Placement | background | 绘制位置（见 5.3.3） |
+| `placement` | LayerPlacement | background | 绘制位置（见 5.3.3） |
 
 **LineCap（线帽样式）**：
 
@@ -1141,7 +1143,7 @@ y = center.y + outerRadius * sin(angle)
 - `dashes`：定义虚线段长度序列，如 `"5,3"` 表示 5px 实线 + 3px 空白
 - `dashOffset`：虚线起始偏移量
 
-#### 5.3.3 Placement（绘制位置）
+#### 5.3.3 LayerPlacement（绘制位置）
 
 Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
