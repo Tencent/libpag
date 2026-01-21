@@ -1023,7 +1023,7 @@ y = center.y + outerRadius * sin(angle)
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
 ```xml
-<TextSpan position="100,200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0">
+<TextSpan position="100,200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0">
   <![CDATA[Hello World]]>
 </TextSpan>
 ```
@@ -1036,7 +1036,6 @@ y = center.y + outerRadius * sin(angle)
 | `fontWeight` | int | 400 | 字重（100-900） |
 | `fontStyle` | enum | normal | normal 或 italic |
 | `tracking` | float | 0 | 字距 |
-| `baselineShift` | float | 0 | 基线偏移 |
 
 **处理流程**：
 1. 根据 `font`、`fontSize`、`fontWeight`、`fontStyle` 查找字体
@@ -2261,7 +2260,6 @@ Layer / Group
 | `fontWeight` | int | 400 |
 | `fontStyle` | enum | normal |
 | `tracking` | float | 0 |
-| `baselineShift` | float | 0 |
 
 内容：`CDATA` 文本
 

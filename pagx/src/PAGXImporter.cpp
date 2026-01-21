@@ -332,7 +332,7 @@ std::unique_ptr<Layer> PAGXImporterImpl::parseLayer(const XMLNode* node) {
   layer->y = getFloatAttribute(node, "y", 0);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    layer->matrix = Matrix::Parse(matrixStr);
+    layer->matrix = MatrixFromString(matrixStr);
   }
   auto matrix3DStr = getAttribute(node, "matrix3D");
   if (!matrix3DStr.empty()) {
@@ -578,7 +578,7 @@ std::unique_ptr<Path> PAGXImporterImpl::parsePath(const XMLNode* node) {
   auto path = std::make_unique<Path>();
   auto dataAttr = getAttribute(node, "data");
   if (!dataAttr.empty()) {
-    path->data = PathData::FromSVGString(dataAttr);
+    path->data = PathDataFromSVGString(dataAttr);
   }
   path->reversed = getBoolAttribute(node, "reversed", false);
   return path;
@@ -593,7 +593,6 @@ std::unique_ptr<TextSpan> PAGXImporterImpl::parseTextSpan(const XMLNode* node) {
   textSpan->fontWeight = getIntAttribute(node, "fontWeight", 400);
   textSpan->fontStyle = getAttribute(node, "fontStyle", "normal");
   textSpan->tracking = getFloatAttribute(node, "tracking", 0);
-  textSpan->baselineShift = getFloatAttribute(node, "baselineShift", 0);
   textSpan->text = node->text;
   return textSpan;
 }
@@ -805,7 +804,7 @@ std::unique_ptr<LinearGradient> PAGXImporterImpl::parseLinearGradient(const XMLN
   gradient->endPoint = parsePoint(endPointStr);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    gradient->matrix = Matrix::Parse(matrixStr);
+    gradient->matrix = MatrixFromString(matrixStr);
   }
   for (const auto& child : node->children) {
     if (child->tag == "ColorStop") {
@@ -823,7 +822,7 @@ std::unique_ptr<RadialGradient> PAGXImporterImpl::parseRadialGradient(const XMLN
   gradient->radius = getFloatAttribute(node, "radius", 0);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    gradient->matrix = Matrix::Parse(matrixStr);
+    gradient->matrix = MatrixFromString(matrixStr);
   }
   for (const auto& child : node->children) {
     if (child->tag == "ColorStop") {
@@ -842,7 +841,7 @@ std::unique_ptr<ConicGradient> PAGXImporterImpl::parseConicGradient(const XMLNod
   gradient->endAngle = getFloatAttribute(node, "endAngle", 360);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    gradient->matrix = Matrix::Parse(matrixStr);
+    gradient->matrix = MatrixFromString(matrixStr);
   }
   for (const auto& child : node->children) {
     if (child->tag == "ColorStop") {
@@ -860,7 +859,7 @@ std::unique_ptr<DiamondGradient> PAGXImporterImpl::parseDiamondGradient(const XM
   gradient->halfDiagonal = getFloatAttribute(node, "halfDiagonal", 0);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    gradient->matrix = Matrix::Parse(matrixStr);
+    gradient->matrix = MatrixFromString(matrixStr);
   }
   for (const auto& child : node->children) {
     if (child->tag == "ColorStop") {
@@ -881,7 +880,7 @@ std::unique_ptr<ImagePattern> PAGXImporterImpl::parseImagePattern(const XMLNode*
   pattern->mipmapMode = MipmapModeFromString(getAttribute(node, "mipmapMode", "linear"));
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
-    pattern->matrix = Matrix::Parse(matrixStr);
+    pattern->matrix = MatrixFromString(matrixStr);
   }
   return pattern;
 }
@@ -909,7 +908,7 @@ std::unique_ptr<Image> PAGXImporterImpl::parseImage(const XMLNode* node) {
 
 std::unique_ptr<PathData> PAGXImporterImpl::parsePathData(const XMLNode* node) {
   auto data = getAttribute(node, "data");
-  auto pathData = std::make_unique<PathData>(PathData::FromSVGString(data));
+  auto pathData = std::make_unique<PathData>(PathDataFromSVGString(data));
   pathData->id = getAttribute(node, "id");
   return pathData;
 }

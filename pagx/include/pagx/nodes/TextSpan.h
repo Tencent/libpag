@@ -61,11 +61,6 @@ class TextSpan : public Element {
   float tracking = 0;
 
   /**
-   * The baseline shift in pixels, positive values shift the text up. The default value is 0.
-   */
-  float baselineShift = 0;
-
-  /**
    * The text content to render.
    */
   std::string text = {};

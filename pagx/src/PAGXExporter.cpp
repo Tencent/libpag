@@ -258,7 +258,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       xml.addRequiredAttribute("endPoint", pointToString(grad->endPoint));
       if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", grad->matrix.toString());
+        xml.addAttribute("matrix", MatrixToString(grad->matrix));
       }
       if (grad->colorStops.empty()) {
         xml.closeElementSelfClosing();
@@ -278,7 +278,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       xml.addRequiredAttribute("radius", grad->radius);
       if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", grad->matrix.toString());
+        xml.addAttribute("matrix", MatrixToString(grad->matrix));
       }
       if (grad->colorStops.empty()) {
         xml.closeElementSelfClosing();
@@ -299,7 +299,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       xml.addAttribute("startAngle", grad->startAngle);
       xml.addAttribute("endAngle", grad->endAngle, 360.0f);
       if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", grad->matrix.toString());
+        xml.addAttribute("matrix", MatrixToString(grad->matrix));
       }
       if (grad->colorStops.empty()) {
         xml.closeElementSelfClosing();
@@ -319,7 +319,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       xml.addRequiredAttribute("halfDiagonal", grad->halfDiagonal);
       if (!grad->matrix.isIdentity()) {
-        xml.addAttribute("matrix", grad->matrix.toString());
+        xml.addAttribute("matrix", MatrixToString(grad->matrix));
       }
       if (grad->colorStops.empty()) {
         xml.closeElementSelfClosing();
@@ -351,7 +351,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
         xml.addAttribute("mipmapMode", MipmapModeToString(pattern->mipmapMode));
       }
       if (!pattern->matrix.isIdentity()) {
-        xml.addAttribute("matrix", pattern->matrix.toString());
+        xml.addAttribute("matrix", MatrixToString(pattern->matrix));
       }
       xml.closeElementSelfClosing();
       break;
@@ -418,7 +418,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
           xml.addAttribute("data", path->dataRef);
         } else {
           // Inline the path data
-          xml.addAttribute("data", path->data.toSVGString());
+          xml.addAttribute("data", PathDataToSVGString(path->data));
         }
       }
       xml.addAttribute("reversed", path->reversed);
@@ -438,7 +438,6 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
         xml.addAttribute("fontStyle", text->fontStyle);
       }
       xml.addAttribute("tracking", text->tracking);
-      xml.addAttribute("baselineShift", text->baselineShift);
       xml.closeElementStart();
       xml.addTextContent(text->text);
       xml.closeElement();
@@ -872,7 +871,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
   xml.addAttribute("x", node->x);
   xml.addAttribute("y", node->y);
   if (!node->matrix.isIdentity()) {
-    xml.addAttribute("matrix", node->matrix.toString());
+    xml.addAttribute("matrix", MatrixToString(node->matrix));
   }
   if (!node->matrix3D.empty()) {
     xml.addAttribute("matrix3D", floatListToString(node->matrix3D));
