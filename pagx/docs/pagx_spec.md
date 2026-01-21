@@ -282,7 +282,7 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
 ```xml
-<ConicGradient center="50,50">
+<ConicGradient center="50,50" startAngle="0" endAngle="360">
   <ColorStop offset="0" color="#FF0000"/>
   <ColorStop offset="1" color="#0000FF"/>
 </ConicGradient>
@@ -542,7 +542,7 @@ PAGX 文档采用层级结构组织内容：
 `<Layer>` 是内容和子图层的基本容器。
 
 ```xml
-<Layer name="MyLayer">
+<Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
   <contents>
     <Rectangle center="50,50" size="100,100"/>
     <Fill color="#FF0000"/>
@@ -669,9 +669,9 @@ PAGX 文档采用层级结构组织内容：
 
 ```xml
 <styles>
-  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
+  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080" showBehindLayer="true"/>
   <InnerShadowStyle offsetX="2" offsetY="2" blurrinessX="5" blurrinessY="5" color="#00000040"/>
-  <BackgroundBlurStyle blurrinessX="20" blurrinessY="20"/>
+  <BackgroundBlurStyle blurrinessX="20" blurrinessY="20" tileMode="mirror"/>
 </styles>
 ```
 
@@ -829,7 +829,7 @@ PAGX 文档采用层级结构组织内容：
     <Fill color="#FFFFFF"/>
   </contents>
 </Layer>
-<Layer mask="#maskShape">
+<Layer mask="#maskShape" maskType="alpha">
   <contents>
     <Rectangle center="100,100" size="200,200"/>
     <Fill color="#FF0000"/>
@@ -925,7 +925,7 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 矩形从中心点定义，支持统一圆角。
 
 ```xml
-<Rectangle center="0,0" size="100,100" roundness="0" reversed="false"/>
+<Rectangle center="100,100" size="200,150" roundness="10" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -954,7 +954,7 @@ rect.bottom = center.y + size.height / 2
 椭圆从中心点定义。
 
 ```xml
-<Ellipse center="0,0" size="100,100" reversed="false"/>
+<Ellipse center="100,100" size="100,60" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -978,7 +978,7 @@ boundingRect.bottom = center.y + size.height / 2
 支持正多边形和星形两种模式。
 
 ```xml
-<Polystar center="0,0" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
+<Polystar center="100,100" polystarType="star" pointCount="5" outerRadius="100" innerRadius="50" rotation="0" outerRoundness="0" innerRoundness="0" reversed="false"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1040,7 +1040,7 @@ y = center.y + outerRadius * sin(angle)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `data` | string/idref | "" | SVG 路径数据或 PathData 资源引用 "#id"（语法见 2.9 节） |
+| `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "#id"（语法见 2.9 节） |
 | `reversed` | bool | false | 反转路径方向 |
 
 #### 5.2.5 TextSpan（文本片段）
@@ -1048,7 +1048,7 @@ y = center.y + outerRadius * sin(angle)
 文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
 
 ```xml
-<TextSpan x="0" y="0" font="Arial" fontSize="12" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0" textAnchor="start">
+<TextSpan x="100" y="200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0" baselineShift="0" textAnchor="start">
   <![CDATA[Hello World]]>
 </TextSpan>
 ```
@@ -2039,7 +2039,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 #### Path
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `data` | string/idref | "" |
+| `data` | string/idref | (必填) |
 | `reversed` | bool | false |
 
 #### TextSpan
@@ -2280,7 +2280,7 @@ contents / Group
   <Layer name="Title">
     <contents>
       <Group anchorPoint="100,20" position="200,50">
-        <TextSpan y="32" font="Helvetica" fontSize="32" fontWeight="700">
+        <TextSpan x="0" y="32" font="Helvetica" fontSize="32" fontWeight="700">
           <![CDATA[Hello PAGX!]]>
         </TextSpan>
         <Fill color="#333333"/>
@@ -2304,7 +2304,7 @@ contents / Group
     </contents>
   </Layer>
   
-  <Layer name="MaskedContent" mask="#maskShape">
+  <Layer name="MaskedContent" mask="#maskShape" maskType="alpha">
     <contents>
       <Rectangle center="200,200" size="200,200"/>
       <Fill color="#FF6B6B"/>
@@ -2320,7 +2320,8 @@ contents / Group
     <Composition id="star" width="50" height="50">
       <Layer name="starLayer">
         <contents>
-          <Polystar center="25,25" outerRadius="25" innerRadius="10"/>
+          <Polystar center="25,25" polystarType="star" pointCount="5"
+                    outerRadius="25" innerRadius="10"/>
           <Fill color="#FFD700"/>
         </contents>
       </Layer>
@@ -2357,7 +2358,7 @@ contents / Group
 <!-- 独立模式：每个形状独立裁剪 50% -->
 <Rectangle center="50,50" size="80,80"/>
 <Ellipse center="150,50" size="80,80"/>
-<TrimPath end="0.5"/>
+<TrimPath start="0" end="0.5" type="separate"/>
 <Stroke color="#333333" width="3"/>
 
 <!-- 连续模式：所有路径视为整体，显示中间 50% -->
@@ -2374,33 +2375,33 @@ contents / Group
 <Group>
   <Ellipse center="80,0" size="10,10"/>
   <Fill color="#3366FF"/>
-  <Repeater copies="12" position="0,0" rotation="30"/>
+  <Repeater copies="12" position="0,0" rotation="30" anchorPoint="0,0"/>
 </Group>
 
 <!-- 渐隐阵列：透明度从 1 渐变到 0.2 -->
-<Rectangle size="30,30"/>
+<Rectangle center="0,0" size="30,30"/>
 <Fill color="#FF3366"/>
-<Repeater copies="5" position="40,0" endAlpha="0.2"/>
+<Repeater copies="5" position="40,0" startAlpha="1" endAlpha="0.2"/>
 ```
 
 #### D.2.4 TextModifier 逐字变换
 
 ```xml
 <!-- 波浪文字：逐字上下偏移 -->
-<TextSpan y="50" font="Arial" fontSize="32">
+<TextSpan x="0" y="50" font="Arial" fontSize="32">
   <![CDATA[WAVE TEXT]]>
 </TextSpan>
 <TextModifier position="0,-20">
-  <RangeSelector shape="triangle"/>
+  <RangeSelector start="0" end="1" shape="triangle"/>
 </TextModifier>
 <Fill color="#333333"/>
 
 <!-- 颜色渐变文字 -->
-<TextSpan y="100" font="Arial" fontSize="32">
+<TextSpan x="0" y="100" font="Arial" fontSize="32">
   <![CDATA[GRADIENT]]>
 </TextSpan>
 <TextModifier fillColor="#FF0000">
-  <RangeSelector shape="rampUp"/>
+  <RangeSelector start="0" end="1" shape="rampUp"/>
 </TextModifier>
 <Fill color="#0000FF"/>
 ```
