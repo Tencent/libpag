@@ -77,12 +77,8 @@ class Repeater : public Element {
    */
   float endAlpha = 1;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Repeater;
-  }
-
-  NodeType type() const override {
-    return NodeType::Repeater;
   }
 };
 

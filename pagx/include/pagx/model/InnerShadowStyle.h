@@ -36,12 +36,8 @@ class InnerShadowStyle : public LayerStyle {
   Color color = {};
   BlendMode blendMode = BlendMode::Normal;
 
-  LayerStyleType layerStyleType() const override {
+  LayerStyleType type() const override {
     return LayerStyleType::InnerShadowStyle;
-  }
-
-  NodeType type() const override {
-    return NodeType::InnerShadowStyle;
   }
 };
 

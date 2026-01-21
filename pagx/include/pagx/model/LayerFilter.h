@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pagx/model/NodeType.h"
-
 namespace pagx {
 
 /**
@@ -48,12 +46,7 @@ class LayerFilter {
   /**
    * Returns the layer filter type of this layer filter.
    */
-  virtual LayerFilterType layerFilterType() const = 0;
-
-  /**
-   * Returns the unified node type of this layer filter.
-   */
-  virtual NodeType type() const = 0;
+  virtual LayerFilterType type() const = 0;
 
  protected:
   LayerFilter() = default;

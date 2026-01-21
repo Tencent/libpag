@@ -31,11 +31,7 @@ class Image : public Resource {
   std::string id = {};
   std::string source = {};
 
-  NodeType type() const override {
-    return NodeType::Image;
-  }
-
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::Image;
   }
 

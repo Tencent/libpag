@@ -75,12 +75,8 @@ class TextSpan : public Element {
    */
   std::string text = {};
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::TextSpan;
-  }
-
-  NodeType type() const override {
-    return NodeType::TextSpan;
   }
 };
 

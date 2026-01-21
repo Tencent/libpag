@@ -42,16 +42,12 @@ class ImagePattern : public ColorSource {
     return ColorSourceType::ImagePattern;
   }
 
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::ImagePattern;
   }
 
   const std::string& resourceId() const override {
     return id;
-  }
-
-  NodeType type() const override {
-    return NodeType::ImagePattern;
   }
 };
 

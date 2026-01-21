@@ -37,11 +37,7 @@ class Composition : public Resource {
   float height = 0;
   std::vector<std::unique_ptr<Layer>> layers = {};
 
-  NodeType type() const override {
-    return NodeType::Composition;
-  }
-
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::Composition;
   }
 

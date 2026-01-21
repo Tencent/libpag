@@ -31,11 +31,7 @@ class PathDataResource : public Resource {
   std::string id = {};
   std::string data = {};  // SVG path data string
 
-  NodeType type() const override {
-    return NodeType::PathData;
-  }
-
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::PathData;
   }
 

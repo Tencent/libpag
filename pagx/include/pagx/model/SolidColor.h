@@ -36,16 +36,12 @@ class SolidColor : public ColorSource {
     return ColorSourceType::SolidColor;
   }
 
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::SolidColor;
   }
 
   const std::string& resourceId() const override {
     return id;
-  }
-
-  NodeType type() const override {
-    return NodeType::SolidColor;
   }
 };
 

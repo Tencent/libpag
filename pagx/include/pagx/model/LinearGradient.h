@@ -41,16 +41,12 @@ class LinearGradient : public ColorSource {
     return ColorSourceType::LinearGradient;
   }
 
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::LinearGradient;
   }
 
   const std::string& resourceId() const override {
     return id;
-  }
-
-  NodeType type() const override {
-    return NodeType::LinearGradient;
   }
 };
 

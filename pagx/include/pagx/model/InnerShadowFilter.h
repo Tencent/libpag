@@ -35,11 +35,7 @@ class InnerShadowFilter : public LayerFilter {
   Color color = {};
   bool shadowOnly = false;
 
-  NodeType type() const override {
-    return NodeType::InnerShadowFilter;
-  }
-
-  LayerFilterType layerFilterType() const override {
+  LayerFilterType type() const override {
     return LayerFilterType::InnerShadowFilter;
   }
 };

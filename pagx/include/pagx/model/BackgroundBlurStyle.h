@@ -34,12 +34,8 @@ class BackgroundBlurStyle : public LayerStyle {
   TileMode tileMode = TileMode::Mirror;
   BlendMode blendMode = BlendMode::Normal;
 
-  LayerStyleType layerStyleType() const override {
+  LayerStyleType type() const override {
     return LayerStyleType::BackgroundBlurStyle;
-  }
-
-  NodeType type() const override {
-    return NodeType::BackgroundBlurStyle;
   }
 };
 

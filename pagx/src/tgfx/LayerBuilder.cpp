@@ -320,29 +320,29 @@ class LayerBuilderImpl {
     }
 
     switch (node->type()) {
-      case NodeType::Rectangle:
+      case ElementType::Rectangle:
         return convertRectangle(static_cast<const Rectangle*>(node));
-      case NodeType::Ellipse:
+      case ElementType::Ellipse:
         return convertEllipse(static_cast<const Ellipse*>(node));
-      case NodeType::Polystar:
+      case ElementType::Polystar:
         return convertPolystar(static_cast<const Polystar*>(node));
-      case NodeType::Path:
+      case ElementType::Path:
         return convertPath(static_cast<const Path*>(node));
-      case NodeType::TextSpan:
+      case ElementType::TextSpan:
         return convertTextSpan(static_cast<const TextSpan*>(node));
-      case NodeType::Fill:
+      case ElementType::Fill:
         return convertFill(static_cast<const Fill*>(node));
-      case NodeType::Stroke:
+      case ElementType::Stroke:
         return convertStroke(static_cast<const Stroke*>(node));
-      case NodeType::TrimPath:
+      case ElementType::TrimPath:
         return convertTrimPath(static_cast<const TrimPath*>(node));
-      case NodeType::RoundCorner:
+      case ElementType::RoundCorner:
         return convertRoundCorner(static_cast<const RoundCorner*>(node));
-      case NodeType::MergePath:
+      case ElementType::MergePath:
         return convertMergePath(static_cast<const MergePath*>(node));
-      case NodeType::Repeater:
+      case ElementType::Repeater:
         return convertRepeater(static_cast<const Repeater*>(node));
-      case NodeType::Group:
+      case ElementType::Group:
         return convertGroup(static_cast<const Group*>(node));
       default:
         return nullptr;
@@ -476,20 +476,20 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    switch (node->type()) {
-      case NodeType::SolidColor: {
+    switch (node->colorSourceType()) {
+      case ColorSourceType::SolidColor: {
         auto solid = static_cast<const SolidColor*>(node);
         return tgfx::SolidColor::Make(ToTGFX(solid->color));
       }
-      case NodeType::LinearGradient: {
+      case ColorSourceType::LinearGradient: {
         auto grad = static_cast<const LinearGradient*>(node);
         return convertLinearGradient(grad);
       }
-      case NodeType::RadialGradient: {
+      case ColorSourceType::RadialGradient: {
         auto grad = static_cast<const RadialGradient*>(node);
         return convertRadialGradient(grad);
       }
-      case NodeType::ImagePattern: {
+      case ColorSourceType::ImagePattern: {
         auto pattern = static_cast<const ImagePattern*>(node);
         return convertImagePattern(pattern);
       }
@@ -586,7 +586,7 @@ class LayerBuilderImpl {
       return nullptr;
     }
     for (const auto& resource : *_resources) {
-      if (resource->type() == NodeType::Image) {
+      if (resource->type() == ResourceType::Image) {
         auto imageNode = static_cast<const Image*>(resource.get());
         if (imageNode->id == resourceId) {
           if (imageNode->source.find("data:") == 0) {
@@ -683,12 +683,12 @@ class LayerBuilderImpl {
     }
 
     switch (node->type()) {
-      case NodeType::DropShadowStyle: {
+      case LayerStyleType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
         return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                            style->blurrinessY, ToTGFX(style->color));
       }
-      case NodeType::InnerShadowStyle: {
+      case LayerStyleType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
         return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                             style->blurrinessY, ToTGFX(style->color));
@@ -704,11 +704,11 @@ class LayerBuilderImpl {
     }
 
     switch (node->type()) {
-      case NodeType::BlurFilter: {
+      case LayerFilterType::BlurFilter: {
         auto filter = static_cast<const BlurFilter*>(node);
         return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
       }
-      case NodeType::DropShadowFilter: {
+      case LayerFilterType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
         return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
                                             filter->blurrinessY, ToTGFX(filter->color));

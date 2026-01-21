@@ -42,16 +42,12 @@ class ConicGradient : public ColorSource {
     return ColorSourceType::ConicGradient;
   }
 
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::ConicGradient;
   }
 
   const std::string& resourceId() const override {
     return id;
-  }
-
-  NodeType type() const override {
-    return NodeType::ConicGradient;
   }
 };
 

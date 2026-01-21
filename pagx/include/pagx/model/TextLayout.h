@@ -67,12 +67,8 @@ class TextLayout : public Element {
    */
   Overflow overflow = Overflow::Clip;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::TextLayout;
-  }
-
-  NodeType type() const override {
-    return NodeType::TextLayout;
   }
 };
 

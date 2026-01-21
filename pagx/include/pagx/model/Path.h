@@ -39,12 +39,8 @@ class Path : public Element {
    */
   bool reversed = false;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Path;
-  }
-
-  NodeType type() const override {
-    return NodeType::Path;
   }
 };
 

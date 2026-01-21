@@ -66,12 +66,8 @@ class TextPath : public Element {
    */
   bool forceAlignment = false;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::TextPath;
-  }
-
-  NodeType type() const override {
-    return NodeType::TextPath;
   }
 };
 

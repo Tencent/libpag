@@ -72,12 +72,8 @@ class Group : public Element {
    */
   std::vector<std::unique_ptr<Element>> elements = {};
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Group;
-  }
-
-  NodeType type() const override {
-    return NodeType::Group;
   }
 };
 

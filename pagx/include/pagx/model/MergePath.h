@@ -34,12 +34,8 @@ class MergePath : public Element {
    */
   MergePathMode mode = MergePathMode::Append;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::MergePath;
-  }
-
-  NodeType type() const override {
-    return NodeType::MergePath;
   }
 };
 

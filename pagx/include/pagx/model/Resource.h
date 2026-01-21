@@ -19,7 +19,6 @@
 #pragma once
 
 #include <string>
-#include "pagx/model/NodeType.h"
 
 namespace pagx {
 
@@ -81,12 +80,7 @@ class Resource {
   /**
    * Returns the resource type of this resource.
    */
-  virtual ResourceType resourceType() const = 0;
-
-  /**
-   * Returns the unified node type of this resource.
-   */
-  virtual NodeType type() const = 0;
+  virtual ResourceType type() const = 0;
 
   /**
    * Returns the unique identifier of this resource.

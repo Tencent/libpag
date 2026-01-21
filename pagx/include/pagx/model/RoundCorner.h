@@ -33,12 +33,8 @@ class RoundCorner : public Element {
    */
   float radius = 10;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::RoundCorner;
-  }
-
-  NodeType type() const override {
-    return NodeType::RoundCorner;
   }
 };
 

@@ -32,11 +32,7 @@ class BlendFilter : public LayerFilter {
   Color color = {};
   BlendMode blendMode = BlendMode::Normal;
 
-  NodeType type() const override {
-    return NodeType::BlendFilter;
-  }
-
-  LayerFilterType layerFilterType() const override {
+  LayerFilterType type() const override {
     return LayerFilterType::BlendFilter;
   }
 };

@@ -1509,21 +1509,21 @@ static bool isSameGeometry(const Element* a, const Element* b) {
   }
 
   switch (a->type()) {
-    case NodeType::Rectangle: {
+    case ElementType::Rectangle: {
       auto rectA = static_cast<const Rectangle*>(a);
       auto rectB = static_cast<const Rectangle*>(b);
       return rectA->center.x == rectB->center.x && rectA->center.y == rectB->center.y &&
              rectA->size.width == rectB->size.width && rectA->size.height == rectB->size.height &&
              rectA->roundness == rectB->roundness;
     }
-    case NodeType::Ellipse: {
+    case ElementType::Ellipse: {
       auto ellipseA = static_cast<const Ellipse*>(a);
       auto ellipseB = static_cast<const Ellipse*>(b);
       return ellipseA->center.x == ellipseB->center.x && ellipseA->center.y == ellipseB->center.y &&
              ellipseA->size.width == ellipseB->size.width &&
              ellipseA->size.height == ellipseB->size.height;
     }
-    case NodeType::Path: {
+    case ElementType::Path: {
       auto pathA = static_cast<const Path*>(a);
       auto pathB = static_cast<const Path*>(b);
       return pathA->data.toSVGString() == pathB->data.toSVGString();
@@ -1550,10 +1550,10 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   const auto* second = layer->contents[1].get();
 
   // Check if first is geometry and second is painter.
-  bool firstIsGeometry = (first->type() == NodeType::Rectangle ||
-                          first->type() == NodeType::Ellipse || first->type() == NodeType::Path);
+  bool firstIsGeometry = (first->type() == ElementType::Rectangle ||
+                          first->type() == ElementType::Ellipse || first->type() == ElementType::Path);
   bool secondIsPainter =
-      (second->type() == NodeType::Fill || second->type() == NodeType::Stroke);
+      (second->type() == ElementType::Fill || second->type() == ElementType::Stroke);
 
   if (firstIsGeometry && secondIsPainter) {
     outGeometry = first;
@@ -1584,8 +1584,8 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
         if (isSimpleShapeLayer(layers[i + 1].get(), geomB, painterB) &&
             isSameGeometry(geomA, geomB)) {
           // Merge: one has Fill, the other has Stroke.
-          bool aHasFill = (painterA->type() == NodeType::Fill);
-          bool bHasFill = (painterB->type() == NodeType::Fill);
+          bool aHasFill = (painterA->type() == ElementType::Fill);
+          bool bHasFill = (painterB->type() == ElementType::Fill);
 
           if (aHasFill != bHasFill) {
             // Create merged layer.

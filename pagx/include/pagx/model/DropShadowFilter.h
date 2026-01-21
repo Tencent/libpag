@@ -35,11 +35,7 @@ class DropShadowFilter : public LayerFilter {
   Color color = {};
   bool shadowOnly = false;
 
-  NodeType type() const override {
-    return NodeType::DropShadowFilter;
-  }
-
-  LayerFilterType layerFilterType() const override {
+  LayerFilterType type() const override {
     return LayerFilterType::DropShadowFilter;
   }
 };

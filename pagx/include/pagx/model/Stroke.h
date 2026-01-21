@@ -24,12 +24,45 @@
 #include "pagx/model/ColorSource.h"
 #include "pagx/model/Element.h"
 #include "pagx/model/types/BlendMode.h"
-#include "pagx/model/types/LineCap.h"
-#include "pagx/model/types/LineJoin.h"
 #include "pagx/model/types/Placement.h"
-#include "pagx/model/types/StrokeAlign.h"
 
 namespace pagx {
+
+/**
+ * Line cap styles for strokes.
+ */
+enum class LineCap {
+  Butt,
+  Round,
+  Square
+};
+
+std::string LineCapToString(LineCap cap);
+LineCap LineCapFromString(const std::string& str);
+
+/**
+ * Line join styles for strokes.
+ */
+enum class LineJoin {
+  Miter,
+  Round,
+  Bevel
+};
+
+std::string LineJoinToString(LineJoin join);
+LineJoin LineJoinFromString(const std::string& str);
+
+/**
+ * Stroke alignment relative to path.
+ */
+enum class StrokeAlign {
+  Center,
+  Inside,
+  Outside
+};
+
+std::string StrokeAlignToString(StrokeAlign align);
+StrokeAlign StrokeAlignFromString(const std::string& str);
 
 /**
  * Stroke represents a stroke painter that outlines shapes with a solid color, gradient, or
@@ -101,12 +134,8 @@ class Stroke : public Element {
    */
   Placement placement = Placement::Background;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Stroke;
-  }
-
-  NodeType type() const override {
-    return NodeType::Stroke;
   }
 };
 

@@ -41,16 +41,12 @@ class RadialGradient : public ColorSource {
     return ColorSourceType::RadialGradient;
   }
 
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::RadialGradient;
   }
 
   const std::string& resourceId() const override {
     return id;
-  }
-
-  NodeType type() const override {
-    return NodeType::RadialGradient;
   }
 };
 

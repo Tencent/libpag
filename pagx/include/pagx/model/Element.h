@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pagx/model/NodeType.h"
-
 namespace pagx {
 
 /**
@@ -106,12 +104,7 @@ class Element {
   /**
    * Returns the element type of this element.
    */
-  virtual ElementType elementType() const = 0;
-
-  /**
-   * Returns the unified node type of this element.
-   */
-  virtual NodeType type() const = 0;
+  virtual ElementType type() const = 0;
 
  protected:
   Element() = default;

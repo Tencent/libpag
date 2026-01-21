@@ -89,12 +89,8 @@ class TextModifier : public Element {
    */
   std::vector<RangeSelector> rangeSelectors = {};
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::TextModifier;
-  }
-
-  NodeType type() const override {
-    return NodeType::TextModifier;
   }
 };
 

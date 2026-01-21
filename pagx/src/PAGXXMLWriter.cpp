@@ -193,13 +193,13 @@ static std::string colorSourceToKey(const ColorSource* node) {
     return "";
   }
   std::ostringstream oss = {};
-  switch (node->type()) {
-    case NodeType::SolidColor: {
+  switch (node->colorSourceType()) {
+    case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       oss << "SolidColor:" << solid->color.toHexString(true);
       break;
     }
-    case NodeType::LinearGradient: {
+    case ColorSourceType::LinearGradient: {
       auto grad = static_cast<const LinearGradient*>(node);
       oss << "LinearGradient:" << grad->startPoint.x << "," << grad->startPoint.y << ":"
           << grad->endPoint.x << "," << grad->endPoint.y << ":" << grad->matrix.toString() << ":";
@@ -208,7 +208,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       }
       break;
     }
-    case NodeType::RadialGradient: {
+    case ColorSourceType::RadialGradient: {
       auto grad = static_cast<const RadialGradient*>(node);
       oss << "RadialGradient:" << grad->center.x << "," << grad->center.y << ":" << grad->radius
           << ":" << grad->matrix.toString() << ":";
@@ -217,7 +217,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       }
       break;
     }
-    case NodeType::ConicGradient: {
+    case ColorSourceType::ConicGradient: {
       auto grad = static_cast<const ConicGradient*>(node);
       oss << "ConicGradient:" << grad->center.x << "," << grad->center.y << ":" << grad->startAngle
           << ":" << grad->endAngle << ":" << grad->matrix.toString() << ":";
@@ -226,7 +226,7 @@ static std::string colorSourceToKey(const ColorSource* node) {
       }
       break;
     }
-    case NodeType::DiamondGradient: {
+    case ColorSourceType::DiamondGradient: {
       auto grad = static_cast<const DiamondGradient*>(node);
       oss << "DiamondGradient:" << grad->center.x << "," << grad->center.y << ":"
           << grad->halfDiagonal << ":" << grad->matrix.toString() << ":";
@@ -235,15 +235,13 @@ static std::string colorSourceToKey(const ColorSource* node) {
       }
       break;
     }
-    case NodeType::ImagePattern: {
+    case ColorSourceType::ImagePattern: {
       auto pattern = static_cast<const ImagePattern*>(node);
       oss << "ImagePattern:" << pattern->image << ":" << static_cast<int>(pattern->tileModeX) << ":"
           << static_cast<int>(pattern->tileModeY) << ":" << static_cast<int>(pattern->sampling)
           << ":" << pattern->matrix.toString();
       break;
     }
-    default:
-      break;
   }
   return oss.str();
 }
@@ -275,7 +273,7 @@ class ResourceContext {
       collectFromLayer(layer.get());
     }
     for (const auto& resource : doc.resources) {
-      if (resource->type() == NodeType::Composition) {
+      if (resource->type() == ResourceType::Composition) {
         auto comp = static_cast<const Composition*>(resource.get());
         for (const auto& layer : comp->layers) {
           collectFromLayer(layer.get());
@@ -357,28 +355,28 @@ class ResourceContext {
 
   void collectFromVectorElement(const Element* element) {
     switch (element->type()) {
-      case NodeType::Path: {
+      case ElementType::Path: {
         auto path = static_cast<const Path*>(element);
         if (!path->data.isEmpty()) {
           getPathDataId(path->data.toSVGString());
         }
         break;
       }
-      case NodeType::Fill: {
+      case ElementType::Fill: {
         auto fill = static_cast<const Fill*>(element);
         if (fill->colorSource) {
           registerColorSource(fill->colorSource.get());
         }
         break;
       }
-      case NodeType::Stroke: {
+      case ElementType::Stroke: {
         auto stroke = static_cast<const Stroke*>(element);
         if (stroke->colorSource) {
           registerColorSource(stroke->colorSource.get());
         }
         break;
       }
-      case NodeType::Group: {
+      case ElementType::Group: {
         auto group = static_cast<const Group*>(element);
         for (const auto& child : group->elements) {
           collectFromVectorElement(child.get());
@@ -417,8 +415,8 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
 }
 
 static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writeId) {
-  switch (node->type()) {
-    case NodeType::SolidColor: {
+  switch (node->colorSourceType()) {
+    case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
       if (writeId && !solid->id.empty()) {
@@ -428,7 +426,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::LinearGradient: {
+    case ColorSourceType::LinearGradient: {
       auto grad = static_cast<const LinearGradient*>(node);
       xml.openElement("LinearGradient");
       if (writeId && !grad->id.empty()) {
@@ -450,7 +448,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       }
       break;
     }
-    case NodeType::RadialGradient: {
+    case ColorSourceType::RadialGradient: {
       auto grad = static_cast<const RadialGradient*>(node);
       xml.openElement("RadialGradient");
       if (writeId && !grad->id.empty()) {
@@ -472,7 +470,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       }
       break;
     }
-    case NodeType::ConicGradient: {
+    case ColorSourceType::ConicGradient: {
       auto grad = static_cast<const ConicGradient*>(node);
       xml.openElement("ConicGradient");
       if (writeId && !grad->id.empty()) {
@@ -495,7 +493,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       }
       break;
     }
-    case NodeType::DiamondGradient: {
+    case ColorSourceType::DiamondGradient: {
       auto grad = static_cast<const DiamondGradient*>(node);
       xml.openElement("DiamondGradient");
       if (writeId && !grad->id.empty()) {
@@ -517,7 +515,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       }
       break;
     }
-    case NodeType::ImagePattern: {
+    case ColorSourceType::ImagePattern: {
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       if (writeId && !pattern->id.empty()) {
@@ -539,16 +537,14 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node, bool writ
       xml.closeElementSelfClosing();
       break;
     }
-    default:
-      break;
   }
 }
 
 // Write ColorSource with assigned id (for Resources section)
 static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
                                    const std::string& id) {
-  switch (node->type()) {
-    case NodeType::SolidColor: {
+  switch (node->colorSourceType()) {
+    case ColorSourceType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
       xml.addAttribute("id", id);
@@ -556,7 +552,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::LinearGradient: {
+    case ColorSourceType::LinearGradient: {
       auto grad = static_cast<const LinearGradient*>(node);
       xml.openElement("LinearGradient");
       xml.addAttribute("id", id);
@@ -576,7 +572,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       }
       break;
     }
-    case NodeType::RadialGradient: {
+    case ColorSourceType::RadialGradient: {
       auto grad = static_cast<const RadialGradient*>(node);
       xml.openElement("RadialGradient");
       xml.addAttribute("id", id);
@@ -596,7 +592,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       }
       break;
     }
-    case NodeType::ConicGradient: {
+    case ColorSourceType::ConicGradient: {
       auto grad = static_cast<const ConicGradient*>(node);
       xml.openElement("ConicGradient");
       xml.addAttribute("id", id);
@@ -617,7 +613,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       }
       break;
     }
-    case NodeType::DiamondGradient: {
+    case ColorSourceType::DiamondGradient: {
       auto grad = static_cast<const DiamondGradient*>(node);
       xml.openElement("DiamondGradient");
       xml.addAttribute("id", id);
@@ -637,7 +633,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       }
       break;
     }
-    case NodeType::ImagePattern: {
+    case ColorSourceType::ImagePattern: {
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       xml.addAttribute("id", id);
@@ -657,8 +653,6 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
       xml.closeElementSelfClosing();
       break;
     }
-    default:
-      break;
   }
 }
 
@@ -669,7 +663,7 @@ static void writeColorSourceWithId(XMLBuilder& xml, const ColorSource* node,
 static void writeVectorElement(XMLBuilder& xml, const Element* node,
                                const ResourceContext& ctx) {
   switch (node->type()) {
-    case NodeType::Rectangle: {
+    case ElementType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
       if (rect->center.x != 0 || rect->center.y != 0) {
@@ -683,7 +677,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::Ellipse: {
+    case ElementType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
       if (ellipse->center.x != 0 || ellipse->center.y != 0) {
@@ -696,7 +690,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::Polystar: {
+    case ElementType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
       if (polystar->center.x != 0 || polystar->center.y != 0) {
@@ -713,7 +707,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::Path: {
+    case ElementType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
       if (!path->data.isEmpty()) {
@@ -731,7 +725,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextSpan: {
+    case ElementType::TextSpan: {
       auto text = static_cast<const TextSpan*>(node);
       xml.openElement("TextSpan");
       xml.addAttribute("x", text->x);
@@ -749,7 +743,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElement();
       break;
     }
-    case NodeType::Fill: {
+    case ElementType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
       // Check if ColorSource should be referenced or inlined
@@ -783,7 +777,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       }
       break;
     }
-    case NodeType::Stroke: {
+    case ElementType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
       // Check if ColorSource should be referenced or inlined
@@ -829,7 +823,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       }
       break;
     }
-    case NodeType::TrimPath: {
+    case ElementType::TrimPath: {
       auto trim = static_cast<const TrimPath*>(node);
       xml.openElement("TrimPath");
       xml.addAttribute("start", trim->start);
@@ -841,14 +835,14 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::RoundCorner: {
+    case ElementType::RoundCorner: {
       auto round = static_cast<const RoundCorner*>(node);
       xml.openElement("RoundCorner");
       xml.addAttribute("radius", round->radius, 10.0f);
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::MergePath: {
+    case ElementType::MergePath: {
       auto merge = static_cast<const MergePath*>(node);
       xml.openElement("MergePath");
       if (merge->mode != MergePathMode::Append) {
@@ -857,7 +851,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextModifier: {
+    case ElementType::TextModifier: {
       auto modifier = static_cast<const TextModifier*>(node);
       xml.openElement("TextModifier");
       if (modifier->anchorPoint.x != 0 || modifier->anchorPoint.y != 0) {
@@ -907,7 +901,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       }
       break;
     }
-    case NodeType::TextPath: {
+    case ElementType::TextPath: {
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
       xml.addAttribute("path", textPath->path);
@@ -922,7 +916,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextLayout: {
+    case ElementType::TextLayout: {
       auto layout = static_cast<const TextLayout*>(node);
       xml.openElement("TextLayout");
       xml.addRequiredAttribute("width", layout->width);
@@ -941,7 +935,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::Repeater: {
+    case ElementType::Repeater: {
       auto repeater = static_cast<const Repeater*>(node);
       xml.openElement("Repeater");
       xml.addAttribute("copies", repeater->copies, 3.0f);
@@ -964,7 +958,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::Group: {
+    case ElementType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
       if (group->anchorPoint.x != 0 || group->anchorPoint.y != 0) {
@@ -1002,7 +996,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
 
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
   switch (node->type()) {
-    case NodeType::DropShadowStyle: {
+    case LayerStyleType::DropShadowStyle: {
       auto style = static_cast<const DropShadowStyle*>(node);
       xml.openElement("DropShadowStyle");
       if (style->blendMode != BlendMode::Normal) {
@@ -1017,7 +1011,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::InnerShadowStyle: {
+    case LayerStyleType::InnerShadowStyle: {
       auto style = static_cast<const InnerShadowStyle*>(node);
       xml.openElement("InnerShadowStyle");
       if (style->blendMode != BlendMode::Normal) {
@@ -1031,7 +1025,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::BackgroundBlurStyle: {
+    case LayerStyleType::BackgroundBlurStyle: {
       auto style = static_cast<const BackgroundBlurStyle*>(node);
       xml.openElement("BackgroundBlurStyle");
       if (style->blendMode != BlendMode::Normal) {
@@ -1056,7 +1050,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
 
 static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
   switch (node->type()) {
-    case NodeType::BlurFilter: {
+    case LayerFilterType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
       xml.openElement("BlurFilter");
       xml.addRequiredAttribute("blurrinessX", filter->blurrinessX);
@@ -1067,7 +1061,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::DropShadowFilter: {
+    case LayerFilterType::DropShadowFilter: {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
       xml.addAttribute("offsetX", filter->offsetX);
@@ -1079,7 +1073,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::InnerShadowFilter: {
+    case LayerFilterType::InnerShadowFilter: {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
       xml.addAttribute("offsetX", filter->offsetX);
@@ -1091,7 +1085,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::BlendFilter: {
+    case LayerFilterType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
       xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
@@ -1101,7 +1095,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::ColorMatrixFilter: {
+    case LayerFilterType::ColorMatrixFilter: {
       auto filter = static_cast<const ColorMatrixFilter*>(node);
       xml.openElement("ColorMatrixFilter");
       std::vector<float> values(filter->matrix.begin(), filter->matrix.end());
@@ -1120,7 +1114,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 
 static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx) {
   switch (node->type()) {
-    case NodeType::Image: {
+    case ResourceType::Image: {
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
@@ -1128,7 +1122,7 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::PathData: {
+    case ResourceType::PathData: {
       auto pathData = static_cast<const PathDataResource*>(node);
       xml.openElement("PathData");
       xml.addAttribute("id", pathData->id);
@@ -1136,7 +1130,7 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::Composition: {
+    case ResourceType::Composition: {
       auto comp = static_cast<const Composition*>(node);
       xml.openElement("Composition");
       xml.addAttribute("id", comp->id);
@@ -1153,12 +1147,12 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
       }
       break;
     }
-    case NodeType::SolidColor:
-    case NodeType::LinearGradient:
-    case NodeType::RadialGradient:
-    case NodeType::ConicGradient:
-    case NodeType::DiamondGradient:
-    case NodeType::ImagePattern:
+    case ResourceType::SolidColor:
+    case ResourceType::LinearGradient:
+    case ResourceType::RadialGradient:
+    case ResourceType::ConicGradient:
+    case ResourceType::DiamondGradient:
+    case ResourceType::ImagePattern:
       writeColorSource(xml, static_cast<const ColorSource*>(node), true);
       break;
     default:
@@ -1267,7 +1261,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
   for (const auto& layer : doc.layers) {
     std::function<void(const Layer*)> collectColorSources = [&](const Layer* layer) {
       for (const auto& element : layer->contents) {
-        if (element->type() == NodeType::Fill) {
+        if (element->type() == ElementType::Fill) {
           auto fill = static_cast<const Fill*>(element.get());
           if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
             std::string key = colorSourceToKey(fill->colorSource.get());
@@ -1275,7 +1269,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
               colorSourceByKey[key] = fill->colorSource.get();
             }
           }
-        } else if (element->type() == NodeType::Stroke) {
+        } else if (element->type() == ElementType::Stroke) {
           auto stroke = static_cast<const Stroke*>(element.get());
           if (stroke->colorSource && ctx.shouldExtractColorSource(stroke->colorSource.get())) {
             std::string key = colorSourceToKey(stroke->colorSource.get());
@@ -1283,11 +1277,11 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
               colorSourceByKey[key] = stroke->colorSource.get();
             }
           }
-        } else if (element->type() == NodeType::Group) {
+        } else if (element->type() == ElementType::Group) {
           auto group = static_cast<const Group*>(element.get());
           std::function<void(const Group*)> collectFromGroup = [&](const Group* g) {
             for (const auto& child : g->elements) {
-              if (child->type() == NodeType::Fill) {
+              if (child->type() == ElementType::Fill) {
                 auto fill = static_cast<const Fill*>(child.get());
                 if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
                   std::string key = colorSourceToKey(fill->colorSource.get());
@@ -1295,7 +1289,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
                     colorSourceByKey[key] = fill->colorSource.get();
                   }
                 }
-              } else if (child->type() == NodeType::Stroke) {
+              } else if (child->type() == ElementType::Stroke) {
                 auto stroke = static_cast<const Stroke*>(child.get());
                 if (stroke->colorSource && ctx.shouldExtractColorSource(stroke->colorSource.get())) {
                   std::string key = colorSourceToKey(stroke->colorSource.get());
@@ -1303,7 +1297,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
                     colorSourceByKey[key] = stroke->colorSource.get();
                   }
                 }
-              } else if (child->type() == NodeType::Group) {
+              } else if (child->type() == ElementType::Group) {
                 collectFromGroup(static_cast<const Group*>(child.get()));
               }
             }
@@ -1320,11 +1314,11 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
 
   // Also collect from Compositions
   for (const auto& resource : doc.resources) {
-    if (resource->type() == NodeType::Composition) {
+    if (resource->type() == ResourceType::Composition) {
       auto comp = static_cast<const Composition*>(resource.get());
       std::function<void(const Layer*)> collectColorSources = [&](const Layer* layer) {
         for (const auto& element : layer->contents) {
-          if (element->type() == NodeType::Fill) {
+          if (element->type() == ElementType::Fill) {
             auto fill = static_cast<const Fill*>(element.get());
             if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
               std::string key = colorSourceToKey(fill->colorSource.get());
@@ -1332,7 +1326,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
                 colorSourceByKey[key] = fill->colorSource.get();
               }
             }
-          } else if (element->type() == NodeType::Stroke) {
+          } else if (element->type() == ElementType::Stroke) {
             auto stroke = static_cast<const Stroke*>(element.get());
             if (stroke->colorSource && ctx.shouldExtractColorSource(stroke->colorSource.get())) {
               std::string key = colorSourceToKey(stroke->colorSource.get());
@@ -1340,11 +1334,11 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
                 colorSourceByKey[key] = stroke->colorSource.get();
               }
             }
-          } else if (element->type() == NodeType::Group) {
+          } else if (element->type() == ElementType::Group) {
             auto group = static_cast<const Group*>(element.get());
             std::function<void(const Group*)> collectFromGroup = [&](const Group* g) {
               for (const auto& child : g->elements) {
-                if (child->type() == NodeType::Fill) {
+                if (child->type() == ElementType::Fill) {
                   auto fill = static_cast<const Fill*>(child.get());
                   if (fill->colorSource && ctx.shouldExtractColorSource(fill->colorSource.get())) {
                     std::string key = colorSourceToKey(fill->colorSource.get());
@@ -1352,7 +1346,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
                       colorSourceByKey[key] = fill->colorSource.get();
                     }
                   }
-                } else if (child->type() == NodeType::Stroke) {
+                } else if (child->type() == ElementType::Stroke) {
                   auto stroke = static_cast<const Stroke*>(child.get());
                   if (stroke->colorSource &&
                       ctx.shouldExtractColorSource(stroke->colorSource.get())) {
@@ -1361,7 +1355,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
                       colorSourceByKey[key] = stroke->colorSource.get();
                     }
                   }
-                } else if (child->type() == NodeType::Group) {
+                } else if (child->type() == ElementType::Group) {
                   collectFromGroup(static_cast<const Group*>(child.get()));
                 }
               }

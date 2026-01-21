@@ -37,12 +37,8 @@ class DropShadowStyle : public LayerStyle {
   bool showBehindLayer = true;
   BlendMode blendMode = BlendMode::Normal;
 
-  LayerStyleType layerStyleType() const override {
+  LayerStyleType type() const override {
     return LayerStyleType::DropShadowStyle;
-  }
-
-  NodeType type() const override {
-    return NodeType::DropShadowStyle;
   }
 };
 

@@ -76,7 +76,7 @@ Layer* Document::findLayer(const std::string& id) const {
   }
   // Then search in Composition resources
   for (const auto& resource : resources) {
-    if (resource->resourceType() == ResourceType::Composition) {
+    if (resource->type() == ResourceType::Composition) {
       auto comp = static_cast<const Composition*>(resource.get());
       found = findLayerRecursive(comp->layers, id);
       if (found) {

@@ -69,12 +69,8 @@ class Fill : public Element {
    */
   Placement placement = Placement::Background;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Fill;
-  }
-
-  NodeType type() const override {
-    return NodeType::Fill;
   }
 };
 

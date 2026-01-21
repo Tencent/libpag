@@ -54,12 +54,8 @@ class TrimPath : public Element {
    */
   TrimType trimType = TrimType::Separate;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::TrimPath;
-  }
-
-  NodeType type() const override {
-    return NodeType::TrimPath;
   }
 };
 

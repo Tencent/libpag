@@ -32,11 +32,7 @@ class BlurFilter : public LayerFilter {
   float blurrinessY = 0;
   TileMode tileMode = TileMode::Decal;
 
-  NodeType type() const override {
-    return NodeType::BlurFilter;
-  }
-
-  LayerFilterType layerFilterType() const override {
+  LayerFilterType type() const override {
     return LayerFilterType::BlurFilter;
   }
 };

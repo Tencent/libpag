@@ -48,12 +48,8 @@ class Rectangle : public Element {
    */
   bool reversed = false;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Rectangle;
-  }
-
-  NodeType type() const override {
-    return NodeType::Rectangle;
   }
 };
 

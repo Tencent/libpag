@@ -76,12 +76,8 @@ class Polystar : public Element {
    */
   bool reversed = false;
 
-  ElementType elementType() const override {
+  ElementType type() const override {
     return ElementType::Polystar;
-  }
-
-  NodeType type() const override {
-    return NodeType::Polystar;
   }
 };
 

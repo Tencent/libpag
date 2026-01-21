@@ -41,16 +41,12 @@ class DiamondGradient : public ColorSource {
     return ColorSourceType::DiamondGradient;
   }
 
-  ResourceType resourceType() const override {
+  ResourceType type() const override {
     return ResourceType::DiamondGradient;
   }
 
   const std::string& resourceId() const override {
     return id;
-  }
-
-  NodeType type() const override {
-    return NodeType::DiamondGradient;
   }
 };
 

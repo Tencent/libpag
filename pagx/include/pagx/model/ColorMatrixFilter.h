@@ -30,11 +30,7 @@ class ColorMatrixFilter : public LayerFilter {
  public:
   std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
 
-  NodeType type() const override {
-    return NodeType::ColorMatrixFilter;
-  }
-
-  LayerFilterType layerFilterType() const override {
+  LayerFilterType type() const override {
     return LayerFilterType::ColorMatrixFilter;
   }
 };

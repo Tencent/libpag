@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pagx/model/NodeType.h"
-
 namespace pagx {
 
 /**
@@ -46,12 +44,7 @@ class LayerStyle {
   /**
    * Returns the layer style type of this layer style.
    */
-  virtual LayerStyleType layerStyleType() const = 0;
-
-  /**
-   * Returns the unified node type of this layer style.
-   */
-  virtual NodeType type() const = 0;
+  virtual LayerStyleType type() const = 0;
 
  protected:
   LayerStyle() = default;

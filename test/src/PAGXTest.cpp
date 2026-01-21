@@ -196,29 +196,29 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
   rect->size.height = 80;
   rect->roundness = 10;
 
-  EXPECT_EQ(rect->type(), pagx::NodeType::Rectangle);
-  EXPECT_STREQ(pagx::NodeTypeName(rect->type()), "Rectangle");
+  EXPECT_EQ(rect->type(), pagx::ElementType::Rectangle);
+  EXPECT_STREQ(pagx::ElementTypeName(rect->type()), "Rectangle");
   EXPECT_FLOAT_EQ(rect->center.x, 50);
   EXPECT_FLOAT_EQ(rect->size.width, 100);
 
   // Test Path creation
   auto path = std::make_unique<pagx::Path>();
   path->data = pagx::PathData::FromSVGString("M0 0 L100 100");
-  EXPECT_EQ(path->type(), pagx::NodeType::Path);
+  EXPECT_EQ(path->type(), pagx::ElementType::Path);
   EXPECT_GT(path->data.verbs().size(), 0u);
 
   // Test Fill creation
   auto fill = std::make_unique<pagx::Fill>();
   fill->color = "#FF0000";
   fill->alpha = 0.8f;
-  EXPECT_EQ(fill->type(), pagx::NodeType::Fill);
+  EXPECT_EQ(fill->type(), pagx::ElementType::Fill);
   EXPECT_EQ(fill->color, "#FF0000");
 
   // Test Group with children
   auto group = std::make_unique<pagx::Group>();
   group->elements.push_back(std::move(rect));
   group->elements.push_back(std::move(fill));
-  EXPECT_EQ(group->type(), pagx::NodeType::Group);
+  EXPECT_EQ(group->type(), pagx::ElementType::Group);
   EXPECT_EQ(group->elements.size(), 2u);
 }
 
@@ -364,7 +364,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   // Test SolidColor
   auto solid = std::make_unique<pagx::SolidColor>();
   solid->color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
-  EXPECT_EQ(solid->type(), pagx::NodeType::SolidColor);
+  EXPECT_EQ(solid->colorSourceType(), pagx::ColorSourceType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
   // Test LinearGradient
@@ -385,7 +385,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   linear->colorStops.push_back(stop1);
   linear->colorStops.push_back(stop2);
 
-  EXPECT_EQ(linear->type(), pagx::NodeType::LinearGradient);
+  EXPECT_EQ(linear->colorSourceType(), pagx::ColorSourceType::LinearGradient);
   EXPECT_EQ(linear->colorStops.size(), 2u);
 
   // Test RadialGradient
@@ -395,7 +395,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   radial->radius = 50;
   radial->colorStops = linear->colorStops;
 
-  EXPECT_EQ(radial->type(), pagx::NodeType::RadialGradient);
+  EXPECT_EQ(radial->colorSourceType(), pagx::ColorSourceType::RadialGradient);
 }
 
 /**
@@ -424,8 +424,8 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
 
   EXPECT_EQ(layer->styles.size(), 1u);
   EXPECT_EQ(layer->filters.size(), 1u);
-  EXPECT_EQ(layer->styles[0]->type(), pagx::NodeType::DropShadowStyle);
-  EXPECT_EQ(layer->filters[0]->type(), pagx::NodeType::BlurFilter);
+  EXPECT_EQ(layer->styles[0]->type(), pagx::LayerStyleType::DropShadowStyle);
+  EXPECT_EQ(layer->filters[0]->type(), pagx::LayerFilterType::BlurFilter);
 }
 
 }  // namespace pag
