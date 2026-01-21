@@ -20,7 +20,7 @@
 
 ### 1.2 文件结构
 
-PAGX 是纯 XML 文件（`.pagx`），可引用同目录下的外部资源，也支持 base64 数据 URI 内嵌图片。发布时可转换为内嵌所有资源的二进制 PAG 格式以优化加载性能。
+PAGX 是纯 XML 文件（`.pagx`），可引用外部资源（相对路径，基于 PAGX 文件所在目录），也支持 base64 数据 URI 内嵌图片。发布时可转换为内嵌所有资源的二进制 PAG 格式以优化加载性能。
 
 ### 1.3 文档组织
 
@@ -192,9 +192,10 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 ```xml
 <!-- 外部文件引用 -->
 <Image id="img1" source="photo.png"/>
+<Image id="img2" source="assets/icons/logo.png"/>
 
 <!-- 内嵌 base64 -->
-<Image id="img2" source="data:image/png;base64,..."/>
+<Image id="img3" source="data:image/png;base64,..."/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -202,6 +203,13 @@ PathData 定义可复用的路径数据，放置在 Resources 中供 Path 元素
 | `source` | string | (必填) | 文件路径或数据 URI |
 
 **支持格式**：PNG、JPEG、WebP、GIF
+
+**路径解析规则**：
+
+- **相对路径**：相对于 PAGX 文件所在目录解析（如 `photo.png`、`assets/logo.png`）
+- **数据 URI**：以 `data:` 开头，内嵌 base64 编码的图片数据
+- 路径分隔符统一使用 `/`（正斜杠），不支持 `\`（反斜杠）
+- 不支持绝对路径和 `../` 父目录引用，所有外部资源必须位于 PAGX 文件所在目录或其子目录内
 
 ### 2.11 颜色源（Color Source）
 
