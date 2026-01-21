@@ -136,7 +136,7 @@ class XMLBuilder {
   }
 };
 
-static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node);
+static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node, bool writeId = true);
 static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node);
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyleNode* node);
 static void writeLayerFilter(XMLBuilder& xml, const LayerFilterNode* node);
@@ -181,12 +181,14 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStopNode>& s
   }
 }
 
-static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
+static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node, bool writeId) {
   switch (node->type()) {
     case NodeType::SolidColor: {
       auto solid = static_cast<const SolidColorNode*>(node);
       xml.openElement("SolidColor");
-      xml.addAttribute("id", solid->id);
+      if (writeId) {
+        xml.addAttribute("id", solid->id);
+      }
       xml.addAttribute("color", solid->color.toHexString(solid->color.alpha < 1.0f));
       xml.closeElementSelfClosing();
       break;
@@ -194,7 +196,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
     case NodeType::LinearGradient: {
       auto grad = static_cast<const LinearGradientNode*>(node);
       xml.openElement("LinearGradient");
-      xml.addAttribute("id", grad->id);
+      if (writeId) {
+        xml.addAttribute("id", grad->id);
+      }
       if (grad->startPoint.x != 0 || grad->startPoint.y != 0) {
         xml.addAttribute("startPoint", pointToString(grad->startPoint));
       }
@@ -216,7 +220,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
     case NodeType::RadialGradient: {
       auto grad = static_cast<const RadialGradientNode*>(node);
       xml.openElement("RadialGradient");
-      xml.addAttribute("id", grad->id);
+      if (writeId) {
+        xml.addAttribute("id", grad->id);
+      }
       if (grad->center.x != 0 || grad->center.y != 0) {
         xml.addAttribute("center", pointToString(grad->center));
       }
@@ -236,7 +242,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
     case NodeType::ConicGradient: {
       auto grad = static_cast<const ConicGradientNode*>(node);
       xml.openElement("ConicGradient");
-      xml.addAttribute("id", grad->id);
+      if (writeId) {
+        xml.addAttribute("id", grad->id);
+      }
       if (grad->center.x != 0 || grad->center.y != 0) {
         xml.addAttribute("center", pointToString(grad->center));
       }
@@ -257,7 +265,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
     case NodeType::DiamondGradient: {
       auto grad = static_cast<const DiamondGradientNode*>(node);
       xml.openElement("DiamondGradient");
-      xml.addAttribute("id", grad->id);
+      if (writeId) {
+        xml.addAttribute("id", grad->id);
+      }
       if (grad->center.x != 0 || grad->center.y != 0) {
         xml.addAttribute("center", pointToString(grad->center));
       }
@@ -277,7 +287,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSourceNode* node) {
     case NodeType::ImagePattern: {
       auto pattern = static_cast<const ImagePatternNode*>(node);
       xml.openElement("ImagePattern");
-      xml.addAttribute("id", pattern->id);
+      if (writeId) {
+        xml.addAttribute("id", pattern->id);
+      }
       xml.addAttribute("image", pattern->image);
       if (pattern->tileModeX != TileMode::Clamp) {
         xml.addAttribute("tileModeX", TileModeToString(pattern->tileModeX));
@@ -392,7 +404,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       }
       if (fill->colorSource) {
         xml.closeElementStart();
-        writeColorSource(xml, fill->colorSource.get());
+        writeColorSource(xml, fill->colorSource.get(), false);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -427,7 +439,7 @@ static void writeVectorElement(XMLBuilder& xml, const VectorElementNode* node) {
       }
       if (stroke->colorSource) {
         xml.closeElementStart();
-        writeColorSource(xml, stroke->colorSource.get());
+        writeColorSource(xml, stroke->colorSource.get(), false);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -754,7 +766,9 @@ static void writeResource(XMLBuilder& xml, const ResourceNode* node) {
 
 static void writeLayer(XMLBuilder& xml, const LayerNode* node) {
   xml.openElement("Layer");
-  xml.addAttribute("id", node->id);
+  if (!node->id.empty()) {
+    xml.addAttribute("id", node->id);
+  }
   xml.addAttribute("name", node->name);
   xml.addAttribute("visible", node->visible, true);
   xml.addAttribute("alpha", node->alpha, 1.0f);
