@@ -19,30 +19,59 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/TextAnimator.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/TextPathAlign.h"
 
 namespace pagx {
 
 /**
- * Text path modifier.
+ * TextPath is a text animator that places text along a path. It allows text to follow the contour
+ * of a referenced path shape.
  */
-class TextPath : public TextAnimator {
+class TextPath : public VectorElement {
  public:
+  /**
+   * A reference to the path shape (e.g., "#pathId") that the text follows.
+   */
   std::string path = {};
+
+  /**
+   * The alignment of text along the path (Start, Center, or Justify). The default value is Start.
+   */
   TextPathAlign pathAlign = TextPathAlign::Start;
+
+  /**
+   * The margin from the start of the path in pixels. The default value is 0.
+   */
   float firstMargin = 0;
+
+  /**
+   * The margin from the end of the path in pixels. The default value is 0.
+   */
   float lastMargin = 0;
+
+  /**
+   * Whether characters are rotated to be perpendicular to the path. The default value is true.
+   */
   bool perpendicularToPath = true;
+
+  /**
+   * Whether to reverse the direction of the path. The default value is false.
+   */
   bool reversed = false;
+
+  /**
+   * Whether to force text alignment to the path even when it exceeds the path length. The default
+   * value is false.
+   */
   bool forceAlignment = false;
 
   NodeType type() const override {
     return NodeType::TextPath;
   }
 
-  ElementType elementType() const override {
-    return ElementType::TextPath;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::TextPath;
   }
 };
 

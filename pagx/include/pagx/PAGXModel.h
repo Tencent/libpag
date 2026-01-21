@@ -24,14 +24,10 @@
 
 // Base classes
 #include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/Element.h"
-#include "pagx/nodes/Geometry.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/Painter.h"
-#include "pagx/nodes/PathModifier.h"
-#include "pagx/nodes/TextAnimator.h"
+#include "pagx/nodes/VectorElement.h"
 
 // Color sources
 #include "pagx/nodes/ColorStop.h"
@@ -42,29 +38,29 @@
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/SolidColor.h"
 
-// Geometry elements
+// Vector elements - shapes
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/TextSpan.h"
 
-// Painters
+// Vector elements - painters
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Stroke.h"
 
-// Path modifiers
+// Vector elements - path modifiers
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/TrimPath.h"
 
-// Text modifiers
+// Vector elements - text modifiers
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 
-// Repeater and Group
+// Vector elements - containers
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Repeater.h"
 

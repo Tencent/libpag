@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/TextAnimator.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/Overflow.h"
 #include "pagx/types/TextAlign.h"
 #include "pagx/types/VerticalAlign.h"
@@ -26,24 +26,53 @@
 namespace pagx {
 
 /**
- * Text layout modifier.
+ * TextLayout is a text animator that controls text layout within a bounding box. It provides
+ * options for text alignment, line height, indentation, and overflow handling.
  */
-class TextLayout : public TextAnimator {
+class TextLayout : public VectorElement {
  public:
+  /**
+   * The width of the text box in pixels. A value of 0 means auto-width. The default value is 0.
+   */
   float width = 0;
+
+  /**
+   * The height of the text box in pixels. A value of 0 means auto-height. The default value is 0.
+   */
   float height = 0;
+
+  /**
+   * The horizontal text alignment (Left, Center, Right, or Justify). The default value is Left.
+   */
   TextAlign textAlign = TextAlign::Left;
+
+  /**
+   * The vertical text alignment (Top, Middle, or Bottom). The default value is Top.
+   */
   VerticalAlign verticalAlign = VerticalAlign::Top;
+
+  /**
+   * The line height multiplier. The default value is 1.2.
+   */
   float lineHeight = 1.2f;
+
+  /**
+   * The first-line indent in pixels. The default value is 0.
+   */
   float indent = 0;
+
+  /**
+   * The overflow behavior when text exceeds the bounding box (Clip, Visible, or Scroll). The
+   * default value is Clip.
+   */
   Overflow overflow = Overflow::Clip;
 
   NodeType type() const override {
     return NodeType::TextLayout;
   }
 
-  ElementType elementType() const override {
-    return ElementType::TextLayout;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::TextLayout;
   }
 };
 

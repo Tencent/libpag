@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/VectorElement.h"
 
 namespace pagx {
 

@@ -18,33 +18,70 @@
 
 #pragma once
 
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/PolystarType.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
 
 /**
- * A polygon or star shape.
+ * Polystar represents a polygon or star shape with configurable points, radii, and roundness.
  */
-class Polystar : public Geometry {
+class Polystar : public VectorElement {
  public:
+  /**
+   * The center point of the polystar.
+   */
   Point center = {};
+
+  /**
+   * The type of polystar shape, either Star or Polygon. The default value is Star.
+   */
   PolystarType polystarType = PolystarType::Star;
+
+  /**
+   * The number of points in the polystar. The default value is 5.
+   */
   float pointCount = 5;
+
+  /**
+   * The outer radius of the polystar. The default value is 100.
+   */
   float outerRadius = 100;
+
+  /**
+   * The inner radius of the polystar. Only applies when polystarType is Star. The default value
+   * is 50.
+   */
   float innerRadius = 50;
+
+  /**
+   * The rotation angle in degrees. The default value is 0.
+   */
   float rotation = 0;
+
+  /**
+   * The roundness of the outer points, ranging from 0 to 100. The default value is 0.
+   */
   float outerRoundness = 0;
+
+  /**
+   * The roundness of the inner points, ranging from 0 to 100. Only applies when polystarType is
+   * Star. The default value is 0.
+   */
   float innerRoundness = 0;
+
+  /**
+   * Whether the path direction is reversed. The default value is false.
+   */
   bool reversed = false;
 
   NodeType type() const override {
     return NodeType::Polystar;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Polystar;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Polystar;
   }
 };
 

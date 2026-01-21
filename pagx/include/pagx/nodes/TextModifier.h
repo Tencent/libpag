@@ -21,34 +21,80 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/RangeSelector.h"
-#include "pagx/nodes/TextAnimator.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
 
 /**
- * Text modifier.
+ * TextModifier is a text animator that modifies text appearance with range-based transformations.
+ * It applies transformations like position, rotation, scale, and color changes to selected ranges
+ * of characters.
  */
-class TextModifier : public TextAnimator {
+class TextModifier : public VectorElement {
  public:
+  /**
+   * The anchor point for transformations.
+   */
   Point anchorPoint = {};
+
+  /**
+   * The position offset applied to selected characters.
+   */
   Point position = {};
+
+  /**
+   * The rotation angle in degrees applied to selected characters. The default value is 0.
+   */
   float rotation = 0;
+
+  /**
+   * The scale factor applied to selected characters. The default value is {1, 1}.
+   */
   Point scale = {1, 1};
+
+  /**
+   * The skew angle in degrees applied to selected characters. The default value is 0.
+   */
   float skew = 0;
+
+  /**
+   * The axis angle in degrees for the skew transformation. The default value is 0.
+   */
   float skewAxis = 0;
+
+  /**
+   * The opacity applied to selected characters, ranging from 0 to 1. The default value is 1.
+   */
   float alpha = 1;
+
+  /**
+   * The fill color override for selected characters as a hex color string.
+   */
   std::string fillColor = {};
+
+  /**
+   * The stroke color override for selected characters as a hex color string.
+   */
   std::string strokeColor = {};
+
+  /**
+   * The stroke width override for selected characters. A value of -1 means no override. The
+   * default value is -1.
+   */
   float strokeWidth = -1;
+
+  /**
+   * The range selectors that determine which characters are affected by this modifier.
+   */
   std::vector<RangeSelector> rangeSelectors = {};
 
   NodeType type() const override {
     return NodeType::TextModifier;
   }
 
-  ElementType elementType() const override {
-    return ElementType::TextModifier;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::TextModifier;
   }
 };
 

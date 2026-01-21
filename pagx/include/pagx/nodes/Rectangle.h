@@ -18,27 +18,42 @@
 
 #pragma once
 
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
 
 /**
- * A rectangle shape.
+ * Rectangle represents a rectangle shape with optional rounded corners.
  */
-class Rectangle : public Geometry {
+class Rectangle : public VectorElement {
  public:
+  /**
+   * The center point of the rectangle.
+   */
   Point center = {};
+
+  /**
+   * The size of the rectangle. The default value is {100, 100}.
+   */
   Size size = {100, 100};
+
+  /**
+   * The corner roundness of the rectangle, ranging from 0 to 100. The default value is 0.
+   */
   float roundness = 0;
+
+  /**
+   * Whether the path direction is reversed. The default value is false.
+   */
   bool reversed = false;
 
   NodeType type() const override {
     return NodeType::Rectangle;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Rectangle;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Rectangle;
   }
 };
 

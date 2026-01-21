@@ -18,26 +18,37 @@
 
 #pragma once
 
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
 
 /**
- * An ellipse shape.
+ * Ellipse represents an ellipse shape defined by a center point and size.
  */
-class Ellipse : public Geometry {
+class Ellipse : public VectorElement {
  public:
+  /**
+   * The center point of the ellipse.
+   */
   Point center = {};
+
+  /**
+   * The size of the ellipse. The default value is {100, 100}.
+   */
   Size size = {100, 100};
+
+  /**
+   * Whether the path direction is reversed. The default value is false.
+   */
   bool reversed = false;
 
   NodeType type() const override {
     return NodeType::Ellipse;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Ellipse;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Ellipse;
   }
 };
 

@@ -16,41 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/VectorElement.h"
 
 namespace pagx {
 
-const char* ElementTypeName(ElementType type) {
+const char* VectorElementTypeName(VectorElementType type) {
   switch (type) {
-    case ElementType::Rectangle:
+    case VectorElementType::Rectangle:
       return "Rectangle";
-    case ElementType::Ellipse:
+    case VectorElementType::Ellipse:
       return "Ellipse";
-    case ElementType::Polystar:
+    case VectorElementType::Polystar:
       return "Polystar";
-    case ElementType::Path:
+    case VectorElementType::Path:
       return "Path";
-    case ElementType::TextSpan:
+    case VectorElementType::TextSpan:
       return "TextSpan";
-    case ElementType::Fill:
+    case VectorElementType::Fill:
       return "Fill";
-    case ElementType::Stroke:
+    case VectorElementType::Stroke:
       return "Stroke";
-    case ElementType::TrimPath:
+    case VectorElementType::TrimPath:
       return "TrimPath";
-    case ElementType::RoundCorner:
+    case VectorElementType::RoundCorner:
       return "RoundCorner";
-    case ElementType::MergePath:
+    case VectorElementType::MergePath:
       return "MergePath";
-    case ElementType::TextModifier:
+    case VectorElementType::TextModifier:
       return "TextModifier";
-    case ElementType::TextPath:
+    case VectorElementType::TextPath:
       return "TextPath";
-    case ElementType::TextLayout:
+    case VectorElementType::TextLayout:
       return "TextLayout";
-    case ElementType::Group:
+    case VectorElementType::Group:
       return "Group";
-    case ElementType::Repeater:
+    case VectorElementType::Repeater:
       return "Repeater";
     default:
       return "Unknown";

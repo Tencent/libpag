@@ -22,10 +22,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "pagx/nodes/Element.h"
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/types/Types.h"
@@ -33,36 +33,130 @@
 namespace pagx {
 
 /**
- * Layer node.
+ * Layer represents a layer node that can contain vector elements, layer styles, filters, and child
+ * layers. It is the main building block for composing visual content in a PAGX document.
  */
 class Layer : public Node {
  public:
+  /**
+   * The unique identifier of the layer.
+   */
   std::string id = {};
+
+  /**
+   * The display name of the layer.
+   */
   std::string name = {};
+
+  /**
+   * Whether the layer is visible. The default value is true.
+   */
   bool visible = true;
+
+  /**
+   * The opacity of the layer, ranging from 0 to 1. The default value is 1.
+   */
   float alpha = 1;
+
+  /**
+   * The blend mode used when compositing the layer. The default value is Normal.
+   */
   BlendMode blendMode = BlendMode::Normal;
+
+  /**
+   * The x-coordinate of the layer position. The default value is 0.
+   */
   float x = 0;
+
+  /**
+   * The y-coordinate of the layer position. The default value is 0.
+   */
   float y = 0;
+
+  /**
+   * The 2D transformation matrix of the layer.
+   */
   Matrix matrix = {};
+
+  /**
+   * The 3D transformation matrix as a 16-element array in column-major order.
+   */
   std::vector<float> matrix3D = {};
+
+  /**
+   * Whether to preserve 3D transformations for child layers. The default value is false.
+   */
   bool preserve3D = false;
+
+  /**
+   * Whether to apply anti-aliasing to the layer edges. The default value is true.
+   */
   bool antiAlias = true;
+
+  /**
+   * Whether to use group opacity mode for the layer and its children. The default value is false.
+   */
   bool groupOpacity = false;
+
+  /**
+   * Whether layer effects pass through to the background. The default value is true.
+   */
   bool passThroughBackground = true;
+
+  /**
+   * Whether to exclude child effects when applying layer styles. The default value is false.
+   */
   bool excludeChildEffectsInLayerStyle = false;
+
+  /**
+   * The scroll rectangle for clipping the layer content.
+   */
   Rect scrollRect = {};
+
+  /**
+   * Whether a scroll rectangle is applied to the layer. The default value is false.
+   */
   bool hasScrollRect = false;
+
+  /**
+   * A reference to a mask layer (e.g., "#maskId").
+   */
   std::string mask = {};
+
+  /**
+   * The type of masking to apply (Alpha, Luminosity, InvertedAlpha, or InvertedLuminosity). The
+   * default value is Alpha.
+   */
   MaskType maskType = MaskType::Alpha;
+
+  /**
+   * A reference to a composition (e.g., "#compositionId") used as the layer content.
+   */
   std::string composition = {};
 
+  /**
+   * The vector elements contained in this layer (shapes, painters, modifiers, etc.).
+   */
   std::vector<std::unique_ptr<Node>> contents = {};
+
+  /**
+   * The layer styles applied to this layer (drop shadow, inner shadow, etc.).
+   */
   std::vector<std::unique_ptr<Node>> styles = {};
+
+  /**
+   * The filters applied to this layer (blur, color matrix, etc.).
+   */
   std::vector<std::unique_ptr<Node>> filters = {};
+
+  /**
+   * The child layers contained in this layer.
+   */
   std::vector<std::unique_ptr<Layer>> children = {};
 
-  // Custom data from SVG data-* attributes (key without "data-" prefix)
+  /**
+   * Custom data from SVG data-* attributes. The keys are stored without the "data-" prefix.
+   */
   std::unordered_map<std::string, std::string> customData = {};
 
   NodeType type() const override {

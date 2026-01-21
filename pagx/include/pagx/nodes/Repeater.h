@@ -18,33 +18,71 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/RepeaterOrder.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
 
 /**
- * Repeater modifier.
+ * Repeater is a modifier that creates multiple copies of preceding elements with progressive
+ * transformations. Each copy can have an incremental offset in position, rotation, scale, and
+ * opacity.
  */
-class Repeater : public Element {
+class Repeater : public VectorElement {
  public:
+  /**
+   * The number of copies to create. The default value is 3.
+   */
   float copies = 3;
+
+  /**
+   * The offset applied to the copy index, allowing fractional copies. The default value is 0.
+   */
   float offset = 0;
+
+  /**
+   * The stacking order of copies (BelowOriginal or AboveOriginal). The default value is
+   * BelowOriginal.
+   */
   RepeaterOrder order = RepeaterOrder::BelowOriginal;
+
+  /**
+   * The anchor point for transformations.
+   */
   Point anchorPoint = {};
+
+  /**
+   * The position offset applied between each copy. The default value is {100, 100}.
+   */
   Point position = {100, 100};
+
+  /**
+   * The rotation angle in degrees applied between each copy. The default value is 0.
+   */
   float rotation = 0;
+
+  /**
+   * The scale factor applied between each copy. The default value is {1, 1}.
+   */
   Point scale = {1, 1};
+
+  /**
+   * The starting opacity for the first copy, ranging from 0 to 1. The default value is 1.
+   */
   float startAlpha = 1;
+
+  /**
+   * The ending opacity for the last copy, ranging from 0 to 1. The default value is 1.
+   */
   float endAlpha = 1;
 
   NodeType type() const override {
     return NodeType::Repeater;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Repeater;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Repeater;
   }
 };
 

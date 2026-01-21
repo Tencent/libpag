@@ -18,23 +18,27 @@
 
 #pragma once
 
-#include "pagx/nodes/PathModifier.h"
+#include "pagx/nodes/VectorElement.h"
 
 namespace pagx {
 
 /**
- * Round corner modifier.
+ * RoundCorner is a path modifier that rounds the corners of shapes by adding smooth curves at
+ * sharp vertices.
  */
-class RoundCorner : public PathModifier {
+class RoundCorner : public VectorElement {
  public:
+  /**
+   * The radius of the rounded corners in pixels. The default value is 10.
+   */
   float radius = 10;
 
   NodeType type() const override {
     return NodeType::RoundCorner;
   }
 
-  ElementType elementType() const override {
-    return ElementType::RoundCorner;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::RoundCorner;
   }
 };
 

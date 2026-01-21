@@ -20,31 +20,64 @@
 
 #include <memory>
 #include <vector>
-#include "pagx/nodes/Element.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/Types.h"
 
 namespace pagx {
 
 /**
- * Group container.
+ * Group is a container that groups multiple vector elements with its own transform. It can contain
+ * shapes, painters, modifiers, and nested groups, allowing for hierarchical organization of
+ * content.
  */
-class Group : public Element {
+class Group : public VectorElement {
  public:
+  /**
+   * The anchor point for transformations.
+   */
   Point anchorPoint = {};
+
+  /**
+   * The position offset of the group.
+   */
   Point position = {};
+
+  /**
+   * The rotation angle in degrees. The default value is 0.
+   */
   float rotation = 0;
+
+  /**
+   * The scale factor as (scaleX, scaleY). The default value is {1, 1}.
+   */
   Point scale = {1, 1};
+
+  /**
+   * The skew angle in degrees. The default value is 0.
+   */
   float skew = 0;
+
+  /**
+   * The axis angle in degrees for the skew transformation. The default value is 0.
+   */
   float skewAxis = 0;
+
+  /**
+   * The opacity of the group, ranging from 0 to 1. The default value is 1.
+   */
   float alpha = 1;
+
+  /**
+   * The child elements contained in this group.
+   */
   std::vector<std::unique_ptr<Node>> elements = {};
 
   NodeType type() const override {
     return NodeType::Group;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Group;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Group;
   }
 };
 

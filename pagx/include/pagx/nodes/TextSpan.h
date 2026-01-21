@@ -19,32 +19,68 @@
 #pragma once
 
 #include <string>
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/FontStyle.h"
 
 namespace pagx {
 
 /**
- * A text span.
+ * TextSpan represents a text span that generates glyph paths for rendering. It defines the text
+ * content, font properties, and positioning within a shape layer.
  */
-class TextSpan : public Geometry {
+class TextSpan : public VectorElement {
  public:
+  /**
+   * The x-coordinate of the text baseline starting point. The default value is 0.
+   */
   float x = 0;
+
+  /**
+   * The y-coordinate of the text baseline starting point. The default value is 0.
+   */
   float y = 0;
+
+  /**
+   * The font family name.
+   */
   std::string font = {};
+
+  /**
+   * The font size in pixels. The default value is 12.
+   */
   float fontSize = 12;
+
+  /**
+   * The font weight, ranging from 100 to 900. The default value is 400 (normal).
+   */
   int fontWeight = 400;
+
+  /**
+   * The font style (Normal, Italic, or Oblique). The default value is Normal.
+   */
   FontStyle fontStyle = FontStyle::Normal;
+
+  /**
+   * The tracking value that adjusts spacing between characters. The default value is 0.
+   */
   float tracking = 0;
+
+  /**
+   * The baseline shift in pixels, positive values shift the text up. The default value is 0.
+   */
   float baselineShift = 0;
+
+  /**
+   * The text content to render.
+   */
   std::string text = {};
 
   NodeType type() const override {
     return NodeType::TextSpan;
   }
 
-  ElementType elementType() const override {
-    return ElementType::TextSpan;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::TextSpan;
   }
 };
 

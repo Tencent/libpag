@@ -18,24 +18,28 @@
 
 #pragma once
 
-#include "pagx/nodes/PathModifier.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/MergePathMode.h"
 
 namespace pagx {
 
 /**
- * Merge path modifier.
+ * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
+ * add, subtract, intersect, or exclude paths from each other.
  */
-class MergePath : public PathModifier {
+class MergePath : public VectorElement {
  public:
+  /**
+   * The merge mode that determines how paths are combined. The default value is Append.
+   */
   MergePathMode mode = MergePathMode::Append;
 
   NodeType type() const override {
     return NodeType::MergePath;
   }
 
-  ElementType elementType() const override {
-    return ElementType::MergePath;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::MergePath;
   }
 };
 

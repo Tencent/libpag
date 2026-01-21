@@ -19,24 +19,32 @@
 #pragma once
 
 #include "pagx/PathData.h"
-#include "pagx/nodes/Geometry.h"
+#include "pagx/nodes/VectorElement.h"
 
 namespace pagx {
 
 /**
- * A path shape.
+ * Path represents a freeform shape defined by a PathData containing vertices, in-tangents, and
+ * out-tangents.
  */
-class Path : public Geometry {
+class Path : public VectorElement {
  public:
+  /**
+   * The path data containing vertices and control points.
+   */
   PathData data = {};
+
+  /**
+   * Whether the path direction is reversed. The default value is false.
+   */
   bool reversed = false;
 
   NodeType type() const override {
     return NodeType::Path;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Path;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Path;
   }
 };
 

@@ -18,27 +18,48 @@
 
 #pragma once
 
-#include "pagx/nodes/PathModifier.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/TrimType.h"
 
 namespace pagx {
 
 /**
- * Trim path modifier.
+ * TrimPath is a path modifier that trims paths to a specified range. It can be used to animate
+ * path drawing or reveal effects by adjusting the start and end values.
  */
-class TrimPath : public PathModifier {
+class TrimPath : public VectorElement {
  public:
+  /**
+   * The starting point of the trim as a percentage of the path length, ranging from 0 to 1. The
+   * default value is 0.
+   */
   float start = 0;
+
+  /**
+   * The ending point of the trim as a percentage of the path length, ranging from 0 to 1. The
+   * default value is 1.
+   */
   float end = 1;
+
+  /**
+   * The offset to shift the trim range along the path, where 1 represents a full path length. The
+   * default value is 0.
+   */
   float offset = 0;
+
+  /**
+   * The trim type that determines how multiple paths are trimmed. Separate trims each path
+   * individually, while Simultaneous trims all paths as one continuous path. The default value is
+   * Separate.
+   */
   TrimType trimType = TrimType::Separate;
 
   NodeType type() const override {
     return NodeType::TrimPath;
   }
 
-  ElementType elementType() const override {
-    return ElementType::TrimPath;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::TrimPath;
   }
 };
 

@@ -21,7 +21,7 @@
 #include <memory>
 #include <string>
 #include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/Painter.h"
+#include "pagx/nodes/VectorElement.h"
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/FillRule.h"
 #include "pagx/types/Placement.h"
@@ -29,25 +29,52 @@
 namespace pagx {
 
 /**
- * A fill painter.
- * The color can be a simple color string ("#FF0000"), a reference ("#gradientId"),
- * or an inline color source node.
+ * Fill represents a fill painter that fills shapes with a solid color, gradient, or pattern. The
+ * color can be specified as a simple color string (e.g., "#FF0000"), a reference to a defined
+ * color source (e.g., "#gradientId"), or an inline ColorSource node.
  */
-class Fill : public Painter {
+class Fill : public VectorElement {
  public:
+  /**
+   * The fill color as a string. Can be a hex color (e.g., "#FF0000"), a reference to a color
+   * source (e.g., "#gradientId"), or empty if colorSource is used.
+   */
   std::string color = {};
+
+  /**
+   * An inline color source node (SolidColor, LinearGradient, etc.) for complex fills. If provided,
+   * this takes precedence over the color string.
+   */
   std::unique_ptr<Node> colorSource = nullptr;
+
+  /**
+   * The opacity of the fill, ranging from 0 (transparent) to 1 (opaque). The default value is 1.
+   */
   float alpha = 1;
+
+  /**
+   * The blend mode used when compositing the fill. The default value is Normal.
+   */
   BlendMode blendMode = BlendMode::Normal;
+
+  /**
+   * The fill rule that determines the interior of self-intersecting paths. The default value is
+   * Winding.
+   */
   FillRule fillRule = FillRule::Winding;
+
+  /**
+   * The placement of the fill relative to strokes (Background or Foreground). The default value is
+   * Background.
+   */
   Placement placement = Placement::Background;
 
   NodeType type() const override {
     return NodeType::Fill;
   }
 
-  ElementType elementType() const override {
-    return ElementType::Fill;
+  VectorElementType vectorElementType() const override {
+    return VectorElementType::Fill;
   }
 };
 
