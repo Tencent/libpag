@@ -205,29 +205,30 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
   rect->size.height = 80;
   rect->roundness = 10;
 
-  EXPECT_EQ(rect->type(), pagx::ElementType::Rectangle);
-  EXPECT_STREQ(pagx::ElementTypeName(rect->type()), "Rectangle");
+  EXPECT_EQ(rect->nodeType(), pagx::NodeType::Rectangle);
   EXPECT_FLOAT_EQ(rect->center.x, 50);
   EXPECT_FLOAT_EQ(rect->size.width, 100);
 
   // Test Path creation
   auto path = std::make_unique<pagx::Path>();
   path->data = pagx::PathData::FromSVGString("M0 0 L100 100");
-  EXPECT_EQ(path->type(), pagx::ElementType::Path);
+  EXPECT_EQ(path->nodeType(), pagx::NodeType::Path);
   EXPECT_GT(path->data.verbs().size(), 0u);
 
   // Test Fill creation
   auto fill = std::make_unique<pagx::Fill>();
-  fill->color = "#FF0000";
+  auto solidColor = std::make_unique<pagx::SolidColor>();
+  solidColor->color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
+  fill->color = std::move(solidColor);
   fill->alpha = 0.8f;
-  EXPECT_EQ(fill->type(), pagx::ElementType::Fill);
-  EXPECT_EQ(fill->color, "#FF0000");
+  EXPECT_EQ(fill->nodeType(), pagx::NodeType::Fill);
+  EXPECT_NE(fill->color, nullptr);
 
   // Test Group with children
   auto group = std::make_unique<pagx::Group>();
   group->elements.push_back(std::move(rect));
   group->elements.push_back(std::move(fill));
-  EXPECT_EQ(group->type(), pagx::ElementType::Group);
+  EXPECT_EQ(group->nodeType(), pagx::NodeType::Group);
   EXPECT_EQ(group->elements.size(), 2u);
 }
 
@@ -255,7 +256,9 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
   rect->size.height = 60;
 
   auto fill = std::make_unique<pagx::Fill>();
-  fill->color = "#0000FF";
+  auto solidColor = std::make_unique<pagx::SolidColor>();
+  solidColor->color = {0.0f, 0.0f, 1.0f, 1.0f};  // Blue
+  fill->color = std::move(solidColor);
 
   group->elements.push_back(std::move(rect));
   group->elements.push_back(std::move(fill));
@@ -293,7 +296,9 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   rect->size.height = 60;
 
   auto fill = std::make_unique<pagx::Fill>();
-  fill->color = "#00FF00";
+  auto solidColor = std::make_unique<pagx::SolidColor>();
+  solidColor->color = {0.0f, 1.0f, 0.0f, 1.0f};  // Green
+  fill->color = std::move(solidColor);
 
   layer->contents.push_back(std::move(rect));
   layer->contents.push_back(std::move(fill));
@@ -349,11 +354,12 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
   EXPECT_FLOAT_EQ(c1.blue, 0.0f);
   EXPECT_FLOAT_EQ(c1.alpha, 1.0f);
 
-  // Test Color parsing
-  auto c2 = pagx::Color::Parse("#FF8000");
+  // Test Color with wide gamut
+  pagx::Color c2 = {1.0f, 0.5f, 0.0f, 1.0f, pagx::ColorSpace::DisplayP3};
   EXPECT_FLOAT_EQ(c2.red, 1.0f);
-  EXPECT_NEAR(c2.green, 0.5f, 0.01f);
+  EXPECT_FLOAT_EQ(c2.green, 0.5f);
   EXPECT_FLOAT_EQ(c2.blue, 0.0f);
+  EXPECT_EQ(c2.colorSpace, pagx::ColorSpace::DisplayP3);
 
   // Test Matrix (identity)
   pagx::Matrix m1 = {};
@@ -372,7 +378,7 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
 PAG_TEST(PAGXTest, ColorSources) {
   // Test SolidColor
   auto solid = std::make_unique<pagx::SolidColor>();
-  solid->color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
   EXPECT_EQ(solid->type(), pagx::ColorSourceType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
@@ -385,11 +391,11 @@ PAG_TEST(PAGXTest, ColorSources) {
 
   pagx::ColorStop stop1;
   stop1.offset = 0;
-  stop1.color = pagx::Color::FromRGBA(1.0f, 0.0f, 0.0f, 1.0f);
+  stop1.color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
 
   pagx::ColorStop stop2;
   stop2.offset = 1;
-  stop2.color = pagx::Color::FromRGBA(0.0f, 0.0f, 1.0f, 1.0f);
+  stop2.color = {0.0f, 0.0f, 1.0f, 1.0f};  // Blue
 
   linear->colorStops.push_back(stop1);
   linear->colorStops.push_back(stop2);
@@ -422,7 +428,7 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
   dropShadow->offsetY = 5;
   dropShadow->blurrinessX = 10;
   dropShadow->blurrinessY = 10;
-  dropShadow->color = pagx::Color::FromRGBA(0, 0, 0, 0.5f);
+  dropShadow->color = {0.0f, 0.0f, 0.0f, 0.5f};  // Semi-transparent black
   layer->styles.push_back(std::move(dropShadow));
 
   // Add blur filter

@@ -19,7 +19,6 @@
 #include "PAGXExporter.h"
 #include <sstream>
 #include "PAGXEnumUtils.h"
-#include "pagx/model/types/Color.h"
 #include "pagx/model/BackgroundBlurStyle.h"
 #include "pagx/model/BlendFilter.h"
 #include "pagx/model/BlurFilter.h"
@@ -235,7 +234,7 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
   for (const auto& stop : stops) {
     xml.openElement("ColorStop");
     xml.addRequiredAttribute("offset", stop.offset);
-    xml.addRequiredAttribute("color", stop.color.toHexString(stop.color.alpha < 1.0f));
+    xml.addRequiredAttribute("color", ColorToHexString(stop.color, stop.color.alpha < 1.0f));
     xml.closeElementSelfClosing();
   }
 }
@@ -246,7 +245,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
       xml.addAttribute("id", solid->id);
-      xml.addAttribute("color", solid->color.toHexString(solid->color.alpha < 1.0f));
+      xml.addAttribute("color", ColorToHexString(solid->color, solid->color.alpha < 1.0f));
       xml.closeElementSelfClosing();
       break;
     }
@@ -359,8 +358,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
 //==============================================================================
 
 static void writeVectorElement(XMLBuilder& xml, const Element* node) {
-  switch (node->type()) {
-    case ElementType::Rectangle: {
+  switch (node->nodeType()) {
+    case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
       if (rect->center.x != 0 || rect->center.y != 0) {
@@ -374,7 +373,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::Ellipse: {
+    case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
       if (ellipse->center.x != 0 || ellipse->center.y != 0) {
@@ -387,13 +386,13 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::Polystar: {
+    case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
       if (polystar->center.x != 0 || polystar->center.y != 0) {
         xml.addAttribute("center", pointToString(polystar->center));
       }
-      xml.addAttribute("polystarType", PolystarTypeToString(polystar->polystarType));
+      xml.addAttribute("type", PolystarTypeToString(polystar->type));
       xml.addAttribute("pointCount", polystar->pointCount, 5.0f);
       xml.addAttribute("outerRadius", polystar->outerRadius, 100.0f);
       xml.addAttribute("innerRadius", polystar->innerRadius, 50.0f);
@@ -404,7 +403,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::Path: {
+    case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
       if (!path->data.isEmpty()) {
@@ -420,7 +419,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::TextSpan: {
+    case NodeType::TextSpan: {
       auto text = static_cast<const TextSpan*>(node);
       xml.openElement("TextSpan");
       if (text->position.x != 0 || text->position.y != 0) {
@@ -439,7 +438,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElement();
       break;
     }
-    case ElementType::Fill: {
+    case NodeType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
       // If colorSource has an id, output reference; otherwise inline the colorSource below
@@ -467,7 +466,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       }
       break;
     }
-    case ElementType::Stroke: {
+    case NodeType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
       // If colorSource has an id, output reference; otherwise inline the colorSource below
@@ -507,26 +506,26 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       }
       break;
     }
-    case ElementType::TrimPath: {
+    case NodeType::TrimPath: {
       auto trim = static_cast<const TrimPath*>(node);
       xml.openElement("TrimPath");
       xml.addAttribute("start", trim->start);
       xml.addAttribute("end", trim->end, 1.0f);
       xml.addAttribute("offset", trim->offset);
-      if (trim->trimType != TrimType::Separate) {
-        xml.addAttribute("type", TrimTypeToString(trim->trimType));
+      if (trim->type != TrimType::Separate) {
+        xml.addAttribute("type", TrimTypeToString(trim->type));
       }
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::RoundCorner: {
+    case NodeType::RoundCorner: {
       auto round = static_cast<const RoundCorner*>(node);
       xml.openElement("RoundCorner");
       xml.addAttribute("radius", round->radius, 10.0f);
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::MergePath: {
+    case NodeType::MergePath: {
       auto merge = static_cast<const MergePath*>(node);
       xml.openElement("MergePath");
       if (merge->mode != MergePathMode::Append) {
@@ -535,7 +534,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::TextModifier: {
+    case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifier*>(node);
       xml.openElement("TextModifier");
       if (modifier->anchorPoint.x != 0 || modifier->anchorPoint.y != 0) {
@@ -589,7 +588,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       }
       break;
     }
-    case ElementType::TextPath: {
+    case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
       xml.addAttribute("path", textPath->path);
@@ -603,7 +602,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::TextLayout: {
+    case NodeType::TextLayout: {
       auto layout = static_cast<const TextLayout*>(node);
       xml.openElement("TextLayout");
       xml.addAttribute("x", layout->x);
@@ -626,7 +625,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::Repeater: {
+    case NodeType::Repeater: {
       auto repeater = static_cast<const Repeater*>(node);
       xml.openElement("Repeater");
       xml.addAttribute("copies", repeater->copies, 3.0f);
@@ -649,7 +648,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ElementType::Group: {
+    case NodeType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
       if (group->anchorPoint.x != 0 || group->anchorPoint.y != 0) {
@@ -697,7 +696,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("offsetY", style->offsetY);
       xml.addAttribute("blurrinessX", style->blurrinessX);
       xml.addAttribute("blurrinessY", style->blurrinessY);
-      xml.addAttribute("color", style->color.toHexString(style->color.alpha < 1.0f));
+      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
       xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
       xml.closeElementSelfClosing();
       break;
@@ -712,7 +711,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("offsetY", style->offsetY);
       xml.addAttribute("blurrinessX", style->blurrinessX);
       xml.addAttribute("blurrinessY", style->blurrinessY);
-      xml.addAttribute("color", style->color.toHexString(style->color.alpha < 1.0f));
+      xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
       xml.closeElementSelfClosing();
       break;
     }
@@ -759,7 +758,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.addAttribute("offsetY", filter->offsetY);
       xml.addAttribute("blurrinessX", filter->blurrinessX);
       xml.addAttribute("blurrinessY", filter->blurrinessY);
-      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
+      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -771,7 +770,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.addAttribute("offsetY", filter->offsetY);
       xml.addAttribute("blurrinessX", filter->blurrinessX);
       xml.addAttribute("blurrinessY", filter->blurrinessY);
-      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
+      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
       break;
@@ -779,7 +778,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case LayerFilterType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
-      xml.addAttribute("color", filter->color.toHexString(filter->color.alpha < 1.0f));
+      xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       if (filter->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
       }

@@ -363,32 +363,32 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    switch (node->type()) {
-      case ElementType::Rectangle:
+    switch (node->nodeType()) {
+      case NodeType::Rectangle:
         return convertRectangle(static_cast<const Rectangle*>(node));
-      case ElementType::Ellipse:
+      case NodeType::Ellipse:
         return convertEllipse(static_cast<const Ellipse*>(node));
-      case ElementType::Polystar:
+      case NodeType::Polystar:
         return convertPolystar(static_cast<const Polystar*>(node));
-      case ElementType::Path:
+      case NodeType::Path:
         return convertPath(static_cast<const Path*>(node));
-      case ElementType::TextSpan:
+      case NodeType::TextSpan:
         return convertTextSpan(static_cast<const TextSpan*>(node));
-      case ElementType::Fill:
+      case NodeType::Fill:
         return convertFill(static_cast<const Fill*>(node));
-      case ElementType::Stroke:
+      case NodeType::Stroke:
         return convertStroke(static_cast<const Stroke*>(node));
-      case ElementType::TrimPath:
+      case NodeType::TrimPath:
         return convertTrimPath(static_cast<const TrimPath*>(node));
-      case ElementType::RoundCorner:
+      case NodeType::RoundCorner:
         return convertRoundCorner(static_cast<const RoundCorner*>(node));
-      case ElementType::MergePath:
+      case NodeType::MergePath:
         return convertMergePath(static_cast<const MergePath*>(node));
-      case ElementType::Repeater:
+      case NodeType::Repeater:
         return convertRepeater(static_cast<const Repeater*>(node));
-      case ElementType::Group:
+      case NodeType::Group:
         return convertGroup(static_cast<const Group*>(node));
-      case ElementType::TextLayout:
+      case NodeType::TextLayout:
         // TextLayout is handled in convertGroup, not converted directly.
         return nullptr;
       default:
@@ -423,7 +423,7 @@ class LayerBuilderImpl {
     polystar->setInnerRoundness(node->innerRoundness);
     polystar->setRotation(node->rotation);
     polystar->setReversed(node->reversed);
-    if (node->polystarType == PolystarType::Polygon) {
+    if (node->type == PolystarType::Polygon) {
       polystar->setPolystarType(tgfx::PolystarType::Polygon);
     } else {
       polystar->setPolystarType(tgfx::PolystarType::Star);
@@ -680,7 +680,7 @@ class LayerBuilderImpl {
     // Check if group contains TextLayout modifier.
     const TextLayout* textLayout = nullptr;
     for (const auto& element : node->elements) {
-      if (element->type() == ElementType::TextLayout) {
+      if (element->nodeType() == NodeType::TextLayout) {
         textLayout = static_cast<const TextLayout*>(element.get());
         break;
       }
@@ -696,7 +696,7 @@ class LayerBuilderImpl {
 
     if (textLayout != nullptr) {
       for (const auto& element : node->elements) {
-        if (element->type() == ElementType::TextSpan) {
+        if (element->nodeType() == NodeType::TextSpan) {
           auto span = static_cast<const pagx::TextSpan*>(element.get());
           TextSpanInfo info;
           info.span = span;
@@ -733,12 +733,12 @@ class LayerBuilderImpl {
 
     for (const auto& element : node->elements) {
       // Skip TextLayout modifier, it's handled by adjusting TextSpan positions.
-      if (element->type() == ElementType::TextLayout) {
+      if (element->nodeType() == NodeType::TextLayout) {
         continue;
       }
 
       // Handle TextSpan with layout adjustments.
-      if (element->type() == ElementType::TextSpan && textLayout != nullptr) {
+      if (element->nodeType() == NodeType::TextSpan && textLayout != nullptr) {
         auto span = static_cast<const pagx::TextSpan*>(element.get());
         auto tgfxTextSpan = std::make_shared<tgfx::TextSpan>();
 
@@ -756,21 +756,21 @@ class LayerBuilderImpl {
 
           // Calculate x offset based on textAlign.
           // This follows tgfx SVG text-anchor handling: xOffset = alignmentFactor * width
-          // where alignmentFactor is: Left=0, Center=-0.5, Right=-1.0
+          // where alignmentFactor is: Start=0, Center=-0.5, End=-1.0
           float xOffset = 0;
           float textWidth = info->bounds.width();
           switch (textLayout->textAlign) {
-            case TextAlign::Left:
+            case TextAlign::Start:
               // No offset needed.
               break;
             case TextAlign::Center:
               xOffset = -0.5f * textWidth;
               break;
-            case TextAlign::Right:
+            case TextAlign::End:
               xOffset = -textWidth;
               break;
             case TextAlign::Justify:
-              // Justify requires more complex handling, treat as left for now.
+              // Justify requires more complex handling, treat as start for now.
               break;
           }
 

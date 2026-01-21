@@ -76,8 +76,8 @@ class Fill : public Element {
    */
   LayerPlacement placement = LayerPlacement::Background;
 
-  ElementType type() const override {
-    return ElementType::Fill;
+  NodeType nodeType() const override {
+    return NodeType::Fill;
   }
 };
 

@@ -563,7 +563,7 @@ std::unique_ptr<Polystar> PAGXXMLParser::parsePolystar(const XMLNode* node) {
   auto polystar = std::make_unique<Polystar>();
   auto centerStr = getAttribute(node, "center", "0,0");
   polystar->center = parsePoint(centerStr);
-  polystar->polystarType = PolystarTypeFromString(getAttribute(node, "polystarType", "star"));
+  polystar->type = PolystarTypeFromString(getAttribute(node, "type", "star"));
   polystar->pointCount = getFloatAttribute(node, "pointCount", 5);
   polystar->outerRadius = getFloatAttribute(node, "outerRadius", 100);
   polystar->innerRadius = getFloatAttribute(node, "innerRadius", 50);
@@ -658,7 +658,7 @@ std::unique_ptr<TrimPath> PAGXXMLParser::parseTrimPath(const XMLNode* node) {
   trim->start = getFloatAttribute(node, "start", 0);
   trim->end = getFloatAttribute(node, "end", 1);
   trim->offset = getFloatAttribute(node, "offset", 0);
-  trim->trimType = TrimTypeFromString(getAttribute(node, "type", "separate"));
+  trim->type = TrimTypeFromString(getAttribute(node, "type", "separate"));
   return trim;
 }
 
@@ -702,24 +702,25 @@ std::unique_ptr<TextModifier> PAGXXMLParser::parseTextModifier(const XMLNode* no
 std::unique_ptr<TextPath> PAGXXMLParser::parseTextPath(const XMLNode* node) {
   auto textPath = std::make_unique<TextPath>();
   textPath->path = getAttribute(node, "path");
-  textPath->pathAlign = TextPathAlignFromString(getAttribute(node, "align", "start"));
+  textPath->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
   textPath->firstMargin = getFloatAttribute(node, "firstMargin", 0);
   textPath->lastMargin = getFloatAttribute(node, "lastMargin", 0);
   textPath->perpendicularToPath = getBoolAttribute(node, "perpendicularToPath", true);
   textPath->reversed = getBoolAttribute(node, "reversed", false);
-  textPath->forceAlignment = getBoolAttribute(node, "forceAlignment", false);
   return textPath;
 }
 
 std::unique_ptr<TextLayout> PAGXXMLParser::parseTextLayout(const XMLNode* node) {
   auto layout = std::make_unique<TextLayout>();
+  layout->x = getFloatAttribute(node, "x", 0);
+  layout->y = getFloatAttribute(node, "y", 0);
   layout->width = getFloatAttribute(node, "width", 0);
   layout->height = getFloatAttribute(node, "height", 0);
-  layout->textAlign = TextAlignFromString(getAttribute(node, "align", "left"));
+  layout->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
+  layout->textAlignLast = TextAlignFromString(getAttribute(node, "textAlignLast", "start"));
   layout->verticalAlign = VerticalAlignFromString(getAttribute(node, "verticalAlign", "top"));
   layout->lineHeight = getFloatAttribute(node, "lineHeight", 1.2f);
-  layout->indent = getFloatAttribute(node, "indent", 0);
-  layout->overflow = OverflowFromString(getAttribute(node, "overflow", "clip"));
+  layout->direction = TextDirectionFromString(getAttribute(node, "direction", "horizontal"));
   return layout;
 }
 

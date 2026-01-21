@@ -127,8 +127,8 @@ class Stroke : public Element {
    */
   LayerPlacement placement = LayerPlacement::Background;
 
-  ElementType type() const override {
-    return ElementType::Stroke;
+  NodeType nodeType() const override {
+    return NodeType::Stroke;
   }
 };
 

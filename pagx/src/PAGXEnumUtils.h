@@ -36,6 +36,7 @@
 #include "pagx/model/TextPath.h"
 #include "pagx/model/TrimPath.h"
 #include "pagx/model/types/BlendMode.h"
+#include "pagx/model/types/Color.h"
 #include "pagx/model/types/ColorSpace.h"
 #include "pagx/model/types/LayerPlacement.h"
 #include "pagx/model/types/TileMode.h"
@@ -46,11 +47,6 @@ namespace pagx {
 // Node types
 //==============================================================================
 const char* NodeTypeName(NodeType type);
-
-//==============================================================================
-// Element types
-//==============================================================================
-const char* ElementTypeName(ElementType type);
 
 //==============================================================================
 // ColorSource types
@@ -162,5 +158,10 @@ std::string SelectorShapeToString(SelectorShape shape);
 SelectorShape SelectorShapeFromString(const std::string& str);
 std::string SelectorModeToString(SelectorMode mode);
 SelectorMode SelectorModeFromString(const std::string& str);
+
+//==============================================================================
+// Color
+//==============================================================================
+std::string ColorToHexString(const Color& color, bool withAlpha = false);
 
 }  // namespace pagx
