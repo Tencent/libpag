@@ -307,7 +307,7 @@ void PAGXXMLParser::parseResources(const XMLNode* node, Document* doc) {
   }
 }
 
-std::unique_ptr<Resource> PAGXXMLParser::parseResource(const XMLNode* node) {
+std::unique_ptr<Node> PAGXXMLParser::parseResource(const XMLNode* node) {
   if (node->tag == "Image") {
     return parseImage(node);
   }

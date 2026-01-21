@@ -21,28 +21,35 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "pagx/model/Resource.h"
+#include "pagx/model/Node.h"
 
 namespace pagx {
 
 class Layer;
 
 /**
- * Composition resource.
+ * Composition represents a reusable composition resource that contains a set of layers. It can be
+ * referenced by a Layer's composition property to create instances.
  */
-class Composition : public Resource {
+class Composition : public Node {
  public:
-  std::string id = {};
+  /**
+   * The width of the composition in pixels.
+   */
   float width = 0;
+
+  /**
+   * The height of the composition in pixels.
+   */
   float height = 0;
+
+  /**
+   * The layers contained in this composition.
+   */
   std::vector<std::unique_ptr<Layer>> layers = {};
 
-  ResourceType type() const override {
-    return ResourceType::Composition;
-  }
-
-  const std::string& resourceId() const override {
-    return id;
+  NodeType nodeType() const override {
+    return NodeType::Composition;
   }
 };
 

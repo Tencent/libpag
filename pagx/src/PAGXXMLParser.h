@@ -84,7 +84,7 @@ class PAGXXMLParser {
 
   static void parseDocument(const XMLNode* root, Document* doc);
   static void parseResources(const XMLNode* node, Document* doc);
-  static std::unique_ptr<Resource> parseResource(const XMLNode* node);
+  static std::unique_ptr<Node> parseResource(const XMLNode* node);
   static std::unique_ptr<Layer> parseLayer(const XMLNode* node);
   static void parseContents(const XMLNode* node, Layer* layer);
   static void parseStyles(const XMLNode* node, Layer* layer);

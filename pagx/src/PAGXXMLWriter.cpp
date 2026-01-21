@@ -306,7 +306,7 @@ class ResourceContext {
       collectFromLayer(layer.get());
     }
     for (const auto& resource : doc.resources) {
-      if (resource->type() == ResourceType::Composition) {
+      if (resource->nodeType() == NodeType::Composition) {
         auto comp = static_cast<const Composition*>(resource.get());
         for (const auto& layer : comp->layers) {
           collectFromLayer(layer.get());
@@ -431,7 +431,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node,
                                const ResourceContext& ctx);
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx);
+static void writeResource(XMLBuilder& xml, const Node* node, const ResourceContext& ctx);
 static void writeLayer(XMLBuilder& xml, const Layer* node, const ResourceContext& ctx);
 
 //==============================================================================
@@ -1149,9 +1149,9 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
-static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceContext& ctx) {
-  switch (node->type()) {
-    case ResourceType::Image: {
+static void writeResource(XMLBuilder& xml, const Node* node, const ResourceContext& ctx) {
+  switch (node->nodeType()) {
+    case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
@@ -1159,7 +1159,7 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
       xml.closeElementSelfClosing();
       break;
     }
-    case ResourceType::PathData: {
+    case NodeType::PathData: {
       auto pathData = static_cast<const PathDataResource*>(node);
       xml.openElement("PathData");
       xml.addAttribute("id", pathData->id);
@@ -1167,7 +1167,7 @@ static void writeResource(XMLBuilder& xml, const Resource* node, const ResourceC
       xml.closeElementSelfClosing();
       break;
     }
-    case ResourceType::Composition: {
+    case NodeType::Composition: {
       auto comp = static_cast<const Composition*>(node);
       xml.openElement("Composition");
       xml.addAttribute("id", comp->id);
@@ -1343,7 +1343,7 @@ std::string PAGXXMLWriter::Write(const Document& doc) {
 
   // Also collect from Compositions
   for (const auto& resource : doc.resources) {
-    if (resource->type() == ResourceType::Composition) {
+    if (resource->nodeType() == NodeType::Composition) {
       auto comp = static_cast<const Composition*>(resource.get());
       std::function<void(const Layer*)> collectColorSources = [&](const Layer* layer) {
         for (const auto& element : layer->contents) {

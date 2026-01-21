@@ -20,17 +20,17 @@
 #include "pagx/model/Element.h"
 #include "pagx/model/LayerFilter.h"
 #include "pagx/model/LayerStyle.h"
-#include "pagx/model/Resource.h"
+#include "pagx/model/Node.h"
 
 namespace pagx {
 
-const char* ResourceTypeName(ResourceType type) {
+const char* NodeTypeName(NodeType type) {
   switch (type) {
-    case ResourceType::Image:
+    case NodeType::Image:
       return "Image";
-    case ResourceType::PathData:
+    case NodeType::PathData:
       return "PathData";
-    case ResourceType::Composition:
+    case NodeType::Composition:
       return "Composition";
     default:
       return "Unknown";

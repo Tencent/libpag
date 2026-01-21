@@ -19,24 +19,23 @@
 #pragma once
 
 #include <string>
-#include "pagx/model/Resource.h"
+#include "pagx/model/Node.h"
 
 namespace pagx {
 
 /**
- * Image resource.
+ * Image represents an image resource that can be referenced by other nodes. The image source can
+ * be a file path, a URL, or a base64-encoded data URI.
  */
-class Image : public Resource {
+class Image : public Node {
  public:
-  std::string id = {};
+  /**
+   * The source of the image. Can be a file path, URL, or base64-encoded data URI.
+   */
   std::string source = {};
 
-  ResourceType type() const override {
-    return ResourceType::Image;
-  }
-
-  const std::string& resourceId() const override {
-    return id;
+  NodeType nodeType() const override {
+    return NodeType::Image;
   }
 };
 

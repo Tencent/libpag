@@ -37,7 +37,7 @@
 #include "pagx/model/Rectangle.h"
 #include "pagx/model/Stroke.h"
 #include "pagx/model/TextSpan.h"
-#include "pagx/PAGXSVGParser.h"
+#include "pagx/SVGImporter.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {
@@ -58,7 +58,7 @@ struct InheritedStyle {
  */
 class SVGParserImpl {
  public:
-  explicit SVGParserImpl(const PAGXSVGParser::Options& options);
+  explicit SVGParserImpl(const SVGImporter::Options& options);
 
   std::shared_ptr<Document> parse(const uint8_t* data, size_t length);
   std::shared_ptr<Document> parseFile(const std::string& filePath);
@@ -137,7 +137,7 @@ class SVGParserImpl {
   // Parse data-* attributes from element and add to layer's customData.
   void parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer);
 
-  PAGXSVGParser::Options _options = {};
+  SVGImporter::Options _options = {};
   std::shared_ptr<Document> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
   std::vector<std::unique_ptr<Layer>> _maskLayers = {};

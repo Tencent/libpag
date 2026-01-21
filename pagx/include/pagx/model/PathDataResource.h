@@ -19,24 +19,23 @@
 #pragma once
 
 #include <string>
-#include "pagx/model/Resource.h"
+#include "pagx/model/Node.h"
 
 namespace pagx {
 
 /**
- * PathData resource - stores reusable path data.
+ * PathDataResource is a reusable path data resource that can be referenced by Path elements. It
+ * stores path data as an SVG path string for efficient serialization.
  */
-class PathDataResource : public Resource {
+class PathDataResource : public Node {
  public:
-  std::string id = {};
-  std::string data = {};  // SVG path data string
+  /**
+   * The SVG path data string (d attribute format).
+   */
+  std::string data = {};
 
-  ResourceType type() const override {
-    return ResourceType::PathData;
-  }
-
-  const std::string& resourceId() const override {
-    return id;
+  NodeType nodeType() const override {
+    return NodeType::PathData;
   }
 };
 

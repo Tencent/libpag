@@ -19,6 +19,7 @@
 #include "pagx/model/Document.h"
 #include <fstream>
 #include <sstream>
+#include "pagx/model/Composition.h"
 #include "PAGXXMLParser.h"
 #include "PAGXXMLWriter.h"
 
@@ -60,12 +61,17 @@ std::string Document::toXML() const {
   return PAGXXMLWriter::Write(*this);
 }
 
-Resource* Document::findResource(const std::string& id) const {
+Node* Document::findResource(const std::string& id) const {
   if (resourceMapDirty) {
     rebuildResourceMap();
   }
   auto it = resourceMap.find(id);
   return it != resourceMap.end() ? it->second : nullptr;
+}
+
+ColorSource* Document::findColorSource(const std::string& id) const {
+  auto it = colorSourceMap.find(id);
+  return it != colorSourceMap.end() ? it->second : nullptr;
 }
 
 Layer* Document::findLayer(const std::string& id) const {
@@ -76,7 +82,7 @@ Layer* Document::findLayer(const std::string& id) const {
   }
   // Then search in Composition resources
   for (const auto& resource : resources) {
-    if (resource->type() == ResourceType::Composition) {
+    if (resource->nodeType() == NodeType::Composition) {
       auto comp = static_cast<const Composition*>(resource.get());
       found = findLayerRecursive(comp->layers, id);
       if (found) {
@@ -90,16 +96,15 @@ Layer* Document::findLayer(const std::string& id) const {
 void Document::rebuildResourceMap() const {
   resourceMap.clear();
   for (const auto& resource : resources) {
-    auto& id = resource->resourceId();
-    if (!id.empty()) {
-      resourceMap[id] = resource.get();
+    if (!resource->id.empty()) {
+      resourceMap[resource->id] = resource.get();
     }
   }
   resourceMapDirty = false;
 }
 
 Layer* Document::findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
-                                            const std::string& id) {
+                                    const std::string& id) {
   for (const auto& layer : layers) {
     if (layer->id == id) {
       return layer.get();

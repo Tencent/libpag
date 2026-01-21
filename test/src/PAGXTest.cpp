@@ -29,7 +29,7 @@
 #include "pagx/model/RadialGradient.h"
 #include "pagx/model/Rectangle.h"
 #include "pagx/model/SolidColor.h"
-#include "pagx/PAGXSVGParser.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/model/PathData.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
@@ -139,8 +139,8 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Save PAGX file to output directory
-    pagx::PAGXSVGParser::Options parserOptions;
-    auto doc = pagx::PAGXSVGParser::Parse(svgPath, parserOptions);
+    pagx::SVGImporter::Options parserOptions;
+    auto doc = pagx::SVGImporter::Parse(svgPath, parserOptions);
     if (doc) {
       std::string xml = doc->toXML();
       auto pagxData = Data::MakeWithCopy(xml.data(), xml.size());

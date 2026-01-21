@@ -24,7 +24,7 @@
 #include <vector>
 #include "pagx/model/ColorSource.h"
 #include "pagx/model/Layer.h"
-#include "pagx/model/Resource.h"
+#include "pagx/model/Node.h"
 
 namespace pagx {
 
@@ -53,10 +53,10 @@ class Document {
   float height = 0;
 
   /**
-   * Resources (images, paths, compositions).
+   * Resources (images, compositions, etc.).
    * These can be referenced by "#id" in the document.
    */
-  std::vector<std::unique_ptr<Resource>> resources = {};
+  std::vector<std::unique_ptr<Node>> resources = {};
 
   /**
    * Color sources (gradients, solid colors, patterns).
@@ -106,7 +106,7 @@ class Document {
    * Finds a resource by ID.
    * Returns nullptr if not found.
    */
-  Resource* findResource(const std::string& id) const;
+  Node* findResource(const std::string& id) const;
 
   /**
    * Finds a color source by ID.
@@ -124,13 +124,13 @@ class Document {
   friend class PAGXXMLParser;
   Document() = default;
 
-  mutable std::unordered_map<std::string, Resource*> resourceMap = {};
+  mutable std::unordered_map<std::string, Node*> resourceMap = {};
   mutable std::unordered_map<std::string, ColorSource*> colorSourceMap = {};
   mutable bool resourceMapDirty = true;
 
   void rebuildResourceMap() const;
   static Layer* findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
-                                       const std::string& id);
+                                   const std::string& id);
 };
 
 }  // namespace pagx

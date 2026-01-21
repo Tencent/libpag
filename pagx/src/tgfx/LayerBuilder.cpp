@@ -36,6 +36,7 @@
 #include "pagx/model/Layer.h"
 #include "pagx/model/LinearGradient.h"
 #include "pagx/model/MergePath.h"
+#include "pagx/model/Node.h"
 #include "pagx/model/Path.h"
 #include "pagx/model/Polystar.h"
 #include "pagx/model/RadialGradient.h"
@@ -46,7 +47,7 @@
 #include "pagx/model/Stroke.h"
 #include "pagx/model/TextSpan.h"
 #include "pagx/model/TrimPath.h"
-#include "pagx/PAGXSVGParser.h"
+#include "pagx/SVGImporter.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -611,7 +612,7 @@ class LayerBuilderImpl {
       return nullptr;
     }
     for (const auto& resource : *_resources) {
-      if (resource->type() == ResourceType::Image) {
+      if (resource->nodeType() == NodeType::Image) {
         auto imageNode = static_cast<const Image*>(resource.get());
         if (imageNode->id == resourceId) {
           if (imageNode->source.find("data:") == 0) {
@@ -744,7 +745,7 @@ class LayerBuilderImpl {
   }
 
   LayerBuilder::Options _options = {};
-  const std::vector<std::unique_ptr<Resource>>* _resources = nullptr;
+  const std::vector<std::unique_ptr<Node>>* _resources = nullptr;
   std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
   std::unordered_map<std::string, std::shared_ptr<tgfx::Layer>> _layerById = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, std::string, tgfx::LayerMaskType>>
@@ -784,7 +785,7 @@ PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Opt
 }
 
 PAGXContent LayerBuilder::FromSVGFile(const std::string& filePath, const Options& options) {
-  auto document = PAGXSVGParser::Parse(filePath);
+  auto document = SVGImporter::Parse(filePath);
   if (!document) {
     return {};
   }
