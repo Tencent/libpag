@@ -1737,7 +1737,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 | **绘制器** | `Fill`, `Stroke` |
 | **形状修改器** | `TrimPath`, `RoundCorner`, `MergePath` |
 | **文本修改器** | `TextModifier`, `TextPath`, `TextLayout` |
-| **选择器** | `RangeSelector`（TextModifier 子元素） |
+| **文本选择器** | `RangeSelector`（TextModifier 子元素） |
 | **其他** | `Repeater`, `Group` |
 
 ### A.2 文档包含关系
