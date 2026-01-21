@@ -949,11 +949,11 @@ boundingRect.bottom = center.y + size.height / 2
 | `polygon` | 正多边形：只使用外半径 |
 | `star` | 星形：使用外半径和内半径交替 |
 
-**多边形模式** (`type="polygon"`)：
+**多边形模式** (`polystarType="polygon"`)：
 - 只使用 `outerRadius` 和 `outerRoundness`
 - `innerRadius` 和 `innerRoundness` 被忽略
 
-**星形模式** (`type="star"`)：
+**星形模式** (`polystarType="star"`)：
 - 外顶点位于 `outerRadius` 处
 - 内顶点位于 `innerRadius` 处
 - 顶点交替连接形成星形
@@ -1713,8 +1713,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 ```
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。
-
----
 
 ---
 
