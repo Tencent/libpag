@@ -1933,10 +1933,24 @@ void SVGParserImpl::convertFilterElement(
       }
     }
 
-    // Check for simple blur filter (first primitive with no "in" or in="SourceGraphic").
+    // Check for blur filter that should apply to the source graphic.
+    // This includes:
+    // 1. feGaussianBlur with in="SourceGraphic"
+    // 2. feGaussianBlur as the first primitive with no "in" attribute
+    // 3. feGaussianBlur following a feBlend that merges SourceGraphic (Figma foreground blur pattern)
     if (node->name == "feGaussianBlur") {
       std::string inAttr = getAttribute(node, "in");
       bool isSourceGraphic = (inAttr == "SourceGraphic") || (inAttr.empty() && i == 0);
+
+      // Check for Figma foreground blur pattern: feFlood → feBlend(in=SourceGraphic) → feGaussianBlur.
+      if (!isSourceGraphic && i >= 2) {
+        auto& prevNode = primitives[i - 1];
+        if (prevNode->name == "feBlend" && getAttribute(prevNode, "in") == "SourceGraphic") {
+          // This blur follows a blend with SourceGraphic, treat it as foreground blur.
+          isSourceGraphic = true;
+        }
+      }
+
       if (isSourceGraphic) {
         std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
         std::istringstream iss(stdDeviation);
