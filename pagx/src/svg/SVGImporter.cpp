@@ -1805,12 +1805,15 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
   maskLayer->name = maskLayer->id;
   maskLayer->visible = false;
 
+  // Compute inherited style from the mask element itself (it may have fill="white" etc.).
+  InheritedStyle maskStyle = computeInheritedStyle(maskElement, parentStyle);
+
   // Parse mask contents.
   auto child = maskElement->getFirstChild();
   while (child) {
     if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
         child->name == "path" || child->name == "polygon" || child->name == "polyline") {
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, maskStyle);
       std::string transformStr = getAttribute(child, "transform");
       if (!transformStr.empty()) {
         // If child has transform, wrap it in a sub-layer with the matrix.
@@ -1823,7 +1826,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
       }
     } else if (child->name == "g") {
       // Handle group inside mask.
-      InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      InheritedStyle inheritedStyle = computeInheritedStyle(child, maskStyle);
       std::string groupTransform = getAttribute(child, "transform");
       auto groupChild = child->getFirstChild();
       while (groupChild) {
