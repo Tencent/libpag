@@ -1,0 +1,131 @@
+.container {
+  width: 100%;
+  height: 100vh;
+  background-color: #2a2a2a;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-selector {
+  background: rgba(0, 0, 0, 0.9);
+  padding: 25rpx 30rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.selector-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.selector-label {
+  color: #999;
+  font-size: 28rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.picker {
+  flex: 1;
+  max-width: 500rpx;
+}
+
+.picker-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20rpx 30rpx;
+  border-radius: 8rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s;
+}
+
+.picker-display:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.picker-text {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-arrow {
+  color: #07c160;
+  font-size: 24rpx;
+  margin-left: 20rpx;
+  flex-shrink: 0;
+}
+
+.reset-btn {
+  padding: 20rpx 35rpx;
+  font-size: 28rpx;
+  background: #07c160;
+  color: #fff;
+  border: none;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.reset-btn::after {
+  border: none;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  padding: 40rpx;
+  border-radius: 8rpx;
+  color: #fff;
+  font-size: 28rpx;
+}
+
+.loading-file {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  padding: 30rpx 50rpx;
+  border-radius: 8rpx;
+  color: #fff;
+  font-size: 24rpx;
+}
+
+.info {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 10rpx 20rpx;
+  border-radius: 4rpx;
+  font-size: 24rpx;
+}

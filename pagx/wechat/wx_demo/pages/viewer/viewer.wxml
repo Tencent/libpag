@@ -1,0 +1,51 @@
+<view class="container">
+  <!-- File Selector at Top -->
+  <view class="file-selector">
+    <view class="selector-left">
+      <view class="selector-label">PAGX File:</view>
+      <picker 
+        mode="selector" 
+        range="{{sampleNames}}" 
+        value="{{currentIndex}}"
+        bindchange="onPickerChange"
+        class="picker"
+      >
+        <view class="picker-display">
+          <text class="picker-text">{{samples[currentIndex].name}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+    <button 
+      class="reset-btn" 
+      bindtap="onReset"
+    >Reset</button>
+  </view>
+
+  <!-- Canvas Area -->
+  <view class="canvas-container">
+    <canvas 
+      type="webgl" 
+      id="pagx-canvas" 
+      class="canvas"
+      catchtouchstart="onTouchStart"
+      catchtouchmove="onTouchMove"
+      catchtouchend="onTouchEnd"
+    ></canvas>
+
+    <!-- Loading -->
+    <view wx:if="{{loading}}" class="loading">
+      <text>Loading...</text>
+    </view>
+
+    <!-- File Loading Indicator -->
+    <view wx:if="{{loadingFile}}" class="loading-file">
+      <text>Switching...</text>
+    </view>
+
+    <!-- Info -->
+    <view class="info">
+      Zoom: {{zoom}}x | Offset: ({{offsetX}}, {{offsetY}})
+    </view>
+  </view>
+</view>
