@@ -24,22 +24,20 @@ namespace pagx {
 
 /**
  * An RGBA color with floating-point components and color space.
- * For sRGB colors, components are typically in [0, 1].
- * For wide gamut colors (Display P3), components may exceed [0, 1].
  */
 struct Color {
   /**
-   * Red component, typically in [0, 1] for sRGB, may exceed for wide gamut.
+   * Red component in [0, 1] range.
    */
   float red = 0;
 
   /**
-   * Green component, typically in [0, 1] for sRGB, may exceed for wide gamut.
+   * Green component in [0, 1] range.
    */
   float green = 0;
 
   /**
-   * Blue component, typically in [0, 1] for sRGB, may exceed for wide gamut.
+   * Blue component in [0, 1] range.
    */
   float blue = 0;
 
