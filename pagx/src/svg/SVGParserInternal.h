@@ -24,6 +24,7 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
