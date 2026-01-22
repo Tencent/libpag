@@ -48,14 +48,9 @@ class ImagePattern : public ColorSource {
   TileMode tileModeY = TileMode::Clamp;
 
   /**
-   * The filter mode for minification (when the image is scaled down). The default value is Linear.
+   * The filter mode for texture sampling. The default value is Linear.
    */
-  FilterMode minFilterMode = FilterMode::Linear;
-
-  /**
-   * The filter mode for magnification (when the image is scaled up). The default value is Linear.
-   */
-  FilterMode magFilterMode = FilterMode::Linear;
+  FilterMode filterMode = FilterMode::Linear;
 
   /**
    * The mipmap mode for texture sampling. The default value is Linear.

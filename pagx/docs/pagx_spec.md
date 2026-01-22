@@ -428,8 +428,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `image` | idref | (必填) | 图片引用 "@id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式 |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
-| `minFilterMode` | FilterMode | linear | 缩小滤镜模式 |
-| `magFilterMode` | FilterMode | linear | 放大滤镜模式 |
+| `filterMode` | FilterMode | linear | 纹理滤镜模式 |
 | `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 

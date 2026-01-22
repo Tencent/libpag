@@ -875,8 +875,7 @@ std::unique_ptr<ImagePattern> PAGXImporterImpl::parseImagePattern(const XMLNode*
   pattern->image = getAttribute(node, "image");
   pattern->tileModeX = TileModeFromString(getAttribute(node, "tileModeX", "clamp"));
   pattern->tileModeY = TileModeFromString(getAttribute(node, "tileModeY", "clamp"));
-  pattern->minFilterMode = FilterModeFromString(getAttribute(node, "minFilterMode", "linear"));
-  pattern->magFilterMode = FilterModeFromString(getAttribute(node, "magFilterMode", "linear"));
+  pattern->filterMode = FilterModeFromString(getAttribute(node, "filterMode", "linear"));
   pattern->mipmapMode = MipmapModeFromString(getAttribute(node, "mipmapMode", "linear"));
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {

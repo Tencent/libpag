@@ -341,11 +341,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (pattern->tileModeY != TileMode::Clamp) {
         xml.addAttribute("tileModeY", TileModeToString(pattern->tileModeY));
       }
-      if (pattern->minFilterMode != FilterMode::Linear) {
-        xml.addAttribute("minFilterMode", FilterModeToString(pattern->minFilterMode));
-      }
-      if (pattern->magFilterMode != FilterMode::Linear) {
-        xml.addAttribute("magFilterMode", FilterModeToString(pattern->magFilterMode));
+      if (pattern->filterMode != FilterMode::Linear) {
+        xml.addAttribute("filterMode", FilterModeToString(pattern->filterMode));
       }
       if (pattern->mipmapMode != MipmapMode::Linear) {
         xml.addAttribute("mipmapMode", MipmapModeToString(pattern->mipmapMode));
