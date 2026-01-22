@@ -74,7 +74,8 @@ class SVGParserImpl {
                                             const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
                        std::vector<std::unique_ptr<Element>>& contents,
-                       const InheritedStyle& inheritedStyle);
+                       const InheritedStyle& inheritedStyle,
+                       bool skipFillForShadow = false);
   std::unique_ptr<Element> convertElement(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
@@ -100,9 +101,12 @@ class SVGParserImpl {
                                                 const InheritedStyle& parentStyle);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
+  // If outShadowOnly is provided, it will be set to true if all converted filters are shadow-only
+  // (i.e., they produce only shadow without the original content).
   bool convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
                             std::vector<std::unique_ptr<LayerFilter>>& filters,
-                            std::vector<std::unique_ptr<LayerStyle>>& styles);
+                            std::vector<std::unique_ptr<LayerStyle>>& styles,
+                            bool* outShadowOnly = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
                      std::vector<std::unique_ptr<Element>>& contents,

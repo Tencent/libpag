@@ -868,7 +868,8 @@ class LayerBuilderImpl {
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
         return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
-                                            filter->blurrinessY, ToTGFX(filter->color));
+                                            filter->blurrinessY, ToTGFX(filter->color),
+                                            filter->shadowOnly);
       }
       default:
         return nullptr;
