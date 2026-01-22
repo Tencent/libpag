@@ -73,8 +73,8 @@ enum class BlendMode {
    */
   Exclusion,
   /**
-   * Creates a result color with the hue of the source and the saturation and luminosity of
-   * the destination.
+   * Creates a result color with the hue of the source and the saturation and luminosity of the
+   * destination.
    */
   Hue,
   /**
@@ -83,13 +83,13 @@ enum class BlendMode {
    */
   Saturation,
   /**
-   * Creates a result color with the hue and saturation of the source and the luminosity of
-   * the destination.
+   * Creates a result color with the hue and saturation of the source and the luminosity of the
+   * destination.
    */
   Color,
   /**
-   * Creates a result color with the luminosity of the source and the hue and saturation of
-   * the destination.
+   * Creates a result color with the luminosity of the source and the hue and saturation of the
+   * destination.
    */
   Luminosity,
   /**

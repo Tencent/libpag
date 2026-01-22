@@ -97,9 +97,9 @@ enum class SelectorMode {
 };
 
 /**
- * A range selector that defines which characters in a text are affected by a text modifier.
- * It provides flexible control over character selection through start/end positions, shapes,
- * and randomization.
+ * A range selector that defines which characters in a text are affected by a text modifier. It
+ * provides flexible control over character selection through start/end positions, shapes, and
+ * randomization.
  */
 class RangeSelector : public TextSelector {
  public:

@@ -102,7 +102,7 @@ class Layer : public Node {
   bool preserve3D = false;
 
   /**
-   * Whether to apply anti-aliasing to the layer edges. The default value is true.
+   * Whether to apply antialiasing to the layer edges. The default value is true.
    */
   bool antiAlias = true;
 

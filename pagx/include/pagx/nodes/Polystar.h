@@ -78,8 +78,8 @@ class Polystar : public Element {
   float outerRoundness = 0;
 
   /**
-   * The roundness of the inner points, ranging from 0 to 100. Only applies when type is
-   * Star. The default value is 0.
+   * The roundness of the inner points, ranging from 0 to 100. Only applies when type is Star. The
+   * default value is 0.
    */
   float innerRoundness = 0;
 

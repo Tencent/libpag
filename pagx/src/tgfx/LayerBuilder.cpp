@@ -21,6 +21,7 @@
 #include <tuple>
 #include <unordered_map>
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorSpace.h"
 #include "tgfx/core/ColorSpace.h"
@@ -63,6 +64,7 @@
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
@@ -843,6 +845,10 @@ class LayerBuilderImpl {
         auto style = static_cast<const InnerShadowStyle*>(node);
         return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
                                             style->blurrinessY, ToTGFX(style->color));
+      }
+      case NodeType::BackgroundBlurStyle: {
+        auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
+        return tgfx::BackgroundBlurStyle::Make(style->blurrinessX, style->blurrinessY);
       }
       default:
         return nullptr;

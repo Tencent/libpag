@@ -26,9 +26,9 @@
 namespace pagx {
 
 /**
- * Group is a container that groups multiple vector elements with its own transform. It can
- * contain shapes, painters, modifiers, and nested groups, allowing for hierarchical organization
- * of content.
+ * Group is a container that groups multiple vector elements with its own transform. It can contain
+ * shapes, painters, modifiers, and nested groups, allowing for hierarchical organization of
+ * content.
  */
 class Group : public Element {
  public:
