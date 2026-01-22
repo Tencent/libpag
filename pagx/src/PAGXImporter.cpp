@@ -787,11 +787,18 @@ RangeSelector PAGXImporterImpl::parseRangeSelector(const XMLNode* node) {
 std::unique_ptr<SolidColor> PAGXImporterImpl::parseSolidColor(const XMLNode* node) {
   auto solid = std::make_unique<SolidColor>();
   solid->id = getAttribute(node, "id");
-  solid->color.red = getFloatAttribute(node, "red", 0);
-  solid->color.green = getFloatAttribute(node, "green", 0);
-  solid->color.blue = getFloatAttribute(node, "blue", 0);
-  solid->color.alpha = getFloatAttribute(node, "alpha", 1);
-  solid->color.colorSpace = ColorSpaceFromString(getAttribute(node, "colorSpace", "sRGB"));
+  // Support "color" attribute with HEX (#RRGGBB) or p3() format
+  auto colorStr = getAttribute(node, "color");
+  if (!colorStr.empty()) {
+    solid->color = parseColor(colorStr);
+  } else {
+    // Fallback to individual red/green/blue/alpha attributes
+    solid->color.red = getFloatAttribute(node, "red", 0);
+    solid->color.green = getFloatAttribute(node, "green", 0);
+    solid->color.blue = getFloatAttribute(node, "blue", 0);
+    solid->color.alpha = getFloatAttribute(node, "alpha", 1);
+    solid->color.colorSpace = ColorSpaceFromString(getAttribute(node, "colorSpace", "sRGB"));
+  }
   return solid;
 }
 
