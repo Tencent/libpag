@@ -1072,6 +1072,22 @@ Rect SVGParserImpl::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
     }
   }
 
+  // For use element, get bounds of the referenced element and apply x/y offset.
+  if (tag == "use") {
+    std::string href = getAttribute(element, "xlink:href");
+    if (href.empty()) {
+      href = getAttribute(element, "href");
+    }
+    std::string refId = resolveUrl(href);
+    auto it = _defs.find(refId);
+    if (it != _defs.end()) {
+      Rect refBounds = getShapeBounds(it->second);
+      float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+      float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+      return Rect::MakeXYWH(refBounds.x + x, refBounds.y + y, refBounds.width, refBounds.height);
+    }
+  }
+
   return Rect::MakeXYWH(0, 0, 0, 0);
 }
 
@@ -2163,15 +2179,19 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
   }
 
   // refCount <= 1: inline the ColorSource (no id).
+  std::unique_ptr<ColorSource> colorSource = nullptr;
   if (defName == "linearGradient") {
-    return convertLinearGradient(defNode, shapeBounds);
+    colorSource = convertLinearGradient(defNode, shapeBounds);
   } else if (defName == "radialGradient") {
-    return convertRadialGradient(defNode, shapeBounds);
+    colorSource = convertRadialGradient(defNode, shapeBounds);
   } else if (defName == "pattern") {
-    return convertPattern(defNode, shapeBounds);
+    colorSource = convertPattern(defNode, shapeBounds);
   }
-
-  return nullptr;
+  if (colorSource) {
+    // Clear the id for inline ColorSource to avoid being treated as a reference.
+    colorSource->id.clear();
+  }
+  return colorSource;
 }
 
 }  // namespace pagx
