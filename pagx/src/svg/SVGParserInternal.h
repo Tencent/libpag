@@ -98,7 +98,9 @@ class SVGParserImpl {
 
   std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
-  void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
+  // Converts SVG filter element to PAGX filters/styles.
+  // Returns true if the filter was successfully converted, false otherwise.
+  bool convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
                             std::vector<std::unique_ptr<LayerFilter>>& filters,
                             std::vector<std::unique_ptr<LayerStyle>>& styles);
 

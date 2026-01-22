@@ -323,7 +323,12 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
     std::string filterId = resolveUrl(filterAttr);
     auto filterIt = _defs.find(filterId);
     if (filterIt != _defs.end()) {
-      convertFilterElement(filterIt->second, layer->filters, layer->styles);
+      bool filterConverted = convertFilterElement(filterIt->second, layer->filters, layer->styles);
+      if (!filterConverted) {
+        // Filter could not be converted to PAGX format. Skip this element entirely to avoid
+        // rendering incorrect results (e.g., black fill instead of shadow effect).
+        return nullptr;
+      }
     }
   }
 
@@ -1862,10 +1867,13 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
   return maskLayer;
 }
 
-void SVGParserImpl::convertFilterElement(
+bool SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
     std::vector<std::unique_ptr<LayerFilter>>& filters,
     std::vector<std::unique_ptr<LayerStyle>>& styles) {
+  size_t initialFilterCount = filters.size();
+  size_t initialStyleCount = styles.size();
+
   // Collect all filter primitives for analysis.
   std::vector<std::shared_ptr<DOMNode>> primitives;
   auto child = filterElement->getFirstChild();
@@ -1974,6 +1982,9 @@ void SVGParserImpl::convertFilterElement(
 
     i++;
   }
+
+  // Return true if any filter or style was added.
+  return filters.size() > initialFilterCount || styles.size() > initialStyleCount;
 }
 
 void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
