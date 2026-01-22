@@ -94,20 +94,22 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   }
 
   // Parse viewBox and dimensions.
+  // When viewBox is present, use viewBox dimensions for the PAGX document size,
+  // because PAGX doesn't support viewBox and all SVG coordinates are in viewBox space.
+  // The explicit width/height with unit conversions (e.g., "1080pt" -> 1440px) are ignored
+  // to avoid coordinate mismatch.
   auto viewBox = parseViewBox(getAttribute(root, "viewBox"));
-  float width = parseLength(getAttribute(root, "width"), 0);
-  float height = parseLength(getAttribute(root, "height"), 0);
+  float width = 0;
+  float height = 0;
 
   if (viewBox.size() >= 4) {
     _viewBoxWidth = viewBox[2];
     _viewBoxHeight = viewBox[3];
-    if (width == 0) {
-      width = _viewBoxWidth;
-    }
-    if (height == 0) {
-      height = _viewBoxHeight;
-    }
+    width = _viewBoxWidth;
+    height = _viewBoxHeight;
   } else {
+    width = parseLength(getAttribute(root, "width"), 0);
+    height = parseLength(getAttribute(root, "height"), 0);
     _viewBoxWidth = width;
     _viewBoxHeight = height;
   }
@@ -134,28 +136,16 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   // This determines which ColorSources should be extracted to resources.
   countColorSourceReferences(root);
 
-  // Check if we need a viewBox transform.
+  // Handle viewBox offset if present (viewBox origin is not 0,0).
   bool needsViewBoxTransform = false;
   Matrix viewBoxMatrix = Matrix::Identity();
   if (viewBox.size() >= 4) {
     float viewBoxX = viewBox[0];
     float viewBoxY = viewBox[1];
-    float viewBoxW = viewBox[2];
-    float viewBoxH = viewBox[3];
 
-    if (viewBoxW > 0 && viewBoxH > 0 &&
-        (viewBoxX != 0 || viewBoxY != 0 || viewBoxW != width || viewBoxH != height)) {
-      // Calculate uniform scale (meet behavior: fit inside viewport).
-      float scaleX = width / viewBoxW;
-      float scaleY = height / viewBoxH;
-      float scale = std::min(scaleX, scaleY);
-
-      // Calculate translation to center content (xMidYMid).
-      float translateX = (width - viewBoxW * scale) / 2.0f - viewBoxX * scale;
-      float translateY = (height - viewBoxH * scale) / 2.0f - viewBoxY * scale;
-
-      // Build the transform matrix: scale then translate.
-      viewBoxMatrix = Matrix::Translate(translateX, translateY) * Matrix::Scale(scale, scale);
+    if (viewBoxX != 0 || viewBoxY != 0) {
+      // Only translate for non-zero viewBox origin.
+      viewBoxMatrix = Matrix::Translate(-viewBoxX, -viewBoxY);
       needsViewBoxTransform = true;
     }
   }

@@ -109,7 +109,24 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
 
-    // Load original SVG with text shaper
+    // Convert to PAGX using new API
+    pagx::LayerBuilder::Options options;
+    options.fallbackTypefaces = GetFallbackTypefaces();
+    auto content = pagx::LayerBuilder::FromSVGFile(svgPath, options);
+    if (content.root == nullptr) {
+      continue;
+    }
+
+    // Use PAGX document size for rendering.
+    // PAGX uses viewBox dimensions when viewBox is present, avoiding unit conversion issues
+    // (e.g., "1080pt" would become 1440px but viewBox coordinates remain 1080).
+    int pagxWidth = static_cast<int>(content.width);
+    int pagxHeight = static_cast<int>(content.height);
+    if (pagxWidth <= 0 || pagxHeight <= 0) {
+      continue;
+    }
+
+    // Load original SVG with text shaper.
     auto svgStream = Stream::MakeFromFile(svgPath);
     if (svgStream == nullptr) {
       continue;
@@ -119,25 +136,19 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
+    // Get tgfx's container size (respects width/height unit conversion).
     auto containerSize = svgDOM->getContainerSize();
-    int width = static_cast<int>(containerSize.width);
-    int height = static_cast<int>(containerSize.height);
-    if (width <= 0 || height <= 0) {
-      continue;
-    }
+    int svgWidth = static_cast<int>(containerSize.width);
+    int svgHeight = static_cast<int>(containerSize.height);
 
-    // Render original SVG
-    auto svgSurface = Surface::Make(context, width, height);
-    auto svgCanvas = svgSurface->getCanvas();
-    svgDOM->render(svgCanvas);
-    EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
-
-    // Convert to PAGX using new API
-    pagx::LayerBuilder::Options options;
-    options.fallbackTypefaces = GetFallbackTypefaces();
-    auto content = pagx::LayerBuilder::FromSVGFile(svgPath, options);
-    if (content.root == nullptr) {
-      continue;
+    // Only compare SVG rendering when sizes match (no unit conversion difference).
+    // When viewBox is present with non-pixel width/height (e.g., "1080pt"), tgfx will scale
+    // content based on the unit conversion, but PAGX uses viewBox coordinates directly.
+    if (svgWidth == pagxWidth && svgHeight == pagxHeight) {
+      auto svgSurface = Surface::Make(context, svgWidth, svgHeight);
+      auto svgCanvas = svgSurface->getCanvas();
+      svgDOM->render(svgCanvas);
+      EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
     }
 
     // Save PAGX file to output directory
@@ -150,7 +161,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Render PAGX using DisplayList (required for mask to work).
-    auto pagxSurface = Surface::Make(context, width, height);
+    auto pagxSurface = Surface::Make(context, pagxWidth, pagxHeight);
     DisplayList displayList;
     displayList.root()->addChild(content.root);
     displayList.render(pagxSurface.get(), false);
