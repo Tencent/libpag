@@ -1861,8 +1861,13 @@ void SVGParserImpl::convertFilterElement(
     std::vector<std::unique_ptr<LayerFilter>>& filters,
     std::vector<std::unique_ptr<LayerStyle>>& styles) {
   // Parse filter children to find effect elements.
+  // In SVG filter chains, only convert feGaussianBlur to BlurFilter when it directly operates on
+  // SourceGraphic. Other cases (SourceAlpha, BackgroundImageFix, or chained from previous
+  // primitives) are typically parts of complex effects like drop shadows and should be skipped.
   auto child = filterElement->getFirstChild();
+  bool isFirstPrimitive = true;
   while (child) {
+    bool isFilterPrimitive = !child->name.empty() && child->name.substr(0, 2) == "fe";
     if (child->name == "feGaussianBlur") {
       std::string inAttr = getAttribute(child, "in");
       std::string stdDeviation = getAttribute(child, "stdDeviation", "0");
@@ -1874,22 +1879,20 @@ void SVGParserImpl::convertFilterElement(
         devY = devX;
       }
 
-      // Check if this is a background blur (in="BackgroundImageFix" or similar background input).
-      if (inAttr == "BackgroundImageFix" || inAttr == "BackgroundImage") {
-        // This is a background blur effect, use BackgroundBlurStyle.
-        auto bgBlur = std::make_unique<BackgroundBlurStyle>();
-        bgBlur->blurrinessX = devX;
-        bgBlur->blurrinessY = devY;
-        styles.push_back(std::move(bgBlur));
-      } else if (inAttr.empty() || inAttr == "SourceGraphic" || inAttr == "SourceAlpha") {
-        // Regular blur filter on the element itself.
+      // Only convert to BlurFilter when explicitly operating on SourceGraphic, or when it's
+      // the first filter primitive with no "in" attribute (defaults to SourceGraphic).
+      // Skip SourceAlpha (used in drop shadows), BackgroundImageFix (Figma pattern), and
+      // feGaussianBlur that chains from previous primitives (part of complex effects).
+      bool isSourceGraphic = (inAttr == "SourceGraphic") || (inAttr.empty() && isFirstPrimitive);
+      if (isSourceGraphic) {
         auto blurFilter = std::make_unique<BlurFilter>();
         blurFilter->blurrinessX = devX;
         blurFilter->blurrinessY = devY;
         filters.push_back(std::move(blurFilter));
       }
-      // Other "in" values (like result names from previous filter stages) are ignored
-      // as they are intermediate steps in complex filter chains.
+    }
+    if (isFilterPrimitive) {
+      isFirstPrimitive = false;
     }
     child = child->getNextSibling();
   }

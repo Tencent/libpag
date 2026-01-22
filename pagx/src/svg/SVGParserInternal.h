@@ -23,7 +23,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Ellipse.h"
