@@ -1626,11 +1626,12 @@ PathData SVGParserImpl::parsePoints(const std::string& value, bool closed) {
   std::vector<float> points;
   std::istringstream iss(value);
   float num = 0;
+  // The >> operator automatically skips whitespace, so we just need to handle commas.
   while (iss >> num) {
     points.push_back(num);
-    char c = 0;
-    if (iss.peek() == ',' || iss.peek() == ' ') {
-      iss >> c;
+    // Skip optional comma separator (whitespace is handled automatically by >>).
+    if (iss.peek() == ',') {
+      iss.get();
     }
   }
 
