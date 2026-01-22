@@ -333,7 +333,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
     std::string filterId = resolveUrl(filterAttr);
     auto filterIt = _defs.find(filterId);
     if (filterIt != _defs.end()) {
-      convertFilterElement(filterIt->second, layer->filters);
+      convertFilterElement(filterIt->second, layer->filters, layer->styles);
     }
   }
 
@@ -1858,12 +1858,13 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
 
 void SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
-    std::vector<std::unique_ptr<LayerFilter>>& filters) {
+    std::vector<std::unique_ptr<LayerFilter>>& filters,
+    std::vector<std::unique_ptr<LayerStyle>>& styles) {
   // Parse filter children to find effect elements.
   auto child = filterElement->getFirstChild();
   while (child) {
     if (child->name == "feGaussianBlur") {
-      auto blurFilter = std::make_unique<BlurFilter>();
+      std::string inAttr = getAttribute(child, "in");
       std::string stdDeviation = getAttribute(child, "stdDeviation", "0");
       // stdDeviation can be one value (both X and Y) or two values (X Y).
       std::istringstream iss(stdDeviation);
@@ -1872,9 +1873,23 @@ void SVGParserImpl::convertFilterElement(
       if (!(iss >> devY)) {
         devY = devX;
       }
-      blurFilter->blurrinessX = devX;
-      blurFilter->blurrinessY = devY;
-      filters.push_back(std::move(blurFilter));
+
+      // Check if this is a background blur (in="BackgroundImageFix" or similar background input).
+      if (inAttr == "BackgroundImageFix" || inAttr == "BackgroundImage") {
+        // This is a background blur effect, use BackgroundBlurStyle.
+        auto bgBlur = std::make_unique<BackgroundBlurStyle>();
+        bgBlur->blurrinessX = devX;
+        bgBlur->blurrinessY = devY;
+        styles.push_back(std::move(bgBlur));
+      } else if (inAttr.empty() || inAttr == "SourceGraphic" || inAttr == "SourceAlpha") {
+        // Regular blur filter on the element itself.
+        auto blurFilter = std::make_unique<BlurFilter>();
+        blurFilter->blurrinessX = devX;
+        blurFilter->blurrinessY = devY;
+        filters.push_back(std::move(blurFilter));
+      }
+      // Other "in" values (like result names from previous filter stages) are ignored
+      // as they are intermediate steps in complex filter chains.
     }
     child = child->getNextSibling();
   }

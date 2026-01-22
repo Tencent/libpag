@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Ellipse.h"
@@ -98,7 +99,8 @@ class SVGParserImpl {
   std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
   void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
-                            std::vector<std::unique_ptr<LayerFilter>>& filters);
+                            std::vector<std::unique_ptr<LayerFilter>>& filters,
+                            std::vector<std::unique_ptr<LayerStyle>>& styles);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
                      std::vector<std::unique_ptr<Element>>& contents,
