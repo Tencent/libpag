@@ -1860,41 +1860,99 @@ void SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
     std::vector<std::unique_ptr<LayerFilter>>& filters,
     std::vector<std::unique_ptr<LayerStyle>>& styles) {
-  // Parse filter children to find effect elements.
-  // In SVG filter chains, only convert feGaussianBlur to BlurFilter when it directly operates on
-  // SourceGraphic. Other cases (SourceAlpha, BackgroundImageFix, or chained from previous
-  // primitives) are typically parts of complex effects like drop shadows and should be skipped.
+  // Collect all filter primitives for analysis.
+  std::vector<std::shared_ptr<DOMNode>> primitives;
   auto child = filterElement->getFirstChild();
-  bool isFirstPrimitive = true;
   while (child) {
-    bool isFilterPrimitive = !child->name.empty() && child->name.substr(0, 2) == "fe";
-    if (child->name == "feGaussianBlur") {
-      std::string inAttr = getAttribute(child, "in");
-      std::string stdDeviation = getAttribute(child, "stdDeviation", "0");
-      // stdDeviation can be one value (both X and Y) or two values (X Y).
-      std::istringstream iss(stdDeviation);
-      float devX = 0, devY = 0;
-      iss >> devX;
-      if (!(iss >> devY)) {
-        devY = devX;
-      }
+    if (!child->name.empty() && child->name.substr(0, 2) == "fe") {
+      primitives.push_back(child);
+    }
+    child = child->getNextSibling();
+  }
 
-      // Only convert to BlurFilter when explicitly operating on SourceGraphic, or when it's
-      // the first filter primitive with no "in" attribute (defaults to SourceGraphic).
-      // Skip SourceAlpha (used in drop shadows), BackgroundImageFix (Figma pattern), and
-      // feGaussianBlur that chains from previous primitives (part of complex effects).
-      bool isSourceGraphic = (inAttr == "SourceGraphic") || (inAttr.empty() && isFirstPrimitive);
+  // Detect Figma-style drop shadow pattern and extract shadow parameters.
+  // Pattern: feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feComposite → feColorMatrix
+  // This pattern may repeat multiple times for multiple shadows.
+  size_t i = 0;
+  while (i < primitives.size()) {
+    auto& node = primitives[i];
+
+    // Check for drop shadow pattern starting with feColorMatrix in="SourceAlpha".
+    if (node->name == "feColorMatrix" && getAttribute(node, "in") == "SourceAlpha") {
+      // Look for the sequence: feColorMatrix → feOffset → feGaussianBlur → feComposite → feColorMatrix
+      if (i + 4 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
+          primitives[i + 2]->name == "feGaussianBlur" &&
+          primitives[i + 3]->name == "feComposite" && primitives[i + 4]->name == "feColorMatrix") {
+        // Extract offset from feOffset.
+        float offsetX = 0, offsetY = 0;
+        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
+        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
+        offsetX = std::stof(dx);
+        offsetY = std::stof(dy);
+
+        // Extract blur from feGaussianBlur.
+        float blurX = 0, blurY = 0;
+        std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
+        std::istringstream iss(stdDeviation);
+        iss >> blurX;
+        if (!(iss >> blurY)) {
+          blurY = blurX;
+        }
+
+        // Extract color from the second feColorMatrix.
+        // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
+        Color shadowColor = {0, 0, 0, 1.0f};
+        std::string colorMatrix = getAttribute(primitives[i + 4], "values");
+        if (!colorMatrix.empty()) {
+          std::istringstream cms(colorMatrix);
+          float values[20] = {};
+          for (int j = 0; j < 20 && cms >> values[j]; j++) {
+          }
+          // R is at index 4, G at index 9, B at index 14, A at index 18.
+          shadowColor.red = values[4];
+          shadowColor.green = values[9];
+          shadowColor.blue = values[14];
+          shadowColor.alpha = values[18];
+        }
+
+        auto dropShadow = std::make_unique<DropShadowFilter>();
+        dropShadow->offsetX = offsetX;
+        dropShadow->offsetY = offsetY;
+        dropShadow->blurrinessX = blurX;
+        dropShadow->blurrinessY = blurY;
+        dropShadow->color = shadowColor;
+        dropShadow->shadowOnly = false;
+        filters.push_back(std::move(dropShadow));
+
+        // Skip the consumed primitives (5 elements) plus the feBlend that follows.
+        i += 5;
+        if (i < primitives.size() && primitives[i]->name == "feBlend") {
+          i++;
+        }
+        continue;
+      }
+    }
+
+    // Check for simple blur filter (first primitive with no "in" or in="SourceGraphic").
+    if (node->name == "feGaussianBlur") {
+      std::string inAttr = getAttribute(node, "in");
+      bool isSourceGraphic = (inAttr == "SourceGraphic") || (inAttr.empty() && i == 0);
       if (isSourceGraphic) {
+        std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
+        std::istringstream iss(stdDeviation);
+        float devX = 0, devY = 0;
+        iss >> devX;
+        if (!(iss >> devY)) {
+          devY = devX;
+        }
         auto blurFilter = std::make_unique<BlurFilter>();
         blurFilter->blurrinessX = devX;
         blurFilter->blurrinessY = devY;
         filters.push_back(std::move(blurFilter));
       }
     }
-    if (isFilterPrimitive) {
-      isFirstPrimitive = false;
-    }
-    child = child->getNextSibling();
+
+    i++;
   }
 }
 
