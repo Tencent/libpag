@@ -65,6 +65,10 @@ enum class NodeType {
    * An image pattern color source.
    */
   ImagePattern,
+  /**
+   * A color stop in a gradient.
+   */
+  ColorStop,
 
   // Layer
   /**

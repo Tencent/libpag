@@ -71,6 +71,8 @@ const char* NodeTypeName(NodeType type) {
       return "DiamondGradient";
     case NodeType::ImagePattern:
       return "ImagePattern";
+    case NodeType::ColorStop:
+      return "ColorStop";
     case NodeType::Layer:
       return "Layer";
     case NodeType::DropShadowStyle:

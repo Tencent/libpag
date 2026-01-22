@@ -19,13 +19,15 @@
 #pragma once
 
 #include "pagx/nodes/Color.h"
+#include "pagx/nodes/Node.h"
 
 namespace pagx {
 
 /**
  * A color stop defines a color at a specific position in a gradient.
  */
-struct ColorStop {
+class ColorStop : public Node {
+ public:
   /**
    * The position of this color stop along the gradient, ranging from 0 to 1.
    */
@@ -35,6 +37,10 @@ struct ColorStop {
    * The color value at this stop position.
    */
   Color color = {};
+
+  NodeType nodeType() const override {
+    return NodeType::ColorStop;
+  }
 };
 
 }  // namespace pagx
