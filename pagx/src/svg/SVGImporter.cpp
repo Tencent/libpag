@@ -309,6 +309,24 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
     }
   }
 
+  // Handle clip-path attribute (similar to mask but uses contour/alpha).
+  std::string clipPathAttr = getAttribute(element, "clip-path");
+  if (!clipPathAttr.empty() && clipPathAttr != "none") {
+    std::string clipId = resolveUrl(clipPathAttr);
+    auto clipIt = _defs.find(clipId);
+    if (clipIt != _defs.end()) {
+      // Convert clipPath element to a mask layer.
+      auto clipLayer = convertMaskElement(clipIt->second, inheritedStyle);
+      if (clipLayer) {
+        layer->mask = "#" + clipLayer->id;
+        // SVG clip-path uses alpha (shape outline) for clipping.
+        layer->maskType = MaskType::Alpha;
+        // Add clip layer as invisible layer to the document.
+        _maskLayers.push_back(std::move(clipLayer));
+      }
+    }
+  }
+
   // Handle filter attribute.
   std::string filterAttr = getAttribute(element, "filter");
   if (!filterAttr.empty() && filterAttr != "none") {
@@ -1994,8 +2012,7 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
           pattern->image = src->image;
           pattern->tileModeX = src->tileModeX;
           pattern->tileModeY = src->tileModeY;
-          pattern->minFilterMode = src->minFilterMode;
-          pattern->magFilterMode = src->magFilterMode;
+          pattern->filterMode = src->filterMode;
           pattern->mipmapMode = src->mipmapMode;
           pattern->matrix = src->matrix;
           return pattern;
