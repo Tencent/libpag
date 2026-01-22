@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXImporterImpl.h"
+#include <cstdlib>
 #include <cstring>
-#include <sstream>
 #include "PAGXStringUtils.h"
 
 namespace pagx {
@@ -1086,17 +1086,7 @@ bool PAGXImporterImpl::getBoolAttribute(const XMLNode* node, const std::string& 
 
 Point PAGXImporterImpl::parsePoint(const std::string& str) {
   Point point = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 2) {
     point.x = values[0];
     point.y = values[1];
@@ -1106,17 +1096,7 @@ Point PAGXImporterImpl::parsePoint(const std::string& str) {
 
 Size PAGXImporterImpl::parseSize(const std::string& str) {
   Size size = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 2) {
     size.width = values[0];
     size.height = values[1];
@@ -1126,17 +1106,7 @@ Size PAGXImporterImpl::parseSize(const std::string& str) {
 
 Rect PAGXImporterImpl::parseRect(const std::string& str) {
   Rect rect = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 4) {
     rect.x = values[0];
     rect.y = values[1];
@@ -1208,17 +1178,7 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
     auto end = str.find(')');
     if (start != std::string::npos && end != std::string::npos) {
       auto inner = str.substr(start + 1, end - start - 1);
-      std::istringstream iss(inner);
-      std::string token = {};
-      std::vector<float> components = {};
-      while (std::getline(iss, token, ',')) {
-        auto trimmed = token;
-        trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-        trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-        if (!trimmed.empty()) {
-          components.push_back(std::stof(trimmed));
-        }
-      }
+      auto components = ParseFloatList(inner);
       if (components.size() >= 3) {
         Color color = {};
         color.red = components[0];
@@ -1236,17 +1196,7 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
     auto end = str.find(')');
     if (start != std::string::npos && end != std::string::npos) {
       auto inner = str.substr(start + 1, end - start - 1);
-      std::istringstream iss(inner);
-      std::string token = {};
-      std::vector<float> components = {};
-      while (std::getline(iss, token, ',')) {
-        auto trimmed = token;
-        trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-        trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-        if (!trimmed.empty()) {
-          components.push_back(std::stof(trimmed));
-        }
-      }
+      auto components = ParseFloatList(inner);
       if (components.size() >= 3) {
         Color color = {};
         color.red = components[0];
@@ -1262,21 +1212,7 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
 }
 
 std::vector<float> PAGXImporterImpl::parseFloatList(const std::string& str) {
-  std::vector<float> values = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      try {
-        values.push_back(std::stof(trimmed));
-      } catch (...) {
-      }
-    }
-  }
-  return values;
+  return ParseFloatList(str);
 }
 
 }  // namespace pagx

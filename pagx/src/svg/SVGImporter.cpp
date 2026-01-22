@@ -19,8 +19,8 @@
 #include "pagx/SVGImporter.h"
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
-#include <sstream>
 #include "PAGXStringUtils.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/SolidColor.h"
@@ -1248,12 +1248,15 @@ Color SVGParserImpl::parseColor(const std::string& value) {
     size_t end = value.find(')');
     if (start != std::string::npos && end != std::string::npos) {
       std::string inner = value.substr(start + 1, end - start - 1);
-      std::istringstream iss(inner);
+      auto components = ParseFloatList(inner);
       float r = 0, g = 0, b = 0, a = 1.0f;
-      char comma = 0;
-      iss >> r >> comma >> g >> comma >> b;
-      if (value.find("rgba") == 0) {
-        iss >> comma >> a;
+      if (components.size() >= 3) {
+        r = components[0];
+        g = components[1];
+        b = components[2];
+        if (components.size() >= 4) {
+          a = components[3];
+        }
       }
       return {r / 255.0f, g / 255.0f, b / 255.0f, a, ColorSpace::SRGB};
     }
@@ -1291,22 +1294,36 @@ Color SVGParserImpl::parseColor(const std::string& value) {
       inner.erase(inner.find_last_not_of(" \t") + 1);
 
       // Parse space-separated values and optional "/ alpha"
-      std::istringstream iss(inner);
-      std::vector<float> components = {};
-      std::string token = {};
+      std::vector<float> components;
       float alpha = 1.0f;
+      const char* ptr = inner.c_str();
+      const char* endPtr = ptr + inner.size();
       bool foundSlash = false;
-      while (iss >> token) {
-        if (token == "/") {
+      while (ptr < endPtr) {
+        // Skip whitespace.
+        while (ptr < endPtr && std::isspace(*ptr)) {
+          ++ptr;
+        }
+        if (ptr >= endPtr) {
+          break;
+        }
+        // Check for slash separator.
+        if (*ptr == '/') {
           foundSlash = true;
+          ++ptr;
           continue;
         }
-        float val = std::stof(token);
+        char* numEnd = nullptr;
+        float val = strtof(ptr, &numEnd);
+        if (numEnd == ptr) {
+          break;
+        }
         if (foundSlash) {
           alpha = val;
         } else {
           components.push_back(val);
         }
+        ptr = numEnd;
       }
       if (components.size() >= 3) {
         Color color = {};
@@ -1521,22 +1538,34 @@ std::string SVGParserImpl::colorToHex(const std::string& value) {
       inner.erase(0, inner.find_first_not_of(" \t"));
       inner.erase(inner.find_last_not_of(" \t") + 1);
       // Parse space-separated values and optional "/ alpha"
-      std::istringstream iss(inner);
-      std::vector<float> components = {};
-      std::string token = {};
+      std::vector<float> components;
       float alpha = 1.0f;
+      const char* ptr = inner.c_str();
+      const char* endPtr = ptr + inner.size();
       bool foundSlash = false;
-      while (iss >> token) {
-        if (token == "/") {
+      while (ptr < endPtr) {
+        while (ptr < endPtr && std::isspace(*ptr)) {
+          ++ptr;
+        }
+        if (ptr >= endPtr) {
+          break;
+        }
+        if (*ptr == '/') {
           foundSlash = true;
+          ++ptr;
           continue;
         }
-        float val = std::stof(token);
+        char* numEnd = nullptr;
+        float val = strtof(ptr, &numEnd);
+        if (numEnd == ptr) {
+          break;
+        }
         if (foundSlash) {
           alpha = val;
         } else {
           components.push_back(val);
         }
+        ptr = numEnd;
       }
       if (components.size() >= 3) {
         char buf[64] = {};
@@ -1603,18 +1632,10 @@ float SVGParserImpl::parseLength(const std::string& value, float containerSize) 
 }
 
 std::vector<float> SVGParserImpl::parseViewBox(const std::string& value) {
-  std::vector<float> result;
   if (value.empty()) {
-    return result;
+    return {};
   }
-
-  std::istringstream iss(value);
-  float num = 0;
-  while (iss >> num) {
-    result.push_back(num);
-  }
-
-  return result;
+  return ParseSpaceSeparatedFloats(value);
 }
 
 PathData SVGParserImpl::parsePoints(const std::string& value, bool closed) {
@@ -1623,16 +1644,25 @@ PathData SVGParserImpl::parsePoints(const std::string& value, bool closed) {
     return path;
   }
 
+  // Parse space/comma-separated float values.
   std::vector<float> points;
-  std::istringstream iss(value);
-  float num = 0;
-  // The >> operator automatically skips whitespace, so we just need to handle commas.
-  while (iss >> num) {
-    points.push_back(num);
-    // Skip optional comma separator (whitespace is handled automatically by >>).
-    if (iss.peek() == ',') {
-      iss.get();
+  const char* ptr = value.c_str();
+  const char* end = ptr + value.size();
+  while (ptr < end) {
+    // Skip whitespace and commas.
+    while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
+      ++ptr;
     }
+    if (ptr >= end) {
+      break;
+    }
+    char* numEnd = nullptr;
+    float num = strtof(ptr, &numEnd);
+    if (numEnd == ptr) {
+      break;
+    }
+    points.push_back(num);
+    ptr = numEnd;
   }
 
   if (points.size() >= 2) {
@@ -1902,32 +1932,28 @@ bool SVGParserImpl::convertFilterElement(
         float offsetX = 0, offsetY = 0;
         std::string dx = getAttribute(primitives[i + 1], "dx", "0");
         std::string dy = getAttribute(primitives[i + 1], "dy", "0");
-        offsetX = std::stof(dx);
-        offsetY = std::stof(dy);
+        offsetX = strtof(dx.c_str(), nullptr);
+        offsetY = strtof(dy.c_str(), nullptr);
 
         // Extract blur from feGaussianBlur.
-        float blurX = 0, blurY = 0;
         std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
-        std::istringstream iss(stdDeviation);
-        iss >> blurX;
-        if (!(iss >> blurY)) {
-          blurY = blurX;
-        }
+        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
+        float blurX = blurValues.empty() ? 0 : blurValues[0];
+        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
 
         // Extract color from the second feColorMatrix.
         // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
         Color shadowColor = {0, 0, 0, 1.0f};
         std::string colorMatrix = getAttribute(primitives[i + 4], "values");
         if (!colorMatrix.empty()) {
-          std::istringstream cms(colorMatrix);
-          float values[20] = {};
-          for (int j = 0; j < 20 && cms >> values[j]; j++) {
-          }
+          auto values = ParseSpaceSeparatedFloats(colorMatrix);
           // R is at index 4, G at index 9, B at index 14, A at index 18.
-          shadowColor.red = values[4];
-          shadowColor.green = values[9];
-          shadowColor.blue = values[14];
-          shadowColor.alpha = values[18];
+          if (values.size() >= 19) {
+            shadowColor.red = values[4];
+            shadowColor.green = values[9];
+            shadowColor.blue = values[14];
+            shadowColor.alpha = values[18];
+          }
         }
 
         auto dropShadow = std::make_unique<DropShadowFilter>();
@@ -1968,12 +1994,9 @@ bool SVGParserImpl::convertFilterElement(
 
       if (isSourceGraphic) {
         std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
-        std::istringstream iss(stdDeviation);
-        float devX = 0, devY = 0;
-        iss >> devX;
-        if (!(iss >> devY)) {
-          devY = devX;
-        }
+        auto devValues = ParseSpaceSeparatedFloats(stdDeviation);
+        float devX = devValues.empty() ? 0 : devValues[0];
+        float devY = devValues.size() > 1 ? devValues[1] : devX;
         auto blurFilter = std::make_unique<BlurFilter>();
         blurFilter->blurrinessX = devX;
         blurFilter->blurrinessY = devY;

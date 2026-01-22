@@ -17,20 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
-#include <fstream>
-#include <sstream>
+#include <cstdio>
 #include "PAGXImporterImpl.h"
 
 namespace pagx {
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath) {
-  std::ifstream file(filePath, std::ios::binary);
-  if (!file.is_open()) {
+  FILE* file = fopen(filePath.c_str(), "rb");
+  if (!file) {
     return nullptr;
   }
-  std::stringstream buffer = {};
-  buffer << file.rdbuf();
-  auto doc = FromXML(buffer.str());
+
+  fseek(file, 0, SEEK_END);
+  long fileSize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  if (fileSize <= 0) {
+    fclose(file);
+    return nullptr;
+  }
+
+  std::string content;
+  content.resize(static_cast<size_t>(fileSize));
+  size_t bytesRead = fread(&content[0], 1, static_cast<size_t>(fileSize), file);
+  fclose(file);
+
+  if (bytesRead != static_cast<size_t>(fileSize)) {
+    return nullptr;
+  }
+
+  auto doc = FromXML(content);
   if (doc) {
     auto lastSlash = filePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {

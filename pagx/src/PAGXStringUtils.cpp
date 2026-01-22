@@ -19,7 +19,8 @@
 #include "PAGXStringUtils.h"
 #include <cctype>
 #include <cmath>
-#include <sstream>
+#include <cstdio>
+#include <cstdlib>
 #include <unordered_map>
 
 namespace pagx {
@@ -269,13 +270,14 @@ ColorSpace ColorSpaceFromString(const std::string& str) {
 
 std::string ColorToHexString(const Color& color, bool withAlpha) {
   if (color.colorSpace == ColorSpace::DisplayP3) {
-    std::ostringstream oss = {};
-    oss << "p3(" << color.red << ", " << color.green << ", " << color.blue;
+    char buf[64] = {};
     if (withAlpha && color.alpha < 1.0f) {
-      oss << ", " << color.alpha;
+      snprintf(buf, sizeof(buf), "p3(%g, %g, %g, %g)", color.red, color.green, color.blue,
+               color.alpha);
+    } else {
+      snprintf(buf, sizeof(buf), "p3(%g, %g, %g)", color.red, color.green, color.blue);
     }
-    oss << ")";
-    return oss.str();
+    return std::string(buf);
   }
   auto toHex = [](float v) -> std::string {
     int i = static_cast<int>(std::round(v * 255.0f));
@@ -296,25 +298,15 @@ std::string ColorToHexString(const Color& color, bool withAlpha) {
 //==============================================================================
 
 std::string MatrixToString(const Matrix& matrix) {
-  std::ostringstream oss = {};
-  oss << matrix.a << "," << matrix.b << "," << matrix.c << "," << matrix.d << "," << matrix.tx
-      << "," << matrix.ty;
-  return oss.str();
+  char buf[256] = {};
+  snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx,
+           matrix.ty);
+  return std::string(buf);
 }
 
 Matrix MatrixFromString(const std::string& str) {
   Matrix m = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 6) {
     m.a = values[0];
     m.b = values[1];
@@ -331,37 +323,42 @@ Matrix MatrixFromString(const std::string& str) {
 //==============================================================================
 
 std::string PathDataToSVGString(const PathData& pathData) {
-  std::ostringstream oss;
-  oss.precision(6);
+  std::string result;
+  result.reserve(256);
 
   size_t pointIndex = 0;
   const auto& verbs = pathData.verbs();
   const auto& points = pathData.points();
 
+  char buf[64] = {};
   for (auto verb : verbs) {
     const float* pts = points.data() + pointIndex;
     switch (verb) {
       case PathVerb::Move:
-        oss << "M" << pts[0] << " " << pts[1];
+        snprintf(buf, sizeof(buf), "M%g %g", pts[0], pts[1]);
+        result += buf;
         break;
       case PathVerb::Line:
-        oss << "L" << pts[0] << " " << pts[1];
+        snprintf(buf, sizeof(buf), "L%g %g", pts[0], pts[1]);
+        result += buf;
         break;
       case PathVerb::Quad:
-        oss << "Q" << pts[0] << " " << pts[1] << " " << pts[2] << " " << pts[3];
+        snprintf(buf, sizeof(buf), "Q%g %g %g %g", pts[0], pts[1], pts[2], pts[3]);
+        result += buf;
         break;
       case PathVerb::Cubic:
-        oss << "C" << pts[0] << " " << pts[1] << " " << pts[2] << " " << pts[3] << " " << pts[4]
-            << " " << pts[5];
+        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", pts[0], pts[1], pts[2], pts[3], pts[4],
+                 pts[5]);
+        result += buf;
         break;
       case PathVerb::Close:
-        oss << "Z";
+        result += "Z";
         break;
     }
     pointIndex += PathData::PointsPerVerb(verb) * 2;
   }
 
-  return oss.str();
+  return result;
 }
 
 // SVG path parser helper functions
@@ -758,6 +755,80 @@ PathData PathDataFromSVGString(const std::string& d) {
   }
 
   return path;
+}
+
+//==============================================================================
+// String parsing utilities
+//==============================================================================
+
+static std::string TrimString(const std::string& str) {
+  auto start = str.find_first_not_of(" \t\n\r");
+  if (start == std::string::npos) {
+    return "";
+  }
+  auto end = str.find_last_not_of(" \t\n\r");
+  return str.substr(start, end - start + 1);
+}
+
+std::vector<std::string> SplitString(const std::string& str, char delimiter) {
+  std::vector<std::string> tokens;
+  size_t start = 0;
+  size_t end = 0;
+  while ((end = str.find(delimiter, start)) != std::string::npos) {
+    auto token = TrimString(str.substr(start, end - start));
+    if (!token.empty()) {
+      tokens.push_back(token);
+    }
+    start = end + 1;
+  }
+  auto lastToken = TrimString(str.substr(start));
+  if (!lastToken.empty()) {
+    tokens.push_back(lastToken);
+  }
+  return tokens;
+}
+
+std::vector<float> ParseFloatList(const std::string& str) {
+  std::vector<float> values;
+  auto tokens = SplitString(str, ',');
+  values.reserve(tokens.size());
+  for (const auto& token : tokens) {
+    char* endPtr = nullptr;
+    float val = strtof(token.c_str(), &endPtr);
+    if (endPtr != token.c_str()) {
+      values.push_back(val);
+    }
+  }
+  return values;
+}
+
+std::vector<float> ParseSpaceSeparatedFloats(const std::string& str) {
+  std::vector<float> values;
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  while (ptr < end) {
+    // Skip whitespace.
+    while (ptr < end && std::isspace(*ptr)) {
+      ++ptr;
+    }
+    if (ptr >= end) {
+      break;
+    }
+    char* endPtr = nullptr;
+    float val = strtof(ptr, &endPtr);
+    if (endPtr == ptr) {
+      break;
+    }
+    values.push_back(val);
+    ptr = endPtr;
+  }
+  return values;
+}
+
+std::string FloatToString(float value) {
+  char buf[32] = {};
+  snprintf(buf, sizeof(buf), "%g", value);
+  return std::string(buf);
 }
 
 #undef DEFINE_ENUM_CONVERSION

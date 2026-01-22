@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXExporterImpl.h"
-#include <sstream>
+#include <cstdio>
 #include "PAGXStringUtils.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -62,80 +62,111 @@ namespace pagx {
 class XMLBuilder {
  public:
   void appendDeclaration() {
-    buffer << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   }
 
   void openElement(const std::string& tag) {
     writeIndent();
-    buffer << "<" << tag;
+    buffer += "<";
+    buffer += tag;
     tagStack.push_back(tag);
   }
 
   void addAttribute(const std::string& name, const std::string& value) {
     if (!value.empty()) {
-      buffer << " " << name << "=\"" << escapeXML(value) << "\"";
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += escapeXML(value);
+      buffer += "\"";
     }
   }
 
   void addAttribute(const std::string& name, float value, float defaultValue = 0) {
     if (value != defaultValue) {
-      buffer << " " << name << "=\"" << formatFloat(value) << "\"";
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += FloatToString(value);
+      buffer += "\"";
     }
   }
 
   void addRequiredAttribute(const std::string& name, float value) {
-    buffer << " " << name << "=\"" << formatFloat(value) << "\"";
+    buffer += " ";
+    buffer += name;
+    buffer += "=\"";
+    buffer += FloatToString(value);
+    buffer += "\"";
   }
 
   void addRequiredAttribute(const std::string& name, const std::string& value) {
-    buffer << " " << name << "=\"" << escapeXML(value) << "\"";
+    buffer += " ";
+    buffer += name;
+    buffer += "=\"";
+    buffer += escapeXML(value);
+    buffer += "\"";
   }
 
   void addAttribute(const std::string& name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
-      buffer << " " << name << "=\"" << value << "\"";
+      char buf[32] = {};
+      snprintf(buf, sizeof(buf), "%d", value);
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += buf;
+      buffer += "\"";
     }
   }
 
   void addAttribute(const std::string& name, bool value, bool defaultValue = false) {
     if (value != defaultValue) {
-      buffer << " " << name << "=\"" << (value ? "true" : "false") << "\"";
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += (value ? "true" : "false");
+      buffer += "\"";
     }
   }
 
   void closeElementStart() {
-    buffer << ">\n";
+    buffer += ">\n";
     indentLevel++;
   }
 
   void closeElementSelfClosing() {
-    buffer << "/>\n";
+    buffer += "/>\n";
     tagStack.pop_back();
   }
 
   void closeElement() {
     indentLevel--;
     writeIndent();
-    buffer << "</" << tagStack.back() << ">\n";
+    buffer += "</";
+    buffer += tagStack.back();
+    buffer += ">\n";
     tagStack.pop_back();
   }
 
   void addTextContent(const std::string& text) {
-    buffer << "<![CDATA[" << text << "]]>";
+    buffer += "<![CDATA[";
+    buffer += text;
+    buffer += "]]>";
   }
 
-  std::string str() const {
-    return buffer.str();
+  const std::string& str() const {
+    return buffer;
   }
 
  private:
-  std::ostringstream buffer = {};
+  std::string buffer = {};
   std::vector<std::string> tagStack = {};
   int indentLevel = 0;
 
   void writeIndent() {
     for (int i = 0; i < indentLevel; i++) {
-      buffer << "  ";
+      buffer += "  ";
     }
   }
 
@@ -165,21 +196,6 @@ class XMLBuilder {
     }
     return result;
   }
-
-  static std::string formatFloat(float value) {
-    std::ostringstream oss = {};
-    oss << value;
-    auto str = oss.str();
-    if (str.find('.') != std::string::npos) {
-      while (str.back() == '0') {
-        str.pop_back();
-      }
-      if (str.back() == '.') {
-        str.pop_back();
-      }
-    }
-    return str;
-  }
 };
 
 //==============================================================================
@@ -187,32 +203,34 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
-  std::ostringstream oss = {};
-  oss << p.x << "," << p.y;
-  return oss.str();
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
+  return std::string(buf);
 }
 
 static std::string sizeToString(const Size& s) {
-  std::ostringstream oss = {};
-  oss << s.width << "," << s.height;
-  return oss.str();
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
+  return std::string(buf);
 }
 
 static std::string rectToString(const Rect& r) {
-  std::ostringstream oss = {};
-  oss << r.x << "," << r.y << "," << r.width << "," << r.height;
-  return oss.str();
+  char buf[128] = {};
+  snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r.x, r.y, r.width, r.height);
+  return std::string(buf);
 }
 
 static std::string floatListToString(const std::vector<float>& values) {
-  std::ostringstream oss = {};
+  std::string result;
+  char buf[32] = {};
   for (size_t i = 0; i < values.size(); i++) {
     if (i > 0) {
-      oss << ",";
+      result += ",";
     }
-    oss << values[i];
+    snprintf(buf, sizeof(buf), "%g", values[i]);
+    result += buf;
   }
-  return oss.str();
+  return result;
 }
 
 //==============================================================================
