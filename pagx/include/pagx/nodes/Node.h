@@ -24,9 +24,8 @@
 namespace pagx {
 
 /**
- * NodeType enumerates all types of nodes that can be stored in a PAGX document.
- * This includes resources (Image, Composition, ColorSources) and elements (shapes, painters,
- * modifiers, etc.).
+ * NodeType enumerates all types of nodes that can be stored in a PAGX document. This includes
+ * resources (Image, Composition, ColorSources) and elements (shapes, painters, modifiers, etc.).
  */
 enum class NodeType {
   // Resources

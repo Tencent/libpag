@@ -137,8 +137,8 @@ class Layer : public Node {
   std::string mask = {};
 
   /**
-   * The type of masking to apply (Alpha, Luminosity, InvertedAlpha, or InvertedLuminosity). The
-   * default value is Alpha.
+   * The type of masking to apply (Alpha, Luminosity, InvertedAlpha, or InvertedLuminosity).
+   * The default value is Alpha.
    */
   MaskType maskType = MaskType::Alpha;
 

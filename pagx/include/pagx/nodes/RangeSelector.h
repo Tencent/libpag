@@ -104,8 +104,8 @@ enum class SelectorMode {
 class RangeSelector : public TextSelector {
  public:
   /**
-   * The starting position of the selection range, in units defined by the unit property. The
-   * default value is 0.
+   * The starting position of the selection range, in units defined by the unit property.
+   * The default value is 0.
    */
   float start = 0;
 

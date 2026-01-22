@@ -63,8 +63,7 @@ class Polystar : public Element {
   float outerRadius = 100;
 
   /**
-   * The inner radius of the polystar. Only applies when type is Star. The default value
-   * is 50.
+   * The inner radius of the polystar. Only applies when type is Star. The default value is 50.
    */
   float innerRadius = 50;
 
