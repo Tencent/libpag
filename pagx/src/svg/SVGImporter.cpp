@@ -1886,6 +1886,13 @@ void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   auto [found, id] = node->findAttribute("id");
   if (found && !id.empty()) {
     _existingIds.insert(id);
+    // Also collect referenceable elements (mask, clipPath, filter, etc.) to _defs,
+    // even if they are defined inline (not inside <defs>).
+    const auto& name = node->name;
+    if (name == "mask" || name == "clipPath" || name == "filter" || name == "linearGradient" ||
+        name == "radialGradient" || name == "pattern") {
+      _defs[id] = node;
+    }
   }
 
   // Recursively collect from children.
