@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pagx/nodes/BlendMode.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -27,6 +28,11 @@ namespace pagx {
  */
 class LayerStyle : public Node {
  public:
+  /**
+   * The blend mode used when compositing the style. The default value is Normal.
+   */
+  BlendMode blendMode = BlendMode::Normal;
+
   ~LayerStyle() override = default;
 
  protected:

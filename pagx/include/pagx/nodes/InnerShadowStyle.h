@@ -19,7 +19,6 @@
 #pragma once
 
 #include "pagx/nodes/LayerStyle.h"
-#include "pagx/nodes/BlendMode.h"
 #include "pagx/nodes/Color.h"
 
 namespace pagx {
@@ -53,11 +52,6 @@ class InnerShadowStyle : public LayerStyle {
    * The color of the shadow.
    */
   Color color = {};
-
-  /**
-   * The blend mode used when compositing the shadow. The default value is Normal.
-   */
-  BlendMode blendMode = BlendMode::Normal;
 
   NodeType nodeType() const override {
     return NodeType::InnerShadowStyle;

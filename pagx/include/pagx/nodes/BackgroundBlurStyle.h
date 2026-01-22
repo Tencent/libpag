@@ -19,7 +19,6 @@
 #pragma once
 
 #include "pagx/nodes/LayerStyle.h"
-#include "pagx/nodes/BlendMode.h"
 #include "pagx/nodes/TileMode.h"
 
 namespace pagx {
@@ -43,11 +42,6 @@ class BackgroundBlurStyle : public LayerStyle {
    * The tile mode for handling blur edges. The default value is Mirror.
    */
   TileMode tileMode = TileMode::Mirror;
-
-  /**
-   * The blend mode used when compositing the blur. The default value is Normal.
-   */
-  BlendMode blendMode = BlendMode::Normal;
 
   NodeType nodeType() const override {
     return NodeType::BackgroundBlurStyle;
