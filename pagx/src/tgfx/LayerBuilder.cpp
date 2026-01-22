@@ -521,20 +521,20 @@ class LayerBuilderImpl {
       return nullptr;
     }
 
-    switch (node->type()) {
-      case ColorSourceType::SolidColor: {
+    switch (node->nodeType()) {
+      case NodeType::SolidColor: {
         auto solid = static_cast<const SolidColor*>(node);
         return tgfx::SolidColor::Make(ToTGFX(solid->color));
       }
-      case ColorSourceType::LinearGradient: {
+      case NodeType::LinearGradient: {
         auto grad = static_cast<const LinearGradient*>(node);
         return convertLinearGradient(grad);
       }
-      case ColorSourceType::RadialGradient: {
+      case NodeType::RadialGradient: {
         auto grad = static_cast<const RadialGradient*>(node);
         return convertRadialGradient(grad);
       }
-      case ColorSourceType::ImagePattern: {
+      case NodeType::ImagePattern: {
         auto pattern = static_cast<const ImagePattern*>(node);
         return convertImagePattern(pattern);
       }

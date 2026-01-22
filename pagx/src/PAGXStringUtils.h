@@ -54,11 +54,6 @@ namespace pagx {
 const char* NodeTypeName(NodeType type);
 
 //==============================================================================
-// ColorSource types
-//==============================================================================
-const char* ColorSourceTypeName(ColorSourceType type);
-
-//==============================================================================
 // BlendMode
 //==============================================================================
 std::string BlendModeToString(BlendMode mode);

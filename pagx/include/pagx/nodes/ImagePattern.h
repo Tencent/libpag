@@ -62,10 +62,6 @@ class ImagePattern : public ColorSource {
    */
   Matrix matrix = {};
 
-  ColorSourceType type() const override {
-    return ColorSourceType::ImagePattern;
-  }
-
   NodeType nodeType() const override {
     return NodeType::ImagePattern;
   }

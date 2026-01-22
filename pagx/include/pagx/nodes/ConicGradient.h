@@ -56,10 +56,6 @@ class ConicGradient : public ColorSource {
    */
   std::vector<ColorStop> colorStops = {};
 
-  ColorSourceType type() const override {
-    return ColorSourceType::ConicGradient;
-  }
-
   NodeType nodeType() const override {
     return NodeType::ConicGradient;
   }

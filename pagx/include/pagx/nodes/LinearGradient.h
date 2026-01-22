@@ -51,10 +51,6 @@ class LinearGradient : public ColorSource {
    */
   std::vector<ColorStop> colorStops = {};
 
-  ColorSourceType type() const override {
-    return ColorSourceType::LinearGradient;
-  }
-
   NodeType nodeType() const override {
     return NodeType::LinearGradient;
   }

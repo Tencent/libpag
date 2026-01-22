@@ -33,10 +33,6 @@ class SolidColor : public ColorSource {
    */
   Color color = {};
 
-  ColorSourceType type() const override {
-    return ColorSourceType::SolidColor;
-  }
-
   NodeType nodeType() const override {
     return NodeType::SolidColor;
   }

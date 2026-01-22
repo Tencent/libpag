@@ -387,7 +387,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   // Test SolidColor
   auto solid = std::make_unique<pagx::SolidColor>();
   solid->color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
-  EXPECT_EQ(solid->type(), pagx::ColorSourceType::SolidColor);
+  EXPECT_EQ(solid->nodeType(), pagx::NodeType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
   // Test LinearGradient
@@ -408,7 +408,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   linear->colorStops.push_back(stop1);
   linear->colorStops.push_back(stop2);
 
-  EXPECT_EQ(linear->type(), pagx::ColorSourceType::LinearGradient);
+  EXPECT_EQ(linear->nodeType(), pagx::NodeType::LinearGradient);
   EXPECT_EQ(linear->colorStops.size(), 2u);
 
   // Test RadialGradient
@@ -418,7 +418,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   radial->radius = 50;
   radial->colorStops = linear->colorStops;
 
-  EXPECT_EQ(radial->type(), pagx::ColorSourceType::RadialGradient);
+  EXPECT_EQ(radial->nodeType(), pagx::NodeType::RadialGradient);
 }
 
 /**

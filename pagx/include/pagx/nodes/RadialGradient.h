@@ -51,10 +51,6 @@ class RadialGradient : public ColorSource {
    */
   std::vector<ColorStop> colorStops = {};
 
-  ColorSourceType type() const override {
-    return ColorSourceType::RadialGradient;
-  }
-
   NodeType nodeType() const override {
     return NodeType::RadialGradient;
   }

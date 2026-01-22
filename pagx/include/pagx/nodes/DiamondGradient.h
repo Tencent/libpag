@@ -51,10 +51,6 @@ class DiamondGradient : public ColorSource {
    */
   std::vector<ColorStop> colorStops = {};
 
-  ColorSourceType type() const override {
-    return ColorSourceType::DiamondGradient;
-  }
-
   NodeType nodeType() const override {
     return NodeType::DiamondGradient;
   }

@@ -240,8 +240,8 @@ static void writeColorStops(XMLBuilder& xml, const std::vector<ColorStop>& stops
 }
 
 static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
-  switch (node->type()) {
-    case ColorSourceType::SolidColor: {
+  switch (node->nodeType()) {
+    case NodeType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
       xml.openElement("SolidColor");
       xml.addAttribute("id", solid->id);
@@ -249,7 +249,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case ColorSourceType::LinearGradient: {
+    case NodeType::LinearGradient: {
       auto grad = static_cast<const LinearGradient*>(node);
       xml.openElement("LinearGradient");
       xml.addAttribute("id", grad->id);
@@ -269,7 +269,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       break;
     }
-    case ColorSourceType::RadialGradient: {
+    case NodeType::RadialGradient: {
       auto grad = static_cast<const RadialGradient*>(node);
       xml.openElement("RadialGradient");
       xml.addAttribute("id", grad->id);
@@ -289,7 +289,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       break;
     }
-    case ColorSourceType::ConicGradient: {
+    case NodeType::ConicGradient: {
       auto grad = static_cast<const ConicGradient*>(node);
       xml.openElement("ConicGradient");
       xml.addAttribute("id", grad->id);
@@ -310,7 +310,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       break;
     }
-    case ColorSourceType::DiamondGradient: {
+    case NodeType::DiamondGradient: {
       auto grad = static_cast<const DiamondGradient*>(node);
       xml.openElement("DiamondGradient");
       xml.addAttribute("id", grad->id);
@@ -330,7 +330,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       }
       break;
     }
-    case ColorSourceType::ImagePattern: {
+    case NodeType::ImagePattern: {
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       xml.addAttribute("id", pattern->id);
@@ -353,6 +353,8 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       xml.closeElementSelfClosing();
       break;
     }
+    default:
+      break;
   }
 }
 

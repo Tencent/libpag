@@ -126,25 +126,6 @@ const char* NodeTypeName(NodeType type) {
   }
 }
 
-const char* ColorSourceTypeName(ColorSourceType type) {
-  switch (type) {
-    case ColorSourceType::SolidColor:
-      return "SolidColor";
-    case ColorSourceType::LinearGradient:
-      return "LinearGradient";
-    case ColorSourceType::RadialGradient:
-      return "RadialGradient";
-    case ColorSourceType::ConicGradient:
-      return "ConicGradient";
-    case ColorSourceType::DiamondGradient:
-      return "DiamondGradient";
-    case ColorSourceType::ImagePattern:
-      return "ImagePattern";
-    default:
-      return "Unknown";
-  }
-}
-
 //==============================================================================
 // Enum string conversions
 //==============================================================================

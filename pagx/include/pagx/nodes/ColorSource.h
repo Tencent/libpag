@@ -23,29 +23,11 @@
 namespace pagx {
 
 /**
- * Color source types.
- */
-enum class ColorSourceType {
-  SolidColor,
-  LinearGradient,
-  RadialGradient,
-  ConicGradient,
-  DiamondGradient,
-  ImagePattern
-};
-
-/**
  * Base class for color sources (SolidColor, gradients, ImagePattern).
  * ColorSource can be used both inline in painters and as standalone resources in defs.
  * Inherits from Node so it can be stored in resources and referenced by ID.
  */
 class ColorSource : public Node {
- public:
-  /**
-   * Returns the color source type of this color source.
-   */
-  virtual ColorSourceType type() const = 0;
-
  protected:
   ColorSource() = default;
 };
