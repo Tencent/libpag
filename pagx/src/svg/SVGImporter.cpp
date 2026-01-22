@@ -1811,13 +1811,39 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
     if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
         child->name == "path" || child->name == "polygon" || child->name == "polyline") {
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
-      convertChildren(child, maskLayer->contents, inheritedStyle);
+      std::string transformStr = getAttribute(child, "transform");
+      if (!transformStr.empty()) {
+        // If child has transform, wrap it in a sub-layer with the matrix.
+        auto subLayer = std::make_unique<Layer>();
+        subLayer->matrix = parseTransform(transformStr);
+        convertChildren(child, subLayer->contents, inheritedStyle);
+        maskLayer->children.push_back(std::move(subLayer));
+      } else {
+        convertChildren(child, maskLayer->contents, inheritedStyle);
+      }
     } else if (child->name == "g") {
       // Handle group inside mask.
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
+      std::string groupTransform = getAttribute(child, "transform");
       auto groupChild = child->getFirstChild();
       while (groupChild) {
-        convertChildren(groupChild, maskLayer->contents, inheritedStyle);
+        std::string childTransform = getAttribute(groupChild, "transform");
+        // Combine group transform and child transform if needed.
+        if (!groupTransform.empty() || !childTransform.empty()) {
+          auto subLayer = std::make_unique<Layer>();
+          Matrix combinedMatrix = Matrix::Identity();
+          if (!groupTransform.empty()) {
+            combinedMatrix = parseTransform(groupTransform);
+          }
+          if (!childTransform.empty()) {
+            combinedMatrix = combinedMatrix * parseTransform(childTransform);
+          }
+          subLayer->matrix = combinedMatrix;
+          convertChildren(groupChild, subLayer->contents, inheritedStyle);
+          maskLayer->children.push_back(std::move(subLayer));
+        } else {
+          convertChildren(groupChild, maskLayer->contents, inheritedStyle);
+        }
         groupChild = groupChild->getNextSibling();
       }
     }
