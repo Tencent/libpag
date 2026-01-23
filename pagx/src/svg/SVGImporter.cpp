@@ -2402,6 +2402,12 @@ bool SVGParserImpl::convertFilterElement(
   while (i < primitives.size()) {
     auto& node = primitives[i];
 
+    // Skip feFlood elements - they are used for background setup but don't affect the shadow.
+    if (node->name == "feFlood") {
+      i++;
+      continue;
+    }
+
     // Check for drop shadow pattern starting with feColorMatrix in="SourceAlpha".
     if (node->name == "feColorMatrix" && getAttribute(node, "in") == "SourceAlpha") {
       // Look for the sequence: feColorMatrix → feOffset → feGaussianBlur → feComposite → feColorMatrix
@@ -2447,6 +2453,54 @@ bool SVGParserImpl::convertFilterElement(
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
+        if (i < primitives.size() && primitives[i]->name == "feBlend") {
+          i++;
+        }
+        continue;
+      }
+
+      // Check for Figma double drop shadow pattern (without feComposite):
+      // feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feColorMatrix → feBlend
+      // This is common in Figma exports with multiple shadows.
+      if (i + 3 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
+          primitives[i + 2]->name == "feGaussianBlur" && primitives[i + 3]->name == "feColorMatrix") {
+        // Extract offset from feOffset.
+        float offsetX = 0, offsetY = 0;
+        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
+        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
+        offsetX = strtof(dx.c_str(), nullptr);
+        offsetY = strtof(dy.c_str(), nullptr);
+
+        // Extract blur from feGaussianBlur.
+        std::string stdDeviation = getAttribute(primitives[i + 2], "stdDeviation", "0");
+        auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
+        float blurX = blurValues.empty() ? 0 : blurValues[0];
+        float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
+
+        // Extract color from feColorMatrix.
+        Color shadowColor = {0, 0, 0, 1.0f};
+        std::string colorMatrix = getAttribute(primitives[i + 3], "values");
+        if (!colorMatrix.empty()) {
+          auto values = ParseSpaceSeparatedFloats(colorMatrix);
+          if (values.size() >= 19) {
+            shadowColor.red = values[4];
+            shadowColor.green = values[9];
+            shadowColor.blue = values[14];
+            shadowColor.alpha = values[18];
+          }
+        }
+
+        auto dropShadow = std::make_unique<DropShadowFilter>();
+        dropShadow->offsetX = offsetX;
+        dropShadow->offsetY = offsetY;
+        dropShadow->blurrinessX = blurX;
+        dropShadow->blurrinessY = blurY;
+        dropShadow->color = shadowColor;
+        dropShadow->shadowOnly = shadowOnly;
+        filters.push_back(std::move(dropShadow));
+
+        // Skip the consumed primitives (4 elements) plus the feBlend that follows.
+        i += 4;
         if (i < primitives.size() && primitives[i]->name == "feBlend") {
           i++;
         }
