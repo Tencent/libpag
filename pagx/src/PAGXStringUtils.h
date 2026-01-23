@@ -127,14 +127,14 @@ std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
 
 //==============================================================================
-// TextAlign, VerticalAlign, Overflow
+// TextAlign, VerticalAlign, WritingMode
 //==============================================================================
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);
 std::string VerticalAlignToString(VerticalAlign align);
 VerticalAlign VerticalAlignFromString(const std::string& str);
-std::string TextDirectionToString(TextDirection direction);
-TextDirection TextDirectionFromString(const std::string& str);
+std::string WritingModeToString(WritingMode mode);
+WritingMode WritingModeFromString(const std::string& str);
 
 //==============================================================================
 // RepeaterOrder

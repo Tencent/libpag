@@ -50,7 +50,7 @@
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
 
 namespace pagx {
@@ -203,6 +203,12 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
+  return std::string(buf);
+}
+
+static std::string pointToString(const tgfx::Point& p) {
   char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
   return std::string(buf);
@@ -440,19 +446,19 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextSpan: {
-      auto text = static_cast<const TextSpan*>(node);
-      xml.openElement("TextSpan");
+    case NodeType::Text: {
+      auto text = static_cast<const Text*>(node);
+      xml.openElement("Text");
       if (text->position.x != 0 || text->position.y != 0) {
         xml.addAttribute("position", pointToString(text->position));
       }
-      xml.addAttribute("font", text->font);
-      xml.addAttribute("fontSize", text->fontSize, 12.0f);
-      xml.addAttribute("fontWeight", text->fontWeight, 400);
-      if (text->fontStyle != "normal" && !text->fontStyle.empty()) {
+      xml.addAttribute("fontFamily", text->fontFamily);
+      if (!text->fontStyle.empty()) {
         xml.addAttribute("fontStyle", text->fontStyle);
       }
-      xml.addAttribute("tracking", text->tracking);
+      xml.addAttribute("fontSize", text->fontSize, 12.0f);
+      xml.addAttribute("letterSpacing", text->letterSpacing);
+      xml.addAttribute("baselineShift", text->baselineShift);
       xml.closeElementStart();
       xml.addTextContent(text->text);
       xml.closeElement();
@@ -651,23 +657,21 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::TextLayout: {
       auto layout = static_cast<const TextLayout*>(node);
       xml.openElement("TextLayout");
-      xml.addAttribute("x", layout->x);
-      xml.addAttribute("y", layout->y);
+      if (layout->position.x != 0 || layout->position.y != 0) {
+        xml.addAttribute("position", pointToString(layout->position));
+      }
       xml.addAttribute("width", layout->width);
       xml.addAttribute("height", layout->height);
       if (layout->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(layout->textAlign));
       }
-      if (layout->textAlignLast != TextAlign::Start) {
-        xml.addAttribute("textAlignLast", TextAlignToString(layout->textAlignLast));
-      }
       if (layout->verticalAlign != VerticalAlign::Top) {
         xml.addAttribute("verticalAlign", VerticalAlignToString(layout->verticalAlign));
       }
-      xml.addAttribute("lineHeight", layout->lineHeight, 1.2f);
-      if (layout->direction != TextDirection::Horizontal) {
-        xml.addAttribute("direction", TextDirectionToString(layout->direction));
+      if (layout->writingMode != WritingMode::Horizontal) {
+        xml.addAttribute("writingMode", WritingModeToString(layout->writingMode));
       }
+      xml.addAttribute("lineHeight", layout->lineHeight, 1.2f);
       xml.closeElementSelfClosing();
       break;
     }

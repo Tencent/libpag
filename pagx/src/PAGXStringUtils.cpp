@@ -100,8 +100,8 @@ const char* NodeTypeName(NodeType type) {
       return "Polystar";
     case NodeType::Path:
       return "Path";
-    case NodeType::TextSpan:
-      return "TextSpan";
+    case NodeType::Text:
+      return "Text";
     case NodeType::Fill:
       return "Fill";
     case NodeType::Stroke:
@@ -222,9 +222,9 @@ DEFINE_ENUM_CONVERSION(VerticalAlign,
     {VerticalAlign::Center, "center"},
     {VerticalAlign::Bottom, "bottom"})
 
-DEFINE_ENUM_CONVERSION(TextDirection,
-    {TextDirection::Horizontal, "horizontal"},
-    {TextDirection::Vertical, "vertical"})
+DEFINE_ENUM_CONVERSION(WritingMode,
+    {WritingMode::Horizontal, "horizontal"},
+    {WritingMode::Vertical, "vertical"})
 
 DEFINE_ENUM_CONVERSION(SelectorUnit,
     {SelectorUnit::Index, "index"},

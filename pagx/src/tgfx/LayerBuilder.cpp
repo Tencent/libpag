@@ -50,7 +50,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextLayout.h"
-#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/SVGImporter.h"
 #include "tgfx/core/Data.h"
@@ -79,7 +79,7 @@
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
-#include "tgfx/layers/vectors/TextSpan.h"
+#include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 #include "tgfx/svg/TextShaper.h"
@@ -375,8 +375,8 @@ class LayerBuilderImpl {
         return convertPolystar(static_cast<const Polystar*>(node));
       case NodeType::Path:
         return convertPath(static_cast<const Path*>(node));
-      case NodeType::TextSpan:
-        return convertTextSpan(static_cast<const TextSpan*>(node));
+      case NodeType::Text:
+        return convertText(static_cast<const Text*>(node));
       case NodeType::Fill:
         return convertFill(static_cast<const Fill*>(node));
       case NodeType::Stroke:
@@ -467,13 +467,13 @@ class LayerBuilderImpl {
     return nullptr;
   }
 
-  std::shared_ptr<tgfx::TextSpan> convertTextSpan(const TextSpan* node) {
-    auto textSpan = std::make_shared<tgfx::TextSpan>();
+  std::shared_ptr<tgfx::Text> convertText(const Text* node) {
+    auto tgfxText = std::make_shared<tgfx::Text>();
 
     std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (!node->font.empty() && !_options.fallbackTypefaces.empty()) {
+    if (!node->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
       for (const auto& tf : _options.fallbackTypefaces) {
-        if (tf && tf->fontFamily() == node->font) {
+        if (tf && tf->fontFamily() == node->fontFamily) {
           typeface = tf;
           break;
         }
@@ -492,11 +492,11 @@ class LayerBuilderImpl {
         auto font = tgfx::Font(typeface, node->fontSize);
         textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
       }
-      textSpan->setTextBlob(textBlob);
+      tgfxText->setTextBlob(textBlob);
     }
 
-    textSpan->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
-    return textSpan;
+    tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
+    return tgfxText;
   }
 
   std::shared_ptr<tgfx::FillStyle> convertFill(const Fill* node) {
@@ -715,26 +715,26 @@ class LayerBuilderImpl {
       }
     }
 
-    // Collect TextSpan info for layout calculation if TextLayout is present.
-    struct TextSpanInfo {
-      const pagx::TextSpan* span = nullptr;
+    // Collect Text info for layout calculation if TextLayout is present.
+    struct TextInfo {
+      const pagx::Text* text = nullptr;
       std::shared_ptr<tgfx::TextBlob> blob = nullptr;
       tgfx::Rect bounds = {};
     };
-    std::vector<TextSpanInfo> textSpans;
+    std::vector<TextInfo> textInfos;
 
     if (textLayout != nullptr) {
       for (const auto& element : node->elements) {
-        if (element->nodeType() == NodeType::TextSpan) {
-          auto span = static_cast<const pagx::TextSpan*>(element.get());
-          TextSpanInfo info;
-          info.span = span;
+        if (element->nodeType() == NodeType::Text) {
+          auto text = static_cast<const pagx::Text*>(element.get());
+          TextInfo info;
+          info.text = text;
 
           // Create TextBlob to measure bounds.
           std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-          if (!span->font.empty() && !_options.fallbackTypefaces.empty()) {
+          if (!text->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
             for (const auto& tf : _options.fallbackTypefaces) {
-              if (tf && tf->fontFamily() == span->font) {
+              if (tf && tf->fontFamily() == text->fontFamily) {
                 typeface = tf;
                 break;
               }
@@ -744,44 +744,44 @@ class LayerBuilderImpl {
             typeface = _options.fallbackTypefaces[0];
           }
 
-          if (!span->text.empty()) {
+          if (!text->text.empty()) {
             if (_textShaper) {
-              info.blob = _textShaper->shape(span->text, typeface, span->fontSize);
+              info.blob = _textShaper->shape(text->text, typeface, text->fontSize);
             } else if (typeface) {
-              auto font = tgfx::Font(typeface, span->fontSize);
-              info.blob = tgfx::TextBlob::MakeFrom(span->text, font);
+              auto font = tgfx::Font(typeface, text->fontSize);
+              info.blob = tgfx::TextBlob::MakeFrom(text->text, font);
             }
             if (info.blob) {
               info.bounds = info.blob->getTightBounds();
             }
           }
-          textSpans.push_back(info);
+          textInfos.push_back(info);
         }
       }
     }
 
     for (const auto& element : node->elements) {
-      // Skip TextLayout modifier, it's handled by adjusting TextSpan positions.
+      // Skip TextLayout modifier, it's handled by adjusting Text positions.
       if (element->nodeType() == NodeType::TextLayout) {
         continue;
       }
 
-      // Handle TextSpan with layout adjustments.
-      if (element->nodeType() == NodeType::TextSpan && textLayout != nullptr) {
-        auto span = static_cast<const pagx::TextSpan*>(element.get());
-        auto tgfxTextSpan = std::make_shared<tgfx::TextSpan>();
+      // Handle Text with layout adjustments.
+      if (element->nodeType() == NodeType::Text && textLayout != nullptr) {
+        auto text = static_cast<const pagx::Text*>(element.get());
+        auto tgfxText = std::make_shared<tgfx::Text>();
 
-        // Find the matching TextSpanInfo.
-        TextSpanInfo* info = nullptr;
-        for (auto& ts : textSpans) {
-          if (ts.span == span) {
-            info = &ts;
+        // Find the matching TextInfo.
+        TextInfo* info = nullptr;
+        for (auto& ti : textInfos) {
+          if (ti.text == text) {
+            info = &ti;
             break;
           }
         }
 
         if (info != nullptr && info->blob) {
-          tgfxTextSpan->setTextBlob(info->blob);
+          tgfxText->setTextBlob(info->blob);
 
           // Calculate x offset based on textAlign.
           // This follows tgfx SVG text-anchor handling: xOffset = alignmentFactor * width
@@ -803,13 +803,13 @@ class LayerBuilderImpl {
               break;
           }
 
-          tgfxTextSpan->setPosition(tgfx::Point::Make(span->position.x + xOffset, span->position.y));
+          tgfxText->setPosition(tgfx::Point::Make(text->position.x + xOffset, text->position.y));
         } else {
           // No blob, use original position.
-          tgfxTextSpan->setPosition(tgfx::Point::Make(span->position.x, span->position.y));
+          tgfxText->setPosition(tgfx::Point::Make(text->position.x, text->position.y));
         }
 
-        elements.push_back(tgfxTextSpan);
+        elements.push_back(tgfxText);
         continue;
       }
 

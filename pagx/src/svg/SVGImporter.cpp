@@ -668,7 +668,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
                                     ShadowOnlyType shadowOnlyType) {
   const auto& tag = element->name;
 
-  // Handle text element specially - it returns a Group with TextSpan.
+  // Handle text element specially - it returns a Group with Text.
   if (tag == "text") {
     auto textGroup = convertText(element, inheritedStyle);
     if (textGroup) {
@@ -922,9 +922,9 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   }
 
   if (!textContent.empty()) {
-    auto textSpan = std::make_unique<TextSpan>();
-    textSpan->position = {x, y};
-    textSpan->text = textContent;
+    auto text = std::make_unique<Text>();
+    text->position = {x, y};
+    text->text = textContent;
 
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
@@ -932,7 +932,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
       fontFamily = inheritedStyle.fontFamily;
     }
     if (!fontFamily.empty()) {
-      textSpan->font = fontFamily;
+      text->fontFamily = fontFamily;
     }
 
     // Font size: element attribute > inherited style.
@@ -941,36 +941,33 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
       fontSize = inheritedStyle.fontSize;
     }
     if (!fontSize.empty()) {
-      textSpan->fontSize = parseLength(fontSize, _viewBoxHeight);
+      text->fontSize = parseLength(fontSize, _viewBoxHeight);
     }
 
     // Font weight: element attribute > inherited style.
+    // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light").
     std::string fontWeight = getAttribute(element, "font-weight");
     if (fontWeight.empty()) {
       fontWeight = inheritedStyle.fontWeight;
     }
-    if (!fontWeight.empty()) {
-      // SVG font-weight: normal=400, bold=700, or numeric 100-900.
-      if (fontWeight == "normal") {
-        textSpan->fontWeight = 400;
-      } else if (fontWeight == "bold") {
-        textSpan->fontWeight = 700;
-      } else if (fontWeight == "lighter") {
-        textSpan->fontWeight = 300;
-      } else if (fontWeight == "bolder") {
-        textSpan->fontWeight = 800;
-      } else {
-        textSpan->fontWeight = static_cast<int>(strtof(fontWeight.c_str(), nullptr));
-      }
-    }
-
     // Font style: element attribute > inherited style.
-    std::string fontStyle = getAttribute(element, "font-style");
-    if (fontStyle.empty()) {
-      fontStyle = inheritedStyle.fontStyle;
+    std::string fontStyleAttr = getAttribute(element, "font-style");
+    if (fontStyleAttr.empty()) {
+      fontStyleAttr = inheritedStyle.fontStyle;
     }
-    if (!fontStyle.empty()) {
-      textSpan->fontStyle = fontStyle;
+    // Combine font-weight and font-style into fontStyle field.
+    // This is a simplification; in practice, font selection is more complex.
+    if (!fontWeight.empty() || !fontStyleAttr.empty()) {
+      bool isBold = (fontWeight == "bold" || fontWeight == "700" || fontWeight == "800" ||
+                     fontWeight == "900" || fontWeight == "bolder");
+      bool isItalic = (fontStyleAttr == "italic" || fontStyleAttr == "oblique");
+      if (isBold && isItalic) {
+        text->fontStyle = "Bold Italic";
+      } else if (isBold) {
+        text->fontStyle = "Bold";
+      } else if (isItalic) {
+        text->fontStyle = "Italic";
+      }
     }
 
     // Letter spacing: element attribute > inherited style.
@@ -979,10 +976,10 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
       letterSpacing = inheritedStyle.letterSpacing;
     }
     if (!letterSpacing.empty()) {
-      textSpan->tracking = parseLength(letterSpacing, _viewBoxWidth);
+      text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth);
     }
 
-    group->elements.push_back(std::move(textSpan));
+    group->elements.push_back(std::move(text));
 
     // Add TextLayout modifier if text-anchor requires alignment.
     // SVG text-anchor maps to PAGX TextLayout.textAlign:
