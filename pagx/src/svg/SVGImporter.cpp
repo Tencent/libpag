@@ -410,6 +410,37 @@ InheritedStyle SVGParserImpl::computeInheritedStyle(const std::shared_ptr<DOMNod
     style.strokeMiterlimit = strokeMiterlimit;
   }
 
+  // Text properties.
+  std::string fontFamily = getAttribute(element, "font-family");
+  if (!fontFamily.empty()) {
+    style.fontFamily = fontFamily;
+  }
+
+  std::string fontSize = getAttribute(element, "font-size");
+  if (!fontSize.empty()) {
+    style.fontSize = fontSize;
+  }
+
+  std::string fontWeight = getAttribute(element, "font-weight");
+  if (!fontWeight.empty()) {
+    style.fontWeight = fontWeight;
+  }
+
+  std::string fontStyle = getAttribute(element, "font-style");
+  if (!fontStyle.empty()) {
+    style.fontStyle = fontStyle;
+  }
+
+  std::string letterSpacing = getAttribute(element, "letter-spacing");
+  if (!letterSpacing.empty()) {
+    style.letterSpacing = letterSpacing;
+  }
+
+  std::string textAnchor = getAttribute(element, "text-anchor");
+  if (!textAnchor.empty()) {
+    style.textAnchor = textAnchor;
+  }
+
   return style;
 }
 
@@ -836,9 +867,12 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
 
-  // Parse text-anchor attribute for horizontal alignment.
+  // Parse text-anchor attribute for horizontal alignment (use inherited if not set).
   // SVG values: start (default), middle, end.
   std::string anchor = getAttribute(element, "text-anchor");
+  if (anchor.empty()) {
+    anchor = inheritedStyle.textAnchor;
+  }
 
   // Get text content from child text nodes and tspan elements.
   std::string textContent;
@@ -864,14 +898,60 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
     textSpan->position = {x, y};
     textSpan->text = textContent;
 
+    // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
+    if (fontFamily.empty()) {
+      fontFamily = inheritedStyle.fontFamily;
+    }
     if (!fontFamily.empty()) {
       textSpan->font = fontFamily;
     }
 
+    // Font size: element attribute > inherited style.
     std::string fontSize = getAttribute(element, "font-size");
+    if (fontSize.empty()) {
+      fontSize = inheritedStyle.fontSize;
+    }
     if (!fontSize.empty()) {
       textSpan->fontSize = parseLength(fontSize, _viewBoxHeight);
+    }
+
+    // Font weight: element attribute > inherited style.
+    std::string fontWeight = getAttribute(element, "font-weight");
+    if (fontWeight.empty()) {
+      fontWeight = inheritedStyle.fontWeight;
+    }
+    if (!fontWeight.empty()) {
+      // SVG font-weight: normal=400, bold=700, or numeric 100-900.
+      if (fontWeight == "normal") {
+        textSpan->fontWeight = 400;
+      } else if (fontWeight == "bold") {
+        textSpan->fontWeight = 700;
+      } else if (fontWeight == "lighter") {
+        textSpan->fontWeight = 300;
+      } else if (fontWeight == "bolder") {
+        textSpan->fontWeight = 800;
+      } else {
+        textSpan->fontWeight = static_cast<int>(strtof(fontWeight.c_str(), nullptr));
+      }
+    }
+
+    // Font style: element attribute > inherited style.
+    std::string fontStyle = getAttribute(element, "font-style");
+    if (fontStyle.empty()) {
+      fontStyle = inheritedStyle.fontStyle;
+    }
+    if (!fontStyle.empty()) {
+      textSpan->fontStyle = fontStyle;
+    }
+
+    // Letter spacing: element attribute > inherited style.
+    std::string letterSpacing = getAttribute(element, "letter-spacing");
+    if (letterSpacing.empty()) {
+      letterSpacing = inheritedStyle.letterSpacing;
+    }
+    if (!letterSpacing.empty()) {
+      textSpan->tracking = parseLength(letterSpacing, _viewBoxWidth);
     }
 
     group->elements.push_back(std::move(textSpan));

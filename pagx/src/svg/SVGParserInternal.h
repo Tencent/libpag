@@ -59,6 +59,13 @@ struct InheritedStyle {
   std::string strokeLinecap = "";   // Empty means not set.
   std::string strokeLinejoin = "";  // Empty means not set.
   std::string strokeMiterlimit = "";// Empty means not set.
+  // Text properties.
+  std::string fontFamily = "";      // Empty means not set.
+  std::string fontSize = "";        // Empty means not set.
+  std::string fontWeight = "";      // Empty means not set.
+  std::string fontStyle = "";       // Empty means not set (normal/italic/oblique).
+  std::string letterSpacing = "";   // Empty means not set.
+  std::string textAnchor = "";      // Empty means not set (start/middle/end).
 };
 
 /**
