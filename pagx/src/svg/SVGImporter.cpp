@@ -627,9 +627,11 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
       bool filterConverted = convertFilterElement(filterIt->second, layer->filters, layer->styles,
                                                   &hasShadowOnlyFilter);
       if (!filterConverted) {
-        // Filter could not be converted to PAGX format. Skip this element entirely to avoid
-        // rendering incorrect results (e.g., black fill instead of shadow effect).
-        return nullptr;
+        // Filter could not be fully converted to PAGX format.
+        // Continue rendering the element without the filter effect.
+        layer->filters.clear();
+        layer->styles.clear();
+        hasShadowOnlyFilter = false;
       }
     }
   }
