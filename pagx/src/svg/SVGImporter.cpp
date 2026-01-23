@@ -619,16 +619,16 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
 
   // Handle filter attribute.
   std::string filterAttr = getAttribute(element, "filter");
-  bool hasShadowOnlyFilter = false;
+  ShadowOnlyType shadowOnlyType = ShadowOnlyType::None;
   if (!filterAttr.empty() && filterAttr != "none") {
     std::string filterId = resolveUrl(filterAttr);
     auto filterIt = _defs.find(filterId);
     if (filterIt != _defs.end()) {
       bool filterConverted = convertFilterElement(filterIt->second, layer->filters, layer->styles,
-                                                  &hasShadowOnlyFilter);
+                                                  &shadowOnlyType);
       if (!filterConverted) {
         // Filter could not be fully converted to PAGX format.
-        if (hasShadowOnlyFilter) {
+        if (shadowOnlyType != ShadowOnlyType::None) {
           // For shadowOnly filters (e.g., inner shadow), the element exists solely to produce
           // the filter effect. If the filter cannot be converted, skip the entire element
           // to avoid rendering incorrect results (e.g., black fill instead of shadow effect).
@@ -654,9 +654,8 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
     }
   } else {
     // Shape element: convert to vector contents.
-    // If this element has a shadow-only filter, skip adding fill because the fill is only
-    // used as shadow source, not to be rendered directly.
-    convertChildren(element, layer->contents, inheritedStyle, hasShadowOnlyFilter);
+    // Pass the shadow-only type to determine how to handle fill.
+    convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
   }
 
   return layer;
@@ -665,7 +664,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
                                     std::vector<std::unique_ptr<Element>>& contents,
                                     const InheritedStyle& inheritedStyle,
-                                    bool shadowOnlyFilter) {
+                                    ShadowOnlyType shadowOnlyType) {
   const auto& tag = element->name;
 
   // Handle text element specially - it returns a Group with TextSpan.
@@ -698,8 +697,8 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   }
 
   if (!skipFillStroke) {
-    if (shadowOnlyFilter) {
-      // For shadowOnly filters, we need to add a fill to provide a source for the shadow.
+    if (shadowOnlyType == ShadowOnlyType::DropShadow) {
+      // For shadowOnly DropShadow filters, we need to add a fill to provide a source for the shadow.
       // The DropShadowFilter generates shadow based on the layer's content alpha channel.
       // We use black (alpha=1) as the fill color since the actual shadow color is determined
       // by the DropShadowFilter's color property, not the fill color.
@@ -708,6 +707,10 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = std::move(solidColor);
       contents.push_back(std::move(fillNode));
+    } else if (shadowOnlyType == ShadowOnlyType::InnerShadow) {
+      // For shadowOnly InnerShadow filters, no fill is needed.
+      // The InnerShadowFilter draws shadow inside the layer's alpha boundary,
+      // using only the shape geometry as the clipping region.
     } else {
       addFillStroke(element, contents, inheritedStyle);
     }
@@ -2374,7 +2377,7 @@ bool SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
     std::vector<std::unique_ptr<LayerFilter>>& filters,
     std::vector<std::unique_ptr<LayerStyle>>& styles,
-    bool* outShadowOnly) {
+    ShadowOnlyType* outShadowOnlyType) {
   size_t initialFilterCount = filters.size();
   size_t initialStyleCount = styles.size();
 
@@ -2396,9 +2399,8 @@ bool SVGParserImpl::convertFilterElement(
   // If filter only produces shadow without merging with original content,
   // we should set shadowOnly=true.
   bool shadowOnly = !hasMerge;
-  if (outShadowOnly != nullptr) {
-    *outShadowOnly = shadowOnly;
-  }
+  // Track what type of shadow-only filter was converted for output.
+  ShadowOnlyType detectedShadowType = ShadowOnlyType::None;
 
   // Detect Figma-style drop shadow pattern and extract shadow parameters.
   // Pattern: feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feComposite → feColorMatrix
@@ -2752,6 +2754,24 @@ bool SVGParserImpl::convertFilterElement(
     }
 
     i++;
+  }
+
+  // Determine the shadow-only type based on newly added filters.
+  if (outShadowOnlyType != nullptr) {
+    if (shadowOnly && filters.size() > initialFilterCount) {
+      // Check the type of the first new filter to determine shadow-only type.
+      // All shadow-only filters in one element should be of the same type.
+      for (size_t idx = initialFilterCount; idx < filters.size(); ++idx) {
+        auto* filter = filters[idx].get();
+        if (filter->nodeType() == NodeType::InnerShadowFilter) {
+          *outShadowOnlyType = ShadowOnlyType::InnerShadow;
+          break;
+        } else if (filter->nodeType() == NodeType::DropShadowFilter) {
+          *outShadowOnlyType = ShadowOnlyType::DropShadow;
+          break;
+        }
+      }
+    }
   }
 
   // Return true if any filter or style was added.

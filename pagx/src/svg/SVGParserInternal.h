@@ -46,6 +46,15 @@
 namespace pagx {
 
 /**
+ * Type of shadow-only filter for determining how to handle element content.
+ */
+enum class ShadowOnlyType {
+  None,        // Not a shadow-only filter, render normally.
+  DropShadow,  // Shadow-only DropShadow: needs fill content as shadow source.
+  InnerShadow  // Shadow-only InnerShadow: no fill needed, uses layer alpha.
+};
+
+/**
  * Inherited SVG style properties that cascade down the element tree.
  */
 struct InheritedStyle {
@@ -89,7 +98,7 @@ class SVGParserImpl {
   void convertChildren(const std::shared_ptr<DOMNode>& element,
                        std::vector<std::unique_ptr<Element>>& contents,
                        const InheritedStyle& inheritedStyle,
-                       bool skipFillForShadow = false);
+                       ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);
   std::unique_ptr<Element> convertElement(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
@@ -115,12 +124,12 @@ class SVGParserImpl {
                                                 const InheritedStyle& parentStyle);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
-  // If outShadowOnly is provided, it will be set to true if all converted filters are shadow-only
-  // (i.e., they produce only shadow without the original content).
+  // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
+  // (DropShadow or InnerShadow) if all converted filters are shadow-only.
   bool convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
                             std::vector<std::unique_ptr<LayerFilter>>& filters,
                             std::vector<std::unique_ptr<LayerStyle>>& styles,
-                            bool* outShadowOnly = nullptr);
+                            ShadowOnlyType* outShadowOnlyType = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
                      std::vector<std::unique_ptr<Element>>& contents,
