@@ -578,7 +578,13 @@ std::unique_ptr<Path> PAGXImporterImpl::parsePath(const XMLNode* node) {
   auto path = std::make_unique<Path>();
   auto dataAttr = getAttribute(node, "data");
   if (!dataAttr.empty()) {
-    path->data = PathDataFromSVGString(dataAttr);
+    if (dataAttr[0] == '@') {
+      // Reference to PathData resource
+      path->dataRef = dataAttr;
+    } else {
+      // Inline path data
+      path->data = PathDataFromSVGString(dataAttr);
+    }
   }
   path->reversed = getBoolAttribute(node, "reversed", false);
   return path;

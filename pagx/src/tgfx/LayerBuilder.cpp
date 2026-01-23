@@ -436,9 +436,35 @@ class LayerBuilderImpl {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = std::make_shared<tgfx::ShapePath>();
-    auto tgfxPath = ToTGFX(node->data);
+    tgfx::Path tgfxPath;
+    if (!node->dataRef.empty()) {
+      // Look up PathData from resources
+      auto pathData = findPathDataResource(node->dataRef);
+      if (pathData) {
+        tgfxPath = ToTGFX(*pathData);
+      }
+    } else {
+      tgfxPath = ToTGFX(node->data);
+    }
     shapePath->setPath(tgfxPath);
     return shapePath;
+  }
+
+  const PathData* findPathDataResource(const std::string& ref) {
+    if (!_resources || ref.empty()) {
+      return nullptr;
+    }
+    // ref format: "@path0" -> id: "path0"
+    std::string id = ref;
+    if (!id.empty() && id[0] == '@') {
+      id = id.substr(1);
+    }
+    for (const auto& res : *_resources) {
+      if (res->nodeType() == NodeType::PathData && res->id == id) {
+        return static_cast<const PathData*>(res.get());
+      }
+    }
+    return nullptr;
   }
 
   std::shared_ptr<tgfx::TextSpan> convertTextSpan(const TextSpan* node) {
