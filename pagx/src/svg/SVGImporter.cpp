@@ -628,10 +628,15 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
                                                   &hasShadowOnlyFilter);
       if (!filterConverted) {
         // Filter could not be fully converted to PAGX format.
-        // Continue rendering the element without the filter effect.
+        if (hasShadowOnlyFilter) {
+          // For shadowOnly filters (e.g., inner shadow), the element exists solely to produce
+          // the filter effect. If the filter cannot be converted, skip the entire element
+          // to avoid rendering incorrect results (e.g., black fill instead of shadow effect).
+          return nullptr;
+        }
+        // For non-shadowOnly filters, continue rendering the element without the filter effect.
         layer->filters.clear();
         layer->styles.clear();
-        hasShadowOnlyFilter = false;
       }
     }
   }
