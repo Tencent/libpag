@@ -70,3 +70,18 @@ void* pag_surface_get_back_hardware_buffer(pag_surface* surface) {
   }
   return surface->ext->getBackHardwareBuffer();
 }
+
+pag_surface* pag_surface_make_from_texture(pag_backend_texture* texture, pag_image_origin origin,
+                                           bool forAsyncThread) {
+  if (texture == nullptr || !texture->p.isValid()) {
+    return nullptr;
+  }
+  pag::ImageOrigin pagOrigin;
+  if (!FromCImageOrigin(origin, &pagOrigin)) {
+    return nullptr;
+  }
+  if (auto surface = pag::PAGSurface::MakeFrom(texture->p, pagOrigin, forAsyncThread)) {
+    return new pag_surface(std::move(surface));
+  }
+  return nullptr;
+}
