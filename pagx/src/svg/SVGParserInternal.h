@@ -48,11 +48,17 @@ namespace pagx {
  * Inherited SVG style properties that cascade down the element tree.
  */
 struct InheritedStyle {
-  std::string fill = "";           // Empty means not set, "none" means no fill.
-  std::string stroke = "";         // Empty means not set.
-  std::string fillOpacity = "";    // Empty means not set.
-  std::string strokeOpacity = "";  // Empty means not set.
-  std::string fillRule = "";       // Empty means not set.
+  std::string fill = "";            // Empty means not set, "none" means no fill.
+  std::string stroke = "";          // Empty means not set.
+  std::string fillOpacity = "";     // Empty means not set.
+  std::string strokeOpacity = "";   // Empty means not set.
+  std::string fillRule = "";        // Empty means not set.
+  std::string strokeDasharray = ""; // Empty means not set, "none" means solid line.
+  std::string strokeDashoffset = "";// Empty means not set.
+  std::string strokeWidth = "";     // Empty means not set.
+  std::string strokeLinecap = "";   // Empty means not set.
+  std::string strokeLinejoin = "";  // Empty means not set.
+  std::string strokeMiterlimit = "";// Empty means not set.
 };
 
 /**

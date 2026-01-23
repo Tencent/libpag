@@ -294,6 +294,36 @@ InheritedStyle SVGParserImpl::computeInheritedStyle(const std::shared_ptr<DOMNod
     style.fillRule = fillRule;
   }
 
+  std::string strokeDasharray = getAttribute(element, "stroke-dasharray");
+  if (!strokeDasharray.empty()) {
+    style.strokeDasharray = strokeDasharray;
+  }
+
+  std::string strokeDashoffset = getAttribute(element, "stroke-dashoffset");
+  if (!strokeDashoffset.empty()) {
+    style.strokeDashoffset = strokeDashoffset;
+  }
+
+  std::string strokeWidth = getAttribute(element, "stroke-width");
+  if (!strokeWidth.empty()) {
+    style.strokeWidth = strokeWidth;
+  }
+
+  std::string strokeLinecap = getAttribute(element, "stroke-linecap");
+  if (!strokeLinecap.empty()) {
+    style.strokeLinecap = strokeLinecap;
+  }
+
+  std::string strokeLinejoin = getAttribute(element, "stroke-linejoin");
+  if (!strokeLinejoin.empty()) {
+    style.strokeLinejoin = strokeLinejoin;
+  }
+
+  std::string strokeMiterlimit = getAttribute(element, "stroke-miterlimit");
+  if (!strokeMiterlimit.empty()) {
+    style.strokeMiterlimit = strokeMiterlimit;
+  }
+
   return style;
 }
 
@@ -429,7 +459,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
                                     std::vector<std::unique_ptr<Element>>& contents,
                                     const InheritedStyle& inheritedStyle,
-                                    bool skipFillForShadow) {
+                                    bool shadowOnlyFilter) {
   const auto& tag = element->name;
 
   // Handle text element specially - it returns a Group with TextSpan.
@@ -443,7 +473,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
 
   // Check if this is a use element referencing an image.
   // In that case, we don't add fill/stroke because the image already has its own fill.
-  bool skipFillStroke = skipFillForShadow;
+  bool skipFillStroke = false;
   if (tag == "use") {
     std::string href = getAttribute(element, "xlink:href");
     if (href.empty()) {
@@ -462,7 +492,19 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   }
 
   if (!skipFillStroke) {
-    addFillStroke(element, contents, inheritedStyle);
+    if (shadowOnlyFilter) {
+      // For shadowOnly filters, we need to add a fill to provide a source for the shadow.
+      // The DropShadowFilter generates shadow based on the layer's content alpha channel.
+      // We use black (alpha=1) as the fill color since the actual shadow color is determined
+      // by the DropShadowFilter's color property, not the fill color.
+      auto fillNode = std::make_unique<Fill>();
+      auto solidColor = std::make_unique<SolidColor>();
+      solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
+      fillNode->color = std::move(solidColor);
+      contents.push_back(std::move(fillNode));
+    } else {
+      addFillStroke(element, contents, inheritedStyle);
+    }
   }
 }
 
@@ -973,36 +1015,35 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
         std::string useTransform = getAttribute(child, "transform");
         Matrix useMatrix = useTransform.empty() ? Matrix::Identity() : parseTransform(useTransform);
 
-        // Calculate the image's actual size in user space (considering content units and transform).
-        float imageSizeInUserSpaceX = 0;
-        float imageSizeInUserSpaceY = 0;
+        // Construct the complete transformation matrix for the ImagePattern.
+        // In SVG with patternContentUnits="objectBoundingBox", the transformation chain is:
+        //   image pixels → useMatrix → pattern space (0-1) → shapeBounds → screen space
+        //
+        // tgfx ImagePattern matrix maps from screen coordinates to image coordinates.
+        // The tgfx shader internally inverts the matrix we provide, so we should provide
+        // the forward transformation (image pixels to screen pixels).
+        //
+        // Forward transform = T(shapeBounds.origin) * S(shapeBounds.size) * useMatrix
+        //
+        // This means:
+        // 1. useMatrix transforms image pixels to pattern space (0-1 coordinates)
+        // 2. Scale by shapeBounds.size transforms to user space dimensions
+        // 3. Translate by shapeBounds.origin positions the pattern at the shape location
+
+        Matrix forwardMatrix = Matrix::Identity();
         if (contentUnitsOBB) {
-          // When patternContentUnits is objectBoundingBox, image dimensions are 0-1 ratios.
-          // Apply use transform (e.g., scale(0.005)) to map image to content space,
-          // then scale by shape bounds to get user space size.
-          imageSizeInUserSpaceX = imageWidth * useMatrix.a * shapeBounds.width;
-          imageSizeInUserSpaceY = imageHeight * useMatrix.d * shapeBounds.height;
+          // Pattern content is in objectBoundingBox coordinates (0-1).
+          // Build the complete forward transform: image pixels → screen pixels
+          forwardMatrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
+                          Matrix::Scale(shapeBounds.width, shapeBounds.height) *
+                          useMatrix;
         } else {
-          // When patternContentUnits is userSpaceOnUse, image dimensions are in user space.
-          imageSizeInUserSpaceX = imageWidth * useMatrix.a;
-          imageSizeInUserSpaceY = imageHeight * useMatrix.d;
+          // Pattern content is in userSpaceOnUse coordinates.
+          // useMatrix transforms image directly to user space, then translate to shape bounds.
+          forwardMatrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) * useMatrix;
         }
 
-        // The ImagePattern shader tiles the original image pixels.
-        // We need to scale the image so it renders at the correct size within the tile.
-        // Since tgfx ImagePattern uses the image's original pixel dimensions as the base,
-        // the matrix should scale the image to match imageSizeInUserSpace.
-        // Note: imageWidth here is the SVG display size, which equals original pixel size
-        // when the image is embedded at 1:1 scale.
-        float scaleX = imageSizeInUserSpaceX / imageWidth;
-        float scaleY = imageSizeInUserSpaceY / imageHeight;
-
-        // PAGX ImagePattern coordinates are relative to the geometry's local origin (0,0).
-        // SVG pattern with objectBoundingBox is relative to the shape's bounding box.
-        // We need to translate the pattern to align with the shape bounds.
-        // Matrix multiplication order: translate first, then scale (right to left).
-        pattern->matrix = Matrix::Translate(shapeBounds.x, shapeBounds.y) *
-                          Matrix::Scale(scaleX, scaleY);
+        pattern->matrix = forwardMatrix;
       }
     } else if (child->name == "image") {
       // Direct image element inside pattern.
@@ -1061,6 +1102,14 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
       fillNode->color = getColorSourceForRef(refId, shapeBounds);
+      // Apply fill-opacity even for url() fills.
+      std::string fillOpacity = getAttribute(element, "fill-opacity");
+      if (fillOpacity.empty()) {
+        fillOpacity = inheritedStyle.fillOpacity;
+      }
+      if (!fillOpacity.empty()) {
+        fillNode->alpha = std::stof(fillOpacity);
+      }
       contents.push_back(std::move(fillNode));
     } else {
       auto fillNode = std::make_unique<Fill>();
@@ -1126,26 +1175,41 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
     }
 
     std::string strokeWidth = getAttribute(element, "stroke-width");
+    if (strokeWidth.empty()) {
+      strokeWidth = inheritedStyle.strokeWidth;
+    }
     if (!strokeWidth.empty()) {
       strokeNode->width = parseLength(strokeWidth, _viewBoxWidth);
     }
 
     std::string strokeLinecap = getAttribute(element, "stroke-linecap");
+    if (strokeLinecap.empty()) {
+      strokeLinecap = inheritedStyle.strokeLinecap;
+    }
     if (!strokeLinecap.empty()) {
       strokeNode->cap = LineCapFromString(strokeLinecap);
     }
 
     std::string strokeLinejoin = getAttribute(element, "stroke-linejoin");
+    if (strokeLinejoin.empty()) {
+      strokeLinejoin = inheritedStyle.strokeLinejoin;
+    }
     if (!strokeLinejoin.empty()) {
       strokeNode->join = LineJoinFromString(strokeLinejoin);
     }
 
     std::string strokeMiterlimit = getAttribute(element, "stroke-miterlimit");
+    if (strokeMiterlimit.empty()) {
+      strokeMiterlimit = inheritedStyle.strokeMiterlimit;
+    }
     if (!strokeMiterlimit.empty()) {
       strokeNode->miterLimit = std::stof(strokeMiterlimit);
     }
 
     std::string dashArray = getAttribute(element, "stroke-dasharray");
+    if (dashArray.empty()) {
+      dashArray = inheritedStyle.strokeDasharray;
+    }
     if (!dashArray.empty() && dashArray != "none") {
       // Parse dash array values, which may contain units (e.g., "2px,2px" or "2,2").
       // Use parseLength to handle both numeric values and values with units.
@@ -1164,6 +1228,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
     }
 
     std::string dashOffset = getAttribute(element, "stroke-dashoffset");
+    if (dashOffset.empty()) {
+      dashOffset = inheritedStyle.strokeDashoffset;
+    }
     if (!dashOffset.empty()) {
       strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
     }
@@ -2138,10 +2205,29 @@ bool SVGParserImpl::convertFilterElement(
     }
 
     // Check for standard drop shadow pattern starting with feGaussianBlur in="SourceAlpha".
-    // Pattern: feGaussianBlur(in=SourceAlpha) → feOffset → ...
+    // Pattern: feGaussianBlur(in=SourceAlpha) → feOffset → [feColorMatrix]
+    // Note: Inner shadow pattern is similar but has feComposite(arithmetic) after feOffset.
+    // We skip inner shadow patterns as they are not supported by PAGX conversion.
     if (node->name == "feGaussianBlur" && getAttribute(node, "in") == "SourceAlpha") {
       // Look for feOffset following the blur.
       if (i + 1 < primitives.size() && primitives[i + 1]->name == "feOffset") {
+        // Check if this is an inner shadow pattern (has feComposite with arithmetic operator).
+        // Inner shadow pattern: feGaussianBlur → feOffset → feComposite(arithmetic) → feColorMatrix
+        bool isInnerShadow = false;
+        if (i + 2 < primitives.size() && primitives[i + 2]->name == "feComposite") {
+          std::string compositeOp = getAttribute(primitives[i + 2], "operator");
+          if (compositeOp == "arithmetic") {
+            isInnerShadow = true;
+          }
+        }
+
+        if (isInnerShadow) {
+          // Skip inner shadow pattern - not supported by PAGX conversion.
+          // Inner shadow is a complex effect that cannot be represented as DropShadowFilter.
+          i++;
+          continue;
+        }
+
         // Extract blur from feGaussianBlur.
         std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
         auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
