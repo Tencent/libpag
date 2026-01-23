@@ -183,11 +183,18 @@ class SVGParserImpl {
   // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
   std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
   
+  // Parse CSS style rules from <style> element.
+  void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
+
   int _nextImageId = 0;
   int _nextGeneratedId = 0;  // Counter for generating unique IDs.
   int _nextColorSourceId = 0;  // Counter for generating ColorSource IDs.
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
+
+  // CSS class rules: key is class name (without dot), value is style properties.
+  // Example: {"cls-1": "fill: #fcfae9"}
+  std::unordered_map<std::string, std::string> _cssClassRules = {};
 };
 
 }  // namespace pagx

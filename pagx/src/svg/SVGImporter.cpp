@@ -83,7 +83,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseFile(const std::string& filePa
 std::string SVGParserImpl::getAttribute(const std::shared_ptr<DOMNode>& node,
                                         const std::string& name,
                                         const std::string& defaultValue) const {
-  // CSS priority: style attribute > presentation attribute (direct attribute)
+  // CSS priority: style attribute > presentation attribute > CSS class rules
   // Check style attribute first for CSS property.
   // Style attribute format: "property1: value1; property2: value2; ..."
   // CSS cascade rule: later properties override earlier ones.
@@ -155,6 +155,74 @@ std::string SVGParserImpl::getAttribute(const std::shared_ptr<DOMNode>& node,
     return value;
   }
 
+  // Check CSS class rules (lowest priority).
+  // class attribute can contain multiple class names separated by whitespace.
+  auto [hasClass, classAttr] = node->findAttribute("class");
+  if (hasClass && !classAttr.empty()) {
+    // Parse class names.
+    size_t pos = 0;
+    while (pos < classAttr.size()) {
+      // Skip whitespace.
+      while (pos < classAttr.size() && std::isspace(classAttr[pos])) {
+        pos++;
+      }
+      if (pos >= classAttr.size()) {
+        break;
+      }
+      // Find end of class name.
+      size_t endPos = pos;
+      while (endPos < classAttr.size() && !std::isspace(classAttr[endPos])) {
+        endPos++;
+      }
+      std::string className = classAttr.substr(pos, endPos - pos);
+      pos = endPos;
+
+      // Look up the class in CSS rules.
+      auto it = _cssClassRules.find(className);
+      if (it != _cssClassRules.end()) {
+        // Parse the style string to find the property we need.
+        const std::string& classStyle = it->second;
+        size_t stylePos = 0;
+        while (stylePos < classStyle.size()) {
+          // Skip whitespace.
+          while (stylePos < classStyle.size() && std::isspace(classStyle[stylePos])) {
+            stylePos++;
+          }
+          // Find property name end (colon).
+          size_t colonPos = classStyle.find(':', stylePos);
+          if (colonPos == std::string::npos) {
+            break;
+          }
+          // Extract property name and trim whitespace.
+          std::string currentProp = classStyle.substr(stylePos, colonPos - stylePos);
+          size_t propStart = currentProp.find_first_not_of(" \t");
+          size_t propEnd = currentProp.find_last_not_of(" \t");
+          if (propStart != std::string::npos && propEnd != std::string::npos) {
+            currentProp = currentProp.substr(propStart, propEnd - propStart + 1);
+          }
+          // Find value end (semicolon or end of string).
+          size_t semicolonPos = classStyle.find(';', colonPos);
+          if (semicolonPos == std::string::npos) {
+            semicolonPos = classStyle.size();
+          }
+          // Check if this is the property we're looking for.
+          if (currentProp == name) {
+            // Extract and trim the value.
+            std::string propValue = classStyle.substr(colonPos + 1, semicolonPos - colonPos - 1);
+            size_t valStart = propValue.find_first_not_of(" \t");
+            size_t valEnd = propValue.find_last_not_of(" \t");
+            if (valStart != std::string::npos && valEnd != std::string::npos) {
+              return propValue.substr(valStart, valEnd - valStart + 1);
+            }
+            return propValue;
+          }
+          // Move to next property.
+          stylePos = semicolonPos + 1;
+        }
+      }
+    }
+  }
+
   return defaultValue;
 }
 
@@ -199,6 +267,24 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   while (child) {
     if (child->name == "defs") {
       parseDefs(child);
+    }
+    child = child->getNextSibling();
+  }
+
+  // Parse <style> elements (can be in defs or directly under svg).
+  child = root->getFirstChild();
+  while (child) {
+    if (child->name == "style") {
+      parseStyleElement(child);
+    } else if (child->name == "defs") {
+      // Also check for <style> inside <defs>.
+      auto defsChild = child->getFirstChild();
+      while (defsChild) {
+        if (defsChild->name == "style") {
+          parseStyleElement(defsChild);
+        }
+        defsChild = defsChild->getNextSibling();
+      }
     }
     child = child->getNextSibling();
   }
@@ -339,6 +425,88 @@ void SVGParserImpl::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
       parseDefs(child);
     }
     child = child->getNextSibling();
+  }
+}
+
+void SVGParserImpl::parseStyleElement(const std::shared_ptr<DOMNode>& styleNode) {
+  // Get the text content of the <style> element.
+  auto textNode = styleNode->getFirstChild();
+  if (!textNode || textNode->type != DOMNodeType::Text) {
+    return;
+  }
+
+  // The text content is stored in the node's name for text nodes.
+  std::string cssContent = textNode->name;
+  if (cssContent.empty()) {
+    return;
+  }
+
+  // Parse CSS rules.
+  // Format: .class-name { property1: value1; property2: value2; }
+  size_t pos = 0;
+  while (pos < cssContent.size()) {
+    // Skip whitespace.
+    while (pos < cssContent.size() && std::isspace(cssContent[pos])) {
+      pos++;
+    }
+    if (pos >= cssContent.size()) {
+      break;
+    }
+
+    // Look for class selector starting with dot.
+    if (cssContent[pos] != '.') {
+      // Skip non-class selectors (find next rule).
+      size_t bracePos = cssContent.find('{', pos);
+      if (bracePos == std::string::npos) {
+        break;
+      }
+      size_t closeBracePos = cssContent.find('}', bracePos);
+      if (closeBracePos == std::string::npos) {
+        break;
+      }
+      pos = closeBracePos + 1;
+      continue;
+    }
+
+    // Found a class selector.
+    pos++;  // Skip the dot.
+
+    // Extract class name (until whitespace or {).
+    size_t classNameEnd = pos;
+    while (classNameEnd < cssContent.size() && !std::isspace(cssContent[classNameEnd]) &&
+           cssContent[classNameEnd] != '{') {
+      classNameEnd++;
+    }
+    std::string className = cssContent.substr(pos, classNameEnd - pos);
+
+    // Find the opening brace.
+    size_t bracePos = cssContent.find('{', classNameEnd);
+    if (bracePos == std::string::npos) {
+      break;
+    }
+
+    // Find the closing brace.
+    size_t closeBracePos = cssContent.find('}', bracePos);
+    if (closeBracePos == std::string::npos) {
+      break;
+    }
+
+    // Extract the style content between braces.
+    std::string styleContent = cssContent.substr(bracePos + 1, closeBracePos - bracePos - 1);
+
+    // Trim whitespace and newlines from style content.
+    size_t contentStart = styleContent.find_first_not_of(" \t\n\r");
+    size_t contentEnd = styleContent.find_last_not_of(" \t\n\r");
+    if (contentStart != std::string::npos && contentEnd != std::string::npos) {
+      styleContent = styleContent.substr(contentStart, contentEnd - contentStart + 1);
+    }
+
+    // Store the class rule.
+    if (!className.empty() && !styleContent.empty()) {
+      _cssClassRules[className] = styleContent;
+    }
+
+    pos = closeBracePos + 1;
   }
 }
 
