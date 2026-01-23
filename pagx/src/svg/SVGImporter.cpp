@@ -2202,6 +2202,50 @@ bool SVGParserImpl::convertFilterElement(
         }
         continue;
       }
+
+      // Check for Figma-style solid drop shadow pattern (no blur):
+      // feColorMatrix(in=SourceAlpha) → feOffset → feColorMatrix → [feBlend]
+      // This creates a solid shadow without blur effect.
+      if (i + 2 < primitives.size() && primitives[i + 1]->name == "feOffset" &&
+          primitives[i + 2]->name == "feColorMatrix") {
+        // Extract offset from feOffset.
+        float offsetX = 0, offsetY = 0;
+        std::string dx = getAttribute(primitives[i + 1], "dx", "0");
+        std::string dy = getAttribute(primitives[i + 1], "dy", "0");
+        offsetX = strtof(dx.c_str(), nullptr);
+        offsetY = strtof(dy.c_str(), nullptr);
+
+        // Extract color from feColorMatrix.
+        // Format: "0 0 0 0 R 0 0 0 0 G 0 0 0 0 B 0 0 0 A 0" where R,G,B are 0-1 and A is alpha.
+        Color shadowColor = {0, 0, 0, 1.0f};
+        std::string colorMatrix = getAttribute(primitives[i + 2], "values");
+        if (!colorMatrix.empty()) {
+          auto values = ParseSpaceSeparatedFloats(colorMatrix);
+          // R is at index 4, G at index 9, B at index 14, A at index 18.
+          if (values.size() >= 19) {
+            shadowColor.red = values[4];
+            shadowColor.green = values[9];
+            shadowColor.blue = values[14];
+            shadowColor.alpha = values[18];
+          }
+        }
+
+        auto dropShadow = std::make_unique<DropShadowFilter>();
+        dropShadow->offsetX = offsetX;
+        dropShadow->offsetY = offsetY;
+        dropShadow->blurrinessX = 0;
+        dropShadow->blurrinessY = 0;
+        dropShadow->color = shadowColor;
+        dropShadow->shadowOnly = shadowOnly;
+        filters.push_back(std::move(dropShadow));
+
+        // Skip the consumed primitives (3 elements) plus any feBlend that follows.
+        i += 3;
+        while (i < primitives.size() && primitives[i]->name == "feBlend") {
+          i++;
+        }
+        continue;
+      }
     }
 
     // Check for standard drop shadow pattern starting with feGaussianBlur in="SourceAlpha".
