@@ -2560,7 +2560,6 @@ bool SVGParserImpl::convertFilterElement(
     // Check for standard drop shadow pattern starting with feGaussianBlur in="SourceAlpha".
     // Pattern: feGaussianBlur(in=SourceAlpha) → feOffset → [feColorMatrix]
     // Note: Inner shadow pattern is similar but has feComposite(arithmetic) after feOffset.
-    // We skip inner shadow patterns as they are not supported by PAGX conversion.
     if (node->name == "feGaussianBlur" && getAttribute(node, "in") == "SourceAlpha") {
       // Look for feOffset following the blur.
       if (i + 1 < primitives.size() && primitives[i + 1]->name == "feOffset") {
@@ -2575,9 +2574,51 @@ bool SVGParserImpl::convertFilterElement(
         }
 
         if (isInnerShadow) {
-          // Skip inner shadow pattern - not supported by PAGX conversion.
-          // Inner shadow is a complex effect that cannot be represented as DropShadowFilter.
-          i++;
+          // Convert inner shadow pattern to InnerShadowFilter.
+          // Extract blur from feGaussianBlur.
+          std::string stdDeviation = getAttribute(node, "stdDeviation", "0");
+          auto blurValues = ParseSpaceSeparatedFloats(stdDeviation);
+          float blurX = blurValues.empty() ? 0 : blurValues[0];
+          float blurY = blurValues.size() > 1 ? blurValues[1] : blurX;
+
+          // Extract offset from feOffset.
+          float offsetX = 0, offsetY = 0;
+          std::string dx = getAttribute(primitives[i + 1], "dx", "0");
+          std::string dy = getAttribute(primitives[i + 1], "dy", "0");
+          offsetX = strtof(dx.c_str(), nullptr);
+          offsetY = strtof(dy.c_str(), nullptr);
+
+          // Look for feColorMatrix after feComposite for shadow color.
+          Color shadowColor = {0, 0, 0, 1.0f};
+          size_t colorMatrixIdx = i + 3;
+          if (colorMatrixIdx < primitives.size() &&
+              primitives[colorMatrixIdx]->name == "feColorMatrix") {
+            std::string colorMatrix = getAttribute(primitives[colorMatrixIdx], "values");
+            if (!colorMatrix.empty()) {
+              auto values = ParseSpaceSeparatedFloats(colorMatrix);
+              if (values.size() >= 19) {
+                shadowColor.red = values[4];
+                shadowColor.green = values[9];
+                shadowColor.blue = values[14];
+                shadowColor.alpha = values[18];
+              }
+            }
+          }
+
+          auto innerShadow = std::make_unique<InnerShadowFilter>();
+          innerShadow->offsetX = offsetX;
+          innerShadow->offsetY = offsetY;
+          innerShadow->blurrinessX = blurX;
+          innerShadow->blurrinessY = blurY;
+          innerShadow->color = shadowColor;
+          innerShadow->shadowOnly = shadowOnly;
+          filters.push_back(std::move(innerShadow));
+
+          // Skip consumed primitives: feGaussianBlur, feOffset, feComposite, [feColorMatrix]
+          i += 3;
+          if (i < primitives.size() && primitives[i]->name == "feColorMatrix") {
+            i++;
+          }
           continue;
         }
 
