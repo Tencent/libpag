@@ -461,10 +461,24 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
-      // If colorSource has an id, output reference; otherwise inline the colorSource below
-      if (fill->color && !fill->color->id.empty()) {
-        // Reference by id
-        xml.addAttribute("color", "#" + fill->color->id);
+      // Determine color attribute value
+      bool needsInlineColorSource = false;
+      if (!fill->colorRef.empty()) {
+        // Use existing colorRef (could be "#FF0000" or "@gradientId")
+        xml.addAttribute("color", fill->colorRef);
+      } else if (fill->color) {
+        if (!fill->color->id.empty()) {
+          // Reference to resource by id
+          xml.addAttribute("color", "@" + fill->color->id);
+        } else if (fill->color->nodeType() == NodeType::SolidColor) {
+          // SolidColor without id: output color value directly
+          auto solid = static_cast<const SolidColor*>(fill->color.get());
+          xml.addAttribute("color",
+                           ColorToHexString(solid->color, solid->color.alpha < 1.0f));
+        } else {
+          // Other ColorSource without id: needs inline as child element
+          needsInlineColorSource = true;
+        }
       }
       xml.addAttribute("alpha", fill->alpha, 1.0f);
       if (fill->blendMode != BlendMode::Normal) {
@@ -476,8 +490,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       if (fill->placement != LayerPlacement::Background) {
         xml.addAttribute("placement", LayerPlacementToString(fill->placement));
       }
-      // Inline ColorSource if it doesn't have an id
-      if (fill->color && fill->color->id.empty()) {
+      if (needsInlineColorSource) {
         xml.closeElementStart();
         writeColorSource(xml, fill->color.get());
         xml.closeElement();
@@ -489,10 +502,24 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
-      // If colorSource has an id, output reference; otherwise inline the colorSource below
-      if (stroke->color && !stroke->color->id.empty()) {
-        // Reference by id
-        xml.addAttribute("color", "#" + stroke->color->id);
+      // Determine color attribute value
+      bool needsInlineColorSource = false;
+      if (!stroke->colorRef.empty()) {
+        // Use existing colorRef (could be "#FF0000" or "@gradientId")
+        xml.addAttribute("color", stroke->colorRef);
+      } else if (stroke->color) {
+        if (!stroke->color->id.empty()) {
+          // Reference to resource by id
+          xml.addAttribute("color", "@" + stroke->color->id);
+        } else if (stroke->color->nodeType() == NodeType::SolidColor) {
+          // SolidColor without id: output color value directly
+          auto solid = static_cast<const SolidColor*>(stroke->color.get());
+          xml.addAttribute("color",
+                           ColorToHexString(solid->color, solid->color.alpha < 1.0f));
+        } else {
+          // Other ColorSource without id: needs inline as child element
+          needsInlineColorSource = true;
+        }
       }
       xml.addAttribute("width", stroke->width, 1.0f);
       xml.addAttribute("alpha", stroke->alpha, 1.0f);
@@ -516,8 +543,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       if (stroke->placement != LayerPlacement::Background) {
         xml.addAttribute("placement", LayerPlacementToString(stroke->placement));
       }
-      // Inline ColorSource if it doesn't have an id
-      if (stroke->color && stroke->color->id.empty()) {
+      if (needsInlineColorSource) {
         xml.closeElementStart();
         writeColorSource(xml, stroke->color.get());
         xml.closeElement();
