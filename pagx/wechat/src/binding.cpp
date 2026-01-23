@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making libpag available.
+//  Tencent is pleased to support the open source community by making tgfx available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
@@ -21,14 +21,19 @@
 
 using namespace emscripten;
 
-EMSCRIPTEN_BINDINGS(PAGXViewer) {
-  class_<pagx::PAGXView>("PAGXView")
-      .smart_ptr<std::shared_ptr<pagx::PAGXView>>("PAGXView")
-      .class_function("MakeFrom", &pagx::PAGXView::MakeFrom)
-      .function("loadPAGX", &pagx::PAGXView::loadPAGX)
-      .function("updateSize", &pagx::PAGXView::updateSize)
-      .function("updateZoomScaleAndOffset", &pagx::PAGXView::updateZoomScaleAndOffset)
-      .function("draw", &pagx::PAGXView::draw)
-      .function("contentWidth", &pagx::PAGXView::contentWidth)
-      .function("contentHeight", &pagx::PAGXView::contentHeight);
+using namespace emscripten;
+using namespace pagx;
+
+EMSCRIPTEN_BINDINGS(PAGXView) {
+  class_<PAGXView>("PAGXView")
+      .smart_ptr<std::shared_ptr<PAGXView>>("PAGXView")
+      .class_function("MakeFrom", &PAGXView::MakeFrom)
+      .function("width", &PAGXView::width)
+      .function("height", &PAGXView::height)
+      .function("loadPAGX", &PAGXView::loadPAGX)
+      .function("updateSize", &PAGXView::updateSize)
+      .function("updateZoomScaleAndOffset", &PAGXView::updateZoomScaleAndOffset)
+      .function("draw", &PAGXView::draw)
+      .function("contentWidth", &PAGXView::contentWidth)
+      .function("contentHeight", &PAGXView::contentHeight);
 }

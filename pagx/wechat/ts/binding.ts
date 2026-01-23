@@ -26,6 +26,15 @@ const setColorSpace = (GL: EmscriptenGL, colorSpace: WindowColorSpace): boolean 
   return true;
 };
 
+const hasWebpSupport = () => {
+  try {
+    return document.createElement('canvas').toDataURL('image/webp', 0.5).indexOf('data:image/webp') === 0;
+  } catch (err) {
+    console.log("wechat is not support webp");
+    return false;
+  }
+};
+
 /**
  * Binding pag js module on pag webassembly module.
  */
@@ -33,4 +42,5 @@ export const binding = (module: PAGX) => {
   TGFXBind(module);
   module.View = View;
   module.tgfx.setColorSpace = setColorSpace;
+  module.tgfx.hasWebpSupport = hasWebpSupport;
 };

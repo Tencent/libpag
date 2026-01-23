@@ -184,7 +184,7 @@ function main() {
 //     module.exports = { copyFiles };
 // }
 
-copyFiles('/Users/billyjin/Desktop/project/tgfx_new/pagx/wechat/ts/wasm', '/Users/billyjin/Desktop/project/tgfx_new/pagx/wechat/wx_demo/utils',
+copyFiles('./ts/wasm', './wx_demo/utils',
   ['*.js', '*.br'], {
   recursive: true,
   overwrite: true,

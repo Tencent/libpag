@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making libpag available.
+//  Tencent is pleased to support the open source community by making tgfx available.
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
@@ -17,12 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXView.h"
+#include <emscripten/html5.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
-
-#include <memory>
-#include <utility>
 #include "GridBackground.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 using namespace emscripten;
@@ -39,10 +38,8 @@ std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
     return nullptr;
   }
 
-  return std::make_shared<PAGXView>(device, width, height);
+  return std::shared_ptr<PAGXView>(new PAGXView(device, width, height));
 }
-
-static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
 
 static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
@@ -64,12 +61,13 @@ static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenDa
 }
 
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
-: device(std::move(device)), _width(width), _height(height) {
+: device(device), _width(width), _height(height) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
 }
 
+static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
 
 void PAGXView::loadPAGX(const val& pagxData) {
   auto data = GetDataFromEmscripten(pagxData);
@@ -94,83 +92,48 @@ void PAGXView::updateSize(int width, int height) {
   if (width <= 0 || height <= 0) {
     return;
   }
-  if (_width == width && _height == height) {
-    return;
-  }
+
   _width = width;
   _height = height;
   surface = nullptr;
-  lastSurfaceWidth = 0;
-  lastSurfaceHeight = 0;
+
+  if (contentLayer) {
+    applyCenteringTransform();
+  }
 }
 
 void PAGXView::applyCenteringTransform() {
-  if (lastSurfaceWidth <= 0 || lastSurfaceHeight <= 0 || !contentLayer) {
+  if (_width <= 0 || _height <= 0 || !contentLayer) {
     return;
   }
   if (pagxWidth <= 0 || pagxHeight <= 0) {
     return;
   }
-  float scaleX = static_cast<float>(lastSurfaceWidth) / pagxWidth;
-  float scaleY = static_cast<float>(lastSurfaceHeight) / pagxHeight;
+
+  float scaleX = static_cast<float>(_width) / pagxWidth;
+  float scaleY = static_cast<float>(_height) / pagxHeight;
   float scale = std::min(scaleX, scaleY);
-  float offsetX = (static_cast<float>(lastSurfaceWidth) - pagxWidth * scale) * 0.5f;
-  float offsetY = (static_cast<float>(lastSurfaceHeight) - pagxHeight * scale) * 0.5f;
+  float offsetX = (static_cast<float>(_width) - pagxWidth * scale) * 0.5f;
+  float offsetY = (static_cast<float>(_height) - pagxHeight * scale) * 0.5f;
+
   auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
   matrix.preScale(scale, scale);
+
+  matrix.preScale(zoomScale, zoomScale);
+  matrix.preTranslate(zoomOffsetX, zoomOffsetY);
+
   contentLayer->setMatrix(matrix);
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(offsetX, offsetY);
-}
+  zoomScale = zoom;
+  zoomOffsetX = offsetX;
+  zoomOffsetY = offsetY;
 
-// void PAGXView::draw() {
-//   if (device == nullptr) {
-//     return;
-//   }
-//   bool hasContentChanged = displayList.hasContentChanged();
-//   bool hasLastRecording = (lastRecording != nullptr);
-//   if (!hasContentChanged && !hasLastRecording) {
-//     return;
-//   }
-//   auto context = device->lockContext();
-//   if (context == nullptr) {
-//     return;
-//   }
-//   if (surface == nullptr) {
-//     surface = tgfx::Surface::Make(context, _width, _height);
-//     if (surface != nullptr) {
-//       lastSurfaceWidth = surface->width();
-//       lastSurfaceHeight = surface->height();
-//       applyCenteringTransform();
-//       presentImmediately = true;
-//     }
-//   }
-//   if (surface == nullptr) {
-//     device->unlock();
-//     return;
-//   }
-//   auto canvas = surface->getCanvas();
-//   canvas->clear();
-//   auto density = 1.0f;
-//   pagx::DrawBackground(canvas, surface->width(), surface->height(), density);
-//   displayList.render(surface.get(), false);
-//   auto recording = context->flush();
-//   if (presentImmediately) {
-//     presentImmediately = false;
-//     if (recording) {
-//       context->submit(std::move(recording));
-//     }
-//   } else {
-//     std::swap(lastRecording, recording);
-//     if (recording) {
-//       context->submit(std::move(recording));
-//     }
-//   }
-//   device->unlock();
-// }
+  if (contentLayer) {
+    applyCenteringTransform();
+  }
+}
 
 bool PAGXView::draw() {
   if (device == nullptr) {
@@ -208,6 +171,14 @@ bool PAGXView::draw() {
   device->unlock();
 
   return true;
+}
+
+int PAGXView::width() const {
+  return _width;
+}
+
+int PAGXView::height() const {
+  return _height;
 }
 
 }  // namespace pagx

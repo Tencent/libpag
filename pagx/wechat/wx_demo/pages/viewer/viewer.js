@@ -12,24 +12,24 @@ import { WXGestureManager } from '../../utils/gesture-manager';
 const SAMPLE_FILES = [
   { 
     name: 'ColorPicker', 
-    url: 'https://pag.io/pagx/samples/ColorPicker.pagx'
+    url: 'https://pag.io/pagx/testFiles/ColorPicker.libpag.pagx'
   },
-  { 
-    name: 'complex3', 
-    url: 'https://pag.io/pagx/testFiles/complex3.pagx'
-  },
+  // { 
+  //   name: 'complex3', 
+  //   url: 'https://pag.io/pagx/testFiles/complex3.pagx'
+  // },
   { 
     name: 'complex6', 
     url: 'https://pag.io/pagx/testFiles/complex6.pagx'
   },
-  { 
-    name: 'path', 
-    url: 'https://pag.io/pagx/testFiles/path.pagx'
-  },
-  { 
-    name: 'refStyle', 
-    url: 'https://pag.io/pagx/testFiles/refStyle.pagx'
-  }
+  // { 
+  //   name: 'path', 
+  //   url: 'https://pag.io/pagx/testFiles/path.pagx'
+  // },
+  // { 
+  //   name: 'refStyle', 
+  //   url: 'https://pag.io/pagx/testFiles/refStyle.pagx'
+  // }
 ];
 
 Page({
