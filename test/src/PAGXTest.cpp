@@ -147,14 +147,20 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Set container size to match PAGX document size, ensuring SVG renders at the same coordinate
-    // space as PAGX regardless of original width/height units (e.g., pt vs px).
-    svgDOM->setContainerSize({pagxWidth, pagxHeight});
+    // Get SVG container size (may differ from PAGX size due to unit conversion, e.g., pt -> px).
+    auto containerSize = svgDOM->getContainerSize();
+    float svgWidth = containerSize.width;
+    float svgHeight = containerSize.height;
 
-    // Render SVG with the same canvas size and scale as PAGX.
+    // Calculate scale to fit SVG into the same canvas as PAGX.
+    // SVG needs to scale from its container size to the canvas size.
+    float svgScaleX = static_cast<float>(canvasWidth) / svgWidth;
+    float svgScaleY = static_cast<float>(canvasHeight) / svgHeight;
+
+    // Render SVG with calculated scale to match PAGX canvas.
     auto svgSurface = Surface::Make(context, canvasWidth, canvasHeight);
     auto svgCanvas = svgSurface->getCanvas();
-    svgCanvas->scale(scale, scale);
+    svgCanvas->scale(svgScaleX, svgScaleY);
     svgDOM->render(svgCanvas);
     EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
 
