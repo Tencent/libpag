@@ -590,7 +590,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
       // Convert mask element to a mask layer.
       auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
       if (maskLayer) {
-        layer->mask = "#" + maskLayer->id;
+        layer->mask = "@" + maskLayer->id;
         // SVG masks use luminance by default.
         layer->maskType = MaskType::Luminance;
         // Add mask layer as invisible layer to the document.
@@ -608,7 +608,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
       // Convert clipPath element to a mask layer.
       auto clipLayer = convertMaskElement(clipIt->second, inheritedStyle);
       if (clipLayer) {
-        layer->mask = "#" + clipLayer->id;
+        layer->mask = "@" + clipLayer->id;
         // SVG clip-path uses alpha (shape outline) for clipping.
         layer->maskType = MaskType::Alpha;
         // Add clip layer as invisible layer to the document.

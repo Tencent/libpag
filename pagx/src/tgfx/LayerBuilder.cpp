@@ -328,8 +328,8 @@ class LayerBuilderImpl {
       // Queue mask to be applied in second pass.
       if (!node->mask.empty()) {
         std::string maskId = node->mask;
-        // Remove leading '#' if present.
-        if (!maskId.empty() && maskId[0] == '#') {
+        // Remove leading '@' if present (resource reference syntax).
+        if (!maskId.empty() && maskId[0] == '@') {
           maskId = maskId.substr(1);
         }
         _pendingMasks.emplace_back(layer, maskId, ToTGFXMaskType(node->maskType));
