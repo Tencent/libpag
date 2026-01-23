@@ -550,6 +550,17 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
     return nullptr;
   }
 
+  // Skip invisible elements (display:none or visibility:hidden).
+  // Mask layers are handled separately via convertMaskElement.
+  std::string display = getAttribute(element, "display");
+  if (display == "none") {
+    return nullptr;
+  }
+  std::string visibility = getAttribute(element, "visibility");
+  if (visibility == "hidden") {
+    return nullptr;
+  }
+
   // Compute inherited style for this element.
   InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
 
@@ -569,16 +580,6 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
   std::string opacity = getAttribute(element, "opacity");
   if (!opacity.empty()) {
     layer->alpha = std::stof(opacity);
-  }
-
-  std::string display = getAttribute(element, "display");
-  if (display == "none") {
-    layer->visible = false;
-  }
-
-  std::string visibility = getAttribute(element, "visibility");
-  if (visibility == "hidden") {
-    layer->visible = false;
   }
 
   // Handle mask attribute.
