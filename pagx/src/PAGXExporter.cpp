@@ -429,14 +429,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
-      if (!path->data.isEmpty()) {
-        // Check if pathData has a reference (id starts with #)
-        if (!path->dataRef.empty()) {
-          xml.addAttribute("data", path->dataRef);
-        } else {
-          // Inline the path data
-          xml.addAttribute("data", PathDataToSVGString(path->data));
-        }
+      if (!path->dataRef.empty()) {
+        // Use the reference to PathData resource.
+        xml.addAttribute("data", path->dataRef);
+      } else if (!path->data.isEmpty()) {
+        // Inline the path data.
+        xml.addAttribute("data", PathDataToSVGString(path->data));
       }
       xml.addAttribute("reversed", path->reversed);
       xml.closeElementSelfClosing();
@@ -835,8 +833,11 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
       break;
     }
     case NodeType::PathData: {
-      // PathData resources are not currently supported as separate Node type.
-      // Path data is stored inline in Path elements.
+      auto pathData = static_cast<const PathData*>(node);
+      xml.openElement("PathData");
+      xml.addAttribute("id", pathData->id);
+      xml.addAttribute("data", PathDataToSVGString(*pathData));
+      xml.closeElementSelfClosing();
       break;
     }
     case NodeType::Composition: {

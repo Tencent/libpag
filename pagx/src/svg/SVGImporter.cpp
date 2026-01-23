@@ -840,8 +840,13 @@ std::unique_ptr<Element> SVGParserImpl::convertLine(
   float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
 
   auto path = std::make_unique<Path>();
-  path->data.moveTo(x1, y1);
-  path->data.lineTo(x2, y2);
+  PathData pathData;
+  pathData.moveTo(x1, y1);
+  pathData.lineTo(x2, y2);
+  if (!pathData.isEmpty()) {
+    std::string pathId = registerPathDataResource(std::move(pathData));
+    path->dataRef = "@" + pathId;
+  }
 
   return path;
 }
@@ -849,14 +854,22 @@ std::unique_ptr<Element> SVGParserImpl::convertLine(
 std::unique_ptr<Element> SVGParserImpl::convertPolyline(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
-  path->data = parsePoints(getAttribute(element, "points"), false);
+  auto pathData = parsePoints(getAttribute(element, "points"), false);
+  if (!pathData.isEmpty()) {
+    std::string pathId = registerPathDataResource(std::move(pathData));
+    path->dataRef = "@" + pathId;
+  }
   return path;
 }
 
 std::unique_ptr<Element> SVGParserImpl::convertPolygon(
     const std::shared_ptr<DOMNode>& element) {
   auto path = std::make_unique<Path>();
-  path->data = parsePoints(getAttribute(element, "points"), true);
+  auto pathData = parsePoints(getAttribute(element, "points"), true);
+  if (!pathData.isEmpty()) {
+    std::string pathId = registerPathDataResource(std::move(pathData));
+    path->dataRef = "@" + pathId;
+  }
   return path;
 }
 
@@ -865,7 +878,11 @@ std::unique_ptr<Element> SVGParserImpl::convertPath(
   auto path = std::make_unique<Path>();
   std::string d = getAttribute(element, "d");
   if (!d.empty()) {
-    path->data = PathDataFromSVGString(d);
+    auto pathData = PathDataFromSVGString(d);
+    if (!pathData.isEmpty()) {
+      std::string pathId = registerPathDataResource(std::move(pathData));
+      path->dataRef = "@" + pathId;
+    }
   }
   return path;
 }
@@ -2196,6 +2213,18 @@ std::string SVGParserImpl::registerImageResource(const std::string& imageSource)
   _imageSourceToId[imageSource] = imageId;
 
   return imageId;
+}
+
+std::string SVGParserImpl::registerPathDataResource(PathData pathData) {
+  // Generate a unique PathData ID.
+  std::string pathId = "path" + std::to_string(_nextPathDataId++);
+
+  // Create and add the PathData resource to the document.
+  auto pathDataNode = std::make_unique<PathData>(std::move(pathData));
+  pathDataNode->id = pathId;
+  _document->resources.push_back(std::move(pathDataNode));
+
+  return pathId;
 }
 
 // Helper function to check if two VectorElement nodes are the same geometry.

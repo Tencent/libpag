@@ -159,6 +159,10 @@ class SVGParserImpl {
   // If the image source (data URI or path) has already been registered, returns the existing ID.
   std::string registerImageResource(const std::string& imageSource);
 
+  // Register a PathData resource and return its reference ID (e.g., "@path0").
+  // This creates a new PathData resource in the document's resources list.
+  std::string registerPathDataResource(PathData pathData);
+
   // Merge adjacent layers that have the same shape geometry.
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
   void mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& layers);
@@ -206,6 +210,7 @@ class SVGParserImpl {
   int _nextImageId = 0;
   int _nextGeneratedId = 0;  // Counter for generating unique IDs.
   int _nextColorSourceId = 0;  // Counter for generating ColorSource IDs.
+  int _nextPathDataId = 0;  // Counter for generating PathData IDs.
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 
