@@ -39,6 +39,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
@@ -146,21 +147,16 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Get tgfx's container size (respects width/height unit conversion).
-    auto containerSize = svgDOM->getContainerSize();
-    int svgWidth = static_cast<int>(containerSize.width);
-    int svgHeight = static_cast<int>(containerSize.height);
+    // Set container size to match PAGX document size, ensuring SVG renders at the same coordinate
+    // space as PAGX regardless of original width/height units (e.g., pt vs px).
+    svgDOM->setContainerSize({pagxWidth, pagxHeight});
 
-    // Only compare SVG rendering when sizes match (no unit conversion difference).
-    // When viewBox is present with non-pixel width/height (e.g., "1080pt"), tgfx will scale
-    // content based on the unit conversion, but PAGX uses viewBox coordinates directly.
-    if (svgWidth == static_cast<int>(pagxWidth) && svgHeight == static_cast<int>(pagxHeight)) {
-      auto svgSurface = Surface::Make(context, canvasWidth, canvasHeight);
-      auto svgCanvas = svgSurface->getCanvas();
-      svgCanvas->scale(scale, scale);
-      svgDOM->render(svgCanvas);
-      EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
-    }
+    // Render SVG with the same canvas size and scale as PAGX.
+    auto svgSurface = Surface::Make(context, canvasWidth, canvasHeight);
+    auto svgCanvas = svgSurface->getCanvas();
+    svgCanvas->scale(scale, scale);
+    svgDOM->render(svgCanvas);
+    EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
 
     // Save PAGX file to output directory
     pagx::SVGImporter::Options parserOptions;
@@ -172,10 +168,13 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Render PAGX using DisplayList (required for mask to work).
+    // Create a container layer for scaling to preserve content.root's original matrix.
     auto pagxSurface = Surface::Make(context, canvasWidth, canvasHeight);
     DisplayList displayList;
-    content.root->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-    displayList.root()->addChild(content.root);
+    auto container = tgfx::Layer::Make();
+    container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
+    container->addChild(content.root);
+    displayList.root()->addChild(container);
     displayList.render(pagxSurface.get(), false);
     EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
   }
