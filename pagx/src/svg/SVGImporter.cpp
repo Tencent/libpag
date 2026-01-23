@@ -29,19 +29,6 @@
 
 namespace pagx {
 
-// Strip surrounding quotes (single or double) from a string.
-// CSS font-family values may contain quotes like: "Arial", 'Times New Roman'.
-static std::string StripQuotes(const std::string& str) {
-  if (str.size() >= 2) {
-    char first = str.front();
-    char last = str.back();
-    if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
-      return str.substr(1, str.size() - 2);
-    }
-  }
-  return str;
-}
-
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                              const Options& options) {
   SVGParserImpl parser(options);
@@ -426,7 +413,7 @@ InheritedStyle SVGParserImpl::computeInheritedStyle(const std::shared_ptr<DOMNod
   // Text properties.
   std::string fontFamily = getAttribute(element, "font-family");
   if (!fontFamily.empty()) {
-    style.fontFamily = StripQuotes(fontFamily);
+    style.fontFamily = fontFamily;
   }
 
   std::string fontSize = getAttribute(element, "font-size");
@@ -940,9 +927,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
 
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
-    if (!fontFamily.empty()) {
-      fontFamily = StripQuotes(fontFamily);
-    } else {
+    if (fontFamily.empty()) {
       fontFamily = inheritedStyle.fontFamily;
     }
     if (!fontFamily.empty()) {
