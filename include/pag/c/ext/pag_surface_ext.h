@@ -52,8 +52,7 @@ PAG_EXPORT void* pag_surface_get_back_hardware_buffer(pag_surface* surface);
 
 /**
  * Creates a new PAGSurface from specified backend texture and origin. Note, the texture must not
- * be bound to any frame buffer. This allows PAG to render directly into an externally provided
- * texture, enabling zero-copy interop with other graphics APIs.
+ * be bound to any frame buffer. This allows PAG to render directly into an externally provided texture.
  * Passes true in the forAsyncThread parameter if the returned PAGSurface needs to be used for
  * asynchronous rendering. If passing true, the PAGSurface internally creates an independent GPU
  * context, and the caller can use semaphore objects to synchronize content, otherwise, it uses the
