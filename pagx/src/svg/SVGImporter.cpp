@@ -1235,10 +1235,6 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
 
   pattern->id = getAttribute(element, "id");
 
-  // SVG patterns use repeat by default.
-  pattern->tileModeX = TileMode::Repeat;
-  pattern->tileModeY = TileMode::Repeat;
-
   // Parse pattern dimensions from SVG attributes.
   float patternWidth = parseLength(getAttribute(element, "width"), 1.0f);
   float patternHeight = parseLength(getAttribute(element, "height"), 1.0f);
@@ -1247,6 +1243,18 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
   // Default is objectBoundingBox, meaning values are relative to the shape bounds.
   std::string patternUnitsStr = getAttribute(element, "patternUnits", "objectBoundingBox");
   bool patternUnitsOBB = (patternUnitsStr == "objectBoundingBox");
+
+  // Determine tile mode based on whether pattern covers the full shape.
+  // When patternUnits is objectBoundingBox and width/height are 1.0 (100%),
+  // the pattern covers the entire shape and should not repeat.
+  if (patternUnitsOBB && patternWidth >= 1.0f && patternHeight >= 1.0f) {
+    pattern->tileModeX = TileMode::Clamp;
+    pattern->tileModeY = TileMode::Clamp;
+  } else {
+    // Pattern tile is smaller than shape - use repeat mode.
+    pattern->tileModeX = TileMode::Repeat;
+    pattern->tileModeY = TileMode::Repeat;
+  }
 
   // Check patternContentUnits - determines how pattern content coordinates are interpreted.
   // Default is userSpaceOnUse, meaning content uses absolute coordinates.
