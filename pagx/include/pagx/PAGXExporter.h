@@ -33,12 +33,6 @@ class PAGXExporter {
    * The output faithfully reflects the structure of the input document.
    */
   static std::string ToXML(const PAGXDocument& document);
-
-  /**
-   * Exports a PAGXDocument to a file.
-   * Returns true if successful, false otherwise.
-   */
-  static bool ToFile(const PAGXDocument& document, const std::string& filePath);
 };
 
 }  // namespace pagx

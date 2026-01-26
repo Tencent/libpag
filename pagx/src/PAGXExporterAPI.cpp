@@ -17,23 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXExporter.h"
-#include <fstream>
 #include "PAGXExporterImpl.h"
 
 namespace pagx {
 
 std::string PAGXExporter::ToXML(const PAGXDocument& document) {
   return PAGXExporterImpl::Export(document);
-}
-
-bool PAGXExporter::ToFile(const PAGXDocument& document, const std::string& filePath) {
-  std::string xml = ToXML(document);
-  std::ofstream file(filePath, std::ios::binary);
-  if (!file.is_open()) {
-    return false;
-  }
-  file << xml;
-  return file.good();
 }
 
 }  // namespace pagx
