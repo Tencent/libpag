@@ -68,6 +68,10 @@ html, body {
     transition: all 0.3s ease;
 }
 
+.drop-zone-content.hidden {
+    display: none;
+}
+
 .drop-icon {
     width: 64px;
     height: 64px;
