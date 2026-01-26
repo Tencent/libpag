@@ -86,6 +86,51 @@
 
 namespace pagx {
 
+// Parse a single hex digit (0-9, a-f, A-F) to its integer value.
+static int ParseHexDigit(char c) {
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+  if (c >= 'A' && c <= 'F') {
+    return c - 'A' + 10;
+  }
+  return 0;
+}
+
+// Parse a hex color string (#RGB, #RRGGBB, or #RRGGBBAA) to tgfx::Color.
+static tgfx::Color ParseHexColor(const std::string& str) {
+  if (str.empty() || str[0] != '#') {
+    return tgfx::Color::Black();
+  }
+  auto hex = str.substr(1);
+  if (hex.size() == 3) {
+    int r = ParseHexDigit(hex[0]);
+    int g = ParseHexDigit(hex[1]);
+    int b = ParseHexDigit(hex[2]);
+    return {static_cast<float>(r * 17) / 255.0f, static_cast<float>(g * 17) / 255.0f,
+            static_cast<float>(b * 17) / 255.0f, 1.0f};
+  }
+  if (hex.size() == 6) {
+    int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+    int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+    int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+    return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+            static_cast<float>(b) / 255.0f, 1.0f};
+  }
+  if (hex.size() == 8) {
+    int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+    int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+    int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+    int a = ParseHexDigit(hex[6]) * 16 + ParseHexDigit(hex[7]);
+    return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+            static_cast<float>(b) / 255.0f, static_cast<float>(a) / 255.0f};
+  }
+  return tgfx::Color::Black();
+}
+
 // Decode base64 encoded string to binary data.
 static std::shared_ptr<tgfx::Data> Base64Decode(const std::string& encodedString) {
   static const std::array<unsigned char, 128> decodingTable = {
@@ -467,6 +512,40 @@ class LayerBuilderImpl {
     return nullptr;
   }
 
+  std::shared_ptr<tgfx::ColorSource> resolveColorRef(const std::string& colorRef) {
+    if (colorRef.empty()) {
+      return nullptr;
+    }
+    // Hex color format: #RGB, #RRGGBB, #RRGGBBAA
+    if (colorRef[0] == '#') {
+      return tgfx::SolidColor::Make(ParseHexColor(colorRef));
+    }
+    // Resource reference format: @resourceId
+    if (colorRef[0] == '@') {
+      std::string resourceId = colorRef.substr(1);
+      return findColorSourceResource(resourceId);
+    }
+    return nullptr;
+  }
+
+  std::shared_ptr<tgfx::ColorSource> findColorSourceResource(const std::string& resourceId) {
+    if (!_resources || resourceId.empty()) {
+      return nullptr;
+    }
+    for (const auto& res : *_resources) {
+      if (res->id == resourceId) {
+        // Check if this is a ColorSource node type.
+        auto nodeType = res->nodeType();
+        if (nodeType == NodeType::SolidColor || nodeType == NodeType::LinearGradient ||
+            nodeType == NodeType::RadialGradient || nodeType == NodeType::ConicGradient ||
+            nodeType == NodeType::DiamondGradient || nodeType == NodeType::ImagePattern) {
+          return convertColorSource(static_cast<const ColorSource*>(res.get()));
+        }
+      }
+    }
+    return nullptr;
+  }
+
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
     auto tgfxText = std::make_shared<tgfx::Text>();
 
@@ -506,7 +585,7 @@ class LayerBuilderImpl {
     if (node->color) {
       colorSource = convertColorSource(node->color.get());
     } else if (!node->colorRef.empty()) {
-      // TODO: Resolve color reference from resources
+      colorSource = resolveColorRef(node->colorRef);
     }
 
     if (colorSource) {
@@ -524,7 +603,7 @@ class LayerBuilderImpl {
     if (node->color) {
       colorSource = convertColorSource(node->color.get());
     } else if (!node->colorRef.empty()) {
-      // TODO: Resolve color reference from resources
+      colorSource = resolveColorRef(node->colorRef);
     }
 
     if (colorSource) {
