@@ -510,30 +510,38 @@ async function loadPAGXFile(file: File) {
     updateProgressUI();
 
     try {
-        // Read file using stream API for non-blocking progress updates
-        const reader = file.stream().getReader();
-        const chunks: Uint8Array[] = [];
-        let loaded = 0;
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-                break;
+        // Read file in chunks for progress updates
+        const fileReadPromise = (async () => {
+            const chunkSize = 64 * 1024; // 64KB per chunk
+            const totalSize = file.size;
+            const chunks: Uint8Array[] = [];
+            let loaded = 0;
+            while (loaded < totalSize) {
+                const slice = file.slice(loaded, Math.min(loaded + chunkSize, totalSize));
+                const buffer = await slice.arrayBuffer();
+                chunks.push(new Uint8Array(buffer));
+                loaded += buffer.byteLength;
+                loadingProgress.fileLoaded = loaded;
+                updateProgressUI();
+                // Yield to allow UI updates
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
-            chunks.push(value);
-            loaded += value.length;
-            loadingProgress.fileLoaded = loaded;
-            updateProgressUI();
-        }
-        // Combine chunks into single buffer
-        const fileBuffer = new Uint8Array(loaded);
-        let offset = 0;
-        for (const chunk of chunks) {
-            fileBuffer.set(chunk, offset);
-            offset += chunk.length;
-        }
+            // Combine chunks into single buffer
+            const fileBuffer = new Uint8Array(totalSize);
+            let offset = 0;
+            for (const chunk of chunks) {
+                fileBuffer.set(chunk, offset);
+                offset += chunk.length;
+            }
+            return fileBuffer;
+        })();
 
-        // Wait for all resources to be ready
-        await Promise.all([wasmLoadPromise, fontLoadPromise]);
+        // Wait for all resources in parallel
+        const [fileBuffer] = await Promise.all([
+            fileReadPromise,
+            wasmLoadPromise,
+            fontLoadPromise
+        ]);
         updateProgressUI();
 
         // Ensure minimum display time for loading UI (300ms)
