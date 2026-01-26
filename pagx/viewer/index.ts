@@ -59,25 +59,33 @@ class LoadingProgress {
     fileLoaded: number = 0;
     fileTotal: number = 0;
 
+    isAllResourcesCached(): boolean {
+        return this.wasmDone && this.fontDone && this.emojiFontDone;
+    }
+
     getOverallProgress(): number {
-        const totalSize = this.wasmTotal + this.fontTotal + this.emojiFontTotal + this.fileTotal;
-        // Use total as loaded for completed items to handle cached resources
-        const wasmLoaded = this.wasmDone ? this.wasmTotal : this.wasmLoaded;
-        const fontLoaded = this.fontDone ? this.fontTotal : this.fontLoaded;
-        const emojiFontLoaded = this.emojiFontDone ? this.emojiFontTotal : this.emojiFontLoaded;
-        const loadedSize = wasmLoaded + fontLoaded + emojiFontLoaded + this.fileLoaded;
+        // Only count resources that are not yet done
+        let totalSize = 0;
+        let loadedSize = 0;
+        if (!this.wasmDone) {
+            totalSize += this.wasmTotal;
+            loadedSize += this.wasmLoaded;
+        }
+        if (!this.fontDone) {
+            totalSize += this.fontTotal;
+            loadedSize += this.fontLoaded;
+        }
+        if (!this.emojiFontDone) {
+            totalSize += this.emojiFontTotal;
+            loadedSize += this.emojiFontLoaded;
+        }
+        // Always include file in progress calculation
+        totalSize += this.fileTotal;
+        loadedSize += this.fileLoaded;
         if (totalSize === 0) {
             return 0;
         }
         return Math.min(100, Math.round((loadedSize / totalSize) * 100));
-    }
-
-    reset(): void {
-        this.wasmLoaded = 0;
-        this.fontLoaded = 0;
-        this.emojiFontLoaded = 0;
-        this.fileLoaded = 0;
-        this.fileTotal = 0;
     }
 }
 
@@ -465,37 +473,44 @@ async function loadPAGXFile(file: File) {
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
 
-    // Reset file progress (keep done flags for cached resources)
+    // Start loading resources if not already started
+    if (!wasmLoadPromise) {
+        wasmLoadPromise = loadWasm();
+    }
+    if (!fontLoadPromise) {
+        fontLoadPromise = loadFonts();
+    }
+
+    // Check if all resources are already cached
+    const allCached = loadingProgress.isAllResourcesCached();
+
+    // Reset file progress
     loadingProgress.fileLoaded = 0;
     loadingProgress.fileTotal = file.size;
 
-    // Show loading UI
-    showLoadingUI();
-    toolbar.classList.add('hidden');
-    updateProgressUI();
+    // Only show loading UI if resources need to be loaded
+    if (!allCached) {
+        showLoadingUI();
+        toolbar.classList.add('hidden');
+        updateProgressUI();
+    }
 
     try {
-        // Start loading resources if not already started
-        if (!wasmLoadPromise) {
-            wasmLoadPromise = loadWasm();
-        }
-        if (!fontLoadPromise) {
-            fontLoadPromise = loadFonts();
-        }
-
         // Read file with progress tracking
         const fileBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
             const reader = new FileReader();
             reader.onprogress = (event) => {
-                if (event.lengthComputable) {
+                if (event.lengthComputable && !allCached) {
                     loadingProgress.fileLoaded = event.loaded;
                     loadingProgress.fileTotal = event.total;
                     updateProgressUI();
                 }
             };
             reader.onload = () => {
-                loadingProgress.fileLoaded = loadingProgress.fileTotal;
-                updateProgressUI();
+                if (!allCached) {
+                    loadingProgress.fileLoaded = loadingProgress.fileTotal;
+                    updateProgressUI();
+                }
                 resolve(reader.result as ArrayBuffer);
             };
             reader.onerror = () => reject(reader.error);
@@ -504,7 +519,6 @@ async function loadPAGXFile(file: File) {
 
         // Wait for all resources to be ready
         await Promise.all([wasmLoadPromise, fontLoadPromise]);
-        updateProgressUI();
 
         // Register fonts and load PAGX file
         registerFontsToView();
