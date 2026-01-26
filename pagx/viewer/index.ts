@@ -416,7 +416,7 @@ Minimum browser versions required:
 `.trim();
 
 if (typeof window !== 'undefined') {
-    // Start preloading fonts immediately when script loads
+    // Start preloading fonts immediately when script loads (non-blocking)
     const fontPreloadPromise = preloadFonts();
 
     window.onload = async () => {
@@ -429,23 +429,17 @@ if (typeof window !== 'undefined') {
             return;
         }
         try {
-            // Wait for both WASM module and fonts to load
-            const [module] = await Promise.all([
-                PAGXWasm({
-                    locateFile: (file: string) => './wasm-mt/' + file,
-                    mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
-                }),
-                fontPreloadPromise,
-            ]);
+            // Load WASM module (don't wait for fonts to make UI responsive faster)
+            const module = await PAGXWasm({
+                locateFile: (file: string) => './wasm-mt/' + file,
+                mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
+            });
             viewerState.module = module as PAGXModule;
 
             // Bind tgfx helper classes required for Web platform
             TGFXBind(viewerState.module as any);
 
             viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
-
-            // Register preloaded fonts immediately after creating pagxView
-            registerFontsToView();
 
             updateSize();
             viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
@@ -455,6 +449,11 @@ if (typeof window !== 'undefined') {
             setupDragAndDrop();
             animationLoop();
             setupVisibilityListeners();
+
+            // Register fonts when ready (non-blocking, happens in background)
+            fontPreloadPromise.then(() => {
+                registerFontsToView();
+            });
         } catch (error) {
             console.error(error);
             throw new Error("PAGX Viewer init failed. Please check the .wasm file path!.");
