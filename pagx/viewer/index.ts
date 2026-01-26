@@ -26,6 +26,12 @@ const MAX_ZOOM = 1000.0;
 // Font URLs for preloading
 const FONT_URL = './fonts/NotoSansSC-Regular.otf';
 const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
+const WASM_URL = './wasm-mt/pagx-viewer.wasm';
+
+// Estimated sizes for progress calculation (in bytes)
+const ESTIMATED_WASM_SIZE = 2400000;
+const ESTIMATED_FONT_SIZE = 8800000;
+const ESTIMATED_EMOJI_FONT_SIZE = 10300000;
 
 class ViewerState {
     module: PAGXModule | null = null;
@@ -36,9 +42,28 @@ class ViewerState {
     zoom: number = 1.0;
     offsetX: number = 0;
     offsetY: number = 0;
-    fontsLoaded: boolean = false;
     fontData: Uint8Array | null = null;
     emojiFontData: Uint8Array | null = null;
+}
+
+class LoadingProgress {
+    wasmLoaded: number = 0;
+    wasmTotal: number = ESTIMATED_WASM_SIZE;
+    fontLoaded: number = 0;
+    fontTotal: number = ESTIMATED_FONT_SIZE;
+    emojiFontLoaded: number = 0;
+    emojiFontTotal: number = ESTIMATED_EMOJI_FONT_SIZE;
+    fileLoaded: number = 0;
+    fileTotal: number = 0;
+
+    getOverallProgress(): number {
+        const totalSize = this.wasmTotal + this.fontTotal + this.emojiFontTotal + this.fileTotal;
+        const loadedSize = this.wasmLoaded + this.fontLoaded + this.emojiFontLoaded + this.fileLoaded;
+        if (totalSize === 0) {
+            return 0;
+        }
+        return Math.min(100, Math.round((loadedSize / totalSize) * 100));
+    }
 }
 
 enum ScaleGestureState {
@@ -193,36 +218,118 @@ class GestureManager {
 
 const viewerState = new ViewerState();
 const gestureManager = new GestureManager();
+const loadingProgress = new LoadingProgress();
 let animationLoopRunning = false;
+let wasmLoadPromise: Promise<void> | null = null;
+let fontLoadPromise: Promise<void> | null = null;
 
-async function loadFont(url: string): Promise<Uint8Array | null> {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            console.warn(`Failed to load font: ${url}`);
-            return null;
-        }
-        const buffer = await response.arrayBuffer();
-        return new Uint8Array(buffer);
-    } catch (error) {
-        console.warn(`Error loading font ${url}:`, error);
-        return null;
+function updateProgressUI(): void {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    if (progressBar && progressText) {
+        const progress = loadingProgress.getOverallProgress();
+        progressBar.style.width = `${progress}%`;
+        progressText.textContent = `${progress}%`;
     }
 }
 
-async function preloadFonts(): Promise<void> {
-    // Load fonts in parallel
+async function fetchWithProgress(
+    url: string,
+    onProgress: (loaded: number, total: number) => void
+): Promise<ArrayBuffer> {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    }
+    const contentLength = response.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
+    if (total > 0) {
+        onProgress(0, total);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) {
+        const buffer = await response.arrayBuffer();
+        onProgress(buffer.byteLength, buffer.byteLength);
+        return buffer;
+    }
+    const chunks: Uint8Array[] = [];
+    let loaded = 0;
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            break;
+        }
+        chunks.push(value);
+        loaded += value.length;
+        onProgress(loaded, total > 0 ? total : loaded);
+    }
+    const result = new Uint8Array(loaded);
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return result.buffer;
+}
+
+async function loadFonts(): Promise<void> {
+    const loadFont = async (
+        url: string,
+        onProgress: (loaded: number, total: number) => void
+    ): Promise<Uint8Array | null> => {
+        try {
+            const buffer = await fetchWithProgress(url, onProgress);
+            return new Uint8Array(buffer);
+        } catch (error) {
+            console.warn(`Error loading font ${url}:`, error);
+            return null;
+        }
+    };
+
     const [fontData, emojiFontData] = await Promise.all([
-        loadFont(FONT_URL),
-        loadFont(EMOJI_FONT_URL),
+        loadFont(FONT_URL, (loaded, total) => {
+            loadingProgress.fontLoaded = loaded;
+            if (total > 0) {
+                loadingProgress.fontTotal = total;
+            }
+            updateProgressUI();
+        }),
+        loadFont(EMOJI_FONT_URL, (loaded, total) => {
+            loadingProgress.emojiFontLoaded = loaded;
+            if (total > 0) {
+                loadingProgress.emojiFontTotal = total;
+            }
+            updateProgressUI();
+        }),
     ]);
     viewerState.fontData = fontData;
     viewerState.emojiFontData = emojiFontData;
-    viewerState.fontsLoaded = true;
-    console.log('Fonts preloaded:', {
-        font: fontData ? `${fontData.length} bytes` : 'not loaded',
-        emojiFont: emojiFontData ? `${emojiFontData.length} bytes` : 'not loaded',
+}
+
+async function loadWasm(): Promise<void> {
+    // First fetch the WASM file with progress tracking
+    const wasmBuffer = await fetchWithProgress(WASM_URL, (loaded, total) => {
+        loadingProgress.wasmLoaded = loaded;
+        if (total > 0) {
+            loadingProgress.wasmTotal = total;
+        }
+        updateProgressUI();
     });
+    // Then instantiate the module with the pre-fetched WASM
+    const module = await PAGXWasm({
+        locateFile: (file: string) => './wasm-mt/' + file,
+        mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js',
+        wasmBinary: wasmBuffer,
+    });
+    viewerState.module = module as PAGXModule;
+    TGFXBind(viewerState.module as any);
+    viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+    updateSize();
+    viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+    bindCanvasEvents(canvas);
+    animationLoop();
+    setupVisibilityListeners();
 }
 
 function registerFontsToView(): void {
@@ -295,49 +402,92 @@ function bindCanvasEvents(canvas: HTMLElement) {
     }, { passive: false });
 }
 
-// Pending file to load after WASM initialization
-let pendingFile: File | null = null;
+function showLoadingUI(): void {
+    const dropZoneContent = document.getElementById('drop-zone-content');
+    const loadingContent = document.getElementById('loading-content');
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZoneContent && loadingContent && dropZone) {
+        dropZoneContent.classList.add('hidden');
+        loadingContent.classList.remove('hidden');
+        dropZone.classList.remove('hidden');
+    }
+}
+
+function showDropZoneUI(): void {
+    const dropZoneContent = document.getElementById('drop-zone-content');
+    const loadingContent = document.getElementById('loading-content');
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZoneContent && loadingContent && dropZone) {
+        dropZoneContent.classList.remove('hidden');
+        loadingContent.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+    }
+}
+
+function hideDropZone(): void {
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        dropZone.classList.add('hidden');
+    }
+}
 
 async function loadPAGXFile(file: File) {
-    const dropZone = document.getElementById('drop-zone') as HTMLDivElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
-    const dropText = dropZone.querySelector('.drop-text') as HTMLParagraphElement;
-    const originalText = dropText.textContent || '';
 
-    // Show loading state and wait for browser to render
-    dropText.textContent = 'Loading...';
-    dropZone.classList.remove('hidden');
+    // Reset progress for file loading
+    loadingProgress.fileLoaded = 0;
+    loadingProgress.fileTotal = file.size;
+
+    // Show loading UI
+    showLoadingUI();
     toolbar.classList.add('hidden');
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-    // If WASM is not ready yet, store the file and wait
-    if (!viewerState.pagxView) {
-        pendingFile = file;
-        return;
-    }
+    updateProgressUI();
 
     try {
-        const arrayBuffer = await file.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        viewerState.pagxView.loadPAGX(uint8Array);
+        // Start loading resources if not already started
+        if (!wasmLoadPromise) {
+            wasmLoadPromise = loadWasm();
+        }
+        if (!fontLoadPromise) {
+            fontLoadPromise = loadFonts();
+        }
+
+        // Read file with progress tracking
+        const fileBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    loadingProgress.fileLoaded = event.loaded;
+                    loadingProgress.fileTotal = event.total;
+                    updateProgressUI();
+                }
+            };
+            reader.onload = () => {
+                loadingProgress.fileLoaded = loadingProgress.fileTotal;
+                updateProgressUI();
+                resolve(reader.result as ArrayBuffer);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Wait for all resources to be ready
+        await Promise.all([wasmLoadPromise, fontLoadPromise]);
+
+        // Register fonts and load PAGX file
+        registerFontsToView();
+        const uint8Array = new Uint8Array(fileBuffer);
+        viewerState.pagxView!.loadPAGX(uint8Array);
         gestureManager.resetTransform(viewerState);
         updateSize();
-        dropZone.classList.add('hidden');
+        hideDropZone();
         toolbar.classList.remove('hidden');
         fileName.textContent = file.name;
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
-        dropText.textContent = originalText;
+        showDropZoneUI();
         alert('Failed to load PAGX file. Please check the file format.');
-    }
-}
-
-function processPendingFile() {
-    if (pendingFile && viewerState.pagxView) {
-        const file = pendingFile;
-        pendingFile = null;
-        loadPAGXFile(file);
     }
 }
 
@@ -433,11 +583,8 @@ Minimum browser versions required:
 `.trim();
 
 if (typeof window !== 'undefined') {
-    // Start preloading fonts immediately when script loads (non-blocking)
-    const fontPreloadPromise = preloadFonts();
-
     window.onload = async () => {
-        // Setup drag and drop early so UI is responsive during WASM loading
+        // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
 
         if (!checkWasmSupport()) {
@@ -448,38 +595,16 @@ if (typeof window !== 'undefined') {
             alert('Your browser does not support WebGL 2.0.\n\n' + BROWSER_REQUIREMENTS);
             return;
         }
-        try {
-            // Load WASM module (don't wait for fonts to make UI responsive faster)
-            const module = await PAGXWasm({
-                locateFile: (file: string) => './wasm-mt/' + file,
-                mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
-            });
-            viewerState.module = module as PAGXModule;
 
-            // Bind tgfx helper classes required for Web platform
-            TGFXBind(viewerState.module as any);
-
-            viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
-
-            updateSize();
-            viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
-
-            const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-            bindCanvasEvents(canvas);
-            animationLoop();
-            setupVisibilityListeners();
-
-            // Process any pending file that was selected during WASM loading
-            processPendingFile();
-
-            // Register fonts when ready (non-blocking, happens in background)
-            fontPreloadPromise.then(() => {
-                registerFontsToView();
-            });
-        } catch (error) {
-            console.error(error);
-            throw new Error("PAGX Viewer init failed. Please check the .wasm file path!.");
-        }
+        // Start preloading resources in background (will be awaited when file is selected)
+        wasmLoadPromise = loadWasm().catch(error => {
+            console.error('WASM load failed:', error);
+            throw error;
+        });
+        fontLoadPromise = loadFonts().catch(error => {
+            console.error('Font load failed:', error);
+            throw error;
+        });
     };
 
     window.onresize = () => {
