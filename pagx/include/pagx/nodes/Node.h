@@ -130,9 +130,9 @@ enum class NodeType {
    */
   Path,
   /**
-   * A text span that generates glyph paths for rendering.
+   * A text element that generates glyphs for rendering.
    */
-  TextSpan,
+  Text,
   /**
    * A fill painter that fills shapes with a color or gradient.
    */
@@ -162,7 +162,7 @@ enum class NodeType {
    */
   TextPath,
   /**
-   * A text animator that controls text layout within a bounding box.
+   * A text modifier that controls text layout and alignment.
    */
   TextLayout,
   /**

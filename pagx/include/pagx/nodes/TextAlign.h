@@ -26,22 +26,23 @@ namespace pagx {
 enum class TextAlign {
   /**
    * Align text to the start (left for LTR, right for RTL).
-   * For TextPath, align text to the path start.
+   * For TextPath: start from the beginning of the path.
    */
   Start,
   /**
    * Align text to the center.
-   * For TextPath, center text along the path.
+   * For TextPath: center text on the path.
    */
   Center,
   /**
    * Align text to the end (right for LTR, left for RTL).
-   * For TextPath, align text to the path end.
+   * For TextPath: end text at the end of the path.
    */
   End,
   /**
    * Justify text (stretch to fill the available width).
-   * For TextPath, force text to fill the path by adjusting letter spacing.
+   * The last line uses start alignment by default.
+   * For TextPath: stretch text to fill the available path length.
    */
   Justify
 };

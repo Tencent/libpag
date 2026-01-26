@@ -25,6 +25,7 @@
 #include <vector>
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -38,21 +39,43 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextLayout.h"
-#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/SVGImporter.h"
 #include "xml/XMLDOM.h"
 
 namespace pagx {
 
 /**
+ * Type of shadow-only filter for determining how to handle element content.
+ */
+enum class ShadowOnlyType {
+  None,        // Not a shadow-only filter, render normally.
+  DropShadow,  // Shadow-only DropShadow: needs fill content as shadow source.
+  InnerShadow  // Shadow-only InnerShadow: no fill needed, uses layer alpha.
+};
+
+/**
  * Inherited SVG style properties that cascade down the element tree.
  */
 struct InheritedStyle {
-  std::string fill = "";           // Empty means not set, "none" means no fill.
-  std::string stroke = "";         // Empty means not set.
-  std::string fillOpacity = "";    // Empty means not set.
-  std::string strokeOpacity = "";  // Empty means not set.
-  std::string fillRule = "";       // Empty means not set.
+  std::string fill = "";            // Empty means not set, "none" means no fill.
+  std::string stroke = "";          // Empty means not set.
+  std::string fillOpacity = "";     // Empty means not set.
+  std::string strokeOpacity = "";   // Empty means not set.
+  std::string fillRule = "";        // Empty means not set.
+  std::string strokeDasharray = ""; // Empty means not set, "none" means solid line.
+  std::string strokeDashoffset = "";// Empty means not set.
+  std::string strokeWidth = "";     // Empty means not set.
+  std::string strokeLinecap = "";   // Empty means not set.
+  std::string strokeLinejoin = "";  // Empty means not set.
+  std::string strokeMiterlimit = "";// Empty means not set.
+  // Text properties.
+  std::string fontFamily = "";      // Empty means not set.
+  std::string fontSize = "";        // Empty means not set.
+  std::string fontWeight = "";      // Empty means not set.
+  std::string fontStyle = "";       // Empty means not set (normal/italic/oblique).
+  std::string letterSpacing = "";   // Empty means not set.
+  std::string textAnchor = "";      // Empty means not set (start/middle/end).
 };
 
 /**
@@ -74,7 +97,8 @@ class SVGParserImpl {
                                             const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
                        std::vector<std::unique_ptr<Element>>& contents,
-                       const InheritedStyle& inheritedStyle);
+                       const InheritedStyle& inheritedStyle,
+                       ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);
   std::unique_ptr<Element> convertElement(const std::shared_ptr<DOMNode>& element);
   std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
@@ -98,9 +122,14 @@ class SVGParserImpl {
 
   std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
-  void convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
+  // Converts SVG filter element to PAGX filters/styles.
+  // Returns true if the filter was successfully converted, false otherwise.
+  // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
+  // (DropShadow or InnerShadow) if all converted filters are shadow-only.
+  bool convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
                             std::vector<std::unique_ptr<LayerFilter>>& filters,
-                            std::vector<std::unique_ptr<LayerStyle>>& styles);
+                            std::vector<std::unique_ptr<LayerStyle>>& styles,
+                            ShadowOnlyType* outShadowOnlyType = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
                      std::vector<std::unique_ptr<Element>>& contents,
@@ -129,6 +158,10 @@ class SVGParserImpl {
   // Register an image resource and return its reference ID (e.g., "#image0").
   // If the image source (data URI or path) has already been registered, returns the existing ID.
   std::string registerImageResource(const std::string& imageSource);
+
+  // Register a PathData resource and return its reference ID (e.g., "@path0").
+  // This creates a new PathData resource in the document's resources list.
+  std::string registerPathDataResource(PathData pathData);
 
   // Merge adjacent layers that have the same shape geometry.
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
@@ -171,11 +204,19 @@ class SVGParserImpl {
   // Store the converted ColorSource by SVG def id (for reuse when refCount > 1).
   std::unordered_map<std::string, ColorSource*> _colorSourceCache = {};
   
+  // Parse CSS style rules from <style> element.
+  void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
+
   int _nextImageId = 0;
   int _nextGeneratedId = 0;  // Counter for generating unique IDs.
   int _nextColorSourceId = 0;  // Counter for generating ColorSource IDs.
+  int _nextPathDataId = 0;  // Counter for generating PathData IDs.
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
+
+  // CSS class rules: key is class name (without dot), value is style properties.
+  // Example: {"cls-1": "fill: #fcfae9"}
+  std::unordered_map<std::string, std::string> _cssClassRules = {};
 };
 
 }  // namespace pagx

@@ -20,52 +20,70 @@
 
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/TextAlign.h"
+#include "tgfx/core/Point.h"
 
 namespace pagx {
 
 /**
- * Text vertical alignment.
+ * Text vertical alignment within the layout area.
  */
 enum class VerticalAlign {
+  /**
+   * Align text to the top of the layout area.
+   */
   Top,
+  /**
+   * Align text to the vertical center of the layout area.
+   */
   Center,
+  /**
+   * Align text to the bottom of the layout area.
+   */
   Bottom
 };
 
 /**
- * Text direction (horizontal or vertical writing mode).
+ * Text writing mode (horizontal or vertical).
  */
-enum class TextDirection {
+enum class WritingMode {
+  /**
+   * Horizontal text layout. Lines flow from top to bottom. This is the default mode for most
+   * languages.
+   */
   Horizontal,
+  /**
+   * Vertical text layout. Characters are arranged vertically from top to bottom, and columns flow
+   * from right to left. This is the traditional writing mode for Chinese, Japanese, and Korean
+   * (CJK) text.
+   */
   Vertical
 };
 
 /**
- * TextLayout is a text modifier that controls text layout and alignment. It supports two modes:
- * - Point Text mode (width=0): Single-line text with anchor-based alignment at position (x, y).
- * - Box Text mode (width>0): Multi-line text within a bounding box with word wrapping.
+ * TextLayout is a text modifier that controls text layout and alignment for accumulated Text
+ * elements. It overrides the position of Text elements and provides layout capabilities including:
+ * - Point text mode (no width): position and alignment relative to anchor point
+ * - Paragraph text mode (with width): automatic line wrapping within bounds
+ * - Vertical alignment (when height is specified)
+ * - Horizontal/vertical writing mode
  */
 class TextLayout : public Element {
  public:
   /**
-   * The x position of the text layout origin. The default value is 0.
+   * The position of the layout origin. The default value is (0, 0).
    */
-  float x = 0;
+  tgfx::Point position = {};
 
   /**
-   * The y position of the text layout origin. The default value is 0.
-   */
-  float y = 0;
-
-  /**
-   * The width of the text box in pixels. A value of 0 enables Point Text mode (single-line,
-   * anchor-based alignment). A value greater than 0 enables Box Text mode (multi-line with word
-   * wrapping). The default value is 0.
+   * The width of the layout area in pixels. When specified (> 0), enables automatic line wrapping
+   * (paragraph text mode). A value of 0 or negative means point text mode (no wrapping).
+   * The default value is 0.
    */
   float width = 0;
 
   /**
-   * The height of the text box in pixels. A value of 0 means auto-height. The default value is 0.
+   * The height of the layout area in pixels. When specified (> 0), enables vertical alignment.
+   * A value of 0 or negative means auto-height. The default value is 0.
    */
   float height = 0;
 
@@ -75,24 +93,21 @@ class TextLayout : public Element {
   TextAlign textAlign = TextAlign::Start;
 
   /**
-   * The alignment of the last line when textAlign is Justify. The default value is Start.
-   */
-  TextAlign textAlignLast = TextAlign::Start;
-
-  /**
    * The vertical text alignment (only effective when height > 0). The default value is Top.
    */
   VerticalAlign verticalAlign = VerticalAlign::Top;
 
   /**
-   * The line height multiplier. The default value is 1.2.
+   * The writing mode (horizontal or vertical text). The default value is Horizontal. Vertical mode
+   * uses right-to-left column ordering (traditional CJK vertical text).
    */
-  float lineHeight = 1.2f;
+  WritingMode writingMode = WritingMode::Horizontal;
 
   /**
-   * The text direction (horizontal or vertical writing mode). The default value is Horizontal.
+   * The line height multiplier. Applied to font size to calculate line spacing. The default value
+   * is 1.2.
    */
-  TextDirection direction = TextDirection::Horizontal;
+  float lineHeight = 1.2f;
 
   NodeType nodeType() const override {
     return NodeType::TextLayout;

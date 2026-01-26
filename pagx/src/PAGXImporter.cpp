@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXImporterImpl.h"
+#include <cstdlib>
 #include <cstring>
-#include <sstream>
 #include "PAGXStringUtils.h"
 
 namespace pagx {
@@ -444,8 +444,8 @@ std::unique_ptr<Element> PAGXImporterImpl::parseElement(const XMLNode* node) {
   if (node->tag == "Path") {
     return parsePath(node);
   }
-  if (node->tag == "TextSpan") {
-    return parseTextSpan(node);
+  if (node->tag == "Text") {
+    return parseText(node);
   }
   if (node->tag == "Fill") {
     return parseFill(node);
@@ -578,23 +578,30 @@ std::unique_ptr<Path> PAGXImporterImpl::parsePath(const XMLNode* node) {
   auto path = std::make_unique<Path>();
   auto dataAttr = getAttribute(node, "data");
   if (!dataAttr.empty()) {
-    path->data = PathDataFromSVGString(dataAttr);
+    if (dataAttr[0] == '@') {
+      // Reference to PathData resource
+      path->dataRef = dataAttr;
+    } else {
+      // Inline path data
+      path->data = PathDataFromSVGString(dataAttr);
+    }
   }
   path->reversed = getBoolAttribute(node, "reversed", false);
   return path;
 }
 
-std::unique_ptr<TextSpan> PAGXImporterImpl::parseTextSpan(const XMLNode* node) {
-  auto textSpan = std::make_unique<TextSpan>();
+std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
+  auto text = std::make_unique<Text>();
   auto positionStr = getAttribute(node, "position", "0,0");
-  textSpan->position = parsePoint(positionStr);
-  textSpan->font = getAttribute(node, "font");
-  textSpan->fontSize = getFloatAttribute(node, "fontSize", 12);
-  textSpan->fontWeight = getIntAttribute(node, "fontWeight", 400);
-  textSpan->fontStyle = getAttribute(node, "fontStyle", "normal");
-  textSpan->tracking = getFloatAttribute(node, "tracking", 0);
-  textSpan->text = node->text;
-  return textSpan;
+  auto pos = parsePoint(positionStr);
+  text->position = tgfx::Point::Make(pos.x, pos.y);
+  text->fontFamily = getAttribute(node, "fontFamily");
+  text->fontStyle = getAttribute(node, "fontStyle");
+  text->fontSize = getFloatAttribute(node, "fontSize", 12);
+  text->letterSpacing = getFloatAttribute(node, "letterSpacing", 0);
+  text->baselineShift = getFloatAttribute(node, "baselineShift", 0);
+  text->text = node->text;
+  return text;
 }
 
 //==============================================================================
@@ -711,15 +718,15 @@ std::unique_ptr<TextPath> PAGXImporterImpl::parseTextPath(const XMLNode* node) {
 
 std::unique_ptr<TextLayout> PAGXImporterImpl::parseTextLayout(const XMLNode* node) {
   auto layout = std::make_unique<TextLayout>();
-  layout->x = getFloatAttribute(node, "x", 0);
-  layout->y = getFloatAttribute(node, "y", 0);
+  auto positionStr = getAttribute(node, "position", "0,0");
+  auto pos = parsePoint(positionStr);
+  layout->position = tgfx::Point::Make(pos.x, pos.y);
   layout->width = getFloatAttribute(node, "width", 0);
   layout->height = getFloatAttribute(node, "height", 0);
   layout->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
-  layout->textAlignLast = TextAlignFromString(getAttribute(node, "textAlignLast", "start"));
   layout->verticalAlign = VerticalAlignFromString(getAttribute(node, "verticalAlign", "top"));
+  layout->writingMode = WritingModeFromString(getAttribute(node, "writingMode", "horizontal"));
   layout->lineHeight = getFloatAttribute(node, "lineHeight", 1.2f);
-  layout->direction = TextDirectionFromString(getAttribute(node, "direction", "horizontal"));
   return layout;
 }
 
@@ -1086,17 +1093,7 @@ bool PAGXImporterImpl::getBoolAttribute(const XMLNode* node, const std::string& 
 
 Point PAGXImporterImpl::parsePoint(const std::string& str) {
   Point point = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 2) {
     point.x = values[0];
     point.y = values[1];
@@ -1106,17 +1103,7 @@ Point PAGXImporterImpl::parsePoint(const std::string& str) {
 
 Size PAGXImporterImpl::parseSize(const std::string& str) {
   Size size = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 2) {
     size.width = values[0];
     size.height = values[1];
@@ -1126,17 +1113,7 @@ Size PAGXImporterImpl::parseSize(const std::string& str) {
 
 Rect PAGXImporterImpl::parseRect(const std::string& str) {
   Rect rect = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  std::vector<float> values = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      values.push_back(std::stof(trimmed));
-    }
-  }
+  auto values = ParseFloatList(str);
   if (values.size() >= 4) {
     rect.x = values[0];
     rect.y = values[1];
@@ -1208,17 +1185,7 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
     auto end = str.find(')');
     if (start != std::string::npos && end != std::string::npos) {
       auto inner = str.substr(start + 1, end - start - 1);
-      std::istringstream iss(inner);
-      std::string token = {};
-      std::vector<float> components = {};
-      while (std::getline(iss, token, ',')) {
-        auto trimmed = token;
-        trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-        trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-        if (!trimmed.empty()) {
-          components.push_back(std::stof(trimmed));
-        }
-      }
+      auto components = ParseFloatList(inner);
       if (components.size() >= 3) {
         Color color = {};
         color.red = components[0];
@@ -1236,17 +1203,7 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
     auto end = str.find(')');
     if (start != std::string::npos && end != std::string::npos) {
       auto inner = str.substr(start + 1, end - start - 1);
-      std::istringstream iss(inner);
-      std::string token = {};
-      std::vector<float> components = {};
-      while (std::getline(iss, token, ',')) {
-        auto trimmed = token;
-        trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-        trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-        if (!trimmed.empty()) {
-          components.push_back(std::stof(trimmed));
-        }
-      }
+      auto components = ParseFloatList(inner);
       if (components.size() >= 3) {
         Color color = {};
         color.red = components[0];
@@ -1262,21 +1219,7 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
 }
 
 std::vector<float> PAGXImporterImpl::parseFloatList(const std::string& str) {
-  std::vector<float> values = {};
-  std::istringstream iss(str);
-  std::string token = {};
-  while (std::getline(iss, token, ',')) {
-    auto trimmed = token;
-    trimmed.erase(0, trimmed.find_first_not_of(" \t"));
-    trimmed.erase(trimmed.find_last_not_of(" \t") + 1);
-    if (!trimmed.empty()) {
-      try {
-        values.push_back(std::stof(trimmed));
-      } catch (...) {
-      }
-    }
-  }
-  return values;
+  return ParseFloatList(str);
 }
 
 }  // namespace pagx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXExporterImpl.h"
-#include <sstream>
+#include <cstdio>
 #include "PAGXStringUtils.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -50,7 +50,7 @@
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
 
 namespace pagx {
@@ -62,80 +62,111 @@ namespace pagx {
 class XMLBuilder {
  public:
   void appendDeclaration() {
-    buffer << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    buffer += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   }
 
   void openElement(const std::string& tag) {
     writeIndent();
-    buffer << "<" << tag;
+    buffer += "<";
+    buffer += tag;
     tagStack.push_back(tag);
   }
 
   void addAttribute(const std::string& name, const std::string& value) {
     if (!value.empty()) {
-      buffer << " " << name << "=\"" << escapeXML(value) << "\"";
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += escapeXML(value);
+      buffer += "\"";
     }
   }
 
   void addAttribute(const std::string& name, float value, float defaultValue = 0) {
     if (value != defaultValue) {
-      buffer << " " << name << "=\"" << formatFloat(value) << "\"";
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += FloatToString(value);
+      buffer += "\"";
     }
   }
 
   void addRequiredAttribute(const std::string& name, float value) {
-    buffer << " " << name << "=\"" << formatFloat(value) << "\"";
+    buffer += " ";
+    buffer += name;
+    buffer += "=\"";
+    buffer += FloatToString(value);
+    buffer += "\"";
   }
 
   void addRequiredAttribute(const std::string& name, const std::string& value) {
-    buffer << " " << name << "=\"" << escapeXML(value) << "\"";
+    buffer += " ";
+    buffer += name;
+    buffer += "=\"";
+    buffer += escapeXML(value);
+    buffer += "\"";
   }
 
   void addAttribute(const std::string& name, int value, int defaultValue = 0) {
     if (value != defaultValue) {
-      buffer << " " << name << "=\"" << value << "\"";
+      char buf[32] = {};
+      snprintf(buf, sizeof(buf), "%d", value);
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += buf;
+      buffer += "\"";
     }
   }
 
   void addAttribute(const std::string& name, bool value, bool defaultValue = false) {
     if (value != defaultValue) {
-      buffer << " " << name << "=\"" << (value ? "true" : "false") << "\"";
+      buffer += " ";
+      buffer += name;
+      buffer += "=\"";
+      buffer += (value ? "true" : "false");
+      buffer += "\"";
     }
   }
 
   void closeElementStart() {
-    buffer << ">\n";
+    buffer += ">\n";
     indentLevel++;
   }
 
   void closeElementSelfClosing() {
-    buffer << "/>\n";
+    buffer += "/>\n";
     tagStack.pop_back();
   }
 
   void closeElement() {
     indentLevel--;
     writeIndent();
-    buffer << "</" << tagStack.back() << ">\n";
+    buffer += "</";
+    buffer += tagStack.back();
+    buffer += ">\n";
     tagStack.pop_back();
   }
 
   void addTextContent(const std::string& text) {
-    buffer << "<![CDATA[" << text << "]]>";
+    buffer += "<![CDATA[";
+    buffer += text;
+    buffer += "]]>";
   }
 
-  std::string str() const {
-    return buffer.str();
+  const std::string& str() const {
+    return buffer;
   }
 
  private:
-  std::ostringstream buffer = {};
+  std::string buffer = {};
   std::vector<std::string> tagStack = {};
   int indentLevel = 0;
 
   void writeIndent() {
     for (int i = 0; i < indentLevel; i++) {
-      buffer << "  ";
+      buffer += "  ";
     }
   }
 
@@ -165,21 +196,6 @@ class XMLBuilder {
     }
     return result;
   }
-
-  static std::string formatFloat(float value) {
-    std::ostringstream oss = {};
-    oss << value;
-    auto str = oss.str();
-    if (str.find('.') != std::string::npos) {
-      while (str.back() == '0') {
-        str.pop_back();
-      }
-      if (str.back() == '.') {
-        str.pop_back();
-      }
-    }
-    return str;
-  }
 };
 
 //==============================================================================
@@ -187,32 +203,40 @@ class XMLBuilder {
 //==============================================================================
 
 static std::string pointToString(const Point& p) {
-  std::ostringstream oss = {};
-  oss << p.x << "," << p.y;
-  return oss.str();
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
+  return std::string(buf);
+}
+
+static std::string pointToString(const tgfx::Point& p) {
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
+  return std::string(buf);
 }
 
 static std::string sizeToString(const Size& s) {
-  std::ostringstream oss = {};
-  oss << s.width << "," << s.height;
-  return oss.str();
+  char buf[64] = {};
+  snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
+  return std::string(buf);
 }
 
 static std::string rectToString(const Rect& r) {
-  std::ostringstream oss = {};
-  oss << r.x << "," << r.y << "," << r.width << "," << r.height;
-  return oss.str();
+  char buf[128] = {};
+  snprintf(buf, sizeof(buf), "%g,%g,%g,%g", r.x, r.y, r.width, r.height);
+  return std::string(buf);
 }
 
 static std::string floatListToString(const std::vector<float>& values) {
-  std::ostringstream oss = {};
+  std::string result;
+  char buf[32] = {};
   for (size_t i = 0; i < values.size(); i++) {
     if (i > 0) {
-      oss << ",";
+      result += ",";
     }
-    oss << values[i];
+    snprintf(buf, sizeof(buf), "%g", values[i]);
+    result += buf;
   }
-  return oss.str();
+  return result;
 }
 
 //==============================================================================
@@ -411,32 +435,30 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
-      if (!path->data.isEmpty()) {
-        // Check if pathData has a reference (id starts with #)
-        if (!path->dataRef.empty()) {
-          xml.addAttribute("data", path->dataRef);
-        } else {
-          // Inline the path data
-          xml.addAttribute("data", PathDataToSVGString(path->data));
-        }
+      if (!path->dataRef.empty()) {
+        // Use the reference to PathData resource.
+        xml.addAttribute("data", path->dataRef);
+      } else if (!path->data.isEmpty()) {
+        // Inline the path data.
+        xml.addAttribute("data", PathDataToSVGString(path->data));
       }
       xml.addAttribute("reversed", path->reversed);
       xml.closeElementSelfClosing();
       break;
     }
-    case NodeType::TextSpan: {
-      auto text = static_cast<const TextSpan*>(node);
-      xml.openElement("TextSpan");
+    case NodeType::Text: {
+      auto text = static_cast<const Text*>(node);
+      xml.openElement("Text");
       if (text->position.x != 0 || text->position.y != 0) {
         xml.addAttribute("position", pointToString(text->position));
       }
-      xml.addAttribute("font", text->font);
-      xml.addAttribute("fontSize", text->fontSize, 12.0f);
-      xml.addAttribute("fontWeight", text->fontWeight, 400);
-      if (text->fontStyle != "normal" && !text->fontStyle.empty()) {
+      xml.addAttribute("fontFamily", text->fontFamily);
+      if (!text->fontStyle.empty()) {
         xml.addAttribute("fontStyle", text->fontStyle);
       }
-      xml.addAttribute("tracking", text->tracking);
+      xml.addAttribute("fontSize", text->fontSize, 12.0f);
+      xml.addAttribute("letterSpacing", text->letterSpacing);
+      xml.addAttribute("baselineShift", text->baselineShift);
       xml.closeElementStart();
       xml.addTextContent(text->text);
       xml.closeElement();
@@ -445,10 +467,24 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
-      // If colorSource has an id, output reference; otherwise inline the colorSource below
-      if (fill->color && !fill->color->id.empty()) {
-        // Reference by id
-        xml.addAttribute("color", "#" + fill->color->id);
+      // Determine color attribute value
+      bool needsInlineColorSource = false;
+      if (!fill->colorRef.empty()) {
+        // Use existing colorRef (could be "#FF0000" or "@gradientId")
+        xml.addAttribute("color", fill->colorRef);
+      } else if (fill->color) {
+        if (!fill->color->id.empty()) {
+          // Reference to resource by id
+          xml.addAttribute("color", "@" + fill->color->id);
+        } else if (fill->color->nodeType() == NodeType::SolidColor) {
+          // SolidColor without id: output color value directly
+          auto solid = static_cast<const SolidColor*>(fill->color.get());
+          xml.addAttribute("color",
+                           ColorToHexString(solid->color, solid->color.alpha < 1.0f));
+        } else {
+          // Other ColorSource without id: needs inline as child element
+          needsInlineColorSource = true;
+        }
       }
       xml.addAttribute("alpha", fill->alpha, 1.0f);
       if (fill->blendMode != BlendMode::Normal) {
@@ -460,8 +496,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       if (fill->placement != LayerPlacement::Background) {
         xml.addAttribute("placement", LayerPlacementToString(fill->placement));
       }
-      // Inline ColorSource if it doesn't have an id
-      if (fill->color && fill->color->id.empty()) {
+      if (needsInlineColorSource) {
         xml.closeElementStart();
         writeColorSource(xml, fill->color.get());
         xml.closeElement();
@@ -473,10 +508,24 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
-      // If colorSource has an id, output reference; otherwise inline the colorSource below
-      if (stroke->color && !stroke->color->id.empty()) {
-        // Reference by id
-        xml.addAttribute("color", "#" + stroke->color->id);
+      // Determine color attribute value
+      bool needsInlineColorSource = false;
+      if (!stroke->colorRef.empty()) {
+        // Use existing colorRef (could be "#FF0000" or "@gradientId")
+        xml.addAttribute("color", stroke->colorRef);
+      } else if (stroke->color) {
+        if (!stroke->color->id.empty()) {
+          // Reference to resource by id
+          xml.addAttribute("color", "@" + stroke->color->id);
+        } else if (stroke->color->nodeType() == NodeType::SolidColor) {
+          // SolidColor without id: output color value directly
+          auto solid = static_cast<const SolidColor*>(stroke->color.get());
+          xml.addAttribute("color",
+                           ColorToHexString(solid->color, solid->color.alpha < 1.0f));
+        } else {
+          // Other ColorSource without id: needs inline as child element
+          needsInlineColorSource = true;
+        }
       }
       xml.addAttribute("width", stroke->width, 1.0f);
       xml.addAttribute("alpha", stroke->alpha, 1.0f);
@@ -500,8 +549,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       if (stroke->placement != LayerPlacement::Background) {
         xml.addAttribute("placement", LayerPlacementToString(stroke->placement));
       }
-      // Inline ColorSource if it doesn't have an id
-      if (stroke->color && stroke->color->id.empty()) {
+      if (needsInlineColorSource) {
         xml.closeElementStart();
         writeColorSource(xml, stroke->color.get());
         xml.closeElement();
@@ -609,23 +657,21 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::TextLayout: {
       auto layout = static_cast<const TextLayout*>(node);
       xml.openElement("TextLayout");
-      xml.addAttribute("x", layout->x);
-      xml.addAttribute("y", layout->y);
+      if (layout->position.x != 0 || layout->position.y != 0) {
+        xml.addAttribute("position", pointToString(layout->position));
+      }
       xml.addAttribute("width", layout->width);
       xml.addAttribute("height", layout->height);
       if (layout->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(layout->textAlign));
       }
-      if (layout->textAlignLast != TextAlign::Start) {
-        xml.addAttribute("textAlignLast", TextAlignToString(layout->textAlignLast));
-      }
       if (layout->verticalAlign != VerticalAlign::Top) {
         xml.addAttribute("verticalAlign", VerticalAlignToString(layout->verticalAlign));
       }
-      xml.addAttribute("lineHeight", layout->lineHeight, 1.2f);
-      if (layout->direction != TextDirection::Horizontal) {
-        xml.addAttribute("direction", TextDirectionToString(layout->direction));
+      if (layout->writingMode != WritingMode::Horizontal) {
+        xml.addAttribute("writingMode", WritingModeToString(layout->writingMode));
       }
+      xml.addAttribute("lineHeight", layout->lineHeight, 1.2f);
       xml.closeElementSelfClosing();
       break;
     }
@@ -817,8 +863,11 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
       break;
     }
     case NodeType::PathData: {
-      // PathData resources are not currently supported as separate Node type.
-      // Path data is stored inline in Path elements.
+      auto pathData = static_cast<const PathData*>(node);
+      xml.openElement("PathData");
+      xml.addAttribute("id", pathData->id);
+      xml.addAttribute("data", PathDataToSVGString(*pathData));
+      xml.closeElementSelfClosing();
       break;
     }
     case NodeType::Composition: {

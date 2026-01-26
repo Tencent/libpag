@@ -492,7 +492,7 @@ PAGX 文档采用层级结构组织内容：
 ```
 <pagx>                          ← 根元素（定义画布尺寸）
 ├── <Layer>                     ← 图层（可多个）
-│   ├── 几何元素                ← Rectangle、Ellipse、Path、TextSpan 等
+│   ├── 几何元素                ← Rectangle、Ellipse、Path、Text 等
 │   ├── 修改器                  ← TrimPath、RoundCorner、TextModifier 等
 │   ├── 绘制器                  ← Fill、Stroke
 │   ├── <Group>                 ← 矢量元素容器（可嵌套）
@@ -874,7 +874,7 @@ VectorElement 系统采用**累积-渲染**的处理模型：几何元素在渲�
 
 | 术语 | 包含元素 | 说明 |
 |------|----------|------|
-| **几何元素** | Rectangle、Ellipse、Polystar、Path、TextSpan | 提供几何形状的元素，在上下文中累积为几何列表 |
+| **几何元素** | Rectangle、Ellipse、Polystar、Path、Text | 提供几何形状的元素，在上下文中累积为几何列表 |
 | **修改器** | TrimPath、RoundCorner、MergePath、TextModifier、TextPath、TextLayout、Repeater | 对累积的几何进行变换 |
 | **绘制器** | Fill、Stroke | 对累积的几何进行填充或描边渲染 |
 | **容器** | Group | 创建独立作用域并应用矩阵变换，处理完成后合并 |
@@ -886,7 +886,7 @@ VectorElement 系统采用**累积-渲染**的处理模型：几何元素在渲�
 | 元素类型 | 内部结构 | 说明 |
 |----------|----------|------|
 | 形状元素（Rectangle、Ellipse、Polystar、Path） | 单个 Path | 每个形状元素产生一个路径 |
-| 文本元素（TextSpan） | 字形列表 | 一个 TextSpan 经过塑形后产生多个字形 |
+| 文本元素（Text） | 字形列表 | 一个 Text 经过塑形后产生多个字形 |
 
 #### 5.1.3 处理与渲染顺序
 
@@ -903,7 +903,7 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 │ Ellipse  │          │RoundCorn │          │  Stroke  │
 │ Polystar │          │MergePath │          └────┬─────┘
 │   Path   │          │TextModif │               │
-│ TextSpan │          │ TextPath │               │
+│   Text   │          │ TextPath │               │
 └────┬─────┘          │TextLayout│               │
      │                │ Repeater │               │
      │                └────┬─────┘               │
@@ -917,7 +917,7 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 
 **渲染上下文**累积的是一个几何列表，其中：
 - 每个形状元素贡献一个 Path
-- 每个 TextSpan 贡献一个字形列表（包含多个字形）
+- 每个 Text 贡献一个字形列表（包含多个字形）
 
 #### 5.1.5 修改器的作用范围
 
@@ -1056,32 +1056,34 @@ y = center.y + outerRadius * sin(angle)
 | `data` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "@id" |
 | `reversed` | bool | false | 反转路径方向 |
 
-#### 5.2.5 文本片段（TextSpan）
+#### 5.2.5 文本（Text）
 
-文本片段提供文本内容的几何形状。一个 TextSpan 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。
+文本元素提供文本内容的几何形状。一个 Text 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。Text 支持换行符（`\n`），使用 1.2 倍字号作为默认行高。
 
 ```xml
-<TextSpan position="100,200" font="Arial" fontSize="24" fontWeight="400" fontStyle="normal" tracking="0">
+<Text position="100,200" fontFamily="Arial" fontStyle="Bold" fontSize="24" letterSpacing="0" baselineShift="0">
   <![CDATA[Hello World]]>
-</TextSpan>
+</Text>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | point | 0,0 | 文本位置 |
-| `font` | string | (必填) | 字体族 |
+| `position` | point | 0,0 | 文本起点位置，y 为基线（可被 TextLayout 覆盖） |
+| `fontFamily` | string | 系统默认 | 字体族 |
+| `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
 | `fontSize` | float | 12 | 字号 |
-| `fontWeight` | int | 400 | 字重（100-900） |
-| `fontStyle` | enum | normal | normal 或 italic |
-| `tracking` | float | 0 | 字距 |
+| `letterSpacing` | float | 0 | 字间距 |
+| `baselineShift` | float | 0 | 基线偏移（正值上移，负值下移） |
 
 **处理流程**：
-1. 根据 `font`、`fontSize`、`fontWeight`、`fontStyle` 查找字体
-2. 应用 `tracking`（字距调整）
+1. 根据 `fontFamily` 和 `fontStyle` 查找字体文件
+2. 应用 `letterSpacing`（字距调整）
 3. 将文本塑形（shaping）为字形列表
-4. 按 `x`、`y` 位置放置
+4. 按 `position` 位置放置（除非被 TextLayout 覆盖）
 
 **字体回退**：当指定字体不可用时，按平台默认字体回退链选择替代字体。
+
+**换行处理**：Text 内容中的 `\n` 会触发换行，使用 1.2 倍字号作为行高。如需自定义行高，使用 TextLayout。
 
 ### 5.3 绘制器（Painters）
 
@@ -1310,8 +1312,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 ```xml
 <Group>
-  <TextSpan font="Arial" fontSize="24"><![CDATA[Hello]]></TextSpan>
-  <TextSpan font="Arial" fontSize="24"><![CDATA[World]]></TextSpan>
+  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello]]></Text>
+  <Text fontFamily="Arial" fontSize="24"><![CDATA[World]]></Text>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
 </Group>
@@ -1324,7 +1326,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 ```
 文本元素              形状修改器              后续修改器
 ┌──────────┐          ┌──────────┐
-│ TextSpan │          │ TrimPath │
+│   Text   │          │ TrimPath │
 └────┬─────┘          │RoundCorn │
      │                │MergePath │
      │ 累积字形列表    └────┬─────┘
@@ -1348,14 +1350,14 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 **转换规则**：
 
 1. **触发条件**：文本遇到 TrimPath、RoundCorner、MergePath 时触发转换
-2. **合并为单个 Path**：一个 TextSpan 的所有字形合并为**一个** Path，而非每个字形产生一个独立 Path
+2. **合并为单个 Path**：一个 Text 的所有字形合并为**一个** Path，而非每个字形产生一个独立 Path
 3. **Emoji 丢失**：Emoji 无法转换为路径轮廓，转换时被丢弃
 4. **不可逆转换**：转换后成为纯 Path，后续的文本修改器对其无效
 
 **示例**：
 ```xml
 <Group>
-  <TextSpan font="Arial" fontSize="24"><![CDATA[Hello 😀]]></TextSpan>
+  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello 😀]]></Text>
   <TrimPath start="0" end="0.5"/>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
@@ -1510,54 +1512,47 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.6 文本排版（TextLayout）
 
-文本排版修改器对累积的文本元素应用段落排版，是 PAGX 格式特有的元素。TextLayout 支持两种模式：
+TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会覆盖 Text 元素的原始位置（类似 TextPath 覆盖位置的行为）。支持两种模式：
 
-- **Point Text 模式**（`width=0`）：单行文本，(x, y) 作为锚点，textAlign 控制文本相对于锚点的对齐
-- **Box Text 模式**（`width>0`）：多行文本框，支持自动换行、垂直对齐等
+- **点文本模式**（无 width）：文本不自动换行，textAlign 控制文本相对于 (x, y) 锚点的对齐
+- **段落文本模式**（有 width）：文本在指定宽度内自动换行
 
-渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。转换为 PAG 二进制格式时，TextLayout 会被预排版展开，字形位置直接写入 TextSpan。
+渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。TextLayout 会被预排版展开，字形位置直接写入 Text。
 
 ```xml
-<!-- Point Text 模式：单行文本居中对齐 -->
-<Group>
-  <TextSpan font="Arial" fontSize="24">Hello World</TextSpan>
-  <TextLayout x="150" y="100" textAlign="center"/>
+<!-- 点文本：居中对齐 -->
+<Layer>
+  <Text fontFamily="Arial" fontSize="24">Hello World</Text>
+  <TextLayout position="150,100" textAlign="center"/>
   <Fill color="#333333"/>
-</Group>
+</Layer>
 
-<!-- Box Text 模式：多行文本框 -->
-<Group>
-  <TextSpan font="Arial" fontSize="16">第一段内容...</TextSpan>
-  <TextSpan font="Arial" fontSize="16" fontWeight="700">粗体</TextSpan>
-  <TextSpan font="Arial" fontSize="16">普通文本。</TextSpan>
-  <TextLayout x="50" y="50" width="300" height="200"
-              textAlign="start"
-              verticalAlign="top"
-              lineHeight="1.5"/>
+<!-- 段落文本：自动换行 -->
+<Layer>
+  <Text fontFamily="Arial" fontSize="16">这是一段很长的文本，会自动换行...</Text>
+  <TextLayout position="50,50" width="300" height="200" textAlign="start" verticalAlign="top" lineHeight="1.5"/>
   <Fill color="#333333"/>
-</Group>
+</Layer>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `x` | float | 0 | 文本布局原点 x 坐标 |
-| `y` | float | 0 | 文本布局原点 y 坐标 |
-| `width` | float | 0 | 文本框宽度（0 = Point Text 模式） |
-| `height` | float | 0 | 文本框高度（0 = 高度自适应） |
+| `position` | point | 0,0 | 排版原点 |
+| `width` | float | auto | 排版宽度（有值则自动换行） |
+| `height` | float | auto | 排版高度（有值则启用垂直对齐） |
 | `textAlign` | TextAlign | start | 水平对齐（见下方） |
-| `textAlignLast` | TextAlign | start | 最后一行对齐（仅 Justify 时生效） |
 | `verticalAlign` | VerticalAlign | top | 垂直对齐（见下方） |
+| `writingMode` | WritingMode | horizontal | 排版方向（见下方） |
 | `lineHeight` | float | 1.2 | 行高倍数 |
-| `direction` | TextDirection | horizontal | 文本方向（见下方） |
 
 **TextAlign（水平对齐）**：
 
 | 值 | 说明 |
 |------|------|
-| `start` | 起始对齐（LTR 为左对齐，RTL 为右对齐） |
+| `start` | 起始对齐（左对齐，对于 RTL 文本为右对齐） |
 | `center` | 居中对齐 |
-| `end` | 结束对齐（LTR 为右对齐，RTL 为左对齐） |
-| `justify` | 两端对齐 |
+| `end` | 结束对齐（右对齐，对于 RTL 文本为左对齐） |
+| `justify` | 两端对齐（最后一行起始对齐） |
 
 **VerticalAlign（垂直对齐）**：
 
@@ -1567,23 +1562,29 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `center` | 垂直居中 |
 | `bottom` | 底部对齐 |
 
-**TextDirection（文本方向）**：
+**WritingMode（排版方向）**：
 
 | 值 | 说明 |
 |------|------|
 | `horizontal` | 横排文本 |
-| `vertical` | 竖排文本 |
+| `vertical` | 竖排文本（列从右到左排列，传统中日文竖排） |
 
 #### 5.5.7 富文本
 
-富文本通过 Group 内的多个 TextSpan 元素组合，共享 Fill/Stroke 样式。
+富文本通过 Group 内的多个 Text 元素组合，每个 Text 可以有独立的 Fill/Stroke 样式。使用 TextLayout 进行统一排版。
 
 ```xml
-<Group>
-  <TextSpan position="0,24" font="Arial" fontSize="24">Hello </TextSpan>
-  <TextSpan position="60,24" font="Arial" fontSize="24" fontWeight="700">World</TextSpan>
-  <Fill color="#000000"/>
-</Group>
+<Layer>
+  <Group>
+    <Text fontFamily="Arial" fontSize="24">Hello </Text>
+    <Fill color="#000000"/>
+  </Group>
+  <Group>
+    <Text fontFamily="Arial" fontStyle="Bold" fontSize="24">World</Text>
+    <Fill color="#FF0000"/>
+  </Group>
+  <TextLayout position="50,100" width="300"/>
+</Layer>
 ```
 
 ### 5.6 复制器（Repeater）
@@ -1653,7 +1654,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 ```xml
 <Group>
-  <TextSpan font="Arial" fontSize="24"><![CDATA[Hi]]></TextSpan>  <!-- 累积字形列表 -->
+  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hi]]></Text>  <!-- 累积字形列表 -->
   <Fill color="#333333"/>            <!-- 渲染填充 -->
   <Repeater copies="3"/> <!-- 复制字形列表和已渲染的填充 -->
   <TextModifier position="0,-5"/>    <!-- 仍可对复制后的字形列表生效 -->
@@ -1801,7 +1802,7 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 | **图层** | `Layer` |
 | **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
 | **滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
-| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `TextSpan` |
+| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text` |
 | **绘制器** | `Fill`, `Stroke` |
 | **形状修改器** | `TrimPath`, `RoundCorner`, `MergePath` |
 | **文本修改器** | `TextModifier`, `TextPath`, `TextLayout` |
@@ -1846,7 +1847,7 @@ Layer / Group
 ├── Ellipse
 ├── Polystar
 ├── Path
-├── TextSpan
+├── Text
 ├── Fill（可内嵌颜色源）
 │   └── SolidColor / LinearGradient / RadialGradient / ConicGradient / DiamondGradient / ImagePattern
 ├── Stroke（可内嵌颜色源）
@@ -1880,9 +1881,9 @@ Layer / Group
   <!-- 标题：使用 Group 是因为需要整体变换 -->
   <Layer name="Title">
     <Group anchorPoint="100,20" position="200,50">
-      <TextSpan position="0,32" font="Helvetica" fontSize="32" fontWeight="700">
+      <Text position="0,32" fontFamily="Helvetica" fontStyle="Bold" fontSize="32">
         <![CDATA[Hello PAGX!]]>
-      </TextSpan>
+      </Text>
       <Fill color="#333333"/>
       <Stroke color="#FFFFFF" width="2" placement="foreground"/>
     </Group>
@@ -1979,44 +1980,62 @@ Layer / Group
 
 ```xml
 <!-- 波浪文字：逐字上下偏移 -->
-<TextSpan position="0,50" font="Arial" fontSize="32">
-  <![CDATA[WAVE TEXT]]>
-</TextSpan>
-<TextModifier position="0,-20">
-  <RangeSelector start="0" end="1" shape="triangle"/>
-</TextModifier>
-<Fill color="#333333"/>
+<Layer>
+  <Text position="0,50" fontFamily="Arial" fontSize="32">
+    <![CDATA[WAVE TEXT]]>
+  </Text>
+  <TextModifier position="0,-20">
+    <RangeSelector start="0" end="1" shape="triangle"/>
+  </TextModifier>
+  <Fill color="#333333"/>
+</Layer>
 
 <!-- 颜色渐变文字 -->
-<TextSpan position="0,100" font="Arial" fontSize="32">
-  <![CDATA[GRADIENT]]>
-</TextSpan>
-<TextModifier fillColor="#FF0000">
-  <RangeSelector start="0" end="1" shape="rampUp"/>
-</TextModifier>
-<Fill color="#0000FF"/>
+<Layer>
+  <Text position="0,100" fontFamily="Arial" fontSize="32">
+    <![CDATA[GRADIENT]]>
+  </Text>
+  <TextModifier fillColor="#FF0000">
+    <RangeSelector start="0" end="1" shape="rampUp"/>
+  </TextModifier>
+  <Fill color="#0000FF"/>
+</Layer>
 ```
 
-#### B.2.5 TextLayout 富文本排版
+#### B.2.5 TextLayout 文本排版
 
 ```xml
-<!-- Point Text 模式：单行居中文本 -->
-<Group>
-  <TextSpan font="Arial" fontSize="24">Centered Text</TextSpan>
-  <TextLayout x="200" y="50" textAlign="center"/>
+<!-- 点文本：居中对齐 -->
+<Layer>
+  <Text fontFamily="Arial" fontSize="24">Centered Text</Text>
+  <TextLayout position="200,50" textAlign="center"/>
   <Fill color="#333333"/>
-</Group>
+</Layer>
 
-<!-- Box Text 模式：多行文本框 -->
-<Group>
-  <TextSpan font="Arial" fontSize="16">This is </TextSpan>
-  <TextSpan font="Arial" fontSize="16" fontWeight="700">bold</TextSpan>
-  <TextSpan font="Arial" fontSize="16"> and </TextSpan>
-  <TextSpan font="Arial" fontSize="16" fontStyle="italic">italic</TextSpan>
-  <TextSpan font="Arial" fontSize="16"> text in a paragraph that will automatically wrap to fit the container width.</TextSpan>
-  <TextLayout x="50" y="100" width="200" height="150" textAlign="justify" lineHeight="1.5"/>
-  <Fill color="#333333"/>
-</Group>
+<!-- 富文本：多种样式 + 自动换行 -->
+<Layer>
+  <Group>
+    <Text fontFamily="Arial" fontSize="16">This is </Text>
+    <Fill color="#333333"/>
+  </Group>
+  <Group>
+    <Text fontFamily="Arial" fontStyle="Bold" fontSize="16">bold</Text>
+    <Fill color="#333333"/>
+  </Group>
+  <Group>
+    <Text fontFamily="Arial" fontSize="16"> and </Text>
+    <Fill color="#333333"/>
+  </Group>
+  <Group>
+    <Text fontFamily="Arial" fontStyle="Italic" fontSize="16">italic</Text>
+    <Fill color="#333333"/>
+  </Group>
+  <Group>
+    <Text fontFamily="Arial" fontSize="16"> text that will automatically wrap.</Text>
+    <Fill color="#333333"/>
+  </Group>
+  <TextLayout position="50,100" width="200" height="150" textAlign="justify" lineHeight="1.5"/>
+</Layer>
 ```
 
 #### B.2.6 TextPath 沿路径文本
@@ -2024,18 +2043,22 @@ Layer / Group
 ```xml
 <!-- 需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/> -->
 <!-- 居中对齐 -->
-<TextSpan font="Arial" fontSize="18">
-  <![CDATA[Text along a curved path]]>
-</TextSpan>
-<TextPath path="@arc" textAlign="center"/>
-<Fill color="#336699"/>
+<Layer>
+  <Text fontFamily="Arial" fontSize="18">
+    <![CDATA[Text along a curved path]]>
+  </Text>
+  <TextPath path="@arc" textAlign="center"/>
+  <Fill color="#336699"/>
+</Layer>
 
 <!-- 强制填满路径（Justify 模式） -->
-<TextSpan font="Arial" fontSize="18">
-  <![CDATA[Justified Text]]>
-</TextSpan>
-<TextPath path="@arc" textAlign="justify" firstMargin="20" lastMargin="20"/>
-<Fill color="#996633"/>
+<Layer>
+  <Text fontFamily="Arial" fontSize="18">
+    <![CDATA[Justified Text]]>
+  </Text>
+  <TextPath path="@arc" textAlign="justify" firstMargin="20" lastMargin="20"/>
+  <Fill color="#996633"/>
+</Layer>
 ```
 
 ---
@@ -2288,16 +2311,16 @@ Layer / Group
 | `data` | string/idref | (必填) |
 | `reversed` | bool | false |
 
-#### TextSpan
+#### Text
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `position` | point | 0,0 |
-| `font` | string | (必填) |
+| `fontFamily` | string | 系统默认 |
+| `fontStyle` | string | "Regular" |
 | `fontSize` | float | 12 |
-| `fontWeight` | int | 400 |
-| `fontStyle` | enum | normal |
-| `tracking` | float | 0 |
+| `letterSpacing` | float | 0 |
+| `baselineShift` | float | 0 |
 
 内容：`CDATA` 文本
 
@@ -2404,13 +2427,12 @@ Layer / Group
 |------|------|--------|
 | `x` | float | 0 |
 | `y` | float | 0 |
-| `width` | float | 0 |
-| `height` | float | 0 |
-| `textAlign` | TextAlign | start |
-| `textAlignLast` | TextAlign | start |
+| `width` | float | auto |
+| `height` | float | auto |
+| `textAlign` | TextAlign | left |
 | `verticalAlign` | VerticalAlign | top |
+| `writingMode` | WritingMode | horizontal |
 | `lineHeight` | float | 1.2 |
-| `direction` | TextDirection | horizontal |
 
 ### C.10 其他节点
 

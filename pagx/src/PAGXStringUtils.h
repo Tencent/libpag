@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -126,14 +127,14 @@ std::string MipmapModeToString(MipmapMode mode);
 MipmapMode MipmapModeFromString(const std::string& str);
 
 //==============================================================================
-// TextAlign, VerticalAlign, Overflow
+// TextAlign, VerticalAlign, WritingMode
 //==============================================================================
 std::string TextAlignToString(TextAlign align);
 TextAlign TextAlignFromString(const std::string& str);
 std::string VerticalAlignToString(VerticalAlign align);
 VerticalAlign VerticalAlignFromString(const std::string& str);
-std::string TextDirectionToString(TextDirection direction);
-TextDirection TextDirectionFromString(const std::string& str);
+std::string WritingModeToString(WritingMode mode);
+WritingMode WritingModeFromString(const std::string& str);
 
 //==============================================================================
 // RepeaterOrder
@@ -167,5 +168,21 @@ Matrix MatrixFromString(const std::string& str);
 //==============================================================================
 PathData PathDataFromSVGString(const std::string& d);
 std::string PathDataToSVGString(const PathData& path);
+
+//==============================================================================
+// String parsing utilities (avoid std::stringstream for smaller binary size)
+//==============================================================================
+
+// Split a string by delimiter and return a vector of trimmed tokens.
+std::vector<std::string> SplitString(const std::string& str, char delimiter);
+
+// Parse comma-separated float values.
+std::vector<float> ParseFloatList(const std::string& str);
+
+// Parse space-separated float values.
+std::vector<float> ParseSpaceSeparatedFloats(const std::string& str);
+
+// Format a float value to string (removes trailing zeros).
+std::string FloatToString(float value);
 
 }  // namespace pagx

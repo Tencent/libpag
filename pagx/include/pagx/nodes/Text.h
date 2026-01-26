@@ -20,25 +20,32 @@
 
 #include <string>
 #include "pagx/nodes/Element.h"
-#include "pagx/nodes/Point.h"
+#include "tgfx/core/Point.h"
 
 namespace pagx {
 
 /**
- * TextSpan represents a text span that generates glyph paths for rendering. It defines the text
- * content, font properties, and positioning within a shape layer.
+ * Text represents a text geometry element that generates glyphs for rendering. It defines the text
+ * content and font properties.
  */
-class TextSpan : public Element {
+class Text : public Element {
  public:
   /**
-   * The position of the text blob.
+   * The position of the text origin (x, y where y is the baseline). Can be overridden by
+   * TextLayout. The default value is (0, 0).
    */
-  Point position = {};
+  tgfx::Point position = {};
 
   /**
-   * The font family name.
+   * The font family name (e.g., "Arial", "Helvetica").
    */
-  std::string font = {};
+  std::string fontFamily = "";
+
+  /**
+   * The font style/variant name (e.g., "Regular", "Bold", "Italic", "Bold Italic"). This
+   * corresponds to the specific font file variant. The default value is "Regular".
+   */
+  std::string fontStyle = "";
 
   /**
    * The font size in pixels. The default value is 12.
@@ -46,27 +53,25 @@ class TextSpan : public Element {
   float fontSize = 12;
 
   /**
-   * The font weight, ranging from 100 to 900. The default value is 400 (normal).
+   * The letter spacing (tracking) value that adjusts spacing between characters. The default value
+   * is 0.
    */
-  int fontWeight = 400;
+  float letterSpacing = 0;
 
   /**
-   * The font style (e.g., "normal", "italic", "oblique"). The default value is "normal".
+   * The baseline shift for superscript/subscript effects. Positive values shift up, negative values
+   * shift down. The default value is 0.
    */
-  std::string fontStyle = "normal";
+  float baselineShift = 0;
 
   /**
-   * The tracking value that adjusts spacing between characters. The default value is 0.
-   */
-  float tracking = 0;
-
-  /**
-   * The text content to render.
+   * The text content to render. Supports newline characters (\n) for line breaks, which use a
+   * default line height of 1.2 times the font size.
    */
   std::string text = {};
 
   NodeType nodeType() const override {
-    return NodeType::TextSpan;
+    return NodeType::Text;
   }
 };
 

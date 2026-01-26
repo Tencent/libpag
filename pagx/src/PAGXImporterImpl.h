@@ -54,7 +54,7 @@
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/TextSpan.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/Color.h"
 
@@ -100,7 +100,7 @@ class PAGXImporterImpl {
   static std::unique_ptr<Ellipse> parseEllipse(const XMLNode* node);
   static std::unique_ptr<Polystar> parsePolystar(const XMLNode* node);
   static std::unique_ptr<Path> parsePath(const XMLNode* node);
-  static std::unique_ptr<TextSpan> parseTextSpan(const XMLNode* node);
+  static std::unique_ptr<Text> parseText(const XMLNode* node);
   static std::unique_ptr<Fill> parseFill(const XMLNode* node);
   static std::unique_ptr<Stroke> parseStroke(const XMLNode* node);
   static std::unique_ptr<TrimPath> parseTrimPath(const XMLNode* node);

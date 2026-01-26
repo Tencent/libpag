@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XMLParser.h"
+#include <cstdio>
 #include <cstdlib>
-#include <fstream>
 #include <memory>
-#include <sstream>
 #include <string>
 #include "expat.h"
 
@@ -151,14 +150,28 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
 }
 
 bool XMLParser::parseFile(const std::string& filePath) {
-  std::ifstream file(filePath, std::ios::binary);
-  if (!file.is_open()) {
+  FILE* file = fopen(filePath.c_str(), "rb");
+  if (!file) {
     return false;
   }
 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  std::string content = buffer.str();
+  fseek(file, 0, SEEK_END);
+  long fileSize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  if (fileSize <= 0) {
+    fclose(file);
+    return false;
+  }
+
+  std::string content;
+  content.resize(static_cast<size_t>(fileSize));
+  size_t bytesRead = fread(&content[0], 1, static_cast<size_t>(fileSize), file);
+  fclose(file);
+
+  if (bytesRead != static_cast<size_t>(fileSize)) {
+    return false;
+  }
 
   return parse(reinterpret_cast<const uint8_t*>(content.data()), content.size());
 }

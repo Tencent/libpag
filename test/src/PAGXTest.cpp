@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include <filesystem>
 #include "pagx/LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
@@ -38,6 +39,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
@@ -87,6 +89,9 @@ static void SaveFile(const std::shared_ptr<Data>& data, const std::string& key) 
  * Test case: Convert all SVG files in apitest/SVG directory to PAGX format and render them.
  */
 PAG_TEST(PAGXTest, SVGToPAGXAll) {
+  // Minimum canvas edge length for rendering. Small images will be scaled up for better visibility.
+  constexpr int MinCanvasEdge = 400;
+
   std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
   std::vector<std::string> svgFiles = {};
 
@@ -120,11 +125,17 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     // Use PAGX document size for rendering.
     // PAGX uses viewBox dimensions when viewBox is present, avoiding unit conversion issues
     // (e.g., "1080pt" would become 1440px but viewBox coordinates remain 1080).
-    int pagxWidth = static_cast<int>(content.width);
-    int pagxHeight = static_cast<int>(content.height);
+    float pagxWidth = content.width;
+    float pagxHeight = content.height;
     if (pagxWidth <= 0 || pagxHeight <= 0) {
       continue;
     }
+
+    // Scale up small images for better visibility.
+    float maxEdge = std::max(pagxWidth, pagxHeight);
+    float scale = (maxEdge < MinCanvasEdge) ? (MinCanvasEdge / maxEdge) : 1.0f;
+    int canvasWidth = static_cast<int>(std::ceil(pagxWidth * scale));
+    int canvasHeight = static_cast<int>(std::ceil(pagxHeight * scale));
 
     // Load original SVG with text shaper.
     auto svgStream = Stream::MakeFromFile(svgPath);
@@ -136,20 +147,22 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Get tgfx's container size (respects width/height unit conversion).
+    // Get SVG container size (may differ from PAGX size due to unit conversion, e.g., pt -> px).
     auto containerSize = svgDOM->getContainerSize();
-    int svgWidth = static_cast<int>(containerSize.width);
-    int svgHeight = static_cast<int>(containerSize.height);
+    float svgWidth = containerSize.width;
+    float svgHeight = containerSize.height;
 
-    // Only compare SVG rendering when sizes match (no unit conversion difference).
-    // When viewBox is present with non-pixel width/height (e.g., "1080pt"), tgfx will scale
-    // content based on the unit conversion, but PAGX uses viewBox coordinates directly.
-    if (svgWidth == pagxWidth && svgHeight == pagxHeight) {
-      auto svgSurface = Surface::Make(context, svgWidth, svgHeight);
-      auto svgCanvas = svgSurface->getCanvas();
-      svgDOM->render(svgCanvas);
-      EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
-    }
+    // Calculate scale to fit SVG into the same canvas as PAGX.
+    // SVG needs to scale from its container size to the canvas size.
+    float svgScaleX = static_cast<float>(canvasWidth) / svgWidth;
+    float svgScaleY = static_cast<float>(canvasHeight) / svgHeight;
+
+    // Render SVG with calculated scale to match PAGX canvas.
+    auto svgSurface = Surface::Make(context, canvasWidth, canvasHeight);
+    auto svgCanvas = svgSurface->getCanvas();
+    svgCanvas->scale(svgScaleX, svgScaleY);
+    svgDOM->render(svgCanvas);
+    EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
 
     // Save PAGX file to output directory
     pagx::SVGImporter::Options parserOptions;
@@ -161,9 +174,13 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Render PAGX using DisplayList (required for mask to work).
-    auto pagxSurface = Surface::Make(context, pagxWidth, pagxHeight);
+    // Create a container layer for scaling to preserve content.root's original matrix.
+    auto pagxSurface = Surface::Make(context, canvasWidth, canvasHeight);
     DisplayList displayList;
-    displayList.root()->addChild(content.root);
+    auto container = tgfx::Layer::Make();
+    container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
+    container->addChild(content.root);
+    displayList.root()->addChild(container);
     displayList.render(pagxSurface.get(), false);
     EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
   }
