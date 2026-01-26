@@ -52,7 +52,6 @@
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/SVGImporter.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -1019,23 +1018,6 @@ PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Opt
     return {};
   }
   return Build(*document, options);
-}
-
-PAGXContent LayerBuilder::FromSVGFile(const std::string& filePath, const Options& options) {
-  auto document = SVGImporter::Parse(filePath);
-  if (!document) {
-    return {};
-  }
-
-  auto opts = options;
-  if (opts.basePath.empty()) {
-    auto lastSlash = filePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      opts.basePath = filePath.substr(0, lastSlash + 1);
-    }
-  }
-
-  return Build(*document, opts);
 }
 
 }  // namespace pagx
