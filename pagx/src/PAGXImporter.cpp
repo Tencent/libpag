@@ -670,7 +670,7 @@ std::unique_ptr<TrimPath> PAGXImporterImpl::parseTrimPath(const XMLNode* node) {
 
 std::unique_ptr<RoundCorner> PAGXImporterImpl::parseRoundCorner(const XMLNode* node) {
   auto round = std::make_unique<RoundCorner>();
-  round->radius = getFloatAttribute(node, "radius", 0);
+  round->radius = getFloatAttribute(node, "radius", 10);
   return round;
 }
 
@@ -682,7 +682,7 @@ std::unique_ptr<MergePath> PAGXImporterImpl::parseMergePath(const XMLNode* node)
 
 std::unique_ptr<TextModifier> PAGXImporterImpl::parseTextModifier(const XMLNode* node) {
   auto modifier = std::make_unique<TextModifier>();
-  auto anchorStr = getAttribute(node, "anchorPoint", "0.5,0.5");
+  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
   modifier->anchorPoint = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   modifier->position = parsePoint(positionStr);
