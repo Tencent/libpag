@@ -488,6 +488,14 @@ async function loadPAGXFile(file: File) {
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
 
+    // Show loading UI with progress reset to 0%
+    const loadingStartTime = Date.now();
+    showLoadingUI();
+    toolbar.classList.add('hidden');
+    resetProgressUI();
+    // Wait for 0% to render before starting
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
     // Start loading resources if not already started
     if (!wasmLoadPromise) {
         wasmLoadPromise = loadWasm();
@@ -499,37 +507,15 @@ async function loadPAGXFile(file: File) {
     // Reset file progress
     loadingProgress.fileLoaded = 0;
     loadingProgress.fileTotal = file.size;
-
-    // Show loading UI with progress reset to 0%
-    const loadingStartTime = Date.now();
-    showLoadingUI();
-    toolbar.classList.add('hidden');
-    resetProgressUI();
-    // Wait for 0% to render before starting
-    await new Promise(resolve => requestAnimationFrame(resolve));
+    updateProgressUI();
 
     try {
-        // Read file with progress tracking
-        const fileBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    loadingProgress.fileLoaded = event.loaded;
-                    loadingProgress.fileTotal = event.total;
-                    updateProgressUI();
-                }
-            };
-            reader.onload = () => {
-                loadingProgress.fileLoaded = loadingProgress.fileTotal;
-                updateProgressUI();
-                resolve(reader.result as ArrayBuffer);
-            };
-            reader.onerror = () => reject(reader.error);
-            reader.readAsArrayBuffer(file);
-        });
-
-        // Wait for all resources to be ready
+        // Wait for WASM and fonts first (these have real progress)
         await Promise.all([wasmLoadPromise, fontLoadPromise]);
+
+        // Read file (local file reading is fast, just mark as complete)
+        const fileBuffer = await file.arrayBuffer();
+        loadingProgress.fileLoaded = loadingProgress.fileTotal;
         updateProgressUI();
 
         // Ensure minimum display time for loading UI (300ms)
