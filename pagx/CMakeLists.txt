@@ -7,6 +7,45 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(PAGX_BUILD_SVG "Build PAGX SVG parser module" ON)
 option(PAGX_BUILD_TGFX_ADAPTER "Build PAGX to tgfx adapter (LayerBuilder)" ON)
 
+# ============== tgfx dependency (when building standalone) ==============
+if (PAGX_BUILD_TGFX_ADAPTER AND NOT TARGET tgfx)
+    if (NOT TGFX_DIR)
+        set(TGFX_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tgfx)
+    endif ()
+    get_filename_component(TGFX_DIR "${TGFX_DIR}" REALPATH)
+    list(APPEND PAGX_INCLUDES ${TGFX_DIR}/include)
+    set(TGFX_CACHE_DIR ${TGFX_DIR}/out/cache)
+    if (EXISTS ${TGFX_CACHE_DIR})
+        # Use cached tgfx build
+        message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_BUILD_SVG=ON")
+        list(APPEND TGFX_OPTIONS "-DTGFX_BUILD_LAYERS=ON")
+        if (CMAKE_BUILD_TYPE MATCHES "Debug")
+            list(APPEND TGFX_OPTIONS "-d")
+            string(TOLOWER ${CMAKE_BUILD_TYPE} TGFX_BUILD_TYPE)
+        endif ()
+        set(TGFX_OUTPUT_DIR ${TGFX_CACHE_DIR}/${TGFX_BUILD_TYPE}/${PLATFORM})
+        set(TGFX_OUTPUT_LIB ${TGFX_OUTPUT_DIR}/${ARCH}/tgfx${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(TGFX_OUTPUT_MD5 ${TGFX_OUTPUT_DIR}/.tgfx.${ARCH}.md5)
+        add_custom_target(tgfx
+                COMMAND node build_tgfx ${TGFX_OPTIONS} -p ${PLATFORM} -a ${ARCH} -o ${TGFX_OUTPUT_DIR}
+                WORKING_DIRECTORY ${TGFX_DIR}
+                BYPRODUCTS ${TGFX_OUTPUT_LIB} ${TGFX_OUTPUT_MD5}
+                VERBATIM USES_TERMINAL)
+        list(APPEND PAGX_STATIC_LIBS ${TGFX_OUTPUT_LIB})
+        list(APPEND PAGX_DEPEND_TARGETS tgfx)
+    else ()
+        # Fallback to source build
+        message("TGFX_DIR: ${TGFX_DIR}")
+        set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+        set(TGFX_BUILD_SVG ON CACHE BOOL "" FORCE)
+        set(TGFX_BUILD_LAYERS ON CACHE BOOL "" FORCE)
+        add_subdirectory(${TGFX_DIR} ${CMAKE_CURRENT_BINARY_DIR}/tgfx)
+        list(APPEND PAGX_STATIC_LIBS $<TARGET_FILE:tgfx>)
+        list(APPEND PAGX_DEPEND_TARGETS tgfx)
+    endif ()
+endif ()
+
 # ============== Core PAGX Library (Independent, no tgfx dependency) ==============
 
 # Collect core sources (excluding subdirectories)
@@ -21,51 +60,56 @@ list(APPEND PAGX_SOURCES ${PAGX_XML_SOURCES})
 if (PAGX_BUILD_SVG)
     file(GLOB_RECURSE PAGX_SVG_SOURCES src/svg/*.cpp)
     list(APPEND PAGX_SOURCES ${PAGX_SVG_SOURCES})
-endif()
+endif ()
 
 # tgfx adapter sources (requires tgfx)
 if (PAGX_BUILD_TGFX_ADAPTER)
-    if (NOT TARGET tgfx)
-        message(FATAL_ERROR "tgfx target not found. Set PAGX_BUILD_TGFX_ADAPTER=OFF to build without tgfx adapter.")
-    endif()
     file(GLOB_RECURSE PAGX_TGFX_SOURCES src/tgfx/*.cpp)
     list(APPEND PAGX_SOURCES ${PAGX_TGFX_SOURCES})
-endif()
+endif ()
 
 add_library(pagx STATIC ${PAGX_SOURCES})
 
 # Public include directory
 target_include_directories(pagx PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # Private include directories
 target_include_directories(pagx PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${PAGX_INCLUDES}
 )
 
 # expat include directory
 target_include_directories(pagx PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat/expat/lib
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/expat/expat/lib
 )
 
 # Windows requires XML_STATIC definition for static expat
-if(WIN32)
+if (WIN32)
     target_compile_definitions(pagx PRIVATE XML_STATIC)
-endif()
+endif ()
 
 if (PAGX_BUILD_SVG)
     target_include_directories(pagx PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/svg
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/svg
     )
-endif()
+endif ()
 
 if (PAGX_BUILD_TGFX_ADAPTER)
     target_include_directories(pagx PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/tgfx
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/tgfx
     )
-    target_link_libraries(pagx PUBLIC tgfx)
-endif()
+    if (TARGET tgfx)
+        target_link_libraries(pagx PUBLIC tgfx)
+    endif ()
+    target_link_libraries(pagx PUBLIC ${PAGX_STATIC_LIBS})
+endif ()
+
+if (PAGX_DEPEND_TARGETS)
+    add_dependencies(pagx ${PAGX_DEPEND_TARGETS})
+endif ()
 
 # ============== Vendor (expat) ==============
 # Build expat and merge into pagx static library
