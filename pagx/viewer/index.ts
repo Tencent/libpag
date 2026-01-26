@@ -301,8 +301,13 @@ async function loadPAGXFile(file: File) {
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
     const dropText = dropZone.querySelector('.drop-text') as HTMLParagraphElement;
     const originalText = dropText.textContent || '';
+
+    // Show loading state
     dropText.textContent = 'Loading...';
+    dropZone.classList.remove('hidden');
+    toolbar.classList.add('hidden');
     await new Promise(resolve => setTimeout(resolve, 10));
+
     try {
         const arrayBuffer = await file.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
