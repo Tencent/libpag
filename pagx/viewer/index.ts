@@ -56,8 +56,6 @@ class LoadingProgress {
     emojiFontLoaded: number = 0;
     emojiFontTotal: number = ESTIMATED_EMOJI_FONT_SIZE;
     emojiFontDone: boolean = false;
-    fileLoaded: number = 0;
-    fileTotal: number = 0;
 
     isAllResourcesCached(): boolean {
         return this.wasmDone && this.fontDone && this.emojiFontDone;
@@ -79,13 +77,12 @@ class LoadingProgress {
             totalSize += this.emojiFontTotal;
             loadedSize += this.emojiFontLoaded;
         }
-        // Always include file in progress calculation
-        totalSize += this.fileTotal;
-        loadedSize += this.fileLoaded;
         if (totalSize === 0) {
-            return 0;
+            // All resources cached, show 99%
+            return 99;
         }
-        return Math.min(100, Math.round((loadedSize / totalSize) * 100));
+        // Cap at 99%, reserve 100% for after PAGX file loaded
+        return Math.min(99, Math.round((loadedSize / totalSize) * 100));
     }
 }
 
@@ -504,44 +501,9 @@ async function loadPAGXFile(file: File) {
         fontLoadPromise = loadFonts();
     }
 
-    // Reset file progress
-    loadingProgress.fileLoaded = 0;
-    loadingProgress.fileTotal = file.size;
-    updateProgressUI();
-
     try {
-        // Read file in chunks for progress updates
-        const fileReadPromise = (async () => {
-            const chunkSize = 64 * 1024; // 64KB per chunk
-            const totalSize = file.size;
-            const chunks: Uint8Array[] = [];
-            let loaded = 0;
-            while (loaded < totalSize) {
-                const slice = file.slice(loaded, Math.min(loaded + chunkSize, totalSize));
-                const buffer = await slice.arrayBuffer();
-                chunks.push(new Uint8Array(buffer));
-                loaded += buffer.byteLength;
-                loadingProgress.fileLoaded = loaded;
-                updateProgressUI();
-                // Yield to allow UI updates
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
-            // Combine chunks into single buffer
-            const fileBuffer = new Uint8Array(totalSize);
-            let offset = 0;
-            for (const chunk of chunks) {
-                fileBuffer.set(chunk, offset);
-                offset += chunk.length;
-            }
-            return fileBuffer;
-        })();
-
-        // Wait for all resources in parallel
-        const [fileBuffer] = await Promise.all([
-            fileReadPromise,
-            wasmLoadPromise,
-            fontLoadPromise
-        ]);
+        // Wait for WASM and fonts (progress goes from 0% to 99%)
+        await Promise.all([wasmLoadPromise, fontLoadPromise]);
         updateProgressUI();
 
         // Ensure minimum display time for loading UI (300ms)
@@ -551,9 +513,12 @@ async function loadPAGXFile(file: File) {
             await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
         }
 
+        // Load PAGX file (progress stays at 99% during this)
+        const fileBuffer = await file.arrayBuffer();
+
         // Register fonts and load PAGX file
         registerFontsToView();
-        viewerState.pagxView!.loadPAGX(fileBuffer);
+        viewerState.pagxView!.loadPAGX(new Uint8Array(fileBuffer));
         gestureManager.resetTransform(viewerState);
         updateSize();
         hideDropZone();
