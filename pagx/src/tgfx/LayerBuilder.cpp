@@ -930,6 +930,10 @@ class LayerBuilderImpl {
           if (!typeface && !_options.fallbackTypefaces.empty()) {
             typeface = _options.fallbackTypefaces[0];
           }
+          // Fallback to system font by name (required for Web platform).
+          if (!typeface && !text->fontFamily.empty()) {
+            typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
+          }
 
           if (!text->text.empty()) {
             if (_textShaper) {

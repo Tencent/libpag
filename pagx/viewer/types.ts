@@ -53,6 +53,7 @@ export interface PAGXModule extends EmscriptenModule {
 }
 
 export interface PAGXView {
+    registerFonts: (fontData: Uint8Array, emojiFontData: Uint8Array) => void;
     loadPAGX: (pagxData: Uint8Array) => void;
     updateSize: () => void;
     updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
