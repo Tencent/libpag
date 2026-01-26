@@ -485,10 +485,11 @@ async function loadPAGXFile(file: File) {
     loadingProgress.fileLoaded = 0;
     loadingProgress.fileTotal = file.size;
 
-    // Show loading UI
+    // Show loading UI and wait for render
     showLoadingUI();
     toolbar.classList.add('hidden');
     updateProgressUI();
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
     try {
         // Read file with progress tracking
@@ -512,6 +513,9 @@ async function loadPAGXFile(file: File) {
 
         // Wait for all resources to be ready
         await Promise.all([wasmLoadPromise, fontLoadPromise]);
+        updateProgressUI();
+        // Allow UI to update before hiding
+        await new Promise(resolve => requestAnimationFrame(resolve));
 
         // Register fonts and load PAGX file
         registerFontsToView();
