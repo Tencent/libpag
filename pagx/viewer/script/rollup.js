@@ -22,7 +22,7 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import alias from '@rollup/plugin-alias';
 import path from "path";
-import {readFileSync} from "node:fs";
+import {readFileSync, readdirSync, unlinkSync} from "node:fs";
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +31,21 @@ const __dirname = path.dirname(__filename);
 const fileHeaderPath = path.resolve(__dirname, '../../../.idea/fileTemplates/includes/PAG File Header.h');
 const banner = readFileSync(fileHeaderPath, 'utf-8');
 const isRelease = process.env.BUILD_MODE === 'release';
+
+// Clean up old source map files in release mode
+if (isRelease) {
+    const outputDir = path.resolve(__dirname, '../wasm-mt');
+    try {
+        const files = readdirSync(outputDir);
+        for (const file of files) {
+            if (file.endsWith('.map')) {
+                unlinkSync(path.join(outputDir, file));
+            }
+        }
+    } catch (e) {
+        // Directory may not exist yet
+    }
+}
 
 const plugins = [
     esbuild({tsconfig: path.resolve(__dirname, "../tsconfig.json"), minify: isRelease}),
