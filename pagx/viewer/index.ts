@@ -481,36 +481,29 @@ async function loadPAGXFile(file: File) {
         fontLoadPromise = loadFonts();
     }
 
-    // Check if all resources are already cached
-    const allCached = loadingProgress.isAllResourcesCached();
-
     // Reset file progress
     loadingProgress.fileLoaded = 0;
     loadingProgress.fileTotal = file.size;
 
-    // Only show loading UI if resources need to be loaded
-    if (!allCached) {
-        showLoadingUI();
-        toolbar.classList.add('hidden');
-        updateProgressUI();
-    }
+    // Show loading UI
+    showLoadingUI();
+    toolbar.classList.add('hidden');
+    updateProgressUI();
 
     try {
         // Read file with progress tracking
         const fileBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
             const reader = new FileReader();
             reader.onprogress = (event) => {
-                if (event.lengthComputable && !allCached) {
+                if (event.lengthComputable) {
                     loadingProgress.fileLoaded = event.loaded;
                     loadingProgress.fileTotal = event.total;
                     updateProgressUI();
                 }
             };
             reader.onload = () => {
-                if (!allCached) {
-                    loadingProgress.fileLoaded = loadingProgress.fileTotal;
-                    updateProgressUI();
-                }
+                loadingProgress.fileLoaded = loadingProgress.fileTotal;
+                updateProgressUI();
                 resolve(reader.result as ArrayBuffer);
             };
             reader.onerror = () => reject(reader.error);
