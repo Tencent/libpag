@@ -3,3 +3,4 @@ CMakeLists.txt
 ../include/
 ../src/
 ../CMakeLists.txt
+../../DEPS
