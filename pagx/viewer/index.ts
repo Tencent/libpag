@@ -508,28 +508,29 @@ async function loadPAGXFile(file: File) {
     loadingProgress.fileLoaded = 0;
     loadingProgress.fileTotal = file.size;
     updateProgressUI();
-    // Allow UI to update with initial progress
-    await new Promise(resolve => setTimeout(resolve, 0));
 
     try {
-        // Read file with progress tracking
-        const fileBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    loadingProgress.fileLoaded = event.loaded;
-                    loadingProgress.fileTotal = event.total;
-                    updateProgressUI();
-                }
-            };
-            reader.onload = () => {
-                loadingProgress.fileLoaded = loadingProgress.fileTotal;
-                updateProgressUI();
-                resolve(reader.result as ArrayBuffer);
-            };
-            reader.onerror = () => reject(reader.error);
-            reader.readAsArrayBuffer(file);
-        });
+        // Read file using stream API for non-blocking progress updates
+        const reader = file.stream().getReader();
+        const chunks: Uint8Array[] = [];
+        let loaded = 0;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            chunks.push(value);
+            loaded += value.length;
+            loadingProgress.fileLoaded = loaded;
+            updateProgressUI();
+        }
+        // Combine chunks into single buffer
+        const fileBuffer = new Uint8Array(loaded);
+        let offset = 0;
+        for (const chunk of chunks) {
+            fileBuffer.set(chunk, offset);
+            offset += chunk.length;
+        }
 
         // Wait for all resources to be ready
         await Promise.all([wasmLoadPromise, fontLoadPromise]);
@@ -544,8 +545,7 @@ async function loadPAGXFile(file: File) {
 
         // Register fonts and load PAGX file
         registerFontsToView();
-        const uint8Array = new Uint8Array(fileBuffer);
-        viewerState.pagxView!.loadPAGX(uint8Array);
+        viewerState.pagxView!.loadPAGX(fileBuffer);
         gestureManager.resetTransform(viewerState);
         updateSize();
         hideDropZone();
