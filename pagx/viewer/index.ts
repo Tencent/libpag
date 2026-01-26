@@ -256,6 +256,21 @@ function updateProgressUI(): void {
     }
 }
 
+function resetProgressUI(): void {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    if (progressBar && progressText) {
+        // Remove transition temporarily to reset instantly
+        progressBar.style.transition = 'none';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        // Force reflow to apply the reset
+        progressBar.offsetHeight;
+        // Restore transition
+        progressBar.style.transition = '';
+    }
+}
+
 async function fetchWithProgress(
     url: string,
     onProgress: (loaded: number, total: number) => void
@@ -485,11 +500,12 @@ async function loadPAGXFile(file: File) {
     loadingProgress.fileLoaded = 0;
     loadingProgress.fileTotal = file.size;
 
-    // Show loading UI and wait for render
+    // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
     toolbar.classList.add('hidden');
-    updateProgressUI();
+    resetProgressUI();
+    // Wait for 0% to render before starting
     await new Promise(resolve => requestAnimationFrame(resolve));
 
     try {
