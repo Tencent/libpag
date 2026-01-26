@@ -18,6 +18,10 @@
 
 import { PAGXModule, PAGXView } from './types';
 import PAGXWasm from './wasm-mt/pagx-viewer';
+import { ScalerContext } from '../../third_party/tgfx/web/src/core/scaler-context';
+import { Matrix } from '../../third_party/tgfx/web/src/core/matrix';
+import { PathRasterizer } from '../../third_party/tgfx/web/src/core/path-rasterizer';
+import { setTGFXModule } from '../../third_party/tgfx/web/src/tgfx-module';
 
 const MIN_ZOOM = 0.001;
 const MAX_ZOOM = 1000.0;
@@ -378,6 +382,12 @@ if (typeof window !== 'undefined') {
                 locateFile: (file: string) => './wasm-mt/' + file,
                 mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
             }) as PAGXModule;
+
+            // Bind tgfx helper classes required for Web platform text rendering
+            setTGFXModule(viewerState.module as any);
+            viewerState.module.ScalerContext = ScalerContext;
+            viewerState.module.WebMask = PathRasterizer;
+            viewerState.module.Matrix = Matrix;
 
             // Bind tgfx helper functions required by WebGLDevice
             viewerState.module.tgfx = {

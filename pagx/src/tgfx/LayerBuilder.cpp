@@ -665,6 +665,10 @@ class LayerBuilderImpl {
     if (!typeface && !_options.fallbackTypefaces.empty()) {
       typeface = _options.fallbackTypefaces[0];
     }
+    // Fallback to system font by name (required for Web platform).
+    if (!typeface && !node->fontFamily.empty()) {
+      typeface = tgfx::Typeface::MakeFromName(node->fontFamily, node->fontStyle);
+    }
 
     if (!node->text.empty()) {
       std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
