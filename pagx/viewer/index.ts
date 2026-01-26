@@ -295,6 +295,9 @@ function bindCanvasEvents(canvas: HTMLElement) {
     }, { passive: false });
 }
 
+// Pending file to load after WASM initialization
+let pendingFile: File | null = null;
+
 async function loadPAGXFile(file: File) {
     const dropZone = document.getElementById('drop-zone') as HTMLDivElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
@@ -308,10 +311,16 @@ async function loadPAGXFile(file: File) {
     toolbar.classList.add('hidden');
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
+    // If WASM is not ready yet, store the file and wait
+    if (!viewerState.pagxView) {
+        pendingFile = file;
+        return;
+    }
+
     try {
         const arrayBuffer = await file.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        viewerState.pagxView?.loadPAGX(uint8Array);
+        viewerState.pagxView.loadPAGX(uint8Array);
         gestureManager.resetTransform(viewerState);
         updateSize();
         dropZone.classList.add('hidden');
@@ -321,6 +330,14 @@ async function loadPAGXFile(file: File) {
         console.error('Failed to load PAGX file:', error);
         dropText.textContent = originalText;
         alert('Failed to load PAGX file. Please check the file format.');
+    }
+}
+
+function processPendingFile() {
+    if (pendingFile && viewerState.pagxView) {
+        const file = pendingFile;
+        pendingFile = null;
+        loadPAGXFile(file);
     }
 }
 
@@ -420,6 +437,9 @@ if (typeof window !== 'undefined') {
     const fontPreloadPromise = preloadFonts();
 
     window.onload = async () => {
+        // Setup drag and drop early so UI is responsive during WASM loading
+        setupDragAndDrop();
+
         if (!checkWasmSupport()) {
             alert('Your browser does not support WebAssembly.\n\n' + BROWSER_REQUIREMENTS);
             return;
@@ -446,9 +466,11 @@ if (typeof window !== 'undefined') {
 
             const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
             bindCanvasEvents(canvas);
-            setupDragAndDrop();
             animationLoop();
             setupVisibilityListeners();
+
+            // Process any pending file that was selected during WASM loading
+            processPendingFile();
 
             // Register fonts when ready (non-blocking, happens in background)
             fontPreloadPromise.then(() => {
