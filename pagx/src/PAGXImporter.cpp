@@ -542,7 +542,7 @@ std::unique_ptr<Rectangle> PAGXImporterImpl::parseRectangle(const XMLNode* node)
   auto rect = std::make_unique<Rectangle>();
   auto centerStr = getAttribute(node, "center", "0,0");
   rect->center = parsePoint(centerStr);
-  auto sizeStr = getAttribute(node, "size", "0,0");
+  auto sizeStr = getAttribute(node, "size", "100,100");
   rect->size = parseSize(sizeStr);
   rect->roundness = getFloatAttribute(node, "roundness", 0);
   rect->reversed = getBoolAttribute(node, "reversed", false);
@@ -553,7 +553,7 @@ std::unique_ptr<Ellipse> PAGXImporterImpl::parseEllipse(const XMLNode* node) {
   auto ellipse = std::make_unique<Ellipse>();
   auto centerStr = getAttribute(node, "center", "0,0");
   ellipse->center = parsePoint(centerStr);
-  auto sizeStr = getAttribute(node, "size", "0,0");
+  auto sizeStr = getAttribute(node, "size", "100,100");
   ellipse->size = parseSize(sizeStr);
   ellipse->reversed = getBoolAttribute(node, "reversed", false);
   return ellipse;

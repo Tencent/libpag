@@ -130,6 +130,110 @@ static tgfx::Color ParseHexColor(const std::string& str) {
   return tgfx::Color::Black();
 }
 
+// Parse a comma-separated list of floats.
+static std::vector<float> ParseFloatList(const std::string& str) {
+  std::vector<float> result;
+  std::string current;
+  for (char c : str) {
+    if (c == ',' || c == ' ') {
+      if (!current.empty()) {
+        result.push_back(std::stof(current));
+        current.clear();
+      }
+    } else {
+      current += c;
+    }
+  }
+  if (!current.empty()) {
+    result.push_back(std::stof(current));
+  }
+  return result;
+}
+
+// Parse a color string to pagx::Color. Supports:
+// - Hex format: #RGB, #RRGGBB, #RRGGBBAA
+// - sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
+// - Display P3 format: p3(r, g, b) or p3(r, g, b, a)
+static Color ParseColorString(const std::string& str) {
+  if (str.empty()) {
+    return {};
+  }
+  // Hex format
+  if (str[0] == '#') {
+    auto hex = str.substr(1);
+    Color color = {};
+    color.colorSpace = ColorSpace::SRGB;
+    if (hex.size() == 3) {
+      int r = ParseHexDigit(hex[0]);
+      int g = ParseHexDigit(hex[1]);
+      int b = ParseHexDigit(hex[2]);
+      color.red = static_cast<float>(r * 17) / 255.0f;
+      color.green = static_cast<float>(g * 17) / 255.0f;
+      color.blue = static_cast<float>(b * 17) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
+    }
+    if (hex.size() == 6) {
+      int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+      int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+      int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+      color.red = static_cast<float>(r) / 255.0f;
+      color.green = static_cast<float>(g) / 255.0f;
+      color.blue = static_cast<float>(b) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
+    }
+    if (hex.size() == 8) {
+      int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+      int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+      int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+      int a = ParseHexDigit(hex[6]) * 16 + ParseHexDigit(hex[7]);
+      color.red = static_cast<float>(r) / 255.0f;
+      color.green = static_cast<float>(g) / 255.0f;
+      color.blue = static_cast<float>(b) / 255.0f;
+      color.alpha = static_cast<float>(a) / 255.0f;
+      return color;
+    }
+  }
+  // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
+  if (str.size() > 5 && str.substr(0, 5) == "srgb(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      auto components = ParseFloatList(inner);
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+        color.colorSpace = ColorSpace::SRGB;
+        return color;
+      }
+    }
+  }
+  // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
+  if (str.size() > 3 && str.substr(0, 3) == "p3(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      auto components = ParseFloatList(inner);
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+        color.colorSpace = ColorSpace::DisplayP3;
+        return color;
+      }
+    }
+  }
+  return {};
+}
+
 // Decode base64 encoded string to binary data.
 static std::shared_ptr<tgfx::Data> Base64Decode(const std::string& encodedString) {
   static const std::array<unsigned char, 128> decodingTable = {
@@ -515,14 +619,15 @@ class LayerBuilderImpl {
     if (colorRef.empty()) {
       return nullptr;
     }
-    // Hex color format: #RGB, #RRGGBB, #RRGGBBAA
-    if (colorRef[0] == '#') {
-      return tgfx::SolidColor::Make(ParseHexColor(colorRef));
-    }
     // Resource reference format: @resourceId
     if (colorRef[0] == '@') {
       std::string resourceId = colorRef.substr(1);
       return findColorSourceResource(resourceId);
+    }
+    // Try to parse as a color string (hex, srgb, p3)
+    auto color = ParseColorString(colorRef);
+    if (color.alpha > 0) {
+      return tgfx::SolidColor::Make(ToTGFX(color));
     }
     return nullptr;
   }
