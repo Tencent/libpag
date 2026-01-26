@@ -17,23 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
 #include "pagx/LayerBuilder.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
-#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
-#include "pagx/SVGImporter.h"
-#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Stroke.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
@@ -69,27 +72,24 @@ static std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
   return typefaces;
 }
 
-static void SaveFile(const std::shared_ptr<Data>& data, const std::string& key) {
-  if (!data) {
-    return;
-  }
+static std::string SavePAGXFile(const std::string& xml, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
   auto dirPath = std::filesystem::path(outPath).parent_path();
   if (!std::filesystem::exists(dirPath)) {
     std::filesystem::create_directories(dirPath);
   }
-  auto file = fopen(outPath.c_str(), "wb");
+  std::ofstream file(outPath, std::ios::binary);
   if (file) {
-    fwrite(data->data(), 1, data->size(), file);
-    fclose(file);
+    file.write(xml.data(), static_cast<std::streamsize>(xml.size()));
   }
+  return outPath;
 }
 
 /**
- * Test case: Convert all SVG files in apitest/SVG directory to PAGX format and render them.
+ * Test case: Convert all SVG files to PAGX format, save as files, then load and render.
+ * This tests the complete round-trip: SVG -> PAGX file -> Load -> Render
  */
 PAG_TEST(PAGXTest, SVGToPAGXAll) {
-  // Minimum canvas edge length for rendering. Small images will be scaled up for better visibility.
   constexpr int MinCanvasEdge = 400;
 
   std::string svgDir = ProjectPath::Absolute("resources/apitest/SVG");
@@ -108,36 +108,42 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Create text shaper for SVG rendering
   auto textShaper = TextShaper::Make(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
 
-    // Convert to PAGX using new API
-    pagx::LayerBuilder::Options options;
-    options.fallbackTypefaces = GetFallbackTypefaces();
-    auto content = pagx::LayerBuilder::FromSVGFile(svgPath, options);
-    if (content.root == nullptr) {
+    // Step 1: Parse SVG to PAGXDocument
+    auto doc = pagx::SVGImporter::Parse(svgPath);
+    if (!doc) {
       continue;
     }
 
-    // Use PAGX document size for rendering.
-    // PAGX uses viewBox dimensions when viewBox is present, avoiding unit conversion issues
-    // (e.g., "1080pt" would become 1440px but viewBox coordinates remain 1080).
-    float pagxWidth = content.width;
-    float pagxHeight = content.height;
+    float pagxWidth = doc->width;
+    float pagxHeight = doc->height;
     if (pagxWidth <= 0 || pagxHeight <= 0) {
       continue;
     }
 
-    // Scale up small images for better visibility.
+    // Step 2: Export to XML and save as PAGX file
+    std::string xml = pagx::PAGXExporter::ToXML(*doc);
+    std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + baseName + ".pagx");
+
+    // Step 3: Load PAGX file and build layer tree (this is the viewer's actual path)
+    pagx::LayerBuilder::Options options;
+    options.fallbackTypefaces = GetFallbackTypefaces();
+    auto content = pagx::LayerBuilder::FromFile(pagxPath, options);
+    if (content.root == nullptr) {
+      continue;
+    }
+
+    // Calculate canvas size
     float maxEdge = std::max(pagxWidth, pagxHeight);
     float scale = (maxEdge < MinCanvasEdge) ? (MinCanvasEdge / maxEdge) : 1.0f;
     int canvasWidth = static_cast<int>(std::ceil(pagxWidth * scale));
     int canvasHeight = static_cast<int>(std::ceil(pagxHeight * scale));
 
-    // Load original SVG with text shaper.
+    // Render original SVG for comparison
     auto svgStream = Stream::MakeFromFile(svgPath);
     if (svgStream == nullptr) {
       continue;
@@ -147,34 +153,19 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Get SVG container size (may differ from PAGX size due to unit conversion, e.g., pt -> px).
     auto containerSize = svgDOM->getContainerSize();
     float svgWidth = containerSize.width;
     float svgHeight = containerSize.height;
-
-    // Calculate scale to fit SVG into the same canvas as PAGX.
-    // SVG needs to scale from its container size to the canvas size.
     float svgScaleX = static_cast<float>(canvasWidth) / svgWidth;
     float svgScaleY = static_cast<float>(canvasHeight) / svgHeight;
 
-    // Render SVG with calculated scale to match PAGX canvas.
     auto svgSurface = Surface::Make(context, canvasWidth, canvasHeight);
     auto svgCanvas = svgSurface->getCanvas();
     svgCanvas->scale(svgScaleX, svgScaleY);
     svgDOM->render(svgCanvas);
     EXPECT_TRUE(Baseline::Compare(svgSurface, "PAGXTest/" + baseName + "_svg"));
 
-    // Save PAGX file to output directory
-    pagx::SVGImporter::Options parserOptions;
-    auto doc = pagx::SVGImporter::Parse(svgPath, parserOptions);
-    if (doc) {
-      std::string xml = pagx::PAGXExporter::ToXML(*doc);
-      auto pagxData = Data::MakeWithCopy(xml.data(), xml.size());
-      SaveFile(pagxData, "PAGXTest/" + baseName + ".pagx");
-    }
-
-    // Render PAGX using DisplayList (required for mask to work).
-    // Create a container layer for scaling to preserve content.root's original matrix.
+    // Render PAGX (loaded from file)
     auto pagxSurface = Surface::Make(context, canvasWidth, canvasHeight);
     DisplayList displayList;
     auto container = tgfx::Layer::Make();
@@ -189,10 +180,153 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
 }
 
 /**
+ * Test case: Verify colorRef parsing for both hex colors and resource references.
+ * This ensures Fill and Stroke with colorRef are rendered correctly.
+ */
+PAG_TEST(PAGXTest, ColorRefRender) {
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200" version="1.0">
+  <Resources>
+    <LinearGradient id="grad1" startPoint="0,0" endPoint="100,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+  </Resources>
+  <Layer>
+    <Group>
+      <Rectangle center="50,100" size="80,80"/>
+      <Fill color="#00FF00"/>
+    </Group>
+    <Group>
+      <Rectangle center="150,100" size="80,80"/>
+      <Fill color="@grad1"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  pagx::LayerBuilder::Options options;
+  options.fallbackTypefaces = GetFallbackTypefaces();
+  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
+                                              strlen(pagxXml), options);
+  ASSERT_TRUE(content.root != nullptr);
+  EXPECT_FLOAT_EQ(content.width, 200.0f);
+  EXPECT_FLOAT_EQ(content.height, 200.0f);
+
+  auto surface = Surface::Make(context, 200, 200);
+  DisplayList displayList;
+  displayList.root()->addChild(content.root);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ColorRefRender"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Verify Stroke with colorRef renders correctly.
+ */
+PAG_TEST(PAGXTest, StrokeColorRefRender) {
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200" version="1.0">
+  <Resources>
+    <LinearGradient id="strokeGrad" startPoint="0,0" endPoint="200,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#00FF00"/>
+    </LinearGradient>
+  </Resources>
+  <Layer>
+    <Group>
+      <Rectangle center="60,100" size="80,80"/>
+      <Stroke color="#0000FF" width="4"/>
+    </Group>
+    <Group>
+      <Rectangle center="140,100" size="80,80"/>
+      <Stroke color="@strokeGrad" width="4"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  pagx::LayerBuilder::Options options;
+  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
+                                              strlen(pagxXml), options);
+  ASSERT_TRUE(content.root != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  DisplayList displayList;
+  displayList.root()->addChild(content.root);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/StrokeColorRefRender"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Verify LayerBuilder::FromFile and FromData produce identical results.
+ */
+PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100" version="1.0">
+  <Layer>
+    <Group>
+      <Rectangle center="50,50" size="60,60"/>
+      <Fill color="#FF5500"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+  // Save to file
+  std::string pagxPath = SavePAGXFile(pagxXml, "PAGXTest/api_test.pagx");
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  pagx::LayerBuilder::Options options;
+
+  // Load via FromFile
+  auto contentFromFile = pagx::LayerBuilder::FromFile(pagxPath, options);
+  ASSERT_TRUE(contentFromFile.root != nullptr);
+
+  // Load via FromData
+  auto contentFromData = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
+                                                      strlen(pagxXml), options);
+  ASSERT_TRUE(contentFromData.root != nullptr);
+
+  // Render both and compare
+  auto surfaceFile = Surface::Make(context, 100, 100);
+  DisplayList displayListFile;
+  displayListFile.root()->addChild(contentFromFile.root);
+  displayListFile.render(surfaceFile.get(), false);
+
+  auto surfaceData = Surface::Make(context, 100, 100);
+  DisplayList displayListData;
+  displayListData.root()->addChild(contentFromData.root);
+  displayListData.render(surfaceData.get(), false);
+
+  // Both should match the same baseline
+  EXPECT_TRUE(Baseline::Compare(surfaceFile, "PAGXTest/LayerBuilderAPIConsistency"));
+  EXPECT_TRUE(Baseline::Compare(surfaceData, "PAGXTest/LayerBuilderAPIConsistency"));
+
+  device->unlock();
+}
+
+/**
  * Test case: PathData public API for path construction
  */
 PAG_TEST(PAGXTest, PathDataConstruction) {
-  // Test basic path commands using public API
   pagx::PathData pathData;
   pathData.moveTo(10, 20);
   pathData.lineTo(30, 40);
@@ -205,7 +339,6 @@ PAG_TEST(PAGXTest, PathDataConstruction) {
   EXPECT_GT(pathData.countPoints(), 0u);
   EXPECT_EQ(pathData.verbs().size(), 6u);  // M, L, L, C, Q, Z
 
-  // Test bounds calculation
   auto bounds = pathData.getBounds();
   EXPECT_FALSE(pathData.isEmpty());
   EXPECT_GT(bounds.width, 0.0f);
@@ -232,7 +365,6 @@ PAG_TEST(PAGXTest, PathDataForEach) {
  * Test case: Strong-typed PAGX node creation
  */
 PAG_TEST(PAGXTest, PAGXNodeBasic) {
-  // Test Rectangle creation
   auto rect = std::make_unique<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
@@ -244,23 +376,20 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
   EXPECT_FLOAT_EQ(rect->center.x, 50);
   EXPECT_FLOAT_EQ(rect->size.width, 100);
 
-  // Test Path creation
   auto path = std::make_unique<pagx::Path>();
   path->data.moveTo(0, 0);
   path->data.lineTo(100, 100);
   EXPECT_EQ(path->nodeType(), pagx::NodeType::Path);
   EXPECT_GT(path->data.verbs().size(), 0u);
 
-  // Test Fill creation
   auto fill = std::make_unique<pagx::Fill>();
   auto solidColor = std::make_unique<pagx::SolidColor>();
-  solidColor->color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
+  solidColor->color = {1.0f, 0.0f, 0.0f, 1.0f};
   fill->color = std::move(solidColor);
   fill->alpha = 0.8f;
   EXPECT_EQ(fill->nodeType(), pagx::NodeType::Fill);
   EXPECT_NE(fill->color, nullptr);
 
-  // Test Group with children
   auto group = std::make_unique<pagx::Group>();
   group->elements.push_back(std::move(rect));
   group->elements.push_back(std::move(fill));
@@ -277,12 +406,10 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
   EXPECT_EQ(doc->width, 400.0f);
   EXPECT_EQ(doc->height, 300.0f);
 
-  // Create a layer with contents
   auto layer = std::make_unique<pagx::Layer>();
   layer->id = "layer1";
   layer->name = "Test Layer";
 
-  // Add a group with rectangle and fill
   auto group = std::make_unique<pagx::Group>();
 
   auto rect = std::make_unique<pagx::Rectangle>();
@@ -293,7 +420,7 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
 
   auto fill = std::make_unique<pagx::Fill>();
   auto solidColor = std::make_unique<pagx::SolidColor>();
-  solidColor->color = {0.0f, 0.0f, 1.0f, 1.0f};  // Blue
+  solidColor->color = {0.0f, 0.0f, 1.0f, 1.0f};
   fill->color = std::move(solidColor);
 
   group->elements.push_back(std::move(rect));
@@ -302,23 +429,19 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
 
   doc->layers.push_back(std::move(layer));
 
-  // Export to XML
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_FALSE(xml.empty());
   EXPECT_NE(xml.find("<pagx"), std::string::npos);
   EXPECT_NE(xml.find("width=\"400\""), std::string::npos);
   EXPECT_NE(xml.find("height=\"300\""), std::string::npos);
 
-  // Save the XML for inspection
-  auto xmlData = tgfx::Data::MakeWithCopy(xml.data(), xml.size());
-  SaveFile(xmlData, "PAGXTest/document_export.pagx");
+  SavePAGXFile(xml, "PAGXTest/document_export.pagx");
 }
 
 /**
  * Test case: PAGXDocument XML round-trip (create -> export -> parse)
  */
 PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
-  // Create a document
   auto doc1 = pagx::PAGXDocument::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
@@ -333,26 +456,21 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
 
   auto fill = std::make_unique<pagx::Fill>();
   auto solidColor = std::make_unique<pagx::SolidColor>();
-  solidColor->color = {0.0f, 1.0f, 0.0f, 1.0f};  // Green
+  solidColor->color = {0.0f, 1.0f, 0.0f, 1.0f};
   fill->color = std::move(solidColor);
 
   layer->contents.push_back(std::move(rect));
   layer->contents.push_back(std::move(fill));
   doc1->layers.push_back(std::move(layer));
 
-  // Export to XML
   std::string xml = pagx::PAGXExporter::ToXML(*doc1);
   EXPECT_FALSE(xml.empty());
 
-  // Parse the XML back
   auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc2 != nullptr);
 
-  // Verify the dimensions
   EXPECT_FLOAT_EQ(doc2->width, 200.0f);
   EXPECT_FLOAT_EQ(doc2->height, 150.0f);
-
-  // Verify the structure
   EXPECT_GE(doc2->layers.size(), 1u);
 }
 
@@ -360,12 +478,10 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
  * Test case: PAGXTypes basic operations
  */
 PAG_TEST(PAGXTest, PAGXTypesBasic) {
-  // Test Point
   pagx::Point p1 = {10.0f, 20.0f};
   EXPECT_FLOAT_EQ(p1.x, 10.0f);
   EXPECT_FLOAT_EQ(p1.y, 20.0f);
 
-  // Test Rect
   pagx::Rect r1 = {0.0f, 10.0f, 100.0f, 50.0f};
   EXPECT_FLOAT_EQ(r1.x, 0.0f);
   EXPECT_FLOAT_EQ(r1.y, 10.0f);
@@ -376,28 +492,24 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
   EXPECT_FLOAT_EQ(r1.right(), 100.0f);
   EXPECT_FLOAT_EQ(r1.bottom(), 60.0f);
 
-  // Test Rect::MakeLTRB
   auto r2 = pagx::Rect::MakeLTRB(10, 20, 110, 70);
   EXPECT_FLOAT_EQ(r2.x, 10.0f);
   EXPECT_FLOAT_EQ(r2.y, 20.0f);
   EXPECT_FLOAT_EQ(r2.width, 100.0f);
   EXPECT_FLOAT_EQ(r2.height, 50.0f);
 
-  // Test Color
   pagx::Color c1 = {1.0f, 0.5f, 0.0f, 1.0f};
   EXPECT_FLOAT_EQ(c1.red, 1.0f);
   EXPECT_FLOAT_EQ(c1.green, 0.5f);
   EXPECT_FLOAT_EQ(c1.blue, 0.0f);
   EXPECT_FLOAT_EQ(c1.alpha, 1.0f);
 
-  // Test Color with wide gamut
   pagx::Color c2 = {1.0f, 0.5f, 0.0f, 1.0f, pagx::ColorSpace::DisplayP3};
   EXPECT_FLOAT_EQ(c2.red, 1.0f);
   EXPECT_FLOAT_EQ(c2.green, 0.5f);
   EXPECT_FLOAT_EQ(c2.blue, 0.0f);
   EXPECT_EQ(c2.colorSpace, pagx::ColorSpace::DisplayP3);
 
-  // Test Matrix (identity)
   pagx::Matrix m1 = {};
   EXPECT_TRUE(m1.isIdentity());
   EXPECT_FLOAT_EQ(m1.a, 1.0f);
@@ -412,13 +524,11 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
  * Test case: Color source nodes
  */
 PAG_TEST(PAGXTest, ColorSources) {
-  // Test SolidColor
   auto solid = std::make_unique<pagx::SolidColor>();
-  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
   EXPECT_EQ(solid->nodeType(), pagx::NodeType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
-  // Test LinearGradient
   auto linear = std::make_unique<pagx::LinearGradient>();
   linear->startPoint.x = 0;
   linear->startPoint.y = 0;
@@ -427,11 +537,11 @@ PAG_TEST(PAGXTest, ColorSources) {
 
   pagx::ColorStop stop1;
   stop1.offset = 0;
-  stop1.color = {1.0f, 0.0f, 0.0f, 1.0f};  // Red
+  stop1.color = {1.0f, 0.0f, 0.0f, 1.0f};
 
   pagx::ColorStop stop2;
   stop2.offset = 1;
-  stop2.color = {0.0f, 0.0f, 1.0f, 1.0f};  // Blue
+  stop2.color = {0.0f, 0.0f, 1.0f, 1.0f};
 
   linear->colorStops.push_back(stop1);
   linear->colorStops.push_back(stop2);
@@ -439,7 +549,6 @@ PAG_TEST(PAGXTest, ColorSources) {
   EXPECT_EQ(linear->nodeType(), pagx::NodeType::LinearGradient);
   EXPECT_EQ(linear->colorStops.size(), 2u);
 
-  // Test RadialGradient
   auto radial = std::make_unique<pagx::RadialGradient>();
   radial->center.x = 50;
   radial->center.y = 50;
@@ -458,16 +567,14 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
   layer->alpha = 0.8f;
   layer->blendMode = pagx::BlendMode::Multiply;
 
-  // Add drop shadow style
   auto dropShadow = std::make_unique<pagx::DropShadowStyle>();
   dropShadow->offsetX = 5;
   dropShadow->offsetY = 5;
   dropShadow->blurrinessX = 10;
   dropShadow->blurrinessY = 10;
-  dropShadow->color = {0.0f, 0.0f, 0.0f, 0.5f};  // Semi-transparent black
+  dropShadow->color = {0.0f, 0.0f, 0.0f, 0.5f};
   layer->styles.push_back(std::move(dropShadow));
 
-  // Add blur filter
   auto blur = std::make_unique<pagx::BlurFilter>();
   blur->blurrinessX = 5;
   blur->blurrinessY = 5;

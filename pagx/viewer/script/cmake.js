@@ -47,3 +47,18 @@ if (!existsSync(destDir)) {
 }
 copyFileSync(path.join(srcDir, 'pagx-viewer.js'), path.join(destDir, 'pagx-viewer.js'));
 copyFileSync(path.join(srcDir, 'pagx-viewer.wasm'), path.join(destDir, 'pagx-viewer.wasm'));
+
+// Copy font files to viewer/fonts/ directory
+const fontSrcDir = path.resolve(__dirname, '../../../third_party/tgfx/resources/font');
+const fontDestDir = path.resolve(__dirname, '../fonts');
+if (!existsSync(fontDestDir)) {
+    mkdirSync(fontDestDir, { recursive: true });
+}
+const fontFiles = ['NotoSansSC-Regular.otf', 'NotoColorEmoji.ttf'];
+for (const fontFile of fontFiles) {
+    const srcPath = path.join(fontSrcDir, fontFile);
+    if (existsSync(srcPath)) {
+        copyFileSync(srcPath, path.join(fontDestDir, fontFile));
+        console.log(`Copied font: ${fontFile}`);
+    }
+}

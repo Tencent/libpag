@@ -52,7 +52,6 @@
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/SVGImporter.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -85,6 +84,155 @@
 #include "tgfx/svg/TextShaper.h"
 
 namespace pagx {
+
+// Parse a single hex digit (0-9, a-f, A-F) to its integer value.
+static int ParseHexDigit(char c) {
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+  if (c >= 'A' && c <= 'F') {
+    return c - 'A' + 10;
+  }
+  return 0;
+}
+
+// Parse a hex color string (#RGB, #RRGGBB, or #RRGGBBAA) to tgfx::Color.
+static tgfx::Color ParseHexColor(const std::string& str) {
+  if (str.empty() || str[0] != '#') {
+    return tgfx::Color::Black();
+  }
+  auto hex = str.substr(1);
+  if (hex.size() == 3) {
+    int r = ParseHexDigit(hex[0]);
+    int g = ParseHexDigit(hex[1]);
+    int b = ParseHexDigit(hex[2]);
+    return {static_cast<float>(r * 17) / 255.0f, static_cast<float>(g * 17) / 255.0f,
+            static_cast<float>(b * 17) / 255.0f, 1.0f};
+  }
+  if (hex.size() == 6) {
+    int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+    int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+    int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+    return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+            static_cast<float>(b) / 255.0f, 1.0f};
+  }
+  if (hex.size() == 8) {
+    int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+    int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+    int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+    int a = ParseHexDigit(hex[6]) * 16 + ParseHexDigit(hex[7]);
+    return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+            static_cast<float>(b) / 255.0f, static_cast<float>(a) / 255.0f};
+  }
+  return tgfx::Color::Black();
+}
+
+// Parse a comma-separated list of floats.
+static std::vector<float> ParseFloatList(const std::string& str) {
+  std::vector<float> result;
+  std::string current;
+  for (char c : str) {
+    if (c == ',' || c == ' ') {
+      if (!current.empty()) {
+        result.push_back(std::stof(current));
+        current.clear();
+      }
+    } else {
+      current += c;
+    }
+  }
+  if (!current.empty()) {
+    result.push_back(std::stof(current));
+  }
+  return result;
+}
+
+// Parse a color string to pagx::Color. Supports:
+// - Hex format: #RGB, #RRGGBB, #RRGGBBAA
+// - sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
+// - Display P3 format: p3(r, g, b) or p3(r, g, b, a)
+static Color ParseColorString(const std::string& str) {
+  if (str.empty()) {
+    return {};
+  }
+  // Hex format
+  if (str[0] == '#') {
+    auto hex = str.substr(1);
+    Color color = {};
+    color.colorSpace = ColorSpace::SRGB;
+    if (hex.size() == 3) {
+      int r = ParseHexDigit(hex[0]);
+      int g = ParseHexDigit(hex[1]);
+      int b = ParseHexDigit(hex[2]);
+      color.red = static_cast<float>(r * 17) / 255.0f;
+      color.green = static_cast<float>(g * 17) / 255.0f;
+      color.blue = static_cast<float>(b * 17) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
+    }
+    if (hex.size() == 6) {
+      int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+      int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+      int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+      color.red = static_cast<float>(r) / 255.0f;
+      color.green = static_cast<float>(g) / 255.0f;
+      color.blue = static_cast<float>(b) / 255.0f;
+      color.alpha = 1.0f;
+      return color;
+    }
+    if (hex.size() == 8) {
+      int r = ParseHexDigit(hex[0]) * 16 + ParseHexDigit(hex[1]);
+      int g = ParseHexDigit(hex[2]) * 16 + ParseHexDigit(hex[3]);
+      int b = ParseHexDigit(hex[4]) * 16 + ParseHexDigit(hex[5]);
+      int a = ParseHexDigit(hex[6]) * 16 + ParseHexDigit(hex[7]);
+      color.red = static_cast<float>(r) / 255.0f;
+      color.green = static_cast<float>(g) / 255.0f;
+      color.blue = static_cast<float>(b) / 255.0f;
+      color.alpha = static_cast<float>(a) / 255.0f;
+      return color;
+    }
+  }
+  // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
+  if (str.size() > 5 && str.substr(0, 5) == "srgb(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      auto components = ParseFloatList(inner);
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+        color.colorSpace = ColorSpace::SRGB;
+        return color;
+      }
+    }
+  }
+  // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
+  if (str.size() > 3 && str.substr(0, 3) == "p3(") {
+    auto start = str.find('(');
+    auto end = str.find(')');
+    if (start != std::string::npos && end != std::string::npos) {
+      auto inner = str.substr(start + 1, end - start - 1);
+      auto components = ParseFloatList(inner);
+      if (components.size() >= 3) {
+        Color color = {};
+        color.red = components[0];
+        color.green = components[1];
+        color.blue = components[2];
+        color.alpha = components.size() >= 4 ? components[3] : 1.0f;
+        color.colorSpace = ColorSpace::DisplayP3;
+        return color;
+      }
+    }
+  }
+  return {};
+}
 
 // Decode base64 encoded string to binary data.
 static std::shared_ptr<tgfx::Data> Base64Decode(const std::string& encodedString) {
@@ -467,6 +615,41 @@ class LayerBuilderImpl {
     return nullptr;
   }
 
+  std::shared_ptr<tgfx::ColorSource> resolveColorRef(const std::string& colorRef) {
+    if (colorRef.empty()) {
+      return nullptr;
+    }
+    // Resource reference format: @resourceId
+    if (colorRef[0] == '@') {
+      std::string resourceId = colorRef.substr(1);
+      return findColorSourceResource(resourceId);
+    }
+    // Try to parse as a color string (hex, srgb, p3)
+    auto color = ParseColorString(colorRef);
+    if (color.alpha > 0) {
+      return tgfx::SolidColor::Make(ToTGFX(color));
+    }
+    return nullptr;
+  }
+
+  std::shared_ptr<tgfx::ColorSource> findColorSourceResource(const std::string& resourceId) {
+    if (!_resources || resourceId.empty()) {
+      return nullptr;
+    }
+    for (const auto& res : *_resources) {
+      if (res->id == resourceId) {
+        // Check if this is a ColorSource node type.
+        auto nodeType = res->nodeType();
+        if (nodeType == NodeType::SolidColor || nodeType == NodeType::LinearGradient ||
+            nodeType == NodeType::RadialGradient || nodeType == NodeType::ConicGradient ||
+            nodeType == NodeType::DiamondGradient || nodeType == NodeType::ImagePattern) {
+          return convertColorSource(static_cast<const ColorSource*>(res.get()));
+        }
+      }
+    }
+    return nullptr;
+  }
+
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
     auto tgfxText = std::make_shared<tgfx::Text>();
 
@@ -481,6 +664,10 @@ class LayerBuilderImpl {
     }
     if (!typeface && !_options.fallbackTypefaces.empty()) {
       typeface = _options.fallbackTypefaces[0];
+    }
+    // Fallback to system font by name (required for Web platform).
+    if (!typeface && !node->fontFamily.empty()) {
+      typeface = tgfx::Typeface::MakeFromName(node->fontFamily, node->fontStyle);
     }
 
     if (!node->text.empty()) {
@@ -506,7 +693,7 @@ class LayerBuilderImpl {
     if (node->color) {
       colorSource = convertColorSource(node->color.get());
     } else if (!node->colorRef.empty()) {
-      // TODO: Resolve color reference from resources
+      colorSource = resolveColorRef(node->colorRef);
     }
 
     if (colorSource) {
@@ -524,7 +711,7 @@ class LayerBuilderImpl {
     if (node->color) {
       colorSource = convertColorSource(node->color.get());
     } else if (!node->colorRef.empty()) {
-      // TODO: Resolve color reference from resources
+      colorSource = resolveColorRef(node->colorRef);
     }
 
     if (colorSource) {
@@ -743,6 +930,10 @@ class LayerBuilderImpl {
           if (!typeface && !_options.fallbackTypefaces.empty()) {
             typeface = _options.fallbackTypefaces[0];
           }
+          // Fallback to system font by name (required for Web platform).
+          if (!typeface && !text->fontFamily.empty()) {
+            typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
+          }
 
           if (!text->text.empty()) {
             if (_textShaper) {
@@ -940,23 +1131,6 @@ PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Opt
     return {};
   }
   return Build(*document, options);
-}
-
-PAGXContent LayerBuilder::FromSVGFile(const std::string& filePath, const Options& options) {
-  auto document = SVGImporter::Parse(filePath);
-  if (!document) {
-    return {};
-  }
-
-  auto opts = options;
-  if (opts.basePath.empty()) {
-    auto lastSlash = filePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      opts.basePath = filePath.substr(0, lastSlash + 1);
-    }
-  }
-
-  return Build(*document, opts);
 }
 
 }  // namespace pagx

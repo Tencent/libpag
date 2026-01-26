@@ -11,6 +11,9 @@
     "strict": true,
     "outDir": "./wasm-mt",
     "baseUrl": ".",
+    "paths": {
+      "@tgfx/*": ["../../third_party/tgfx/web/src/*"]
+    },
     "resolveJsonModule": true
   },
   "include": ["*.ts", "src/**/*.ts"]

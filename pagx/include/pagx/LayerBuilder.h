@@ -92,12 +92,6 @@ class LayerBuilder {
    * Builds a layer tree from PAGX XML data.
    */
   static PAGXContent FromData(const uint8_t* data, size_t length, const Options& options = Options());
-
-  /**
-   * Builds a layer tree from an SVG file.
-   * This is a convenience method that first parses the SVG, then builds the layer tree.
-   */
-  static PAGXContent FromSVGFile(const std::string& filePath, const Options& options = Options());
 };
 
 }  // namespace pagx

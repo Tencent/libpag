@@ -26,7 +26,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Enable SharedArrayBuffer
+// Enable SharedArrayBuffer (required for multi-threaded builds)
 app.use((req, res, next) => {
   res.set('Cross-Origin-Opener-Policy', 'same-origin');
   res.set('Cross-Origin-Embedder-Policy', 'require-corp');

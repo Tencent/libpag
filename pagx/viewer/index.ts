@@ -18,9 +18,14 @@
 
 import { PAGXModule, PAGXView } from './types';
 import PAGXWasm from './wasm-mt/pagx-viewer';
+import { TGFXBind } from '@tgfx/binding';
 
 const MIN_ZOOM = 0.001;
 const MAX_ZOOM = 1000.0;
+
+// Font URLs for preloading
+const FONT_URL = './fonts/NotoSansSC-Regular.otf';
+const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
 
 class ViewerState {
     module: PAGXModule | null = null;
@@ -31,6 +36,9 @@ class ViewerState {
     zoom: number = 1.0;
     offsetX: number = 0;
     offsetY: number = 0;
+    fontsLoaded: boolean = false;
+    fontData: Uint8Array | null = null;
+    emojiFontData: Uint8Array | null = null;
 }
 
 enum ScaleGestureState {
@@ -186,6 +194,45 @@ class GestureManager {
 const viewerState = new ViewerState();
 const gestureManager = new GestureManager();
 let animationLoopRunning = false;
+
+async function loadFont(url: string): Promise<Uint8Array | null> {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            console.warn(`Failed to load font: ${url}`);
+            return null;
+        }
+        const buffer = await response.arrayBuffer();
+        return new Uint8Array(buffer);
+    } catch (error) {
+        console.warn(`Error loading font ${url}:`, error);
+        return null;
+    }
+}
+
+async function preloadFonts(): Promise<void> {
+    // Load fonts in parallel
+    const [fontData, emojiFontData] = await Promise.all([
+        loadFont(FONT_URL),
+        loadFont(EMOJI_FONT_URL),
+    ]);
+    viewerState.fontData = fontData;
+    viewerState.emojiFontData = emojiFontData;
+    viewerState.fontsLoaded = true;
+    console.log('Fonts preloaded:', {
+        font: fontData ? `${fontData.length} bytes` : 'not loaded',
+        emojiFont: emojiFontData ? `${emojiFontData.length} bytes` : 'not loaded',
+    });
+}
+
+function registerFontsToView(): void {
+    if (!viewerState.pagxView) {
+        return;
+    }
+    const fontData = viewerState.fontData || new Uint8Array(0);
+    const emojiFontData = viewerState.emojiFontData || new Uint8Array(0);
+    viewerState.pagxView.registerFonts(fontData, emojiFontData);
+}
 
 function updateSize() {
     if (!viewerState.pagxView) {
@@ -364,6 +411,9 @@ Minimum browser versions required:
 `.trim();
 
 if (typeof window !== 'undefined') {
+    // Start preloading fonts immediately when script loads
+    const fontPreloadPromise = preloadFonts();
+
     window.onload = async () => {
         if (!checkWasmSupport()) {
             alert('Your browser does not support WebAssembly.\n\n' + BROWSER_REQUIREMENTS);
@@ -374,34 +424,24 @@ if (typeof window !== 'undefined') {
             return;
         }
         try {
-            viewerState.module = await PAGXWasm({
-                locateFile: (file: string) => './wasm-mt/' + file,
-                mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
-            }) as PAGXModule;
+            // Wait for both WASM module and fonts to load
+            const [module] = await Promise.all([
+                PAGXWasm({
+                    locateFile: (file: string) => './wasm-mt/' + file,
+                    mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
+                }),
+                fontPreloadPromise,
+            ]);
+            viewerState.module = module as PAGXModule;
 
-            // Bind tgfx helper functions required by WebGLDevice
-            viewerState.module.tgfx = {
-                setColorSpace: (GL: any, colorSpace: number) => {
-                    // WindowColorSpace: None=0, SRGB=1, DisplayP3=2, Others=3
-                    if (colorSpace === 3) {
-                        return false;
-                    }
-                    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-                    if ('drawingBufferColorSpace' in gl) {
-                        if (colorSpace === 0 || colorSpace === 1) {
-                            (gl as any).drawingBufferColorSpace = 'srgb';
-                        } else {
-                            (gl as any).drawingBufferColorSpace = 'display-p3';
-                        }
-                        return true;
-                    } else if (colorSpace === 2) {
-                        return false;
-                    }
-                    return true;
-                }
-            };
+            // Bind tgfx helper classes required for Web platform
+            TGFXBind(viewerState.module as any);
 
             viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+
+            // Register preloaded fonts immediately after creating pagxView
+            registerFontsToView();
+
             updateSize();
             viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
 
