@@ -18,10 +18,7 @@
 
 import { PAGXModule, PAGXView } from './types';
 import PAGXWasm from './wasm-mt/pagx-viewer';
-import { ScalerContext } from '../../third_party/tgfx/web/src/core/scaler-context';
-import { Matrix } from '../../third_party/tgfx/web/src/core/matrix';
-import { PathRasterizer } from '../../third_party/tgfx/web/src/core/path-rasterizer';
-import { setTGFXModule } from '../../third_party/tgfx/web/src/tgfx-module';
+import { TGFXBind } from '@tgfx/binding';
 
 const MIN_ZOOM = 0.001;
 const MAX_ZOOM = 1000.0;
@@ -383,33 +380,8 @@ if (typeof window !== 'undefined') {
                 mainScriptUrlOrBlob: './wasm-mt/pagx-viewer.js'
             }) as PAGXModule;
 
-            // Bind tgfx helper classes required for Web platform text rendering
-            setTGFXModule(viewerState.module as any);
-            viewerState.module.ScalerContext = ScalerContext;
-            viewerState.module.WebMask = PathRasterizer;
-            viewerState.module.Matrix = Matrix;
-
-            // Bind tgfx helper functions required by WebGLDevice
-            viewerState.module.tgfx = {
-                setColorSpace: (GL: any, colorSpace: number) => {
-                    // WindowColorSpace: None=0, SRGB=1, DisplayP3=2, Others=3
-                    if (colorSpace === 3) {
-                        return false;
-                    }
-                    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-                    if ('drawingBufferColorSpace' in gl) {
-                        if (colorSpace === 0 || colorSpace === 1) {
-                            (gl as any).drawingBufferColorSpace = 'srgb';
-                        } else {
-                            (gl as any).drawingBufferColorSpace = 'display-p3';
-                        }
-                        return true;
-                    } else if (colorSpace === 2) {
-                        return false;
-                    }
-                    return true;
-                }
-            };
+            // Bind tgfx helper classes required for Web platform
+            TGFXBind(viewerState.module as any);
 
             viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
             updateSize();

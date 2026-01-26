@@ -20,6 +20,7 @@ import esbuild from 'rollup-plugin-esbuild';
 import resolve from '@rollup/plugin-node-resolve';
 import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
+import alias from '@rollup/plugin-alias';
 import path from "path";
 import {readFileSync} from "node:fs";
 import { fileURLToPath } from 'url';
@@ -34,8 +35,11 @@ const isRelease = process.env.BUILD_MODE === 'release';
 const plugins = [
     esbuild({tsconfig: path.resolve(__dirname, "../tsconfig.json"), minify: isRelease}),
     json(),
-    resolve(),
+    resolve({ extensions: ['.ts', '.js'] }),
     commonJs(),
+    alias({
+        entries: [{ find: '@tgfx', replacement: path.resolve(__dirname, '../../../third_party/tgfx/web/src') }],
+    }),
     {
         name: 'preserve-import-meta-url',
         resolveImportMeta(property, options) {
