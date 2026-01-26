@@ -302,11 +302,11 @@ async function loadPAGXFile(file: File) {
     const dropText = dropZone.querySelector('.drop-text') as HTMLParagraphElement;
     const originalText = dropText.textContent || '';
 
-    // Show loading state
+    // Show loading state and wait for browser to render
     dropText.textContent = 'Loading...';
     dropZone.classList.remove('hidden');
     toolbar.classList.add('hidden');
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     try {
         const arrayBuffer = await file.arrayBuffer();
