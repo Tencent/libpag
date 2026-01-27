@@ -2036,6 +2036,8 @@ Layer / Group
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   
+  <!-- ==================== 图层内容 ==================== -->
+  
   <!-- 背景层 -->
   <Layer name="Background">
     <Rectangle center="400,300" size="800,600"/>
@@ -2073,7 +2075,7 @@ Layer / Group
     </Group>
   </Layer>
   
-  <!-- 第一行右侧: 遮罩示例 -->
+  <!-- ===== 第一行右侧: 遮罩示例 ===== -->
   <Layer id="circleMask" visible="false">
     <Ellipse center="0,0" size="70,70"/>
     <Fill color="#FFFFFF"/>
@@ -2174,7 +2176,7 @@ Layer / Group
     <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
   </Layer>
   
-  <!-- 第六行右侧: 图片 + 合成 + 预排版 -->
+  <!-- ===== 第六行右侧: 图片 + 合成 + 预排版 ===== -->
   <Layer name="PhotoLayer" x="550" y="480">
     <Rectangle center="0,0" size="100,70" roundness="6"/>
     <Fill>
@@ -2202,42 +2204,47 @@ Layer / Group
   
   <!-- ==================== 资源区 ==================== -->
   <Resources>
+    <!-- 图片资源 -->
     <Image id="photo" source="assets/photo.png"/>
     <Image id="noise" source="assets/noise.png"/>
-    
+    <!-- 路径数据资源 -->
     <PathData id="wavePath" data="M 0 0 Q 40 -30 80 0 T 160 0 T 240 0"/>
     <PathData id="arcPath" data="M 0 0 Q 100 -50 200 0"/>
-    
+    <!-- 嵌入矢量字体 -->
     <Font id="textFont">
       <Glyph path="M 0 0 L 0 24 M 0 12 L 14 12 M 14 0 L 14 24"/>
       <Glyph path="M 0 0 L 0 24 L 10 24"/>
     </Font>
+    <!-- 嵌入位图字体（Emoji） -->
     <Font id="emojiFont">
       <Glyph image="assets/emoji/star.png" offset="0,-2"/>
     </Font>
-    
+    <!-- 线性渐变 -->
     <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,600">
       <ColorStop offset="0" color="#1A1A2E"/>
       <ColorStop offset="0.5" color="#16213E"/>
       <ColorStop offset="1" color="#0F3460"/>
     </LinearGradient>
+    <!-- 径向渐变 -->
     <RadialGradient id="spotlight" center="400,300" radius="350">
       <ColorStop offset="0" color="#FFFFFF20"/>
       <ColorStop offset="1" color="#00000000"/>
     </RadialGradient>
+    <!-- 锥形渐变 -->
     <ConicGradient id="rainbow" center="50,50" startAngle="0" endAngle="360">
       <ColorStop offset="0" color="#FF0000"/>
       <ColorStop offset="0.33" color="#00FF00"/>
       <ColorStop offset="0.66" color="#0000FF"/>
       <ColorStop offset="1" color="#FF0000"/>
     </ConicGradient>
+    <!-- 菱形渐变 -->
     <DiamondGradient id="diamond" center="30,30" radius="30">
       <ColorStop offset="0" color="#FFFFFF"/>
       <ColorStop offset="1" color="#1ABC9C"/>
     </DiamondGradient>
-    
+    <!-- 图片填充 -->
     <ImagePattern id="noisePattern" image="@noise" tileModeX="repeat" tileModeY="repeat"/>
-    
+    <!-- 合成（可复用组件） -->
     <Composition id="buttonComp" width="100" height="32">
       <Layer>
         <Rectangle center="50,16" size="100,32" roundness="6"/>
