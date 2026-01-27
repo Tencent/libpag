@@ -21,10 +21,6 @@ const MAX_ZOOM = 10.0;
 const TAP_TIMEOUT = 300;
 const TAP_DISTANCE_THRESHOLD = 50;
 
-// Offset limits to prevent content from moving too far outside viewport
-// These are in content space units (larger values allow more pan freedom)
-const MAX_OFFSET_MULTIPLIER = 5.0;  // Allow panning up to 5x content size in each direction
-
 export interface GestureState {
   action: 'none' | 'update' | 'reset';
   zoom: number;
@@ -35,22 +31,12 @@ export interface GestureState {
 export class WXGestureManager {
   // Current state
   private zoom: number = 1.0;
-  private offsetX: number = 0;  // offset passed to C++: offset = contentOffset / zoom
+  private offsetX: number = 0;  // Physical pixel offset passed to C++ DisplayList
   private offsetY: number = 0;
   
-  // Content space offset (physical pixels / canvasToContentScale)
-  // This represents the offset in content coordinate space, maintaining visual position
-  private contentOffsetX: number = 0;
-  private contentOffsetY: number = 0;
-  
-  // Content dimensions for offset limiting
-  private contentWidth: number = 0;
-  private contentHeight: number = 0;
-  
-  // Canvas dimensions in physical pixels and scale factor
+  // Canvas dimensions in physical pixels
   private canvasWidth: number = 0;   // physical pixels (rect.width * dpr)
   private canvasHeight: number = 0;  // physical pixels (rect.height * dpr)
-  private canvasToContentScale: number = 1.0;  // canvasPixels / contentPixels
   
   // Single-finger drag state
   private lastTouchX: number = 0;
@@ -59,10 +45,6 @@ export class WXGestureManager {
   // Pinch zoom state
   private initialDistance: number = 0;
   private initialZoom: number = 1.0;
-  private initialContentOffsetX: number = 0;
-  private initialContentOffsetY: number = 0;
-  private pinchCenterX: number = 0;  // physical pixels
-  private pinchCenterY: number = 0;  // physical pixels
   
   // Double-tap detection
   private lastTapTime: number = 0;
@@ -98,19 +80,11 @@ export class WXGestureManager {
     
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
-    this.contentWidth = contentWidth;
-    this.contentHeight = contentHeight;
-    this.canvasToContentScale = Math.min(
-      canvasWidth / contentWidth,
-      canvasHeight / contentHeight
-    );
     
     // Reset all transforms when (re)initializing
     this.zoom = 1.0;
     this.offsetX = 0;
     this.offsetY = 0;
-    this.contentOffsetX = 0;
-    this.contentOffsetY = 0;
     
     return {
       action: 'reset',
@@ -122,10 +96,6 @@ export class WXGestureManager {
   
   /**
    * Update canvas size (e.g., after orientation change or window resize).
-   * 
-   * NOTE: When canvas size changes, canvasToContentScale and centerOffset both change,
-   * making it impossible to maintain the exact visual position. The simplest
-   * and most predictable approach is to reset all transforms.
    */
   public updateSize(
     canvasWidth: number,
@@ -133,25 +103,8 @@ export class WXGestureManager {
     contentWidth: number,
     contentHeight: number
   ): void {
-    const oldScale = this.canvasToContentScale;
-    
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
-    this.contentWidth = contentWidth;
-    this.contentHeight = contentHeight;
-    this.canvasToContentScale = Math.min(
-      canvasWidth / contentWidth,
-      canvasHeight / contentHeight
-    );
-    
-    if (oldScale > 0 && Math.abs(oldScale - this.canvasToContentScale) > 0.001) {
-      // Reset all transforms when scale changes
-      this.zoom = 1.0;
-      this.offsetX = 0;
-      this.offsetY = 0;
-      this.contentOffsetX = 0;
-      this.contentOffsetY = 0;
-    }
   }
   
   /**
@@ -173,31 +126,12 @@ export class WXGestureManager {
     this.zoom = 1.0;
     this.offsetX = 0;
     this.offsetY = 0;
-    this.contentOffsetX = 0;
-    this.contentOffsetY = 0;
     return {
       action: 'reset',
       zoom: this.zoom,
       offsetX: this.offsetX,
       offsetY: this.offsetY
     };
-  }
-  
-  /**
-   * Clamp content offset to prevent extreme values that cause rendering issues.
-   * Limits offset to a reasonable range based on content size.
-   */
-  private clampContentOffset(): void {
-    if (this.contentWidth <= 0 || this.contentHeight <= 0) {
-      return;
-    }
-    
-    // Allow panning up to MAX_OFFSET_MULTIPLIER times the content size
-    const maxOffsetX = this.contentWidth * MAX_OFFSET_MULTIPLIER;
-    const maxOffsetY = this.contentHeight * MAX_OFFSET_MULTIPLIER;
-    
-    this.contentOffsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, this.contentOffsetX));
-    this.contentOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, this.contentOffsetY));
   }
   
   /**
@@ -234,14 +168,6 @@ export class WXGestureManager {
       const dy = touches[1].y - touches[0].y;
       this.initialDistance = Math.hypot(dx, dy);
       this.initialZoom = this.zoom;
-      
-      // IMPORTANT: Save current content offsets before zoom starts
-      this.initialContentOffsetX = this.contentOffsetX;
-      this.initialContentOffsetY = this.contentOffsetY;
-      
-      // Record pinch center in physical pixels (touches are in logical pixels)
-      this.pinchCenterX = (touches[0].x + touches[1].x) * 0.5 * dpr;
-      this.pinchCenterY = (touches[0].y + touches[1].y) * 0.5 * dpr;
     }
     
     return this.getState();
@@ -269,22 +195,9 @@ export class WXGestureManager {
       const deltaX = (touches[0].x - this.lastTouchX) * dpr;
       const deltaY = (touches[0].y - this.lastTouchY) * dpr;
       
-      // Accumulate content space offset
-      // deltaX is in physical pixels, canvasToContentScale is physicalPixels/contentPixels
-      // so deltaX / canvasToContentScale gives us content space units
-      if (this.canvasToContentScale > 0) {
-        this.contentOffsetX += deltaX / this.canvasToContentScale;
-        this.contentOffsetY += deltaY / this.canvasToContentScale;
-      }
-      
-      // Clamp offset to prevent extreme values
-      this.clampContentOffset();
-      
-      // Convert to C++ offset space: offset = contentOffset / zoom
-      if (this.zoom > 0) {
-        this.offsetX = this.contentOffsetX / this.zoom;
-        this.offsetY = this.contentOffsetY / this.zoom;
-      }
+      // Accumulate offset directly in physical pixels
+      this.offsetX += deltaX;
+      this.offsetY += deltaY;
       
       this.lastTouchX = touches[0].x;
       this.lastTouchY = touches[0].y;
@@ -313,35 +226,16 @@ export class WXGestureManager {
         Math.min(MAX_ZOOM, this.initialZoom * scaleChange)
       );
       
-      // Focal point calculation in content space:
-      // Canvas position (physical pixels): C = centerOffset + canvasToContentScale * zoom * (offset + P)
-      // where P is point in content space
-      // To find P: P = (C - centerOffset) / (canvasToContentScale * zoom) - offset
-      //             = (C - centerOffset) / canvasToContentScale / zoom - contentOffset / zoom
-      //             = ((C - centerOffset) / canvasToContentScale - contentOffset) / zoom
-      // At zoom start: P = ((pinchCenter - center) / canvasToContentScale - initialContentOffset) / initialZoom
+      // Calculate current pinch center (may have moved during zoom)
+      const currentPinchCenterX = (touches[0].x + touches[1].x) * 0.5 * dpr;
+      const currentPinchCenterY = (touches[0].y + touches[1].y) * 0.5 * dpr;
       
-      // Convert focal point from physical pixels to content space
-      if (this.canvasToContentScale > 0 && this.initialZoom > 0) {
-        const focalContent = (this.pinchCenterX - this.canvasWidth * 0.5) / this.canvasToContentScale;
-        const focalContentY = (this.pinchCenterY - this.canvasHeight * 0.5) / this.canvasToContentScale;
-        
-        // Content point at focal: P = (focalContent - initialContentOffset) / initialZoom
-        // Keep P fixed: focalContent - initialContentOffset = P * initialZoom
-        //               newContentOffset = focalContent - P * newZoom
-        //                                = focalContent - (focalContent - initialContentOffset) * (newZoom / initialZoom)
-        this.contentOffsetX = focalContent - (focalContent - this.initialContentOffsetX) * (newZoom / this.initialZoom);
-        this.contentOffsetY = focalContentY - (focalContentY - this.initialContentOffsetY) * (newZoom / this.initialZoom);
-      }
-      
-      // Clamp offset to prevent extreme values
-      this.clampContentOffset();
-      
+      // Standard zoom-around-point formula using CURRENT zoom (not initial):
+      // This allows for smooth continuous zooming even if fingers move
+      // offset_new = (offset_old - focal) * (zoom_new / zoom_old) + focal
+      this.offsetX = (this.offsetX - currentPinchCenterX) * (newZoom / this.zoom) + currentPinchCenterX;
+      this.offsetY = (this.offsetY - currentPinchCenterY) * (newZoom / this.zoom) + currentPinchCenterY;
       this.zoom = newZoom;
-      if (this.zoom > 0) {
-        this.offsetX = this.contentOffsetX / this.zoom;
-        this.offsetY = this.contentOffsetY / this.zoom;
-      }
       
       return {
         action: 'update',

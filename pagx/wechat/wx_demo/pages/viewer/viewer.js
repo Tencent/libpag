@@ -14,30 +14,19 @@ const SAMPLE_FILES = [
     name: 'ColorPicker', 
     url: 'https://pag.io/pagx/testFiles/ColorPicker.libpag.pagx'
   },
-  // { 
-  //   name: 'complex3', 
-  //   url: 'https://pag.io/pagx/testFiles/complex3.pagx'
-  // },
+  { 
+    name: 'complex7', 
+    url: 'https://pag.io/pagx/testFiles/complex7.pagx'
+  },
   { 
     name: 'complex6', 
     url: 'https://pag.io/pagx/testFiles/complex6.pagx'
-  },
-  // { 
-  //   name: 'path', 
-  //   url: 'https://pag.io/pagx/testFiles/path.pagx'
-  // },
-  // { 
-  //   name: 'refStyle', 
-  //   url: 'https://pag.io/pagx/testFiles/refStyle.pagx'
-  // }
+  }
 ];
 
 Page({
   data: {
     loading: true,
-    zoom: 1.0,
-    offsetX: 0,
-    offsetY: 0,
     samples: SAMPLE_FILES,
     sampleNames: SAMPLE_FILES.map(item => item.name),
     currentIndex: 0,
@@ -51,11 +40,6 @@ Page({
   animationFrameId: 0,
   gestureManager: null,
   dpr: 2,
-  
-  // UI update throttling
-  lastUIUpdateTime: 0,
-  pendingUIUpdate: null,
-  UI_UPDATE_INTERVAL: 100, // Update UI at most every 100ms
 
   async onLoad(options) {
     try {
@@ -106,12 +90,6 @@ Page({
 
   onUnload() {
     this.stopRendering();
-    
-    // Clear pending UI update
-    if (this.pendingUIUpdate) {
-      clearTimeout(this.pendingUIUpdate);
-      this.pendingUIUpdate = null;
-    }
     
     if (this.View) {
       this.View.destroy();
@@ -286,44 +264,6 @@ Page({
       console.error('Failed to update C++ view:', error);
       return;
     }
-    
-    // Throttle UI updates to avoid setData flooding
-    const now = Date.now();
-    
-    if (state.action === 'reset') {
-      // Reset should update UI immediately
-      this.updateUIState(state);
-      return;
-    }
-    
-    // For 'update' action, throttle UI updates
-    if (now - this.lastUIUpdateTime >= this.UI_UPDATE_INTERVAL) {
-      this.updateUIState(state);
-      this.lastUIUpdateTime = now;
-      
-      // Clear any pending update since we just updated
-      if (this.pendingUIUpdate) {
-        clearTimeout(this.pendingUIUpdate);
-        this.pendingUIUpdate = null;
-      }
-    } else {
-      // Schedule a delayed update if not already scheduled
-      if (!this.pendingUIUpdate) {
-        this.pendingUIUpdate = setTimeout(() => {
-          this.updateUIState(state);
-          this.lastUIUpdateTime = Date.now();
-          this.pendingUIUpdate = null;
-        }, this.UI_UPDATE_INTERVAL - (now - this.lastUIUpdateTime));
-      }
-    }
-  },
-  
-  updateUIState(state) {
-    this.setData({
-      zoom: state.zoom.toFixed(2),
-      offsetX: Math.round(state.offsetX),
-      offsetY: Math.round(state.offsetY)
-    });
   },
 
   startRendering() {

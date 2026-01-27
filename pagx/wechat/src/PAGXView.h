@@ -85,9 +85,6 @@ class PAGXView {
   float pagxHeight = 0.0f;
   int _width = 0;
   int _height = 0;
-  float zoomScale = 1.0f;
-  float zoomOffsetX = 0.0f;
-  float zoomOffsetY = 0.0f;
 };
 
 }  // namespace pagx

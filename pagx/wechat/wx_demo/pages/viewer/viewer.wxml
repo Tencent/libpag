@@ -42,10 +42,5 @@
     <view wx:if="{{loadingFile}}" class="loading-file">
       <text>Switching...</text>
     </view>
-
-    <!-- Info -->
-    <view class="info">
-      Zoom: {{zoom}}x | Offset: ({{offsetX}}, {{offsetY}})
-    </view>
   </view>
 </view>

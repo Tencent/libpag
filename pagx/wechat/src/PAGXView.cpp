@@ -119,20 +119,12 @@ void PAGXView::applyCenteringTransform() {
   auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
   matrix.preScale(scale, scale);
 
-  matrix.preScale(zoomScale, zoomScale);
-  matrix.preTranslate(zoomOffsetX, zoomOffsetY);
-
   contentLayer->setMatrix(matrix);
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
-  zoomScale = zoom;
-  zoomOffsetX = offsetX;
-  zoomOffsetY = offsetY;
-
-  if (contentLayer) {
-    applyCenteringTransform();
-  }
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
 }
 
 bool PAGXView::draw() {
