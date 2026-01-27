@@ -1431,45 +1431,10 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 **示例**：
 
 ```xml
-<!-- append 模式：简单合并，保留各自填充规则 -->
-<Layer>
-  <Rectangle center="50,50" size="80,80"/>
-  <Ellipse center="90,90" size="80,80"/>
-  <MergePath mode="append"/>
-  <Fill color="#3366FF"/>
-</Layer>
-
-<!-- union 模式：并集，合并覆盖区域 -->
-<Layer>
-  <Rectangle center="50,50" size="80,80"/>
-  <Ellipse center="90,90" size="80,80"/>
-  <MergePath mode="union"/>
-  <Fill color="#33CC66"/>
-</Layer>
-
-<!-- intersect 模式：交集，只保留重叠区域 -->
-<Layer>
-  <Rectangle center="50,50" size="80,80"/>
-  <Ellipse center="90,90" size="80,80"/>
-  <MergePath mode="intersect"/>
-  <Fill color="#FF6633"/>
-</Layer>
-
-<!-- xor 模式：异或，保留非重叠区域 -->
-<Layer>
-  <Rectangle center="50,50" size="80,80"/>
-  <Ellipse center="90,90" size="80,80"/>
-  <MergePath mode="xor"/>
-  <Fill color="#CC33FF"/>
-</Layer>
-
-<!-- difference 模式：差集，从矩形中减去椭圆 -->
-<Layer>
-  <Rectangle center="50,50" size="80,80"/>
-  <Ellipse center="90,90" size="80,80"/>
-  <MergePath mode="difference"/>
-  <Fill color="#FFCC33"/>
-</Layer>
+<Rectangle center="50,50" size="80,80"/>
+<Ellipse center="90,90" size="80,80"/>
+<MergePath mode="union"/>
+<Fill color="#3366FF"/>
 ```
 
 ### 5.5 文本修改器（Text Modifiers）
@@ -1745,42 +1710,33 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 
 #### 5.5.7 富文本
 
-富文本通过 Group 内的多个 Text 元素组合，每个 Text 可以有独立的 Fill/Stroke 样式。使用 TextLayout 进行统一排版。
+富文本通过多个 Group 组合不同样式的 Text 元素，使用 TextLayout 进行统一排版。
 
 ```xml
 <Layer>
-  <!-- 常规文本 -->
   <Group>
     <Text text="This is " fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <!-- 加粗红色文本 -->
   <Group>
-    <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Text text="bold red" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <Fill color="#FF0000"/>
   </Group>
-  <!-- 常规文本 -->
   <Group>
-    <Text text=" information. " fontFamily="Arial" fontSize="18"/>
+    <Text text=" and " fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <!-- 带下划线的链接样式 -->
   <Group>
-    <Text text="Click here" fontFamily="Arial" fontSize="18"/>
+    <Text text="italic blue" fontFamily="Arial" fontStyle="Italic" fontSize="18"/>
     <Fill color="#0066CC"/>
-    <Stroke color="#0066CC" width="1"/>
   </Group>
-  <!-- 常规文本 -->
   <Group>
-    <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
+    <Text text=" text." fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <!-- TextLayout 统一排版所有 Text -->
-  <TextLayout position="50,100" width="300" textAlign="start" lineHeight="1.5"/>
+  <TextLayout position="50,100" width="300" textAlign="start"/>
 </Layer>
 ```
-
-**说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
 
 ### 5.6 复制器（Repeater）
 
