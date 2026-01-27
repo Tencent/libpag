@@ -47,7 +47,7 @@ class Data {
    * Returns the read-only memory address of the data cast to uint8_t*.
    */
   const uint8_t* bytes() const {
-    return reinterpret_cast<const uint8_t*>(_data);
+    return _data;
   }
 
   /**
@@ -67,7 +67,7 @@ class Data {
  private:
   Data(const void* data, size_t length);
 
-  const void* _data = nullptr;
+  const uint8_t* _data = nullptr;
   size_t _size = 0;
 };
 

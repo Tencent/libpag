@@ -37,7 +37,7 @@ Data::Data(const void* data, size_t length) : _size(length) {
 }
 
 Data::~Data() {
-  delete[] reinterpret_cast<const uint8_t*>(_data);
+  delete[] _data;
 }
 
 }  // namespace pagx
