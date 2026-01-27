@@ -28,9 +28,12 @@
 namespace pagx {
 
 /**
- * Text represents a text geometry element that generates glyphs for rendering. It supports two
- * rendering modes: precomposition (using GlyphRun children) and runtime shaping (using text
- * content with font properties).
+ * Text is a geometry element that produces a glyph list after text shaping, which accumulates into
+ * the rendering context for subsequent modifiers or painters. It supports two rendering modes:
+ * - Pre-typesetting mode: Uses GlyphRun children with precomputed glyph IDs and positions, rendered
+ *   with embedded fonts to ensure cross-platform consistency.
+ * - Runtime shaping mode: Performs text shaping at runtime using the text content and font
+ *   properties. Results may vary slightly across platforms due to font and shaping differences.
  */
 class Text : public Element {
  public:
@@ -41,8 +44,8 @@ class Text : public Element {
   std::string text = {};
 
   /**
-   * The position of the text origin (x, y where y is the baseline). Can be overridden by
-   * TextLayout. The default value is (0, 0).
+   * The position of the text origin (x, y where y is the baseline). This can be overridden by
+   * TextLayout or TextPath modifiers. The default value is (0, 0).
    */
   tgfx::Point position = {};
 
@@ -75,7 +78,7 @@ class Text : public Element {
   float baselineShift = 0.0f;
 
   /**
-   * Precomposed glyph runs. When present, these are used for rendering instead of runtime shaping.
+   * Pre-typeset glyph runs. When present, these are used for rendering instead of runtime shaping.
    * Multiple GlyphRuns support font fallback (e.g., different fonts for Latin and CJK characters).
    */
   std::vector<std::unique_ptr<GlyphRun>> glyphRuns = {};
