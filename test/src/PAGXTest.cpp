@@ -1122,4 +1122,299 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
   device->unlock();
 }
 
+/**
+ * Test case: Complete PAGX example from specification document.
+ * This tests the full rendering capabilities of PAGX including:
+ * - Multiple layers with different Y positions
+ * - Geometric shapes (Rectangle, Ellipse, Polystar, Path)
+ * - Gradients (Linear, Radial, Conic)
+ * - Shape modifiers (TrimPath, RoundCorner, MergePath, Repeater)
+ * - Text with TextLayout
+ * - Filters (Blur, DropShadow, Blend, ColorMatrix)
+ * - Layer styles (DropShadowStyle, InnerShadowStyle)
+ * - Mask and maskType
+ * - Embedded fonts and GlyphRun
+ * - Composition references
+ */
+PAG_TEST(PAGXTest, CompleteExample) {
+  // Modern dark theme design example
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="800" height="520">
+  
+  <!-- Background -->
+  <Layer name="Background">
+    <Rectangle center="400,260" size="800,520"/>
+    <Fill color="@bgGradient"/>
+  </Layer>
+  
+  <!-- Decorative glows -->
+  <Layer name="GlowTopLeft" blendMode="screen">
+    <Ellipse center="100,80" size="300,300"/>
+    <Fill color="@glowPurple"/>
+  </Layer>
+  <Layer name="GlowBottomRight" blendMode="screen">
+    <Ellipse center="700,440" size="400,400"/>
+    <Fill color="@glowBlue"/>
+  </Layer>
+  
+  <!-- Title -->
+  <Layer name="Title">
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <TextLayout position="400,55" textAlign="center"/>
+    <Fill color="@titleGradient"/>
+  </Layer>
+  <Layer name="Subtitle">
+    <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="400,95" textAlign="center"/>
+    <Fill color="#FFFFFF60"/>
+  </Layer>
+  
+  <!-- Shape cards row y=150 -->
+  <Layer name="ShapeCards" y="150">
+    <Group position="100,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="100,0">
+      <Rectangle center="0,0" size="50,35" roundness="6"/>
+      <Fill color="@coral"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#E7524080"/>
+    </Group>
+    
+    <Group position="230,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="230,0">
+      <Ellipse center="0,0" size="50,35"/>
+      <Fill color="@purple"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#A855F780"/>
+    </Group>
+    
+    <Group position="360,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="360,0">
+      <Polystar center="0,0" type="star" pointCount="5" outerRadius="22" innerRadius="10" rotation="-90"/>
+      <Fill color="@amber"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F59E0B80"/>
+    </Group>
+    
+    <Group position="490,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="490,0">
+      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="24"/>
+      <Fill color="@teal"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#14B8A680"/>
+    </Group>
+    
+    <Group position="620,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="620,0">
+      <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
+      <Fill color="@orange"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F9731680"/>
+    </Group>
+  </Layer>
+  
+  <!-- Modifiers row y=270 -->
+  <Layer name="Modifiers" y="270">
+    <Group position="120,0">
+      <Path data="@wavePath"/>
+      <TrimPath start="0" end="0.75"/>
+      <Stroke color="@cyan" width="3" cap="round"/>
+    </Group>
+    
+    <Group position="280,0">
+      <Rectangle center="0,0" size="60,40"/>
+      <RoundCorner radius="10"/>
+      <Fill color="@emerald"/>
+    </Group>
+    
+    <Group position="420,0">
+      <Rectangle center="-10,0" size="35,35"/>
+      <Ellipse center="10,0" size="35,35"/>
+      <MergePath mode="xor"/>
+      <Fill color="@purple"/>
+    </Group>
+    
+    <Group position="580,0">
+      <Ellipse center="25,0" size="10,10"/>
+      <Fill color="@cyan"/>
+      <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
+    </Group>
+  </Layer>
+  
+  <!-- Mask example -->
+  <Layer id="circleMask" visible="false">
+    <Ellipse center="0,0" size="45,45"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer name="MaskedLayer" x="700" y="270" mask="@circleMask" maskType="alpha">
+    <Rectangle center="0,0" size="50,50"/>
+    <Fill color="@rainbow"/>
+  </Layer>
+  
+  <!-- Filters row y=360 -->
+  <Layer name="FilterCards" y="360">
+    <Group position="130,0">
+      <Rectangle center="0,0" size="80,60" roundness="10"/>
+      <Fill color="@emerald"/>
+      <BlurFilter blurX="3" blurY="3"/>
+    </Group>
+    
+    <Group position="260,0">
+      <Rectangle center="0,0" size="80,60" roundness="10"/>
+      <Fill color="@cyan"/>
+      <DropShadowFilter offsetX="4" offsetY="4" blurX="10" blurY="10" color="#00000080"/>
+    </Group>
+    
+    <Group position="390,0">
+      <Ellipse center="0,0" size="55,55"/>
+      <Fill color="@purple"/>
+      <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+    </Group>
+    
+    <Group position="520,0">
+      <Rectangle center="0,0" size="80,60" roundness="10"/>
+      <Fill color="@coral"/>
+      <BlendFilter color="#3B82F660" blendMode="overlay"/>
+    </Group>
+    
+    <Group position="670,0">
+      <Ellipse center="0,0" size="60,60"/>
+      <Fill>
+        <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
+      </Fill>
+      <Stroke color="#FFFFFF30" width="2"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="12" blurY="12" color="#00000060"/>
+    </Group>
+  </Layer>
+  
+  <!-- Footer row y=455 -->
+  <Layer name="Footer" y="455">
+    <Group position="200,0">
+      <Rectangle center="0,0" size="120,36" roundness="18"/>
+      <Fill color="@buttonGradient"/>
+      <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#FFFFFF30"/>
+    </Group>
+    <Group position="200,0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#FFFFFF"/>
+    </Group>
+    
+    <Group position="400,0">
+      <Text fontFamily="Arial" fontSize="18">
+        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
+      </Text>
+      <Fill color="#FFFFFF60"/>
+    </Group>
+    
+    <Group position="600,0">
+      <Rectangle center="0,0" size="100,36" roundness="8"/>
+      <Fill color="#FFFFFF10"/>
+      <Stroke color="#FFFFFF20" width="1"/>
+    </Group>
+  </Layer>
+  <Layer composition="@badgeComp" x="600" y="455"/>
+  
+  <!-- Resources -->
+  <Resources>
+    <Image id="photo" source="resources/apitest/imageReplacement.png"/>
+    <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
+    <Font id="iconFont">
+      <Glyph path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
+    </Font>
+    <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,520">
+      <ColorStop offset="0" color="#0F0F1A"/>
+      <ColorStop offset="0.5" color="#1A1A2E"/>
+      <ColorStop offset="1" color="#0D1B2A"/>
+    </LinearGradient>
+    <RadialGradient id="glowPurple" center="0,0" radius="150">
+      <ColorStop offset="0" color="#A855F720"/>
+      <ColorStop offset="1" color="#A855F700"/>
+    </RadialGradient>
+    <RadialGradient id="glowBlue" center="0,0" radius="200">
+      <ColorStop offset="0" color="#3B82F615"/>
+      <ColorStop offset="1" color="#3B82F600"/>
+    </RadialGradient>
+    <LinearGradient id="titleGradient" startPoint="0,0" endPoint="200,0">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="0.5" color="#A855F7"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </LinearGradient>
+    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
+      <ColorStop offset="0" color="#A855F7"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </LinearGradient>
+    <ConicGradient id="rainbow" center="25,25" startAngle="0" endAngle="360">
+      <ColorStop offset="0" color="#F43F5E"/>
+      <ColorStop offset="0.25" color="#A855F7"/>
+      <ColorStop offset="0.5" color="#3B82F6"/>
+      <ColorStop offset="0.75" color="#14B8A6"/>
+      <ColorStop offset="1" color="#F43F5E"/>
+    </ConicGradient>
+    <SolidColor id="coral" color="#F43F5E"/>
+    <SolidColor id="purple" color="#A855F7"/>
+    <SolidColor id="amber" color="#F59E0B"/>
+    <SolidColor id="teal" color="#14B8A6"/>
+    <SolidColor id="orange" color="#F97316"/>
+    <SolidColor id="cyan" color="#06B6D4"/>
+    <SolidColor id="emerald" color="#10B981"/>
+    <Composition id="badgeComp" width="100" height="36">
+      <Layer>
+        <Text text="v1.0" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="50,18" textAlign="center"/>
+        <Fill color="#FFFFFF80"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  
+</pagx>
+)";
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Parse XML to document
+  auto doc = pagx::PAGXImporter::FromXML(pagxXml);
+  ASSERT_TRUE(doc != nullptr);
+
+  // Typeset text elements
+  auto typesetter = pagx::Typesetter::Make();
+  typesetter->setFallbackTypefaces(GetFallbackTypefaces());
+  typesetter->typeset(doc.get());
+
+  // Build layer tree with base path for image loading
+  pagx::LayerBuilder::Options options;
+  options.basePath = ProjectPath::Absolute("");
+  auto content = pagx::LayerBuilder::Build(*doc, options);
+  ASSERT_TRUE(content.root != nullptr);
+  EXPECT_FLOAT_EQ(content.width, 800.0f);
+  EXPECT_FLOAT_EQ(content.height, 520.0f);
+
+  auto surface = Surface::Make(context, 800, 520);
+  DisplayList displayList;
+  displayList.root()->addChild(content.root);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/CompleteExample"));
+
+  device->unlock();
+}
+
 }  // namespace pag
