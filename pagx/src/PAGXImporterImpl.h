@@ -29,6 +29,7 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -124,6 +125,9 @@ class PAGXImporterImpl {
   static std::unique_ptr<Image> parseImage(const XMLNode* node);
   static std::unique_ptr<PathData> parsePathData(const XMLNode* node);
   static std::unique_ptr<Composition> parseComposition(const XMLNode* node);
+  static std::unique_ptr<Font> parseFont(const XMLNode* node);
+  static std::unique_ptr<Glyph> parseGlyph(const XMLNode* node);
+  static std::unique_ptr<GlyphRun> parseGlyphRun(const XMLNode* node);
 
   static std::unique_ptr<DropShadowStyle> parseDropShadowStyle(const XMLNode* node);
   static std::unique_ptr<InnerShadowStyle> parseInnerShadowStyle(const XMLNode* node);

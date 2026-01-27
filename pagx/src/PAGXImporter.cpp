@@ -318,6 +318,9 @@ std::unique_ptr<Node> PAGXImporterImpl::parseResource(const XMLNode* node) {
   if (node->tag == "Composition") {
     return parseComposition(node);
   }
+  if (node->tag == "Font") {
+    return parseFont(node);
+  }
   return nullptr;
 }
 
@@ -592,6 +595,13 @@ std::unique_ptr<Path> PAGXImporterImpl::parsePath(const XMLNode* node) {
 
 std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
   auto text = std::make_unique<Text>();
+  // Parse text content from attribute first, then fallback to CDATA
+  auto textAttr = getAttribute(node, "text");
+  if (!textAttr.empty()) {
+    text->text = textAttr;
+  } else if (!node->text.empty()) {
+    text->text = node->text;
+  }
   auto positionStr = getAttribute(node, "position", "0,0");
   auto pos = parsePoint(positionStr);
   text->position = tgfx::Point::Make(pos.x, pos.y);
@@ -600,7 +610,17 @@ std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
   text->fontSize = getFloatAttribute(node, "fontSize", 12);
   text->letterSpacing = getFloatAttribute(node, "letterSpacing", 0);
   text->baselineShift = getFloatAttribute(node, "baselineShift", 0);
-  text->text = node->text;
+
+  // Parse GlyphRun children for precomposition mode
+  for (const auto& child : node->children) {
+    if (child->tag == "GlyphRun") {
+      auto glyphRun = parseGlyphRun(child.get());
+      if (glyphRun) {
+        text->glyphRuns.push_back(std::move(glyphRun));
+      }
+    }
+  }
+
   return text;
 }
 
@@ -940,6 +960,139 @@ std::unique_ptr<Composition> PAGXImporterImpl::parseComposition(const XMLNode* n
     }
   }
   return comp;
+}
+
+std::unique_ptr<Font> PAGXImporterImpl::parseFont(const XMLNode* node) {
+  auto font = std::make_unique<Font>();
+  font->id = getAttribute(node, "id");
+  for (const auto& child : node->children) {
+    if (child->tag == "Glyph") {
+      auto glyph = parseGlyph(child.get());
+      if (glyph) {
+        font->glyphs.push_back(std::move(glyph));
+      }
+    }
+  }
+  return font;
+}
+
+std::unique_ptr<Glyph> PAGXImporterImpl::parseGlyph(const XMLNode* node) {
+  auto glyph = std::make_unique<Glyph>();
+  glyph->path = getAttribute(node, "path");
+  glyph->image = getAttribute(node, "image");
+  auto offsetStr = getAttribute(node, "offset");
+  if (!offsetStr.empty()) {
+    glyph->offset = parsePoint(offsetStr);
+  }
+  return glyph;
+}
+
+std::unique_ptr<GlyphRun> PAGXImporterImpl::parseGlyphRun(const XMLNode* node) {
+  auto run = std::make_unique<GlyphRun>();
+  run->font = getAttribute(node, "font");
+  run->y = getFloatAttribute(node, "y", 0);
+
+  // Parse glyphs (comma-separated GlyphIDs)
+  auto glyphsStr = getAttribute(node, "glyphs");
+  if (!glyphsStr.empty()) {
+    auto glyphList = parseFloatList(glyphsStr);
+    for (auto g : glyphList) {
+      run->glyphs.push_back(static_cast<tgfx::GlyphID>(g));
+    }
+  }
+
+  // Parse xPositions (comma-separated x coordinates for Horizontal mode)
+  auto xPosStr = getAttribute(node, "xPositions");
+  if (!xPosStr.empty()) {
+    run->xPositions = parseFloatList(xPosStr);
+  }
+
+  // Parse positions (semicolon-separated x,y pairs for Point mode)
+  auto posStr = getAttribute(node, "positions");
+  if (!posStr.empty()) {
+    // Split by semicolon
+    size_t start = 0;
+    size_t end = posStr.find(';');
+    while (start < posStr.size()) {
+      std::string pair = {};
+      if (end == std::string::npos) {
+        pair = posStr.substr(start);
+      } else {
+        pair = posStr.substr(start, end - start);
+      }
+      auto coords = ParseFloatList(pair);
+      if (coords.size() >= 2) {
+        run->positions.push_back({coords[0], coords[1]});
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+      end = posStr.find(';', start);
+    }
+  }
+
+  // Parse xforms (semicolon-separated scos,ssin,tx,ty for RSXform mode)
+  auto xformsStr = getAttribute(node, "xforms");
+  if (!xformsStr.empty()) {
+    size_t start = 0;
+    size_t end = xformsStr.find(';');
+    while (start < xformsStr.size()) {
+      std::string group = {};
+      if (end == std::string::npos) {
+        group = xformsStr.substr(start);
+      } else {
+        group = xformsStr.substr(start, end - start);
+      }
+      auto vals = ParseFloatList(group);
+      if (vals.size() >= 4) {
+        RSXform xform = {};
+        xform.scos = vals[0];
+        xform.ssin = vals[1];
+        xform.tx = vals[2];
+        xform.ty = vals[3];
+        run->xforms.push_back(xform);
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+      end = xformsStr.find(';', start);
+    }
+  }
+
+  // Parse matrices (semicolon-separated a,b,c,d,tx,ty for Matrix mode)
+  auto matricesStr = getAttribute(node, "matrices");
+  if (!matricesStr.empty()) {
+    size_t start = 0;
+    size_t end = matricesStr.find(';');
+    while (start < matricesStr.size()) {
+      std::string group = {};
+      if (end == std::string::npos) {
+        group = matricesStr.substr(start);
+      } else {
+        group = matricesStr.substr(start, end - start);
+      }
+      auto vals = ParseFloatList(group);
+      if (vals.size() >= 6) {
+        Matrix m = {};
+        m.a = vals[0];
+        m.b = vals[1];
+        m.c = vals[2];
+        m.d = vals[3];
+        m.tx = vals[4];
+        m.ty = vals[5];
+        run->matrices.push_back(m);
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      start = end + 1;
+      end = matricesStr.find(';', start);
+    }
+  }
+
+  return run;
 }
 
 //==============================================================================
