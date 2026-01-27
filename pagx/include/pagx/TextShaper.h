@@ -27,17 +27,12 @@
 namespace pagx {
 
 /**
- * TextShaper converts text elements in a PAGXDocument from runtime shaping format to pre-shaped
- * format. This process:
+ * TextShaper performs text shaping on PAGXDocument, converting Text elements from runtime shaping
+ * format to pre-shaped format with embedded glyph outlines.
  *
- * 1. Performs text shaping/layout using the provided fonts
- * 2. Extracts glyph outlines as path data
- * 3. Embeds the path data as Font resources in the document
- * 4. Adds GlyphRun data to Text elements pointing to embedded fonts
- *
- * After shaping, the document can be rendered without runtime font dependencies, ensuring
- * cross-platform consistency. The original text content and font properties are preserved
- * for potential re-editing.
+ * Usage scenarios:
+ * - Export: Call shape() to embed pre-shaped data into document before saving
+ * - Rendering: LayerBuilder handles text shaping internally, TextShaper is not needed
  *
  * Terminology:
  * - Runtime shaping: Text is shaped at render time using system/loaded fonts
@@ -46,26 +41,44 @@ namespace pagx {
 class TextShaper {
  public:
   /**
-   * Creates a TextShaper with the specified fallback typefaces.
-   * @param fallbackTypefaces Typefaces to use for text shaping, in priority order.
+   * Creates a TextShaper instance.
    */
-  static std::shared_ptr<TextShaper> Make(
-      std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces);
+  static std::shared_ptr<TextShaper> Make();
 
   virtual ~TextShaper() = default;
 
   /**
+   * Registers a typeface for a specific font family and style. When shaping text, the registered
+   * typeface will be used if its family and style match the text's fontFamily and fontStyle.
+   * @param typeface The typeface to register.
+   */
+  virtual void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) = 0;
+
+  /**
+   * Registers multiple typefaces at once.
+   * @param typefaces The typefaces to register.
+   */
+  virtual void registerTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) = 0;
+
+  /**
+   * Sets the fallback typefaces used when no registered typeface matches the text's font
+   * properties. The first matching typeface in the list will be used.
+   * @param typefaces Fallback typefaces in priority order.
+   */
+  virtual void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) = 0;
+
+  /**
    * Shapes all text elements in the document, converting them from runtime shaping format
-   * to pre-shaped format with embedded font resources.
-   *
-   * For each unique typeface used, a Font resource is added to the document containing
-   * the glyph outlines as SVG path data. Text elements are updated with GlyphRun data
+   * to pre-shaped format. For each unique typeface used, a Font resource is added to the document
+   * containing the glyph outlines as path data. Text elements are updated with GlyphRun data
    * that references these embedded fonts.
    *
    * @param document The document to process (modified in place).
-   * @return true if any text was shaped, false if no text elements found or all already pre-shaped.
+   * @param reshaped If true, forces re-shaping of text elements that already have GlyphRun data.
+   *                 If false (default), skips text elements that are already pre-shaped.
+   * @return true if any text was shaped, false if no text elements found or all skipped.
    */
-  virtual bool shape(PAGXDocument* document) = 0;
+  virtual bool shape(PAGXDocument* document, bool reshaped = false) = 0;
 };
 
 }  // namespace pagx

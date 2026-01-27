@@ -963,8 +963,9 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   originalDL.render(originalSurface.get(), false);
 
   // Step 3: Shape text
-  auto textShaper = pagx::TextShaper::Make(typefaces);
+  auto textShaper = pagx::TextShaper::Make();
   ASSERT_TRUE(textShaper != nullptr);
+  textShaper->setFallbackTypefaces(typefaces);
   bool shaped = textShaper->shape(doc.get());
   EXPECT_TRUE(shaped);
 
@@ -1078,8 +1079,9 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
   originalDL.render(originalSurface.get(), false);
 
   // Shape text
-  auto textShaper = pagx::TextShaper::Make(typefaces);
+  auto textShaper = pagx::TextShaper::Make();
   ASSERT_TRUE(textShaper != nullptr);
+  textShaper->setFallbackTypefaces(typefaces);
   bool shaped = textShaper->shape(doc.get());
   EXPECT_TRUE(shaped);
 

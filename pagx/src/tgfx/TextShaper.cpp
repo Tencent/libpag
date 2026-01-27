@@ -64,19 +64,54 @@ static std::string PathToSVGString(const tgfx::Path& path) {
   return result;
 }
 
+// Key for font registration: fontFamily + fontStyle
+struct FontKey {
+  std::string family = {};
+  std::string style = {};
+
+  bool operator==(const FontKey& other) const {
+    return family == other.family && style == other.style;
+  }
+};
+
+struct FontKeyHash {
+  size_t operator()(const FontKey& key) const {
+    return std::hash<std::string>()(key.family) ^ (std::hash<std::string>()(key.style) << 1);
+  }
+};
+
 // Private implementation class
 class TextShaperImpl : public TextShaper {
  public:
-  explicit TextShaperImpl(std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces)
-      : _fallbackTypefaces(std::move(fallbackTypefaces)) {
+  TextShaperImpl() = default;
+
+  void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) override {
+    if (!typeface) {
+      return;
+    }
+    FontKey key;
+    key.family = typeface->fontFamily();
+    key.style = typeface->fontStyle();
+    _registeredTypefaces[key] = std::move(typeface);
   }
 
-  bool shape(PAGXDocument* document) override {
+  void registerTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) override {
+    for (auto& typeface : typefaces) {
+      registerTypeface(std::move(typeface));
+    }
+  }
+
+  void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) override {
+    _fallbackTypefaces = std::move(typefaces);
+  }
+
+  bool shape(PAGXDocument* document, bool reshape) override {
     if (!document) {
       return false;
     }
 
     _document = document;
+    _reshape = reshape;
     _textShaped = false;
     _fontResources.clear();
     _glyphMapping.clear();
@@ -148,9 +183,13 @@ class TextShaperImpl : public TextShaper {
       return;
     }
 
-    // Skip if already pre-shaped
+    // Handle already pre-shaped text
     if (!text->glyphRuns.empty()) {
-      return;
+      if (!_reshape) {
+        return;  // Skip if not reshaping
+      }
+      // Clear existing glyph runs for reshaping
+      text->glyphRuns.clear();
     }
 
     // Skip if no text content
@@ -159,21 +198,7 @@ class TextShaperImpl : public TextShaper {
     }
 
     // Find typeface for this text
-    std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (!text->fontFamily.empty() && !_fallbackTypefaces.empty()) {
-      for (const auto& tf : _fallbackTypefaces) {
-        if (tf && tf->fontFamily() == text->fontFamily) {
-          typeface = tf;
-          break;
-        }
-      }
-    }
-    if (!typeface && !_fallbackTypefaces.empty()) {
-      typeface = _fallbackTypefaces[0];
-    }
-    if (!typeface && !text->fontFamily.empty()) {
-      typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
-    }
+    auto typeface = findTypeface(text->fontFamily, text->fontStyle);
     if (!typeface) {
       return;
     }
@@ -275,6 +300,48 @@ class TextShaperImpl : public TextShaper {
     _textShaped = true;
   }
 
+  std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
+                                               const std::string& fontStyle) {
+    // First, try exact match from registered typefaces
+    if (!fontFamily.empty()) {
+      FontKey key;
+      key.family = fontFamily;
+      key.style = fontStyle.empty() ? "Regular" : fontStyle;
+      auto it = _registeredTypefaces.find(key);
+      if (it != _registeredTypefaces.end()) {
+        return it->second;
+      }
+
+      // Try matching family only (any style)
+      for (const auto& pair : _registeredTypefaces) {
+        if (pair.first.family == fontFamily) {
+          return pair.second;
+        }
+      }
+    }
+
+    // Then, try fallback typefaces
+    if (!fontFamily.empty()) {
+      for (const auto& tf : _fallbackTypefaces) {
+        if (tf && tf->fontFamily() == fontFamily) {
+          return tf;
+        }
+      }
+    }
+
+    // Use first fallback typeface
+    if (!_fallbackTypefaces.empty()) {
+      return _fallbackTypefaces[0];
+    }
+
+    // Last resort: try system font
+    if (!fontFamily.empty()) {
+      return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    }
+
+    return nullptr;
+  }
+
   std::string getOrCreateFontResource(const std::shared_ptr<tgfx::Typeface>& typeface,
                                       const tgfx::Font& font,
                                       const std::vector<tgfx::GlyphID>& glyphIDs) {
@@ -325,8 +392,16 @@ class TextShaperImpl : public TextShaper {
     return fontId;
   }
 
+  // Registered typefaces by family + style
+  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> _registeredTypefaces =
+      {};
+
+  // Fallback typefaces
   std::vector<std::shared_ptr<tgfx::Typeface>> _fallbackTypefaces = {};
+
+  // Current processing state
   PAGXDocument* _document = nullptr;
+  bool _reshape = false;
   bool _textShaped = false;
 
   // Font ID -> Font resource
@@ -337,12 +412,8 @@ class TextShaperImpl : public TextShaper {
       {};
 };
 
-std::shared_ptr<TextShaper> TextShaper::Make(
-    std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces) {
-  if (fallbackTypefaces.empty()) {
-    return nullptr;
-  }
-  return std::make_shared<TextShaperImpl>(std::move(fallbackTypefaces));
+std::shared_ptr<TextShaper> TextShaper::Make() {
+  return std::make_shared<TextShaperImpl>();
 }
 
 }  // namespace pagx
