@@ -718,7 +718,13 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
-      xml.addAttribute("path", textPath->path);
+      if (!textPath->path.empty()) {
+        // Use the reference to PathData resource.
+        xml.addAttribute("path", textPath->path);
+      } else if (!textPath->data.isEmpty()) {
+        // Inline the path data.
+        xml.addAttribute("path", PathDataToSVGString(textPath->data));
+      }
       if (textPath->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(textPath->textAlign));
       }

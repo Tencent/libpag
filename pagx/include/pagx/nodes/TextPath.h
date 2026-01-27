@@ -20,18 +20,25 @@
 
 #include <string>
 #include "pagx/nodes/Element.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/TextAlign.h"
 
 namespace pagx {
 
 /**
  * TextPath is a text modifier that places text along a path. It allows text to follow the contour
- * of a referenced path shape.
+ * of a path shape. The path can be specified either inline or by referencing a PathData resource.
  */
 class TextPath : public Element {
  public:
   /**
-   * A reference to the path shape (e.g., "#pathId") that the text follows.
+   * The path data containing vertices and control points for inline definition.
+   */
+  PathData data = {};
+
+  /**
+   * Reference to a PathData resource (e.g., "@pathId"). If non-empty, this takes precedence
+   * over the inline `data` field when exporting.
    */
   std::string path = {};
 

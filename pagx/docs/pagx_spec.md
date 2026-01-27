@@ -1571,15 +1571,19 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 #### 5.5.5 文本路径（TextPath）
 
-将文本沿指定路径排列。
+将文本沿指定路径排列。路径可以通过引用 Resources 中定义的 PathData，也可以内联路径数据。
 
 ```xml
+<!-- 引用 PathData 资源 -->
 <TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false"/>
+
+<!-- 内联路径数据 -->
+<TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | idref | (必填) | PathData 资源引用 "@id" |
+| `path` | string/idref | (必填) | SVG 路径数据或 PathData 资源引用 "@id" |
 | `textAlign` | TextAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
@@ -2133,7 +2137,7 @@ Layer / Group
 #### B.2.6 TextPath 沿路径文本
 
 ```xml
-<!-- 需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/> -->
+<!-- 引用 PathData 资源（需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/>） -->
 <!-- 居中对齐 -->
 <Layer>
   <Text text="Text along a curved path" fontFamily="Arial" fontSize="18"/>
@@ -2146,6 +2150,13 @@ Layer / Group
   <Text text="Justified Text" fontFamily="Arial" fontSize="18"/>
   <TextPath path="@arc" textAlign="justify" firstMargin="20" lastMargin="20"/>
   <Fill color="#996633"/>
+</Layer>
+
+<!-- 内联路径数据 -->
+<Layer>
+  <Text text="Inline Path" fontFamily="Arial" fontSize="18"/>
+  <TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
+  <Fill color="#339966"/>
 </Layer>
 ```
 
@@ -2527,7 +2538,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `path` | idref | (必填) |
+| `path` | string/idref | (必填) |
 | `textAlign` | TextAlign | start |
 | `firstMargin` | float | 0 |
 | `lastMargin` | float | 0 |

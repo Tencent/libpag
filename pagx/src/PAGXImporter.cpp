@@ -727,7 +727,16 @@ std::unique_ptr<TextModifier> PAGXImporterImpl::parseTextModifier(const XMLNode*
 
 std::unique_ptr<TextPath> PAGXImporterImpl::parseTextPath(const XMLNode* node) {
   auto textPath = std::make_unique<TextPath>();
-  textPath->path = getAttribute(node, "path");
+  auto pathAttr = getAttribute(node, "path");
+  if (!pathAttr.empty()) {
+    if (pathAttr[0] == '@') {
+      // Reference to PathData resource
+      textPath->path = pathAttr;
+    } else {
+      // Inline path data
+      textPath->data = PathDataFromSVGString(pathAttr);
+    }
+  }
   textPath->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
   textPath->firstMargin = getFloatAttribute(node, "firstMargin", 0);
   textPath->lastMargin = getFloatAttribute(node, "lastMargin", 0);
