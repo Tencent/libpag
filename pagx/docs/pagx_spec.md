@@ -2036,79 +2036,6 @@ Layer / Group
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="800" height="600">
   
-  <!-- ==================== 资源区 ==================== -->
-  <Resources>
-    <!-- 图片资源 -->
-    <Image id="photo" source="assets/photo.png"/>
-    <Image id="noise" source="assets/noise.png"/>
-    
-    <!-- 路径数据资源 -->
-    <PathData id="wavePath" data="M 0 0 Q 40 -30 80 0 T 160 0 T 240 0"/>
-    <PathData id="arcPath" data="M 0 0 Q 100 -50 200 0"/>
-    
-    <!-- 嵌入矢量字体 -->
-    <Font id="customFont">
-      <Glyph path="M 0 0 L 0 24 M 0 12 L 14 12 M 14 0 L 14 24"/>
-      <Glyph path="M 0 0 L 0 24 L 10 24"/>
-    </Font>
-    
-    <!-- 嵌入位图字体（Emoji） -->
-    <Font id="emojiFont">
-      <Glyph image="assets/emoji/smile.png" offset="0,-2"/>
-      <Glyph image="assets/emoji/heart.png" offset="0,-2"/>
-    </Font>
-    
-    <!-- 纯色定义 -->
-    <SolidColor id="brandRed" color="#E74C3C"/>
-    <SolidColor id="brandBlue" color="#3498DB"/>
-    
-    <!-- 线性渐变 -->
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,600">
-      <ColorStop offset="0" color="#1A1A2E"/>
-      <ColorStop offset="0.5" color="#16213E"/>
-      <ColorStop offset="1" color="#0F3460"/>
-    </LinearGradient>
-    
-    <!-- 径向渐变 -->
-    <RadialGradient id="spotlight" center="400,300" radius="350">
-      <ColorStop offset="0" color="#FFFFFF20"/>
-      <ColorStop offset="1" color="#00000000"/>
-    </RadialGradient>
-    
-    <!-- 锥形渐变 -->
-    <ConicGradient id="rainbow" center="50,50" startAngle="0" endAngle="360">
-      <ColorStop offset="0" color="#FF0000"/>
-      <ColorStop offset="0.33" color="#00FF00"/>
-      <ColorStop offset="0.66" color="#0000FF"/>
-      <ColorStop offset="1" color="#FF0000"/>
-    </ConicGradient>
-    
-    <!-- 菱形渐变 -->
-    <DiamondGradient id="diamond" center="50,50" radius="50">
-      <ColorStop offset="0" color="#FFFFFF"/>
-      <ColorStop offset="1" color="#333333"/>
-    </DiamondGradient>
-    
-    <!-- 图片填充 -->
-    <ImagePattern id="noisePattern" image="@noise" tileModeX="repeat" tileModeY="repeat"/>
-    
-    <!-- 合成（可复用组件） -->
-    <Composition id="buttonComp" width="100" height="32">
-      <Layer>
-        <Rectangle center="50,16" size="100,32" roundness="6"/>
-        <Fill color="#3498DB"/>
-        <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#00000040"/>
-      </Layer>
-      <Layer>
-        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="50,16" textAlign="center"/>
-        <Fill color="#FFFFFF"/>
-      </Layer>
-    </Composition>
-  </Resources>
-  
-  <!-- ==================== 图层内容 ==================== -->
-  
   <!-- 背景层 -->
   <Layer name="Background">
     <Rectangle center="400,300" size="800,600"/>
@@ -2138,7 +2065,7 @@ Layer / Group
     </Group>
     <Group position="380,0">
       <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="28"/>
-      <Fill color="#1ABC9C"/>
+      <Fill color="@diamond"/>
     </Group>
     <Group position="480,0">
       <Path data="M -25 -18 L 0 -30 L 25 -18 L 25 18 L 0 30 L -25 18 Z"/>
@@ -2146,7 +2073,7 @@ Layer / Group
     </Group>
   </Layer>
   
-  <!-- ===== 第一行右侧: 遮罩示例 ===== -->
+  <!-- 第一行右侧: 遮罩示例 -->
   <Layer id="circleMask" visible="false">
     <Ellipse center="0,0" size="70,70"/>
     <Fill color="#FFFFFF"/>
@@ -2247,7 +2174,7 @@ Layer / Group
     <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
   </Layer>
   
-  <!-- ===== 第六行右侧: 图片 + 合成 ===== -->
+  <!-- 第六行右侧: 图片 + 合成 + 预排版 -->
   <Layer name="PhotoLayer" x="550" y="480">
     <Rectangle center="0,0" size="100,70" roundness="6"/>
     <Fill>
@@ -2259,13 +2186,71 @@ Layer / Group
   
   <Layer composition="@buttonComp" x="680" y="464"/>
   
-  <!-- ===== 第六行: 预排版文本 ===== -->
-  <Layer name="PrerenderedText" x="700" y="510">
+  <Layer name="PrerenderedText" x="680" y="510">
     <Text fontFamily="Arial" fontSize="16">
-      <GlyphRun font="@customFont" glyphs="1,2" y="0" xPositions="0,18"/>
+      <GlyphRun font="@textFont" glyphs="1,2" y="0" xPositions="0,18"/>
     </Text>
     <Fill color="#95A5A6"/>
   </Layer>
+  
+  <Layer name="EmojiText" x="730" y="510">
+    <Text fontFamily="Arial" fontSize="16">
+      <GlyphRun font="@emojiFont" glyphs="1" y="0" xPositions="0"/>
+    </Text>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  
+  <!-- ==================== 资源区 ==================== -->
+  <Resources>
+    <Image id="photo" source="assets/photo.png"/>
+    <Image id="noise" source="assets/noise.png"/>
+    
+    <PathData id="wavePath" data="M 0 0 Q 40 -30 80 0 T 160 0 T 240 0"/>
+    <PathData id="arcPath" data="M 0 0 Q 100 -50 200 0"/>
+    
+    <Font id="textFont">
+      <Glyph path="M 0 0 L 0 24 M 0 12 L 14 12 M 14 0 L 14 24"/>
+      <Glyph path="M 0 0 L 0 24 L 10 24"/>
+    </Font>
+    <Font id="emojiFont">
+      <Glyph image="assets/emoji/star.png" offset="0,-2"/>
+    </Font>
+    
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,600">
+      <ColorStop offset="0" color="#1A1A2E"/>
+      <ColorStop offset="0.5" color="#16213E"/>
+      <ColorStop offset="1" color="#0F3460"/>
+    </LinearGradient>
+    <RadialGradient id="spotlight" center="400,300" radius="350">
+      <ColorStop offset="0" color="#FFFFFF20"/>
+      <ColorStop offset="1" color="#00000000"/>
+    </RadialGradient>
+    <ConicGradient id="rainbow" center="50,50" startAngle="0" endAngle="360">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="0.33" color="#00FF00"/>
+      <ColorStop offset="0.66" color="#0000FF"/>
+      <ColorStop offset="1" color="#FF0000"/>
+    </ConicGradient>
+    <DiamondGradient id="diamond" center="30,30" radius="30">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="1" color="#1ABC9C"/>
+    </DiamondGradient>
+    
+    <ImagePattern id="noisePattern" image="@noise" tileModeX="repeat" tileModeY="repeat"/>
+    
+    <Composition id="buttonComp" width="100" height="32">
+      <Layer>
+        <Rectangle center="50,16" size="100,32" roundness="6"/>
+        <Fill color="#3498DB"/>
+        <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#00000040"/>
+      </Layer>
+      <Layer>
+        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="50,16" textAlign="center"/>
+        <Fill color="#FFFFFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
   
 </pagx>
 ```
@@ -2276,13 +2261,13 @@ Layer / Group
 
 | 类别 | 涵盖节点 |
 |------|---------|
-| **资源** | Image、PathData、Font/Glyph、SolidColor、LinearGradient、RadialGradient、ConicGradient、DiamondGradient、ImagePattern、Composition |
+| **资源** | Image、PathData、Font/Glyph（矢量+位图）、LinearGradient、RadialGradient、ConicGradient、DiamondGradient、ImagePattern、Composition |
 | **几何元素** | Rectangle、Ellipse、Polystar（star/polygon）、Path、Text |
-| **绘制器** | Fill（纯色/渐变/图片）、Stroke（多重描边） |
+| **绘制器** | Fill（纯色/渐变/图片）、Stroke |
 | **图层样式** | DropShadowStyle、InnerShadowStyle |
 | **滤镜** | BlurFilter、DropShadowFilter、BlendFilter、ColorMatrixFilter |
 | **形状修改器** | TrimPath、RoundCorner、MergePath |
-| **文本修改器** | TextModifier/RangeSelector、TextPath、TextLayout |
+| **文本修改器** | TextModifier/RangeSelector、TextPath、TextLayout、GlyphRun |
 | **其他** | Repeater、Group、遮罩（mask/maskType）、合成引用 |
 
 ---
