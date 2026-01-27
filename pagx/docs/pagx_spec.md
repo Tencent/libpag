@@ -2531,7 +2531,7 @@ Layer / Group
 | `easeOut` | float | 0 |
 | `mode` | SelectorMode | add |
 | `weight` | float | 1 |
-| `randomizeOrder` | bool | false |
+| `randomOrder` | bool | false |
 | `randomSeed` | int | 0 |
 
 #### TextPath
@@ -2542,18 +2542,17 @@ Layer / Group
 | `textAlign` | TextAlign | start |
 | `firstMargin` | float | 0 |
 | `lastMargin` | float | 0 |
-| `perpendicularToPath` | bool | true |
+| `perpendicular` | bool | true |
 | `reversed` | bool | false |
 
 #### TextLayout
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `x` | float | 0 |
-| `y` | float | 0 |
+| `position` | point | 0,0 |
 | `width` | float | auto |
 | `height` | float | auto |
-| `textAlign` | TextAlign | left |
+| `textAlign` | TextAlign | start |
 | `verticalAlign` | VerticalAlign | top |
 | `writingMode` | WritingMode | horizontal |
 | `lineHeight` | float | 1.2 |
