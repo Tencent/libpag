@@ -947,9 +947,10 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
  * Test case: Text shaping round-trip.
  * 1. Load SVG with text content
  * 2. Typeset text (Typesetter)
- * 3. Export to PAGX
- * 4. Reload PAGX and render (pre-shaped)
- * 5. Compare render results
+ * 3. Render original (typeset document)
+ * 4. Export to PAGX
+ * 5. Reload PAGX and render (reloaded)
+ * 6. Compare render results - should be identical
  */
 PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   // Use text.svg as the test file

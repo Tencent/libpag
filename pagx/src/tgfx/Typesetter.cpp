@@ -462,9 +462,8 @@ class TypesetterImpl : public Typesetter {
     // Check if font resource already exists
     auto it = _fontResources.find(fontId);
     if (it == _fontResources.end()) {
-      // Create new Font resource
-      auto fontNode = _document->makeNode<Font>();
-      fontNode->id = fontId;
+      // Create new Font resource with the ID so it gets registered in nodeMap
+      auto fontNode = _document->makeNode<Font>(fontId);
       _fontResources[fontId] = fontNode;
       _glyphMapping[fontId] = {};
     }
