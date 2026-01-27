@@ -46,6 +46,11 @@ class BlurFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::BlurFilter;
   }
+
+ private:
+  BlurFilter() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

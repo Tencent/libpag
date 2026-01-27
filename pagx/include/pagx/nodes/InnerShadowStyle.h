@@ -56,6 +56,11 @@ class InnerShadowStyle : public LayerStyle {
   NodeType nodeType() const override {
     return NodeType::InnerShadowStyle;
   }
+
+ private:
+  InnerShadowStyle() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

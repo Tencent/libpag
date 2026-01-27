@@ -58,28 +58,8 @@ struct Rect {
     return {x, y, w, h};
   }
 
-  float left() const {
-    return x;
-  }
-
-  float top() const {
-    return y;
-  }
-
-  float right() const {
-    return x + width;
-  }
-
-  float bottom() const {
-    return y + height;
-  }
-
   bool isEmpty() const {
     return width <= 0 || height <= 0;
-  }
-
-  void setEmpty() {
-    x = y = width = height = 0;
   }
 
   bool operator==(const Rect& other) const {

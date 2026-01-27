@@ -499,10 +499,6 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
   EXPECT_FLOAT_EQ(r1.y, 10.0f);
   EXPECT_FLOAT_EQ(r1.width, 100.0f);
   EXPECT_FLOAT_EQ(r1.height, 50.0f);
-  EXPECT_FLOAT_EQ(r1.left(), 0.0f);
-  EXPECT_FLOAT_EQ(r1.top(), 10.0f);
-  EXPECT_FLOAT_EQ(r1.right(), 100.0f);
-  EXPECT_FLOAT_EQ(r1.bottom(), 60.0f);
 
   auto r2 = pagx::Rect::MakeLTRB(10, 20, 110, 70);
   EXPECT_FLOAT_EQ(r2.x, 10.0f);

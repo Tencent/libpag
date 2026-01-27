@@ -18,12 +18,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
+#include "pagx/nodes/Matrix.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Point.h"
-#include "pagx/nodes/Matrix.h"
-#include "tgfx/core/Font.h"
 
 namespace pagx {
 
@@ -41,6 +41,8 @@ struct RSXform {
   float ty = 0.0f;
 };
 
+class Font;
+
 /**
  * GlyphRun defines pre-shaped glyph data for a segment of text. Each GlyphRun independently
  * references a font resource.
@@ -48,14 +50,14 @@ struct RSXform {
 class GlyphRun : public Node {
  public:
   /**
-   * Reference to Font resource by ID (e.g., "@myFont").
+   * Reference to the Font resource.
    */
-  std::string font = {};
+  Font* font = nullptr;
 
   /**
    * GlyphID sequence. GlyphID 0 indicates missing glyph (not rendered).
    */
-  std::vector<tgfx::GlyphID> glyphs = {};
+  std::vector<uint16_t> glyphs = {};
 
   /**
    * Shared y coordinate for Horizontal positioning mode. The default value is 0.
@@ -85,6 +87,11 @@ class GlyphRun : public Node {
   NodeType nodeType() const override {
     return NodeType::GlyphRun;
   }
+
+ private:
+  GlyphRun() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

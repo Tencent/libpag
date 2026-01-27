@@ -32,15 +32,9 @@ namespace pagx {
 class TextPath : public Element {
  public:
   /**
-   * The path data containing vertices and control points for inline definition.
+   * The path data that the text follows.
    */
-  PathData data = {};
-
-  /**
-   * Reference to a PathData resource (e.g., "@pathId"). If non-empty, this takes precedence
-   * over the inline `data` field when exporting.
-   */
-  std::string path = {};
+  PathData* path = nullptr;
 
   /**
    * The alignment of text along the path. The default value is Start.
@@ -74,6 +68,11 @@ class TextPath : public Element {
   NodeType nodeType() const override {
     return NodeType::TextPath;
   }
+
+ private:
+  TextPath() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

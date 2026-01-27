@@ -23,7 +23,7 @@
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
-#include "tgfx/core/Point.h"
+#include "pagx/nodes/Point.h"
 
 namespace pagx {
 
@@ -47,7 +47,7 @@ class Text : public Element {
    * The position of the text origin (x, y where y is the baseline). This can be overridden by
    * TextLayout or TextPath modifiers. The default value is (0, 0).
    */
-  tgfx::Point position = {};
+  Point position = {};
 
   /**
    * The font family name (e.g., "Arial", "Helvetica"). Used for runtime shaping.
@@ -80,11 +80,16 @@ class Text : public Element {
   /**
    * Pre-shaped glyph runs. When present, these are used for rendering instead of runtime shaping.
    */
-  std::vector<std::unique_ptr<GlyphRun>> glyphRuns = {};
+  std::vector<GlyphRun*> glyphRuns = {};
 
   NodeType nodeType() const override {
     return NodeType::Text;
   }
+
+ private:
+  Text() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

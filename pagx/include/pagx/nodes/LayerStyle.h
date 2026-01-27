@@ -37,6 +37,8 @@ class LayerStyle : public Node {
 
  protected:
   LayerStyle() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

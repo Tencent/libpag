@@ -61,6 +61,11 @@ class DropShadowFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::DropShadowFilter;
   }
+
+ private:
+  DropShadowFilter() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXDocument.h"
-#include "pagx/nodes/Composition.h"
 
 namespace pagx {
 
@@ -28,55 +27,9 @@ std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight
   return doc;
 }
 
-Node* PAGXDocument::findResource(const std::string& id) {
-  if (resourceMapDirty) {
-    rebuildResourceMap();
-  }
-  auto it = resourceMap.find(id);
-  return it != resourceMap.end() ? it->second : nullptr;
-}
-
-Layer* PAGXDocument::findLayer(const std::string& id) const {
-  // First search in top-level layers
-  auto found = findLayerRecursive(layers, id);
-  if (found) {
-    return found;
-  }
-  // Then search in Composition resources
-  for (const auto& resource : resources) {
-    if (resource->nodeType() == NodeType::Composition) {
-      auto comp = static_cast<const Composition*>(resource.get());
-      found = findLayerRecursive(comp->layers, id);
-      if (found) {
-        return found;
-      }
-    }
-  }
-  return nullptr;
-}
-
-void PAGXDocument::rebuildResourceMap() {
-  resourceMap.clear();
-  for (const auto& resource : resources) {
-    if (!resource->id.empty()) {
-      resourceMap[resource->id] = resource.get();
-    }
-  }
-  resourceMapDirty = false;
-}
-
-Layer* PAGXDocument::findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
-                                        const std::string& id) {
-  for (const auto& layer : layers) {
-    if (layer->id == id) {
-      return layer.get();
-    }
-    auto found = findLayerRecursive(layer->children, id);
-    if (found) {
-      return found;
-    }
-  }
-  return nullptr;
+Node* PAGXDocument::findNode(const std::string& id) const {
+  auto it = nodeMap.find(id);
+  return it != nodeMap.end() ? it->second : nullptr;
 }
 
 }  // namespace pagx

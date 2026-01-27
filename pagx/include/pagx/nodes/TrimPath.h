@@ -71,6 +71,11 @@ class TrimPath : public Element {
   NodeType nodeType() const override {
     return NodeType::TrimPath;
   }
+
+ private:
+  TrimPath() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

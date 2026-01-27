@@ -91,6 +91,11 @@ class Polystar : public Element {
   NodeType nodeType() const override {
     return NodeType::Polystar;
   }
+
+ private:
+  Polystar() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

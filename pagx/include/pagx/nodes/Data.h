@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,57 @@
 
 #pragma once
 
-#include <string>
-#include "pagx/PAGXDocument.h"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 namespace pagx {
 
 /**
- * Internal implementation of PAGX XML exporter.
- * Exports a PAGXDocument to XML string without any optimization.
- * The output faithfully reflects the structure of the input Document.
+ * Data holds an immutable byte buffer.
  */
-class PAGXExporterImpl {
+class Data {
  public:
   /**
-   * Exports a PAGXDocument to XML string.
+   * Creates a Data object by copying the specified data.
    */
-  static std::string Export(const PAGXDocument& doc);
+  static std::shared_ptr<Data> MakeWithCopy(const void* data, size_t length);
+
+  ~Data();
+
+  /**
+   * Returns the memory address of the data.
+   */
+  const void* data() const {
+    return _data;
+  }
+
+  /**
+   * Returns the read-only memory address of the data cast to uint8_t*.
+   */
+  const uint8_t* bytes() const {
+    return reinterpret_cast<const uint8_t*>(_data);
+  }
+
+  /**
+   * Returns the byte size.
+   */
+  size_t size() const {
+    return _size;
+  }
+
+  /**
+   * Returns true if the Data is empty.
+   */
+  bool empty() const {
+    return _size == 0;
+  }
+
+ private:
+  Data(const void* data, size_t length);
+
+  const void* _data = nullptr;
+  size_t _size = 0;
 };
 
 }  // namespace pagx

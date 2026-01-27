@@ -54,6 +54,11 @@ class DiamondGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::DiamondGradient;
   }
+
+ private:
+  DiamondGradient() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

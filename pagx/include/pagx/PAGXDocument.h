@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -55,15 +56,9 @@ class PAGXDocument {
   float height = 0;
 
   /**
-   * Resources (images, compositions, color sources, etc.).
-   * These can be referenced by "@id" in the document.
+   * Top-level layers (raw pointers, owned by nodes).
    */
-  std::vector<std::unique_ptr<Node>> resources = {};
-
-  /**
-   * Top-level layers.
-   */
-  std::vector<std::unique_ptr<Layer>> layers = {};
+  std::vector<Layer*> layers = {};
 
   /**
    * Base path for resolving relative resource paths.
@@ -71,24 +66,56 @@ class PAGXDocument {
   std::string basePath = {};
 
   /**
-   * Finds a resource by ID.
-   * Returns nullptr if not found.
+   * Creates a node of the specified type and adds it to the document management.
+   * If an ID is provided, the node will be indexed for lookup.
+   * If the ID already exists, an error will be logged and the new node will replace the old one in
+   * the index.
    */
-  Node* findResource(const std::string& id);
+  template <typename T>
+  T* makeNode(const std::string& id = "") {
+    auto node = std::unique_ptr<T>(new T());
+    auto* result = node.get();
+    if (!id.empty()) {
+      auto it = nodeMap.find(id);
+      if (it != nodeMap.end()) {
+        fprintf(stderr, "PAGXDocument::makeNode(): Duplicate node id '%s', overwriting.\n",
+                id.c_str());
+      }
+      result->id = id;
+      nodeMap[id] = result;
+    }
+    nodes.push_back(std::move(node));
+    return result;
+  }
 
   /**
-   * Finds a layer by ID (searches recursively).
+   * Finds a node by ID.
    * Returns nullptr if not found.
    */
-  Layer* findLayer(const std::string& id) const;
+  Node* findNode(const std::string& id) const;
+
+  /**
+   * Finds a node of the specified type by ID.
+   * Returns nullptr if not found.
+   */
+  template <typename T>
+  T* findNode(const std::string& id) const {
+    return static_cast<T*>(findNode(id));
+  }
+
+  /**
+   * All nodes in the document (owned by the document).
+   */
+  std::vector<std::unique_ptr<Node>> nodes = {};
 
  private:
-  std::unordered_map<std::string, Node*> resourceMap = {};
-  bool resourceMapDirty = true;
+  PAGXDocument() = default;
 
-  void rebuildResourceMap();
-  static Layer* findLayerRecursive(const std::vector<std::unique_ptr<Layer>>& layers,
-                                   const std::string& id);
+  std::unordered_map<std::string, Node*> nodeMap = {};
+
+  friend class PAGXImporter;
+  friend class PAGXExporter;
+  friend class TextShaperImpl;
 };
 
 }  // namespace pagx

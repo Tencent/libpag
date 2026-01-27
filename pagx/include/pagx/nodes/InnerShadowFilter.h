@@ -61,6 +61,11 @@ class InnerShadowFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::InnerShadowFilter;
   }
+
+ private:
+  InnerShadowFilter() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

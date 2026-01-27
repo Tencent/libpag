@@ -46,6 +46,11 @@ class BackgroundBlurStyle : public LayerStyle {
   NodeType nodeType() const override {
     return NodeType::BackgroundBlurStyle;
   }
+
+ private:
+  BackgroundBlurStyle() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

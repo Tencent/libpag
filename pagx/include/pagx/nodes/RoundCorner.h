@@ -36,6 +36,11 @@ class RoundCorner : public Element {
   NodeType nodeType() const override {
     return NodeType::RoundCorner;
   }
+
+ private:
+  RoundCorner() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

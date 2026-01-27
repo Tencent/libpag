@@ -32,13 +32,7 @@ class Path : public Element {
   /**
    * The path data containing vertices and control points.
    */
-  PathData data = {};
-
-  /**
-   * Reference to a PathData resource (e.g., "#path1"). If non-empty, this takes precedence
-   * over the inline `data` field when exporting.
-   */
-  std::string dataRef = {};
+  PathData* data = nullptr;
 
   /**
    * Whether the path direction is reversed. The default value is false.
@@ -48,6 +42,11 @@ class Path : public Element {
   NodeType nodeType() const override {
     return NodeType::Path;
   }
+
+ private:
+  Path() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

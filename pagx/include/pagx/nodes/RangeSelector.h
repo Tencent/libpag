@@ -163,6 +163,11 @@ class RangeSelector : public TextSelector {
   NodeType nodeType() const override {
     return NodeType::RangeSelector;
   }
+
+ private:
+  RangeSelector() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

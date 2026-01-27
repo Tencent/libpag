@@ -31,6 +31,8 @@ class TextSelector : public Node {
 
  protected:
   TextSelector() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

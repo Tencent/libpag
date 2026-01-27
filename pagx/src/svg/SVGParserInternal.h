@@ -93,46 +93,46 @@ class SVGParserImpl {
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
 
-  std::unique_ptr<Layer> convertToLayer(const std::shared_ptr<DOMNode>& element,
+  Layer* convertToLayer(const std::shared_ptr<DOMNode>& element,
                                             const InheritedStyle& parentStyle);
   void convertChildren(const std::shared_ptr<DOMNode>& element,
-                       std::vector<std::unique_ptr<Element>>& contents,
+                       std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
                        ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);
-  std::unique_ptr<Element> convertElement(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Group> convertG(const std::shared_ptr<DOMNode>& element,
+  Element* convertElement(const std::shared_ptr<DOMNode>& element);
+  Group* convertG(const std::shared_ptr<DOMNode>& element,
                                       const InheritedStyle& inheritedStyle);
-  std::unique_ptr<Element> convertRect(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Element> convertCircle(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Element> convertEllipse(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Element> convertLine(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Element> convertPolyline(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Element> convertPolygon(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Element> convertPath(const std::shared_ptr<DOMNode>& element);
-  std::unique_ptr<Group> convertText(const std::shared_ptr<DOMNode>& element,
+  Element* convertRect(const std::shared_ptr<DOMNode>& element);
+  Element* convertCircle(const std::shared_ptr<DOMNode>& element);
+  Element* convertEllipse(const std::shared_ptr<DOMNode>& element);
+  Element* convertLine(const std::shared_ptr<DOMNode>& element);
+  Element* convertPolyline(const std::shared_ptr<DOMNode>& element);
+  Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
+  Element* convertPath(const std::shared_ptr<DOMNode>& element);
+  Group* convertText(const std::shared_ptr<DOMNode>& element,
                                          const InheritedStyle& inheritedStyle);
-  std::unique_ptr<Element> convertUse(const std::shared_ptr<DOMNode>& element);
+  Element* convertUse(const std::shared_ptr<DOMNode>& element);
 
-  std::unique_ptr<LinearGradient> convertLinearGradient(
+  LinearGradient* convertLinearGradient(
       const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
-  std::unique_ptr<RadialGradient> convertRadialGradient(
+  RadialGradient* convertRadialGradient(
       const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds);
-  std::unique_ptr<ImagePattern> convertPattern(const std::shared_ptr<DOMNode>& element,
+  ImagePattern* convertPattern(const std::shared_ptr<DOMNode>& element,
                                                     const Rect& shapeBounds);
 
-  std::unique_ptr<Layer> convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
+  Layer* convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                                 const InheritedStyle& parentStyle);
   // Converts SVG filter element to PAGX filters/styles.
   // Returns true if the filter was successfully converted, false otherwise.
   // If outShadowOnlyType is provided, it will be set to indicate the type of shadow-only filter
   // (DropShadow or InnerShadow) if all converted filters are shadow-only.
   bool convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
-                            std::vector<std::unique_ptr<LayerFilter>>& filters,
-                            std::vector<std::unique_ptr<LayerStyle>>& styles,
+                            std::vector<LayerFilter*>& filters,
+                            std::vector<LayerStyle*>& styles,
                             ShadowOnlyType* outShadowOnlyType = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element,
-                     std::vector<std::unique_ptr<Element>>& contents,
+                     std::vector<Element*>& contents,
                      const InheritedStyle& inheritedStyle);
 
   // Compute shape bounds from SVG element attributes.
@@ -155,17 +155,17 @@ class SVGParserImpl {
   std::string getAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                            const std::string& defaultValue = "") const;
 
-  // Register an image resource and return its reference ID (e.g., "#image0").
-  // If the image source (data URI or path) has already been registered, returns the existing ID.
-  std::string registerImageResource(const std::string& imageSource);
+  // Register an image resource and return its node pointer.
+  // If the image source (data URI or path) has already been registered, returns the existing node.
+  Image* registerImageResource(const std::string& imageSource);
 
   // Register a PathData resource and return its reference ID (e.g., "@path0").
   // This creates a new PathData resource in the document's resources list.
-  std::string registerPathDataResource(PathData pathData);
+  std::string registerPathDataResource(PathData* pathData);
 
   // Merge adjacent layers that have the same shape geometry.
   // This optimizes the output by combining Fill and Stroke for identical shapes into one Layer.
-  void mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& layers);
+  void mergeAdjacentLayers(std::vector<Layer*>& layers);
 
   // Collect all IDs from the SVG document to avoid conflicts when generating new IDs.
   void collectAllIds(const std::shared_ptr<DOMNode>& node);
@@ -186,14 +186,14 @@ class SVGParserImpl {
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).
-  std::unique_ptr<ColorSource> getColorSourceForRef(const std::string& refId,
+  ColorSource* getColorSourceForRef(const std::string& refId,
                                                      const Rect& shapeBounds);
 
   SVGImporter::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
-  std::vector<std::unique_ptr<Layer>> _maskLayers = {};
-  std::unordered_map<std::string, std::string> _imageSourceToId = {};  // Maps image source to resource ID.
+  std::vector<Layer*> _maskLayers = {};
+  std::unordered_map<std::string, Image*> _imageSourceToId = {};  // Maps image source to resource node.
   std::unordered_set<std::string> _existingIds = {};  // All IDs found in SVG to avoid conflicts.
   
   // ColorSource reference counting for gradients and patterns.

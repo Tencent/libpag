@@ -61,6 +61,11 @@ class DropShadowStyle : public LayerStyle {
   NodeType nodeType() const override {
     return NodeType::DropShadowStyle;
   }
+
+ private:
+  DropShadowStyle() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

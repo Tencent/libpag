@@ -54,6 +54,11 @@ class RadialGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::RadialGradient;
   }
+
+ private:
+  RadialGradient() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

@@ -18,13 +18,14 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Point.h"
 
 namespace pagx {
+
+class Image;
+class PathData;
 
 /**
  * Glyph defines a single glyph's rendering data. Either path or image must be specified, not both.
@@ -32,24 +33,28 @@ namespace pagx {
 class Glyph : public Node {
  public:
   /**
-   * SVG path data for vector glyph outline. Mutually exclusive with image.
+   * Vector glyph outline data. Mutually exclusive with image.
    */
-  std::string path = {};
+  PathData* path = nullptr;
 
   /**
-   * Image data (base64 data URI) or external file path for bitmap glyph. Mutually exclusive with
-   * path.
+   * Bitmap glyph image resource. Mutually exclusive with path.
    */
-  std::string image = {};
+  Image* image = nullptr;
 
   /**
-   * Bitmap offset for image glyphs (only used when image is specified). The default value is (0,0).
+   * Bitmap offset for image glyphs. The default value is (0,0).
    */
   Point offset = {};
 
   NodeType nodeType() const override {
     return NodeType::Glyph;
   }
+
+ private:
+  Glyph() = default;
+
+  friend class PAGXDocument;
 };
 
 /**
@@ -63,11 +68,16 @@ class Font : public Node {
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing
    * glyph).
    */
-  std::vector<std::unique_ptr<Glyph>> glyphs = {};
+  std::vector<Glyph*> glyphs = {};
 
   NodeType nodeType() const override {
     return NodeType::Font;
   }
+
+ private:
+  Font() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

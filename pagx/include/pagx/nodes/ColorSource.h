@@ -30,6 +30,8 @@ namespace pagx {
 class ColorSource : public Node {
  protected:
   ColorSource() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

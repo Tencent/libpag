@@ -70,11 +70,16 @@ class Group : public Element {
   /**
    * The child elements contained in this group.
    */
-  std::vector<std::unique_ptr<Element>> elements = {};
+  std::vector<Element*> elements = {};
 
   NodeType nodeType() const override {
     return NodeType::Group;
   }
+
+ private:
+  Group() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

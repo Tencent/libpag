@@ -62,6 +62,11 @@ class MergePath : public Element {
   NodeType nodeType() const override {
     return NodeType::MergePath;
   }
+
+ private:
+  MergePath() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx
