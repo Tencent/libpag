@@ -25,6 +25,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/TextPrecomposer.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -918,6 +919,188 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
   EXPECT_GE(doc2->layers.size(), 1u);
 
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
+}
+
+/**
+ * Test case: Text precomposition round-trip.
+ * 1. Load SVG with text content
+ * 2. Render original (runtime shaping)
+ * 3. Precompose text (TextPrecomposer)
+ * 4. Export to PAGX
+ * 5. Reload PAGX and render (precomposed)
+ * 6. Compare render results
+ */
+PAG_TEST(PAGXTest, TextPrecomposerRoundTrip) {
+  // Use text.svg as the test file
+  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/text.svg");
+
+  // Step 1: Parse SVG
+  auto doc = pagx::SVGImporter::Parse(svgPath);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_GT(doc->width, 0);
+  ASSERT_GT(doc->height, 0);
+
+  int canvasWidth = static_cast<int>(doc->width);
+  int canvasHeight = static_cast<int>(doc->height);
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typefaces = GetFallbackTypefaces();
+  ASSERT_FALSE(typefaces.empty());
+
+  // Step 2: Render original (runtime shaping)
+  pagx::LayerBuilder::Options buildOptions;
+  buildOptions.fallbackTypefaces = typefaces;
+  auto originalContent = pagx::LayerBuilder::Build(*doc, buildOptions);
+  ASSERT_TRUE(originalContent.root != nullptr);
+
+  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList originalDL;
+  originalDL.root()->addChild(originalContent.root);
+  originalDL.render(originalSurface.get(), false);
+
+  // Step 3: Precompose text
+  pagx::TextPrecomposer::Options precomposeOptions;
+  precomposeOptions.fallbackTypefaces = typefaces;
+  bool processed = pagx::TextPrecomposer::Process(*doc, precomposeOptions);
+  EXPECT_TRUE(processed);
+
+  // Verify Font resources were added
+  bool hasFontResource = false;
+  for (const auto& res : doc->resources) {
+    if (res->nodeType() == pagx::NodeType::Font) {
+      hasFontResource = true;
+      auto fontNode = static_cast<const pagx::Font*>(res.get());
+      EXPECT_FALSE(fontNode->glyphs.empty());
+      break;
+    }
+  }
+  EXPECT_TRUE(hasFontResource);
+
+  // Step 4: Export to PAGX
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("<Font"), std::string::npos);
+  EXPECT_NE(xml.find("<GlyphRun"), std::string::npos);
+
+  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/text_precomposed.pagx");
+
+  // Step 5: Reload PAGX (without typefaces - should use embedded font)
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
+
+  // Verify Font resource was imported
+  bool fontFound = false;
+  for (const auto& res : reloadedDoc->resources) {
+    if (res->nodeType() == pagx::NodeType::Font) {
+      auto fontNode = static_cast<const pagx::Font*>(res.get());
+      EXPECT_FALSE(fontNode->id.empty());
+      EXPECT_FALSE(fontNode->glyphs.empty());
+      fontFound = true;
+    }
+  }
+  EXPECT_TRUE(fontFound);
+
+  // Verify Text has GlyphRun
+  bool glyphRunFound = false;
+  for (const auto& layer : reloadedDoc->layers) {
+    for (const auto& content : layer->contents) {
+      if (content->nodeType() == pagx::NodeType::Group) {
+        auto group = static_cast<const pagx::Group*>(content.get());
+        for (const auto& elem : group->elements) {
+          if (elem->nodeType() == pagx::NodeType::Text) {
+            auto text = static_cast<const pagx::Text*>(elem.get());
+            if (!text->glyphRuns.empty()) {
+              glyphRunFound = true;
+            }
+          }
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(glyphRunFound);
+
+  pagx::LayerBuilder::Options reloadOptions;
+  // Intentionally not providing fallback typefaces to verify embedded font works
+  auto reloadedContent = pagx::LayerBuilder::Build(*reloadedDoc, reloadOptions);
+  ASSERT_TRUE(reloadedContent.root != nullptr);
+
+  // Step 6: Render precomposed version
+  auto precomposedSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList precomposedDL;
+  precomposedDL.root()->addChild(reloadedContent.root);
+  precomposedDL.render(precomposedSurface.get(), false);
+
+  // Step 7: Compare renders - they should be identical
+  auto originalPixels = originalSurface->makeImageSnapshot();
+  auto precomposedPixels = precomposedSurface->makeImageSnapshot();
+  ASSERT_TRUE(originalPixels != nullptr);
+  ASSERT_TRUE(precomposedPixels != nullptr);
+
+  // Save outputs for visual inspection
+  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextPrecomposer_Original"));
+  EXPECT_TRUE(Baseline::Compare(precomposedSurface, "PAGXTest/TextPrecomposer_Precomposed"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Text precomposition with textFont.svg (multiple text elements)
+ */
+PAG_TEST(PAGXTest, TextPrecomposerMultipleText) {
+  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/textFont.svg");
+
+  auto doc = pagx::SVGImporter::Parse(svgPath);
+  ASSERT_TRUE(doc != nullptr);
+
+  int canvasWidth = static_cast<int>(doc->width);
+  int canvasHeight = static_cast<int>(doc->height);
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typefaces = GetFallbackTypefaces();
+
+  // Render original
+  pagx::LayerBuilder::Options buildOptions;
+  buildOptions.fallbackTypefaces = typefaces;
+  auto originalContent = pagx::LayerBuilder::Build(*doc, buildOptions);
+  ASSERT_TRUE(originalContent.root != nullptr);
+
+  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList originalDL;
+  originalDL.root()->addChild(originalContent.root);
+  originalDL.render(originalSurface.get(), false);
+
+  // Precompose
+  pagx::TextPrecomposer::Options precomposeOptions;
+  precomposeOptions.fallbackTypefaces = typefaces;
+  bool processed = pagx::TextPrecomposer::Process(*doc, precomposeOptions);
+  EXPECT_TRUE(processed);
+
+  // Export and reload
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/textFont_precomposed.pagx");
+
+  pagx::LayerBuilder::Options reloadOptions;
+  auto reloadedContent = pagx::LayerBuilder::FromFile(pagxPath, reloadOptions);
+  ASSERT_TRUE(reloadedContent.root != nullptr);
+
+  // Render precomposed
+  auto precomposedSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList precomposedDL;
+  precomposedDL.root()->addChild(reloadedContent.root);
+  precomposedDL.render(precomposedSurface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextPrecomposerMultiple_Original"));
+  EXPECT_TRUE(Baseline::Compare(precomposedSurface, "PAGXTest/TextPrecomposerMultiple_Precomposed"));
+
+  device->unlock();
 }
 
 }  // namespace pag

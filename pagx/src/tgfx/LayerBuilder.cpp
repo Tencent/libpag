@@ -716,8 +716,8 @@ class LayerBuilderImpl {
         continue;
       }
 
-      // For CustomTypeface (PathTypeface/ImageTypeface), the glyph paths already define
-      // actual coordinates, so we use fontSize 1.0. The visual size comes from the path data.
+      // For embedded fonts (CustomTypeface from TextPrecomposer), the glyph paths and positions
+      // are already scaled to the target fontSize. Use fontSize=1.0 since paths are absolute.
       tgfx::Font font(typeface, 1);
       size_t count = run->glyphs.size();
 
@@ -1096,7 +1096,17 @@ class LayerBuilderImpl {
           TextInfo info;
           info.text = text;
 
-          // Create TextBlob to measure bounds.
+          // Check for precomposed mode first
+          if (!text->glyphRuns.empty()) {
+            info.blob = buildPrecomposedTextBlob(text);
+            if (info.blob) {
+              info.bounds = info.blob->getTightBounds();
+            }
+            textInfos.push_back(info);
+            continue;
+          }
+
+          // Runtime shaping mode: Create TextBlob to measure bounds.
           std::shared_ptr<tgfx::Typeface> typeface = nullptr;
           if (!text->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
             for (const auto& tf : _options.fallbackTypefaces) {
