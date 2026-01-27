@@ -52,6 +52,8 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 
 namespace pagx {
 
@@ -449,6 +451,9 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Text: {
       auto text = static_cast<const Text*>(node);
       xml.openElement("Text");
+      if (!text->text.empty()) {
+        xml.addAttribute("text", text->text);
+      }
       if (text->position.x != 0 || text->position.y != 0) {
         xml.addAttribute("position", pointToString(text->position));
       }
@@ -459,9 +464,79 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.addAttribute("fontSize", text->fontSize, 12.0f);
       xml.addAttribute("letterSpacing", text->letterSpacing);
       xml.addAttribute("baselineShift", text->baselineShift);
-      xml.closeElementStart();
-      xml.addTextContent(text->text);
-      xml.closeElement();
+
+      // Check if we need children (GlyphRuns)
+      if (text->glyphRuns.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& run : text->glyphRuns) {
+          xml.openElement("GlyphRun");
+          xml.addAttribute("font", run->font);
+
+          // Write glyphs as comma-separated integers
+          if (!run->glyphs.empty()) {
+            std::string glyphsStr = {};
+            char buf[16] = {};
+            for (size_t i = 0; i < run->glyphs.size(); i++) {
+              if (i > 0) {
+                glyphsStr += ",";
+              }
+              snprintf(buf, sizeof(buf), "%u", run->glyphs[i]);
+              glyphsStr += buf;
+            }
+            xml.addRequiredAttribute("glyphs", glyphsStr);
+          }
+
+          // Determine positioning mode
+          if (!run->matrices.empty()) {
+            // Matrix mode: semicolon-separated groups of 6 values
+            std::string matStr = {};
+            char buf[32] = {};
+            for (size_t i = 0; i < run->matrices.size(); i++) {
+              if (i > 0) {
+                matStr += ";";
+              }
+              const auto& m = run->matrices[i];
+              snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", m.a, m.b, m.c, m.d, m.tx, m.ty);
+              matStr += buf;
+            }
+            xml.addRequiredAttribute("matrices", matStr);
+          } else if (!run->xforms.empty()) {
+            // RSXform mode: semicolon-separated groups of 4 values
+            std::string xformsStr = {};
+            char buf[64] = {};
+            for (size_t i = 0; i < run->xforms.size(); i++) {
+              if (i > 0) {
+                xformsStr += ";";
+              }
+              const auto& x = run->xforms[i];
+              snprintf(buf, sizeof(buf), "%g,%g,%g,%g", x.scos, x.ssin, x.tx, x.ty);
+              xformsStr += buf;
+            }
+            xml.addRequiredAttribute("xforms", xformsStr);
+          } else if (!run->positions.empty()) {
+            // Point mode: semicolon-separated x,y pairs
+            std::string posStr = {};
+            char buf[32] = {};
+            for (size_t i = 0; i < run->positions.size(); i++) {
+              if (i > 0) {
+                posStr += ";";
+              }
+              snprintf(buf, sizeof(buf), "%g,%g", run->positions[i].x, run->positions[i].y);
+              posStr += buf;
+            }
+            xml.addRequiredAttribute("positions", posStr);
+          } else if (!run->xPositions.empty()) {
+            // Horizontal mode
+            xml.addAttribute("y", run->y);
+            xml.addRequiredAttribute("xPositions", floatListToString(run->xPositions));
+          }
+
+          xml.closeElementSelfClosing();
+        }
+        xml.closeElement();
+      }
       break;
     }
     case NodeType::Fill: {
@@ -882,6 +957,27 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
           writeLayer(xml, layer.get());
+        }
+        xml.closeElement();
+      }
+      break;
+    }
+    case NodeType::Font: {
+      auto font = static_cast<const Font*>(node);
+      xml.openElement("Font");
+      xml.addAttribute("id", font->id);
+      if (font->glyphs.empty()) {
+        xml.closeElementSelfClosing();
+      } else {
+        xml.closeElementStart();
+        for (const auto& glyph : font->glyphs) {
+          xml.openElement("Glyph");
+          xml.addAttribute("path", glyph->path);
+          xml.addAttribute("image", glyph->image);
+          if (glyph->offset.x != 0 || glyph->offset.y != 0) {
+            xml.addAttribute("offset", pointToString(glyph->offset));
+          }
+          xml.closeElementSelfClosing();
         }
         xml.closeElement();
       }

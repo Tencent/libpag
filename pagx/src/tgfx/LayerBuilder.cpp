@@ -716,9 +716,9 @@ class LayerBuilderImpl {
         continue;
       }
 
-      // Note: For precomposed text, fontSize is already baked into the glyph paths,
-      // so we use fontSize 1.0 here. The actual size comes from the path coordinates.
-      tgfx::Font font(typeface, node->fontSize);
+      // For CustomTypeface (PathTypeface/ImageTypeface), the glyph paths already define
+      // actual coordinates, so we use fontSize 1.0. The visual size comes from the path data.
+      tgfx::Font font(typeface, 1);
       size_t count = run->glyphs.size();
 
       // Determine positioning mode (priority: matrices > xforms > positions > xPositions)

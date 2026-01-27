@@ -37,7 +37,14 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Text.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/TextBlobBuilder.h"
+#include "tgfx/svg/SVGPathParser.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
@@ -584,6 +591,333 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
   EXPECT_EQ(layer->filters.size(), 1u);
   EXPECT_EQ(layer->styles[0]->nodeType(), pagx::NodeType::DropShadowStyle);
   EXPECT_EQ(layer->filters[0]->nodeType(), pagx::NodeType::BlurFilter);
+}
+
+/**
+ * Test case: Font and Glyph node creation
+ */
+PAG_TEST(PAGXTest, FontGlyphNodes) {
+  auto font = std::make_unique<pagx::Font>();
+  font->id = "testFont";
+
+  auto glyph1 = std::make_unique<pagx::Glyph>();
+  glyph1->path = "M0 0 L100 0 L100 100 L0 100 Z";
+
+  auto glyph2 = std::make_unique<pagx::Glyph>();
+  glyph2->path = "M50 0 L100 100 L0 100 Z";
+
+  font->glyphs.push_back(std::move(glyph1));
+  font->glyphs.push_back(std::move(glyph2));
+
+  EXPECT_EQ(font->nodeType(), pagx::NodeType::Font);
+  EXPECT_EQ(font->glyphs.size(), 2u);
+  EXPECT_EQ(font->glyphs[0]->nodeType(), pagx::NodeType::Glyph);
+  EXPECT_FALSE(font->glyphs[0]->path.empty());
+}
+
+/**
+ * Test case: GlyphRun node with horizontal positioning
+ */
+PAG_TEST(PAGXTest, GlyphRunHorizontal) {
+  auto glyphRun = std::make_unique<pagx::GlyphRun>();
+  glyphRun->font = "@testFont";
+  glyphRun->glyphs = {1, 2, 1};
+  glyphRun->y = 50;
+  glyphRun->xPositions = {10, 60, 110};
+
+  EXPECT_EQ(glyphRun->nodeType(), pagx::NodeType::GlyphRun);
+  EXPECT_EQ(glyphRun->font, "@testFont");
+  EXPECT_EQ(glyphRun->glyphs.size(), 3u);
+  EXPECT_EQ(glyphRun->xPositions.size(), 3u);
+  EXPECT_FLOAT_EQ(glyphRun->y, 50.0f);
+}
+
+/**
+ * Test case: GlyphRun node with point positions
+ */
+PAG_TEST(PAGXTest, GlyphRunPointPositions) {
+  auto glyphRun = std::make_unique<pagx::GlyphRun>();
+  glyphRun->font = "@testFont";
+  glyphRun->glyphs = {1, 2};
+  glyphRun->positions = {{10, 20}, {60, 80}};
+
+  EXPECT_EQ(glyphRun->nodeType(), pagx::NodeType::GlyphRun);
+  EXPECT_EQ(glyphRun->positions.size(), 2u);
+  EXPECT_FLOAT_EQ(glyphRun->positions[0].x, 10.0f);
+  EXPECT_FLOAT_EQ(glyphRun->positions[1].y, 80.0f);
+}
+
+/**
+ * Test case: GlyphRun node with RSXform positioning
+ */
+PAG_TEST(PAGXTest, GlyphRunRSXform) {
+  auto glyphRun = std::make_unique<pagx::GlyphRun>();
+  glyphRun->font = "@testFont";
+  glyphRun->glyphs = {1, 2};
+
+  pagx::RSXform xform1 = {1, 0, 10, 20};
+  pagx::RSXform xform2 = {0.707f, 0.707f, 60, 80};
+  glyphRun->xforms = {xform1, xform2};
+
+  EXPECT_EQ(glyphRun->nodeType(), pagx::NodeType::GlyphRun);
+  EXPECT_EQ(glyphRun->xforms.size(), 2u);
+  EXPECT_FLOAT_EQ(glyphRun->xforms[0].scos, 1.0f);
+  EXPECT_FLOAT_EQ(glyphRun->xforms[1].ssin, 0.707f);
+}
+
+/**
+ * Test case: Text node with precomposed GlyphRuns
+ */
+PAG_TEST(PAGXTest, TextPrecomposed) {
+  auto text = std::make_unique<pagx::Text>();
+  text->fontSize = 24;
+
+  auto glyphRun = std::make_unique<pagx::GlyphRun>();
+  glyphRun->font = "@font1";
+  glyphRun->glyphs = {1, 2, 3};
+  glyphRun->y = 24;
+  glyphRun->xPositions = {0, 24, 48};
+  text->glyphRuns.push_back(std::move(glyphRun));
+
+  EXPECT_EQ(text->nodeType(), pagx::NodeType::Text);
+  EXPECT_EQ(text->glyphRuns.size(), 1u);
+  EXPECT_EQ(text->glyphRuns[0]->glyphs.size(), 3u);
+}
+
+/**
+ * Test case: PathTypefaceBuilder and TextBlobBuilder basic functionality
+ */
+PAG_TEST(PAGXTest, PathTypefaceBasic) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create a custom typeface from path
+  tgfx::PathTypefaceBuilder builder;
+  auto path1 = tgfx::SVGPathParser::FromSVGString("M0 0 L40 0 L40 50 L0 50 Z");
+  ASSERT_TRUE(path1 != nullptr);
+  auto glyphId1 = builder.addGlyph(*path1);
+  EXPECT_EQ(glyphId1, 1);
+
+  auto path2 = tgfx::SVGPathParser::FromSVGString("M0 0 L20 50 L40 0 Z");
+  ASSERT_TRUE(path2 != nullptr);
+  auto glyphId2 = builder.addGlyph(*path2);
+  EXPECT_EQ(glyphId2, 2);
+
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+
+  // Render using canvas->drawGlyphs directly
+  auto surface = Surface::Make(context, 200, 100);
+  auto canvas = surface->getCanvas();
+
+  // For CustomTypeface, fontSize should be 1.0 since path coordinates define the actual size
+  tgfx::Font font(typeface, 1);
+  std::vector<tgfx::GlyphID> glyphIDs = {1, 2, 1};
+  std::vector<tgfx::Point> positions = {
+      tgfx::Point::Make(10, 60), tgfx::Point::Make(60, 60), tgfx::Point::Make(110, 60)};
+  tgfx::Paint paint;
+  paint.setColor(tgfx::Color::Red());
+  canvas->drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PathTypefaceBasic"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Precomposed text rendering with embedded font
+ */
+PAG_TEST(PAGXTest, PrecomposedTextRender) {
+  // PAGX with embedded font and precomposed text
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="100" version="1.0">
+  <Resources>
+    <Font id="pathFont">
+      <Glyph path="M0 0 L40 0 L40 50 L0 50 Z"/>
+      <Glyph path="M0 0 L20 50 L40 0 Z"/>
+    </Font>
+  </Resources>
+  <Layer>
+    <Group>
+      <Text fontSize="50">
+        <GlyphRun font="@pathFont" glyphs="1,2,1" y="60" xPositions="10,60,110"/>
+      </Text>
+      <Fill color="#FF0000"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+  // First verify the XML parsing
+  auto doc = pagx::PAGXImporter::FromXML(pagxXml);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_FALSE(doc->resources.empty());
+  EXPECT_EQ(doc->resources.size(), 1u);
+  EXPECT_EQ(doc->resources[0]->nodeType(), pagx::NodeType::Font);
+  auto fontNode = static_cast<const pagx::Font*>(doc->resources[0].get());
+  EXPECT_EQ(fontNode->id, "pathFont");
+  EXPECT_EQ(fontNode->glyphs.size(), 2u);
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  pagx::LayerBuilder::Options options;
+  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
+                                              strlen(pagxXml), options);
+  ASSERT_TRUE(content.root != nullptr);
+
+  auto surface = Surface::Make(context, 200, 100);
+  DisplayList displayList;
+  displayList.root()->addChild(content.root);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextRender"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Precomposed text with point positions
+ */
+PAG_TEST(PAGXTest, PrecomposedTextPointPositions) {
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="150" version="1.0">
+  <Resources>
+    <Font id="pathFont">
+      <Glyph path="M0 0 L30 0 L30 40 L0 40 Z"/>
+      <Glyph path="M15 0 L30 40 L0 40 Z"/>
+    </Font>
+  </Resources>
+  <Layer>
+    <Group>
+      <Text fontSize="40">
+        <GlyphRun font="@pathFont" glyphs="1,2,1" positions="20,30;80,60;140,90"/>
+      </Text>
+      <Fill color="#0000FF"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  pagx::LayerBuilder::Options options;
+  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
+                                              strlen(pagxXml), options);
+  ASSERT_TRUE(content.root != nullptr);
+
+  auto surface = Surface::Make(context, 200, 150);
+  DisplayList displayList;
+  displayList.root()->addChild(content.root);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextPointPositions"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Text with missing glyph (GlyphID 0)
+ */
+PAG_TEST(PAGXTest, PrecomposedTextMissingGlyph) {
+  const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="100" version="1.0">
+  <Resources>
+    <Font id="testFont">
+      <Glyph path="M0 0 L40 0 L40 50 L0 50 Z"/>
+    </Font>
+  </Resources>
+  <Layer>
+    <Group>
+      <Text fontSize="50">
+        <GlyphRun font="@testFont" glyphs="1,0,1" y="60" xPositions="10,60,110"/>
+      </Text>
+      <Fill color="#00FF00"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  pagx::LayerBuilder::Options options;
+  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
+                                              strlen(pagxXml), options);
+  ASSERT_TRUE(content.root != nullptr);
+
+  auto surface = Surface::Make(context, 200, 100);
+  DisplayList displayList;
+  displayList.root()->addChild(content.root);
+  displayList.render(surface.get(), false);
+  // GlyphID 0 should not be rendered, so only two glyphs appear
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextMissingGlyph"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Font and GlyphRun XML round-trip
+ */
+PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto font = std::make_unique<pagx::Font>();
+  font->id = "roundTripFont";
+
+  auto glyph1 = std::make_unique<pagx::Glyph>();
+  glyph1->path = "M0 0 L40 0 L40 50 L0 50 Z";
+  font->glyphs.push_back(std::move(glyph1));
+
+  auto glyph2 = std::make_unique<pagx::Glyph>();
+  glyph2->path = "M20 0 L40 50 L0 50 Z";
+  font->glyphs.push_back(std::move(glyph2));
+
+  doc->resources.push_back(std::move(font));
+
+  auto layer = std::make_unique<pagx::Layer>();
+  auto group = std::make_unique<pagx::Group>();
+
+  auto text = std::make_unique<pagx::Text>();
+  text->fontSize = 50;
+
+  auto glyphRun = std::make_unique<pagx::GlyphRun>();
+  glyphRun->font = "@roundTripFont";
+  glyphRun->glyphs = {1, 2};
+  glyphRun->y = 60;
+  glyphRun->xPositions = {10, 60};
+  text->glyphRuns.push_back(std::move(glyphRun));
+
+  auto fill = std::make_unique<pagx::Fill>();
+  auto solidColor = std::make_unique<pagx::SolidColor>();
+  solidColor->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = std::move(solidColor);
+
+  group->elements.push_back(std::move(text));
+  group->elements.push_back(std::move(fill));
+  layer->contents.push_back(std::move(group));
+  doc->layers.push_back(std::move(layer));
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("<Font"), std::string::npos);
+  EXPECT_NE(xml.find("<Glyph"), std::string::npos);
+  EXPECT_NE(xml.find("<GlyphRun"), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_GE(doc2->resources.size(), 1u);
+  EXPECT_GE(doc2->layers.size(), 1u);
+
+  SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
 }
 
 }  // namespace pag
