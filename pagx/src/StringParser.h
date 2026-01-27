@@ -20,32 +20,30 @@
 
 #include <string>
 #include <vector>
+#include "pagx/nodes/BlendMode.h"
+#include "pagx/nodes/Color.h"
+#include "pagx/nodes/ColorSpace.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/FilterMode.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LayerFilter.h"
+#include "pagx/nodes/LayerPlacement.h"
 #include "pagx/nodes/LayerStyle.h"
+#include "pagx/nodes/Matrix.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/MipmapMode.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/TrimPath.h"
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/Color.h"
-#include "pagx/nodes/ColorSpace.h"
-#include "pagx/nodes/LayerPlacement.h"
-#include "pagx/nodes/FilterMode.h"
-#include "pagx/nodes/MipmapMode.h"
 #include "pagx/nodes/TileMode.h"
-#include "pagx/nodes/Matrix.h"
-#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/TrimPath.h"
 
 namespace pagx {
 
@@ -158,31 +156,17 @@ SelectorMode SelectorModeFromString(const std::string& str);
 std::string ColorToHexString(const Color& color, bool withAlpha = false);
 
 //==============================================================================
-// Matrix - encoding/decoding for PAGX format
+// Matrix
 //==============================================================================
 std::string MatrixToString(const Matrix& matrix);
 Matrix MatrixFromString(const std::string& str);
 
 //==============================================================================
-// PathData
+// String parsing utilities
 //==============================================================================
-PathData PathDataFromSVGString(const std::string& d);
-std::string PathDataToSVGString(const PathData& path);
-
-//==============================================================================
-// String parsing utilities (avoid std::stringstream for smaller binary size)
-//==============================================================================
-
-// Split a string by delimiter and return a vector of trimmed tokens.
 std::vector<std::string> SplitString(const std::string& str, char delimiter);
-
-// Parse comma-separated float values.
 std::vector<float> ParseFloatList(const std::string& str);
-
-// Parse space-separated float values.
 std::vector<float> ParseSpaceSeparatedFloats(const std::string& str);
-
-// Format a float value to string (removes trailing zeros).
 std::string FloatToString(float value);
 
 }  // namespace pagx

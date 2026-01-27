@@ -18,6 +18,8 @@
 
 #include "pagx/TextShaper.h"
 #include <unordered_map>
+#include "StringParser.h"
+#include "SVGPathParser.h"
 #include <unordered_set>
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
@@ -118,22 +120,17 @@ class TextShaperImpl : public TextShaper {
 
     // Process all layers
     for (auto& layer : _document->layers) {
-      processLayer(layer.get());
+      processLayer(layer);
     }
 
-    // Process compositions in resources
-    for (auto& res : _document->resources) {
-      if (res->nodeType() == NodeType::Composition) {
-        auto comp = static_cast<Composition*>(res.get());
+    // Process compositions in nodes
+    for (auto& node : _document->nodes) {
+      if (node->nodeType() == NodeType::Composition) {
+        auto comp = static_cast<Composition*>(node.get());
         for (auto& layer : comp->layers) {
-          processLayer(layer.get());
+          processLayer(layer);
         }
       }
-    }
-
-    // Add collected Font resources to document
-    for (auto& fontPair : _fontResources) {
-      _document->resources.push_back(std::move(fontPair.second));
     }
 
     return _textShaped;
@@ -147,12 +144,12 @@ class TextShaperImpl : public TextShaper {
 
     // Process layer contents
     for (auto& element : layer->contents) {
-      processElement(element.get());
+      processElement(element);
     }
 
     // Process child layers
     for (auto& child : layer->children) {
-      processLayer(child.get());
+      processLayer(child);
     }
   }
 
@@ -169,7 +166,7 @@ class TextShaperImpl : public TextShaper {
       case NodeType::Group: {
         auto group = static_cast<Group*>(element);
         for (auto& child : group->elements) {
-          processElement(child.get());
+          processElement(child);
         }
         break;
       }
@@ -278,8 +275,9 @@ class TextShaperImpl : public TextShaper {
     std::string fontId = getOrCreateFontResource(typeface, font, glyphIDs);
 
     // Create GlyphRun with remapped glyph IDs
-    auto glyphRun = std::make_unique<GlyphRun>();
-    glyphRun->font = "@" + fontId;
+    auto glyphRun = _document->makeNode<GlyphRun>();
+    // Link glyph run to font resource
+    glyphRun->font = _fontResources[fontId];
 
     // Remap glyph IDs to font-specific indices
     for (tgfx::GlyphID glyphID : glyphIDs) {
@@ -296,7 +294,7 @@ class TextShaperImpl : public TextShaper {
     glyphRun->y = 0;
     glyphRun->xPositions = std::move(xPositions);
 
-    text->glyphRuns.push_back(std::move(glyphRun));
+    text->glyphRuns.push_back(glyphRun);
     _textShaped = true;
   }
 
@@ -352,13 +350,13 @@ class TextShaperImpl : public TextShaper {
     auto it = _fontResources.find(fontId);
     if (it == _fontResources.end()) {
       // Create new Font resource
-      auto fontNode = std::make_unique<Font>();
+      auto fontNode = _document->makeNode<Font>();
       fontNode->id = fontId;
-      _fontResources[fontId] = std::move(fontNode);
+      _fontResources[fontId] = fontNode;
       _glyphMapping[fontId] = {};
     }
 
-    Font* fontNode = _fontResources[fontId].get();
+    Font* fontNode = _fontResources[fontId];
     auto& glyphMap = _glyphMapping[fontId];
 
     // Add any new glyphs
@@ -380,13 +378,14 @@ class TextShaperImpl : public TextShaper {
       }
 
       // Create Glyph node
-      auto glyph = std::make_unique<Glyph>();
-      glyph->path = pathStr;
+      auto glyph = _document->makeNode<Glyph>();
+      glyph->path = _document->makeNode<PathData>();
+      *glyph->path = PathDataFromSVGString(pathStr);
 
       // Map original glyph ID to new index (1-based, since PathTypefaceBuilder uses 1-based IDs)
       glyphMap[glyphID] = static_cast<tgfx::GlyphID>(fontNode->glyphs.size() + 1);
 
-      fontNode->glyphs.push_back(std::move(glyph));
+      fontNode->glyphs.push_back(glyph);
     }
 
     return fontId;
@@ -405,7 +404,7 @@ class TextShaperImpl : public TextShaper {
   bool _textShaped = false;
 
   // Font ID -> Font resource
-  std::unordered_map<std::string, std::unique_ptr<Font>> _fontResources = {};
+  std::unordered_map<std::string, Font*> _fontResources = {};
 
   // Font ID -> (original GlyphID -> new GlyphID)
   std::unordered_map<std::string, std::unordered_map<tgfx::GlyphID, tgfx::GlyphID>> _glyphMapping =

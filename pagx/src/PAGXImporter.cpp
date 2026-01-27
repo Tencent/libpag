@@ -16,12 +16,64 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGXImporterImpl.h"
+#include "pagx/PAGXImporter.h"
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include "PAGXStringUtils.h"
+#include <memory>
+#include <unordered_map>
+#include <vector>
+#include "Base64.h"
+#include "StringParser.h"
+#include "SVGPathParser.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
+#include "pagx/nodes/BlendFilter.h"
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
+#include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/DropShadowFilter.h"
+#include "pagx/nodes/DropShadowStyle.h"
+#include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
+#include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
+#include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/TextLayout.h"
+#include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/Color.h"
 
 namespace pagx {
+
+//==============================================================================
+// Internal XML node representation
+//==============================================================================
+
+struct XMLNode {
+  std::string tag = {};
+  std::unordered_map<std::string, std::string> attributes = {};
+  std::vector<std::unique_ptr<XMLNode>> children = {};
+  std::string text = {};
+};
 
 //==============================================================================
 // Simple XML tokenizer
@@ -257,76 +309,138 @@ class XMLTokenizer {
 };
 
 //==============================================================================
-// PAGXXMLParser implementation
+// Forward declarations and utility functions
 //==============================================================================
 
-std::shared_ptr<PAGXDocument> PAGXImporterImpl::Parse(const uint8_t* data, size_t length) {
-  auto root = parseXML(data, length);
-  if (!root || root->tag != "pagx") {
-    return nullptr;
-  }
-  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
-  parseDocument(root.get(), doc.get());
-  return doc;
-}
+static std::string getAttribute(const XMLNode* node, const std::string& name,
+                                const std::string& defaultValue = "");
+static float getFloatAttribute(const XMLNode* node, const std::string& name,
+                               float defaultValue = 0);
+static int getIntAttribute(const XMLNode* node, const std::string& name, int defaultValue = 0);
+static bool getBoolAttribute(const XMLNode* node, const std::string& name,
+                             bool defaultValue = false);
+static Point parsePoint(const std::string& str);
+static Size parseSize(const std::string& str);
+static Rect parseRect(const std::string& str);
+static Color parseColor(const std::string& str);
+static std::vector<float> parseFloatList(const std::string& str);
 
-std::unique_ptr<XMLNode> PAGXImporterImpl::parseXML(const uint8_t* data, size_t length) {
+// Forward declarations for parse functions
+static void parseDocument(const XMLNode* root, PAGXDocument* doc);
+static void parseResources(const XMLNode* node, PAGXDocument* doc);
+static Node* parseResource(const XMLNode* node, PAGXDocument* doc);
+static Layer* parseLayer(const XMLNode* node, PAGXDocument* doc);
+static void parseContents(const XMLNode* node, Layer* layer, PAGXDocument* doc);
+static void parseStyles(const XMLNode* node, Layer* layer, PAGXDocument* doc);
+static void parseFilters(const XMLNode* node, Layer* layer, PAGXDocument* doc);
+static Element* parseElement(const XMLNode* node, PAGXDocument* doc);
+static ColorSource* parseColorSource(const XMLNode* node, PAGXDocument* doc);
+static LayerStyle* parseLayerStyle(const XMLNode* node, PAGXDocument* doc);
+static LayerFilter* parseLayerFilter(const XMLNode* node, PAGXDocument* doc);
+static Rectangle* parseRectangle(const XMLNode* node, PAGXDocument* doc);
+static Ellipse* parseEllipse(const XMLNode* node, PAGXDocument* doc);
+static Polystar* parsePolystar(const XMLNode* node, PAGXDocument* doc);
+static Path* parsePath(const XMLNode* node, PAGXDocument* doc);
+static Text* parseText(const XMLNode* node, PAGXDocument* doc);
+static Fill* parseFill(const XMLNode* node, PAGXDocument* doc);
+static Stroke* parseStroke(const XMLNode* node, PAGXDocument* doc);
+static TrimPath* parseTrimPath(const XMLNode* node, PAGXDocument* doc);
+static RoundCorner* parseRoundCorner(const XMLNode* node, PAGXDocument* doc);
+static MergePath* parseMergePath(const XMLNode* node, PAGXDocument* doc);
+static TextModifier* parseTextModifier(const XMLNode* node, PAGXDocument* doc);
+static TextPath* parseTextPath(const XMLNode* node, PAGXDocument* doc);
+static TextLayout* parseTextLayout(const XMLNode* node, PAGXDocument* doc);
+static Repeater* parseRepeater(const XMLNode* node, PAGXDocument* doc);
+static Group* parseGroup(const XMLNode* node, PAGXDocument* doc);
+static RangeSelector* parseRangeSelector(const XMLNode* node, PAGXDocument* doc);
+static SolidColor* parseSolidColor(const XMLNode* node, PAGXDocument* doc);
+static LinearGradient* parseLinearGradient(const XMLNode* node, PAGXDocument* doc);
+static RadialGradient* parseRadialGradient(const XMLNode* node, PAGXDocument* doc);
+static ConicGradient* parseConicGradient(const XMLNode* node, PAGXDocument* doc);
+static DiamondGradient* parseDiamondGradient(const XMLNode* node, PAGXDocument* doc);
+static ImagePattern* parseImagePattern(const XMLNode* node, PAGXDocument* doc);
+static ColorStop parseColorStop(const XMLNode* node);
+static Image* parseImage(const XMLNode* node, PAGXDocument* doc);
+static PathData* parsePathData(const XMLNode* node, PAGXDocument* doc);
+static Composition* parseComposition(const XMLNode* node, PAGXDocument* doc);
+static Font* parseFont(const XMLNode* node, PAGXDocument* doc);
+static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc);
+static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc);
+static DropShadowStyle* parseDropShadowStyle(const XMLNode* node, PAGXDocument* doc);
+static InnerShadowStyle* parseInnerShadowStyle(const XMLNode* node, PAGXDocument* doc);
+static BackgroundBlurStyle* parseBackgroundBlurStyle(const XMLNode* node, PAGXDocument* doc);
+static BlurFilter* parseBlurFilter(const XMLNode* node, PAGXDocument* doc);
+static DropShadowFilter* parseDropShadowFilter(const XMLNode* node, PAGXDocument* doc);
+static InnerShadowFilter* parseInnerShadowFilter(const XMLNode* node, PAGXDocument* doc);
+static BlendFilter* parseBlendFilter(const XMLNode* node, PAGXDocument* doc);
+static ColorMatrixFilter* parseColorMatrixFilter(const XMLNode* node, PAGXDocument* doc);
+
+//==============================================================================
+// Internal parser implementation
+//==============================================================================
+
+static std::unique_ptr<XMLNode> parseXML(const uint8_t* data, size_t length) {
   XMLTokenizer tokenizer(data, length);
   return tokenizer.parse();
 }
 
-void PAGXImporterImpl::parseDocument(const XMLNode* root, PAGXDocument* doc) {
+static void parseDocument(const XMLNode* root, PAGXDocument* doc) {
   doc->version = getAttribute(root, "version", "1.0");
   doc->width = getFloatAttribute(root, "width", 0);
   doc->height = getFloatAttribute(root, "height", 0);
 
+  // First pass: Parse Resources.
   for (const auto& child : root->children) {
     if (child->tag == "Resources") {
       parseResources(child.get(), doc);
-    } else if (child->tag == "Layer") {
-      auto layer = parseLayer(child.get());
+    }
+  }
+
+  // Second pass: Parse Layers.
+  for (const auto& child : root->children) {
+    if (child->tag == "Layer") {
+      auto layer = parseLayer(child.get(), doc);
       if (layer) {
-        doc->layers.push_back(std::move(layer));
+        doc->layers.push_back(layer);
       }
     }
   }
 }
 
-void PAGXImporterImpl::parseResources(const XMLNode* node, PAGXDocument* doc) {
+static void parseResources(const XMLNode* node, PAGXDocument* doc) {
   for (const auto& child : node->children) {
     // Try to parse as a resource (including color sources)
-    auto resource = parseResource(child.get());
+    auto resource = parseResource(child.get(), doc);
     if (resource) {
-      doc->resources.push_back(std::move(resource));
       continue;
     }
     // Try to parse as a color source (which is also a Node)
-    auto colorSource = parseColorSource(child.get());
-    if (colorSource) {
-      doc->resources.push_back(std::move(colorSource));
-    }
+    parseColorSource(child.get(), doc);
   }
 }
 
-std::unique_ptr<Node> PAGXImporterImpl::parseResource(const XMLNode* node) {
+static Node* parseResource(const XMLNode* node, PAGXDocument* doc) {
   if (node->tag == "Image") {
-    return parseImage(node);
+    return parseImage(node, doc);
   }
   if (node->tag == "PathData") {
-    return parsePathData(node);
+    return parsePathData(node, doc);
   }
   if (node->tag == "Composition") {
-    return parseComposition(node);
+    return parseComposition(node, doc);
   }
   if (node->tag == "Font") {
-    return parseFont(node);
+    return parseFont(node, doc);
   }
   return nullptr;
 }
 
-std::unique_ptr<Layer> PAGXImporterImpl::parseLayer(const XMLNode* node) {
-  auto layer = std::make_unique<Layer>();
-  layer->id = getAttribute(node, "id");
+static Layer* parseLayer(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto layer = doc->makeNode<Layer>(id);
+  if (!layer) {
+    return nullptr;
+  }
   layer->name = getAttribute(node, "name");
   layer->visible = getBoolAttribute(node, "visible", true);
   layer->alpha = getFloatAttribute(node, "alpha", 1);
@@ -352,9 +466,17 @@ std::unique_ptr<Layer> PAGXImporterImpl::parseLayer(const XMLNode* node) {
     layer->scrollRect = parseRect(scrollRectStr);
     layer->hasScrollRect = true;
   }
-  layer->mask = getAttribute(node, "mask");
+
+  auto maskAttr = getAttribute(node, "mask");
+  if (!maskAttr.empty() && maskAttr[0] == '@') {
+    layer->mask = doc->findNode<Layer>(maskAttr.substr(1));
+  }
   layer->maskType = MaskTypeFromString(getAttribute(node, "maskType", "alpha"));
-  layer->composition = getAttribute(node, "composition");
+
+  auto compositionAttr = getAttribute(node, "composition");
+  if (!compositionAttr.empty() && compositionAttr[0] == '@') {
+    layer->composition = doc->findNode<Composition>(compositionAttr.substr(1));
+  }
 
   // Parse data-* custom attributes.
   for (const auto& [key, value] : node->attributes) {
@@ -366,173 +488,173 @@ std::unique_ptr<Layer> PAGXImporterImpl::parseLayer(const XMLNode* node) {
   for (const auto& child : node->children) {
     // Legacy format: support container nodes for backward compatibility.
     if (child->tag == "contents") {
-      parseContents(child.get(), layer.get());
+      parseContents(child.get(), layer, doc);
       continue;
     }
     if (child->tag == "styles") {
-      parseStyles(child.get(), layer.get());
+      parseStyles(child.get(), layer, doc);
       continue;
     }
     if (child->tag == "filters") {
-      parseFilters(child.get(), layer.get());
+      parseFilters(child.get(), layer, doc);
       continue;
     }
     // New format: direct child elements without container nodes.
     if (child->tag == "Layer") {
-      auto childLayer = parseLayer(child.get());
+      auto childLayer = parseLayer(child.get(), doc);
       if (childLayer) {
-        layer->children.push_back(std::move(childLayer));
+        layer->children.push_back(childLayer);
       }
       continue;
     }
     // Try to parse as VectorElement.
-    auto element = parseElement(child.get());
+    auto element = parseElement(child.get(), doc);
     if (element) {
-      layer->contents.push_back(std::move(element));
+      layer->contents.push_back(element);
       continue;
     }
     // Try to parse as LayerStyle.
-    auto style = parseLayerStyle(child.get());
+    auto style = parseLayerStyle(child.get(), doc);
     if (style) {
-      layer->styles.push_back(std::move(style));
+      layer->styles.push_back(style);
       continue;
     }
     // Try to parse as LayerFilter.
-    auto filter = parseLayerFilter(child.get());
+    auto filter = parseLayerFilter(child.get(), doc);
     if (filter) {
-      layer->filters.push_back(std::move(filter));
+      layer->filters.push_back(filter);
     }
   }
 
   return layer;
 }
 
-void PAGXImporterImpl::parseContents(const XMLNode* node, Layer* layer) {
+static void parseContents(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
   for (const auto& child : node->children) {
-    auto element = parseElement(child.get());
+    auto element = parseElement(child.get(), doc);
     if (element) {
-      layer->contents.push_back(std::move(element));
+      layer->contents.push_back(element);
     }
   }
 }
 
-void PAGXImporterImpl::parseStyles(const XMLNode* node, Layer* layer) {
+static void parseStyles(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
   for (const auto& child : node->children) {
-    auto style = parseLayerStyle(child.get());
+    auto style = parseLayerStyle(child.get(), doc);
     if (style) {
-      layer->styles.push_back(std::move(style));
+      layer->styles.push_back(style);
     }
   }
 }
 
-void PAGXImporterImpl::parseFilters(const XMLNode* node, Layer* layer) {
+static void parseFilters(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
   for (const auto& child : node->children) {
-    auto filter = parseLayerFilter(child.get());
+    auto filter = parseLayerFilter(child.get(), doc);
     if (filter) {
-      layer->filters.push_back(std::move(filter));
+      layer->filters.push_back(filter);
     }
   }
 }
 
-std::unique_ptr<Element> PAGXImporterImpl::parseElement(const XMLNode* node) {
+static Element* parseElement(const XMLNode* node, PAGXDocument* doc) {
   if (node->tag == "Rectangle") {
-    return parseRectangle(node);
+    return parseRectangle(node, doc);
   }
   if (node->tag == "Ellipse") {
-    return parseEllipse(node);
+    return parseEllipse(node, doc);
   }
   if (node->tag == "Polystar") {
-    return parsePolystar(node);
+    return parsePolystar(node, doc);
   }
   if (node->tag == "Path") {
-    return parsePath(node);
+    return parsePath(node, doc);
   }
   if (node->tag == "Text") {
-    return parseText(node);
+    return parseText(node, doc);
   }
   if (node->tag == "Fill") {
-    return parseFill(node);
+    return parseFill(node, doc);
   }
   if (node->tag == "Stroke") {
-    return parseStroke(node);
+    return parseStroke(node, doc);
   }
   if (node->tag == "TrimPath") {
-    return parseTrimPath(node);
+    return parseTrimPath(node, doc);
   }
   if (node->tag == "RoundCorner") {
-    return parseRoundCorner(node);
+    return parseRoundCorner(node, doc);
   }
   if (node->tag == "MergePath") {
-    return parseMergePath(node);
+    return parseMergePath(node, doc);
   }
   if (node->tag == "TextModifier") {
-    return parseTextModifier(node);
+    return parseTextModifier(node, doc);
   }
   if (node->tag == "TextPath") {
-    return parseTextPath(node);
+    return parseTextPath(node, doc);
   }
   if (node->tag == "TextLayout") {
-    return parseTextLayout(node);
+    return parseTextLayout(node, doc);
   }
   if (node->tag == "Repeater") {
-    return parseRepeater(node);
+    return parseRepeater(node, doc);
   }
   if (node->tag == "Group") {
-    return parseGroup(node);
+    return parseGroup(node, doc);
   }
   return nullptr;
 }
 
-std::unique_ptr<ColorSource> PAGXImporterImpl::parseColorSource(const XMLNode* node) {
+static ColorSource* parseColorSource(const XMLNode* node, PAGXDocument* doc) {
   if (node->tag == "SolidColor") {
-    return parseSolidColor(node);
+    return parseSolidColor(node, doc);
   }
   if (node->tag == "LinearGradient") {
-    return parseLinearGradient(node);
+    return parseLinearGradient(node, doc);
   }
   if (node->tag == "RadialGradient") {
-    return parseRadialGradient(node);
+    return parseRadialGradient(node, doc);
   }
   if (node->tag == "ConicGradient") {
-    return parseConicGradient(node);
+    return parseConicGradient(node, doc);
   }
   if (node->tag == "DiamondGradient") {
-    return parseDiamondGradient(node);
+    return parseDiamondGradient(node, doc);
   }
   if (node->tag == "ImagePattern") {
-    return parseImagePattern(node);
+    return parseImagePattern(node, doc);
   }
   return nullptr;
 }
 
-std::unique_ptr<LayerStyle> PAGXImporterImpl::parseLayerStyle(const XMLNode* node) {
+static LayerStyle* parseLayerStyle(const XMLNode* node, PAGXDocument* doc) {
   if (node->tag == "DropShadowStyle") {
-    return parseDropShadowStyle(node);
+    return parseDropShadowStyle(node, doc);
   }
   if (node->tag == "InnerShadowStyle") {
-    return parseInnerShadowStyle(node);
+    return parseInnerShadowStyle(node, doc);
   }
   if (node->tag == "BackgroundBlurStyle") {
-    return parseBackgroundBlurStyle(node);
+    return parseBackgroundBlurStyle(node, doc);
   }
   return nullptr;
 }
 
-std::unique_ptr<LayerFilter> PAGXImporterImpl::parseLayerFilter(const XMLNode* node) {
+static LayerFilter* parseLayerFilter(const XMLNode* node, PAGXDocument* doc) {
   if (node->tag == "BlurFilter") {
-    return parseBlurFilter(node);
+    return parseBlurFilter(node, doc);
   }
   if (node->tag == "DropShadowFilter") {
-    return parseDropShadowFilter(node);
+    return parseDropShadowFilter(node, doc);
   }
   if (node->tag == "InnerShadowFilter") {
-    return parseInnerShadowFilter(node);
+    return parseInnerShadowFilter(node, doc);
   }
   if (node->tag == "BlendFilter") {
-    return parseBlendFilter(node);
+    return parseBlendFilter(node, doc);
   }
   if (node->tag == "ColorMatrixFilter") {
-    return parseColorMatrixFilter(node);
+    return parseColorMatrixFilter(node, doc);
   }
   return nullptr;
 }
@@ -541,8 +663,11 @@ std::unique_ptr<LayerFilter> PAGXImporterImpl::parseLayerFilter(const XMLNode* n
 // Geometry element parsing
 //==============================================================================
 
-std::unique_ptr<Rectangle> PAGXImporterImpl::parseRectangle(const XMLNode* node) {
-  auto rect = std::make_unique<Rectangle>();
+static Rectangle* parseRectangle(const XMLNode* node, PAGXDocument* doc) {
+  auto rect = doc->makeNode<Rectangle>(getAttribute(node, "id"));
+  if (!rect) {
+    return nullptr;
+  }
   auto centerStr = getAttribute(node, "center", "0,0");
   rect->center = parsePoint(centerStr);
   auto sizeStr = getAttribute(node, "size", "100,100");
@@ -552,8 +677,11 @@ std::unique_ptr<Rectangle> PAGXImporterImpl::parseRectangle(const XMLNode* node)
   return rect;
 }
 
-std::unique_ptr<Ellipse> PAGXImporterImpl::parseEllipse(const XMLNode* node) {
-  auto ellipse = std::make_unique<Ellipse>();
+static Ellipse* parseEllipse(const XMLNode* node, PAGXDocument* doc) {
+  auto ellipse = doc->makeNode<Ellipse>(getAttribute(node, "id"));
+  if (!ellipse) {
+    return nullptr;
+  }
   auto centerStr = getAttribute(node, "center", "0,0");
   ellipse->center = parsePoint(centerStr);
   auto sizeStr = getAttribute(node, "size", "100,100");
@@ -562,8 +690,11 @@ std::unique_ptr<Ellipse> PAGXImporterImpl::parseEllipse(const XMLNode* node) {
   return ellipse;
 }
 
-std::unique_ptr<Polystar> PAGXImporterImpl::parsePolystar(const XMLNode* node) {
-  auto polystar = std::make_unique<Polystar>();
+static Polystar* parsePolystar(const XMLNode* node, PAGXDocument* doc) {
+  auto polystar = doc->makeNode<Polystar>(getAttribute(node, "id"));
+  if (!polystar) {
+    return nullptr;
+  }
   auto centerStr = getAttribute(node, "center", "0,0");
   polystar->center = parsePoint(centerStr);
   polystar->type = PolystarTypeFromString(getAttribute(node, "type", "star"));
@@ -577,24 +708,32 @@ std::unique_ptr<Polystar> PAGXImporterImpl::parsePolystar(const XMLNode* node) {
   return polystar;
 }
 
-std::unique_ptr<Path> PAGXImporterImpl::parsePath(const XMLNode* node) {
-  auto path = std::make_unique<Path>();
+static Path* parsePath(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto path = doc->makeNode<Path>(id);
+  if (!path) {
+    return nullptr;
+  }
   auto dataAttr = getAttribute(node, "data");
   if (!dataAttr.empty()) {
     if (dataAttr[0] == '@') {
       // Reference to PathData resource
-      path->dataRef = dataAttr;
+      path->data = doc->findNode<PathData>(dataAttr.substr(1));
     } else {
       // Inline path data
-      path->data = PathDataFromSVGString(dataAttr);
+      path->data = doc->makeNode<PathData>();
+      *path->data = PathDataFromSVGString(dataAttr);
     }
   }
   path->reversed = getBoolAttribute(node, "reversed", false);
   return path;
 }
 
-std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
-  auto text = std::make_unique<Text>();
+static Text* parseText(const XMLNode* node, PAGXDocument* doc) {
+  auto text = doc->makeNode<Text>(getAttribute(node, "id"));
+  if (!text) {
+    return nullptr;
+  }
   // Parse text content from attribute first, then fallback to CDATA
   auto textAttr = getAttribute(node, "text");
   if (!textAttr.empty()) {
@@ -604,7 +743,7 @@ std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
   }
   auto positionStr = getAttribute(node, "position", "0,0");
   auto pos = parsePoint(positionStr);
-  text->position = tgfx::Point::Make(pos.x, pos.y);
+  text->position = {pos.x, pos.y};
   text->fontFamily = getAttribute(node, "fontFamily");
   text->fontStyle = getAttribute(node, "fontStyle");
   text->fontSize = getFloatAttribute(node, "fontSize", 12);
@@ -614,9 +753,9 @@ std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
   // Parse GlyphRun children for precomposition mode
   for (const auto& child : node->children) {
     if (child->tag == "GlyphRun") {
-      auto glyphRun = parseGlyphRun(child.get());
+      auto glyphRun = parseGlyphRun(child.get(), doc);
       if (glyphRun) {
-        text->glyphRuns.push_back(std::move(glyphRun));
+        text->glyphRuns.push_back(glyphRun);
       }
     }
   }
@@ -628,18 +767,33 @@ std::unique_ptr<Text> PAGXImporterImpl::parseText(const XMLNode* node) {
 // Painter parsing
 //==============================================================================
 
-std::unique_ptr<Fill> PAGXImporterImpl::parseFill(const XMLNode* node) {
-  auto fill = std::make_unique<Fill>();
-  fill->colorRef = getAttribute(node, "color");
+static Fill* parseFill(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto fill = doc->makeNode<Fill>(id);
+  if (!fill) {
+    return nullptr;
+  }
+  auto colorAttr = getAttribute(node, "color");
+  if (!colorAttr.empty()) {
+    if (colorAttr[0] == '@') {
+      // Reference to ColorSource resource.
+      fill->color = doc->findNode<ColorSource>(colorAttr.substr(1));
+    } else {
+      // Inline color string (e.g. #FF0000, srgb(), p3()).
+      auto solidColor = doc->makeNode<SolidColor>();
+      solidColor->color = parseColor(colorAttr);
+      fill->color = solidColor;
+    }
+  }
   fill->alpha = getFloatAttribute(node, "alpha", 1);
   fill->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   fill->fillRule = FillRuleFromString(getAttribute(node, "fillRule", "winding"));
   fill->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
 
   for (const auto& child : node->children) {
-    auto colorSource = parseColorSource(child.get());
+    auto colorSource = parseColorSource(child.get(), doc);
     if (colorSource) {
-      fill->color = std::move(colorSource);
+      fill->color = colorSource;
       break;
     }
   }
@@ -647,9 +801,24 @@ std::unique_ptr<Fill> PAGXImporterImpl::parseFill(const XMLNode* node) {
   return fill;
 }
 
-std::unique_ptr<Stroke> PAGXImporterImpl::parseStroke(const XMLNode* node) {
-  auto stroke = std::make_unique<Stroke>();
-  stroke->colorRef = getAttribute(node, "color");
+static Stroke* parseStroke(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto stroke = doc->makeNode<Stroke>(id);
+  if (!stroke) {
+    return nullptr;
+  }
+  auto colorAttr = getAttribute(node, "color");
+  if (!colorAttr.empty()) {
+    if (colorAttr[0] == '@') {
+      // Reference to ColorSource resource.
+      stroke->color = doc->findNode<ColorSource>(colorAttr.substr(1));
+    } else {
+      // Inline color string (e.g. #FF0000, srgb(), p3()).
+      auto solidColor = doc->makeNode<SolidColor>();
+      solidColor->color = parseColor(colorAttr);
+      stroke->color = solidColor;
+    }
+  }
   stroke->width = getFloatAttribute(node, "width", 1);
   stroke->alpha = getFloatAttribute(node, "alpha", 1);
   stroke->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
@@ -665,9 +834,9 @@ std::unique_ptr<Stroke> PAGXImporterImpl::parseStroke(const XMLNode* node) {
   stroke->placement = LayerPlacementFromString(getAttribute(node, "placement", "background"));
 
   for (const auto& child : node->children) {
-    auto colorSource = parseColorSource(child.get());
+    auto colorSource = parseColorSource(child.get(), doc);
     if (colorSource) {
-      stroke->color = std::move(colorSource);
+      stroke->color = colorSource;
       break;
     }
   }
@@ -679,8 +848,11 @@ std::unique_ptr<Stroke> PAGXImporterImpl::parseStroke(const XMLNode* node) {
 // Modifier parsing
 //==============================================================================
 
-std::unique_ptr<TrimPath> PAGXImporterImpl::parseTrimPath(const XMLNode* node) {
-  auto trim = std::make_unique<TrimPath>();
+static TrimPath* parseTrimPath(const XMLNode* node, PAGXDocument* doc) {
+  auto trim = doc->makeNode<TrimPath>(getAttribute(node, "id"));
+  if (!trim) {
+    return nullptr;
+  }
   trim->start = getFloatAttribute(node, "start", 0);
   trim->end = getFloatAttribute(node, "end", 1);
   trim->offset = getFloatAttribute(node, "offset", 0);
@@ -688,20 +860,30 @@ std::unique_ptr<TrimPath> PAGXImporterImpl::parseTrimPath(const XMLNode* node) {
   return trim;
 }
 
-std::unique_ptr<RoundCorner> PAGXImporterImpl::parseRoundCorner(const XMLNode* node) {
-  auto round = std::make_unique<RoundCorner>();
+static RoundCorner* parseRoundCorner(const XMLNode* node, PAGXDocument* doc) {
+  auto round = doc->makeNode<RoundCorner>(getAttribute(node, "id"));
+  if (!round) {
+    return nullptr;
+  }
   round->radius = getFloatAttribute(node, "radius", 10);
   return round;
 }
 
-std::unique_ptr<MergePath> PAGXImporterImpl::parseMergePath(const XMLNode* node) {
-  auto merge = std::make_unique<MergePath>();
+static MergePath* parseMergePath(const XMLNode* node, PAGXDocument* doc) {
+  auto merge = doc->makeNode<MergePath>(getAttribute(node, "id"));
+  if (!merge) {
+    return nullptr;
+  }
   merge->mode = MergePathModeFromString(getAttribute(node, "mode", "append"));
   return merge;
 }
 
-std::unique_ptr<TextModifier> PAGXImporterImpl::parseTextModifier(const XMLNode* node) {
-  auto modifier = std::make_unique<TextModifier>();
+static TextModifier* parseTextModifier(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto modifier = doc->makeNode<TextModifier>(id);
+  if (!modifier) {
+    return nullptr;
+  }
   auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
   modifier->anchorPoint = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
@@ -712,29 +894,46 @@ std::unique_ptr<TextModifier> PAGXImporterImpl::parseTextModifier(const XMLNode*
   modifier->skew = getFloatAttribute(node, "skew", 0);
   modifier->skewAxis = getFloatAttribute(node, "skewAxis", 0);
   modifier->alpha = getFloatAttribute(node, "alpha", 1);
-  modifier->fillColor = getAttribute(node, "fillColor");
-  modifier->strokeColor = getAttribute(node, "strokeColor");
-  modifier->strokeWidth = getFloatAttribute(node, "strokeWidth", -1);
+  auto fillColorAttr = getAttribute(node, "fillColor");
+  if (!fillColorAttr.empty()) {
+    modifier->fillColor = parseColor(fillColorAttr);
+  }
+  auto strokeColorAttr = getAttribute(node, "strokeColor");
+  if (!strokeColorAttr.empty()) {
+    modifier->strokeColor = parseColor(strokeColorAttr);
+  }
+  auto strokeWidthAttr = getAttribute(node, "strokeWidth");
+  if (!strokeWidthAttr.empty()) {
+    modifier->strokeWidth = std::stof(strokeWidthAttr);
+  }
 
   for (const auto& child : node->children) {
     if (child->tag == "RangeSelector") {
-      modifier->selectors.push_back(std::make_unique<RangeSelector>(parseRangeSelector(child.get())));
+      auto selector = parseRangeSelector(child.get(), doc);
+      if (selector) {
+        modifier->selectors.push_back(selector);
+      }
     }
   }
 
   return modifier;
 }
 
-std::unique_ptr<TextPath> PAGXImporterImpl::parseTextPath(const XMLNode* node) {
-  auto textPath = std::make_unique<TextPath>();
+static TextPath* parseTextPath(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto textPath = doc->makeNode<TextPath>(id);
+  if (!textPath) {
+    return nullptr;
+  }
   auto pathAttr = getAttribute(node, "path");
   if (!pathAttr.empty()) {
     if (pathAttr[0] == '@') {
       // Reference to PathData resource
-      textPath->path = pathAttr;
+      textPath->path = doc->findNode<PathData>(pathAttr.substr(1));
     } else {
       // Inline path data
-      textPath->data = PathDataFromSVGString(pathAttr);
+      textPath->path = doc->makeNode<PathData>();
+      *textPath->path = PathDataFromSVGString(pathAttr);
     }
   }
   textPath->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
@@ -745,11 +944,14 @@ std::unique_ptr<TextPath> PAGXImporterImpl::parseTextPath(const XMLNode* node) {
   return textPath;
 }
 
-std::unique_ptr<TextLayout> PAGXImporterImpl::parseTextLayout(const XMLNode* node) {
-  auto layout = std::make_unique<TextLayout>();
+static TextLayout* parseTextLayout(const XMLNode* node, PAGXDocument* doc) {
+  auto layout = doc->makeNode<TextLayout>(getAttribute(node, "id"));
+  if (!layout) {
+    return nullptr;
+  }
   auto positionStr = getAttribute(node, "position", "0,0");
   auto pos = parsePoint(positionStr);
-  layout->position = tgfx::Point::Make(pos.x, pos.y);
+  layout->position = {pos.x, pos.y};
   layout->width = getFloatAttribute(node, "width", 0);
   layout->height = getFloatAttribute(node, "height", 0);
   layout->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
@@ -759,8 +961,11 @@ std::unique_ptr<TextLayout> PAGXImporterImpl::parseTextLayout(const XMLNode* nod
   return layout;
 }
 
-std::unique_ptr<Repeater> PAGXImporterImpl::parseRepeater(const XMLNode* node) {
-  auto repeater = std::make_unique<Repeater>();
+static Repeater* parseRepeater(const XMLNode* node, PAGXDocument* doc) {
+  auto repeater = doc->makeNode<Repeater>(getAttribute(node, "id"));
+  if (!repeater) {
+    return nullptr;
+  }
   repeater->copies = getFloatAttribute(node, "copies", 3);
   repeater->offset = getFloatAttribute(node, "offset", 0);
   repeater->order = RepeaterOrderFromString(getAttribute(node, "order", "belowOriginal"));
@@ -776,8 +981,11 @@ std::unique_ptr<Repeater> PAGXImporterImpl::parseRepeater(const XMLNode* node) {
   return repeater;
 }
 
-std::unique_ptr<Group> PAGXImporterImpl::parseGroup(const XMLNode* node) {
-  auto group = std::make_unique<Group>();
+static Group* parseGroup(const XMLNode* node, PAGXDocument* doc) {
+  auto group = doc->makeNode<Group>(getAttribute(node, "id"));
+  if (!group) {
+    return nullptr;
+  }
   // group->name (removed) = getAttribute(node, "name");
   auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
   group->anchorPoint = parsePoint(anchorStr);
@@ -791,28 +999,31 @@ std::unique_ptr<Group> PAGXImporterImpl::parseGroup(const XMLNode* node) {
   group->alpha = getFloatAttribute(node, "alpha", 1);
 
   for (const auto& child : node->children) {
-    auto element = parseElement(child.get());
+    auto element = parseElement(child.get(), doc);
     if (element) {
-      group->elements.push_back(std::move(element));
+      group->elements.push_back(element);
     }
   }
 
   return group;
 }
 
-RangeSelector PAGXImporterImpl::parseRangeSelector(const XMLNode* node) {
-  RangeSelector selector = {};
-  selector.start = getFloatAttribute(node, "start", 0);
-  selector.end = getFloatAttribute(node, "end", 1);
-  selector.offset = getFloatAttribute(node, "offset", 0);
-  selector.unit = SelectorUnitFromString(getAttribute(node, "unit", "percentage"));
-  selector.shape = SelectorShapeFromString(getAttribute(node, "shape", "square"));
-  selector.easeIn = getFloatAttribute(node, "easeIn", 0);
-  selector.easeOut = getFloatAttribute(node, "easeOut", 0);
-  selector.mode = SelectorModeFromString(getAttribute(node, "mode", "add"));
-  selector.weight = getFloatAttribute(node, "weight", 1);
-  selector.randomizeOrder = getBoolAttribute(node, "randomizeOrder", false);
-  selector.randomSeed = getIntAttribute(node, "randomSeed", 0);
+static RangeSelector* parseRangeSelector(const XMLNode* node, PAGXDocument* doc) {
+  auto selector = doc->makeNode<RangeSelector>(getAttribute(node, "id"));
+  if (!selector) {
+    return nullptr;
+  }
+  selector->start = getFloatAttribute(node, "start", 0);
+  selector->end = getFloatAttribute(node, "end", 1);
+  selector->offset = getFloatAttribute(node, "offset", 0);
+  selector->unit = SelectorUnitFromString(getAttribute(node, "unit", "percentage"));
+  selector->shape = SelectorShapeFromString(getAttribute(node, "shape", "square"));
+  selector->easeIn = getFloatAttribute(node, "easeIn", 0);
+  selector->easeOut = getFloatAttribute(node, "easeOut", 0);
+  selector->mode = SelectorModeFromString(getAttribute(node, "mode", "add"));
+  selector->weight = getFloatAttribute(node, "weight", 1);
+  selector->randomizeOrder = getBoolAttribute(node, "randomizeOrder", false);
+  selector->randomSeed = getIntAttribute(node, "randomSeed", 0);
   return selector;
 }
 
@@ -820,9 +1031,11 @@ RangeSelector PAGXImporterImpl::parseRangeSelector(const XMLNode* node) {
 // Color source parsing
 //==============================================================================
 
-std::unique_ptr<SolidColor> PAGXImporterImpl::parseSolidColor(const XMLNode* node) {
-  auto solid = std::make_unique<SolidColor>();
-  solid->id = getAttribute(node, "id");
+static SolidColor* parseSolidColor(const XMLNode* node, PAGXDocument* doc) {
+  auto solid = doc->makeNode<SolidColor>(getAttribute(node, "id"));
+  if (!solid) {
+    return nullptr;
+  }
   // Support "color" attribute with HEX (#RRGGBB) or p3() format
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
@@ -838,9 +1051,11 @@ std::unique_ptr<SolidColor> PAGXImporterImpl::parseSolidColor(const XMLNode* nod
   return solid;
 }
 
-std::unique_ptr<LinearGradient> PAGXImporterImpl::parseLinearGradient(const XMLNode* node) {
-  auto gradient = std::make_unique<LinearGradient>();
-  gradient->id = getAttribute(node, "id");
+static LinearGradient* parseLinearGradient(const XMLNode* node, PAGXDocument* doc) {
+  auto gradient = doc->makeNode<LinearGradient>(getAttribute(node, "id"));
+  if (!gradient) {
+    return nullptr;
+  }
   auto startPointStr = getAttribute(node, "startPoint", "0,0");
   gradient->startPoint = parsePoint(startPointStr);
   auto endPointStr = getAttribute(node, "endPoint", "0,0");
@@ -857,9 +1072,11 @@ std::unique_ptr<LinearGradient> PAGXImporterImpl::parseLinearGradient(const XMLN
   return gradient;
 }
 
-std::unique_ptr<RadialGradient> PAGXImporterImpl::parseRadialGradient(const XMLNode* node) {
-  auto gradient = std::make_unique<RadialGradient>();
-  gradient->id = getAttribute(node, "id");
+static RadialGradient* parseRadialGradient(const XMLNode* node, PAGXDocument* doc) {
+  auto gradient = doc->makeNode<RadialGradient>(getAttribute(node, "id"));
+  if (!gradient) {
+    return nullptr;
+  }
   auto centerStr = getAttribute(node, "center", "0,0");
   gradient->center = parsePoint(centerStr);
   gradient->radius = getFloatAttribute(node, "radius", 0);
@@ -875,9 +1092,11 @@ std::unique_ptr<RadialGradient> PAGXImporterImpl::parseRadialGradient(const XMLN
   return gradient;
 }
 
-std::unique_ptr<ConicGradient> PAGXImporterImpl::parseConicGradient(const XMLNode* node) {
-  auto gradient = std::make_unique<ConicGradient>();
-  gradient->id = getAttribute(node, "id");
+static ConicGradient* parseConicGradient(const XMLNode* node, PAGXDocument* doc) {
+  auto gradient = doc->makeNode<ConicGradient>(getAttribute(node, "id"));
+  if (!gradient) {
+    return nullptr;
+  }
   auto centerStr = getAttribute(node, "center", "0,0");
   gradient->center = parsePoint(centerStr);
   gradient->startAngle = getFloatAttribute(node, "startAngle", 0);
@@ -894,9 +1113,11 @@ std::unique_ptr<ConicGradient> PAGXImporterImpl::parseConicGradient(const XMLNod
   return gradient;
 }
 
-std::unique_ptr<DiamondGradient> PAGXImporterImpl::parseDiamondGradient(const XMLNode* node) {
-  auto gradient = std::make_unique<DiamondGradient>();
-  gradient->id = getAttribute(node, "id");
+static DiamondGradient* parseDiamondGradient(const XMLNode* node, PAGXDocument* doc) {
+  auto gradient = doc->makeNode<DiamondGradient>(getAttribute(node, "id"));
+  if (!gradient) {
+    return nullptr;
+  }
   auto centerStr = getAttribute(node, "center", "0,0");
   gradient->center = parsePoint(centerStr);
   gradient->halfDiagonal = getFloatAttribute(node, "halfDiagonal", 0);
@@ -912,10 +1133,16 @@ std::unique_ptr<DiamondGradient> PAGXImporterImpl::parseDiamondGradient(const XM
   return gradient;
 }
 
-std::unique_ptr<ImagePattern> PAGXImporterImpl::parseImagePattern(const XMLNode* node) {
-  auto pattern = std::make_unique<ImagePattern>();
-  pattern->id = getAttribute(node, "id");
-  pattern->image = getAttribute(node, "image");
+static ImagePattern* parseImagePattern(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto pattern = doc->makeNode<ImagePattern>(id);
+  if (!pattern) {
+    return nullptr;
+  }
+  auto imageAttr = getAttribute(node, "image");
+  if (!imageAttr.empty() && imageAttr[0] == '@') {
+    pattern->image = doc->findNode<Image>(imageAttr.substr(1));
+  }
   pattern->tileModeX = TileModeFromString(getAttribute(node, "tileModeX", "clamp"));
   pattern->tileModeY = TileModeFromString(getAttribute(node, "tileModeY", "clamp"));
   pattern->filterMode = FilterModeFromString(getAttribute(node, "filterMode", "linear"));
@@ -927,7 +1154,7 @@ std::unique_ptr<ImagePattern> PAGXImporterImpl::parseImagePattern(const XMLNode*
   return pattern;
 }
 
-ColorStop PAGXImporterImpl::parseColorStop(const XMLNode* node) {
+static ColorStop parseColorStop(const XMLNode* node) {
   ColorStop stop = {};
   stop.offset = getFloatAttribute(node, "offset", 0);
   auto colorStr = getAttribute(node, "color");
@@ -941,54 +1168,99 @@ ColorStop PAGXImporterImpl::parseColorStop(const XMLNode* node) {
 // Resource parsing
 //==============================================================================
 
-std::unique_ptr<Image> PAGXImporterImpl::parseImage(const XMLNode* node) {
-  auto image = std::make_unique<Image>();
-  image->id = getAttribute(node, "id");
-  image->source = getAttribute(node, "source");
+static Image* parseImage(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto image = doc->makeNode<Image>(id);
+  if (!image) {
+    return nullptr;
+  }
+  auto source = getAttribute(node, "source");
+  if (source.find("data:") == 0) {
+    auto commaPos = source.find(',');
+    if (commaPos != std::string::npos) {
+      image->data = Base64Decode(source.substr(commaPos + 1));
+    }
+  } else {
+    image->filePath = source;
+  }
   return image;
 }
 
-std::unique_ptr<PathData> PAGXImporterImpl::parsePathData(const XMLNode* node) {
+static PathData* parsePathData(const XMLNode* node, PAGXDocument* doc) {
+  auto id = getAttribute(node, "id");
+  auto pathData = doc->makeNode<PathData>(id);
+  if (!pathData) {
+    return nullptr;
+  }
   auto data = getAttribute(node, "data");
-  auto pathData = std::make_unique<PathData>(PathDataFromSVGString(data));
-  pathData->id = getAttribute(node, "id");
+  if (!data.empty()) {
+    *pathData = PathDataFromSVGString(data);
+  }
   return pathData;
 }
 
-std::unique_ptr<Composition> PAGXImporterImpl::parseComposition(const XMLNode* node) {
-  auto comp = std::make_unique<Composition>();
-  comp->id = getAttribute(node, "id");
+static Composition* parseComposition(const XMLNode* node, PAGXDocument* doc) {
+  auto comp = doc->makeNode<Composition>(getAttribute(node, "id"));
+  if (!comp) {
+    return nullptr;
+  }
   comp->width = getFloatAttribute(node, "width", 0);
   comp->height = getFloatAttribute(node, "height", 0);
   for (const auto& child : node->children) {
     if (child->tag == "Layer") {
-      auto layer = parseLayer(child.get());
+      auto layer = parseLayer(child.get(), doc);
       if (layer) {
-        comp->layers.push_back(std::move(layer));
+        comp->layers.push_back(layer);
       }
     }
   }
   return comp;
 }
 
-std::unique_ptr<Font> PAGXImporterImpl::parseFont(const XMLNode* node) {
-  auto font = std::make_unique<Font>();
-  font->id = getAttribute(node, "id");
+static Font* parseFont(const XMLNode* node, PAGXDocument* doc) {
+  auto font = doc->makeNode<Font>(getAttribute(node, "id"));
+  if (!font) {
+    return nullptr;
+  }
   for (const auto& child : node->children) {
     if (child->tag == "Glyph") {
-      auto glyph = parseGlyph(child.get());
+      auto glyph = parseGlyph(child.get(), doc);
       if (glyph) {
-        font->glyphs.push_back(std::move(glyph));
+        font->glyphs.push_back(glyph);
       }
     }
   }
   return font;
 }
 
-std::unique_ptr<Glyph> PAGXImporterImpl::parseGlyph(const XMLNode* node) {
-  auto glyph = std::make_unique<Glyph>();
-  glyph->path = getAttribute(node, "path");
-  glyph->image = getAttribute(node, "image");
+static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
+  auto glyph = doc->makeNode<Glyph>(getAttribute(node, "id"));
+  if (!glyph) {
+    return nullptr;
+  }
+  auto pathAttr = getAttribute(node, "path");
+  if (!pathAttr.empty()) {
+    glyph->path = doc->makeNode<PathData>();
+    *glyph->path = PathDataFromSVGString(pathAttr);
+  }
+  auto imageAttr = getAttribute(node, "image");
+  if (!imageAttr.empty()) {
+    if (imageAttr[0] == '@') {
+      // Reference to existing Image resource
+      glyph->image = doc->findNode<Image>(imageAttr.substr(1));
+    } else {
+      // Inline image source (data URI or file path)
+      glyph->image = doc->makeNode<Image>();
+      if (imageAttr.find("data:") == 0) {
+        auto commaPos = imageAttr.find(',');
+        if (commaPos != std::string::npos) {
+          glyph->image->data = Base64Decode(imageAttr.substr(commaPos + 1));
+        }
+      } else {
+        glyph->image->filePath = imageAttr;
+      }
+    }
+  }
   auto offsetStr = getAttribute(node, "offset");
   if (!offsetStr.empty()) {
     glyph->offset = parsePoint(offsetStr);
@@ -996,9 +1268,15 @@ std::unique_ptr<Glyph> PAGXImporterImpl::parseGlyph(const XMLNode* node) {
   return glyph;
 }
 
-std::unique_ptr<GlyphRun> PAGXImporterImpl::parseGlyphRun(const XMLNode* node) {
-  auto run = std::make_unique<GlyphRun>();
-  run->font = getAttribute(node, "font");
+static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
+  auto run = doc->makeNode<GlyphRun>(getAttribute(node, "id"));
+  if (!run) {
+    return nullptr;
+  }
+  auto fontAttr = getAttribute(node, "font");
+  if (!fontAttr.empty() && fontAttr[0] == '@') {
+    run->font = doc->findNode<Font>(fontAttr.substr(1));
+  }
   run->y = getFloatAttribute(node, "y", 0);
 
   // Parse glyphs (comma-separated GlyphIDs)
@@ -1006,7 +1284,7 @@ std::unique_ptr<GlyphRun> PAGXImporterImpl::parseGlyphRun(const XMLNode* node) {
   if (!glyphsStr.empty()) {
     auto glyphList = parseFloatList(glyphsStr);
     for (auto g : glyphList) {
-      run->glyphs.push_back(static_cast<tgfx::GlyphID>(g));
+      run->glyphs.push_back(static_cast<uint16_t>(g));
     }
   }
 
@@ -1108,8 +1386,11 @@ std::unique_ptr<GlyphRun> PAGXImporterImpl::parseGlyphRun(const XMLNode* node) {
 // Layer style parsing
 //==============================================================================
 
-std::unique_ptr<DropShadowStyle> PAGXImporterImpl::parseDropShadowStyle(const XMLNode* node) {
-  auto style = std::make_unique<DropShadowStyle>();
+static DropShadowStyle* parseDropShadowStyle(const XMLNode* node, PAGXDocument* doc) {
+  auto style = doc->makeNode<DropShadowStyle>(getAttribute(node, "id"));
+  if (!style) {
+    return nullptr;
+  }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   style->offsetX = getFloatAttribute(node, "offsetX", 0);
   style->offsetY = getFloatAttribute(node, "offsetY", 0);
@@ -1123,8 +1404,11 @@ std::unique_ptr<DropShadowStyle> PAGXImporterImpl::parseDropShadowStyle(const XM
   return style;
 }
 
-std::unique_ptr<InnerShadowStyle> PAGXImporterImpl::parseInnerShadowStyle(const XMLNode* node) {
-  auto style = std::make_unique<InnerShadowStyle>();
+static InnerShadowStyle* parseInnerShadowStyle(const XMLNode* node, PAGXDocument* doc) {
+  auto style = doc->makeNode<InnerShadowStyle>(getAttribute(node, "id"));
+  if (!style) {
+    return nullptr;
+  }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   style->offsetX = getFloatAttribute(node, "offsetX", 0);
   style->offsetY = getFloatAttribute(node, "offsetY", 0);
@@ -1137,9 +1421,12 @@ std::unique_ptr<InnerShadowStyle> PAGXImporterImpl::parseInnerShadowStyle(const 
   return style;
 }
 
-std::unique_ptr<BackgroundBlurStyle> PAGXImporterImpl::parseBackgroundBlurStyle(
-    const XMLNode* node) {
-  auto style = std::make_unique<BackgroundBlurStyle>();
+static BackgroundBlurStyle* parseBackgroundBlurStyle(
+    const XMLNode* node, PAGXDocument* doc) {
+  auto style = doc->makeNode<BackgroundBlurStyle>(getAttribute(node, "id"));
+  if (!style) {
+    return nullptr;
+  }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   style->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
   style->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
@@ -1151,16 +1438,22 @@ std::unique_ptr<BackgroundBlurStyle> PAGXImporterImpl::parseBackgroundBlurStyle(
 // Layer filter parsing
 //==============================================================================
 
-std::unique_ptr<BlurFilter> PAGXImporterImpl::parseBlurFilter(const XMLNode* node) {
-  auto filter = std::make_unique<BlurFilter>();
+static BlurFilter* parseBlurFilter(const XMLNode* node, PAGXDocument* doc) {
+  auto filter = doc->makeNode<BlurFilter>(getAttribute(node, "id"));
+  if (!filter) {
+    return nullptr;
+  }
   filter->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
   filter->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
   filter->tileMode = TileModeFromString(getAttribute(node, "tileMode", "decal"));
   return filter;
 }
 
-std::unique_ptr<DropShadowFilter> PAGXImporterImpl::parseDropShadowFilter(const XMLNode* node) {
-  auto filter = std::make_unique<DropShadowFilter>();
+static DropShadowFilter* parseDropShadowFilter(const XMLNode* node, PAGXDocument* doc) {
+  auto filter = doc->makeNode<DropShadowFilter>(getAttribute(node, "id"));
+  if (!filter) {
+    return nullptr;
+  }
   filter->offsetX = getFloatAttribute(node, "offsetX", 0);
   filter->offsetY = getFloatAttribute(node, "offsetY", 0);
   filter->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
@@ -1173,8 +1466,11 @@ std::unique_ptr<DropShadowFilter> PAGXImporterImpl::parseDropShadowFilter(const 
   return filter;
 }
 
-std::unique_ptr<InnerShadowFilter> PAGXImporterImpl::parseInnerShadowFilter(const XMLNode* node) {
-  auto filter = std::make_unique<InnerShadowFilter>();
+static InnerShadowFilter* parseInnerShadowFilter(const XMLNode* node, PAGXDocument* doc) {
+  auto filter = doc->makeNode<InnerShadowFilter>(getAttribute(node, "id"));
+  if (!filter) {
+    return nullptr;
+  }
   filter->offsetX = getFloatAttribute(node, "offsetX", 0);
   filter->offsetY = getFloatAttribute(node, "offsetY", 0);
   filter->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
@@ -1187,8 +1483,11 @@ std::unique_ptr<InnerShadowFilter> PAGXImporterImpl::parseInnerShadowFilter(cons
   return filter;
 }
 
-std::unique_ptr<BlendFilter> PAGXImporterImpl::parseBlendFilter(const XMLNode* node) {
-  auto filter = std::make_unique<BlendFilter>();
+static BlendFilter* parseBlendFilter(const XMLNode* node, PAGXDocument* doc) {
+  auto filter = doc->makeNode<BlendFilter>(getAttribute(node, "id"));
+  if (!filter) {
+    return nullptr;
+  }
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     filter->color = parseColor(colorStr);
@@ -1197,8 +1496,11 @@ std::unique_ptr<BlendFilter> PAGXImporterImpl::parseBlendFilter(const XMLNode* n
   return filter;
 }
 
-std::unique_ptr<ColorMatrixFilter> PAGXImporterImpl::parseColorMatrixFilter(const XMLNode* node) {
-  auto filter = std::make_unique<ColorMatrixFilter>();
+static ColorMatrixFilter* parseColorMatrixFilter(const XMLNode* node, PAGXDocument* doc) {
+  auto filter = doc->makeNode<ColorMatrixFilter>(getAttribute(node, "id"));
+  if (!filter) {
+    return nullptr;
+  }
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     auto values = parseFloatList(matrixStr);
@@ -1213,13 +1515,13 @@ std::unique_ptr<ColorMatrixFilter> PAGXImporterImpl::parseColorMatrixFilter(cons
 // Utility functions
 //==============================================================================
 
-std::string PAGXImporterImpl::getAttribute(const XMLNode* node, const std::string& name,
+static std::string getAttribute(const XMLNode* node, const std::string& name,
                                         const std::string& defaultValue) {
   auto it = node->attributes.find(name);
   return it != node->attributes.end() ? it->second : defaultValue;
 }
 
-float PAGXImporterImpl::getFloatAttribute(const XMLNode* node, const std::string& name,
+static float getFloatAttribute(const XMLNode* node, const std::string& name,
                                        float defaultValue) {
   auto str = getAttribute(node, name);
   if (str.empty()) {
@@ -1232,7 +1534,7 @@ float PAGXImporterImpl::getFloatAttribute(const XMLNode* node, const std::string
   }
 }
 
-int PAGXImporterImpl::getIntAttribute(const XMLNode* node, const std::string& name, int defaultValue) {
+static int getIntAttribute(const XMLNode* node, const std::string& name, int defaultValue) {
   auto str = getAttribute(node, name);
   if (str.empty()) {
     return defaultValue;
@@ -1244,7 +1546,7 @@ int PAGXImporterImpl::getIntAttribute(const XMLNode* node, const std::string& na
   }
 }
 
-bool PAGXImporterImpl::getBoolAttribute(const XMLNode* node, const std::string& name,
+static bool getBoolAttribute(const XMLNode* node, const std::string& name,
                                      bool defaultValue) {
   auto str = getAttribute(node, name);
   if (str.empty()) {
@@ -1253,7 +1555,7 @@ bool PAGXImporterImpl::getBoolAttribute(const XMLNode* node, const std::string& 
   return str == "true" || str == "1";
 }
 
-Point PAGXImporterImpl::parsePoint(const std::string& str) {
+static Point parsePoint(const std::string& str) {
   Point point = {};
   auto values = ParseFloatList(str);
   if (values.size() >= 2) {
@@ -1263,7 +1565,7 @@ Point PAGXImporterImpl::parsePoint(const std::string& str) {
   return point;
 }
 
-Size PAGXImporterImpl::parseSize(const std::string& str) {
+static Size parseSize(const std::string& str) {
   Size size = {};
   auto values = ParseFloatList(str);
   if (values.size() >= 2) {
@@ -1273,7 +1575,7 @@ Size PAGXImporterImpl::parseSize(const std::string& str) {
   return size;
 }
 
-Rect PAGXImporterImpl::parseRect(const std::string& str) {
+static Rect parseRect(const std::string& str) {
   Rect rect = {};
   auto values = ParseFloatList(str);
   if (values.size() >= 4) {
@@ -1300,7 +1602,7 @@ int parseHexDigit(char c) {
 }
 }  // namespace
 
-Color PAGXImporterImpl::parseColor(const std::string& str) {
+static Color parseColor(const std::string& str) {
   if (str.empty()) {
     return {};
   }
@@ -1380,8 +1682,60 @@ Color PAGXImporterImpl::parseColor(const std::string& str) {
   return {};
 }
 
-std::vector<float> PAGXImporterImpl::parseFloatList(const std::string& str) {
+static std::vector<float> parseFloatList(const std::string& str) {
   return ParseFloatList(str);
+}
+
+//==============================================================================
+// Public API implementation
+//==============================================================================
+
+std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath) {
+  FILE* file = fopen(filePath.c_str(), "rb");
+  if (!file) {
+    return nullptr;
+  }
+
+  fseek(file, 0, SEEK_END);
+  long fileSize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  if (fileSize <= 0) {
+    fclose(file);
+    return nullptr;
+  }
+
+  std::string content;
+  content.resize(static_cast<size_t>(fileSize));
+  size_t bytesRead = fread(&content[0], 1, static_cast<size_t>(fileSize), file);
+  fclose(file);
+
+  if (bytesRead != static_cast<size_t>(fileSize)) {
+    return nullptr;
+  }
+
+  auto doc = FromXML(content);
+  if (doc) {
+    auto lastSlash = filePath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+      doc->basePath = filePath.substr(0, lastSlash + 1);
+    }
+  }
+  return doc;
+}
+
+std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlContent) {
+  return FromXML(reinterpret_cast<const uint8_t*>(xmlContent.data()), xmlContent.size());
+}
+
+std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
+  auto root = parseXML(data, length);
+  if (!root || root->tag != "pagx") {
+    return nullptr;
+  }
+  auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
+  parseDocument(root.get(), doc.get());
+  return doc;
 }
 
 }  // namespace pagx

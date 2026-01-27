@@ -16,9 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGXExporterImpl.h"
+#include "pagx/PAGXExporter.h"
 #include <cstdio>
-#include "PAGXStringUtils.h"
+#include "Base64.h"
+#include "StringParser.h"
+#include "SVGPathParser.h"
+#include "tgfx/core/Data.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -210,12 +213,6 @@ static std::string pointToString(const Point& p) {
   return std::string(buf);
 }
 
-static std::string pointToString(const tgfx::Point& p) {
-  char buf[64] = {};
-  snprintf(buf, sizeof(buf), "%g,%g", p.x, p.y);
-  return std::string(buf);
-}
-
 static std::string sizeToString(const Size& s) {
   char buf[64] = {};
   snprintf(buf, sizeof(buf), "%g,%g", s.width, s.height);
@@ -360,7 +357,9 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       xml.addAttribute("id", pattern->id);
-      xml.addAttribute("image", pattern->image);
+      if (pattern->image != nullptr && !pattern->image->id.empty()) {
+        xml.addAttribute("image", "@" + pattern->image->id);
+      }
       if (pattern->tileModeX != TileMode::Clamp) {
         xml.addAttribute("tileModeX", TileModeToString(pattern->tileModeX));
       }
@@ -437,12 +436,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
-      if (!path->dataRef.empty()) {
+      if (path->data != nullptr && !path->data->id.empty()) {
         // Use the reference to PathData resource.
-        xml.addAttribute("data", path->dataRef);
-      } else if (!path->data.isEmpty()) {
+        xml.addAttribute("data", "@" + path->data->id);
+      } else if (path->data != nullptr && !path->data->isEmpty()) {
         // Inline the path data.
-        xml.addAttribute("data", PathDataToSVGString(path->data));
+        xml.addAttribute("data", PathDataToSVGString(*path->data));
       }
       xml.addAttribute("reversed", path->reversed);
       xml.closeElementSelfClosing();
@@ -472,7 +471,9 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
         xml.closeElementStart();
         for (const auto& run : text->glyphRuns) {
           xml.openElement("GlyphRun");
-          xml.addAttribute("font", run->font);
+          if (run->font != nullptr && !run->font->id.empty()) {
+            xml.addAttribute("font", "@" + run->font->id);
+          }
 
           // Write glyphs as comma-separated integers
           if (!run->glyphs.empty()) {
@@ -544,16 +545,13 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.openElement("Fill");
       // Determine color attribute value
       bool needsInlineColorSource = false;
-      if (!fill->colorRef.empty()) {
-        // Use existing colorRef (could be "#FF0000" or "@gradientId")
-        xml.addAttribute("color", fill->colorRef);
-      } else if (fill->color) {
+      if (fill->color) {
         if (!fill->color->id.empty()) {
           // Reference to resource by id
           xml.addAttribute("color", "@" + fill->color->id);
         } else if (fill->color->nodeType() == NodeType::SolidColor) {
           // SolidColor without id: output color value directly
-          auto solid = static_cast<const SolidColor*>(fill->color.get());
+          auto solid = static_cast<const SolidColor*>(fill->color);
           xml.addAttribute("color",
                            ColorToHexString(solid->color, solid->color.alpha < 1.0f));
         } else {
@@ -573,7 +571,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       }
       if (needsInlineColorSource) {
         xml.closeElementStart();
-        writeColorSource(xml, fill->color.get());
+        writeColorSource(xml, fill->color);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -585,16 +583,13 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.openElement("Stroke");
       // Determine color attribute value
       bool needsInlineColorSource = false;
-      if (!stroke->colorRef.empty()) {
-        // Use existing colorRef (could be "#FF0000" or "@gradientId")
-        xml.addAttribute("color", stroke->colorRef);
-      } else if (stroke->color) {
+      if (stroke->color) {
         if (!stroke->color->id.empty()) {
           // Reference to resource by id
           xml.addAttribute("color", "@" + stroke->color->id);
         } else if (stroke->color->nodeType() == NodeType::SolidColor) {
           // SolidColor without id: output color value directly
-          auto solid = static_cast<const SolidColor*>(stroke->color.get());
+          auto solid = static_cast<const SolidColor*>(stroke->color);
           xml.addAttribute("color",
                            ColorToHexString(solid->color, solid->color.alpha < 1.0f));
         } else {
@@ -626,7 +621,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       }
       if (needsInlineColorSource) {
         xml.closeElementStart();
-        writeColorSource(xml, stroke->color.get());
+        writeColorSource(xml, stroke->color);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -677,10 +672,14 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.addAttribute("skew", modifier->skew);
       xml.addAttribute("skewAxis", modifier->skewAxis);
       xml.addAttribute("alpha", modifier->alpha, 1.0f);
-      xml.addAttribute("fillColor", modifier->fillColor);
-      xml.addAttribute("strokeColor", modifier->strokeColor);
-      if (modifier->strokeWidth >= 0) {
-        xml.addAttribute("strokeWidth", modifier->strokeWidth);
+      if (modifier->fillColor.has_value()) {
+        xml.addAttribute("fillColor", ColorToHexString(modifier->fillColor.value()));
+      }
+      if (modifier->strokeColor.has_value()) {
+        xml.addAttribute("strokeColor", ColorToHexString(modifier->strokeColor.value()));
+      }
+      if (modifier->strokeWidth.has_value()) {
+        xml.addAttribute("strokeWidth", modifier->strokeWidth.value());
       }
       if (modifier->selectors.empty()) {
         xml.closeElementSelfClosing();
@@ -690,7 +689,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
           if (selector->nodeType() != NodeType::RangeSelector) {
             continue;
           }
-          auto rangeSelector = static_cast<const RangeSelector*>(selector.get());
+          auto rangeSelector = static_cast<const RangeSelector*>(selector);
           xml.openElement("RangeSelector");
           xml.addAttribute("start", rangeSelector->start);
           xml.addAttribute("end", rangeSelector->end, 1.0f);
@@ -718,12 +717,12 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
     case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
-      if (!textPath->path.empty()) {
+      if (textPath->path != nullptr && !textPath->path->id.empty()) {
         // Use the reference to PathData resource.
-        xml.addAttribute("path", textPath->path);
-      } else if (!textPath->data.isEmpty()) {
+        xml.addAttribute("path", "@" + textPath->path->id);
+      } else if (textPath->path != nullptr && !textPath->path->isEmpty()) {
         // Inline the path data.
-        xml.addAttribute("path", PathDataToSVGString(textPath->data));
+        xml.addAttribute("path", PathDataToSVGString(*textPath->path));
       }
       if (textPath->textAlign != TextAlign::Start) {
         xml.addAttribute("textAlign", TextAlignToString(textPath->textAlign));
@@ -800,7 +799,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       } else {
         xml.closeElementStart();
         for (const auto& element : group->elements) {
-          writeVectorElement(xml, element.get());
+          writeVectorElement(xml, element);
         }
         xml.closeElement();
       }
@@ -939,7 +938,12 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      xml.addAttribute("source", image->source);
+      if (image->data) {
+        xml.addAttribute("source", "data:image/png;base64," +
+                                       Base64Encode(reinterpret_cast<const uint8_t*>(image->data->data()), image->data->size()));
+      } else {
+        xml.addAttribute("source", image->filePath);
+      }
       xml.closeElementSelfClosing();
       break;
     }
@@ -962,7 +966,7 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
-          writeLayer(xml, layer.get());
+          writeLayer(xml, layer);
         }
         xml.closeElement();
       }
@@ -978,8 +982,23 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
         xml.closeElementStart();
         for (const auto& glyph : font->glyphs) {
           xml.openElement("Glyph");
-          xml.addAttribute("path", glyph->path);
-          xml.addAttribute("image", glyph->image);
+          xml.addAttribute("id", glyph->id);
+          if (glyph->path != nullptr && !glyph->path->id.empty()) {
+            xml.addAttribute("path", "@" + glyph->path->id);
+          } else if (glyph->path != nullptr && !glyph->path->isEmpty()) {
+            xml.addAttribute("path", PathDataToSVGString(*glyph->path));
+          }
+          if (glyph->image != nullptr) {
+            if (!glyph->image->id.empty()) {
+              xml.addAttribute("image", "@" + glyph->image->id);
+            } else if (glyph->image->data) {
+              xml.addAttribute("image", "data:image/png;base64," +
+                                            Base64Encode(glyph->image->data->bytes(),
+                                                         glyph->image->data->size()));
+            } else if (!glyph->image->filePath.empty()) {
+              xml.addAttribute("image", glyph->image->filePath);
+            }
+          }
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             xml.addAttribute("offset", pointToString(glyph->offset));
           }
@@ -1034,11 +1053,15 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
   if (node->hasScrollRect) {
     xml.addAttribute("scrollRect", rectToString(node->scrollRect));
   }
-  xml.addAttribute("mask", node->mask);
+  if (node->mask != nullptr && !node->mask->id.empty()) {
+    xml.addAttribute("mask", "@" + node->mask->id);
+  }
   if (node->maskType != MaskType::Alpha) {
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
-  xml.addAttribute("composition", node->composition);
+  if (node->composition != nullptr && !node->composition->id.empty()) {
+    xml.addAttribute("composition", "@" + node->composition->id);
+  }
 
   // Write custom data as data-* attributes.
   for (const auto& [key, value] : node->customData) {
@@ -1056,22 +1079,22 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {
-    writeVectorElement(xml, element.get());
+    writeVectorElement(xml, element);
   }
 
   // Write LayerStyle (styles) directly without container node.
   for (const auto& style : node->styles) {
-    writeLayerStyle(xml, style.get());
+    writeLayerStyle(xml, style);
   }
 
   // Write LayerFilter (filters) directly without container node.
   for (const auto& filter : node->filters) {
-    writeLayerFilter(xml, filter.get());
+    writeLayerFilter(xml, filter);
   }
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    writeLayer(xml, child.get());
+    writeLayer(xml, child);
   }
 
   xml.closeElement();
@@ -1081,7 +1104,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
 // Main Export function
 //==============================================================================
 
-std::string PAGXExporterImpl::Export(const PAGXDocument& doc) {
+std::string PAGXExporter::ToXML(const PAGXDocument& doc) {
   XMLBuilder xml = {};
   xml.appendDeclaration();
 
@@ -1093,16 +1116,18 @@ std::string PAGXExporterImpl::Export(const PAGXDocument& doc) {
 
   // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    writeLayer(xml, layer.get());
+    writeLayer(xml, layer);
   }
 
   // Write Resources section at the end (only if there are resources)
-  if (!doc.resources.empty()) {
+  if (!doc.nodes.empty()) {
     xml.openElement("Resources");
     xml.closeElementStart();
 
-    for (const auto& resource : doc.resources) {
-      writeResource(xml, resource.get());
+    for (const auto& resource : doc.nodes) {
+      if (!resource->id.empty()) {
+        writeResource(xml, resource.get());
+      }
     }
 
     xml.closeElement();

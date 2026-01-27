@@ -26,6 +26,8 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextShaper.h"
+#include "../../pagx/src/StringParser.h"
+#include "../../pagx/src/SVGPathParser.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -373,7 +375,8 @@ PAG_TEST(PAGXTest, PathDataForEach) {
  * Test case: Strong-typed PAGX node creation
  */
 PAG_TEST(PAGXTest, PAGXNodeBasic) {
-  auto rect = std::make_unique<pagx::Rectangle>();
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto rect = doc->makeNode<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 100;
@@ -384,23 +387,24 @@ PAG_TEST(PAGXTest, PAGXNodeBasic) {
   EXPECT_FLOAT_EQ(rect->center.x, 50);
   EXPECT_FLOAT_EQ(rect->size.width, 100);
 
-  auto path = std::make_unique<pagx::Path>();
-  path->data.moveTo(0, 0);
-  path->data.lineTo(100, 100);
+  auto path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  path->data->moveTo(0, 0);
+  path->data->lineTo(100, 100);
   EXPECT_EQ(path->nodeType(), pagx::NodeType::Path);
-  EXPECT_GT(path->data.verbs().size(), 0u);
+  EXPECT_GT(path->data->verbs().size(), 0u);
 
-  auto fill = std::make_unique<pagx::Fill>();
-  auto solidColor = std::make_unique<pagx::SolidColor>();
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solidColor = doc->makeNode<pagx::SolidColor>();
   solidColor->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  fill->color = std::move(solidColor);
+  fill->color = solidColor;
   fill->alpha = 0.8f;
   EXPECT_EQ(fill->nodeType(), pagx::NodeType::Fill);
   EXPECT_NE(fill->color, nullptr);
 
-  auto group = std::make_unique<pagx::Group>();
-  group->elements.push_back(std::move(rect));
-  group->elements.push_back(std::move(fill));
+  auto group = doc->makeNode<pagx::Group>();
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
   EXPECT_EQ(group->nodeType(), pagx::NodeType::Group);
   EXPECT_EQ(group->elements.size(), 2u);
 }
@@ -414,28 +418,28 @@ PAG_TEST(PAGXTest, PAGXDocumentXMLExport) {
   EXPECT_EQ(doc->width, 400.0f);
   EXPECT_EQ(doc->height, 300.0f);
 
-  auto layer = std::make_unique<pagx::Layer>();
+  auto layer = doc->makeNode<pagx::Layer>();
   layer->id = "layer1";
   layer->name = "Test Layer";
 
-  auto group = std::make_unique<pagx::Group>();
+  auto group = doc->makeNode<pagx::Group>();
 
-  auto rect = std::make_unique<pagx::Rectangle>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 80;
   rect->size.height = 60;
 
-  auto fill = std::make_unique<pagx::Fill>();
-  auto solidColor = std::make_unique<pagx::SolidColor>();
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solidColor = doc->makeNode<pagx::SolidColor>();
   solidColor->color = {0.0f, 0.0f, 1.0f, 1.0f};
-  fill->color = std::move(solidColor);
+  fill->color = solidColor;
 
-  group->elements.push_back(std::move(rect));
-  group->elements.push_back(std::move(fill));
-  layer->contents.push_back(std::move(group));
+  group->elements.push_back(rect);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
 
-  doc->layers.push_back(std::move(layer));
+  doc->layers.push_back(layer);
 
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_FALSE(xml.empty());
@@ -453,23 +457,23 @@ PAG_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   auto doc1 = pagx::PAGXDocument::Make(200, 150);
   ASSERT_TRUE(doc1 != nullptr);
 
-  auto layer = std::make_unique<pagx::Layer>();
+  auto layer = doc1->makeNode<pagx::Layer>();
   layer->name = "TestLayer";
 
-  auto rect = std::make_unique<pagx::Rectangle>();
+  auto rect = doc1->makeNode<pagx::Rectangle>();
   rect->center.x = 50;
   rect->center.y = 50;
   rect->size.width = 80;
   rect->size.height = 60;
 
-  auto fill = std::make_unique<pagx::Fill>();
-  auto solidColor = std::make_unique<pagx::SolidColor>();
+  auto fill = doc1->makeNode<pagx::Fill>();
+  auto solidColor = doc1->makeNode<pagx::SolidColor>();
   solidColor->color = {0.0f, 1.0f, 0.0f, 1.0f};
-  fill->color = std::move(solidColor);
+  fill->color = solidColor;
 
-  layer->contents.push_back(std::move(rect));
-  layer->contents.push_back(std::move(fill));
-  doc1->layers.push_back(std::move(layer));
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc1->layers.push_back(layer);
 
   std::string xml = pagx::PAGXExporter::ToXML(*doc1);
   EXPECT_FALSE(xml.empty());
@@ -532,12 +536,13 @@ PAG_TEST(PAGXTest, PAGXTypesBasic) {
  * Test case: Color source nodes
  */
 PAG_TEST(PAGXTest, ColorSources) {
-  auto solid = std::make_unique<pagx::SolidColor>();
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto solid = doc->makeNode<pagx::SolidColor>();
   solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
   EXPECT_EQ(solid->nodeType(), pagx::NodeType::SolidColor);
   EXPECT_FLOAT_EQ(solid->color.red, 1.0f);
 
-  auto linear = std::make_unique<pagx::LinearGradient>();
+  auto linear = doc->makeNode<pagx::LinearGradient>();
   linear->startPoint.x = 0;
   linear->startPoint.y = 0;
   linear->endPoint.x = 100;
@@ -557,7 +562,7 @@ PAG_TEST(PAGXTest, ColorSources) {
   EXPECT_EQ(linear->nodeType(), pagx::NodeType::LinearGradient);
   EXPECT_EQ(linear->colorStops.size(), 2u);
 
-  auto radial = std::make_unique<pagx::RadialGradient>();
+  auto radial = doc->makeNode<pagx::RadialGradient>();
   radial->center.x = 50;
   radial->center.y = 50;
   radial->radius = 50;
@@ -570,23 +575,24 @@ PAG_TEST(PAGXTest, ColorSources) {
  * Test case: Layer node with styles and filters
  */
 PAG_TEST(PAGXTest, LayerStylesFilters) {
-  auto layer = std::make_unique<pagx::Layer>();
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto layer = doc->makeNode<pagx::Layer>();
   layer->name = "StyledLayer";
   layer->alpha = 0.8f;
   layer->blendMode = pagx::BlendMode::Multiply;
 
-  auto dropShadow = std::make_unique<pagx::DropShadowStyle>();
+  auto dropShadow = doc->makeNode<pagx::DropShadowStyle>();
   dropShadow->offsetX = 5;
   dropShadow->offsetY = 5;
   dropShadow->blurrinessX = 10;
   dropShadow->blurrinessY = 10;
   dropShadow->color = {0.0f, 0.0f, 0.0f, 0.5f};
-  layer->styles.push_back(std::move(dropShadow));
+  layer->styles.push_back(dropShadow);
 
-  auto blur = std::make_unique<pagx::BlurFilter>();
+  auto blur = doc->makeNode<pagx::BlurFilter>();
   blur->blurrinessX = 5;
   blur->blurrinessY = 5;
-  layer->filters.push_back(std::move(blur));
+  layer->filters.push_back(blur);
 
   EXPECT_EQ(layer->styles.size(), 1u);
   EXPECT_EQ(layer->filters.size(), 1u);
@@ -598,36 +604,41 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
  * Test case: Font and Glyph node creation
  */
 PAG_TEST(PAGXTest, FontGlyphNodes) {
-  auto font = std::make_unique<pagx::Font>();
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto font = doc->makeNode<pagx::Font>();
   font->id = "testFont";
 
-  auto glyph1 = std::make_unique<pagx::Glyph>();
-  glyph1->path = "M0 0 L100 0 L100 100 L0 100 Z";
+  auto glyph1 = doc->makeNode<pagx::Glyph>();
+  glyph1->path = doc->makeNode<pagx::PathData>();
+  *glyph1->path = pagx::PathDataFromSVGString("M0 0 L100 0 L100 100 L0 100 Z");
 
-  auto glyph2 = std::make_unique<pagx::Glyph>();
-  glyph2->path = "M50 0 L100 100 L0 100 Z";
+  auto glyph2 = doc->makeNode<pagx::Glyph>();
+  glyph2->path = doc->makeNode<pagx::PathData>();
+  *glyph2->path = pagx::PathDataFromSVGString("M50 0 L100 100 L0 100 Z");
 
-  font->glyphs.push_back(std::move(glyph1));
-  font->glyphs.push_back(std::move(glyph2));
+  font->glyphs.push_back(glyph1);
+  font->glyphs.push_back(glyph2);
 
   EXPECT_EQ(font->nodeType(), pagx::NodeType::Font);
   EXPECT_EQ(font->glyphs.size(), 2u);
   EXPECT_EQ(font->glyphs[0]->nodeType(), pagx::NodeType::Glyph);
-  EXPECT_FALSE(font->glyphs[0]->path.empty());
+  EXPECT_NE(font->glyphs[0]->path, nullptr);
 }
 
 /**
  * Test case: GlyphRun node with horizontal positioning
  */
 PAG_TEST(PAGXTest, GlyphRunHorizontal) {
-  auto glyphRun = std::make_unique<pagx::GlyphRun>();
-  glyphRun->font = "@testFont";
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto font = doc->makeNode<pagx::Font>("testFont");
+  auto glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->font = font;
   glyphRun->glyphs = {1, 2, 1};
   glyphRun->y = 50;
   glyphRun->xPositions = {10, 60, 110};
 
   EXPECT_EQ(glyphRun->nodeType(), pagx::NodeType::GlyphRun);
-  EXPECT_EQ(glyphRun->font, "@testFont");
+  EXPECT_EQ(glyphRun->font, font);
   EXPECT_EQ(glyphRun->glyphs.size(), 3u);
   EXPECT_EQ(glyphRun->xPositions.size(), 3u);
   EXPECT_FLOAT_EQ(glyphRun->y, 50.0f);
@@ -637,8 +648,10 @@ PAG_TEST(PAGXTest, GlyphRunHorizontal) {
  * Test case: GlyphRun node with point positions
  */
 PAG_TEST(PAGXTest, GlyphRunPointPositions) {
-  auto glyphRun = std::make_unique<pagx::GlyphRun>();
-  glyphRun->font = "@testFont";
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto font = doc->makeNode<pagx::Font>("testFont");
+  auto glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->font = font;
   glyphRun->glyphs = {1, 2};
   glyphRun->positions = {{10, 20}, {60, 80}};
 
@@ -652,8 +665,10 @@ PAG_TEST(PAGXTest, GlyphRunPointPositions) {
  * Test case: GlyphRun node with RSXform positioning
  */
 PAG_TEST(PAGXTest, GlyphRunRSXform) {
-  auto glyphRun = std::make_unique<pagx::GlyphRun>();
-  glyphRun->font = "@testFont";
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto font = doc->makeNode<pagx::Font>("testFont");
+  auto glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->font = font;
   glyphRun->glyphs = {1, 2};
 
   pagx::RSXform xform1 = {1, 0, 10, 20};
@@ -670,15 +685,17 @@ PAG_TEST(PAGXTest, GlyphRunRSXform) {
  * Test case: Text node with precomposed GlyphRuns
  */
 PAG_TEST(PAGXTest, TextPrecomposed) {
-  auto text = std::make_unique<pagx::Text>();
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto text = doc->makeNode<pagx::Text>();
   text->fontSize = 24;
 
-  auto glyphRun = std::make_unique<pagx::GlyphRun>();
-  glyphRun->font = "@font1";
+  auto font = doc->makeNode<pagx::Font>("font1");
+  auto glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->font = font;
   glyphRun->glyphs = {1, 2, 3};
   glyphRun->y = 24;
   glyphRun->xPositions = {0, 24, 48};
-  text->glyphRuns.push_back(std::move(glyphRun));
+  text->glyphRuns.push_back(glyphRun);
 
   EXPECT_EQ(text->nodeType(), pagx::NodeType::Text);
   EXPECT_EQ(text->glyphRuns.size(), 1u);
@@ -754,11 +771,17 @@ PAG_TEST(PAGXTest, PrecomposedTextRender) {
   // First verify the XML parsing
   auto doc = pagx::PAGXImporter::FromXML(pagxXml);
   ASSERT_TRUE(doc != nullptr);
-  ASSERT_FALSE(doc->resources.empty());
-  EXPECT_EQ(doc->resources.size(), 1u);
-  EXPECT_EQ(doc->resources[0]->nodeType(), pagx::NodeType::Font);
-  auto fontNode = static_cast<const pagx::Font*>(doc->resources[0].get());
-  EXPECT_EQ(fontNode->id, "pathFont");
+  ASSERT_FALSE(doc->nodes.empty());
+  
+  // Find the Font resource
+  pagx::Font* fontNode = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font && node->id == "pathFont") {
+      fontNode = static_cast<pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_TRUE(fontNode != nullptr);
   EXPECT_EQ(fontNode->glyphs.size(), 2u);
 
   auto device = DevicePool::Make();
@@ -871,41 +894,41 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(200, 100);
   ASSERT_TRUE(doc != nullptr);
 
-  auto font = std::make_unique<pagx::Font>();
+  auto font = doc->makeNode<pagx::Font>();
   font->id = "roundTripFont";
 
-  auto glyph1 = std::make_unique<pagx::Glyph>();
-  glyph1->path = "M0 0 L40 0 L40 50 L0 50 Z";
-  font->glyphs.push_back(std::move(glyph1));
+  auto glyph1 = doc->makeNode<pagx::Glyph>();
+  glyph1->path = doc->makeNode<pagx::PathData>();
+  *glyph1->path = pagx::PathDataFromSVGString("M0 0 L40 0 L40 50 L0 50 Z");
+  font->glyphs.push_back(glyph1);
 
-  auto glyph2 = std::make_unique<pagx::Glyph>();
-  glyph2->path = "M20 0 L40 50 L0 50 Z";
-  font->glyphs.push_back(std::move(glyph2));
+  auto glyph2 = doc->makeNode<pagx::Glyph>();
+  glyph2->path = doc->makeNode<pagx::PathData>();
+  *glyph2->path = pagx::PathDataFromSVGString("M20 0 L40 50 L0 50 Z");
+  font->glyphs.push_back(glyph2);
 
-  doc->resources.push_back(std::move(font));
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto group = doc->makeNode<pagx::Group>();
 
-  auto layer = std::make_unique<pagx::Layer>();
-  auto group = std::make_unique<pagx::Group>();
-
-  auto text = std::make_unique<pagx::Text>();
+  auto text = doc->makeNode<pagx::Text>();
   text->fontSize = 50;
 
-  auto glyphRun = std::make_unique<pagx::GlyphRun>();
-  glyphRun->font = "@roundTripFont";
+  auto glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->font = font;
   glyphRun->glyphs = {1, 2};
   glyphRun->y = 60;
   glyphRun->xPositions = {10, 60};
-  text->glyphRuns.push_back(std::move(glyphRun));
+  text->glyphRuns.push_back(glyphRun);
 
-  auto fill = std::make_unique<pagx::Fill>();
-  auto solidColor = std::make_unique<pagx::SolidColor>();
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solidColor = doc->makeNode<pagx::SolidColor>();
   solidColor->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  fill->color = std::move(solidColor);
+  fill->color = solidColor;
 
-  group->elements.push_back(std::move(text));
-  group->elements.push_back(std::move(fill));
-  layer->contents.push_back(std::move(group));
-  doc->layers.push_back(std::move(layer));
+  group->elements.push_back(text);
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+  doc->layers.push_back(layer);
 
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   EXPECT_FALSE(xml.empty());
@@ -915,7 +938,7 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
 
   auto doc2 = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc2 != nullptr);
-  EXPECT_GE(doc2->resources.size(), 1u);
+  EXPECT_GE(doc2->nodes.size(), 1u);
   EXPECT_GE(doc2->layers.size(), 1u);
 
   SavePAGXFile(xml, "PAGXTest/font_glyph_roundtrip.pagx");
@@ -971,7 +994,7 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
 
   // Verify Font resources were added
   bool hasFontResource = false;
-  for (const auto& res : doc->resources) {
+  for (const auto& res : doc->nodes) {
     if (res->nodeType() == pagx::NodeType::Font) {
       hasFontResource = true;
       auto fontNode = static_cast<const pagx::Font*>(res.get());
@@ -995,7 +1018,7 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
 
   // Verify Font resource was imported
   bool fontFound = false;
-  for (const auto& res : reloadedDoc->resources) {
+  for (const auto& res : reloadedDoc->nodes) {
     if (res->nodeType() == pagx::NodeType::Font) {
       auto fontNode = static_cast<const pagx::Font*>(res.get());
       EXPECT_FALSE(fontNode->id.empty());
@@ -1010,10 +1033,10 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   for (const auto& layer : reloadedDoc->layers) {
     for (const auto& content : layer->contents) {
       if (content->nodeType() == pagx::NodeType::Group) {
-        auto group = static_cast<const pagx::Group*>(content.get());
+        auto group = static_cast<const pagx::Group*>(content);
         for (const auto& elem : group->elements) {
           if (elem->nodeType() == pagx::NodeType::Text) {
-            auto text = static_cast<const pagx::Text*>(elem.get());
+            auto text = static_cast<const pagx::Text*>(elem);
             if (!text->glyphRuns.empty()) {
               glyphRunFound = true;
             }
