@@ -25,6 +25,9 @@
 #if TARGET_OS_IPHONE
 #include <OpenGLES/ES3/gl.h>
 #else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
 #include <OpenGL/gl3.h>
 #endif
 #elif defined(_WIN32)
