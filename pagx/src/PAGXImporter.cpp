@@ -61,7 +61,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/nodes/Color.h"
+#include "pagx/types/Color.h"
 
 namespace pagx {
 

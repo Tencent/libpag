@@ -19,8 +19,8 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
-#include "pagx/nodes/Point.h"
-#include "pagx/nodes/TextAlign.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/TextAlign.h"
 
 namespace pagx {
 

@@ -23,8 +23,8 @@
 #include <vector>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/LayerPlacement.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/LayerPlacement.h"
 
 namespace pagx {
 

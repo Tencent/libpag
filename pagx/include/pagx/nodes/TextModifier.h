@@ -23,8 +23,8 @@
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/TextSelector.h"
-#include "pagx/nodes/Point.h"
-#include "pagx/nodes/Color.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/Color.h"
 
 namespace pagx {
 

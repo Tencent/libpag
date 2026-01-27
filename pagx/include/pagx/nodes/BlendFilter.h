@@ -19,8 +19,8 @@
 #pragma once
 
 #include "pagx/nodes/LayerFilter.h"
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/Color.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/Color.h"
 
 namespace pagx {
 

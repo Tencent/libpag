@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/Rect.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 

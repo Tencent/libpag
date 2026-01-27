@@ -20,7 +20,7 @@
 
 #include <vector>
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/Point.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 

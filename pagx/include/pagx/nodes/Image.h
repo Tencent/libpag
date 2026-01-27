@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <string>
-#include "pagx/nodes/Data.h"
+#include "pagx/types/Data.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {

@@ -26,9 +26,9 @@
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/Matrix.h"
-#include "pagx/nodes/Rect.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/Matrix.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 

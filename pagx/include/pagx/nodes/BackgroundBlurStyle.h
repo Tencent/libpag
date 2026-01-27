@@ -19,7 +19,7 @@
 #pragma once
 
 #include "pagx/nodes/LayerStyle.h"
-#include "pagx/nodes/TileMode.h"
+#include "pagx/types/TileMode.h"
 
 namespace pagx {
 

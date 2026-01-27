@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/ColorSpace.h"
+#include "pagx/types/ColorSpace.h"
 
 namespace pagx {
 
