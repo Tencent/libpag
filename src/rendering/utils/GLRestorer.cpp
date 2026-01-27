@@ -18,6 +18,8 @@
 
 #include "GLRestorer.h"
 
+#ifndef PAG_BUILD_FOR_WEB
+
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #if TARGET_OS_IPHONE
@@ -25,154 +27,83 @@
 #else
 #include <OpenGL/gl3.h>
 #endif
-#elif defined(__ANDROID__) || defined(ANDROID)
-#include <GLES3/gl3.h>
 #elif defined(_WIN32)
 #include <windows.h>
 #include <GL/gl.h>
-#elif defined(__OHOS__)
+#elif defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 #include <GLES3/gl3.h>
 #else
-#include <GL/gl.h>
+#include <GLES3/gl3.h>
 #endif
 
-// Some platforms may not define these constants
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef _WIN32
+// Windows GL/gl.h only provides OpenGL 1.1, need to define missing constants
 #define GL_VERTEX_ARRAY_BINDING 0x85B5
-#endif
-
-#ifndef GL_BLEND_EQUATION
-#define GL_BLEND_EQUATION 0x8009
-#endif
-
-#ifndef GL_BLEND_EQUATION_RGB
 #define GL_BLEND_EQUATION_RGB 0x8009
-#endif
-
-#ifndef GL_BLEND_EQUATION_ALPHA
 #define GL_BLEND_EQUATION_ALPHA 0x883D
-#endif
-
-#ifndef GL_BLEND_SRC_RGB
 #define GL_BLEND_SRC_RGB 0x80C9
-#endif
-
-#ifndef GL_BLEND_DST_RGB
 #define GL_BLEND_DST_RGB 0x80C8
-#endif
-
-#ifndef GL_BLEND_SRC_ALPHA
 #define GL_BLEND_SRC_ALPHA 0x80CB
-#endif
-
-#ifndef GL_BLEND_DST_ALPHA
 #define GL_BLEND_DST_ALPHA 0x80CA
-#endif
-
-#ifndef GL_FRAMEBUFFER
 #define GL_FRAMEBUFFER 0x8D40
-#endif
-
-#ifndef GL_FRAMEBUFFER_BINDING
 #define GL_FRAMEBUFFER_BINDING 0x8CA6
-#endif
-
-#ifndef GL_CURRENT_PROGRAM
 #define GL_CURRENT_PROGRAM 0x8B8D
-#endif
-
-#ifndef GL_ACTIVE_TEXTURE
 #define GL_ACTIVE_TEXTURE 0x84E0
-#endif
-
-#ifndef GL_ARRAY_BUFFER
 #define GL_ARRAY_BUFFER 0x8892
-#endif
-
-#ifndef GL_ELEMENT_ARRAY_BUFFER
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
-#endif
-
-#ifndef GL_ARRAY_BUFFER_BINDING
 #define GL_ARRAY_BUFFER_BINDING 0x8894
-#endif
-
-#ifndef GL_ELEMENT_ARRAY_BUFFER_BINDING
 #define GL_ELEMENT_ARRAY_BUFFER_BINDING 0x8895
+
+typedef void(APIENTRY* BINDVERTEXARRAY)(GLuint array);
+typedef void(APIENTRY* BINDFRAMEBUFFER)(GLenum target, GLuint framebuffer);
+typedef void(APIENTRY* BINDBUFFER)(GLenum target, GLuint buffer);
+typedef void(APIENTRY* USEPROGRAM)(GLuint program);
+typedef void(APIENTRY* ACTIVETEXTURE)(GLenum texture);
+typedef void(APIENTRY* BLENDEQUATIONSEPARATE)(GLenum modeRGB, GLenum modeAlpha);
+typedef void(APIENTRY* BLENDFUNCSEPARATE)(GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha,
+                                          GLenum dstAlpha);
+
+static BINDVERTEXARRAY bindVertexArray = nullptr;
+static BINDFRAMEBUFFER bindFramebuffer = nullptr;
+static BINDBUFFER bindBuffer = nullptr;
+static USEPROGRAM useProgram = nullptr;
+static ACTIVETEXTURE activeTextureFunc = nullptr;
+static BLENDEQUATIONSEPARATE blendEquationSeparate = nullptr;
+static BLENDFUNCSEPARATE blendFuncSeparate = nullptr;
+
+static void LoadGLFunctions() {
+  static bool loaded = false;
+  if (loaded) {
+    return;
+  }
+  loaded = true;
+  bindVertexArray = (BINDVERTEXARRAY)wglGetProcAddress("glBindVertexArray");
+  bindFramebuffer = (BINDFRAMEBUFFER)wglGetProcAddress("glBindFramebuffer");
+  bindBuffer = (BINDBUFFER)wglGetProcAddress("glBindBuffer");
+  useProgram = (USEPROGRAM)wglGetProcAddress("glUseProgram");
+  activeTextureFunc = (ACTIVETEXTURE)wglGetProcAddress("glActiveTexture");
+  blendEquationSeparate = (BLENDEQUATIONSEPARATE)wglGetProcAddress("glBlendEquationSeparate");
+  blendFuncSeparate = (BLENDFUNCSEPARATE)wglGetProcAddress("glBlendFuncSeparate");
+}
 #endif
 
 namespace pag {
 
 static void ClearGLError() {
   while (glGetError() != GL_NO_ERROR) {
-    // Silently clear any existing GL errors
   }
 }
-
-// Platform-specific VAO function declarations
-#if defined(__APPLE__)
-#if TARGET_OS_IPHONE
-#define HAS_VAO 1
-#else
-#define HAS_VAO 1
-#endif
-#elif defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-#define HAS_VAO 1
-#elif defined(_WIN32)
-// Windows needs function pointer loading for GL extensions
-typedef void(APIENTRY* PFNGLBINDVERTEXARRAYPROC)(GLuint array);
-typedef void(APIENTRY* PFNGLUSEPROGRAMPROC)(GLuint program);
-typedef void(APIENTRY* PFNGLBINDFRAMEBUFFERPROC)(GLenum target, GLuint framebuffer);
-typedef void(APIENTRY* PFNGLACTIVETEXTUREPROC)(GLenum texture);
-typedef void(APIENTRY* PFNGLBINDBUFFERPROC)(GLenum target, GLuint buffer);
-typedef void(APIENTRY* PFNGLBLENDEQUATIONPROC)(GLenum mode);
-typedef void(APIENTRY* PFNGLBLENDEQUATIONSEPARATEPROC)(GLenum modeRGB, GLenum modeAlpha);
-typedef void(APIENTRY* PFNGLBLENDFUNCSEPARATEPROC)(GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha,
-                                                   GLenum dstAlpha);
-
-static PFNGLBINDVERTEXARRAYPROC glBindVertexArrayFunc = nullptr;
-static PFNGLUSEPROGRAMPROC glUseProgramFunc = nullptr;
-static PFNGLBINDFRAMEBUFFERPROC glBindFramebufferFunc = nullptr;
-static PFNGLACTIVETEXTUREPROC glActiveTextureFunc = nullptr;
-static PFNGLBINDBUFFERPROC glBindBufferFunc = nullptr;
-static PFNGLBLENDEQUATIONPROC glBlendEquationFunc = nullptr;
-static PFNGLBLENDEQUATIONSEPARATEPROC glBlendEquationSeparateFunc = nullptr;
-static PFNGLBLENDFUNCSEPARATEPROC glBlendFuncSeparateFunc = nullptr;
-static bool glFunctionsLoaded = false;
-
-static void LoadGLFunctions() {
-  if (glFunctionsLoaded) {
-    return;
-  }
-  glBindVertexArrayFunc = (PFNGLBINDVERTEXARRAYPROC)wglGetProcAddress("glBindVertexArray");
-  glUseProgramFunc = (PFNGLUSEPROGRAMPROC)wglGetProcAddress("glUseProgram");
-  glBindFramebufferFunc = (PFNGLBINDFRAMEBUFFERPROC)wglGetProcAddress("glBindFramebuffer");
-  glActiveTextureFunc = (PFNGLACTIVETEXTUREPROC)wglGetProcAddress("glActiveTexture");
-  glBindBufferFunc = (PFNGLBINDBUFFERPROC)wglGetProcAddress("glBindBuffer");
-  glBlendEquationFunc = (PFNGLBLENDEQUATIONPROC)wglGetProcAddress("glBlendEquation");
-  glBlendEquationSeparateFunc =
-      (PFNGLBLENDEQUATIONSEPARATEPROC)wglGetProcAddress("glBlendEquationSeparate");
-  glBlendFuncSeparateFunc = (PFNGLBLENDFUNCSEPARATEPROC)wglGetProcAddress("glBlendFuncSeparate");
-  glFunctionsLoaded = true;
-}
-#define HAS_VAO 0
-#else
-#define HAS_VAO 1
-#endif
 
 void GLRestorer::save() {
-  // Clear any existing GL errors to prevent external errors from affecting our logic
   ClearGLError();
 
-#if defined(_WIN32)
+#ifdef _WIN32
   LoadGLFunctions();
 #endif
 
   glGetIntegerv(GL_VIEWPORT, viewport);
+  glGetIntegerv(GL_SCISSOR_BOX, scissorBox);
   scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
-  if (scissorEnabled) {
-    glGetIntegerv(GL_SCISSOR_BOX, scissorBox);
-  }
   glGetIntegerv(GL_CURRENT_PROGRAM, &program);
   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &frameBuffer);
   glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
@@ -180,56 +111,36 @@ void GLRestorer::save() {
   glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
   glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementArrayBuffer);
 
-  // VAO support check and handling
-#if HAS_VAO
-  hasVertexArray = true;
-  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
-#elif defined(_WIN32)
-  if (glBindVertexArrayFunc != nullptr) {
-    hasVertexArray = true;
+#ifdef _WIN32
+  if (bindVertexArray != nullptr) {
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
+    bindVertexArray(0);
   }
-#endif
-
-  // Unbind buffers before PAG rendering
-#if defined(_WIN32)
-  if (glBindBufferFunc != nullptr) {
-    glBindBufferFunc(GL_ARRAY_BUFFER, 0);
-    glBindBufferFunc(GL_ELEMENT_ARRAY_BUFFER, 0);
+  if (bindBuffer != nullptr) {
+    bindBuffer(GL_ARRAY_BUFFER, 0);
+    bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   }
 #else
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
+  glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 #endif
 
   blendEnabled = glIsEnabled(GL_BLEND);
   if (blendEnabled) {
-    glGetIntegerv(GL_BLEND_EQUATION, &blendEquation);
-    glGetIntegerv(GL_BLEND_EQUATION_RGB, &equationRGB);
-    glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &equationAlpha);
+    glGetIntegerv(GL_BLEND_EQUATION_RGB, &blendEquationRGB);
+    glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &blendEquationAlpha);
     glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrcRGB);
     glGetIntegerv(GL_BLEND_DST_RGB, &blendDstRGB);
     glGetIntegerv(GL_BLEND_SRC_ALPHA, &blendSrcAlpha);
     glGetIntegerv(GL_BLEND_DST_ALPHA, &blendDstAlpha);
   }
-
-  // Unbind VAO before PAG rendering
-  if (hasVertexArray && vertexArray > 0) {
-#if HAS_VAO
-    glBindVertexArray(0);
-#elif defined(_WIN32)
-    if (glBindVertexArrayFunc != nullptr) {
-      glBindVertexArrayFunc(0);
-    }
-#endif
-  }
 }
 
 void GLRestorer::restore() {
-  // Restore viewport
   glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
-  // Restore scissor state
   if (scissorEnabled) {
     glEnable(GL_SCISSOR_TEST);
     glScissor(scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
@@ -237,85 +148,58 @@ void GLRestorer::restore() {
     glDisable(GL_SCISSOR_TEST);
   }
 
-  // Restore program
-#if defined(_WIN32)
-  if (glUseProgramFunc != nullptr) {
-    glUseProgramFunc(static_cast<unsigned>(program));
+#ifdef _WIN32
+  if (useProgram != nullptr) {
+    useProgram(program);
   }
-#else
-  glUseProgram(static_cast<unsigned>(program));
-#endif
-
-  // Restore framebuffer
-#if defined(_WIN32)
-  if (glBindFramebufferFunc != nullptr) {
-    glBindFramebufferFunc(GL_FRAMEBUFFER, static_cast<unsigned>(frameBuffer));
+  if (bindFramebuffer != nullptr) {
+    bindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
   }
-#else
-  glBindFramebuffer(GL_FRAMEBUFFER, static_cast<unsigned>(frameBuffer));
-#endif
-
-  // Restore texture
-#if defined(_WIN32)
-  if (glActiveTextureFunc != nullptr) {
-    glActiveTextureFunc(static_cast<unsigned>(activeTexture));
+  if (activeTextureFunc != nullptr) {
+    activeTextureFunc(activeTexture);
   }
-#else
-  glActiveTexture(static_cast<unsigned>(activeTexture));
-#endif
-  glBindTexture(GL_TEXTURE_2D, static_cast<unsigned>(textureID));
-
-  // Restore VAO
-  if (hasVertexArray && vertexArray > 0) {
-#if HAS_VAO
-    glBindVertexArray(static_cast<unsigned>(vertexArray));
-#elif defined(_WIN32)
-    if (glBindVertexArrayFunc != nullptr) {
-      glBindVertexArrayFunc(static_cast<unsigned>(vertexArray));
-    }
-#endif
+  glBindTexture(GL_TEXTURE_2D, textureID);
+  if (bindVertexArray != nullptr && vertexArray > 0) {
+    bindVertexArray(vertexArray);
   }
-
-  // Restore buffers
-#if defined(_WIN32)
-  if (glBindBufferFunc != nullptr) {
-    glBindBufferFunc(GL_ARRAY_BUFFER, static_cast<unsigned>(arrayBuffer));
-    glBindBufferFunc(GL_ELEMENT_ARRAY_BUFFER, static_cast<unsigned>(elementArrayBuffer));
+  if (bindBuffer != nullptr) {
+    bindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+    bindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementArrayBuffer);
   }
-#else
-  glBindBuffer(GL_ARRAY_BUFFER, static_cast<unsigned>(arrayBuffer));
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<unsigned>(elementArrayBuffer));
-#endif
-
-  // Restore blend state
   if (blendEnabled) {
     glEnable(GL_BLEND);
-#if defined(_WIN32)
-    if (glBlendEquationFunc != nullptr) {
-      glBlendEquationFunc(static_cast<unsigned>(blendEquation));
+    if (blendEquationSeparate != nullptr) {
+      blendEquationSeparate(blendEquationRGB, blendEquationAlpha);
     }
-    if (glBlendEquationSeparateFunc != nullptr) {
-      glBlendEquationSeparateFunc(static_cast<unsigned>(equationRGB),
-                                  static_cast<unsigned>(equationAlpha));
+    if (blendFuncSeparate != nullptr) {
+      blendFuncSeparate(blendSrcRGB, blendDstRGB, blendSrcAlpha, blendDstAlpha);
     }
-    if (glBlendFuncSeparateFunc != nullptr) {
-      glBlendFuncSeparateFunc(static_cast<unsigned>(blendSrcRGB), static_cast<unsigned>(blendDstRGB),
-                              static_cast<unsigned>(blendSrcAlpha),
-                              static_cast<unsigned>(blendDstAlpha));
-    }
-#else
-    glBlendEquation(static_cast<unsigned>(blendEquation));
-    glBlendEquationSeparate(static_cast<unsigned>(equationRGB),
-                            static_cast<unsigned>(equationAlpha));
-    glBlendFuncSeparate(static_cast<unsigned>(blendSrcRGB), static_cast<unsigned>(blendDstRGB),
-                        static_cast<unsigned>(blendSrcAlpha), static_cast<unsigned>(blendDstAlpha));
-#endif
   } else {
     glDisable(GL_BLEND);
   }
+#else
+  glUseProgram(program);
+  glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+  glActiveTexture(activeTexture);
+  glBindTexture(GL_TEXTURE_2D, textureID);
+  if (vertexArray > 0) {
+    glBindVertexArray(vertexArray);
+  }
+  glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementArrayBuffer);
 
-  // Clear any GL errors produced by PAG to prevent affecting external rendering
+  if (blendEnabled) {
+    glEnable(GL_BLEND);
+    glBlendEquationSeparate(blendEquationRGB, blendEquationAlpha);
+    glBlendFuncSeparate(blendSrcRGB, blendDstRGB, blendSrcAlpha, blendDstAlpha);
+  } else {
+    glDisable(GL_BLEND);
+  }
+#endif
+
   ClearGLError();
 }
 
 }  // namespace pag
+
+#endif  // PAG_BUILD_FOR_WEB

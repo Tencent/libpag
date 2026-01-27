@@ -40,7 +40,9 @@ PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
 }
 
 PAGSurface::~PAGSurface() {
-  delete glRestorer;
+#ifndef PAG_BUILD_FOR_WEB
+  delete static_cast<GLRestorer*>(glRestorer);
+#endif
 }
 
 int PAGSurface::width() {
@@ -297,16 +299,20 @@ tgfx::Context* PAGSurface::lockContext() {
     return nullptr;
   }
   auto context = device->lockContext();
+#ifndef PAG_BUILD_FOR_WEB
   if (context != nullptr && glRestorer != nullptr) {
-    glRestorer->save();
+    static_cast<GLRestorer*>(glRestorer)->save();
   }
+#endif
   return context;
 }
 
 void PAGSurface::unlockContext() {
+#ifndef PAG_BUILD_FOR_WEB
   if (glRestorer != nullptr) {
-    glRestorer->restore();
+    static_cast<GLRestorer*>(glRestorer)->restore();
   }
+#endif
   auto device = drawable->getDevice();
   if (device != nullptr) {
     device->unlock();

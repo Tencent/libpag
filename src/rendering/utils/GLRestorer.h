@@ -18,6 +18,8 @@
 
 #pragma once
 
+#ifndef PAG_BUILD_FOR_WEB
+
 namespace pag {
 
 /**
@@ -38,21 +40,18 @@ class GLRestorer {
 
  private:
   int viewport[4] = {};
-  unsigned char scissorEnabled = 0;
   int scissorBox[4] = {};
-  int frameBuffer = 0;
+  unsigned char scissorEnabled = 0;
+  unsigned char blendEnabled = 0;
   int program = 0;
+  int frameBuffer = 0;
   int activeTexture = 0;
   int textureID = 0;
   int arrayBuffer = 0;
   int elementArrayBuffer = 0;
   int vertexArray = 0;
-  bool hasVertexArray = false;
-
-  unsigned char blendEnabled = 0;
-  int blendEquation = 0;
-  int equationRGB = 0;
-  int equationAlpha = 0;
+  int blendEquationRGB = 0;
+  int blendEquationAlpha = 0;
   int blendSrcRGB = 0;
   int blendDstRGB = 0;
   int blendSrcAlpha = 0;
@@ -60,3 +59,5 @@ class GLRestorer {
 };
 
 }  // namespace pag
+
+#endif  // PAG_BUILD_FOR_WEB
