@@ -2046,10 +2046,16 @@ Layer / Group
     <PathData id="wavePath" data="M 0 50 Q 50 0 100 50 T 200 50 T 300 50"/>
     <PathData id="arcPath" data="M 0 100 Q 150 0 300 100"/>
     
-    <!-- 嵌入字体和字形 -->
+    <!-- 嵌入矢量字体 -->
     <Font id="customFont">
       <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
       <Glyph path="M 50 0 L 50 700 L 300 700"/>
+    </Font>
+    
+    <!-- 嵌入位图字体（Emoji） -->
+    <Font id="emojiFont">
+      <Glyph image="assets/emoji/smile.png" offset="0,-2"/>
+      <Glyph image="assets/emoji/heart.png" offset="0,-2"/>
     </Font>
     
     <!-- 纯色定义 -->
