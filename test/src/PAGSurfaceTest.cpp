@@ -148,6 +148,85 @@ PAG_TEST(PAGSurfaceTest, Mask) {
 }
 
 /**
+ * 用例描述: 测试 GLRestorer 在共享纹理场景下正确保存和恢复 OpenGL 状态
+ */
+PAG_TEST(PAGSurfaceTest, GLRestorer) {
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
+  int width = pagFile->width();
+  int height = pagFile->height();
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create shared texture as render target
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
+
+  // Create FBO for external OpenGL rendering
+  GLuint fbo = 0;
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureInfo.id, 0);
+  ASSERT_EQ(glCheckFramebufferStatus(GL_FRAMEBUFFER), static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE));
+
+  // Step 1: Set external GL state before PAG rendering
+  int expectedViewport[4] = {10, 20, 200, 150};
+  glViewport(expectedViewport[0], expectedViewport[1], expectedViewport[2], expectedViewport[3]);
+  glEnable(GL_SCISSOR_TEST);
+  int expectedScissorBox[4] = {5, 10, 100, 80};
+  glScissor(expectedScissorBox[0], expectedScissorBox[1], expectedScissorBox[2],
+            expectedScissorBox[3]);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  int expectedFbo = 0;
+  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &expectedFbo);
+  device->unlock();
+
+  // Step 2: PAG rendering (GLRestorer should save state on lockContext, restore on unlockContext)
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0);
+  pagPlayer->flush();
+
+  // Step 3: Verify GL state is restored after PAG rendering
+  // Note: We need to check state without calling lockContext again,
+  // because the state should be restored when PAG's unlockContext was called.
+  // But since we need context to be current to query GL state, we use the same device.
+  context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // These checks verify that GLRestorer restored the state when PAG finished rendering
+  int actualViewport[4] = {};
+  glGetIntegerv(GL_VIEWPORT, actualViewport);
+  EXPECT_EQ(actualViewport[0], expectedViewport[0]);
+  EXPECT_EQ(actualViewport[1], expectedViewport[1]);
+  EXPECT_EQ(actualViewport[2], expectedViewport[2]);
+  EXPECT_EQ(actualViewport[3], expectedViewport[3]);
+
+  EXPECT_TRUE(glIsEnabled(GL_SCISSOR_TEST));
+  int actualScissorBox[4] = {};
+  glGetIntegerv(GL_SCISSOR_BOX, actualScissorBox);
+  EXPECT_EQ(actualScissorBox[0], expectedScissorBox[0]);
+  EXPECT_EQ(actualScissorBox[1], expectedScissorBox[1]);
+  EXPECT_EQ(actualScissorBox[2], expectedScissorBox[2]);
+  EXPECT_EQ(actualScissorBox[3], expectedScissorBox[3]);
+
+  EXPECT_TRUE(glIsEnabled(GL_BLEND));
+
+  int actualFbo = 0;
+  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &actualFbo);
+  EXPECT_EQ(actualFbo, expectedFbo);
+
+  glDeleteFramebuffers(1, &fbo);
+  glDeleteTextures(1, &textureInfo.id);
+  device->unlock();
+}
+
+/**
  * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
  */
 PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
