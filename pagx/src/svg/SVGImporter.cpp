@@ -2225,10 +2225,7 @@ Image* SVGParserImpl::registerImageResource(const std::string& imageSource) {
 }
 
 std::string SVGParserImpl::registerPathDataResource(PathData* pathData) {
-  // Generate a unique PathData ID.
-  std::string pathId = "path" + std::to_string(_nextPathDataId++);
-
-  // Set the ID.
+  std::string pathId = generateUniqueId("path");
   pathData->id = pathId;
   return pathId;
 }
@@ -2842,8 +2839,8 @@ void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
 std::string SVGParserImpl::generateUniqueId(const std::string& prefix) {
   std::string id;
   do {
-    id = "_" + prefix + std::to_string(_nextGeneratedId++);
-  } while (_existingIds.count(id) > 0);
+    id = prefix + std::to_string(_nextGeneratedId++);
+  } while (_existingIds.count(id) > 0 || (_document && _document->findNode(id) != nullptr));
   _existingIds.insert(id);
   return id;
 }
@@ -2915,12 +2912,7 @@ void SVGParserImpl::countColorSourceReferencesInElement(const std::shared_ptr<DO
 }
 
 std::string SVGParserImpl::generateColorSourceId() {
-  std::string id;
-  do {
-    id = "color" + std::to_string(_nextColorSourceId++);
-  } while (_existingIds.count(id) > 0);
-  _existingIds.insert(id);
-  return id;
+  return generateUniqueId("color");
 }
 
 ColorSource* SVGParserImpl::getColorSourceForRef(const std::string& refId,

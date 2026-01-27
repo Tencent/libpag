@@ -207,10 +207,7 @@ class SVGParserImpl {
   // Parse CSS style rules from <style> element.
   void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
 
-  int _nextImageId = 0;
-  int _nextGeneratedId = 0;  // Counter for generating unique IDs.
-  int _nextColorSourceId = 0;  // Counter for generating ColorSource IDs.
-  int _nextPathDataId = 0;  // Counter for generating PathData IDs.
+  int _nextGeneratedId = 0;
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 
