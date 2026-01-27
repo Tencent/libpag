@@ -1710,33 +1710,42 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 
 #### 5.5.7 富文本
 
-富文本通过多个 Group 组合不同样式的 Text 元素，使用 TextLayout 进行统一排版。
+富文本通过 Group 内的多个 Text 元素组合，每个 Text 可以有独立的 Fill/Stroke 样式。使用 TextLayout 进行统一排版。
 
 ```xml
 <Layer>
+  <!-- 常规文本 -->
   <Group>
     <Text text="This is " fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
+  <!-- 加粗红色文本 -->
   <Group>
-    <Text text="bold red" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <Fill color="#FF0000"/>
   </Group>
+  <!-- 常规文本 -->
   <Group>
-    <Text text=" and " fontFamily="Arial" fontSize="18"/>
+    <Text text=" information. " fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
+  <!-- 带下划线的链接样式 -->
   <Group>
-    <Text text="italic blue" fontFamily="Arial" fontStyle="Italic" fontSize="18"/>
+    <Text text="Click here" fontFamily="Arial" fontSize="18"/>
     <Fill color="#0066CC"/>
+    <Stroke color="#0066CC" width="1"/>
   </Group>
+  <!-- 常规文本 -->
   <Group>
-    <Text text=" text." fontFamily="Arial" fontSize="18"/>
+    <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <TextLayout position="50,100" width="300" textAlign="start"/>
+  <!-- TextLayout 统一排版所有 Text -->
+  <TextLayout position="50,100" width="300" textAlign="start" lineHeight="1.5"/>
 </Layer>
 ```
+
+**说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
 
 ### 5.6 复制器（Repeater）
 
@@ -2188,8 +2197,8 @@ Layer / Group
     <Fill color="#F39C12"/>
   </Layer>
   
-  <!-- 文本动画效果 -->
-  <Layer name="AnimatedText" x="100" y="450">
+  <!-- 文本修改器效果 -->
+  <Layer name="TextModifierDemo" x="100" y="450">
     <Text text="WAVE EFFECT" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
     <TextModifier position="0,-15" rotation="5" scale="1.1,1.1">
       <RangeSelector start="0" end="1" shape="triangle" randomOrder="false"/>
