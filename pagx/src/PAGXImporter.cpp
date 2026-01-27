@@ -28,6 +28,7 @@
 #include "SVGPathParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
+#include "tgfx/platform/Print.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/Composition.h"
@@ -1275,20 +1276,23 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
   }
   auto fontAttr = getAttribute(node, "font");
   if (!fontAttr.empty() && fontAttr[0] == '@') {
-    run->font = doc->findNode<Font>(fontAttr.substr(1));
+    auto fontId = fontAttr.substr(1);
+    run->font = doc->findNode<Font>(fontId);
     if (!run->font) {
-      // Font resource not found, GlyphRun is invalid
-      return nullptr;
+      tgfx::PrintError("PAGXImporter: Font resource '%s' not found, GlyphRun will be empty.\n",
+                       fontId.c_str());
     }
   }
   run->y = getFloatAttribute(node, "y", 0);
 
-  // Parse glyphs (comma-separated GlyphIDs)
-  auto glyphsStr = getAttribute(node, "glyphs");
-  if (!glyphsStr.empty()) {
-    auto glyphList = parseFloatList(glyphsStr);
-    for (auto g : glyphList) {
-      run->glyphs.push_back(static_cast<uint16_t>(g));
+  // Parse glyphs only if font is valid
+  if (run->font) {
+    auto glyphsStr = getAttribute(node, "glyphs");
+    if (!glyphsStr.empty()) {
+      auto glyphList = parseFloatList(glyphsStr);
+      for (auto g : glyphList) {
+        run->glyphs.push_back(static_cast<uint16_t>(g));
+      }
     }
   }
 
