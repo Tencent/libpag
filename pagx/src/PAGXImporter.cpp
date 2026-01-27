@@ -940,7 +940,7 @@ static TextPath* parseTextPath(const XMLNode* node, PAGXDocument* doc) {
   textPath->textAlign = TextAlignFromString(getAttribute(node, "textAlign", "start"));
   textPath->firstMargin = getFloatAttribute(node, "firstMargin", 0);
   textPath->lastMargin = getFloatAttribute(node, "lastMargin", 0);
-  textPath->perpendicularToPath = getBoolAttribute(node, "perpendicularToPath", true);
+  textPath->perpendicular = getBoolAttribute(node, "perpendicular", true);
   textPath->reversed = getBoolAttribute(node, "reversed", false);
   return textPath;
 }
@@ -1023,7 +1023,7 @@ static RangeSelector* parseRangeSelector(const XMLNode* node, PAGXDocument* doc)
   selector->easeOut = getFloatAttribute(node, "easeOut", 0);
   selector->mode = SelectorModeFromString(getAttribute(node, "mode", "add"));
   selector->weight = getFloatAttribute(node, "weight", 1);
-  selector->randomizeOrder = getBoolAttribute(node, "randomizeOrder", false);
+  selector->randomOrder = getBoolAttribute(node, "randomOrder", false);
   selector->randomSeed = getIntAttribute(node, "randomSeed", 0);
   return selector;
 }
@@ -1121,7 +1121,7 @@ static DiamondGradient* parseDiamondGradient(const XMLNode* node, PAGXDocument* 
   }
   auto centerStr = getAttribute(node, "center", "0,0");
   gradient->center = parsePoint(centerStr);
-  gradient->halfDiagonal = getFloatAttribute(node, "halfDiagonal", 0);
+  gradient->radius = getFloatAttribute(node, "radius", 0);
   auto matrixStr = getAttribute(node, "matrix");
   if (!matrixStr.empty()) {
     gradient->matrix = MatrixFromString(matrixStr);
@@ -1402,13 +1402,13 @@ static DropShadowStyle* parseDropShadowStyle(const XMLNode* node, PAGXDocument* 
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   style->offsetX = getFloatAttribute(node, "offsetX", 0);
   style->offsetY = getFloatAttribute(node, "offsetY", 0);
-  style->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
-  style->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
+  style->blurX = getFloatAttribute(node, "blurX", 0);
+  style->blurY = getFloatAttribute(node, "blurY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     style->color = parseColor(colorStr);
   }
-  style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true);
+  style->showBehind = getBoolAttribute(node, "showBehind", true);
   return style;
 }
 
@@ -1420,8 +1420,8 @@ static InnerShadowStyle* parseInnerShadowStyle(const XMLNode* node, PAGXDocument
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
   style->offsetX = getFloatAttribute(node, "offsetX", 0);
   style->offsetY = getFloatAttribute(node, "offsetY", 0);
-  style->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
-  style->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
+  style->blurX = getFloatAttribute(node, "blurX", 0);
+  style->blurY = getFloatAttribute(node, "blurY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     style->color = parseColor(colorStr);
@@ -1436,8 +1436,8 @@ static BackgroundBlurStyle* parseBackgroundBlurStyle(
     return nullptr;
   }
   style->blendMode = BlendModeFromString(getAttribute(node, "blendMode", "normal"));
-  style->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
-  style->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
+  style->blurX = getFloatAttribute(node, "blurX", 0);
+  style->blurY = getFloatAttribute(node, "blurY", 0);
   style->tileMode = TileModeFromString(getAttribute(node, "tileMode", "mirror"));
   return style;
 }
@@ -1451,8 +1451,8 @@ static BlurFilter* parseBlurFilter(const XMLNode* node, PAGXDocument* doc) {
   if (!filter) {
     return nullptr;
   }
-  filter->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
-  filter->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
+  filter->blurX = getFloatAttribute(node, "blurX", 0);
+  filter->blurY = getFloatAttribute(node, "blurY", 0);
   filter->tileMode = TileModeFromString(getAttribute(node, "tileMode", "decal"));
   return filter;
 }
@@ -1464,8 +1464,8 @@ static DropShadowFilter* parseDropShadowFilter(const XMLNode* node, PAGXDocument
   }
   filter->offsetX = getFloatAttribute(node, "offsetX", 0);
   filter->offsetY = getFloatAttribute(node, "offsetY", 0);
-  filter->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
-  filter->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
+  filter->blurX = getFloatAttribute(node, "blurX", 0);
+  filter->blurY = getFloatAttribute(node, "blurY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     filter->color = parseColor(colorStr);
@@ -1481,8 +1481,8 @@ static InnerShadowFilter* parseInnerShadowFilter(const XMLNode* node, PAGXDocume
   }
   filter->offsetX = getFloatAttribute(node, "offsetX", 0);
   filter->offsetY = getFloatAttribute(node, "offsetY", 0);
-  filter->blurrinessX = getFloatAttribute(node, "blurrinessX", 0);
-  filter->blurrinessY = getFloatAttribute(node, "blurrinessY", 0);
+  filter->blurX = getFloatAttribute(node, "blurX", 0);
+  filter->blurY = getFloatAttribute(node, "blurY", 0);
   auto colorStr = getAttribute(node, "color");
   if (!colorStr.empty()) {
     filter->color = parseColor(colorStr);

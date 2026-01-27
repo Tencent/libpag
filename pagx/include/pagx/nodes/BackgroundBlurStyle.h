@@ -31,12 +31,12 @@ class BackgroundBlurStyle : public LayerStyle {
   /**
    * The horizontal blur radius in pixels. The default value is 0.
    */
-  float blurrinessX = 0;
+  float blurX = 0;
 
   /**
    * The vertical blur radius in pixels. The default value is 0.
    */
-  float blurrinessY = 0;
+  float blurY = 0;
 
   /**
    * The tile mode for handling blur edges. The default value is Mirror.

@@ -41,12 +41,12 @@ class DropShadowStyle : public LayerStyle {
   /**
    * The horizontal blur radius of the shadow in pixels. The default value is 0.
    */
-  float blurrinessX = 0;
+  float blurX = 0;
 
   /**
    * The vertical blur radius of the shadow in pixels. The default value is 0.
    */
-  float blurrinessY = 0;
+  float blurY = 0;
 
   /**
    * The color of the shadow.
@@ -56,7 +56,7 @@ class DropShadowStyle : public LayerStyle {
   /**
    * Whether the shadow is shown behind the layer. The default value is true.
    */
-  bool showBehindLayer = true;
+  bool showBehind = true;
 
   NodeType nodeType() const override {
     return NodeType::DropShadowStyle;

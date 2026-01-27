@@ -2484,8 +2484,8 @@ bool SVGParserImpl::convertFilterElement(
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
         filters.push_back(dropShadow);
@@ -2532,8 +2532,8 @@ bool SVGParserImpl::convertFilterElement(
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
         filters.push_back(dropShadow);
@@ -2576,8 +2576,8 @@ bool SVGParserImpl::convertFilterElement(
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = 0;
-        dropShadow->blurrinessY = 0;
+        dropShadow->blurX = 0;
+        dropShadow->blurY = 0;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
         filters.push_back(dropShadow);
@@ -2642,8 +2642,8 @@ bool SVGParserImpl::convertFilterElement(
           auto innerShadow = _document->makeNode<InnerShadowFilter>();
           innerShadow->offsetX = offsetX;
           innerShadow->offsetY = offsetY;
-          innerShadow->blurrinessX = blurX;
-          innerShadow->blurrinessY = blurY;
+          innerShadow->blurX = blurX;
+          innerShadow->blurY = blurY;
           innerShadow->color = shadowColor;
           innerShadow->shadowOnly = shadowOnly;
           filters.push_back(innerShadow);
@@ -2688,8 +2688,8 @@ bool SVGParserImpl::convertFilterElement(
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
         filters.push_back(dropShadow);
@@ -2740,8 +2740,8 @@ bool SVGParserImpl::convertFilterElement(
         auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
         filters.push_back(dropShadow);
@@ -2779,8 +2779,8 @@ bool SVGParserImpl::convertFilterElement(
         float devX = devValues.empty() ? 0 : devValues[0];
         float devY = devValues.size() > 1 ? devValues[1] : devX;
         auto blurFilter = _document->makeNode<BlurFilter>();
-        blurFilter->blurrinessX = devX;
-        blurFilter->blurrinessY = devY;
+        blurFilter->blurX = devX;
+        blurFilter->blurY = devY;
         filters.push_back(blurFilter);
       }
     }

@@ -918,17 +918,17 @@ class LayerBuilderImpl {
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
-        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
-                                           style->blurrinessY, ToTGFX(style->color));
+        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                           style->blurY, ToTGFX(style->color));
       }
       case NodeType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
-        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
-                                            style->blurrinessY, ToTGFX(style->color));
+        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                            style->blurY, ToTGFX(style->color));
       }
       case NodeType::BackgroundBlurStyle: {
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
-        return tgfx::BackgroundBlurStyle::Make(style->blurrinessX, style->blurrinessY);
+        return tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY);
       }
       default:
         return nullptr;
@@ -943,12 +943,12 @@ class LayerBuilderImpl {
     switch (node->nodeType()) {
       case NodeType::BlurFilter: {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
-        return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
+        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY);
       }
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
-        return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
-                                            filter->blurrinessY, ToTGFX(filter->color),
+        return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
+                                            filter->blurY, ToTGFX(filter->color),
                                             filter->shadowOnly);
       }
       default:

@@ -58,7 +58,7 @@ class TextPath : public Element {
   /**
    * Whether characters are rotated to be perpendicular to the path. The default value is true.
    */
-  bool perpendicularToPath = true;
+  bool perpendicular = true;
 
   /**
    * Whether to reverse the direction of the path. The default value is false.

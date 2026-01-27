@@ -583,14 +583,14 @@ PAG_TEST(PAGXTest, LayerStylesFilters) {
   auto dropShadow = doc->makeNode<pagx::DropShadowStyle>();
   dropShadow->offsetX = 5;
   dropShadow->offsetY = 5;
-  dropShadow->blurrinessX = 10;
-  dropShadow->blurrinessY = 10;
+  dropShadow->blurX = 10;
+  dropShadow->blurY = 10;
   dropShadow->color = {0.0f, 0.0f, 0.0f, 0.5f};
   layer->styles.push_back(dropShadow);
 
   auto blur = doc->makeNode<pagx::BlurFilter>();
-  blur->blurrinessX = 5;
-  blur->blurrinessY = 5;
+  blur->blurX = 5;
+  blur->blurY = 5;
   layer->filters.push_back(blur);
 
   EXPECT_EQ(layer->styles.size(), 1u);

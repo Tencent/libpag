@@ -153,7 +153,7 @@ class RangeSelector : public TextSelector {
   /**
    * Whether to randomize the order of character selection. The default value is false.
    */
-  bool randomizeOrder = false;
+  bool randomOrder = false;
 
   /**
    * The seed for random order generation. The default value is 0.

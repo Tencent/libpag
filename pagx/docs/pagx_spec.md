@@ -381,7 +381,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 菱形渐变从中心向四角辐射。
 
 ```xml
-<DiamondGradient center="50,50" halfDiagonal="50">
+<DiamondGradient center="50,50" radius="50">
   <ColorStop offset="0" color="#FFFFFF"/>
   <ColorStop offset="1" color="#000000"/>
 </DiamondGradient>
@@ -390,10 +390,10 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `center` | point | 0,0 | 中心点 |
-| `halfDiagonal` | float | (必填) | 半对角线长度 |
+| `radius` | float | (必填) | 渐变半径 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
-**计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / halfDiagonal` 决定。
+**计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / radius` 决定。
 
 ##### 渐变色标（ColorStop）
 
@@ -617,8 +617,8 @@ PAGX 文档采用层级结构组织内容：
 <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
   <Rectangle center="50,50" size="100,100"/>
   <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
-  <BlurFilter blurrinessX="10" blurrinessY="10"/>
+  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+  <BlurFilter blurX="10" blurY="10"/>
   <Layer name="Child">
     <Ellipse center="50,50" size="80,80"/>
     <Fill color="#00FF00"/>
@@ -714,9 +714,9 @@ Layer 的子元素按类型自动归类为四个集合：
 <Layer>
   <Rectangle center="50,50" size="100,100"/>
   <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080" showBehindLayer="true"/>
-  <InnerShadowStyle offsetX="2" offsetY="2" blurrinessX="5" blurrinessY="5" color="#00000040"/>
-  <BackgroundBlurStyle blurrinessX="20" blurrinessY="20" tileMode="mirror"/>
+  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehind="true"/>
+  <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
+  <BackgroundBlurStyle blurX="20" blurY="20" tileMode="mirror"/>
 </Layer>
 ```
 
@@ -728,24 +728,24 @@ Layer 的子元素按类型自动归类为四个集合：
 
 #### 4.3.1 投影阴影（DropShadowStyle）
 
-在图层**下方**绘制投影阴影。基于不透明图层内容计算阴影形状。当 `showBehindLayer="false"` 时，额外使用**图层轮廓**作为擦除遮罩挖空被图层遮挡的部分。
+在图层**下方**绘制投影阴影。基于不透明图层内容计算阴影形状。当 `showBehind="false"` 时，额外使用**图层轮廓**作为擦除遮罩挖空被图层遮挡的部分。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `offsetX` | float | 0 | X 偏移 |
 | `offsetY` | float | 0 | Y 偏移 |
-| `blurrinessX` | float | 0 | X 模糊半径 |
-| `blurrinessY` | float | 0 | Y 模糊半径 |
+| `blurX` | float | 0 | X 模糊半径 |
+| `blurY` | float | 0 | Y 模糊半径 |
 | `color` | color | #000000 | 阴影颜色 |
-| `showBehindLayer` | bool | true | 图层后面是否显示阴影 |
+| `showBehind` | bool | true | 图层后面是否显示阴影 |
 
 **渲染步骤**：
 1. 获取不透明图层内容并偏移 `(offsetX, offsetY)`
-2. 对偏移后的内容应用高斯模糊 `(blurrinessX, blurrinessY)`
+2. 对偏移后的内容应用高斯模糊 `(blurX, blurY)`
 3. 使用 `color` 的颜色填充阴影区域
-4. 如果 `showBehindLayer="false"`，使用图层轮廓作为擦除遮罩挖空被遮挡部分
+4. 如果 `showBehind="false"`，使用图层轮廓作为擦除遮罩挖空被遮挡部分
 
-**showBehindLayer**：
+**showBehind**：
 - `true`：阴影完整显示，包括被图层内容遮挡的部分
 - `false`：阴影被图层内容遮挡的部分会被挖空（使用图层轮廓作为擦除遮罩）
 
@@ -755,13 +755,13 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `blurrinessX` | float | 0 | X 模糊半径 |
-| `blurrinessY` | float | 0 | Y 模糊半径 |
+| `blurX` | float | 0 | X 模糊半径 |
+| `blurY` | float | 0 | Y 模糊半径 |
 | `tileMode` | TileMode | mirror | 平铺模式 |
 
 **渲染步骤**：
 1. 获取图层边界下方的图层背景
-2. 对图层背景应用高斯模糊 `(blurrinessX, blurrinessY)`
+2. 对图层背景应用高斯模糊 `(blurX, blurY)`
 3. 使用不透明图层内容作为遮罩裁剪模糊结果
 
 #### 4.3.3 内阴影（InnerShadowStyle）
@@ -772,13 +772,13 @@ Layer 的子元素按类型自动归类为四个集合：
 |------|------|--------|------|
 | `offsetX` | float | 0 | X 偏移 |
 | `offsetY` | float | 0 | Y 偏移 |
-| `blurrinessX` | float | 0 | X 模糊半径 |
-| `blurrinessY` | float | 0 | Y 模糊半径 |
+| `blurX` | float | 0 | X 模糊半径 |
+| `blurY` | float | 0 | Y 模糊半径 |
 | `color` | color | #000000 | 阴影颜色 |
 
 **渲染步骤**：
 1. 获取不透明图层内容并偏移 `(offsetX, offsetY)`
-2. 对偏移后内容的反向（内容外部区域）应用高斯模糊 `(blurrinessX, blurrinessY)`
+2. 对偏移后内容的反向（内容外部区域）应用高斯模糊 `(blurX, blurY)`
 3. 使用 `color` 的颜色填充阴影区域
 4. 与不透明图层内容求交集，仅保留内容内部的阴影
 
@@ -792,8 +792,8 @@ Layer 的子元素按类型自动归类为四个集合：
 <Layer>
   <Rectangle center="50,50" size="100,100"/>
   <Fill color="#FF0000"/>
-  <BlurFilter blurrinessX="10" blurrinessY="10"/>
-  <DropShadowFilter offsetX="5" offsetY="5" blurrinessX="10" blurrinessY="10" color="#00000080"/>
+  <BlurFilter blurX="10" blurY="10"/>
+  <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
   <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
 </Layer>
 ```
@@ -802,8 +802,8 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `blurrinessX` | float | (必填) | X 模糊半径 |
-| `blurrinessY` | float | (必填) | Y 模糊半径 |
+| `blurX` | float | (必填) | X 模糊半径 |
+| `blurY` | float | (必填) | Y 模糊半径 |
 | `tileMode` | TileMode | decal | 平铺模式 |
 
 #### 4.4.2 投影阴影滤镜（DropShadowFilter）
@@ -814,14 +814,14 @@ Layer 的子元素按类型自动归类为四个集合：
 |------|------|--------|------|
 | `offsetX` | float | 0 | X 偏移 |
 | `offsetY` | float | 0 | Y 偏移 |
-| `blurrinessX` | float | 0 | X 模糊半径 |
-| `blurrinessY` | float | 0 | Y 模糊半径 |
+| `blurX` | float | 0 | X 模糊半径 |
+| `blurY` | float | 0 | Y 模糊半径 |
 | `color` | color | #000000 | 阴影颜色 |
 | `shadowOnly` | bool | false | 仅显示阴影 |
 
 **渲染步骤**：
 1. 将滤镜输入偏移 `(offsetX, offsetY)`
-2. 提取 alpha 通道并应用高斯模糊 `(blurrinessX, blurrinessY)`
+2. 提取 alpha 通道并应用高斯模糊 `(blurX, blurY)`
 3. 使用 `color` 的颜色填充阴影区域
 4. 将阴影与滤镜输入合成（`shadowOnly=false`）或仅输出阴影（`shadowOnly=true`）
 
@@ -833,8 +833,8 @@ Layer 的子元素按类型自动归类为四个集合：
 |------|------|--------|------|
 | `offsetX` | float | 0 | X 偏移 |
 | `offsetY` | float | 0 | Y 偏移 |
-| `blurrinessX` | float | 0 | X 模糊半径 |
-| `blurrinessY` | float | 0 | Y 模糊半径 |
+| `blurX` | float | 0 | X 模糊半径 |
+| `blurY` | float | 0 | Y 模糊半径 |
 | `color` | color | #000000 | 阴影颜色 |
 | `shadowOnly` | bool | false | 仅显示阴影 |
 
@@ -1523,7 +1523,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 范围选择器定义 TextModifier 影响的字形范围和影响程度。
 
 ```xml
-<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomizeOrder="false" randomSeed="0"/>
+<RangeSelector start="0" end="1" offset="0" unit="percentage" shape="square" easeIn="0" easeOut="0" mode="add" weight="1" randomOrder="false" randomSeed="0"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1537,7 +1537,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `easeOut` | float | 0 | 缓出量 |
 | `mode` | SelectorMode | add | 组合模式（见下方） |
 | `weight` | float | 1 | 选择器权重 |
-| `randomizeOrder` | bool | false | 随机顺序 |
+| `randomOrder` | bool | false | 随机顺序 |
 | `randomSeed` | int | 0 | 随机种子 |
 
 **SelectorUnit（单位）**：
@@ -1575,7 +1575,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 ```xml
 <!-- 引用 PathData 资源 -->
-<TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicularToPath="true" reversed="false"/>
+<TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicular="true" reversed="false"/>
 
 <!-- 内联路径数据 -->
 <TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
@@ -1587,7 +1587,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 | `textAlign` | TextAlign | start | 对齐模式（见下方） |
 | `firstMargin` | float | 0 | 起始边距 |
 | `lastMargin` | float | 0 | 结束边距 |
-| `perpendicularToPath` | bool | true | 垂直于路径 |
+| `perpendicular` | bool | true | 垂直于路径 |
 | `reversed` | bool | false | 反转方向 |
 
 **TextAlign 在 TextPath 中的含义**：
@@ -1606,7 +1606,7 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 **字形定位**：
 1. 计算字形中心在路径上的位置
 2. 获取该位置的路径切线方向
-3. 如果 `perpendicularToPath="true"`，旋转字形使其垂直于路径
+3. 如果 `perpendicular="true"`，旋转字形使其垂直于路径
 
 **闭合路径**：对于闭合路径，超出范围的字形会环绕到路径另一端。
 
@@ -1987,7 +1987,7 @@ Layer / Group
       <Fill color="#333333"/>
       <Stroke color="#FFFFFF" width="2" placement="foreground"/>
     </Group>
-    <DropShadowStyle offsetX="2" offsetY="2" blurrinessX="4" blurrinessY="4" color="#00000040"/>
+    <DropShadowStyle offsetX="2" offsetY="2" blurX="4" blurY="4" color="#00000040"/>
   </Layer>
   
   <!-- 使用合成的星星 -->
@@ -2253,7 +2253,7 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `center` | point | 0,0 |
-| `halfDiagonal` | float | (必填) |
+| `radius` | float | (必填) |
 | `matrix` | string | 单位矩阵 |
 
 子元素：`ColorStop`+
@@ -2311,10 +2311,10 @@ Layer / Group
 |------|------|--------|
 | `offsetX` | float | 0 |
 | `offsetY` | float | 0 |
-| `blurrinessX` | float | 0 |
-| `blurrinessY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
 | `color` | color | #000000 |
-| `showBehindLayer` | bool | true |
+| `showBehind` | bool | true |
 | `blendMode` | BlendMode | normal |
 
 #### InnerShadowStyle
@@ -2323,8 +2323,8 @@ Layer / Group
 |------|------|--------|
 | `offsetX` | float | 0 |
 | `offsetY` | float | 0 |
-| `blurrinessX` | float | 0 |
-| `blurrinessY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
 | `color` | color | #000000 |
 | `blendMode` | BlendMode | normal |
 
@@ -2332,8 +2332,8 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `blurrinessX` | float | 0 |
-| `blurrinessY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
 | `tileMode` | TileMode | mirror |
 | `blendMode` | BlendMode | normal |
 
@@ -2343,8 +2343,8 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `blurrinessX` | float | (必填) |
-| `blurrinessY` | float | (必填) |
+| `blurX` | float | (必填) |
+| `blurY` | float | (必填) |
 | `tileMode` | TileMode | decal |
 
 #### DropShadowFilter
@@ -2353,8 +2353,8 @@ Layer / Group
 |------|------|--------|
 | `offsetX` | float | 0 |
 | `offsetY` | float | 0 |
-| `blurrinessX` | float | 0 |
-| `blurrinessY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
 | `color` | color | #000000 |
 | `shadowOnly` | bool | false |
 
@@ -2364,8 +2364,8 @@ Layer / Group
 |------|------|--------|
 | `offsetX` | float | 0 |
 | `offsetY` | float | 0 |
-| `blurrinessX` | float | 0 |
-| `blurrinessY` | float | 0 |
+| `blurX` | float | 0 |
+| `blurY` | float | 0 |
 | `color` | color | #000000 |
 | `shadowOnly` | bool | false |
 

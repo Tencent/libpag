@@ -342,7 +342,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (grad->center.x != 0 || grad->center.y != 0) {
         xml.addAttribute("center", pointToString(grad->center));
       }
-      xml.addRequiredAttribute("halfDiagonal", grad->halfDiagonal);
+      xml.addRequiredAttribute("radius", grad->radius);
       if (!grad->matrix.isIdentity()) {
         xml.addAttribute("matrix", MatrixToString(grad->matrix));
       }
@@ -708,7 +708,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
             xml.addAttribute("mode", SelectorModeToString(rangeSelector->mode));
           }
           xml.addAttribute("weight", rangeSelector->weight, 1.0f);
-          xml.addAttribute("randomizeOrder", rangeSelector->randomizeOrder);
+          xml.addAttribute("randomOrder", rangeSelector->randomOrder);
           xml.addAttribute("randomSeed", rangeSelector->randomSeed);
           xml.closeElementSelfClosing();
         }
@@ -731,7 +731,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       }
       xml.addAttribute("firstMargin", textPath->firstMargin);
       xml.addAttribute("lastMargin", textPath->lastMargin);
-      xml.addAttribute("perpendicularToPath", textPath->perpendicularToPath, true);
+      xml.addAttribute("perpendicular", textPath->perpendicular, true);
       xml.addAttribute("reversed", textPath->reversed);
       xml.closeElementSelfClosing();
       break;
@@ -826,10 +826,10 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       }
       xml.addAttribute("offsetX", style->offsetX);
       xml.addAttribute("offsetY", style->offsetY);
-      xml.addAttribute("blurrinessX", style->blurrinessX);
-      xml.addAttribute("blurrinessY", style->blurrinessY);
+      xml.addAttribute("blurX", style->blurX);
+      xml.addAttribute("blurY", style->blurY);
       xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
-      xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
+      xml.addAttribute("showBehind", style->showBehind, true);
       xml.closeElementSelfClosing();
       break;
     }
@@ -841,8 +841,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       }
       xml.addAttribute("offsetX", style->offsetX);
       xml.addAttribute("offsetY", style->offsetY);
-      xml.addAttribute("blurrinessX", style->blurrinessX);
-      xml.addAttribute("blurrinessY", style->blurrinessY);
+      xml.addAttribute("blurX", style->blurX);
+      xml.addAttribute("blurY", style->blurY);
       xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
       xml.closeElementSelfClosing();
       break;
@@ -853,8 +853,8 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->blendMode != BlendMode::Normal) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
-      xml.addAttribute("blurrinessX", style->blurrinessX);
-      xml.addAttribute("blurrinessY", style->blurrinessY);
+      xml.addAttribute("blurX", style->blurX);
+      xml.addAttribute("blurY", style->blurY);
       if (style->tileMode != TileMode::Mirror) {
         xml.addAttribute("tileMode", TileModeToString(style->tileMode));
       }
@@ -875,8 +875,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
       xml.openElement("BlurFilter");
-      xml.addRequiredAttribute("blurrinessX", filter->blurrinessX);
-      xml.addRequiredAttribute("blurrinessY", filter->blurrinessY);
+      xml.addRequiredAttribute("blurX", filter->blurX);
+      xml.addRequiredAttribute("blurY", filter->blurY);
       if (filter->tileMode != TileMode::Decal) {
         xml.addAttribute("tileMode", TileModeToString(filter->tileMode));
       }
@@ -888,8 +888,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.openElement("DropShadowFilter");
       xml.addAttribute("offsetX", filter->offsetX);
       xml.addAttribute("offsetY", filter->offsetY);
-      xml.addAttribute("blurrinessX", filter->blurrinessX);
-      xml.addAttribute("blurrinessY", filter->blurrinessY);
+      xml.addAttribute("blurX", filter->blurX);
+      xml.addAttribute("blurY", filter->blurY);
       xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
@@ -900,8 +900,8 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.openElement("InnerShadowFilter");
       xml.addAttribute("offsetX", filter->offsetX);
       xml.addAttribute("offsetY", filter->offsetY);
-      xml.addAttribute("blurrinessX", filter->blurrinessX);
-      xml.addAttribute("blurrinessY", filter->blurrinessY);
+      xml.addAttribute("blurX", filter->blurX);
+      xml.addAttribute("blurY", filter->blurY);
       xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       xml.addAttribute("shadowOnly", filter->shadowOnly);
       xml.closeElementSelfClosing();
