@@ -2043,13 +2043,13 @@ Layer / Group
     <Image id="noise" source="assets/noise.png"/>
     
     <!-- 路径数据资源 -->
-    <PathData id="wavePath" data="M 0 50 Q 50 0 100 50 T 200 50 T 300 50"/>
-    <PathData id="arcPath" data="M 0 100 Q 150 0 300 100"/>
+    <PathData id="wavePath" data="M 0 0 Q 40 -30 80 0 T 160 0 T 240 0"/>
+    <PathData id="arcPath" data="M 0 0 Q 100 -50 200 0"/>
     
     <!-- 嵌入矢量字体 -->
     <Font id="customFont">
-      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
-      <Glyph path="M 50 0 L 50 700 L 300 700"/>
+      <Glyph path="M 0 0 L 0 24 M 0 12 L 14 12 M 14 0 L 14 24"/>
+      <Glyph path="M 0 0 L 0 24 L 10 24"/>
     </Font>
     
     <!-- 嵌入位图字体（Emoji） -->
@@ -2070,24 +2070,21 @@ Layer / Group
     </LinearGradient>
     
     <!-- 径向渐变 -->
-    <RadialGradient id="spotlight" center="400,300" radius="300">
-      <ColorStop offset="0" color="#FFFFFF30"/>
+    <RadialGradient id="spotlight" center="400,300" radius="350">
+      <ColorStop offset="0" color="#FFFFFF20"/>
       <ColorStop offset="1" color="#00000000"/>
     </RadialGradient>
     
     <!-- 锥形渐变 -->
-    <ConicGradient id="rainbow" center="0,0" startAngle="0" endAngle="360">
+    <ConicGradient id="rainbow" center="50,50" startAngle="0" endAngle="360">
       <ColorStop offset="0" color="#FF0000"/>
-      <ColorStop offset="0.17" color="#FF8000"/>
-      <ColorStop offset="0.33" color="#FFFF00"/>
-      <ColorStop offset="0.5" color="#00FF00"/>
-      <ColorStop offset="0.67" color="#0080FF"/>
-      <ColorStop offset="0.83" color="#8000FF"/>
+      <ColorStop offset="0.33" color="#00FF00"/>
+      <ColorStop offset="0.66" color="#0000FF"/>
       <ColorStop offset="1" color="#FF0000"/>
     </ConicGradient>
     
     <!-- 菱形渐变 -->
-    <DiamondGradient id="diamond" center="0,0" radius="50">
+    <DiamondGradient id="diamond" center="50,50" radius="50">
       <ColorStop offset="0" color="#FFFFFF"/>
       <ColorStop offset="1" color="#333333"/>
     </DiamondGradient>
@@ -2096,15 +2093,15 @@ Layer / Group
     <ImagePattern id="noisePattern" image="@noise" tileModeX="repeat" tileModeY="repeat"/>
     
     <!-- 合成（可复用组件） -->
-    <Composition id="buttonComp" width="120" height="40">
-      <Layer name="buttonBg">
-        <Rectangle center="60,20" size="120,40" roundness="8"/>
+    <Composition id="buttonComp" width="100" height="32">
+      <Layer>
+        <Rectangle center="50,16" size="100,32" roundness="6"/>
         <Fill color="#3498DB"/>
-        <InnerShadowStyle offsetX="0" offsetY="2" blurX="4" blurY="4" color="#00000040"/>
+        <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#00000040"/>
       </Layer>
-      <Layer name="buttonText">
-        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
-        <TextLayout position="60,20" textAlign="center"/>
+      <Layer>
+        <Text text="Button" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="50,16" textAlign="center"/>
         <Fill color="#FFFFFF"/>
       </Layer>
     </Composition>
@@ -2112,190 +2109,162 @@ Layer / Group
   
   <!-- ==================== 图层内容 ==================== -->
   
-  <!-- 背景层：渐变 + 噪点纹理 -->
+  <!-- 背景层 -->
   <Layer name="Background">
     <Rectangle center="400,300" size="800,600"/>
     <Fill color="@skyGradient"/>
-    <Fill color="@noisePattern" alpha="0.05"/>
+    <Fill color="@noisePattern" alpha="0.03"/>
   </Layer>
   
   <!-- 聚光灯效果 -->
   <Layer name="Spotlight" blendMode="screen">
-    <Ellipse center="400,300" size="600,600"/>
+    <Ellipse center="400,300" size="700,700"/>
     <Fill color="@spotlight"/>
   </Layer>
   
-  <!-- 几何元素展示 -->
-  <Layer name="Shapes">
-    <!-- 矩形 + 圆角修改器 -->
-    <Group position="100,100">
-      <Rectangle center="0,0" size="80,60"/>
-      <RoundCorner radius="10"/>
+  <!-- ===== 第一行 y=60: 几何元素展示 ===== -->
+  <Layer name="Shapes" y="60">
+    <Group position="80,0">
+      <Rectangle center="0,0" size="60,45" roundness="8"/>
       <Fill color="#E74C3C"/>
-      <Stroke color="#C0392B" width="2"/>
     </Group>
-    
-    <!-- 椭圆 + 多重描边 -->
-    <Group position="250,100">
-      <Ellipse center="0,0" size="80,60"/>
+    <Group position="180,0">
+      <Ellipse center="0,0" size="60,45"/>
       <Fill color="#9B59B6"/>
-      <Stroke color="#FFFFFF40" width="8"/>
-      <Stroke color="#FFFFFF80" width="4"/>
-      <Stroke color="#FFFFFF" width="1"/>
     </Group>
-    
-    <!-- 星形 -->
-    <Group position="400,100">
-      <Polystar center="0,0" type="star" pointCount="5" outerRadius="40" innerRadius="20" rotation="-90"/>
+    <Group position="280,0">
+      <Polystar center="0,0" type="star" pointCount="5" outerRadius="28" innerRadius="12" rotation="-90"/>
       <Fill color="#F1C40F"/>
-      <Stroke color="#F39C12" width="2"/>
     </Group>
-    
-    <!-- 多边形 -->
-    <Group position="550,100">
-      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="40"/>
+    <Group position="380,0">
+      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="28"/>
       <Fill color="#1ABC9C"/>
     </Group>
-    
-    <!-- 自定义路径 -->
-    <Group position="700,100">
-      <Path data="M -30 -20 L 0 -40 L 30 -20 L 30 20 L 0 40 L -30 20 Z"/>
+    <Group position="480,0">
+      <Path data="M -25 -18 L 0 -30 L 25 -18 L 25 18 L 0 30 L -25 18 Z"/>
       <Fill color="#E67E22"/>
     </Group>
   </Layer>
   
-  <!-- 路径裁剪动画效果 -->
-  <Layer name="TrimPathDemo">
-    <Path data="@wavePath"/>
-    <TrimPath start="0" end="0.7" offset="0" type="separate"/>
-    <Stroke color="#3498DB" width="4" cap="round"/>
+  <!-- ===== 第一行右侧: 遮罩示例 ===== -->
+  <Layer id="circleMask" visible="false">
+    <Ellipse center="0,0" size="70,70"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer name="MaskedLayer" x="680" y="60" mask="@circleMask" maskType="alpha">
+    <Rectangle center="0,0" size="90,90"/>
+    <Fill color="@rainbow"/>
   </Layer>
   
-  <!-- 布尔运算展示 -->
-  <Layer name="BooleanOps" x="50" y="200">
-    <Rectangle center="30,30" size="50,50"/>
-    <Ellipse center="55,55" size="50,50"/>
+  <!-- ===== 第二行 y=150: 修改器展示 ===== -->
+  <Layer name="TrimPathDemo" x="60" y="150">
+    <Path data="@wavePath"/>
+    <TrimPath start="0" end="0.7" type="separate"/>
+    <Stroke color="#3498DB" width="3" cap="round"/>
+  </Layer>
+  
+  <Layer name="RoundCornerDemo" x="350" y="150">
+    <Rectangle center="0,0" size="70,50"/>
+    <RoundCorner radius="12"/>
+    <Fill color="#2ECC71"/>
+  </Layer>
+  
+  <Layer name="MergePathDemo" x="480" y="150">
+    <Rectangle center="-12,0" size="45,45"/>
+    <Ellipse center="12,0" size="45,45"/>
     <MergePath mode="xor"/>
     <Fill color="#9B59B6"/>
   </Layer>
   
-  <!-- 复制器展示 -->
-  <Layer name="RepeaterDemo" x="200" y="200">
-    <Group>
-      <Ellipse center="60,0" size="15,15"/>
-      <Fill color="#3498DB"/>
-      <Repeater copies="8" position="0,0" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.3"/>
-    </Group>
+  <Layer name="RepeaterDemo" x="620" y="150">
+    <Ellipse center="35,0" size="12,12"/>
+    <Fill color="#3498DB"/>
+    <Repeater copies="6" rotation="60" anchorPoint="0,0" startAlpha="1" endAlpha="0.2"/>
   </Layer>
   
-  <!-- 文本基础 -->
-  <Layer name="SimpleText">
-    <Text text="PAGX Format" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
-    <TextLayout position="400,350" textAlign="center"/>
+  <!-- ===== 第三行 y=250: 标题文本 ===== -->
+  <Layer name="TitleText">
+    <Text text="PAGX Format" fontFamily="Arial" fontStyle="Bold" fontSize="42"/>
+    <TextLayout position="400,250" textAlign="center"/>
     <Fill color="#ECF0F1"/>
-    <DropShadowStyle offsetX="3" offsetY="3" blurX="6" blurY="6" color="#00000080"/>
+    <DropShadowStyle offsetX="2" offsetY="2" blurX="4" blurY="4" color="#00000060"/>
   </Layer>
   
-  <!-- 沿路径文本 -->
-  <Layer name="TextOnPath">
-    <Text text="Text along a curved path" fontFamily="Arial" fontSize="16"/>
+  <!-- ===== 第四行 y=320: 沿路径文本 ===== -->
+  <Layer name="TextOnPath" x="300" y="320">
+    <Text text="Text along a curved path" fontFamily="Arial" fontSize="14"/>
     <TextPath path="@arcPath" textAlign="center" perpendicular="true"/>
     <Fill color="#F39C12"/>
   </Layer>
   
-  <!-- 文本修改器效果 -->
-  <Layer name="TextModifierDemo" x="100" y="450">
-    <Text text="WAVE EFFECT" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
-    <TextModifier position="0,-15" rotation="5" scale="1.1,1.1">
-      <RangeSelector start="0" end="1" shape="triangle" randomOrder="false"/>
+  <!-- ===== 第五行 y=400: 文本修改器 + 富文本 ===== -->
+  <Layer name="TextModifierDemo" x="100" y="400">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
+    <TextModifier position="0,-8" scale="1.1,1.1">
+      <RangeSelector start="0" end="1" shape="triangle"/>
     </TextModifier>
     <Fill color="#E74C3C"/>
   </Layer>
   
-  <!-- 富文本 -->
-  <Layer name="RichText">
+  <Layer name="RichText" x="550" y="400">
     <Group>
-      <Text text="This is " fontFamily="Arial" fontSize="16"/>
+      <Text text="Rich " fontFamily="Arial" fontSize="14"/>
       <Fill color="#ECF0F1"/>
     </Group>
     <Group>
-      <Text text="rich text" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+      <Text text="text" fontFamily="Arial" fontStyle="Bold" fontSize="14"/>
       <Fill color="#E74C3C"/>
     </Group>
     <Group>
-      <Text text=" with " fontFamily="Arial" fontSize="16"/>
-      <Fill color="#ECF0F1"/>
-    </Group>
-    <Group>
-      <Text text="multiple styles" fontFamily="Arial" fontStyle="Italic" fontSize="16"/>
+      <Text text=" demo" fontFamily="Arial" fontStyle="Italic" fontSize="14"/>
       <Fill color="#3498DB"/>
     </Group>
-    <Group>
-      <Text text="." fontFamily="Arial" fontSize="16"/>
-      <Fill color="#ECF0F1"/>
-    </Group>
-    <TextLayout position="400,500" width="300" textAlign="center"/>
+    <TextLayout position="0,0" textAlign="start"/>
   </Layer>
   
-  <!-- 预排版文本 -->
-  <Layer name="PrerenderedText">
-    <Text fontFamily="Arial" fontSize="20">
-      <GlyphRun font="@customFont" glyphs="1,2" y="550" xPositions="50,80"/>
-    </Text>
-    <Fill color="#95A5A6"/>
+  <!-- ===== 第六行 y=480: 滤镜展示 ===== -->
+  <Layer name="BlurFilterDemo" x="80" y="480">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#2ECC71"/>
+    <BlurFilter blurX="2" blurY="2" tileMode="clamp"/>
   </Layer>
   
-  <!-- 使用合成组件 -->
-  <Layer composition="@buttonComp" x="340" y="560"/>
+  <Layer name="DropShadowFilterDemo" x="180" y="480">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#3498DB"/>
+    <DropShadowFilter offsetX="3" offsetY="3" blurX="6" blurY="6" color="#00000060"/>
+  </Layer>
   
-  <!-- 图片层 -->
-  <Layer name="PhotoLayer" x="600" y="400" alpha="0.9">
-    <Rectangle center="80,60" size="160,120" roundness="8"/>
+  <Layer name="BlendFilterDemo" x="280" y="480">
+    <Rectangle center="0,0" size="60,60" roundness="8"/>
+    <Fill color="#E74C3C"/>
+    <BlendFilter color="#0000FF60" blendMode="overlay"/>
+  </Layer>
+  
+  <Layer name="ColorMatrixDemo" x="380" y="480">
+    <Ellipse center="0,0" size="60,60"/>
+    <Fill color="#9B59B6"/>
+    <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+  </Layer>
+  
+  <!-- ===== 第六行右侧: 图片 + 合成 ===== -->
+  <Layer name="PhotoLayer" x="550" y="480">
+    <Rectangle center="0,0" size="100,70" roundness="6"/>
     <Fill>
       <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
     </Fill>
-    <Stroke color="#FFFFFF" width="3"/>
-    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000060"/>
+    <Stroke color="#FFFFFF" width="2"/>
+    <DropShadowStyle offsetX="3" offsetY="3" blurX="6" blurY="6" color="#00000050"/>
   </Layer>
   
-  <!-- 遮罩示例 -->
-  <Layer id="circleMask" visible="false">
-    <Ellipse center="650,200" size="100,100"/>
-    <Fill color="#FFFFFF"/>
-  </Layer>
-  <Layer name="MaskedLayer" mask="@circleMask" maskType="alpha">
-    <Rectangle center="650,200" size="150,150"/>
-    <Fill color="@rainbow" alpha="0.8"/>
-  </Layer>
+  <Layer composition="@buttonComp" x="680" y="464"/>
   
-  <!-- 滤镜效果 -->
-  <Layer name="FilteredLayer" x="500" y="180">
-    <Rectangle center="50,50" size="80,80" roundness="10"/>
-    <Fill color="#2ECC71"/>
-    <BlurFilter blurX="2" blurY="2" tileMode="clamp"/>
-    <DropShadowFilter offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000060"/>
-  </Layer>
-  
-  <!-- 图层样式综合展示 -->
-  <Layer name="LayerStylesDemo" x="50" y="500">
-    <Rectangle center="40,40" size="70,70" roundness="5"/>
-    <Fill color="#3498DB"/>
-    <DropShadowStyle offsetX="4" offsetY="4" blurX="8" blurY="8" color="#00000080"/>
-    <InnerShadowStyle offsetX="2" offsetY="2" blurX="4" blurY="4" color="#00000040"/>
-  </Layer>
-  
-  <!-- 混合滤镜 -->
-  <Layer name="BlendFilterDemo" x="150" y="500">
-    <Rectangle center="40,40" size="70,70" roundness="5"/>
-    <Fill color="#E74C3C"/>
-    <BlendFilter color="#0000FF80" blendMode="overlay"/>
-  </Layer>
-  
-  <!-- 颜色矩阵滤镜（灰度效果） -->
-  <Layer name="GrayscaleDemo" x="250" y="500">
-    <Ellipse center="40,40" size="70,70"/>
-    <Fill color="#9B59B6"/>
-    <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+  <!-- ===== 第六行: 预排版文本 ===== -->
+  <Layer name="PrerenderedText" x="700" y="510">
+    <Text fontFamily="Arial" fontSize="16">
+      <GlyphRun font="@customFont" glyphs="1,2" y="0" xPositions="0,18"/>
+    </Text>
+    <Fill color="#95A5A6"/>
   </Layer>
   
 </pagx>
