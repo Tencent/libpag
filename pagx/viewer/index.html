@@ -13,7 +13,7 @@
 <div id="container" class="container">
     <canvas class="canvas" id="pagx-canvas"></canvas>
     <div id="drop-zone" class="drop-zone">
-        <div class="drop-zone-content">
+        <div id="drop-zone-content" class="drop-zone-content">
             <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
@@ -23,6 +23,13 @@
             <p class="drop-subtext">or</p>
             <button id="file-btn" class="file-btn">Browse File</button>
             <input type="file" id="file-input" accept=".pagx" hidden/>
+        </div>
+        <div id="loading-content" class="loading-content hidden">
+            <p class="loading-text">Loading...</p>
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <p id="progress-text" class="progress-text">0%</p>
         </div>
     </div>
     <div id="toolbar" class="toolbar hidden">

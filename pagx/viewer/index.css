@@ -68,6 +68,10 @@ html, body {
     transition: all 0.3s ease;
 }
 
+.drop-zone-content.hidden {
+    display: none;
+}
+
 .drop-icon {
     width: 64px;
     height: 64px;
@@ -104,6 +108,45 @@ html, body {
 
 .file-btn:active {
     background: #3a80c9;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 80px;
+}
+
+.loading-content.hidden {
+    display: none;
+}
+
+.loading-text {
+    color: #ccc;
+    font-size: 20px;
+    margin: 0 0 24px 0;
+}
+
+.progress-container {
+    width: 280px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #4a90d9, #5a9ee9);
+    border-radius: 3px;
+    transition: width 0.15s ease-out;
+}
+
+.progress-text {
+    color: #888;
+    font-size: 14px;
+    margin: 12px 0 0 0;
 }
 
 .toolbar {
