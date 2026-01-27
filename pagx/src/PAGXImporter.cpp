@@ -1276,6 +1276,10 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
   auto fontAttr = getAttribute(node, "font");
   if (!fontAttr.empty() && fontAttr[0] == '@') {
     run->font = doc->findNode<Font>(fontAttr.substr(1));
+    if (!run->font) {
+      // Font resource not found, GlyphRun is invalid
+      return nullptr;
+    }
   }
   run->y = getFloatAttribute(node, "y", 0);
 
