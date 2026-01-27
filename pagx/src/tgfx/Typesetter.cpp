@@ -145,10 +145,8 @@ class TypesetterImpl : public Typesetter {
       return;
     }
 
-    // Process layer contents
-    for (auto& element : layer->contents) {
-      processElement(element);
-    }
+    // Process layer contents, looking for Text + TextLayout combinations
+    processLayerContents(layer->contents);
 
     // Process child layers
     for (auto& child : layer->children) {
@@ -156,53 +154,25 @@ class TypesetterImpl : public Typesetter {
     }
   }
 
-  void processElement(Element* element) {
-    if (!element) {
-      return;
-    }
+  void processLayerContents(std::vector<Element*>& contents) {
+    // Find TextLayout in layer contents
+    const TextLayout* textLayout = nullptr;
+    std::vector<Text*> textElements = {};
 
-    switch (element->nodeType()) {
-      case NodeType::Text: {
-        // Standalone Text (not in a Group)
-        processStandaloneText(static_cast<Text*>(element));
-        break;
-      }
-      case NodeType::Group: {
+    for (auto& element : contents) {
+      if (element->nodeType() == NodeType::TextLayout) {
+        textLayout = static_cast<const TextLayout*>(element);
+      } else if (element->nodeType() == NodeType::Text) {
+        textElements.push_back(static_cast<Text*>(element));
+      } else if (element->nodeType() == NodeType::Group) {
         processGroup(static_cast<Group*>(element));
-        break;
       }
-      default:
-        break;
-    }
-  }
-
-  void processStandaloneText(Text* text) {
-    if (!text) {
-      return;
     }
 
-    // Check if already typeset
-    if (!text->glyphRuns.empty() && !_force) {
-      return;
+    // If we found Text elements at Layer level (not in Group)
+    if (!textElements.empty()) {
+      processTextWithLayout(textElements, textLayout);
     }
-
-    // Clear existing glyph runs
-    text->glyphRuns.clear();
-
-    // Skip if no text content
-    if (text->text.empty()) {
-      return;
-    }
-
-    // Shape the text
-    auto shapedInfo = shapeText(text);
-    if (shapedInfo.originalGlyphIDs.empty()) {
-      return;
-    }
-
-    // Create GlyphRun (no layout adjustment for standalone text)
-    createGlyphRun(text, shapedInfo, 0.0f);
-    _textTypeset = true;
   }
 
   void processGroup(Group* group) {
@@ -225,12 +195,14 @@ class TypesetterImpl : public Typesetter {
       }
     }
 
-    // If no Text elements, nothing to do
-    if (textElements.empty()) {
-      return;
+    // Process Text elements with optional TextLayout
+    if (!textElements.empty()) {
+      processTextWithLayout(textElements, textLayout);
     }
+  }
 
-    // Check if any Text in this Group needs typesetting
+  void processTextWithLayout(std::vector<Text*>& textElements, const TextLayout* textLayout) {
+    // Check if any Text needs typesetting
     bool needsTypesetting = _force;
     if (!needsTypesetting) {
       for (auto* text : textElements) {
@@ -245,7 +217,7 @@ class TypesetterImpl : public Typesetter {
       return;
     }
 
-    // Clear all GlyphRuns in the Group for re-typesetting
+    // Clear all GlyphRuns for re-typesetting
     for (auto* text : textElements) {
       text->glyphRuns.clear();
     }
@@ -273,6 +245,9 @@ class TypesetterImpl : public Typesetter {
       float xOffset = 0;
       if (textLayout != nullptr) {
         xOffset = calculateLayoutOffset(textLayout, shapedInfo.totalWidth);
+        // Apply TextLayout position to Text position
+        text->position.x = textLayout->position.x;
+        text->position.y = textLayout->position.y;
       }
 
       // Create GlyphRun with layout offset baked in

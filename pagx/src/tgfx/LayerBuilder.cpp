@@ -874,6 +874,30 @@ class LayerBuilderImpl {
     }
 
     group->setElements(elements);
+
+    // Apply transform properties
+    if (node->anchorPoint.x != 0 || node->anchorPoint.y != 0) {
+      group->setAnchorPoint(ToTGFX(node->anchorPoint));
+    }
+    if (node->position.x != 0 || node->position.y != 0) {
+      group->setPosition(ToTGFX(node->position));
+    }
+    if (node->scale.x != 1 || node->scale.y != 1) {
+      group->setScale(ToTGFX(node->scale));
+    }
+    if (node->rotation != 0) {
+      group->setRotation(node->rotation);
+    }
+    if (node->alpha != 1) {
+      group->setAlpha(node->alpha);
+    }
+    if (node->skew != 0) {
+      group->setSkew(node->skew);
+    }
+    if (node->skewAxis != 0) {
+      group->setSkewAxis(node->skewAxis);
+    }
+
     return group;
   }
 
@@ -881,8 +905,13 @@ class LayerBuilderImpl {
     layer->setVisible(node->visible);
     layer->setAlpha(node->alpha);
 
-    if (!node->matrix.isIdentity()) {
-      layer->setMatrix(ToTGFX(node->matrix));
+    // Apply transformation: combine x/y translation with matrix
+    auto matrix = ToTGFX(node->matrix);
+    if (node->x != 0 || node->y != 0) {
+      matrix = tgfx::Matrix::MakeTrans(node->x, node->y) * matrix;
+    }
+    if (!matrix.isIdentity()) {
+      layer->setMatrix(matrix);
     }
 
     // Layer styles
