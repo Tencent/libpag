@@ -485,6 +485,46 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `width` | float | (必填) | 合成宽度 |
 | `height` | float | (必填) | 合成高度 |
 
+#### 3.3.5 字体（Font）
+
+Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或位图）。PAGX 文件通过嵌入字形数据实现完全自包含，确保跨平台渲染一致性。
+
+```xml
+<!-- 嵌入矢量字体 -->
+<Font id="myFont">
+  <Glyph path="M 50 0 L 300 700 L 550 0 Z"/>
+  <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
+</Font>
+
+<!-- 嵌入位图字体（Emoji） -->
+<Font id="emojiFont">
+  <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
+  <Glyph image="emoji/heart.png" offset="0,-5"/>
+</Font>
+```
+
+**一致性约束**：同一 Font 内的所有 Glyph 必须使用相同类型（全部 `path` 或全部 `image`），不允许混用。
+
+**GlyphID 规则**：
+- **GlyphID 从 1 开始**：Glyph 列表的索引 + 1 = GlyphID
+- **GlyphID 0 保留**：表示缺失字形，不渲染
+
+##### 字形（Glyph）
+
+Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，不能同时指定。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `path` | string | - | SVG 路径数据（矢量轮廓） |
+| `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
+| `offset` | point | 0,0 | 位图偏移量（仅 `image` 时使用） |
+
+**字形类型**：
+- **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓
+- **位图字形**：指定 `image` 属性，用于 Emoji 等彩色字形，可通过 `offset` 调整位置
+
+**路径坐标系**：字形路径使用最终渲染坐标，已包含字号缩放。不同字号的同一字符应作为独立 Glyph 存储，因为字体在不同字号下可能有不同的字形设计。
+
 ### 3.4 文档层级结构
 
 PAGX 文档采用层级结构组织内容：
@@ -507,6 +547,8 @@ PAGX 文档采用层级结构组织内容：
     ├── <SolidColor>            ← 纯色定义
     ├── <LinearGradient>        ← 渐变定义
     ├── <ImagePattern>          ← 图片图案定义
+    ├── <Font>                  ← 字体资源（嵌入字体）
+    │   └── <Glyph>             ← 字形定义
     └── <Composition>           ← 合成定义
         └── <Layer>             ← 合成内的图层
 ```
@@ -1058,16 +1100,15 @@ y = center.y + outerRadius * sin(angle)
 
 #### 5.2.5 文本（Text）
 
-文本元素提供文本内容的几何形状。一个 Text 经过塑形后会产生**字形列表**（多个字形），而非单一 Path。Text 支持换行符（`\n`），使用 1.2 倍字号作为默认行高。
+文本元素提供文本内容的几何形状。与形状元素产生单一 Path 不同，Text 经过塑形后会产生**字形列表**（多个字形）并累积到渲染上下文的几何列表中，供后续修改器变换或绘制器渲染。
 
 ```xml
-<Text position="100,200" fontFamily="Arial" fontStyle="Bold" fontSize="24" letterSpacing="0" baselineShift="0">
-  <![CDATA[Hello World]]>
-</Text>
+<Text text="Hello World" position="100,200" fontFamily="Arial" fontStyle="Bold" fontSize="24" letterSpacing="0" baselineShift="0"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| `text` | string | "" | 文本内容 |
 | `position` | point | 0,0 | 文本起点位置，y 为基线（可被 TextLayout 覆盖） |
 | `fontFamily` | string | 系统默认 | 字体族 |
 | `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
@@ -1075,15 +1116,70 @@ y = center.y + outerRadius * sin(angle)
 | `letterSpacing` | float | 0 | 字间距 |
 | `baselineShift` | float | 0 | 基线偏移（正值上移，负值下移） |
 
-**处理流程**：
-1. 根据 `fontFamily` 和 `fontStyle` 查找字体文件
-2. 应用 `letterSpacing`（字距调整）
-3. 将文本塑形（shaping）为字形列表
-4. 按 `position` 位置放置（除非被 TextLayout 覆盖）
+子元素：`CDATA` 文本、`GlyphRun`*
 
-**字体回退**：当指定字体不可用时，按平台默认字体回退链选择替代字体。
+**文本内容**：通常使用 `text` 属性指定文本内容。当文本包含 XML 特殊字符（`<`、`>`、`&` 等）或需要保留多行格式时，可使用 CDATA 子节点替代 `text` 属性。Text 不允许直接包含纯文本子节点，必须用 CDATA 包裹。
 
-**换行处理**：Text 内容中的 `\n` 会触发换行，使用 1.2 倍字号作为行高。如需自定义行高，使用 TextLayout。
+```xml
+<!-- 简单文本：使用 text 属性 -->
+<Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+
+<!-- 包含特殊字符：使用 CDATA -->
+<Text fontFamily="Arial" fontSize="24"><![CDATA[A < B & C > D]]></Text>
+
+<!-- 多行文本：使用 CDATA 保留格式 -->
+<Text fontFamily="Arial" fontSize="24">
+<![CDATA[Line 1
+Line 2
+Line 3]]>
+</Text>
+```
+
+**渲染模式**：Text 支持**预排版**和**运行时排版**两种模式。预排版通过 GlyphRun 子节点提供预计算的字形和位置，使用嵌入字体渲染，确保跨平台完全一致。运行时排版在运行时进行塑形和排版，因各平台字体和排版特性差异，可能存在细微不一致。如需精确还原设计工具的排版效果，建议使用预排版。
+
+**运行时排版渲染流程**：
+1. 根据 `fontFamily` 和 `fontStyle` 查找系统字体，不可用时按运行时配置的回退列表选择替代字体
+2. 使用 `text` 属性（或 CDATA 子节点）进行塑形，换行符触发换行（默认 1.2 倍字号行高，可通过 TextLayout 自定义）
+3. 应用 `fontSize`、`letterSpacing`、`baselineShift` 等排版参数
+4. 构造字形列表累积到渲染上下文
+
+##### 预排版数据（GlyphRun）
+
+GlyphRun 定义一组字形的预排版数据。每个 GlyphRun 独立引用字体，支持字体回退场景（如中文回退到宋体、emoji 回退到系统表情字体）。
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `font` | idref | 引用 Font 资源 `@id` |
+| `glyphs` | string | GlyphID 序列，逗号分隔（0 表示缺失字形） |
+| `y` | float | 共享 y 坐标（仅 Horizontal 模式），默认 0 |
+| `xPositions` | string | x 坐标序列，逗号分隔（Horizontal 模式） |
+| `positions` | string | (x,y) 坐标序列，分号分隔（Point 模式） |
+| `xforms` | string | RSXform 序列 (scos,ssin,tx,ty)，分号分隔（RSXform 模式） |
+| `matrices` | string | Matrix 序列 (a,b,c,d,tx,ty)，分号分隔（Matrix 模式） |
+
+**定位模式选择**（优先级从高到低）：
+1. 有 `matrices` → Matrix 模式：每个字形有完整 2D 仿射变换
+2. 有 `xforms` → RSXform 模式：每个字形有旋转+缩放+平移（路径文本）
+3. 有 `positions` → Point 模式：每个字形有独立 (x,y) 位置（多行/复杂布局）
+4. 有 `xPositions` → Horizontal 模式：每个字形有 x 坐标，共享 `y` 值（单行水平文本）
+5. 仅 `glyphs` → 不支持，必须提供位置数据
+
+**RSXform 说明**：
+RSXform 是压缩的旋转+缩放矩阵，四个分量 (scos, ssin, tx, ty) 表示：
+```
+| scos  -ssin   tx |
+| ssin   scos   ty |
+|   0      0     1 |
+```
+其中 scos = scale × cos(angle)，ssin = scale × sin(angle)。
+
+**Matrix 说明**：
+Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) 表示：
+```
+|  a   c   tx |
+|  b   d   ty |
+|  0   0    1 |
+```
 
 ### 5.3 绘制器（Painters）
 
@@ -1312,8 +1408,8 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 ```xml
 <Group>
-  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello]]></Text>
-  <Text fontFamily="Arial" fontSize="24"><![CDATA[World]]></Text>
+  <Text text="Hello" fontFamily="Arial" fontSize="24"/>
+  <Text text="World" fontFamily="Arial" fontSize="24"/>
   <TextModifier position="0,-10"/>
   <Fill color="#333333"/>
 </Group>
@@ -1522,14 +1618,14 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 ```xml
 <!-- 点文本：居中对齐 -->
 <Layer>
-  <Text fontFamily="Arial" fontSize="24">Hello World</Text>
+  <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
   <TextLayout position="150,100" textAlign="center"/>
   <Fill color="#333333"/>
 </Layer>
 
 <!-- 段落文本：自动换行 -->
 <Layer>
-  <Text fontFamily="Arial" fontSize="16">这是一段很长的文本，会自动换行...</Text>
+  <Text text="这是一段很长的文本，会自动换行..." fontFamily="Arial" fontSize="16"/>
   <TextLayout position="50,50" width="300" height="200" textAlign="start" verticalAlign="top" lineHeight="1.5"/>
   <Fill color="#333333"/>
 </Layer>
@@ -1576,11 +1672,11 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 ```xml
 <Layer>
   <Group>
-    <Text fontFamily="Arial" fontSize="24">Hello </Text>
+    <Text text="Hello " fontFamily="Arial" fontSize="24"/>
     <Fill color="#000000"/>
   </Group>
   <Group>
-    <Text fontFamily="Arial" fontStyle="Bold" fontSize="24">World</Text>
+    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
     <Fill color="#FF0000"/>
   </Group>
   <TextLayout position="50,100" width="300"/>
@@ -1654,7 +1750,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 ```xml
 <Group>
-  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hi]]></Text>  <!-- 累积字形列表 -->
+  <Text text="Hi" fontFamily="Arial" fontSize="24"/>  <!-- 累积字形列表 -->
   <Fill color="#333333"/>            <!-- 渲染填充 -->
   <Repeater copies="3"/> <!-- 复制字形列表和已渲染的填充 -->
   <TextModifier position="0,-5"/>    <!-- 仍可对复制后的字形列表生效 -->
@@ -1798,11 +1894,12 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 | 分类 | 节点 |
 |------|------|
 | **文档根** | `pagx` |
-| **资源** | `Resources`, `Image`, `PathData`, `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ColorStop`, `ImagePattern`, `Composition` |
+| **资源** | `Resources`, `Image`, `PathData`, `Font`, `Glyph`, `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ColorStop`, `ImagePattern`, `Composition` |
 | **图层** | `Layer` |
 | **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
 | **滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
 | **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text` |
+| **预排版数据** | `GlyphRun`（Text 子元素） |
 | **绘制器** | `Fill`, `Stroke` |
 | **形状修改器** | `TrimPath`, `RoundCorner`, `MergePath` |
 | **文本修改器** | `TextModifier`, `TextPath`, `TextLayout` |
@@ -1822,6 +1919,7 @@ pagx
 │   ├── ConicGradient → ColorStop*
 │   ├── DiamondGradient → ColorStop*
 │   ├── ImagePattern
+│   ├── Font → Glyph*
 │   └── Composition → Layer*
 │
 └── Layer*
@@ -1847,7 +1945,7 @@ Layer / Group
 ├── Ellipse
 ├── Polystar
 ├── Path
-├── Text
+├── Text → GlyphRun*（预排版模式）
 ├── Fill（可内嵌颜色源）
 │   └── SolidColor / LinearGradient / RadialGradient / ConicGradient / DiamondGradient / ImagePattern
 ├── Stroke（可内嵌颜色源）
@@ -1881,9 +1979,7 @@ Layer / Group
   <!-- 标题：使用 Group 是因为需要整体变换 -->
   <Layer name="Title">
     <Group anchorPoint="100,20" position="200,50">
-      <Text position="0,32" fontFamily="Helvetica" fontStyle="Bold" fontSize="32">
-        <![CDATA[Hello PAGX!]]>
-      </Text>
+      <Text text="Hello PAGX!" position="0,32" fontFamily="Helvetica" fontStyle="Bold" fontSize="32"/>
       <Fill color="#333333"/>
       <Stroke color="#FFFFFF" width="2" placement="foreground"/>
     </Group>
@@ -1981,9 +2077,7 @@ Layer / Group
 ```xml
 <!-- 波浪文字：逐字上下偏移 -->
 <Layer>
-  <Text position="0,50" fontFamily="Arial" fontSize="32">
-    <![CDATA[WAVE TEXT]]>
-  </Text>
+  <Text text="WAVE TEXT" position="0,50" fontFamily="Arial" fontSize="32"/>
   <TextModifier position="0,-20">
     <RangeSelector start="0" end="1" shape="triangle"/>
   </TextModifier>
@@ -1992,9 +2086,7 @@ Layer / Group
 
 <!-- 颜色渐变文字 -->
 <Layer>
-  <Text position="0,100" fontFamily="Arial" fontSize="32">
-    <![CDATA[GRADIENT]]>
-  </Text>
+  <Text text="GRADIENT" position="0,100" fontFamily="Arial" fontSize="32"/>
   <TextModifier fillColor="#FF0000">
     <RangeSelector start="0" end="1" shape="rampUp"/>
   </TextModifier>
@@ -2007,7 +2099,7 @@ Layer / Group
 ```xml
 <!-- 点文本：居中对齐 -->
 <Layer>
-  <Text fontFamily="Arial" fontSize="24">Centered Text</Text>
+  <Text text="Centered Text" fontFamily="Arial" fontSize="24"/>
   <TextLayout position="200,50" textAlign="center"/>
   <Fill color="#333333"/>
 </Layer>
@@ -2015,23 +2107,23 @@ Layer / Group
 <!-- 富文本：多种样式 + 自动换行 -->
 <Layer>
   <Group>
-    <Text fontFamily="Arial" fontSize="16">This is </Text>
+    <Text text="This is " fontFamily="Arial" fontSize="16"/>
     <Fill color="#333333"/>
   </Group>
   <Group>
-    <Text fontFamily="Arial" fontStyle="Bold" fontSize="16">bold</Text>
+    <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
     <Fill color="#333333"/>
   </Group>
   <Group>
-    <Text fontFamily="Arial" fontSize="16"> and </Text>
+    <Text text=" and " fontFamily="Arial" fontSize="16"/>
     <Fill color="#333333"/>
   </Group>
   <Group>
-    <Text fontFamily="Arial" fontStyle="Italic" fontSize="16">italic</Text>
+    <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="16"/>
     <Fill color="#333333"/>
   </Group>
   <Group>
-    <Text fontFamily="Arial" fontSize="16"> text that will automatically wrap.</Text>
+    <Text text=" text that will automatically wrap." fontFamily="Arial" fontSize="16"/>
     <Fill color="#333333"/>
   </Group>
   <TextLayout position="50,100" width="200" height="150" textAlign="justify" lineHeight="1.5"/>
@@ -2044,18 +2136,14 @@ Layer / Group
 <!-- 需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/> -->
 <!-- 居中对齐 -->
 <Layer>
-  <Text fontFamily="Arial" fontSize="18">
-    <![CDATA[Text along a curved path]]>
-  </Text>
+  <Text text="Text along a curved path" fontFamily="Arial" fontSize="18"/>
   <TextPath path="@arc" textAlign="center"/>
   <Fill color="#336699"/>
 </Layer>
 
 <!-- 强制填满路径（Justify 模式） -->
 <Layer>
-  <Text fontFamily="Arial" fontSize="18">
-    <![CDATA[Justified Text]]>
-  </Text>
+  <Text text="Justified Text" fontFamily="Arial" fontSize="18"/>
   <TextPath path="@arc" textAlign="justify" firstMargin="20" lastMargin="20"/>
   <Fill color="#996633"/>
 </Layer>
@@ -2099,6 +2187,18 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `data` | string | (必填) |
+
+#### Font
+
+子元素：`Glyph`*
+
+#### Glyph
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `path` | string | - |
+| `image` | string | - |
+| `offset` | point | 0,0 |
 
 #### SolidColor
 
@@ -2315,6 +2415,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
+| `text` | string | "" |
 | `position` | point | 0,0 |
 | `fontFamily` | string | 系统默认 |
 | `fontStyle` | string | "Regular" |
@@ -2322,7 +2423,19 @@ Layer / Group
 | `letterSpacing` | float | 0 |
 | `baselineShift` | float | 0 |
 
-内容：`CDATA` 文本
+子元素：`CDATA` 文本、`GlyphRun`*
+
+#### GlyphRun
+
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `font` | idref | (必填) |
+| `glyphs` | string | (必填) |
+| `y` | float | 0 |
+| `xPositions` | string | - |
+| `positions` | string | - |
+| `xforms` | string | - |
+| `matrices` | string | - |
 
 ### C.7 绘制器节点
 
