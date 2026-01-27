@@ -51,7 +51,6 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
 #include "tgfx/core/ColorSpace.h"
@@ -88,7 +87,13 @@
 #include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
-#include "tgfx/svg/TextShaper.h"
+
+#ifdef DEBUG
+#include <cassert>
+#define DEBUG_ASSERT(x) assert(x)
+#else
+#define DEBUG_ASSERT(x)
+#endif
 
 namespace pagx {
 
@@ -347,12 +352,6 @@ static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
 class LayerBuilderImpl {
  public:
   explicit LayerBuilderImpl(const LayerBuilder::Options& options) : _options(options) {
-    // Create text shaper from options or fallback typefaces.
-    if (_options.textShaper) {
-      _textShaper = _options.textShaper;
-    } else if (!_options.fallbackTypefaces.empty()) {
-      _textShaper = tgfx::TextShaper::Make(_options.fallbackTypefaces);
-    }
   }
 
   PAGXContent build(const PAGXDocument& document) {
@@ -531,51 +530,21 @@ class LayerBuilderImpl {
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
     auto tgfxText = std::make_shared<tgfx::Text>();
 
-    // Check for precomposition mode (has GlyphRuns)
-    if (!node->glyphRuns.empty()) {
-      auto textBlob = buildPrecomposedTextBlob(node);
-      if (textBlob) {
-        tgfxText->setTextBlob(textBlob);
-        tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
-        return tgfxText;
-      }
+    // Text must be pre-typeset with GlyphRuns. Use Typesetter before calling LayerBuilder.
+    if (node->glyphRuns.empty()) {
+      DEBUG_ASSERT(false && "Text element has no GlyphRun data. Use Typesetter to typeset first.");
+      return tgfxText;
     }
 
-    // Runtime shaping mode
-    std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (!node->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
-      for (const auto& tf : _options.fallbackTypefaces) {
-        if (tf && tf->fontFamily() == node->fontFamily) {
-          typeface = tf;
-          break;
-        }
-      }
-    }
-    if (!typeface && !_options.fallbackTypefaces.empty()) {
-      typeface = _options.fallbackTypefaces[0];
-    }
-    // Fallback to system font by name (required for Web platform).
-    if (!typeface && !node->fontFamily.empty()) {
-      typeface = tgfx::Typeface::MakeFromName(node->fontFamily, node->fontStyle);
-    }
-
-    if (!node->text.empty()) {
-      std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
-      // Use TextShaper for fallback support (including emoji).
-      if (_textShaper) {
-        textBlob = _textShaper->shape(node->text, typeface, node->fontSize);
-      } else if (typeface) {
-        auto font = tgfx::Font(typeface, node->fontSize);
-        textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
-      }
+    auto textBlob = buildTextBlob(node);
+    if (textBlob) {
       tgfxText->setTextBlob(textBlob);
     }
-
     tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     return tgfxText;
   }
 
-  std::shared_ptr<tgfx::TextBlob> buildPrecomposedTextBlob(const Text* node) {
+  std::shared_ptr<tgfx::TextBlob> buildTextBlob(const Text* node) {
     tgfx::TextBlobBuilder builder;
 
     for (const auto& run : node->glyphRuns) {
@@ -892,124 +861,9 @@ class LayerBuilderImpl {
     auto group = std::make_shared<tgfx::VectorGroup>();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
 
-    // Check if group contains TextLayout modifier.
-    const TextLayout* textLayout = nullptr;
     for (const auto& element : node->elements) {
+      // Skip TextLayout modifier - layout has been baked into GlyphRun positions by Typesetter
       if (element->nodeType() == NodeType::TextLayout) {
-        textLayout = static_cast<const TextLayout*>(element);
-        break;
-      }
-    }
-
-    // Collect Text info for layout calculation if TextLayout is present.
-    struct TextInfo {
-      const pagx::Text* text = nullptr;
-      std::shared_ptr<tgfx::TextBlob> blob = nullptr;
-      tgfx::Rect bounds = {};
-    };
-    std::vector<TextInfo> textInfos;
-
-    if (textLayout != nullptr) {
-      for (const auto& element : node->elements) {
-        if (element->nodeType() == NodeType::Text) {
-          auto text = static_cast<const pagx::Text*>(element);
-          TextInfo info;
-          info.text = text;
-
-          // Check for precomposed mode first
-          if (!text->glyphRuns.empty()) {
-            info.blob = buildPrecomposedTextBlob(text);
-            if (info.blob) {
-              info.bounds = info.blob->getTightBounds();
-            }
-            textInfos.push_back(info);
-            continue;
-          }
-
-          // Runtime shaping mode: Create TextBlob to measure bounds.
-          std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-          if (!text->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
-            for (const auto& tf : _options.fallbackTypefaces) {
-              if (tf && tf->fontFamily() == text->fontFamily) {
-                typeface = tf;
-                break;
-              }
-            }
-          }
-          if (!typeface && !_options.fallbackTypefaces.empty()) {
-            typeface = _options.fallbackTypefaces[0];
-          }
-          // Fallback to system font by name (required for Web platform).
-          if (!typeface && !text->fontFamily.empty()) {
-            typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
-          }
-
-          if (!text->text.empty()) {
-            if (_textShaper) {
-              info.blob = _textShaper->shape(text->text, typeface, text->fontSize);
-            } else if (typeface) {
-              auto font = tgfx::Font(typeface, text->fontSize);
-              info.blob = tgfx::TextBlob::MakeFrom(text->text, font);
-            }
-            if (info.blob) {
-              info.bounds = info.blob->getTightBounds();
-            }
-          }
-          textInfos.push_back(info);
-        }
-      }
-    }
-
-    for (const auto& element : node->elements) {
-      // Skip TextLayout modifier, it's handled by adjusting Text positions.
-      if (element->nodeType() == NodeType::TextLayout) {
-        continue;
-      }
-
-      // Handle Text with layout adjustments.
-      if (element->nodeType() == NodeType::Text && textLayout != nullptr) {
-        auto text = static_cast<const pagx::Text*>(element);
-        auto tgfxText = std::make_shared<tgfx::Text>();
-
-        // Find the matching TextInfo.
-        TextInfo* info = nullptr;
-        for (auto& ti : textInfos) {
-          if (ti.text == text) {
-            info = &ti;
-            break;
-          }
-        }
-
-        if (info != nullptr && info->blob) {
-          tgfxText->setTextBlob(info->blob);
-
-          // Calculate x offset based on textAlign.
-          // This follows tgfx SVG text-anchor handling: xOffset = alignmentFactor * width
-          // where alignmentFactor is: Start=0, Center=-0.5, End=-1.0
-          float xOffset = 0;
-          float textWidth = info->bounds.width();
-          switch (textLayout->textAlign) {
-            case TextAlign::Start:
-              // No offset needed.
-              break;
-            case TextAlign::Center:
-              xOffset = -0.5f * textWidth;
-              break;
-            case TextAlign::End:
-              xOffset = -textWidth;
-              break;
-            case TextAlign::Justify:
-              // Justify requires more complex handling, treat as start for now.
-              break;
-          }
-
-          tgfxText->setPosition(tgfx::Point::Make(text->position.x + xOffset, text->position.y));
-        } else {
-          // No blob, use original position.
-          tgfxText->setPosition(tgfx::Point::Make(text->position.x, text->position.y));
-        }
-
-        elements.push_back(tgfxText);
         continue;
       }
 
@@ -1104,7 +958,6 @@ class LayerBuilderImpl {
 
   LayerBuilder::Options _options = {};
   const PAGXDocument* _document = nullptr;
-  std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};

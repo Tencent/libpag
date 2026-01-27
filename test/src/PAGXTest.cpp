@@ -25,7 +25,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "pagx/TextShaper.h"
+#include "pagx/Typesetter.h"
 #include "../../pagx/src/StringParser.h"
 #include "../../pagx/src/SVGPathParser.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -120,6 +120,10 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
 
   auto textShaper = TextShaper::Make(GetFallbackTypefaces());
 
+  // Create Typesetter for text shaping
+  auto typesetter = pagx::Typesetter::Make();
+  typesetter->setFallbackTypefaces(GetFallbackTypefaces());
+
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
 
@@ -135,14 +139,15 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Step 2: Export to XML and save as PAGX file
+    // Step 2: Typeset text elements
+    typesetter->typeset(doc.get());
+
+    // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
     std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + baseName + ".pagx");
 
-    // Step 3: Load PAGX file and build layer tree (this is the viewer's actual path)
-    pagx::LayerBuilder::Options options;
-    options.fallbackTypefaces = GetFallbackTypefaces();
-    auto content = pagx::LayerBuilder::FromFile(pagxPath, options);
+    // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
+    auto content = pagx::LayerBuilder::FromFile(pagxPath);
     if (content.root == nullptr) {
       continue;
     }
@@ -220,10 +225,8 @@ PAG_TEST(PAGXTest, ColorRefRender) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  pagx::LayerBuilder::Options options;
-  options.fallbackTypefaces = GetFallbackTypefaces();
   auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                              strlen(pagxXml), options);
+                                              strlen(pagxXml));
   ASSERT_TRUE(content.root != nullptr);
   EXPECT_FLOAT_EQ(content.width, 200.0f);
   EXPECT_FLOAT_EQ(content.height, 200.0f);
@@ -943,11 +946,10 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
 /**
  * Test case: Text shaping round-trip.
  * 1. Load SVG with text content
- * 2. Render original (runtime shaping)
- * 3. Shape text (TextShaper)
- * 4. Export to PAGX
- * 5. Reload PAGX and render (pre-shaped)
- * 6. Compare render results
+ * 2. Typeset text (Typesetter)
+ * 3. Export to PAGX
+ * 4. Reload PAGX and render (pre-shaped)
+ * 5. Compare render results
  */
 PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   // Use text.svg as the test file
@@ -970,23 +972,12 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   auto typefaces = GetFallbackTypefaces();
   ASSERT_FALSE(typefaces.empty());
 
-  // Step 2: Render original (runtime shaping)
-  pagx::LayerBuilder::Options buildOptions;
-  buildOptions.fallbackTypefaces = typefaces;
-  auto originalContent = pagx::LayerBuilder::Build(*doc, buildOptions);
-  ASSERT_TRUE(originalContent.root != nullptr);
-
-  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList originalDL;
-  originalDL.root()->addChild(originalContent.root);
-  originalDL.render(originalSurface.get(), false);
-
-  // Step 3: Shape text
-  auto textShaper = pagx::TextShaper::Make();
-  ASSERT_TRUE(textShaper != nullptr);
-  textShaper->setFallbackTypefaces(typefaces);
-  bool shaped = textShaper->shape(doc.get());
-  EXPECT_TRUE(shaped);
+  // Step 2: Typeset text
+  auto typesetter = pagx::Typesetter::Make();
+  ASSERT_TRUE(typesetter != nullptr);
+  typesetter->setFallbackTypefaces(typefaces);
+  bool typeset = typesetter->typeset(doc.get());
+  EXPECT_TRUE(typeset);
 
   // Verify Font resources were added
   bool hasFontResource = false;
@@ -999,6 +990,15 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
     }
   }
   EXPECT_TRUE(hasFontResource);
+
+  // Step 3: Render typeset document
+  auto originalContent = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(originalContent.root != nullptr);
+
+  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList originalDL;
+  originalDL.root()->addChild(originalContent.root);
+  originalDL.render(originalSurface.get(), false);
 
   // Step 4: Export to PAGX
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -1086,10 +1086,15 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
 
   auto typefaces = GetFallbackTypefaces();
 
-  // Render original
-  pagx::LayerBuilder::Options buildOptions;
-  buildOptions.fallbackTypefaces = typefaces;
-  auto originalContent = pagx::LayerBuilder::Build(*doc, buildOptions);
+  // Typeset text
+  auto typesetter = pagx::Typesetter::Make();
+  ASSERT_TRUE(typesetter != nullptr);
+  typesetter->setFallbackTypefaces(typefaces);
+  bool typeset = typesetter->typeset(doc.get());
+  EXPECT_TRUE(typeset);
+
+  // Render typeset document
+  auto originalContent = pagx::LayerBuilder::Build(*doc);
   ASSERT_TRUE(originalContent.root != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
@@ -1097,19 +1102,11 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
   originalDL.root()->addChild(originalContent.root);
   originalDL.render(originalSurface.get(), false);
 
-  // Shape text
-  auto textShaper = pagx::TextShaper::Make();
-  ASSERT_TRUE(textShaper != nullptr);
-  textShaper->setFallbackTypefaces(typefaces);
-  bool shaped = textShaper->shape(doc.get());
-  EXPECT_TRUE(shaped);
-
   // Export and reload
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   std::string pagxPath = SavePAGXFile(xml, "PAGXTest/textFont_preshaped.pagx");
 
-  pagx::LayerBuilder::Options reloadOptions;
-  auto reloadedContent = pagx::LayerBuilder::FromFile(pagxPath, reloadOptions);
+  auto reloadedContent = pagx::LayerBuilder::FromFile(pagxPath);
   ASSERT_TRUE(reloadedContent.root != nullptr);
 
   // Render pre-shaped

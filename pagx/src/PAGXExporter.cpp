@@ -242,12 +242,14 @@ static std::string floatListToString(const std::vector<float>& values) {
 // Forward declarations
 //==============================================================================
 
+using Options = PAGXExporter::Options;
+
 static void writeColorSource(XMLBuilder& xml, const ColorSource* node);
-static void writeVectorElement(XMLBuilder& xml, const Element* node);
+static void writeVectorElement(XMLBuilder& xml, const Element* node, const Options& options);
 static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void writeResource(XMLBuilder& xml, const Node* node);
-static void writeLayer(XMLBuilder& xml, const Layer* node);
+static void writeResource(XMLBuilder& xml, const Node* node, const Options& options);
+static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& options);
 
 //==============================================================================
 // ColorStop and ColorSource writing
@@ -387,7 +389,7 @@ static void writeColorSource(XMLBuilder& xml, const ColorSource* node) {
 // VectorElement writing
 //==============================================================================
 
-static void writeVectorElement(XMLBuilder& xml, const Element* node) {
+static void writeVectorElement(XMLBuilder& xml, const Element* node, const Options& options) {
   switch (node->nodeType()) {
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
@@ -464,8 +466,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       xml.addAttribute("letterSpacing", text->letterSpacing);
       xml.addAttribute("baselineShift", text->baselineShift);
 
-      // Check if we need children (GlyphRuns)
-      if (text->glyphRuns.empty()) {
+      // Skip GlyphRuns if requested or if none exist
+      if (options.skipGlyphData || text->glyphRuns.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
@@ -799,7 +801,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node) {
       } else {
         xml.closeElementStart();
         for (const auto& element : group->elements) {
-          writeVectorElement(xml, element);
+          writeVectorElement(xml, element, options);
         }
         xml.closeElement();
       }
@@ -932,7 +934,7 @@ static void writeLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
 // Resource writing
 //==============================================================================
 
-static void writeResource(XMLBuilder& xml, const Node* node) {
+static void writeResource(XMLBuilder& xml, const Node* node, const Options& options) {
   switch (node->nodeType()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
@@ -966,13 +968,17 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
-          writeLayer(xml, layer);
+          writeLayer(xml, layer, options);
         }
         xml.closeElement();
       }
       break;
     }
     case NodeType::Font: {
+      // Skip Font resources if skipGlyphData is true
+      if (options.skipGlyphData) {
+        break;
+      }
       auto font = static_cast<const Font*>(node);
       xml.openElement("Font");
       xml.addAttribute("id", font->id);
@@ -1026,7 +1032,7 @@ static void writeResource(XMLBuilder& xml, const Node* node) {
 // Layer writing
 //==============================================================================
 
-static void writeLayer(XMLBuilder& xml, const Layer* node) {
+static void writeLayer(XMLBuilder& xml, const Layer* node, const Options& options) {
   xml.openElement("Layer");
   if (!node->id.empty()) {
     xml.addAttribute("id", node->id);
@@ -1079,7 +1085,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {
-    writeVectorElement(xml, element);
+    writeVectorElement(xml, element, options);
   }
 
   // Write LayerStyle (styles) directly without container node.
@@ -1094,7 +1100,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    writeLayer(xml, child);
+    writeLayer(xml, child, options);
   }
 
   xml.closeElement();
@@ -1104,7 +1110,7 @@ static void writeLayer(XMLBuilder& xml, const Layer* node) {
 // Main Export function
 //==============================================================================
 
-std::string PAGXExporter::ToXML(const PAGXDocument& doc) {
+std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
   XMLBuilder xml = {};
   xml.appendDeclaration();
 
@@ -1116,7 +1122,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc) {
 
   // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    writeLayer(xml, layer);
+    writeLayer(xml, layer, options);
   }
 
   // Write Resources section at the end (only if there are resources)
@@ -1126,7 +1132,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc) {
 
     for (const auto& resource : doc.nodes) {
       if (!resource->id.empty()) {
-        writeResource(xml, resource.get());
+        writeResource(xml, resource.get(), options);
       }
     }
 

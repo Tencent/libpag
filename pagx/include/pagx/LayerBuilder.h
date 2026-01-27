@@ -20,14 +20,8 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 #include "pagx/PAGXDocument.h"
-#include "tgfx/core/Typeface.h"
 #include "tgfx/layers/Layer.h"
-
-namespace tgfx {
-class TextShaper;
-}
 
 namespace pagx {
 
@@ -52,46 +46,41 @@ struct PAGXContent {
 };
 
 /**
+ * Build options for LayerBuilder.
+ */
+struct LayerBuildOptions {
+  /**
+   * Base path for resolving relative resource paths.
+   */
+  std::string basePath = {};
+};
+
+/**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
  * This is the bridge between the independent pagx module and tgfx rendering.
+ *
+ * Note: LayerBuilder expects the document to be pre-typeset. Text elements without GlyphRun data
+ * will trigger a DEBUG_ASSERT in debug builds and be skipped in release builds. Use Typesetter
+ * to typeset the document before calling LayerBuilder.
  */
 class LayerBuilder {
  public:
-  struct Options {
-    /**
-     * Fallback typefaces for text rendering.
-     */
-    std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
-
-    /**
-     * Text shaper for text rendering with fallback support.
-     * If not provided, a default TextShaper will be created from fallbackTypefaces.
-     */
-    std::shared_ptr<tgfx::TextShaper> textShaper;
-
-    /**
-     * Base path for resolving relative resource paths.
-     */
-    std::string basePath;
-
-    Options() : fallbackTypefaces(), textShaper(nullptr), basePath() {
-    }
-  };
+  using Options = LayerBuildOptions;
 
   /**
    * Builds a layer tree from a PAGXDocument.
    */
-  static PAGXContent Build(const PAGXDocument& document, const Options& options = Options());
+  static PAGXContent Build(const PAGXDocument& document, const Options& options = {});
 
   /**
    * Builds a layer tree from a PAGX file.
    */
-  static PAGXContent FromFile(const std::string& filePath, const Options& options = Options());
+  static PAGXContent FromFile(const std::string& filePath, const Options& options = {});
 
   /**
    * Builds a layer tree from PAGX XML data.
    */
-  static PAGXContent FromData(const uint8_t* data, size_t length, const Options& options = Options());
+  static PAGXContent FromData(const uint8_t* data, size_t length, const Options& options = {});
 };
 
 }  // namespace pagx

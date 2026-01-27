@@ -115,7 +115,7 @@ class PAGXDocument {
 
   friend class PAGXImporter;
   friend class PAGXExporter;
-  friend class TextShaperImpl;
+  friend class TypesetterImpl;
 };
 
 }  // namespace pagx
