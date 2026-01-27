@@ -714,7 +714,7 @@ Layer 的子元素按类型自动归类为四个集合：
 <Layer>
   <Rectangle center="50,50" size="100,100"/>
   <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehind="true"/>
+  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
   <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
   <BackgroundBlurStyle blurX="20" blurY="20" tileMode="mirror"/>
 </Layer>
@@ -728,7 +728,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 #### 4.3.1 投影阴影（DropShadowStyle）
 
-在图层**下方**绘制投影阴影。基于不透明图层内容计算阴影形状。当 `showBehind="false"` 时，额外使用**图层轮廓**作为擦除遮罩挖空被图层遮挡的部分。
+在图层**下方**绘制投影阴影。基于不透明图层内容计算阴影形状。当 `showBehindLayer="false"` 时，额外使用**图层轮廓**作为擦除遮罩挖空被图层遮挡的部分。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -737,15 +737,15 @@ Layer 的子元素按类型自动归类为四个集合：
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
 | `color` | color | #000000 | 阴影颜色 |
-| `showBehind` | bool | true | 图层后面是否显示阴影 |
+| `showBehindLayer` | bool | true | 图层后面是否显示阴影 |
 
 **渲染步骤**：
 1. 获取不透明图层内容并偏移 `(offsetX, offsetY)`
 2. 对偏移后的内容应用高斯模糊 `(blurX, blurY)`
 3. 使用 `color` 的颜色填充阴影区域
-4. 如果 `showBehind="false"`，使用图层轮廓作为擦除遮罩挖空被遮挡部分
+4. 如果 `showBehindLayer="false"`，使用图层轮廓作为擦除遮罩挖空被遮挡部分
 
-**showBehind**：
+**showBehindLayer**：
 - `true`：阴影完整显示，包括被图层内容遮挡的部分
 - `false`：阴影被图层内容遮挡的部分会被挖空（使用图层轮廓作为擦除遮罩）
 
@@ -2314,7 +2314,7 @@ Layer / Group
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
 | `color` | color | #000000 |
-| `showBehind` | bool | true |
+| `showBehindLayer` | bool | true |
 | `blendMode` | BlendMode | normal |
 
 #### InnerShadowStyle

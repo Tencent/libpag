@@ -1408,7 +1408,7 @@ static DropShadowStyle* parseDropShadowStyle(const XMLNode* node, PAGXDocument* 
   if (!colorStr.empty()) {
     style->color = parseColor(colorStr);
   }
-  style->showBehind = getBoolAttribute(node, "showBehind", true);
+  style->showBehindLayer = getBoolAttribute(node, "showBehindLayer", true);
   return style;
 }
 

@@ -829,7 +829,7 @@ static void writeLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       xml.addAttribute("blurX", style->blurX);
       xml.addAttribute("blurY", style->blurY);
       xml.addAttribute("color", ColorToHexString(style->color, style->color.alpha < 1.0f));
-      xml.addAttribute("showBehind", style->showBehind, true);
+      xml.addAttribute("showBehindLayer", style->showBehindLayer, true);
       xml.closeElementSelfClosing();
       break;
     }

@@ -56,7 +56,7 @@ class DropShadowStyle : public LayerStyle {
   /**
    * Whether the shadow is shown behind the layer. The default value is true.
    */
-  bool showBehind = true;
+  bool showBehindLayer = true;
 
   NodeType nodeType() const override {
     return NodeType::DropShadowStyle;
