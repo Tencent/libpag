@@ -42,7 +42,7 @@ struct RSXform {
 };
 
 /**
- * GlyphRun defines pre-typeset glyph data for a segment of text. Each GlyphRun independently
+ * GlyphRun defines pre-shaped glyph data for a segment of text. Each GlyphRun independently
  * references a font resource.
  */
 class GlyphRun : public Node {

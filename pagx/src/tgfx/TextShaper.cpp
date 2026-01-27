@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/TextPrecomposer.h"
+#include "pagx/TextShaper.h"
 #include <unordered_map>
 #include <unordered_set>
 #include "pagx/nodes/Composition.h"
@@ -27,7 +27,6 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/svg/TextShaper.h"
 
 namespace pagx {
 
@@ -65,27 +64,30 @@ static std::string PathToSVGString(const tgfx::Path& path) {
   return result;
 }
 
-// Private helper class that performs the actual text precomposition
-class TextPrecomposerImpl {
+// Private implementation class
+class TextShaperImpl : public TextShaper {
  public:
-  TextPrecomposerImpl(PAGXDocument& document, const TextPrecomposer::Options& options)
-      : _document(document), _options(options) {
-    // Initialize text shaper
-    if (_options.textShaper) {
-      _textShaper = _options.textShaper;
-    } else if (!_options.fallbackTypefaces.empty()) {
-      _textShaper = tgfx::TextShaper::Make(_options.fallbackTypefaces);
-    }
+  explicit TextShaperImpl(std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces)
+      : _fallbackTypefaces(std::move(fallbackTypefaces)) {
   }
 
-  bool process() {
+  bool shape(PAGXDocument* document) override {
+    if (!document) {
+      return false;
+    }
+
+    _document = document;
+    _textShaped = false;
+    _fontResources.clear();
+    _glyphMapping.clear();
+
     // Process all layers
-    for (auto& layer : _document.layers) {
+    for (auto& layer : _document->layers) {
       processLayer(layer.get());
     }
 
     // Process compositions in resources
-    for (auto& res : _document.resources) {
+    for (auto& res : _document->resources) {
       if (res->nodeType() == NodeType::Composition) {
         auto comp = static_cast<Composition*>(res.get());
         for (auto& layer : comp->layers) {
@@ -96,10 +98,10 @@ class TextPrecomposerImpl {
 
     // Add collected Font resources to document
     for (auto& fontPair : _fontResources) {
-      _document.resources.push_back(std::move(fontPair.second));
+      _document->resources.push_back(std::move(fontPair.second));
     }
 
-    return _textProcessed;
+    return _textShaped;
   }
 
  private:
@@ -146,7 +148,7 @@ class TextPrecomposerImpl {
       return;
     }
 
-    // Skip if already precomposed
+    // Skip if already pre-shaped
     if (!text->glyphRuns.empty()) {
       return;
     }
@@ -158,16 +160,16 @@ class TextPrecomposerImpl {
 
     // Find typeface for this text
     std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (!text->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
-      for (const auto& tf : _options.fallbackTypefaces) {
+    if (!text->fontFamily.empty() && !_fallbackTypefaces.empty()) {
+      for (const auto& tf : _fallbackTypefaces) {
         if (tf && tf->fontFamily() == text->fontFamily) {
           typeface = tf;
           break;
         }
       }
     }
-    if (!typeface && !_options.fallbackTypefaces.empty()) {
-      typeface = _options.fallbackTypefaces[0];
+    if (!typeface && !_fallbackTypefaces.empty()) {
+      typeface = _fallbackTypefaces[0];
     }
     if (!typeface && !text->fontFamily.empty()) {
       typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
@@ -270,7 +272,7 @@ class TextPrecomposerImpl {
     glyphRun->xPositions = std::move(xPositions);
 
     text->glyphRuns.push_back(std::move(glyphRun));
-    _textProcessed = true;
+    _textShaped = true;
   }
 
   std::string getOrCreateFontResource(const std::shared_ptr<tgfx::Typeface>& typeface,
@@ -323,10 +325,9 @@ class TextPrecomposerImpl {
     return fontId;
   }
 
-  PAGXDocument& _document;
-  TextPrecomposer::Options _options;
-  std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
-  bool _textProcessed = false;
+  std::vector<std::shared_ptr<tgfx::Typeface>> _fallbackTypefaces = {};
+  PAGXDocument* _document = nullptr;
+  bool _textShaped = false;
 
   // Font ID -> Font resource
   std::unordered_map<std::string, std::unique_ptr<Font>> _fontResources = {};
@@ -336,9 +337,12 @@ class TextPrecomposerImpl {
       {};
 };
 
-bool TextPrecomposer::Process(PAGXDocument& document, const Options& options) {
-  TextPrecomposerImpl impl(document, options);
-  return impl.process();
+std::shared_ptr<TextShaper> TextShaper::Make(
+    std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces) {
+  if (fallbackTypefaces.empty()) {
+    return nullptr;
+  }
+  return std::make_shared<TextShaperImpl>(std::move(fallbackTypefaces));
 }
 
 }  // namespace pagx

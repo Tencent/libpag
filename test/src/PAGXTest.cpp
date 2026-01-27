@@ -25,7 +25,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
-#include "pagx/TextPrecomposer.h"
+#include "pagx/TextShaper.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
@@ -922,15 +922,15 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
 }
 
 /**
- * Test case: Text precomposition round-trip.
+ * Test case: Text shaping round-trip.
  * 1. Load SVG with text content
  * 2. Render original (runtime shaping)
- * 3. Precompose text (TextPrecomposer)
+ * 3. Shape text (TextShaper)
  * 4. Export to PAGX
- * 5. Reload PAGX and render (precomposed)
+ * 5. Reload PAGX and render (pre-shaped)
  * 6. Compare render results
  */
-PAG_TEST(PAGXTest, TextPrecomposerRoundTrip) {
+PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   // Use text.svg as the test file
   std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/text.svg");
 
@@ -962,11 +962,11 @@ PAG_TEST(PAGXTest, TextPrecomposerRoundTrip) {
   originalDL.root()->addChild(originalContent.root);
   originalDL.render(originalSurface.get(), false);
 
-  // Step 3: Precompose text
-  pagx::TextPrecomposer::Options precomposeOptions;
-  precomposeOptions.fallbackTypefaces = typefaces;
-  bool processed = pagx::TextPrecomposer::Process(*doc, precomposeOptions);
-  EXPECT_TRUE(processed);
+  // Step 3: Shape text
+  auto textShaper = pagx::TextShaper::Make(typefaces);
+  ASSERT_TRUE(textShaper != nullptr);
+  bool shaped = textShaper->shape(doc.get());
+  EXPECT_TRUE(shaped);
 
   // Verify Font resources were added
   bool hasFontResource = false;
@@ -986,7 +986,7 @@ PAG_TEST(PAGXTest, TextPrecomposerRoundTrip) {
   EXPECT_NE(xml.find("<Font"), std::string::npos);
   EXPECT_NE(xml.find("<GlyphRun"), std::string::npos);
 
-  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/text_precomposed.pagx");
+  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/text_preshaped.pagx");
 
   // Step 5: Reload PAGX (without typefaces - should use embedded font)
   auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
@@ -1028,29 +1028,29 @@ PAG_TEST(PAGXTest, TextPrecomposerRoundTrip) {
   auto reloadedContent = pagx::LayerBuilder::Build(*reloadedDoc, reloadOptions);
   ASSERT_TRUE(reloadedContent.root != nullptr);
 
-  // Step 6: Render precomposed version
-  auto precomposedSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList precomposedDL;
-  precomposedDL.root()->addChild(reloadedContent.root);
-  precomposedDL.render(precomposedSurface.get(), false);
+  // Step 6: Render pre-shaped version
+  auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList preshapedDL;
+  preshapedDL.root()->addChild(reloadedContent.root);
+  preshapedDL.render(preshapedSurface.get(), false);
 
   // Step 7: Compare renders - they should be identical
   auto originalPixels = originalSurface->makeImageSnapshot();
-  auto precomposedPixels = precomposedSurface->makeImageSnapshot();
+  auto preshapedPixels = preshapedSurface->makeImageSnapshot();
   ASSERT_TRUE(originalPixels != nullptr);
-  ASSERT_TRUE(precomposedPixels != nullptr);
+  ASSERT_TRUE(preshapedPixels != nullptr);
 
   // Save outputs for visual inspection
-  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextPrecomposer_Original"));
-  EXPECT_TRUE(Baseline::Compare(precomposedSurface, "PAGXTest/TextPrecomposer_Precomposed"));
+  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaper_Original"));
+  EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaper_PreShaped"));
 
   device->unlock();
 }
 
 /**
- * Test case: Text precomposition with textFont.svg (multiple text elements)
+ * Test case: Text shaping with textFont.svg (multiple text elements)
  */
-PAG_TEST(PAGXTest, TextPrecomposerMultipleText) {
+PAG_TEST(PAGXTest, TextShaperMultipleText) {
   std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/textFont.svg");
 
   auto doc = pagx::SVGImporter::Parse(svgPath);
@@ -1077,28 +1077,28 @@ PAG_TEST(PAGXTest, TextPrecomposerMultipleText) {
   originalDL.root()->addChild(originalContent.root);
   originalDL.render(originalSurface.get(), false);
 
-  // Precompose
-  pagx::TextPrecomposer::Options precomposeOptions;
-  precomposeOptions.fallbackTypefaces = typefaces;
-  bool processed = pagx::TextPrecomposer::Process(*doc, precomposeOptions);
-  EXPECT_TRUE(processed);
+  // Shape text
+  auto textShaper = pagx::TextShaper::Make(typefaces);
+  ASSERT_TRUE(textShaper != nullptr);
+  bool shaped = textShaper->shape(doc.get());
+  EXPECT_TRUE(shaped);
 
   // Export and reload
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/textFont_precomposed.pagx");
+  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/textFont_preshaped.pagx");
 
   pagx::LayerBuilder::Options reloadOptions;
   auto reloadedContent = pagx::LayerBuilder::FromFile(pagxPath, reloadOptions);
   ASSERT_TRUE(reloadedContent.root != nullptr);
 
-  // Render precomposed
-  auto precomposedSurface = Surface::Make(context, canvasWidth, canvasHeight);
-  DisplayList precomposedDL;
-  precomposedDL.root()->addChild(reloadedContent.root);
-  precomposedDL.render(precomposedSurface.get(), false);
+  // Render pre-shaped
+  auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList preshapedDL;
+  preshapedDL.root()->addChild(reloadedContent.root);
+  preshapedDL.render(preshapedSurface.get(), false);
 
-  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextPrecomposerMultiple_Original"));
-  EXPECT_TRUE(Baseline::Compare(precomposedSurface, "PAGXTest/TextPrecomposerMultiple_Precomposed"));
+  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaperMultiple_Original"));
+  EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaperMultiple_PreShaped"));
 
   device->unlock();
 }
