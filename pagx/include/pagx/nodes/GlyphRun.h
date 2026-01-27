@@ -42,9 +42,8 @@ struct RSXform {
 };
 
 /**
- * GlyphRun defines precomposed glyph data for a segment of text. Each GlyphRun independently
- * references a font, supporting font fallback scenarios (e.g., Chinese fallback to Songti, emoji
- * fallback to system emoji font).
+ * GlyphRun defines pre-typeset glyph data for a segment of text. Each GlyphRun independently
+ * references a font resource.
  */
 class GlyphRun : public Node {
  public:

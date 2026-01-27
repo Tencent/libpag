@@ -79,7 +79,6 @@ class Text : public Element {
 
   /**
    * Pre-typeset glyph runs. When present, these are used for rendering instead of runtime shaping.
-   * Multiple GlyphRuns support font fallback (e.g., different fonts for Latin and CJK characters).
    */
   std::vector<std::unique_ptr<GlyphRun>> glyphRuns = {};
 
