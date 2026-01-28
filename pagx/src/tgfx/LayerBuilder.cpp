@@ -664,7 +664,12 @@ class LayerBuilderImpl {
             // External file path
             std::string fullPath = imageNode->filePath;
             if (_document && imageNode->filePath[0] != '/' && !_document->basePath.empty()) {
-              fullPath = _document->basePath + imageNode->filePath;
+              // Ensure basePath ends with '/' before concatenating
+              if (_document->basePath.back() != '/') {
+                fullPath = _document->basePath + "/" + imageNode->filePath;
+              } else {
+                fullPath = _document->basePath + imageNode->filePath;
+              }
             }
             codec = tgfx::ImageCodec::MakeFrom(fullPath);
           }
@@ -800,7 +805,12 @@ class LayerBuilderImpl {
     } else if (!imageNode->filePath.empty()) {
       std::string imagePath = imageNode->filePath;
       if (!_options.basePath.empty() && imagePath[0] != '/') {
-        imagePath = _options.basePath + imagePath;
+        // Ensure basePath ends with '/' before concatenating
+        if (_options.basePath.back() != '/') {
+          imagePath = _options.basePath + "/" + imagePath;
+        } else {
+          imagePath = _options.basePath + imagePath;
+        }
       }
       image = tgfx::Image::MakeFromFile(imagePath);
     }
