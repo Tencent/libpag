@@ -32,71 +32,6 @@
 
 namespace pagx {
 
-// Scales RGBA8888 pixels using area averaging (box filter) for high-quality downscaling.
-static void ScalePixelsAreaAverage(const uint8_t* srcPixels, int srcW, int srcH, size_t srcRowBytes,
-                                   uint8_t* dstPixels, int dstW, int dstH, size_t dstRowBytes) {
-  float scaleX = static_cast<float>(srcW) / static_cast<float>(dstW);
-  float scaleY = static_cast<float>(srcH) / static_cast<float>(dstH);
-
-  for (int dstY = 0; dstY < dstH; dstY++) {
-    float srcY0 = static_cast<float>(dstY) * scaleY;
-    float srcY1 = static_cast<float>(dstY + 1) * scaleY;
-    int y0 = static_cast<int>(std::floor(srcY0));
-    int y1 = static_cast<int>(std::ceil(srcY1));
-    y0 = std::max(0, std::min(y0, srcH - 1));
-    y1 = std::max(0, std::min(y1, srcH));
-
-    auto* dstRow = dstPixels + dstY * dstRowBytes;
-
-    for (int dstX = 0; dstX < dstW; dstX++) {
-      float srcX0 = static_cast<float>(dstX) * scaleX;
-      float srcX1 = static_cast<float>(dstX + 1) * scaleX;
-      int x0 = static_cast<int>(std::floor(srcX0));
-      int x1 = static_cast<int>(std::ceil(srcX1));
-      x0 = std::max(0, std::min(x0, srcW - 1));
-      x1 = std::max(0, std::min(x1, srcW));
-
-      float sumR = 0, sumG = 0, sumB = 0, sumA = 0;
-      float totalWeight = 0;
-
-      for (int sy = y0; sy < y1; sy++) {
-        float wy = 1.0f;
-        if (sy == y0) {
-          wy = 1.0f - (srcY0 - static_cast<float>(y0));
-        }
-        if (sy == y1 - 1 && y1 > y0 + 1) {
-          wy = srcY1 - static_cast<float>(y1 - 1);
-        }
-
-        for (int sx = x0; sx < x1; sx++) {
-          float wx = 1.0f;
-          if (sx == x0) {
-            wx = 1.0f - (srcX0 - static_cast<float>(x0));
-          }
-          if (sx == x1 - 1 && x1 > x0 + 1) {
-            wx = srcX1 - static_cast<float>(x1 - 1);
-          }
-
-          float weight = wx * wy;
-          const auto* p = srcPixels + sy * srcRowBytes + sx * 4;
-          sumR += static_cast<float>(p[0]) * weight;
-          sumG += static_cast<float>(p[1]) * weight;
-          sumB += static_cast<float>(p[2]) * weight;
-          sumA += static_cast<float>(p[3]) * weight;
-          totalWeight += weight;
-        }
-      }
-
-      if (totalWeight > 0) {
-        dstRow[dstX * 4 + 0] = static_cast<uint8_t>(std::round(sumR / totalWeight));
-        dstRow[dstX * 4 + 1] = static_cast<uint8_t>(std::round(sumG / totalWeight));
-        dstRow[dstX * 4 + 2] = static_cast<uint8_t>(std::round(sumB / totalWeight));
-        dstRow[dstX * 4 + 3] = static_cast<uint8_t>(std::round(sumA / totalWeight));
-      }
-    }
-  }
-}
-
 static std::string PathToSVGString(const tgfx::Path& path) {
   std::string result = {};
   result.reserve(256);
@@ -211,41 +146,21 @@ static Glyph* CreateBitmapGlyph(PAGXDocument* document, const GlyphInfo& info) {
     return nullptr;
   }
 
-  tgfx::Bitmap srcBitmap(srcW, srcH, false, false);
-  if (srcBitmap.isEmpty()) {
+  tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
+  if (dstBitmap.isEmpty()) {
     return nullptr;
   }
-  auto* srcPixels = srcBitmap.lockPixels();
-  if (srcPixels == nullptr || !imageCodec->readPixels(srcBitmap.info(), srcPixels)) {
-    srcBitmap.unlockPixels();
+  auto* dstPixels = dstBitmap.lockPixels();
+  if (dstPixels == nullptr) {
     return nullptr;
   }
-  srcBitmap.unlockPixels();
-
-  std::shared_ptr<tgfx::Data> pngData = nullptr;
-
-  if (dstW == srcW && dstH == srcH) {
-    pngData = srcBitmap.encode(tgfx::EncodedFormat::PNG, 100);
-  } else {
-    tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
-    if (dstBitmap.isEmpty()) {
-      return nullptr;
-    }
-
-    auto* dstPixels = dstBitmap.lockPixels();
-    if (dstPixels == nullptr) {
-      return nullptr;
-    }
-    auto* srcReadPixels = static_cast<const uint8_t*>(srcBitmap.lockPixels());
-    ScalePixelsAreaAverage(srcReadPixels, srcW, srcH, srcBitmap.info().rowBytes(),
-                           static_cast<uint8_t*>(dstPixels), dstW, dstH,
-                           dstBitmap.info().rowBytes());
-    srcBitmap.unlockPixels();
-    dstBitmap.unlockPixels();
-
-    pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
+  bool success = imageCodec->readPixels(dstBitmap.info(), dstPixels);
+  dstBitmap.unlockPixels();
+  if (!success) {
+    return nullptr;
   }
 
+  auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
   if (pngData == nullptr) {
     return nullptr;
   }
