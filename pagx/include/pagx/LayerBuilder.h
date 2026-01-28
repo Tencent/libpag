@@ -20,7 +20,9 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx {
@@ -49,6 +51,10 @@ struct PAGXContent {
  * Build options for LayerBuilder.
  */
 struct LayerBuildOptions {
+  /**
+   * Fallback typefaces used when the primary font doesn't contain required glyphs.
+   */
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
 };
 
 /**

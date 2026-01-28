@@ -24,7 +24,9 @@ cmake --build cmake-build-debug --target PAGFullTest
 
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `PAGSurfaceTest/Mask`
 - 截图输出到 `test/out/{folder}/{name}.webp`，基准图为同目录下 `{name}_base.webp`
-- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/version.json`（本地）中同一 key 的版本号，一致时才进行基准图对比，不一致则跳过返回成功，以此接受截图变更
+- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/version.json`（本地）中同一 key 的版本号
+    - 两边 key 都存在且版本号不同：跳过比较并返回成功（用于接受截图变更）
+    - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
 - **NEVER** 自动接受截图基准变更，包括禁止自动运行 `UpdateBaseline` target、禁止修改或覆盖 `version.json` 文件

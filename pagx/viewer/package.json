@@ -4,10 +4,11 @@
   "description": "PAGX File Viewer",
   "type": "module",
   "scripts": {
-    "clean": "rimraf wasm-mt build-pagx .pagx.wasm-mt.md5",
+    "clean": "rimraf wasm-mt",
     "build": "node script/cmake.js -a wasm-mt && rollup -c ./script/rollup.js",
     "build:debug": "node script/cmake.js -a wasm-mt --debug && rollup -c ./script/rollup.js",
     "build:release": "node script/cmake.js -a wasm-mt && BUILD_MODE=release rollup -c ./script/rollup.js",
+    "publish": "node script/publish.cjs",
     "server": "node server.js"
   },
   "devDependencies": {

@@ -1,10 +1,8 @@
-# PAGX 格式规范 v1.0
+# PAGX 格式规范
 
 ## 1. 介绍（Introduction）
 
 **PAGX**（Portable Animated Graphics XML）是一种基于 XML 的矢量动画标记语言。它提供了统一且强大的矢量图形与动画描述能力，旨在成为跨所有主要工具与运行时的矢量动画交换标准。
-
-**PAGX** (Portable Animated Graphics XML) is an XML-based markup language for describing animated vector graphics. It provides a unified and powerful representation of vector graphics and animations, designed to be the vector animation interchange standard across all major tools and runtimes.
 
 ### 1.1 设计目标
 
@@ -12,7 +10,7 @@
 
 - **特性完备**：完整覆盖矢量图形、图片、富文本、滤镜效果、混合模式、遮罩等能力，满足复杂动效的描述需求。
 
-- **精简高效**：提供简洁且强大的统一结构，兼顾静态矢量与动画的优化描述，同时预留未来交互和脚本的扩展能力。
+- **精简高效**：提供简洁且强大的统一结构，兼顾静态的优化描述，同时预留未来交互和脚本的扩展能力。
 
 - **生态兼容**：可作为 After Effects、Figma、腾讯设计等设计工具的通用交换格式，实现设计资产无缝流转。
 
