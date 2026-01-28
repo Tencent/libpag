@@ -6,7 +6,7 @@
 
 ### 1.1 Design Goals
 
-- **Open and Readable**: Pure text XML format that is easy to read and edit, with native support for version control and diff comparison, facilitating debugging and AI comprehension and generation.
+- **Open and Readable**: Plain-text XML format that is easy to read and edit, with native support for version control and diff comparison, facilitating debugging, AI understanding, and content generation.
 
 - **Feature Complete**: Comprehensive coverage of vector graphics, images, rich text, filter effects, blend modes, masks, and more to meet the requirements of complex animation descriptions.
 
@@ -250,7 +250,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
 
-**Layer Rendering Order**: Layers are rendered sequentially in document order; layers appearing earlier in the document are rendered first (appearing below), while layers appearing later are rendered last (appearing above).
+**Layer Rendering Order**: Layers are rendered sequentially in document order; layers earlier in the document render first (below); later layers render last (above).
 
 ### 3.3 Resources
 
@@ -438,7 +438,7 @@ Image patterns use an image as a color source.
 
 ##### Color Source Coordinate System
 
-Except for solid colors, all color sources (gradients, image patterns) have the concept of a coordinate system, which is **relative to the origin of the geometry element's local coordinate system**. The `matrix` attribute can be used to apply transforms to the color source coordinate system.
+Except for solid colors, all color sources (gradients, image patterns) operate within a coordinate system **relative to the origin of the geometry element's local coordinate system**. The `matrix` attribute can be used to apply transforms to the color source coordinate system.
 
 **Transform Behavior**:
 
@@ -501,7 +501,7 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 </Font>
 ```
 
-**Consistency Constraint**: All Glyphs within the same Font must use the same type (all `path` or all `image`); mixing is not allowed.
+**Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 
 **GlyphID Rules**:
 - **GlyphID starts from 1**: Glyph list index + 1 = GlyphID
@@ -806,7 +806,7 @@ Key difference from layer styles (Section 4.3): Layer styles **independently ren
 
 #### 4.4.2 DropShadowFilter
 
-Generates shadow effect based on filter input. Core difference from DropShadowStyle: The filter projects based on original rendering content and supports semi-transparency; the style projects based on opaque layer content. Additionally, the two support different attribute features.
+Generates shadow effect based on filter input. Key difference from DropShadowStyle: the filter projects from original rendering content and preserves semi-transparency, while the style projects from opaque layer content. Additionally, the two support different attribute features.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1360,7 +1360,7 @@ Trims paths to a specified start/end range.
 |-----------|------|---------|-------------|
 | `start` | float | 0 | Start position 0~1 |
 | `end` | float | 1 | End position 0~1 |
-| `offset` | float | 0 | Offset (degrees); 360 degrees represents one cycle of the full path length |
+| `offset` | float | 0 | Offset in degrees; 360° equals one full cycle of the path length |
 | `type` | TrimType | separate | Trim type (see below) |
 
 **TrimType**:
@@ -1792,7 +1792,7 @@ alpha = lerp(startAlpha, endAlpha, t)
 
 **Fractional Copy Count**:
 
-When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **overlay with semi-transparency**:
+When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **semi-transparent blending**:
 
 1. **Geometry copying**: Shapes and text are copied by `ceil(copies)` (i.e., 4), geometry itself is not scaled or clipped
 2. **Opacity adjustment**: The last copy's opacity is multiplied by the fractional part (e.g., 0.5), producing semi-transparent effect
