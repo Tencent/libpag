@@ -426,8 +426,7 @@ Image patterns use an image as a color source.
 | `image` | idref | (required) | Image reference "@id" |
 | `tileModeX` | TileMode | clamp | X-direction tile mode |
 | `tileModeY` | TileMode | clamp | Y-direction tile mode |
-| `minFilterMode` | FilterMode | linear | Texture filter mode for minification |
-| `magFilterMode` | FilterMode | linear | Texture filter mode for magnification |
+| `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
 | `matrix` | string | identity matrix | Transform matrix |
 
@@ -1611,10 +1610,14 @@ Range selectors define the glyph range and influence degree for TextModifier.
 
 #### 5.5.5 TextPath
 
-Arranges text along a specified path.
+Arranges text along a specified path. The path can reference a PathData defined in Resources, or use inline path data.
 
 ```xml
+<!-- Reference PathData resource -->
 <TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicular="true" reversed="false"/>
+
+<!-- Inline path data -->
+<TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1716,28 +1719,37 @@ Rich text is achieved through multiple Text elements within a Group, each Text h
     <Text text="This is " fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <!-- Bold text -->
+  <!-- Bold red text -->
   <Group>
-    <Text text="bold" fontFamily="Arial-Bold" fontSize="18"/>
+    <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <Fill color="#FF0000"/>
+  </Group>
+  <!-- Regular text -->
+  <Group>
+    <Text text=" information. " fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <!-- Colored text -->
+  <!-- Underlined link style -->
   <Group>
-    <Text text=" and " fontFamily="Arial" fontSize="18"/>
+    <Text text="Click here" fontFamily="Arial" fontSize="18"/>
+    <Fill color="#0066CC"/>
+    <Stroke color="#0066CC" width="1"/>
+  </Group>
+  <!-- Regular text -->
+  <Group>
+    <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
     <Fill color="#333333"/>
   </Group>
-  <Group>
-    <Text text="colored" fontFamily="Arial" fontSize="18"/>
-    <Fill color="#FF6600"/>
-  </Group>
-  <!-- Apply unified layout -->
-  <TextLayout position="50,50" width="400" textAlign="start"/>
+  <!-- TextLayout applies unified typography to all Text elements -->
+  <TextLayout position="50,100" width="300" textAlign="start" lineHeight="1.5"/>
 </Layer>
 ```
 
+**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a whole for typography, enabling auto-wrapping and alignment.
+
 ### 5.6 Repeater
 
-Repeater duplicates accumulated content and rendered styles, applying progressive transforms to each copy.
+Repeater duplicates accumulated content and rendered styles, applying progressive transforms to each copy. Repeater affects both Paths and glyph lists simultaneously, and does not trigger text-to-shape conversion.
 
 ```xml
 <Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
@@ -1799,6 +1811,15 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 - **Simultaneous effect**: Copies all accumulated Paths and glyph lists
 - **Preserve text attributes**: Glyph lists retain glyph information after copying; subsequent text modifiers can still affect them
 - **Copy rendered styles**: Also copies already rendered fills and strokes
+
+```xml
+<Group>
+  <Text text="Hi" fontFamily="Arial" fontSize="24"/>  <!-- Accumulate glyph list -->
+  <Fill color="#333333"/>            <!-- Render fill -->
+  <Repeater copies="3"/> <!-- Copy glyph list and rendered fill -->
+  <TextModifier position="0,-5"/>    <!-- Still affects copied glyph lists -->
+</Group>
+```
 
 ### 5.7 Group
 
@@ -2418,8 +2439,7 @@ Child elements: `ColorStop`+
 | `image` | idref | (required) |
 | `tileModeX` | TileMode | clamp |
 | `tileModeY` | TileMode | clamp |
-| `minFilterMode` | FilterMode | linear |
-| `magFilterMode` | FilterMode | linear |
+| `filterMode` | FilterMode | linear |
 | `mipmapMode` | MipmapMode | linear |
 | `matrix` | string | identity matrix |
 
@@ -2447,7 +2467,7 @@ Child elements: `ColorStop`+
 | `maskType` | MaskType | alpha |
 | `composition` | idref | - |
 
-Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`*
+Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (automatically categorized by type)
 
 ### C.4 Layer Style Nodes
 
