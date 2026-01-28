@@ -33,6 +33,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
@@ -1395,15 +1396,24 @@ PAG_TEST(PAGXTest, CompleteExample) {
   auto doc = pagx::PAGXImporter::FromXML(pagxXml);
   ASSERT_TRUE(doc != nullptr);
 
+  // Manually resolve relative Image paths since we parsed from XML string
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      if (!image->filePath.empty() && image->filePath[0] != '/' &&
+          image->filePath.find("://") == std::string::npos) {
+        image->filePath = ProjectPath::Absolute(image->filePath);
+      }
+    }
+  }
+
   // Typeset text elements
   auto typesetter = pagx::Typesetter::Make();
   typesetter->setFallbackTypefaces(GetFallbackTypefaces());
   typesetter->typeset(doc.get());
 
-  // Build layer tree with base path for image loading
-  pagx::LayerBuilder::Options options;
-  options.basePath = ProjectPath::Absolute("");
-  auto content = pagx::LayerBuilder::Build(*doc, options);
+  // Build layer tree
+  auto content = pagx::LayerBuilder::Build(*doc);
   ASSERT_TRUE(content.root != nullptr);
   EXPECT_FLOAT_EQ(content.width, 800.0f);
   EXPECT_FLOAT_EQ(content.height, 520.0f);

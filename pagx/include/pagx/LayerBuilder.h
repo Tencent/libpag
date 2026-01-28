@@ -49,10 +49,6 @@ struct PAGXContent {
  * Build options for LayerBuilder.
  */
 struct LayerBuildOptions {
-  /**
-   * Base path for resolving relative resource paths.
-   */
-  std::string basePath = {};
 };
 
 /**

@@ -24,6 +24,7 @@
 #include "StringParser.h"
 #include "SVGPathParser.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "SVGParserInternal.h"
 #include "xml/XMLDOM.h"
@@ -35,9 +36,23 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
   SVGParserImpl parser(options);
   auto doc = parser.parseFile(filePath);
   if (doc) {
+    // Convert relative paths to absolute paths
+    std::string basePath = {};
     auto lastSlash = filePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
-      doc->basePath = filePath.substr(0, lastSlash + 1);
+      basePath = filePath.substr(0, lastSlash + 1);
+    }
+    if (!basePath.empty()) {
+      for (auto& node : doc->nodes) {
+        if (node->nodeType() == NodeType::Image) {
+          auto* image = static_cast<Image*>(node.get());
+          if (!image->filePath.empty() && image->filePath[0] != '/' &&
+              image->filePath.find("://") == std::string::npos &&
+              image->filePath.find("data:") != 0) {
+            image->filePath = basePath + image->filePath;
+          }
+        }
+      }
     }
   }
   return doc;

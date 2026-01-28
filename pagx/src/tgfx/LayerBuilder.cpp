@@ -661,17 +661,8 @@ class LayerBuilderImpl {
               }
             }
           } else if (!imageNode->filePath.empty()) {
-            // External file path
-            std::string fullPath = imageNode->filePath;
-            if (_document && imageNode->filePath[0] != '/' && !_document->basePath.empty()) {
-              // Ensure basePath ends with '/' before concatenating
-              if (_document->basePath.back() != '/') {
-                fullPath = _document->basePath + "/" + imageNode->filePath;
-              } else {
-                fullPath = _document->basePath + imageNode->filePath;
-              }
-            }
-            codec = tgfx::ImageCodec::MakeFrom(fullPath);
+            // External file path (already resolved to absolute during import)
+            codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
           }
 
           if (codec) {
@@ -803,16 +794,8 @@ class LayerBuilderImpl {
     } else if (imageNode->filePath.find("data:") == 0) {
       image = ImageFromDataURI(imageNode->filePath);
     } else if (!imageNode->filePath.empty()) {
-      std::string imagePath = imageNode->filePath;
-      if (!_options.basePath.empty() && imagePath[0] != '/') {
-        // Ensure basePath ends with '/' before concatenating
-        if (_options.basePath.back() != '/') {
-          imagePath = _options.basePath + "/" + imagePath;
-        } else {
-          imagePath = _options.basePath + imagePath;
-        }
-      }
-      image = tgfx::Image::MakeFromFile(imagePath);
+      // External file path (already resolved to absolute during import)
+      image = tgfx::Image::MakeFromFile(imageNode->filePath);
     }
 
     if (!image) {
@@ -1015,16 +998,7 @@ PAGXContent LayerBuilder::FromFile(const std::string& filePath, const Options& o
   if (!document) {
     return {};
   }
-
-  auto opts = options;
-  if (opts.basePath.empty()) {
-    auto lastSlash = filePath.find_last_of("/\\");
-    if (lastSlash != std::string::npos) {
-      opts.basePath = filePath.substr(0, lastSlash + 1);
-    }
-  }
-
-  return Build(*document, opts);
+  return Build(*document, options);
 }
 
 PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Options& options) {

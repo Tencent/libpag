@@ -61,11 +61,6 @@ class PAGXDocument {
   std::vector<Layer*> layers = {};
 
   /**
-   * Base path for resolving relative resource paths.
-   */
-  std::string basePath = {};
-
-  /**
    * Creates a node of the specified type and adds it to the document management.
    * If an ID is provided, the node will be indexed for lookup.
    * If the ID already exists, an error will be logged and the new node will replace the old one in
