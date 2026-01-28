@@ -19,7 +19,6 @@
 #include "pagx/LayerBuilder.h"
 #include <tuple>
 #include <unordered_map>
-#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/types/ColorSpace.h"
@@ -351,19 +350,15 @@ static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
 // Internal builder class
 class LayerBuilderImpl {
  public:
-  explicit LayerBuilderImpl(const LayerBuilder::Options& options) : _options(options) {
+  explicit LayerBuilderImpl(const TextGlyphs* textGlyphs) : _textGlyphs(textGlyphs) {
   }
 
-  PAGXContent build(const PAGXDocument& document) {
+  std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
     _document = &document;
     // Clear mappings from previous builds.
     _tgfxLayerByPagxLayer.clear();
     _pendingMasks.clear();
     _fontCache.clear();
-
-    PAGXContent content;
-    content.width = document.width;
-    content.height = document.height;
 
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
@@ -387,12 +382,11 @@ class LayerBuilderImpl {
       }
     }
 
-    content.root = rootLayer;
     _document = nullptr;
     _tgfxLayerByPagxLayer.clear();
     _pendingMasks.clear();
     _fontCache.clear();
-    return content;
+    return rootLayer;
   }
 
  private:
@@ -530,13 +524,23 @@ class LayerBuilderImpl {
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
     auto tgfxText = std::make_shared<tgfx::Text>();
 
-    // Text must be pre-typeset with GlyphRuns. Use Typesetter before calling LayerBuilder.
+    // Priority 1: Use TextGlyphs mapping (original typeface, best quality)
+    if (_textGlyphs != nullptr) {
+      auto textBlob = _textGlyphs->get(node);
+      if (textBlob) {
+        tgfxText->setTextBlob(textBlob);
+        tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
+        return tgfxText;
+      }
+    }
+
+    // Priority 2: Build from glyphRuns (embedded font, for imported files)
     if (node->glyphRuns.empty()) {
-      DEBUG_ASSERT(false && "Text element has no GlyphRun data. Use Typesetter to typeset first.");
+      DEBUG_ASSERT(false && "Text element has no GlyphRun data and no TextGlyphs provided.");
       return tgfxText;
     }
 
-    auto textBlob = buildTextBlob(node);
+    auto textBlob = buildTextBlobFromGlyphRuns(node);
     if (textBlob) {
       tgfxText->setTextBlob(textBlob);
     }
@@ -544,7 +548,7 @@ class LayerBuilderImpl {
     return tgfxText;
   }
 
-  std::shared_ptr<tgfx::TextBlob> buildTextBlob(const Text* node) {
+  std::shared_ptr<tgfx::TextBlob> buildTextBlobFromGlyphRuns(const Text* node) {
     tgfx::TextBlobBuilder builder;
 
     for (const auto& run : node->glyphRuns) {
@@ -978,7 +982,7 @@ class LayerBuilderImpl {
     }
   }
 
-  LayerBuilder::Options _options = {};
+  const TextGlyphs* _textGlyphs = nullptr;
   const PAGXDocument* _document = nullptr;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
@@ -988,25 +992,10 @@ class LayerBuilderImpl {
 
 // Public API implementation
 
-PAGXContent LayerBuilder::Build(const PAGXDocument& document, const Options& options) {
-  LayerBuilderImpl builder(options);
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(const PAGXDocument& document,
+                                                 const TextGlyphs* textGlyphs) {
+  LayerBuilderImpl builder(textGlyphs);
   return builder.build(document);
-}
-
-PAGXContent LayerBuilder::FromFile(const std::string& filePath, const Options& options) {
-  auto document = PAGXImporter::FromFile(filePath);
-  if (!document) {
-    return {};
-  }
-  return Build(*document, options);
-}
-
-PAGXContent LayerBuilder::FromData(const uint8_t* data, size_t length, const Options& options) {
-  auto document = PAGXImporter::FromXML(data, length);
-  if (!document) {
-    return {};
-  }
-  return Build(*document, options);
 }
 
 }  // namespace pagx

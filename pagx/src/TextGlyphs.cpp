@@ -16,30 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include "pagx/PAGXDocument.h"
 #include "pagx/TextGlyphs.h"
-#include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
-/**
- * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
- * This is the bridge between the independent pagx module and tgfx rendering.
- */
-class LayerBuilder {
- public:
-  /**
-   * Builds a layer tree from a PAGXDocument.
-   * @param document The document to build from.
-   * @param textGlyphs Optional typesetting results. If provided, uses original typefaces for
-   *                   rendering (best quality). If nullptr, builds from embedded GlyphRun data.
-   * @return The root layer of the built layer tree.
-   */
-  static std::shared_ptr<tgfx::Layer> Build(const PAGXDocument& document,
-                                            const TextGlyphs* textGlyphs = nullptr);
-};
+void TextGlyphs::add(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob) {
+  if (text != nullptr && textBlob != nullptr) {
+    textBlobs[text] = std::move(textBlob);
+  }
+}
+
+std::shared_ptr<tgfx::TextBlob> TextGlyphs::get(const Text* text) const {
+  auto it = textBlobs.find(const_cast<Text*>(text));
+  if (it != textBlobs.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
+bool TextGlyphs::contains(const Text* text) const {
+  return textBlobs.find(const_cast<Text*>(text)) != textBlobs.end();
+}
+
+void TextGlyphs::forEach(
+    std::function<void(Text*, std::shared_ptr<tgfx::TextBlob>)> callback) const {
+  for (const auto& pair : textBlobs) {
+    callback(pair.first, pair.second);
+  }
+}
+
+size_t TextGlyphs::size() const {
+  return textBlobs.size();
+}
+
+bool TextGlyphs::empty() const {
+  return textBlobs.empty();
+}
 
 }  // namespace pagx

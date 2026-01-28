@@ -18,28 +18,35 @@
 
 #pragma once
 
-#include <memory>
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextGlyphs.h"
-#include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
 /**
- * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
- * This is the bridge between the independent pagx module and tgfx rendering.
+ * FontEmbedder extracts glyph data from TextGlyphs and embeds it into the PAGXDocument.
+ * It creates Font nodes with glyph paths/images and updates Text nodes with GlyphRun data.
+ *
+ * Font merging strategy:
+ * - All vector glyphs (with path) are merged into one Font node
+ * - All bitmap glyphs (with image) are merged into another Font node
+ * - Maximum 2 Font nodes per document
  */
-class LayerBuilder {
+class FontEmbedder {
  public:
   /**
-   * Builds a layer tree from a PAGXDocument.
-   * @param document The document to build from.
-   * @param textGlyphs Optional typesetting results. If provided, uses original typefaces for
-   *                   rendering (best quality). If nullptr, builds from embedded GlyphRun data.
-   * @return The root layer of the built layer tree.
+   * Embeds font data from TextGlyphs into the document.
+   *
+   * This method:
+   * 1. Iterates all TextBlobs in textGlyphs, extracts glyph data (paths or images)
+   * 2. Merges glyphs into Font nodes (one for vector, one for bitmap)
+   * 3. Creates GlyphRun nodes for each Text, referencing the embedded fonts
+   *
+   * @param document The document to embed fonts into (modified in place).
+   * @param textGlyphs The typesetting results containing Text -> TextBlob mappings.
+   * @return true if embedding succeeded, false otherwise.
    */
-  static std::shared_ptr<tgfx::Layer> Build(const PAGXDocument& document,
-                                            const TextGlyphs* textGlyphs = nullptr);
+  static bool Embed(PAGXDocument* document, const TextGlyphs& textGlyphs);
 };
 
 }  // namespace pagx

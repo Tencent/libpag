@@ -26,6 +26,8 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/Typesetter.h"
+#include "pagx/FontEmbedder.h"
+#include "pagx/TextGlyphs.h"
 #include "../../pagx/src/StringParser.h"
 #include "../../pagx/src/SVGPathParser.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -122,8 +124,8 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
   auto textShaper = TextShaper::Make(GetFallbackTypefaces());
 
   // Create Typesetter for text shaping
-  auto typesetter = pagx::Typesetter::Make();
-  typesetter->setFallbackTypefaces(GetFallbackTypefaces());
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
 
   for (const auto& svgPath : svgFiles) {
     std::string baseName = std::filesystem::path(svgPath).stem().string();
@@ -140,16 +142,21 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
       continue;
     }
 
-    // Step 2: Typeset text elements
-    typesetter->typeset(doc.get());
+    // Step 2: Typeset text elements and embed fonts
+    auto textGlyphs = typesetter.createTextGlyphs(doc.get());
+    pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
     std::string pagxPath = SavePAGXFile(xml, "PAGXTest/" + baseName + ".pagx");
 
     // Step 4: Load PAGX file and build layer tree (this is the viewer's actual path)
-    auto content = pagx::LayerBuilder::FromFile(pagxPath);
-    if (content.root == nullptr) {
+    auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+    if (reloadedDoc == nullptr) {
+      continue;
+    }
+    auto layer = pagx::LayerBuilder::Build(*reloadedDoc);
+    if (layer == nullptr) {
       continue;
     }
 
@@ -186,7 +193,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     DisplayList displayList;
     auto container = tgfx::Layer::Make();
     container->setMatrix(tgfx::Matrix::MakeScale(scale, scale));
-    container->addChild(content.root);
+    container->addChild(layer);
     displayList.root()->addChild(container);
     displayList.render(pagxSurface.get(), false);
     EXPECT_TRUE(Baseline::Compare(pagxSurface, "PAGXTest/" + baseName + "_pagx"));
@@ -226,15 +233,15 @@ PAG_TEST(PAGXTest, ColorRefRender) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                              strlen(pagxXml));
-  ASSERT_TRUE(content.root != nullptr);
-  EXPECT_FLOAT_EQ(content.width, 200.0f);
-  EXPECT_FLOAT_EQ(content.height, 200.0f);
+  auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                         strlen(pagxXml));
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 200);
   DisplayList displayList;
-  displayList.root()->addChild(content.root);
+  displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ColorRefRender"));
 
@@ -271,14 +278,15 @@ PAG_TEST(PAGXTest, StrokeColorRefRender) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  pagx::LayerBuilder::Options options;
-  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                              strlen(pagxXml), options);
-  ASSERT_TRUE(content.root != nullptr);
+  auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                         strlen(pagxXml));
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 200);
   DisplayList displayList;
-  displayList.root()->addChild(content.root);
+  displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/StrokeColorRefRender"));
 
@@ -286,7 +294,7 @@ PAG_TEST(PAGXTest, StrokeColorRefRender) {
 }
 
 /**
- * Test case: Verify LayerBuilder::FromFile and FromData produce identical results.
+ * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
 PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
@@ -308,26 +316,28 @@ PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  pagx::LayerBuilder::Options options;
-
   // Load via FromFile
-  auto contentFromFile = pagx::LayerBuilder::FromFile(pagxPath, options);
-  ASSERT_TRUE(contentFromFile.root != nullptr);
+  auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(docFromFile != nullptr);
+  auto layerFromFile = pagx::LayerBuilder::Build(*docFromFile);
+  ASSERT_TRUE(layerFromFile != nullptr);
 
-  // Load via FromData
-  auto contentFromData = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                                      strlen(pagxXml), options);
-  ASSERT_TRUE(contentFromData.root != nullptr);
+  // Load via FromXML
+  auto docFromData = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                                  strlen(pagxXml));
+  ASSERT_TRUE(docFromData != nullptr);
+  auto layerFromData = pagx::LayerBuilder::Build(*docFromData);
+  ASSERT_TRUE(layerFromData != nullptr);
 
   // Render both and compare
   auto surfaceFile = Surface::Make(context, 100, 100);
   DisplayList displayListFile;
-  displayListFile.root()->addChild(contentFromFile.root);
+  displayListFile.root()->addChild(layerFromFile);
   displayListFile.render(surfaceFile.get(), false);
 
   auto surfaceData = Surface::Make(context, 100, 100);
   DisplayList displayListData;
-  displayListData.root()->addChild(contentFromData.root);
+  displayListData.root()->addChild(layerFromData);
   displayListData.render(surfaceData.get(), false);
 
   // Both should match the same baseline
@@ -789,14 +799,13 @@ PAG_TEST(PAGXTest, PrecomposedTextRender) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  pagx::LayerBuilder::Options options;
-  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                              strlen(pagxXml), options);
-  ASSERT_TRUE(content.root != nullptr);
+  // Build layer tree (doc already parsed above)
+  auto layer = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 100);
   DisplayList displayList;
-  displayList.root()->addChild(content.root);
+  displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextRender"));
 
@@ -831,14 +840,15 @@ PAG_TEST(PAGXTest, PrecomposedTextPointPositions) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  pagx::LayerBuilder::Options options;
-  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                              strlen(pagxXml), options);
-  ASSERT_TRUE(content.root != nullptr);
+  auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                         strlen(pagxXml));
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 150);
   DisplayList displayList;
-  displayList.root()->addChild(content.root);
+  displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextPointPositions"));
 
@@ -872,14 +882,15 @@ PAG_TEST(PAGXTest, PrecomposedTextMissingGlyph) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
 
-  pagx::LayerBuilder::Options options;
-  auto content = pagx::LayerBuilder::FromData(reinterpret_cast<const uint8_t*>(pagxXml),
-                                              strlen(pagxXml), options);
-  ASSERT_TRUE(content.root != nullptr);
+  auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                         strlen(pagxXml));
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 100);
   DisplayList displayList;
-  displayList.root()->addChild(content.root);
+  displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   // GlyphID 0 should not be rendered, so only two glyphs appear
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextMissingGlyph"));
@@ -974,12 +985,12 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   auto typefaces = GetFallbackTypefaces();
   ASSERT_FALSE(typefaces.empty());
 
-  // Step 2: Typeset text
-  auto typesetter = pagx::Typesetter::Make();
-  ASSERT_TRUE(typesetter != nullptr);
-  typesetter->setFallbackTypefaces(typefaces);
-  bool typeset = typesetter->typeset(doc.get());
-  EXPECT_TRUE(typeset);
+  // Step 2: Typeset text and embed fonts
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(typefaces);
+  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
+  EXPECT_FALSE(textGlyphs.empty());
+  pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
 
   // Verify Font resources were added
   bool hasFontResource = false;
@@ -994,12 +1005,12 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   EXPECT_TRUE(hasFontResource);
 
   // Step 3: Render typeset document
-  auto originalContent = pagx::LayerBuilder::Build(*doc);
-  ASSERT_TRUE(originalContent.root != nullptr);
+  auto originalLayer = pagx::LayerBuilder::Build(*doc, &textGlyphs);
+  ASSERT_TRUE(originalLayer != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
   DisplayList originalDL;
-  originalDL.root()->addChild(originalContent.root);
+  originalDL.root()->addChild(originalLayer);
   originalDL.render(originalSurface.get(), false);
 
   // Step 4: Export to PAGX
@@ -1045,15 +1056,14 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   }
   EXPECT_TRUE(glyphRunFound);
 
-  pagx::LayerBuilder::Options reloadOptions;
-  // Intentionally not providing fallback typefaces to verify embedded font works
-  auto reloadedContent = pagx::LayerBuilder::Build(*reloadedDoc, reloadOptions);
-  ASSERT_TRUE(reloadedContent.root != nullptr);
+  // Intentionally not providing TextGlyphs to verify embedded font works
+  auto reloadedLayer = pagx::LayerBuilder::Build(*reloadedDoc);
+  ASSERT_TRUE(reloadedLayer != nullptr);
 
   // Step 6: Render pre-shaped version
   auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
   DisplayList preshapedDL;
-  preshapedDL.root()->addChild(reloadedContent.root);
+  preshapedDL.root()->addChild(reloadedLayer);
   preshapedDL.render(preshapedSurface.get(), false);
 
   // Step 7: Compare renders - they should be identical
@@ -1088,33 +1098,35 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
 
   auto typefaces = GetFallbackTypefaces();
 
-  // Typeset text
-  auto typesetter = pagx::Typesetter::Make();
-  ASSERT_TRUE(typesetter != nullptr);
-  typesetter->setFallbackTypefaces(typefaces);
-  bool typeset = typesetter->typeset(doc.get());
-  EXPECT_TRUE(typeset);
+  // Typeset text and embed fonts
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(typefaces);
+  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
+  EXPECT_FALSE(textGlyphs.empty());
+  pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
 
   // Render typeset document
-  auto originalContent = pagx::LayerBuilder::Build(*doc);
-  ASSERT_TRUE(originalContent.root != nullptr);
+  auto originalLayer = pagx::LayerBuilder::Build(*doc, &textGlyphs);
+  ASSERT_TRUE(originalLayer != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
   DisplayList originalDL;
-  originalDL.root()->addChild(originalContent.root);
+  originalDL.root()->addChild(originalLayer);
   originalDL.render(originalSurface.get(), false);
 
   // Export and reload
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
   std::string pagxPath = SavePAGXFile(xml, "PAGXTest/textFont_preshaped.pagx");
 
-  auto reloadedContent = pagx::LayerBuilder::FromFile(pagxPath);
-  ASSERT_TRUE(reloadedContent.root != nullptr);
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
+  auto reloadedLayer = pagx::LayerBuilder::Build(*reloadedDoc);
+  ASSERT_TRUE(reloadedLayer != nullptr);
 
   // Render pre-shaped
   auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
   DisplayList preshapedDL;
-  preshapedDL.root()->addChild(reloadedContent.root);
+  preshapedDL.root()->addChild(reloadedLayer);
   preshapedDL.render(preshapedSurface.get(), false);
 
   EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaperMultiple_Original"));
@@ -1407,20 +1419,19 @@ PAG_TEST(PAGXTest, CompleteExample) {
     }
   }
 
-  // Typeset text elements
-  auto typesetter = pagx::Typesetter::Make();
-  typesetter->setFallbackTypefaces(GetFallbackTypefaces());
-  typesetter->typeset(doc.get());
+  // Typeset text elements and embed fonts
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
+  pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
 
   // Build layer tree
-  auto content = pagx::LayerBuilder::Build(*doc);
-  ASSERT_TRUE(content.root != nullptr);
-  EXPECT_FLOAT_EQ(content.width, 800.0f);
-  EXPECT_FLOAT_EQ(content.height, 520.0f);
+  auto layer = pagx::LayerBuilder::Build(*doc);
+  ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 800, 520);
   DisplayList displayList;
-  displayList.root()->addChild(content.root);
+  displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/CompleteExample"));
 
