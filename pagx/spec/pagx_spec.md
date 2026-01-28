@@ -18,7 +18,7 @@
 
 ### 1.2 File Structure
 
-PAGX is a pure XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development, review, or editing.
+PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
 
 ### 1.3 Document Organization
 
@@ -145,7 +145,7 @@ Matrix form:
 
 ### 2.8 Color
 
-PAGX supports two color representation methods:
+PAGX supports two color formats:
 
 #### HEX Format (Hexadecimal)
 
@@ -171,7 +171,7 @@ Floating-point format uses `colorspace(r, g, b)` or `colorspace(r, g, b, a)` to 
 **Notes**:
 - Color space identifiers (`srgb` or `p3`) and parentheses **cannot be omitted**
 - Wide color gamut (Display P3) component values may exceed the [0, 1] range to represent colors outside the sRGB gamut
-- sRGB floating-point format and HEX format represent the same color space; choose as needed
+- sRGB floating-point format and HEX format represent the same color space; use whichever best suits your needs
 
 #### Color Source Reference
 
@@ -274,7 +274,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 #### 3.3.1 Image
 
-Image resources define bitmap data that can be referenced throughout the document.
+Image resources define bitmap data for use throughout the document.
 
 ```xml
 <Image source="photo.png"/>
@@ -485,7 +485,7 @@ Compositions are used for content reuse (similar to After Effects pre-comps).
 
 #### 3.3.5 Font
 
-Font defines embedded font resources containing subsetted glyph data (vector outlines or bitmaps). PAGX files achieve complete self-containment through embedded glyph data, ensuring cross-platform rendering consistency.
+Font defines embedded font resources containing subsetted glyph data (vector outlines or bitmaps). Embedding glyph data makes PAGX files fully self-contained, ensuring consistent rendering across platforms.
 
 ```xml
 <!-- Embedded vector font -->
@@ -555,7 +555,7 @@ PAGX documents organize content in a hierarchical structure:
 
 ## 4. Layer System
 
-Layers are the fundamental organizational units for PAGX content, providing rich visual effect control capabilities.
+Layers are the fundamental organizational units for PAGX content, offering comprehensive control over visual effects.
 
 ### 4.1 Core Concepts
 
@@ -700,7 +700,7 @@ Blend modes define how source color (S) combines with destination color (D).
 
 ### 4.3 Layer Styles
 
-Layer styles add visual effects above or below layer content without replacing the original content.
+Layer styles add visual effects above or below layer content without modifying the original.
 
 **Input Sources for Layer Styles**:
 
@@ -784,7 +784,7 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 
 Layer filters are the final stage of layer rendering. All previously rendered results (including layer styles) accumulated in order serve as filter input. Filters are applied in chain fashion according to document order, with each filter's output becoming the next filter's input.
 
-Key difference from layer styles (Section 4.3): Layer styles **independently render** visual effects above or below layer content, while filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
+Unlike layer styles (Section 4.3), which **independently render** visual effects above or below layer content, filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
 
 ```xml
 <Layer>
@@ -806,7 +806,7 @@ Key difference from layer styles (Section 4.3): Layer styles **independently ren
 
 #### 4.4.2 DropShadowFilter
 
-Generates shadow effect based on filter input. Key difference from DropShadowStyle: the filter projects from original rendering content and preserves semi-transparency, while the style projects from opaque layer content. Additionally, the two support different attribute features.
+Generates shadow effect based on filter input. Unlike DropShadowStyle, the filter projects from original rendering content and preserves semi-transparency, whereas the style projects from opaque layer content. The two also support different attribute features.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1071,7 +1071,7 @@ y = center.y + outerRadius * sin(angle)
 
 **Fractional Point Count**:
 - `pointCount` supports decimal values (e.g., `5.5`)
-- The fractional part represents the "completion degree" of the last vertex, producing an incomplete final corner
+- The fractional part determines how much of the final vertex is drawn, producing an incomplete corner
 - `pointCount <= 0` generates no path
 
 **Roundness**:
@@ -1133,7 +1133,7 @@ Line 3]]>
 </Text>
 ```
 
-**Rendering Modes**: Text supports **pre-layout** and **runtime layout** modes. Pre-layout provides pre-computed glyphs and positions via GlyphRun child nodes, rendering with embedded fonts for cross-platform consistency. Runtime layout performs shaping and layout at runtime; due to platform differences in fonts and layout features, minor inconsistencies may occur. For exact reproduction of design tool layouts, pre-layout is recommended.
+**Rendering Modes**: Text supports **pre-layout** and **runtime layout** modes. Pre-layout provides pre-computed glyphs and positions via GlyphRun child nodes, rendering with embedded fonts for cross-platform consistency. Runtime layout performs shaping and layout at runtime; due to platform differences in fonts and layout features, minor inconsistencies may occur. For pixel-perfect reproduction of design tool layouts, pre-layout is recommended.
 
 **Runtime Layout Rendering Flow**:
 1. Find system font based on `fontFamily` and `fontStyle`; if unavailable, select fallback font according to runtime-configured fallback list
@@ -1745,7 +1745,7 @@ Rich text is achieved through multiple Text elements within a Group, each Text h
 </Layer>
 ```
 
-**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a whole for typography, enabling auto-wrapping and alignment.
+**Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
 
 ### 5.6 Repeater
 
@@ -1796,7 +1796,7 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 
 1. **Geometry copying**: Shapes and text are copied by `ceil(copies)` (i.e., 4), geometry itself is not scaled or clipped
 2. **Opacity adjustment**: The last copy's opacity is multiplied by the fractional part (e.g., 0.5), producing semi-transparent effect
-3. **Visual effect**: Simulates "partially existing" copies through opacity gradation
+3. **Visual effect**: Simulates partial copies through opacity gradation
 
 **Example**: When `copies="2.3"`:
 - Copy 3 complete geometry copies
