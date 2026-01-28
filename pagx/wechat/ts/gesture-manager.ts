@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-const MIN_ZOOM = 0.1;
-const MAX_ZOOM = 10.0;
 const TAP_TIMEOUT = 300;
 const TAP_DISTANCE_THRESHOLD = 50;
 
@@ -221,10 +219,7 @@ export class WXGestureManager {
       const currentDistance = Math.hypot(dx, dy);
       
       const scaleChange = currentDistance / this.initialDistance;
-      const newZoom = Math.max(
-        MIN_ZOOM,
-        Math.min(MAX_ZOOM, this.initialZoom * scaleChange)
-      );
+      const newZoom = this.initialZoom * scaleChange;
       
       // Calculate current pinch center (may have moved during zoom)
       const currentPinchCenterX = (touches[0].x + touches[1].x) * 0.5 * dpr;
