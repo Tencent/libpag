@@ -20,26 +20,27 @@
 
 #include <memory>
 #include "pagx/PAGXDocument.h"
-#include "pagx/TextGlyphs.h"
+#include "pagx/Typesetter.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx {
 
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
- * This is the bridge between the independent pagx module and tgfx rendering.
+ * Text elements are rendered using the Typesetter to create TextGlyphs.
  */
 class LayerBuilder {
  public:
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from.
-   * @param textGlyphs Optional typesetting results. If provided, uses original typefaces for
-   *                   rendering (best quality). If nullptr, builds from embedded GlyphRun data.
+   * @param typesetter Optional typesetter for text rendering. If nullptr, a default Typesetter is
+   *                   created internally. Pass a custom Typesetter to use registered typefaces
+   *                   and fallback fonts.
    * @return The root layer of the built layer tree.
    */
-  static std::shared_ptr<tgfx::Layer> Build(const PAGXDocument& document,
-                                            const TextGlyphs* textGlyphs = nullptr);
+  static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document,
+                                            Typesetter* typesetter = nullptr);
 };
 
 }  // namespace pagx

@@ -34,6 +34,8 @@ namespace pagx {
  */
 class FontEmbedder {
  public:
+  FontEmbedder() = default;
+
   /**
    * Embeds font data from TextGlyphs into the document.
    *
@@ -46,7 +48,7 @@ class FontEmbedder {
    * @param textGlyphs The typesetting results containing Text -> TextBlob mappings.
    * @return true if embedding succeeded, false otherwise.
    */
-  static bool Embed(PAGXDocument* document, const TextGlyphs& textGlyphs);
+  bool embed(PAGXDocument* document, const TextGlyphs& textGlyphs);
 };
 
 }  // namespace pagx

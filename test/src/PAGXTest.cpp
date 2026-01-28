@@ -144,7 +144,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
 
     // Step 2: Typeset text elements and embed fonts
     auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-    pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
+    pagx::FontEmbedder().embed(doc.get(), textGlyphs);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -155,7 +155,7 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     if (reloadedDoc == nullptr) {
       continue;
     }
-    auto layer = pagx::LayerBuilder::Build(*reloadedDoc);
+    auto layer = pagx::LayerBuilder::Build(reloadedDoc.get());
     if (layer == nullptr) {
       continue;
     }
@@ -236,7 +236,7 @@ PAG_TEST(PAGXTest, ColorRefRender) {
   auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
                                          strlen(pagxXml));
   ASSERT_TRUE(doc != nullptr);
-  auto layer = pagx::LayerBuilder::Build(*doc);
+  auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 200);
@@ -281,7 +281,7 @@ PAG_TEST(PAGXTest, StrokeColorRefRender) {
   auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
                                          strlen(pagxXml));
   ASSERT_TRUE(doc != nullptr);
-  auto layer = pagx::LayerBuilder::Build(*doc);
+  auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 200);
@@ -319,14 +319,14 @@ PAG_TEST(PAGXTest, LayerBuilderAPIConsistency) {
   // Load via FromFile
   auto docFromFile = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_TRUE(docFromFile != nullptr);
-  auto layerFromFile = pagx::LayerBuilder::Build(*docFromFile);
+  auto layerFromFile = pagx::LayerBuilder::Build(docFromFile.get());
   ASSERT_TRUE(layerFromFile != nullptr);
 
   // Load via FromXML
   auto docFromData = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
                                                   strlen(pagxXml));
   ASSERT_TRUE(docFromData != nullptr);
-  auto layerFromData = pagx::LayerBuilder::Build(*docFromData);
+  auto layerFromData = pagx::LayerBuilder::Build(docFromData.get());
   ASSERT_TRUE(layerFromData != nullptr);
 
   // Render both and compare
@@ -800,7 +800,7 @@ PAG_TEST(PAGXTest, PrecomposedTextRender) {
   ASSERT_TRUE(context != nullptr);
 
   // Build layer tree (doc already parsed above)
-  auto layer = pagx::LayerBuilder::Build(*doc);
+  auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 100);
@@ -843,7 +843,7 @@ PAG_TEST(PAGXTest, PrecomposedTextPointPositions) {
   auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
                                          strlen(pagxXml));
   ASSERT_TRUE(doc != nullptr);
-  auto layer = pagx::LayerBuilder::Build(*doc);
+  auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 150);
@@ -885,7 +885,7 @@ PAG_TEST(PAGXTest, PrecomposedTextMissingGlyph) {
   auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
                                          strlen(pagxXml));
   ASSERT_TRUE(doc != nullptr);
-  auto layer = pagx::LayerBuilder::Build(*doc);
+  auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 200, 100);
@@ -990,7 +990,7 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   typesetter.setFallbackTypefaces(typefaces);
   auto textGlyphs = typesetter.createTextGlyphs(doc.get());
   EXPECT_FALSE(textGlyphs.empty());
-  pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
+  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
 
   // Verify Font resources were added
   bool hasFontResource = false;
@@ -1005,7 +1005,7 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   EXPECT_TRUE(hasFontResource);
 
   // Step 3: Render typeset document
-  auto originalLayer = pagx::LayerBuilder::Build(*doc, &textGlyphs);
+  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
   ASSERT_TRUE(originalLayer != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
@@ -1057,7 +1057,7 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   EXPECT_TRUE(glyphRunFound);
 
   // Intentionally not providing TextGlyphs to verify embedded font works
-  auto reloadedLayer = pagx::LayerBuilder::Build(*reloadedDoc);
+  auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(reloadedLayer != nullptr);
 
   // Step 6: Render pre-shaped version
@@ -1103,10 +1103,10 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
   typesetter.setFallbackTypefaces(typefaces);
   auto textGlyphs = typesetter.createTextGlyphs(doc.get());
   EXPECT_FALSE(textGlyphs.empty());
-  pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
+  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
 
   // Render typeset document
-  auto originalLayer = pagx::LayerBuilder::Build(*doc, &textGlyphs);
+  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
   ASSERT_TRUE(originalLayer != nullptr);
 
   auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
@@ -1120,7 +1120,7 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
 
   auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_TRUE(reloadedDoc != nullptr);
-  auto reloadedLayer = pagx::LayerBuilder::Build(*reloadedDoc);
+  auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(reloadedLayer != nullptr);
 
   // Render pre-shaped
@@ -1423,10 +1423,10 @@ PAG_TEST(PAGXTest, CompleteExample) {
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(GetFallbackTypefaces());
   auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-  pagx::FontEmbedder::Embed(doc.get(), textGlyphs);
+  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
 
   // Build layer tree
-  auto layer = pagx::LayerBuilder::Build(*doc);
+  auto layer = pagx::LayerBuilder::Build(doc.get());
   ASSERT_TRUE(layer != nullptr);
 
   auto surface = Surface::Make(context, 800, 520);

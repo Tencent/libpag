@@ -20,33 +20,18 @@
 
 namespace pagx {
 
-void TextGlyphs::add(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob) {
+void TextGlyphs::setTextBlob(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob) {
   if (text != nullptr && textBlob != nullptr) {
     textBlobs[text] = std::move(textBlob);
   }
 }
 
-std::shared_ptr<tgfx::TextBlob> TextGlyphs::get(const Text* text) const {
+std::shared_ptr<tgfx::TextBlob> TextGlyphs::getTextBlob(const Text* text) const {
   auto it = textBlobs.find(const_cast<Text*>(text));
   if (it != textBlobs.end()) {
     return it->second;
   }
   return nullptr;
-}
-
-bool TextGlyphs::contains(const Text* text) const {
-  return textBlobs.find(const_cast<Text*>(text)) != textBlobs.end();
-}
-
-void TextGlyphs::forEach(
-    std::function<void(Text*, std::shared_ptr<tgfx::TextBlob>)> callback) const {
-  for (const auto& pair : textBlobs) {
-    callback(pair.first, pair.second);
-  }
-}
-
-size_t TextGlyphs::size() const {
-  return textBlobs.size();
 }
 
 bool TextGlyphs::empty() const {
