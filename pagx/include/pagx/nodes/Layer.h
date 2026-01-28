@@ -32,6 +32,8 @@
 
 namespace pagx {
 
+class Composition;
+
 /**
  * Mask types that define how a mask layer affects its target.
  */
@@ -132,9 +134,9 @@ class Layer : public Node {
   bool hasScrollRect = false;
 
   /**
-   * A reference to a mask layer (e.g., "#maskId").
+   * A reference to a mask layer.
    */
-  std::string mask = {};
+  Layer* mask = nullptr;
 
   /**
    * The type of masking to apply (Alpha, Luminosity, InvertedAlpha, or InvertedLuminosity).
@@ -143,33 +145,38 @@ class Layer : public Node {
   MaskType maskType = MaskType::Alpha;
 
   /**
-   * A reference to a composition (e.g., "#compositionId") used as the layer content.
+   * A reference to a composition used as the layer content.
    */
-  std::string composition = {};
+  Composition* composition = nullptr;
 
   /**
    * The vector elements contained in this layer (shapes, painters, modifiers, etc.).
    */
-  std::vector<std::unique_ptr<Element>> contents = {};
+  std::vector<Element*> contents = {};
 
   /**
    * The layer styles applied to this layer (drop shadow, inner shadow, etc.).
    */
-  std::vector<std::unique_ptr<LayerStyle>> styles = {};
+  std::vector<LayerStyle*> styles = {};
 
   /**
    * The filters applied to this layer (blur, color matrix, etc.).
    */
-  std::vector<std::unique_ptr<LayerFilter>> filters = {};
+  std::vector<LayerFilter*> filters = {};
 
   /**
    * The child layers contained in this layer.
    */
-  std::vector<std::unique_ptr<Layer>> children = {};
+  std::vector<Layer*> children = {};
 
   NodeType nodeType() const override {
     return NodeType::Layer;
   }
+
+ private:
+  Layer() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

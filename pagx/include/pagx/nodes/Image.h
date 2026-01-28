@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include "pagx/nodes/Data.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -30,13 +32,23 @@ namespace pagx {
 class Image : public Node {
  public:
   /**
-   * The source of the image. Can be a file path, URL, or base64-encoded data URI.
+   * Image binary data (decoded from base64).
    */
-  std::string source = {};
+  std::shared_ptr<Data> data = nullptr;
+
+  /**
+   * External file path (mutually exclusive with data, data has priority).
+   */
+  std::string filePath = {};
 
   NodeType nodeType() const override {
     return NodeType::Image;
   }
+
+ private:
+  Image() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

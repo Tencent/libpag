@@ -20,20 +20,21 @@
 
 #include <string>
 #include "pagx/nodes/Element.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/TextAlign.h"
 
 namespace pagx {
 
 /**
  * TextPath is a text modifier that places text along a path. It allows text to follow the contour
- * of a referenced path shape.
+ * of a path shape. The path can be specified either inline or by referencing a PathData resource.
  */
 class TextPath : public Element {
  public:
   /**
-   * A reference to the path shape (e.g., "#pathId") that the text follows.
+   * The path data that the text follows.
    */
-  std::string path = {};
+  PathData* path = nullptr;
 
   /**
    * The alignment of text along the path. The default value is Start.
@@ -57,7 +58,7 @@ class TextPath : public Element {
   /**
    * Whether characters are rotated to be perpendicular to the path. The default value is true.
    */
-  bool perpendicularToPath = true;
+  bool perpendicular = true;
 
   /**
    * Whether to reverse the direction of the path. The default value is false.
@@ -67,6 +68,11 @@ class TextPath : public Element {
   NodeType nodeType() const override {
     return NodeType::TextPath;
   }
+
+ private:
+  TextPath() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

@@ -46,11 +46,16 @@ class Composition : public Node {
   /**
    * The layers contained in this composition.
    */
-  std::vector<std::unique_ptr<Layer>> layers = {};
+  std::vector<Layer*> layers = {};
 
   NodeType nodeType() const override {
     return NodeType::Composition;
   }
+
+ private:
+  Composition() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

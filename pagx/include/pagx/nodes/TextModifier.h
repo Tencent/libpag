@@ -18,12 +18,13 @@
 
 #pragma once
 
-#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/TextSelector.h"
 #include "pagx/nodes/Point.h"
+#include "pagx/nodes/Color.h"
 
 namespace pagx {
 
@@ -70,29 +71,33 @@ class TextModifier : public Element {
   float alpha = 1;
 
   /**
-   * The fill color override for selected characters as a hex color string.
+   * The fill color override for selected characters.
    */
-  std::string fillColor = {};
+  std::optional<Color> fillColor = std::nullopt;
 
   /**
-   * The stroke color override for selected characters as a hex color string.
+   * The stroke color override for selected characters.
    */
-  std::string strokeColor = {};
+  std::optional<Color> strokeColor = std::nullopt;
 
   /**
-   * The stroke width override for selected characters. A value of -1 means no override. The
-   * default value is -1.
+   * The stroke width override for selected characters.
    */
-  float strokeWidth = -1;
+  std::optional<float> strokeWidth = std::nullopt;
 
   /**
    * The selectors that determine which characters are affected by this modifier.
    */
-  std::vector<std::unique_ptr<TextSelector>> selectors = {};
+  std::vector<TextSelector*> selectors = {};
 
   NodeType nodeType() const override {
     return NodeType::TextModifier;
   }
+
+ private:
+  TextModifier() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

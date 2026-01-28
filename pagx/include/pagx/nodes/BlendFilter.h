@@ -42,6 +42,11 @@ class BlendFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::BlendFilter;
   }
+
+ private:
+  BlendFilter() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

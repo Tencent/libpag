@@ -31,6 +31,8 @@ class LayerFilter : public Node {
 
  protected:
   LayerFilter() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

@@ -27,15 +27,17 @@
 
 namespace pagx {
 
+class Image;
+
 /**
  * An image pattern color source that tiles an image to fill shapes.
  */
 class ImagePattern : public ColorSource {
  public:
   /**
-   * A reference to an image resource (e.g., "@imageId").
+   * A reference to an image resource.
    */
-  std::string image = {};
+  Image* image = nullptr;
 
   /**
    * The tile mode for the horizontal direction. The default value is Clamp.
@@ -65,6 +67,11 @@ class ImagePattern : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::ImagePattern;
   }
+
+ private:
+  ImagePattern() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

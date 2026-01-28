@@ -36,6 +36,11 @@ class SolidColor : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::SolidColor;
   }
+
+ private:
+  SolidColor() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

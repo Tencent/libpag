@@ -59,6 +59,11 @@ class ConicGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::ConicGradient;
   }
+
+ private:
+  ConicGradient() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

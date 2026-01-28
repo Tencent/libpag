@@ -17,21 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/LayerBuilder.h"
-#include <array>
 #include <tuple>
 #include <unordered_map>
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorSpace.h"
-#include "tgfx/core/ColorSpace.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/Data.h"
 #include "pagx/nodes/DiamondGradient.h"
+#include "Base64.h"
+#include "StringParser.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -49,14 +51,18 @@
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
-#include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
+#include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/core/TextBlobBuilder.h"
+#include "tgfx/svg/SVGPathParser.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/VectorLayer.h"
@@ -81,7 +87,13 @@
 #include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
-#include "tgfx/svg/TextShaper.h"
+
+#ifdef DEBUG
+#include <cassert>
+#define DEBUG_ASSERT(x) assert(x)
+#else
+#define DEBUG_ASSERT(x)
+#endif
 
 namespace pagx {
 
@@ -128,26 +140,6 @@ static tgfx::Color ParseHexColor(const std::string& str) {
             static_cast<float>(b) / 255.0f, static_cast<float>(a) / 255.0f};
   }
   return tgfx::Color::Black();
-}
-
-// Parse a comma-separated list of floats.
-static std::vector<float> ParseFloatList(const std::string& str) {
-  std::vector<float> result;
-  std::string current;
-  for (char c : str) {
-    if (c == ',' || c == ' ') {
-      if (!current.empty()) {
-        result.push_back(std::stof(current));
-        current.clear();
-      }
-    } else {
-      current += c;
-    }
-  }
-  if (!current.empty()) {
-    result.push_back(std::stof(current));
-  }
-  return result;
 }
 
 // Parse a color string to pagx::Color. Supports:
@@ -234,54 +226,12 @@ static Color ParseColorString(const std::string& str) {
   return {};
 }
 
-// Decode base64 encoded string to binary data.
-static std::shared_ptr<tgfx::Data> Base64Decode(const std::string& encodedString) {
-  static const std::array<unsigned char, 128> decodingTable = {
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62,
-      64, 64, 64, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64, 64, 0,
-      1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-      23, 24, 25, 64, 64, 64, 64, 64, 64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
-      39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64};
-
-  size_t inputLength = encodedString.size();
-  if (inputLength % 4 != 0) {
+// Type converter from pagx::Data to tgfx::Data
+static std::shared_ptr<tgfx::Data> ToTGFX(const std::shared_ptr<pagx::Data>& data) {
+  if (!data) {
     return nullptr;
   }
-
-  size_t outputLength = inputLength / 4 * 3;
-  if (inputLength >= 1 && encodedString[inputLength - 1] == '=') {
-    outputLength--;
-  }
-  if (inputLength >= 2 && encodedString[inputLength - 2] == '=') {
-    outputLength--;
-  }
-
-  auto output = static_cast<unsigned char*>(malloc(outputLength));
-  if (!output) {
-    return nullptr;
-  }
-
-  for (size_t i = 0, j = 0; i < inputLength;) {
-    auto a = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-    auto b = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-    auto c = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-    auto d = encodedString[i] <= 127 ? decodingTable[encodedString[i++]] : 64;
-
-    uint32_t triple = (a << 3 * 6) + (b << 2 * 6) + (c << 1 * 6) + (d << 0 * 6);
-
-    if (j < outputLength) {
-      output[j++] = (triple >> 2 * 8) & 0xFF;
-    }
-    if (j < outputLength) {
-      output[j++] = (triple >> 1 * 8) & 0xFF;
-    }
-    if (j < outputLength) {
-      output[j++] = (triple >> 0 * 8) & 0xFF;
-    }
-  }
-
-  return tgfx::Data::MakeAdopted(output, outputLength, tgfx::Data::FreeProc);
+  return tgfx::Data::MakeWithCopy(data->data(), data->size());
 }
 
 // Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
@@ -307,7 +257,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
     return nullptr;
   }
 
-  return tgfx::Image::MakeFromEncoded(data);
+  return tgfx::Image::MakeFromEncoded(ToTGFX(data));
 }
 
 // Type converters from pagx to tgfx
@@ -402,21 +352,14 @@ static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
 class LayerBuilderImpl {
  public:
   explicit LayerBuilderImpl(const LayerBuilder::Options& options) : _options(options) {
-    // Create text shaper from options or fallback typefaces.
-    if (_options.textShaper) {
-      _textShaper = _options.textShaper;
-    } else if (!_options.fallbackTypefaces.empty()) {
-      _textShaper = tgfx::TextShaper::Make(_options.fallbackTypefaces);
-    }
   }
 
   PAGXContent build(const PAGXDocument& document) {
-    // Cache resources for later lookup.
-    _resources = &document.resources;
-
-    // Clear layer mappings from previous builds.
-    _layerById.clear();
+    _document = &document;
+    // Clear mappings from previous builds.
+    _tgfxLayerByPagxLayer.clear();
     _pendingMasks.clear();
+    _fontCache.clear();
 
     PAGXContent content;
     content.width = document.width;
@@ -425,16 +368,16 @@ class LayerBuilderImpl {
     // Build layer tree.
     auto rootLayer = tgfx::Layer::Make();
     for (const auto& layer : document.layers) {
-      auto childLayer = convertLayer(layer.get());
+      auto childLayer = convertLayer(layer);
       if (childLayer) {
         rootLayer->addChild(childLayer);
       }
     }
 
     // Apply masks after all layers are built (second pass).
-    for (const auto& [layer, maskId, maskType] : _pendingMasks) {
-      auto it = _layerById.find(maskId);
-      if (it != _layerById.end()) {
+    for (const auto& [layer, maskPagx, maskType] : _pendingMasks) {
+      auto it = _tgfxLayerByPagxLayer.find(maskPagx);
+      if (it != _tgfxLayerByPagxLayer.end()) {
         auto maskLayer = it->second;
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
@@ -445,9 +388,10 @@ class LayerBuilderImpl {
     }
 
     content.root = rootLayer;
-    _resources = nullptr;
-    _layerById.clear();
+    _document = nullptr;
+    _tgfxLayerByPagxLayer.clear();
     _pendingMasks.clear();
+    _fontCache.clear();
     return content;
   }
 
@@ -466,25 +410,18 @@ class LayerBuilderImpl {
     }
 
     if (layer) {
-      // Register layer by ID for mask lookups.
-      if (!node->id.empty()) {
-        _layerById[node->id] = layer;
-      }
+      // Register layer for mask lookups.
+      _tgfxLayerByPagxLayer[node] = layer;
 
       applyLayerAttributes(node, layer.get());
 
       // Queue mask to be applied in second pass.
-      if (!node->mask.empty()) {
-        std::string maskId = node->mask;
-        // Remove leading '@' if present (resource reference syntax).
-        if (!maskId.empty() && maskId[0] == '@') {
-          maskId = maskId.substr(1);
-        }
-        _pendingMasks.emplace_back(layer, maskId, ToTGFXMaskType(node->maskType));
+      if (node->mask != nullptr) {
+        _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
       }
 
       for (const auto& child : node->children) {
-        auto childLayer = convertLayer(child.get());
+        auto childLayer = convertLayer(child);
         if (childLayer) {
           layer->addChild(childLayer);
         }
@@ -499,7 +436,7 @@ class LayerBuilderImpl {
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
 
     for (const auto& element : node->contents) {
-      auto tgfxElement = convertVectorElement(element.get());
+      auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
         contents.push_back(tgfxElement);
       }
@@ -584,106 +521,166 @@ class LayerBuilderImpl {
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
     auto shapePath = std::make_shared<tgfx::ShapePath>();
-    tgfx::Path tgfxPath;
-    if (!node->dataRef.empty()) {
-      // Look up PathData from resources
-      auto pathData = findPathDataResource(node->dataRef);
-      if (pathData) {
-        tgfxPath = ToTGFX(*pathData);
-      }
-    } else {
-      tgfxPath = ToTGFX(node->data);
+    if (node->data) {
+      shapePath->setPath(ToTGFX(*node->data));
     }
-    shapePath->setPath(tgfxPath);
     return shapePath;
-  }
-
-  const PathData* findPathDataResource(const std::string& ref) {
-    if (!_resources || ref.empty()) {
-      return nullptr;
-    }
-    // ref format: "@path0" -> id: "path0"
-    std::string id = ref;
-    if (!id.empty() && id[0] == '@') {
-      id = id.substr(1);
-    }
-    for (const auto& res : *_resources) {
-      if (res->nodeType() == NodeType::PathData && res->id == id) {
-        return static_cast<const PathData*>(res.get());
-      }
-    }
-    return nullptr;
-  }
-
-  std::shared_ptr<tgfx::ColorSource> resolveColorRef(const std::string& colorRef) {
-    if (colorRef.empty()) {
-      return nullptr;
-    }
-    // Resource reference format: @resourceId
-    if (colorRef[0] == '@') {
-      std::string resourceId = colorRef.substr(1);
-      return findColorSourceResource(resourceId);
-    }
-    // Try to parse as a color string (hex, srgb, p3)
-    auto color = ParseColorString(colorRef);
-    if (color.alpha > 0) {
-      return tgfx::SolidColor::Make(ToTGFX(color));
-    }
-    return nullptr;
-  }
-
-  std::shared_ptr<tgfx::ColorSource> findColorSourceResource(const std::string& resourceId) {
-    if (!_resources || resourceId.empty()) {
-      return nullptr;
-    }
-    for (const auto& res : *_resources) {
-      if (res->id == resourceId) {
-        // Check if this is a ColorSource node type.
-        auto nodeType = res->nodeType();
-        if (nodeType == NodeType::SolidColor || nodeType == NodeType::LinearGradient ||
-            nodeType == NodeType::RadialGradient || nodeType == NodeType::ConicGradient ||
-            nodeType == NodeType::DiamondGradient || nodeType == NodeType::ImagePattern) {
-          return convertColorSource(static_cast<const ColorSource*>(res.get()));
-        }
-      }
-    }
-    return nullptr;
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
     auto tgfxText = std::make_shared<tgfx::Text>();
 
-    std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-    if (!node->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
-      for (const auto& tf : _options.fallbackTypefaces) {
-        if (tf && tf->fontFamily() == node->fontFamily) {
-          typeface = tf;
-          break;
-        }
-      }
-    }
-    if (!typeface && !_options.fallbackTypefaces.empty()) {
-      typeface = _options.fallbackTypefaces[0];
-    }
-    // Fallback to system font by name (required for Web platform).
-    if (!typeface && !node->fontFamily.empty()) {
-      typeface = tgfx::Typeface::MakeFromName(node->fontFamily, node->fontStyle);
+    // Text must be pre-typeset with GlyphRuns. Use Typesetter before calling LayerBuilder.
+    if (node->glyphRuns.empty()) {
+      DEBUG_ASSERT(false && "Text element has no GlyphRun data. Use Typesetter to typeset first.");
+      return tgfxText;
     }
 
-    if (!node->text.empty()) {
-      std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
-      // Use TextShaper for fallback support (including emoji).
-      if (_textShaper) {
-        textBlob = _textShaper->shape(node->text, typeface, node->fontSize);
-      } else if (typeface) {
-        auto font = tgfx::Font(typeface, node->fontSize);
-        textBlob = tgfx::TextBlob::MakeFrom(node->text, font);
-      }
+    auto textBlob = buildTextBlob(node);
+    if (textBlob) {
       tgfxText->setTextBlob(textBlob);
     }
-
     tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     return tgfxText;
+  }
+
+  std::shared_ptr<tgfx::TextBlob> buildTextBlob(const Text* node) {
+    tgfx::TextBlobBuilder builder;
+
+    for (const auto& run : node->glyphRuns) {
+      if (run->glyphs.empty()) {
+        continue;
+      }
+
+      // Resolve font reference
+      auto typeface = buildTypefaceFromFont(run->font);
+      if (!typeface) {
+        continue;
+      }
+
+      // For embedded fonts (CustomTypeface from TextPrecomposer), the glyph paths and positions
+      // are already scaled to the target fontSize. Use fontSize=1.0 since paths are absolute.
+      tgfx::Font font(typeface, 1);
+      size_t count = run->glyphs.size();
+
+      // Determine positioning mode (priority: matrices > xforms > positions > xPositions)
+      if (!run->matrices.empty() && run->matrices.size() >= count) {
+        // Matrix mode
+        auto& buffer = builder.allocRunMatrix(font, count);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        auto* matrices = reinterpret_cast<float*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          const auto& m = run->matrices[i];
+          matrices[i * 6 + 0] = m.a;
+          matrices[i * 6 + 1] = m.b;
+          matrices[i * 6 + 2] = m.c;
+          matrices[i * 6 + 3] = m.d;
+          matrices[i * 6 + 4] = m.tx;
+          matrices[i * 6 + 5] = m.ty;
+        }
+      } else if (!run->xforms.empty() && run->xforms.size() >= count) {
+        // RSXform mode
+        auto& buffer = builder.allocRunRSXform(font, count);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          const auto& x = run->xforms[i];
+          xforms[i] = tgfx::RSXform::Make(x.scos, x.ssin, x.tx, x.ty);
+        }
+      } else if (!run->positions.empty() && run->positions.size() >= count) {
+        // Point mode
+        auto& buffer = builder.allocRunPos(font, count);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          positions[i] = tgfx::Point::Make(run->positions[i].x, run->positions[i].y);
+        }
+      } else if (!run->xPositions.empty() && run->xPositions.size() >= count) {
+        // Horizontal mode
+        auto& buffer = builder.allocRunPosH(font, count, run->y);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, run->xPositions.data(), count * sizeof(float));
+      }
+    }
+
+    return builder.build();
+  }
+
+  std::shared_ptr<tgfx::Typeface> buildTypefaceFromFont(const Font* fontNode) {
+    if (!fontNode || fontNode->glyphs.empty()) {
+      return nullptr;
+    }
+
+    auto it = _fontCache.find(fontNode);
+    if (it != _fontCache.end()) {
+      return it->second;
+    }
+
+    // Determine if font is path-based or image-based
+    bool hasPath = false;
+    bool hasImage = false;
+    for (const auto& glyph : fontNode->glyphs) {
+      if (glyph->path != nullptr) {
+        hasPath = true;
+      }
+      if (glyph->image != nullptr) {
+        hasImage = true;
+      }
+    }
+
+    std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+    if (hasPath && !hasImage) {
+      // Build path-based typeface
+      tgfx::PathTypefaceBuilder builder;
+      for (const auto& glyph : fontNode->glyphs) {
+        if (glyph->path != nullptr) {
+          builder.addGlyph(ToTGFX(*glyph->path));
+        }
+      }
+      typeface = builder.detach();
+    } else if (hasImage && !hasPath) {
+      // Build image-based typeface
+      tgfx::ImageTypefaceBuilder builder;
+      for (const auto& glyph : fontNode->glyphs) {
+        if (glyph->image != nullptr) {
+          std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
+          auto imageNode = glyph->image;
+          if (imageNode->data != nullptr) {
+            codec = tgfx::ImageCodec::MakeFrom(ToTGFX(imageNode->data));
+          } else if (imageNode->filePath.find("data:") == 0) {
+            // Data URI - decode base64 image data
+            auto commaPos = imageNode->filePath.find(',');
+            if (commaPos != std::string::npos) {
+              auto header = imageNode->filePath.substr(0, commaPos);
+              if (header.find(";base64") != std::string::npos) {
+                auto base64Data = imageNode->filePath.substr(commaPos + 1);
+                auto data = Base64Decode(base64Data);
+                if (data) {
+                  codec = tgfx::ImageCodec::MakeFrom(ToTGFX(data));
+                }
+              }
+            }
+          } else if (!imageNode->filePath.empty()) {
+            // External file path
+            std::string fullPath = imageNode->filePath;
+            if (_document && imageNode->filePath[0] != '/' && !_document->basePath.empty()) {
+              fullPath = _document->basePath + imageNode->filePath;
+            }
+            codec = tgfx::ImageCodec::MakeFrom(fullPath);
+          }
+
+          if (codec) {
+            builder.addGlyph(codec, ToTGFX(glyph->offset));
+          }
+        }
+      }
+      typeface = builder.detach();
+    }
+
+    if (typeface) {
+      _fontCache[fontNode] = typeface;
+    }
+    return typeface;
   }
 
   std::shared_ptr<tgfx::FillStyle> convertFill(const Fill* node) {
@@ -691,9 +688,7 @@ class LayerBuilderImpl {
 
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
     if (node->color) {
-      colorSource = convertColorSource(node->color.get());
-    } else if (!node->colorRef.empty()) {
-      colorSource = resolveColorRef(node->colorRef);
+      colorSource = convertColorSource(node->color);
     }
 
     if (colorSource) {
@@ -709,9 +704,7 @@ class LayerBuilderImpl {
 
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
     if (node->color) {
-      colorSource = convertColorSource(node->color.get());
-    } else if (!node->colorRef.empty()) {
-      colorSource = resolveColorRef(node->colorRef);
+      colorSource = convertColorSource(node->color);
     }
 
     if (colorSource) {
@@ -794,21 +787,18 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
-    if (!node || node->image.empty()) {
+    if (!node || node->image == nullptr) {
       return nullptr;
     }
 
-    // Load image from data URI, resource reference, or file path.
+    auto imageNode = node->image;
     std::shared_ptr<tgfx::Image> image = nullptr;
-    if (node->image.find("#") == 0) {
-      // Resource reference (e.g., "#image0") - look up in document resources.
-      std::string resourceId = node->image.substr(1);
-      image = findImageResource(resourceId);
-    } else if (node->image.find("data:") == 0) {
-      image = ImageFromDataURI(node->image);
-    } else {
-      // Try as file path.
-      std::string imagePath = node->image;
+    if (imageNode->data) {
+      image = tgfx::Image::MakeFromEncoded(ToTGFX(imageNode->data));
+    } else if (imageNode->filePath.find("data:") == 0) {
+      image = ImageFromDataURI(imageNode->filePath);
+    } else if (!imageNode->filePath.empty()) {
+      std::string imagePath = imageNode->filePath;
       if (!_options.basePath.empty() && imagePath[0] != '/') {
         imagePath = _options.basePath + imagePath;
       }
@@ -841,28 +831,6 @@ class LayerBuilderImpl {
     return pattern;
   }
 
-  std::shared_ptr<tgfx::Image> findImageResource(const std::string& resourceId) {
-    if (!_resources) {
-      return nullptr;
-    }
-    for (const auto& resource : *_resources) {
-      if (resource->nodeType() == NodeType::Image) {
-        auto imageNode = static_cast<const Image*>(resource.get());
-        if (imageNode->id == resourceId) {
-          if (imageNode->source.find("data:") == 0) {
-            return ImageFromDataURI(imageNode->source);
-          } else {
-            std::string imagePath = imageNode->source;
-            if (!_options.basePath.empty() && imagePath[0] != '/') {
-              imagePath = _options.basePath + imagePath;
-            }
-            return tgfx::Image::MakeFromFile(imagePath);
-          }
-        }
-      }
-    }
-    return nullptr;
-  }
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
     auto trim = std::make_shared<tgfx::TrimPath>();
     trim->setStart(node->start);
@@ -893,118 +861,13 @@ class LayerBuilderImpl {
     auto group = std::make_shared<tgfx::VectorGroup>();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
 
-    // Check if group contains TextLayout modifier.
-    const TextLayout* textLayout = nullptr;
     for (const auto& element : node->elements) {
-      if (element->nodeType() == NodeType::TextLayout) {
-        textLayout = static_cast<const TextLayout*>(element.get());
-        break;
-      }
-    }
-
-    // Collect Text info for layout calculation if TextLayout is present.
-    struct TextInfo {
-      const pagx::Text* text = nullptr;
-      std::shared_ptr<tgfx::TextBlob> blob = nullptr;
-      tgfx::Rect bounds = {};
-    };
-    std::vector<TextInfo> textInfos;
-
-    if (textLayout != nullptr) {
-      for (const auto& element : node->elements) {
-        if (element->nodeType() == NodeType::Text) {
-          auto text = static_cast<const pagx::Text*>(element.get());
-          TextInfo info;
-          info.text = text;
-
-          // Create TextBlob to measure bounds.
-          std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-          if (!text->fontFamily.empty() && !_options.fallbackTypefaces.empty()) {
-            for (const auto& tf : _options.fallbackTypefaces) {
-              if (tf && tf->fontFamily() == text->fontFamily) {
-                typeface = tf;
-                break;
-              }
-            }
-          }
-          if (!typeface && !_options.fallbackTypefaces.empty()) {
-            typeface = _options.fallbackTypefaces[0];
-          }
-          // Fallback to system font by name (required for Web platform).
-          if (!typeface && !text->fontFamily.empty()) {
-            typeface = tgfx::Typeface::MakeFromName(text->fontFamily, text->fontStyle);
-          }
-
-          if (!text->text.empty()) {
-            if (_textShaper) {
-              info.blob = _textShaper->shape(text->text, typeface, text->fontSize);
-            } else if (typeface) {
-              auto font = tgfx::Font(typeface, text->fontSize);
-              info.blob = tgfx::TextBlob::MakeFrom(text->text, font);
-            }
-            if (info.blob) {
-              info.bounds = info.blob->getTightBounds();
-            }
-          }
-          textInfos.push_back(info);
-        }
-      }
-    }
-
-    for (const auto& element : node->elements) {
-      // Skip TextLayout modifier, it's handled by adjusting Text positions.
+      // Skip TextLayout modifier - layout has been baked into GlyphRun positions by Typesetter
       if (element->nodeType() == NodeType::TextLayout) {
         continue;
       }
 
-      // Handle Text with layout adjustments.
-      if (element->nodeType() == NodeType::Text && textLayout != nullptr) {
-        auto text = static_cast<const pagx::Text*>(element.get());
-        auto tgfxText = std::make_shared<tgfx::Text>();
-
-        // Find the matching TextInfo.
-        TextInfo* info = nullptr;
-        for (auto& ti : textInfos) {
-          if (ti.text == text) {
-            info = &ti;
-            break;
-          }
-        }
-
-        if (info != nullptr && info->blob) {
-          tgfxText->setTextBlob(info->blob);
-
-          // Calculate x offset based on textAlign.
-          // This follows tgfx SVG text-anchor handling: xOffset = alignmentFactor * width
-          // where alignmentFactor is: Start=0, Center=-0.5, End=-1.0
-          float xOffset = 0;
-          float textWidth = info->bounds.width();
-          switch (textLayout->textAlign) {
-            case TextAlign::Start:
-              // No offset needed.
-              break;
-            case TextAlign::Center:
-              xOffset = -0.5f * textWidth;
-              break;
-            case TextAlign::End:
-              xOffset = -textWidth;
-              break;
-            case TextAlign::Justify:
-              // Justify requires more complex handling, treat as start for now.
-              break;
-          }
-
-          tgfxText->setPosition(tgfx::Point::Make(text->position.x + xOffset, text->position.y));
-        } else {
-          // No blob, use original position.
-          tgfxText->setPosition(tgfx::Point::Make(text->position.x, text->position.y));
-        }
-
-        elements.push_back(tgfxText);
-        continue;
-      }
-
-      auto tgfxElement = convertVectorElement(element.get());
+      auto tgfxElement = convertVectorElement(element);
       if (tgfxElement) {
         elements.push_back(tgfxElement);
       }
@@ -1025,7 +888,7 @@ class LayerBuilderImpl {
     // Layer styles
     std::vector<std::shared_ptr<tgfx::LayerStyle>> styles;
     for (const auto& style : node->styles) {
-      auto tgfxStyle = convertLayerStyle(style.get());
+      auto tgfxStyle = convertLayerStyle(style);
       if (tgfxStyle) {
         styles.push_back(tgfxStyle);
       }
@@ -1037,7 +900,7 @@ class LayerBuilderImpl {
     // Layer filters
     std::vector<std::shared_ptr<tgfx::LayerFilter>> filters;
     for (const auto& filter : node->filters) {
-      auto tgfxFilter = convertLayerFilter(filter.get());
+      auto tgfxFilter = convertLayerFilter(filter);
       if (tgfxFilter) {
         filters.push_back(tgfxFilter);
       }
@@ -1055,17 +918,17 @@ class LayerBuilderImpl {
     switch (node->nodeType()) {
       case NodeType::DropShadowStyle: {
         auto style = static_cast<const DropShadowStyle*>(node);
-        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
-                                           style->blurrinessY, ToTGFX(style->color));
+        return tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                           style->blurY, ToTGFX(style->color));
       }
       case NodeType::InnerShadowStyle: {
         auto style = static_cast<const InnerShadowStyle*>(node);
-        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurrinessX,
-                                            style->blurrinessY, ToTGFX(style->color));
+        return tgfx::InnerShadowStyle::Make(style->offsetX, style->offsetY, style->blurX,
+                                            style->blurY, ToTGFX(style->color));
       }
       case NodeType::BackgroundBlurStyle: {
         auto style = static_cast<const pagx::BackgroundBlurStyle*>(node);
-        return tgfx::BackgroundBlurStyle::Make(style->blurrinessX, style->blurrinessY);
+        return tgfx::BackgroundBlurStyle::Make(style->blurX, style->blurY);
       }
       default:
         return nullptr;
@@ -1080,12 +943,12 @@ class LayerBuilderImpl {
     switch (node->nodeType()) {
       case NodeType::BlurFilter: {
         auto filter = static_cast<const pagx::BlurFilter*>(node);
-        return tgfx::BlurFilter::Make(filter->blurrinessX, filter->blurrinessY);
+        return tgfx::BlurFilter::Make(filter->blurX, filter->blurY);
       }
       case NodeType::DropShadowFilter: {
         auto filter = static_cast<const DropShadowFilter*>(node);
-        return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurrinessX,
-                                            filter->blurrinessY, ToTGFX(filter->color),
+        return tgfx::DropShadowFilter::Make(filter->offsetX, filter->offsetY, filter->blurX,
+                                            filter->blurY, ToTGFX(filter->color),
                                             filter->shadowOnly);
       }
       default:
@@ -1094,11 +957,11 @@ class LayerBuilderImpl {
   }
 
   LayerBuilder::Options _options = {};
-  const std::vector<std::unique_ptr<Node>>* _resources = nullptr;
-  std::shared_ptr<tgfx::TextShaper> _textShaper = nullptr;
-  std::unordered_map<std::string, std::shared_ptr<tgfx::Layer>> _layerById = {};
-  std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, std::string, tgfx::LayerMaskType>>
+  const PAGXDocument* _document = nullptr;
+  std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
+  std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> _fontCache = {};
 };
 
 // Public API implementation

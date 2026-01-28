@@ -92,15 +92,9 @@ class Stroke : public Element {
  public:
   /**
    * The color source for this stroke. Can be a SolidColor, LinearGradient, RadialGradient,
-   * ConicGradient, DiamondGradient, or ImagePattern. If null, uses the colorRef reference.
+   * ConicGradient, DiamondGradient, or ImagePattern.
    */
-  std::unique_ptr<ColorSource> color = nullptr;
-
-  /**
-   * A reference to a color source defined in Resources (e.g., "@gradientId").
-   * Only used if color is null.
-   */
-  std::string colorRef = {};
+  ColorSource* color = nullptr;
 
   /**
    * The stroke width in pixels. The default value is 1.
@@ -157,6 +151,11 @@ class Stroke : public Element {
   NodeType nodeType() const override {
     return NodeType::Stroke;
   }
+
+ private:
+  Stroke() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

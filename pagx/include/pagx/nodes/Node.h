@@ -69,6 +69,14 @@ enum class NodeType {
    * A color stop in a gradient.
    */
   ColorStop,
+  /**
+   * An embedded font resource containing glyph data.
+   */
+  Font,
+  /**
+   * A single glyph definition in a Font.
+   */
+  Glyph,
 
   // Layer
   /**
@@ -178,7 +186,11 @@ enum class NodeType {
   /**
    * A range selector for text modifiers.
    */
-  RangeSelector
+  RangeSelector,
+  /**
+   * A precomposed glyph run for text rendering.
+   */
+  GlyphRun
 };
 
 /**

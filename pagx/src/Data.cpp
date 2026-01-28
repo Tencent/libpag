@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/PAGXExporter.h"
-#include "PAGXExporterImpl.h"
+#include "pagx/nodes/Data.h"
+#include <cstring>
 
 namespace pagx {
 
-std::string PAGXExporter::ToXML(const PAGXDocument& document) {
-  return PAGXExporterImpl::Export(document);
+std::shared_ptr<Data> Data::MakeWithCopy(const void* data, size_t length) {
+  if (data == nullptr || length == 0) {
+    return nullptr;
+  }
+  return std::shared_ptr<Data>(new Data(data, length));
+}
+
+Data::Data(const void* data, size_t length) : _size(length) {
+  if (data != nullptr && length > 0) {
+    auto* buffer = new uint8_t[length];
+    std::memcpy(buffer, data, length);
+    _data = buffer;
+  }
+}
+
+Data::~Data() {
+  delete[] _data;
 }
 
 }  // namespace pagx

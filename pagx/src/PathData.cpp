@@ -21,9 +21,6 @@
 
 namespace pagx {
 
-// Constant for approximating a quarter circle with cubic Bezier curves
-static constexpr float CUBIC_ARC_FACTOR = 0.5522847498307936f;
-
 int PathData::PointsPerVerb(PathVerb verb) {
   switch (verb) {
     case PathVerb::Move:
@@ -78,87 +75,12 @@ void PathData::close() {
   _verbs.push_back(PathVerb::Close);
 }
 
-void PathData::addRect(const Rect& rect) {
-  moveTo(rect.left(), rect.top());
-  lineTo(rect.right(), rect.top());
-  lineTo(rect.right(), rect.bottom());
-  lineTo(rect.left(), rect.bottom());
-  close();
-}
-
-void PathData::addOval(const Rect& rect) {
-  float cx = rect.left() + rect.width * 0.5f;
-  float cy = rect.top() + rect.height * 0.5f;
-  float rx = rect.width * 0.5f;
-  float ry = rect.height * 0.5f;
-
-  float dx = rx * CUBIC_ARC_FACTOR;
-  float dy = ry * CUBIC_ARC_FACTOR;
-
-  moveTo(cx + rx, cy);
-  cubicTo(cx + rx, cy + dy, cx + dx, cy + ry, cx, cy + ry);
-  cubicTo(cx - dx, cy + ry, cx - rx, cy + dy, cx - rx, cy);
-  cubicTo(cx - rx, cy - dy, cx - dx, cy - ry, cx, cy - ry);
-  cubicTo(cx + dx, cy - ry, cx + rx, cy - dy, cx + rx, cy);
-  close();
-}
-
-void PathData::addRoundRect(const Rect& rect, float radiusX, float radiusY) {
-  if (radiusX <= 0 || radiusY <= 0) {
-    addRect(rect);
-    return;
-  }
-
-  float maxRadiusX = rect.width * 0.5f;
-  float maxRadiusY = rect.height * 0.5f;
-  radiusX = std::min(radiusX, maxRadiusX);
-  radiusY = std::min(radiusY, maxRadiusY);
-
-  float dx = radiusX * CUBIC_ARC_FACTOR;
-  float dy = radiusY * CUBIC_ARC_FACTOR;
-
-  moveTo(rect.left() + radiusX, rect.top());
-  lineTo(rect.right() - radiusX, rect.top());
-  cubicTo(rect.right() - radiusX + dx, rect.top(), rect.right(), rect.top() + radiusY - dy,
-          rect.right(), rect.top() + radiusY);
-  lineTo(rect.right(), rect.bottom() - radiusY);
-  cubicTo(rect.right(), rect.bottom() - radiusY + dy, rect.right() - radiusX + dx, rect.bottom(),
-          rect.right() - radiusX, rect.bottom());
-  lineTo(rect.left() + radiusX, rect.bottom());
-  cubicTo(rect.left() + radiusX - dx, rect.bottom(), rect.left(), rect.bottom() - radiusY + dy,
-          rect.left(), rect.bottom() - radiusY);
-  lineTo(rect.left(), rect.top() + radiusY);
-  cubicTo(rect.left(), rect.top() + radiusY - dy, rect.left() + radiusX - dx, rect.top(),
-          rect.left() + radiusX, rect.top());
-  close();
-}
-
-void PathData::clear() {
-  _verbs.clear();
-  _points.clear();
-  _cachedBounds.setEmpty();
-  _boundsDirty = true;
-}
-
-void PathData::transform(const Matrix& matrix) {
-  if (matrix.isIdentity()) {
-    return;
-  }
-  for (size_t i = 0; i < _points.size(); i += 2) {
-    Point p = {_points[i], _points[i + 1]};
-    Point transformed = matrix.mapPoint(p);
-    _points[i] = transformed.x;
-    _points[i + 1] = transformed.y;
-  }
-  _boundsDirty = true;
-}
-
 Rect PathData::getBounds() {
   if (!_boundsDirty) {
     return _cachedBounds;
   }
 
-  _cachedBounds.setEmpty();
+  _cachedBounds = {};
   if (_points.empty()) {
     _boundsDirty = false;
     return _cachedBounds;

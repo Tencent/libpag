@@ -47,6 +47,11 @@ class Ellipse : public Element {
   NodeType nodeType() const override {
     return NodeType::Ellipse;
   }
+
+ private:
+  Ellipse() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

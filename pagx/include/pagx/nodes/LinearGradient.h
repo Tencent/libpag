@@ -54,6 +54,11 @@ class LinearGradient : public ColorSource {
   NodeType nodeType() const override {
     return NodeType::LinearGradient;
   }
+
+ private:
+  LinearGradient() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

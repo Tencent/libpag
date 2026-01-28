@@ -43,6 +43,11 @@ class ColorMatrixFilter : public LayerFilter {
   NodeType nodeType() const override {
     return NodeType::ColorMatrixFilter;
   }
+
+ private:
+  ColorMatrixFilter() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

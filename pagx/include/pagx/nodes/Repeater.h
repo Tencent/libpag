@@ -87,6 +87,11 @@ class Repeater : public Element {
   NodeType nodeType() const override {
     return NodeType::Repeater;
   }
+
+ private:
+  Repeater() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

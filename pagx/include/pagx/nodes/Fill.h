@@ -50,15 +50,9 @@ class Fill : public Element {
  public:
   /**
    * The color source for this fill. Can be a SolidColor, LinearGradient, RadialGradient,
-   * ConicGradient, DiamondGradient, or ImagePattern. If null, uses the colorRef reference.
+   * ConicGradient, DiamondGradient, or ImagePattern.
    */
-  std::unique_ptr<ColorSource> color = nullptr;
-
-  /**
-   * A reference to a color source defined in Resources (e.g., "@gradientId").
-   * Only used if color is null.
-   */
-  std::string colorRef = {};
+  ColorSource* color = nullptr;
 
   /**
    * The opacity of the fill, ranging from 0 (transparent) to 1 (opaque). The default value is 1.
@@ -85,6 +79,11 @@ class Fill : public Element {
   NodeType nodeType() const override {
     return NodeType::Fill;
   }
+
+ private:
+  Fill() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

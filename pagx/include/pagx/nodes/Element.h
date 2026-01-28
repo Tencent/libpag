@@ -33,6 +33,8 @@ class Element : public Node {
 
  protected:
   Element() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

@@ -21,7 +21,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
-#include "PAGXStringUtils.h"
+#include "StringParser.h"
+#include "SVGPathParser.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/SolidColor.h"
 #include "SVGParserInternal.h"
@@ -312,13 +313,13 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   rootStyle = computeInheritedStyle(root, rootStyle);
 
   // Collect converted layers.
-  std::vector<std::unique_ptr<Layer>> convertedLayers;
+  std::vector<Layer*> convertedLayers;
   child = root->getFirstChild();
   while (child) {
     if (child->name != "defs") {
       auto layer = convertToLayer(child, rootStyle);
       if (layer) {
-        convertedLayers.push_back(std::move(layer));
+        convertedLayers.push_back(layer);
       }
     }
     child = child->getNextSibling();
@@ -326,7 +327,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
 
   // Add collected mask layers (invisible, used as mask references).
   for (auto& maskLayer : _maskLayers) {
-    convertedLayers.insert(convertedLayers.begin(), std::move(maskLayer));
+    convertedLayers.insert(convertedLayers.begin(), maskLayer);
   }
   _maskLayers.clear();
 
@@ -336,15 +337,15 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   // If viewBox transform is needed, wrap in a root layer with the transform.
   // Otherwise, add layers directly to document (no root wrapper).
   if (needsViewBoxTransform) {
-    auto rootLayer = std::make_unique<Layer>();
+    auto rootLayer = _document->makeNode<Layer>();
     rootLayer->matrix = viewBoxMatrix;
     for (auto& layer : convertedLayers) {
-      rootLayer->children.push_back(std::move(layer));
+      rootLayer->children.push_back(layer);
     }
-    _document->layers.push_back(std::move(rootLayer));
+    _document->layers.push_back(rootLayer);
   } else {
     for (auto& layer : convertedLayers) {
-      _document->layers.push_back(std::move(layer));
+      _document->layers.push_back(layer);
     }
   }
 
@@ -541,7 +542,7 @@ void SVGParserImpl::parseStyleElement(const std::shared_ptr<DOMNode>& styleNode)
   }
 }
 
-std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNode>& element,
+Layer* SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                                      const InheritedStyle& parentStyle) {
   const auto& tag = element->name;
 
@@ -564,13 +565,13 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
   // Compute inherited style for this element.
   InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
 
-  auto layer = std::make_unique<Layer>();
+  auto layer = _document->makeNode<Layer>();
 
   // Parse common layer attributes.
   layer->id = getAttribute(element, "id");
 
   // Parse data-* custom attributes.
-  parseCustomData(element, layer.get());
+  parseCustomData(element, layer);
 
   std::string transform = getAttribute(element, "transform");
   if (!transform.empty()) {
@@ -591,11 +592,11 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
       // Convert mask element to a mask layer.
       auto maskLayer = convertMaskElement(maskIt->second, inheritedStyle);
       if (maskLayer) {
-        layer->mask = "@" + maskLayer->id;
+        layer->mask = maskLayer;
         // SVG masks use luminance by default.
         layer->maskType = MaskType::Luminance;
         // Add mask layer as invisible layer to the document.
-        _maskLayers.push_back(std::move(maskLayer));
+        _maskLayers.push_back(maskLayer);
       }
     }
   }
@@ -609,11 +610,11 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
       // Convert clipPath element to a mask layer.
       auto clipLayer = convertMaskElement(clipIt->second, inheritedStyle);
       if (clipLayer) {
-        layer->mask = "@" + clipLayer->id;
+        layer->mask = clipLayer;
         // SVG clip-path uses alpha (shape outline) for clipping.
         layer->maskType = MaskType::Alpha;
         // Add clip layer as invisible layer to the document.
-        _maskLayers.push_back(std::move(clipLayer));
+        _maskLayers.push_back(clipLayer);
       }
     }
   }
@@ -649,7 +650,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
     while (child) {
       auto childLayer = convertToLayer(child, inheritedStyle);
       if (childLayer) {
-        layer->children.push_back(std::move(childLayer));
+        layer->children.push_back(childLayer);
       }
       child = child->getNextSibling();
     }
@@ -663,7 +664,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNo
 }
 
 void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
-                                    std::vector<std::unique_ptr<Element>>& contents,
+                                    std::vector<Element*>& contents,
                                     const InheritedStyle& inheritedStyle,
                                     ShadowOnlyType shadowOnlyType) {
   const auto& tag = element->name;
@@ -672,7 +673,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   if (tag == "text") {
     auto textGroup = convertText(element, inheritedStyle);
     if (textGroup) {
-      contents.push_back(std::move(textGroup));
+      contents.push_back(textGroup);
     }
     return;
   }
@@ -694,7 +695,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
 
   auto shapeElement = convertElement(element);
   if (shapeElement) {
-    contents.push_back(std::move(shapeElement));
+    contents.push_back(shapeElement);
   }
 
   if (!skipFillStroke) {
@@ -703,11 +704,11 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
       // The DropShadowFilter generates shadow based on the layer's content alpha channel.
       // We use black (alpha=1) as the fill color since the actual shadow color is determined
       // by the DropShadowFilter's color property, not the fill color.
-      auto fillNode = std::make_unique<Fill>();
-      auto solidColor = std::make_unique<SolidColor>();
+      auto fillNode = _document->makeNode<Fill>();
+      auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
-      fillNode->color = std::move(solidColor);
-      contents.push_back(std::move(fillNode));
+      fillNode->color = solidColor;
+      contents.push_back(fillNode);
     } else if (shadowOnlyType == ShadowOnlyType::InnerShadow) {
       // For shadowOnly InnerShadow filters, no fill is needed.
       // The InnerShadowFilter draws shadow inside the layer's alpha boundary,
@@ -718,7 +719,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   }
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertElement(
+Element* SVGParserImpl::convertElement(
     const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
@@ -743,12 +744,12 @@ std::unique_ptr<Element> SVGParserImpl::convertElement(
   return nullptr;
 }
 
-std::unique_ptr<Group> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& element,
+Group* SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& element,
                                                const InheritedStyle& parentStyle) {
   // Compute inherited style for this group element.
   InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
 
-  auto group = std::make_unique<Group>();
+  auto group = _document->makeNode<Group>();
 
   // group->name (removed) = getAttribute(element, "id");
 
@@ -770,7 +771,7 @@ std::unique_ptr<Group> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& e
   while (child) {
     auto childElement = convertElement(child);
     if (childElement) {
-      group->elements.push_back(std::move(childElement));
+      group->elements.push_back(childElement);
     }
     addFillStroke(child, group->elements, inheritedStyle);
     child = child->getNextSibling();
@@ -779,7 +780,7 @@ std::unique_ptr<Group> SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& e
   return group;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertRect(
+Element* SVGParserImpl::convertRect(
     const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
@@ -792,7 +793,7 @@ std::unique_ptr<Element> SVGParserImpl::convertRect(
     ry = rx;
   }
 
-  auto rect = std::make_unique<Rectangle>();
+  auto rect = _document->makeNode<Rectangle>();
   rect->center.x = x + width / 2;
   rect->center.y = y + height / 2;
   rect->size.width = width;
@@ -802,13 +803,13 @@ std::unique_ptr<Element> SVGParserImpl::convertRect(
   return rect;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertCircle(
+Element* SVGParserImpl::convertCircle(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
   float r = parseLength(getAttribute(element, "r"), _viewBoxWidth);
 
-  auto ellipse = std::make_unique<Ellipse>();
+  auto ellipse = _document->makeNode<Ellipse>();
   ellipse->center.x = cx;
   ellipse->center.y = cy;
   ellipse->size.width = r * 2;
@@ -817,14 +818,14 @@ std::unique_ptr<Element> SVGParserImpl::convertCircle(
   return ellipse;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertEllipse(
+Element* SVGParserImpl::convertEllipse(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
   float rx = parseLength(getAttribute(element, "rx"), _viewBoxWidth);
   float ry = parseLength(getAttribute(element, "ry"), _viewBoxHeight);
 
-  auto ellipse = std::make_unique<Ellipse>();
+  auto ellipse = _document->makeNode<Ellipse>();
   ellipse->center.x = cx;
   ellipse->center.y = cy;
   ellipse->size.width = rx * 2;
@@ -833,64 +834,67 @@ std::unique_ptr<Element> SVGParserImpl::convertEllipse(
   return ellipse;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertLine(
+Element* SVGParserImpl::convertLine(
     const std::shared_ptr<DOMNode>& element) {
   float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
   float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
   float x2 = parseLength(getAttribute(element, "x2"), _viewBoxWidth);
   float y2 = parseLength(getAttribute(element, "y2"), _viewBoxHeight);
 
-  auto path = std::make_unique<Path>();
-  PathData pathData;
-  pathData.moveTo(x1, y1);
-  pathData.lineTo(x2, y2);
-  if (!pathData.isEmpty()) {
-    std::string pathId = registerPathDataResource(std::move(pathData));
-    path->dataRef = "@" + pathId;
+  auto path = _document->makeNode<Path>();
+  auto pathData = _document->makeNode<PathData>();
+  pathData->moveTo(x1, y1);
+  pathData->lineTo(x2, y2);
+  if (!pathData->isEmpty()) {
+    registerPathDataResource(pathData);
+    path->data = pathData;
   }
 
   return path;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertPolyline(
+Element* SVGParserImpl::convertPolyline(
     const std::shared_ptr<DOMNode>& element) {
-  auto path = std::make_unique<Path>();
-  auto pathData = parsePoints(getAttribute(element, "points"), false);
-  if (!pathData.isEmpty()) {
-    std::string pathId = registerPathDataResource(std::move(pathData));
-    path->dataRef = "@" + pathId;
+  auto path = _document->makeNode<Path>();
+  auto pathDataNode = _document->makeNode<PathData>();
+  *pathDataNode = parsePoints(getAttribute(element, "points"), false);
+  if (!pathDataNode->isEmpty()) {
+    registerPathDataResource(pathDataNode);
+    path->data = pathDataNode;
   }
   return path;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertPolygon(
+Element* SVGParserImpl::convertPolygon(
     const std::shared_ptr<DOMNode>& element) {
-  auto path = std::make_unique<Path>();
-  auto pathData = parsePoints(getAttribute(element, "points"), true);
-  if (!pathData.isEmpty()) {
-    std::string pathId = registerPathDataResource(std::move(pathData));
-    path->dataRef = "@" + pathId;
+  auto path = _document->makeNode<Path>();
+  auto pathDataNode = _document->makeNode<PathData>();
+  *pathDataNode = parsePoints(getAttribute(element, "points"), true);
+  if (!pathDataNode->isEmpty()) {
+    registerPathDataResource(pathDataNode);
+    path->data = pathDataNode;
   }
   return path;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertPath(
+Element* SVGParserImpl::convertPath(
     const std::shared_ptr<DOMNode>& element) {
-  auto path = std::make_unique<Path>();
+  auto path = _document->makeNode<Path>();
   std::string d = getAttribute(element, "d");
   if (!d.empty()) {
-    auto pathData = PathDataFromSVGString(d);
-    if (!pathData.isEmpty()) {
-      std::string pathId = registerPathDataResource(std::move(pathData));
-      path->dataRef = "@" + pathId;
+    auto pathDataNode = _document->makeNode<PathData>();
+    *pathDataNode = PathDataFromSVGString(d);
+    if (!pathDataNode->isEmpty()) {
+      registerPathDataResource(pathDataNode);
+      path->data = pathDataNode;
     }
   }
   return path;
 }
 
-std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>& element,
+Group* SVGParserImpl::convertText(const std::shared_ptr<DOMNode>& element,
                                                   const InheritedStyle& inheritedStyle) {
-  auto group = std::make_unique<Group>();
+  auto group = _document->makeNode<Group>();
 
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
@@ -922,7 +926,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   }
 
   if (!textContent.empty()) {
-    auto text = std::make_unique<Text>();
+    auto text = _document->makeNode<Text>();
     text->position = {x, y};
     text->text = textContent;
 
@@ -979,7 +983,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
       text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth);
     }
 
-    group->elements.push_back(std::move(text));
+    group->elements.push_back(text);
 
     // Add TextLayout modifier if text-anchor requires alignment.
     // SVG text-anchor maps to PAGX TextLayout.textAlign:
@@ -987,7 +991,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
     //   middle -> Center
     //   end    -> End
     if (!anchor.empty() && anchor != "start") {
-      auto textLayout = std::make_unique<TextLayout>();
+      auto textLayout = _document->makeNode<TextLayout>();
       textLayout->width = 0;   // auto-width (Point Text mode)
       textLayout->height = 0;  // auto-height
       if (anchor == "middle") {
@@ -995,7 +999,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
       } else if (anchor == "end") {
         textLayout->textAlign = TextAlign::End;
       }
-      group->elements.push_back(std::move(textLayout));
+      group->elements.push_back(textLayout);
     }
   }
 
@@ -1003,7 +1007,7 @@ std::unique_ptr<Group> SVGParserImpl::convertText(const std::shared_ptr<DOMNode>
   return group;
 }
 
-std::unique_ptr<Element> SVGParserImpl::convertUse(
+Element* SVGParserImpl::convertUse(
     const std::shared_ptr<DOMNode>& element) {
   std::string href = getAttribute(element, "xlink:href");
   if (href.empty()) {
@@ -1038,30 +1042,30 @@ std::unique_ptr<Element> SVGParserImpl::convertUse(
     float imageHeight = parseLength(getAttribute(it->second, "height"), _viewBoxHeight);
 
     // Register the image resource.
-    std::string resourceId = registerImageResource(imageHref);
+    auto imageNode = registerImageResource(imageHref);
 
     // Create a rectangle to display the image at original size.
     // The transform will be applied by the parent Layer's matrix.
-    auto rect = std::make_unique<Rectangle>();
+    auto rect = _document->makeNode<Rectangle>();
     rect->center.x = x + imageWidth / 2;
     rect->center.y = y + imageHeight / 2;
     rect->size.width = imageWidth;
     rect->size.height = imageHeight;
 
     // Create an ImagePattern fill for the rectangle.
-    auto pattern = std::make_unique<ImagePattern>();
-    pattern->image = "#" + resourceId;
+    auto pattern = _document->makeNode<ImagePattern>();
+    pattern->image = imageNode;
     // Position the pattern at the rectangle's origin.
     pattern->matrix = Matrix::Translate(x, y);
 
     // Create a fill with the image pattern.
-    auto fill = std::make_unique<Fill>();
-    fill->color = std::move(pattern);
+    auto fill = _document->makeNode<Fill>();
+    fill->color = pattern;
 
     // Create a group containing the rectangle and fill.
-    auto group = std::make_unique<Group>();
-    group->elements.push_back(std::move(rect));
-    group->elements.push_back(std::move(fill));
+    auto group = _document->makeNode<Group>();
+    group->elements.push_back(rect);
+    group->elements.push_back(fill);
 
     return group;
   }
@@ -1071,9 +1075,9 @@ std::unique_ptr<Element> SVGParserImpl::convertUse(
     if (node) {
       if (x != 0 || y != 0) {
         // Wrap in a group with translation.
-        auto group = std::make_unique<Group>();
+        auto group = _document->makeNode<Group>();
         group->position = {x, y};
-        group->elements.push_back(std::move(node));
+        group->elements.push_back(node);
         return group;
       }
     }
@@ -1081,14 +1085,14 @@ std::unique_ptr<Element> SVGParserImpl::convertUse(
   }
 
   // For non-expanded use references, just create an empty group for now.
-  auto group = std::make_unique<Group>();
+  auto group = _document->makeNode<Group>();
   // group->name (removed) = "_useRef:" + refId;
   return group;
 }
 
-std::unique_ptr<LinearGradient> SVGParserImpl::convertLinearGradient(
+LinearGradient* SVGParserImpl::convertLinearGradient(
     const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
-  auto gradient = std::make_unique<LinearGradient>();
+  auto gradient = _document->makeNode<LinearGradient>();
 
   gradient->id = getAttribute(element, "id");
 
@@ -1146,9 +1150,9 @@ std::unique_ptr<LinearGradient> SVGParserImpl::convertLinearGradient(
   return gradient;
 }
 
-std::unique_ptr<RadialGradient> SVGParserImpl::convertRadialGradient(
+RadialGradient* SVGParserImpl::convertRadialGradient(
     const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
-  auto gradient = std::make_unique<RadialGradient>();
+  auto gradient = _document->makeNode<RadialGradient>();
 
   gradient->id = getAttribute(element, "id");
 
@@ -1229,9 +1233,9 @@ std::unique_ptr<RadialGradient> SVGParserImpl::convertRadialGradient(
   return gradient;
 }
 
-std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
+ImagePattern* SVGParserImpl::convertPattern(
     const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
-  auto pattern = std::make_unique<ImagePattern>();
+  auto pattern = _document->makeNode<ImagePattern>();
 
   pattern->id = getAttribute(element, "id");
 
@@ -1284,9 +1288,9 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
           imageHref = getAttribute(imgIt->second, "href");
         }
 
-        // Register the image resource and use the reference ID.
-        std::string resourceId = registerImageResource(imageHref);
-        pattern->image = "#" + resourceId;
+        // Register the image resource and use the reference pointer.
+        auto imageNode = registerImageResource(imageHref);
+        pattern->image = imageNode;
 
         // Get image display dimensions from SVG (these are the dimensions in pattern content space).
         float imageWidth = parseLength(getAttribute(imgIt->second, "width"), 1.0f);
@@ -1333,9 +1337,9 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
         imageHref = getAttribute(child, "href");
       }
 
-      // Register the image resource and use the reference ID.
-      std::string resourceId = registerImageResource(imageHref);
-      pattern->image = "#" + resourceId;
+      // Register the image resource and use the reference pointer.
+      auto imageNode = registerImageResource(imageHref);
+      pattern->image = imageNode;
 
       float imageWidth = parseLength(getAttribute(child, "width"), 1.0f);
       float imageHeight = parseLength(getAttribute(child, "height"), 1.0f);
@@ -1356,7 +1360,7 @@ std::unique_ptr<ImagePattern> SVGParserImpl::convertPattern(
 }
 
 void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
-                                  std::vector<std::unique_ptr<Element>>& contents,
+                                  std::vector<Element*>& contents,
                                   const InheritedStyle& inheritedStyle) {
   // Get shape bounds for pattern calculations (computed once, used if needed).
   Rect shapeBounds = getShapeBounds(element);
@@ -1373,13 +1377,13 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
   if (fill != "none") {
     if (fill.empty()) {
       // No fill specified anywhere - use SVG default black.
-      auto fillNode = std::make_unique<Fill>();
-      auto solidColor = std::make_unique<SolidColor>();
+      auto fillNode = _document->makeNode<Fill>();
+      auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
-      fillNode->color = std::move(solidColor);
-      contents.push_back(std::move(fillNode));
+      fillNode->color = solidColor;
+      contents.push_back(fillNode);
     } else if (fill.find("url(") == 0) {
-      auto fillNode = std::make_unique<Fill>();
+      auto fillNode = _document->makeNode<Fill>();
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
       fillNode->color = getColorSourceForRef(refId, shapeBounds);
@@ -1391,9 +1395,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       if (!fillOpacity.empty()) {
         fillNode->alpha = std::stof(fillOpacity);
       }
-      contents.push_back(std::move(fillNode));
+      contents.push_back(fillNode);
     } else {
-      auto fillNode = std::make_unique<Fill>();
+      auto fillNode = _document->makeNode<Fill>();
 
       // Determine effective fill-opacity.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
@@ -1407,9 +1411,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       // Convert color to SolidColor for PAGX compatibility.
       // SolidColor is always inlined (no id).
       Color parsedColor = parseColor(fill);
-      auto solidColor = std::make_unique<SolidColor>();
+      auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = parsedColor;
-      fillNode->color = std::move(solidColor);
+      fillNode->color = solidColor;
 
       // Determine effective fill-rule.
       std::string fillRule = getAttribute(element, "fill-rule");
@@ -1420,7 +1424,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
         fillNode->fillRule = FillRule::EvenOdd;
       }
 
-      contents.push_back(std::move(fillNode));
+      contents.push_back(fillNode);
     }
   }
 
@@ -1431,7 +1435,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
 
   if (!stroke.empty() && stroke != "none") {
-    auto strokeNode = std::make_unique<Stroke>();
+    auto strokeNode = _document->makeNode<Stroke>();
 
     if (stroke.find("url(") == 0) {
       std::string refId = resolveUrl(stroke);
@@ -1450,9 +1454,9 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       // Convert color to SolidColor for PAGX compatibility.
       // SolidColor is always inlined (no id).
       Color parsedColor = parseColor(stroke);
-      auto solidColor = std::make_unique<SolidColor>();
+      auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = parsedColor;
-      strokeNode->color = std::move(solidColor);
+      strokeNode->color = solidColor;
     }
 
     std::string strokeWidth = getAttribute(element, "stroke-width");
@@ -1516,7 +1520,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
       strokeNode->dashOffset = parseLength(dashOffset, _viewBoxWidth);
     }
 
-    contents.push_back(std::move(strokeNode));
+    contents.push_back(strokeNode);
   }
 }
 
@@ -2195,9 +2199,9 @@ std::string SVGParserImpl::resolveUrl(const std::string& url) {
   return url;
 }
 
-std::string SVGParserImpl::registerImageResource(const std::string& imageSource) {
+Image* SVGParserImpl::registerImageResource(const std::string& imageSource) {
   if (imageSource.empty()) {
-    return "";
+    return nullptr;
   }
 
   // Check if this image source has already been registered.
@@ -2210,26 +2214,19 @@ std::string SVGParserImpl::registerImageResource(const std::string& imageSource)
   std::string imageId = generateUniqueId("image");
 
   // Create and add the image resource to the document.
-  auto imageNode = std::make_unique<Image>();
+  auto imageNode = _document->makeNode<Image>();
   imageNode->id = imageId;
-  imageNode->source = imageSource;
-  _document->resources.push_back(std::move(imageNode));
+  imageNode->filePath = imageSource;
 
   // Cache the mapping.
-  _imageSourceToId[imageSource] = imageId;
+  _imageSourceToId[imageSource] = imageNode;
 
-  return imageId;
+  return imageNode;
 }
 
-std::string SVGParserImpl::registerPathDataResource(PathData pathData) {
-  // Generate a unique PathData ID.
-  std::string pathId = "path" + std::to_string(_nextPathDataId++);
-
-  // Create and add the PathData resource to the document.
-  auto pathDataNode = std::make_unique<PathData>(std::move(pathData));
-  pathDataNode->id = pathId;
-  _document->resources.push_back(std::move(pathDataNode));
-
+std::string SVGParserImpl::registerPathDataResource(PathData* pathData) {
+  std::string pathId = generateUniqueId("path");
+  pathData->id = pathId;
   return pathId;
 }
 
@@ -2257,7 +2254,7 @@ static bool isSameGeometry(const Element* a, const Element* b) {
     case NodeType::Path: {
       auto pathA = static_cast<const Path*>(a);
       auto pathB = static_cast<const Path*>(b);
-      return PathDataToSVGString(pathA->data) == PathDataToSVGString(pathB->data);
+      return PathDataToSVGString(*pathA->data) == PathDataToSVGString(*pathB->data);
     }
     default:
       return false;
@@ -2277,8 +2274,8 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
     return false;
   }
 
-  const auto* first = layer->contents[0].get();
-  const auto* second = layer->contents[1].get();
+  const auto* first = layer->contents[0];
+  const auto* second = layer->contents[1];
 
   // Check if first is geometry and second is painter.
   bool firstIsGeometry = (first->nodeType() == NodeType::Rectangle ||
@@ -2294,25 +2291,25 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   return false;
 }
 
-void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& layers) {
+void SVGParserImpl::mergeAdjacentLayers(std::vector<Layer*>& layers) {
   if (layers.size() < 2) {
     return;
   }
 
-  std::vector<std::unique_ptr<Layer>> merged;
+  std::vector<Layer*> merged;
   size_t i = 0;
 
   while (i < layers.size()) {
     const Element* geomA = nullptr;
     const Element* painterA = nullptr;
 
-    if (isSimpleShapeLayer(layers[i].get(), geomA, painterA)) {
+    if (isSimpleShapeLayer(layers[i], geomA, painterA)) {
       // Check if the next layer has the same geometry.
       if (i + 1 < layers.size()) {
         const Element* geomB = nullptr;
         const Element* painterB = nullptr;
 
-        if (isSimpleShapeLayer(layers[i + 1].get(), geomB, painterB) &&
+        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) &&
             isSameGeometry(geomA, geomB)) {
           // Merge: one has Fill, the other has Stroke.
           bool aHasFill = (painterA->nodeType() == NodeType::Fill);
@@ -2320,21 +2317,21 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
 
           if (aHasFill != bHasFill) {
             // Create merged layer.
-            auto mergedLayer = std::make_unique<Layer>();
+            auto mergedLayer = _document->makeNode<Layer>();
 
             // Move geometry from first layer.
-            mergedLayer->contents.push_back(std::move(layers[i]->contents[0]));
+            mergedLayer->contents.push_back(layers[i]->contents[0]);
 
             // Add Fill first, then Stroke (standard order).
             if (aHasFill) {
-              mergedLayer->contents.push_back(std::move(layers[i]->contents[1]));
-              mergedLayer->contents.push_back(std::move(layers[i + 1]->contents[1]));
+              mergedLayer->contents.push_back(layers[i]->contents[1]);
+              mergedLayer->contents.push_back(layers[i + 1]->contents[1]);
             } else {
-              mergedLayer->contents.push_back(std::move(layers[i + 1]->contents[1]));
-              mergedLayer->contents.push_back(std::move(layers[i]->contents[1]));
+              mergedLayer->contents.push_back(layers[i + 1]->contents[1]);
+              mergedLayer->contents.push_back(layers[i]->contents[1]);
             }
 
-            merged.push_back(std::move(mergedLayer));
+            merged.push_back(mergedLayer);
             i += 2;  // Skip both layers.
             continue;
           }
@@ -2343,16 +2340,16 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<std::unique_ptr<Layer>>& lay
     }
 
     // No merge, keep the layer as is.
-    merged.push_back(std::move(layers[i]));
+    merged.push_back(layers[i]);
     i++;
   }
 
-  layers = std::move(merged);
+  layers = merged;
 }
 
-std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
+Layer* SVGParserImpl::convertMaskElement(
     const std::shared_ptr<DOMNode>& maskElement, const InheritedStyle& parentStyle) {
-  auto maskLayer = std::make_unique<Layer>();
+  auto maskLayer = _document->makeNode<Layer>();
   maskLayer->id = getAttribute(maskElement, "id");
   maskLayer->name = maskLayer->id;
   maskLayer->visible = false;
@@ -2369,10 +2366,10 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
       std::string transformStr = getAttribute(child, "transform");
       if (!transformStr.empty()) {
         // If child has transform, wrap it in a sub-layer with the matrix.
-        auto subLayer = std::make_unique<Layer>();
+        auto subLayer = _document->makeNode<Layer>();
         subLayer->matrix = parseTransform(transformStr);
         convertChildren(child, subLayer->contents, inheritedStyle);
-        maskLayer->children.push_back(std::move(subLayer));
+        maskLayer->children.push_back(subLayer);
       } else {
         convertChildren(child, maskLayer->contents, inheritedStyle);
       }
@@ -2385,7 +2382,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
         std::string childTransform = getAttribute(groupChild, "transform");
         // Combine group transform and child transform if needed.
         if (!groupTransform.empty() || !childTransform.empty()) {
-          auto subLayer = std::make_unique<Layer>();
+          auto subLayer = _document->makeNode<Layer>();
           Matrix combinedMatrix = Matrix::Identity();
           if (!groupTransform.empty()) {
             combinedMatrix = parseTransform(groupTransform);
@@ -2395,7 +2392,7 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
           }
           subLayer->matrix = combinedMatrix;
           convertChildren(groupChild, subLayer->contents, inheritedStyle);
-          maskLayer->children.push_back(std::move(subLayer));
+          maskLayer->children.push_back(subLayer);
         } else {
           convertChildren(groupChild, maskLayer->contents, inheritedStyle);
         }
@@ -2410,8 +2407,8 @@ std::unique_ptr<Layer> SVGParserImpl::convertMaskElement(
 
 bool SVGParserImpl::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
-    std::vector<std::unique_ptr<LayerFilter>>& filters,
-    std::vector<std::unique_ptr<LayerStyle>>& styles,
+    std::vector<LayerFilter*>& filters,
+    std::vector<LayerStyle*>& styles,
     ShadowOnlyType* outShadowOnlyType) {
   size_t initialFilterCount = filters.size();
   size_t initialStyleCount = styles.size();
@@ -2484,14 +2481,14 @@ bool SVGParserImpl::convertFilterElement(
           }
         }
 
-        auto dropShadow = std::make_unique<DropShadowFilter>();
+        auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(std::move(dropShadow));
+        filters.push_back(dropShadow);
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -2532,14 +2529,14 @@ bool SVGParserImpl::convertFilterElement(
           }
         }
 
-        auto dropShadow = std::make_unique<DropShadowFilter>();
+        auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(std::move(dropShadow));
+        filters.push_back(dropShadow);
 
         // Skip the consumed primitives (4 elements) plus the feBlend that follows.
         i += 4;
@@ -2576,14 +2573,14 @@ bool SVGParserImpl::convertFilterElement(
           }
         }
 
-        auto dropShadow = std::make_unique<DropShadowFilter>();
+        auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = 0;
-        dropShadow->blurrinessY = 0;
+        dropShadow->blurX = 0;
+        dropShadow->blurY = 0;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(std::move(dropShadow));
+        filters.push_back(dropShadow);
 
         // Skip the consumed primitives (3 elements) plus any feBlend that follows.
         i += 3;
@@ -2642,14 +2639,14 @@ bool SVGParserImpl::convertFilterElement(
             }
           }
 
-          auto innerShadow = std::make_unique<InnerShadowFilter>();
+          auto innerShadow = _document->makeNode<InnerShadowFilter>();
           innerShadow->offsetX = offsetX;
           innerShadow->offsetY = offsetY;
-          innerShadow->blurrinessX = blurX;
-          innerShadow->blurrinessY = blurY;
+          innerShadow->blurX = blurX;
+          innerShadow->blurY = blurY;
           innerShadow->color = shadowColor;
           innerShadow->shadowOnly = shadowOnly;
-          filters.push_back(std::move(innerShadow));
+          filters.push_back(innerShadow);
 
           // Skip consumed primitives: feGaussianBlur, feOffset, feComposite, [feColorMatrix]
           i += 3;
@@ -2688,14 +2685,14 @@ bool SVGParserImpl::convertFilterElement(
           }
         }
 
-        auto dropShadow = std::make_unique<DropShadowFilter>();
+        auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(std::move(dropShadow));
+        filters.push_back(dropShadow);
 
         // Skip consumed primitives.
         i += 2;
@@ -2740,14 +2737,14 @@ bool SVGParserImpl::convertFilterElement(
           }
         }
 
-        auto dropShadow = std::make_unique<DropShadowFilter>();
+        auto dropShadow = _document->makeNode<DropShadowFilter>();
         dropShadow->offsetX = offsetX;
         dropShadow->offsetY = offsetY;
-        dropShadow->blurrinessX = blurX;
-        dropShadow->blurrinessY = blurY;
+        dropShadow->blurX = blurX;
+        dropShadow->blurY = blurY;
         dropShadow->color = shadowColor;
         dropShadow->shadowOnly = shadowOnly;
-        filters.push_back(std::move(dropShadow));
+        filters.push_back(dropShadow);
 
         // Skip consumed primitives.
         i += 2;
@@ -2781,10 +2778,10 @@ bool SVGParserImpl::convertFilterElement(
         auto devValues = ParseSpaceSeparatedFloats(stdDeviation);
         float devX = devValues.empty() ? 0 : devValues[0];
         float devY = devValues.size() > 1 ? devValues[1] : devX;
-        auto blurFilter = std::make_unique<BlurFilter>();
-        blurFilter->blurrinessX = devX;
-        blurFilter->blurrinessY = devY;
-        filters.push_back(std::move(blurFilter));
+        auto blurFilter = _document->makeNode<BlurFilter>();
+        blurFilter->blurX = devX;
+        blurFilter->blurY = devY;
+        filters.push_back(blurFilter);
       }
     }
 
@@ -2797,7 +2794,7 @@ bool SVGParserImpl::convertFilterElement(
       // Check the type of the first new filter to determine shadow-only type.
       // All shadow-only filters in one element should be of the same type.
       for (size_t idx = initialFilterCount; idx < filters.size(); ++idx) {
-        auto* filter = filters[idx].get();
+        auto* filter = filters[idx];
         if (filter->nodeType() == NodeType::InnerShadowFilter) {
           *outShadowOnlyType = ShadowOnlyType::InnerShadow;
           break;
@@ -2842,8 +2839,8 @@ void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
 std::string SVGParserImpl::generateUniqueId(const std::string& prefix) {
   std::string id;
   do {
-    id = "_" + prefix + std::to_string(_nextGeneratedId++);
-  } while (_existingIds.count(id) > 0);
+    id = prefix + std::to_string(_nextGeneratedId++);
+  } while (_existingIds.count(id) > 0 || (_document && _document->findNode(id) != nullptr));
   _existingIds.insert(id);
   return id;
 }
@@ -2915,15 +2912,10 @@ void SVGParserImpl::countColorSourceReferencesInElement(const std::shared_ptr<DO
 }
 
 std::string SVGParserImpl::generateColorSourceId() {
-  std::string id;
-  do {
-    id = "color" + std::to_string(_nextColorSourceId++);
-  } while (_existingIds.count(id) > 0);
-  _existingIds.insert(id);
-  return id;
+  return generateUniqueId("color");
 }
 
-std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::string& refId,
+ColorSource* SVGParserImpl::getColorSourceForRef(const std::string& refId,
                                                                   const Rect& shapeBounds) {
   auto defIt = _defs.find(refId);
   if (defIt == _defs.end()) {
@@ -2957,7 +2949,7 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
         // Clone the cached ColorSource
         ColorSource* cached = cacheIt->second;
         if (defName == "linearGradient") {
-          auto grad = std::make_unique<LinearGradient>();
+          auto grad = _document->makeNode<LinearGradient>();
           auto* src = static_cast<LinearGradient*>(cached);
           grad->id = src->id;
           grad->startPoint = src->startPoint;
@@ -2966,7 +2958,7 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
           grad->colorStops = src->colorStops;
           return grad;
         } else if (defName == "radialGradient") {
-          auto grad = std::make_unique<RadialGradient>();
+          auto grad = _document->makeNode<RadialGradient>();
           auto* src = static_cast<RadialGradient*>(cached);
           grad->id = src->id;
           grad->center = src->center;
@@ -2975,7 +2967,7 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
           grad->colorStops = src->colorStops;
           return grad;
         } else if (defName == "pattern") {
-          auto pattern = std::make_unique<ImagePattern>();
+          auto pattern = _document->makeNode<ImagePattern>();
           auto* src = static_cast<ImagePattern*>(cached);
           pattern->id = src->id;
           pattern->image = src->image;
@@ -2994,7 +2986,7 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
     std::string colorSourceId = generateColorSourceId();
     _colorSourceIdMap[refId] = colorSourceId;
 
-    std::unique_ptr<ColorSource> colorSource;
+    ColorSource* colorSource = nullptr;
     if (defName == "linearGradient") {
       colorSource = convertLinearGradient(defNode, shapeBounds);
     } else if (defName == "radialGradient") {
@@ -3005,9 +2997,8 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
 
     if (colorSource) {
       colorSource->id = colorSourceId;
-      // Cache the raw pointer before moving to resources.
-      _colorSourceCache[refId] = colorSource.get();
-      _document->resources.push_back(std::move(colorSource));
+      // Cache the raw pointer.
+      _colorSourceCache[refId] = colorSource;
       
       // Now return a clone with the same id (as a reference).
       return getColorSourceForRef(refId, shapeBounds);
@@ -3016,7 +3007,7 @@ std::unique_ptr<ColorSource> SVGParserImpl::getColorSourceForRef(const std::stri
   }
 
   // refCount <= 1: inline the ColorSource (no id).
-  std::unique_ptr<ColorSource> colorSource = nullptr;
+  ColorSource* colorSource = nullptr;
   if (defName == "linearGradient") {
     colorSource = convertLinearGradient(defNode, shapeBounds);
   } else if (defName == "radialGradient") {

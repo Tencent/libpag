@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,21 +19,12 @@
 #pragma once
 
 #include <string>
-#include "pagx/PAGXDocument.h"
+#include "pagx/nodes/PathData.h"
 
 namespace pagx {
 
-/**
- * Internal implementation of PAGX XML exporter.
- * Exports a PAGXDocument to XML string without any optimization.
- * The output faithfully reflects the structure of the input Document.
- */
-class PAGXExporterImpl {
- public:
-  /**
-   * Exports a PAGXDocument to XML string.
-   */
-  static std::string Export(const PAGXDocument& doc);
-};
+PathData PathDataFromSVGString(const std::string& d);
+
+std::string PathDataToSVGString(const PathData& path);
 
 }  // namespace pagx

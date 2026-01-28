@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,39 +18,57 @@
 
 #pragma once
 
-#include "pagx/nodes/LayerFilter.h"
-#include "pagx/nodes/TileMode.h"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 namespace pagx {
 
 /**
- * A blur filter that applies a Gaussian blur effect to the layer.
+ * Data holds an immutable byte buffer.
  */
-class BlurFilter : public LayerFilter {
+class Data {
  public:
   /**
-   * The horizontal blur radius in pixels. The default value is 0.
+   * Creates a Data object by copying the specified data.
    */
-  float blurX = 0;
+  static std::shared_ptr<Data> MakeWithCopy(const void* data, size_t length);
+
+  ~Data();
 
   /**
-   * The vertical blur radius in pixels. The default value is 0.
+   * Returns the memory address of the data.
    */
-  float blurY = 0;
+  const void* data() const {
+    return _data;
+  }
 
   /**
-   * The tile mode for handling blur edges. The default value is Decal.
+   * Returns the read-only memory address of the data cast to uint8_t*.
    */
-  TileMode tileMode = TileMode::Decal;
+  const uint8_t* bytes() const {
+    return _data;
+  }
 
-  NodeType nodeType() const override {
-    return NodeType::BlurFilter;
+  /**
+   * Returns the byte size.
+   */
+  size_t size() const {
+    return _size;
+  }
+
+  /**
+   * Returns true if the Data is empty.
+   */
+  bool empty() const {
+    return _size == 0;
   }
 
  private:
-  BlurFilter() = default;
+  Data(const void* data, size_t length);
 
-  friend class PAGXDocument;
+  const uint8_t* _data = nullptr;
+  size_t _size = 0;
 };
 
 }  // namespace pagx

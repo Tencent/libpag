@@ -19,8 +19,8 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
+#include "pagx/nodes/Point.h"
 #include "pagx/nodes/TextAlign.h"
-#include "tgfx/core/Point.h"
 
 namespace pagx {
 
@@ -72,7 +72,7 @@ class TextLayout : public Element {
   /**
    * The position of the layout origin. The default value is (0, 0).
    */
-  tgfx::Point position = {};
+  Point position = {};
 
   /**
    * The width of the layout area in pixels. When specified (> 0), enables automatic line wrapping
@@ -112,6 +112,11 @@ class TextLayout : public Element {
   NodeType nodeType() const override {
     return NodeType::TextLayout;
   }
+
+ private:
+  TextLayout() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

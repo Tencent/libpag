@@ -52,6 +52,11 @@ class Rectangle : public Element {
   NodeType nodeType() const override {
     return NodeType::Rectangle;
   }
+
+ private:
+  Rectangle() = default;
+
+  friend class PAGXDocument;
 };
 
 }  // namespace pagx

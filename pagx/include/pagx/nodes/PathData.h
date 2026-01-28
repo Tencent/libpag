@@ -21,7 +21,6 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/Matrix.h"
 #include "pagx/nodes/Rect.h"
 
 namespace pagx {
@@ -44,8 +43,6 @@ enum class PathVerb {
  */
 class PathData : public Node {
  public:
-  PathData() = default;
-
   /**
    * Starts a new contour at the specified point.
    */
@@ -80,21 +77,6 @@ class PathData : public Node {
    * Closes the current contour by connecting to the starting point.
    */
   void close();
-
-  /**
-   * Adds a rectangle to the path.
-   */
-  void addRect(const Rect& rect);
-
-  /**
-   * Adds an oval inscribed in the specified rectangle.
-   */
-  void addOval(const Rect& rect);
-
-  /**
-   * Adds a rounded rectangle to the path.
-   */
-  void addRoundRect(const Rect& rect, float radiusX, float radiusY);
 
   /**
    * Returns the array of path commands.
@@ -145,16 +127,6 @@ class PathData : public Node {
   }
 
   /**
-   * Clears all path data.
-   */
-  void clear();
-
-  /**
-   * Transforms all points in the path by the given matrix.
-   */
-  void transform(const Matrix& matrix);
-
-  /**
    * Returns the number of points used by the given verb.
    */
   static int PointsPerVerb(PathVerb verb);
@@ -164,10 +136,16 @@ class PathData : public Node {
   }
 
  private:
+  PathData() = default;
+
   std::vector<PathVerb> _verbs = {};
   std::vector<float> _points = {};
   Rect _cachedBounds = {};
   bool _boundsDirty = true;
+
+  friend class PAGXDocument;
+  friend class SVGParserImpl;
+  friend PathData PathDataFromSVGString(const std::string& d);
 };
 
 }  // namespace pagx

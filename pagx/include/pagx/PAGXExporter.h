@@ -24,15 +24,29 @@
 namespace pagx {
 
 /**
+ * Export options for PAGXExporter.
+ */
+struct PAGXExportOptions {
+  /**
+   * Whether to skip GlyphRun and Font resource data in the export.
+   * - false (default): Export pre-shaped glyph data for cross-platform consistency.
+   * - true: Skip glyph data to reduce file size. Text will require runtime shaping.
+   */
+  bool skipGlyphData = false;
+};
+
+/**
  * PAGXExporter exports PAGXDocument to PAGX XML format.
  */
 class PAGXExporter {
  public:
+  using Options = PAGXExportOptions;
+
   /**
    * Exports a PAGXDocument to XML string.
    * The output faithfully reflects the structure of the input document.
    */
-  static std::string ToXML(const PAGXDocument& document);
+  static std::string ToXML(const PAGXDocument& document, const Options& options = {});
 };
 
 }  // namespace pagx
