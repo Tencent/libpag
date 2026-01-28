@@ -113,29 +113,6 @@ static std::string PathToSVGString(const tgfx::Path& path) {
   return result;
 }
 
-// Key for identifying unique glyphs: typeface pointer + glyph ID.
-struct GlyphKey {
-  const tgfx::Typeface* typeface = nullptr;
-  tgfx::GlyphID glyphID = 0;
-
-  bool operator==(const GlyphKey& other) const {
-    return typeface == other.typeface && glyphID == other.glyphID;
-  }
-};
-
-struct GlyphKeyHash {
-  size_t operator()(const GlyphKey& key) const {
-    return std::hash<const void*>()(key.typeface) ^ (std::hash<uint16_t>()(key.glyphID) << 1);
-  }
-};
-
-// Information about a glyph to be embedded.
-struct GlyphInfo {
-  std::string pathString = {};
-  std::shared_ptr<tgfx::ImageCodec> imageCodec = nullptr;
-  tgfx::Matrix imageMatrix = {};
-};
-
 // Internal implementation class for FontEmbedder.
 class FontEmbedderImpl {
  public:
@@ -147,18 +124,7 @@ class FontEmbedderImpl {
       return false;
     }
 
-    // First pass: collect all glyphs and create Font nodes
-    textGlyphs.forEach([this](Text* text, std::shared_ptr<tgfx::TextBlob> textBlob) {
-      if (textBlob == nullptr) {
-        return;
-      }
-      collectGlyphs(textBlob);
-    });
-
-    // Create Font nodes if we have glyphs
-    createFontNodes();
-
-    // Second pass: create GlyphRuns for each Text
+    // Process each Text and create GlyphRuns with embedded fonts
     textGlyphs.forEach([this](Text* text, std::shared_ptr<tgfx::TextBlob> textBlob) {
       if (textBlob == nullptr) {
         return;
@@ -170,241 +136,219 @@ class FontEmbedderImpl {
   }
 
  private:
-  void collectGlyphs(const std::shared_ptr<tgfx::TextBlob>& textBlob) {
-    for (const auto& run : *textBlob) {
-      auto* typeface = run.font.getTypeface().get();
-      for (size_t i = 0; i < run.glyphCount; ++i) {
-        tgfx::GlyphID glyphID = run.glyphs[i];
-        GlyphKey key = {typeface, glyphID};
-
-        if (vectorGlyphMapping.find(key) != vectorGlyphMapping.end() ||
-            bitmapGlyphMapping.find(key) != bitmapGlyphMapping.end()) {
-          continue;  // Already processed
-        }
-
-        // Try to get glyph path first (vector outline)
-        tgfx::Path glyphPath = {};
-        bool hasPath = run.font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
-
-        // Try to get glyph image (bitmap, e.g., color emoji)
-        tgfx::Matrix imageMatrix = {};
-        auto imageCodec = run.font.getImage(glyphID, nullptr, &imageMatrix);
-
-        if (hasPath) {
-          // Vector glyph
-          GlyphInfo info = {};
-          info.pathString = PathToSVGString(glyphPath);
-          if (!info.pathString.empty()) {
-            pendingVectorGlyphs.push_back({key, info});
-          }
-        } else if (imageCodec) {
-          // Bitmap glyph
-          GlyphInfo info = {};
-          info.imageCodec = imageCodec;
-          info.imageMatrix = imageMatrix;
-          pendingBitmapGlyphs.push_back({key, info});
-        }
-      }
-    }
-  }
-
-  void createFontNodes() {
-    // Create vector font if needed
-    if (!pendingVectorGlyphs.empty()) {
-      vectorFont = document->makeNode<Font>("vector_font");
-      tgfx::GlyphID nextID = 1;
-      for (auto& [key, info] : pendingVectorGlyphs) {
-        auto glyph = document->makeNode<Glyph>();
-        glyph->path = document->makeNode<PathData>();
-        *glyph->path = PathDataFromSVGString(info.pathString);
-        vectorFont->glyphs.push_back(glyph);
-        vectorGlyphMapping[key] = nextID++;
-      }
-    }
-
-    // Create bitmap font if needed
-    if (!pendingBitmapGlyphs.empty()) {
-      bitmapFont = document->makeNode<Font>("bitmap_font");
-      tgfx::GlyphID nextID = 1;
-      for (auto& [key, info] : pendingBitmapGlyphs) {
-        auto glyph = createBitmapGlyph(info);
-        if (glyph != nullptr) {
-          bitmapFont->glyphs.push_back(glyph);
-          bitmapGlyphMapping[key] = nextID++;
-        }
-      }
-    }
-  }
-
-  Glyph* createBitmapGlyph(const GlyphInfo& info) {
-    auto imageCodec = info.imageCodec;
-    auto imageMatrix = info.imageMatrix;
-
-    int srcW = imageCodec->width();
-    int srcH = imageCodec->height();
-    float scaleX = imageMatrix.getScaleX();
-    float scaleY = imageMatrix.getScaleY();
-    int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
-    int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
-
-    if (dstW <= 0 || dstH <= 0) {
-      return nullptr;
-    }
-
-    tgfx::Bitmap srcBitmap(srcW, srcH, false, false);
-    if (srcBitmap.isEmpty()) {
-      return nullptr;
-    }
-
-    auto* srcPixels = srcBitmap.lockPixels();
-    if (srcPixels == nullptr || !imageCodec->readPixels(srcBitmap.info(), srcPixels)) {
-      srcBitmap.unlockPixels();
-      return nullptr;
-    }
-    srcBitmap.unlockPixels();
-
-    tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
-    if (dstBitmap.isEmpty()) {
-      return nullptr;
-    }
-
-    auto* dstPixels = dstBitmap.lockPixels();
-    if (dstPixels == nullptr) {
-      return nullptr;
-    }
-
-    auto* srcReadPixels = static_cast<const uint8_t*>(srcBitmap.lockPixels());
-    ScalePixelsBilinear(srcReadPixels, srcW, srcH, srcBitmap.info().rowBytes(),
-                        static_cast<uint8_t*>(dstPixels), dstW, dstH, dstBitmap.info().rowBytes());
-    srcBitmap.unlockPixels();
-    dstBitmap.unlockPixels();
-
-    auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
-    if (pngData == nullptr) {
-      return nullptr;
-    }
-
-    auto glyph = document->makeNode<Glyph>();
-    auto image = document->makeNode<Image>();
-    image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
-    glyph->image = image;
-    glyph->offset.x = imageMatrix.getTranslateX();
-    glyph->offset.y = imageMatrix.getTranslateY();
-
-    return glyph;
-  }
-
   void createGlyphRuns(Text* text, const std::shared_ptr<tgfx::TextBlob>& textBlob) {
     // Clear existing glyph runs
     text->glyphRuns.clear();
 
     for (const auto& run : *textBlob) {
-      auto* typeface = run.font.getTypeface().get();
+      if (run.glyphCount == 0) {
+        continue;
+      }
 
-      // Separate glyphs into vector and bitmap runs
-      std::vector<size_t> vectorIndices = {};
-      std::vector<size_t> bitmapIndices = {};
+      // Get or create Font resource for this typeface + font size combination
+      std::string fontId = getOrCreateFontResource(run.font, run.glyphs, run.glyphCount);
+      if (fontId.empty()) {
+        continue;
+      }
 
+      // Create GlyphRun with remapped glyph IDs
+      auto glyphRun = document->makeNode<GlyphRun>();
+      glyphRun->font = fontResources[fontId];
+
+      // Remap glyph IDs to font-specific indices
+      auto& glyphMap = glyphMapping[fontId];
       for (size_t i = 0; i < run.glyphCount; ++i) {
-        GlyphKey key = {typeface, run.glyphs[i]};
-        if (vectorGlyphMapping.find(key) != vectorGlyphMapping.end()) {
-          vectorIndices.push_back(i);
-        } else if (bitmapGlyphMapping.find(key) != bitmapGlyphMapping.end()) {
-          bitmapIndices.push_back(i);
+        tgfx::GlyphID glyphID = run.glyphs[i];
+        auto it = glyphMap.find(glyphID);
+        if (it != glyphMap.end()) {
+          glyphRun->glyphs.push_back(it->second);
+        } else {
+          glyphRun->glyphs.push_back(0);  // Missing glyph
         }
       }
 
-      // Create vector glyph run
-      if (!vectorIndices.empty() && vectorFont != nullptr) {
-        auto glyphRun = createGlyphRun(run, vectorIndices, vectorFont, vectorGlyphMapping, typeface);
-        if (glyphRun != nullptr) {
-          text->glyphRuns.push_back(glyphRun);
+      // Copy positions based on positioning mode
+      switch (run.positioning) {
+        case tgfx::GlyphPositioning::Horizontal: {
+          glyphRun->y = run.offsetY;
+          for (size_t i = 0; i < run.glyphCount; ++i) {
+            glyphRun->xPositions.push_back(run.positions[i]);
+          }
+          break;
+        }
+        case tgfx::GlyphPositioning::Point: {
+          auto* points = reinterpret_cast<const tgfx::Point*>(run.positions);
+          for (size_t i = 0; i < run.glyphCount; ++i) {
+            glyphRun->positions.push_back({points[i].x, points[i].y});
+          }
+          break;
+        }
+        case tgfx::GlyphPositioning::RSXform: {
+          auto* xforms = reinterpret_cast<const tgfx::RSXform*>(run.positions);
+          for (size_t i = 0; i < run.glyphCount; ++i) {
+            RSXform xform = {};
+            xform.scos = xforms[i].scos;
+            xform.ssin = xforms[i].ssin;
+            xform.tx = xforms[i].tx;
+            xform.ty = xforms[i].ty;
+            glyphRun->xforms.push_back(xform);
+          }
+          break;
+        }
+        case tgfx::GlyphPositioning::Matrix: {
+          auto* matrices = reinterpret_cast<const float*>(run.positions);
+          for (size_t i = 0; i < run.glyphCount; ++i) {
+            Matrix m = {};
+            m.a = matrices[i * 6 + 0];
+            m.b = matrices[i * 6 + 1];
+            m.c = matrices[i * 6 + 2];
+            m.d = matrices[i * 6 + 3];
+            m.tx = matrices[i * 6 + 4];
+            m.ty = matrices[i * 6 + 5];
+            glyphRun->matrices.push_back(m);
+          }
+          break;
         }
       }
 
-      // Create bitmap glyph run
-      if (!bitmapIndices.empty() && bitmapFont != nullptr) {
-        auto glyphRun = createGlyphRun(run, bitmapIndices, bitmapFont, bitmapGlyphMapping, typeface);
-        if (glyphRun != nullptr) {
-          text->glyphRuns.push_back(glyphRun);
-        }
-      }
+      text->glyphRuns.push_back(glyphRun);
     }
   }
 
-  GlyphRun* createGlyphRun(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
-                           Font* font,
-                           const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& mapping,
-                           const tgfx::Typeface* typeface) {
-    auto glyphRun = document->makeNode<GlyphRun>();
-    glyphRun->font = font;
-
-    for (size_t i : indices) {
-      GlyphKey key = {typeface, run.glyphs[i]};
-      auto it = mapping.find(key);
-      if (it != mapping.end()) {
-        glyphRun->glyphs.push_back(it->second);
-      } else {
-        glyphRun->glyphs.push_back(0);
-      }
+  std::string getOrCreateFontResource(const tgfx::Font& font, const tgfx::GlyphID* glyphs,
+                                      size_t glyphCount) {
+    auto typeface = font.getTypeface();
+    if (typeface == nullptr) {
+      return "";
     }
 
-    // Copy positions based on positioning mode
-    switch (run.positioning) {
-      case tgfx::GlyphPositioning::Horizontal: {
-        glyphRun->y = run.offsetY;
-        for (size_t i : indices) {
-          glyphRun->xPositions.push_back(run.positions[i]);
-        }
-        break;
-      }
-      case tgfx::GlyphPositioning::Point: {
-        auto* points = reinterpret_cast<const tgfx::Point*>(run.positions);
-        for (size_t i : indices) {
-          glyphRun->positions.push_back({points[i].x, points[i].y});
-        }
-        break;
-      }
-      case tgfx::GlyphPositioning::RSXform: {
-        auto* xforms = reinterpret_cast<const tgfx::RSXform*>(run.positions);
-        for (size_t i : indices) {
-          RSXform xform = {};
-          xform.scos = xforms[i].scos;
-          xform.ssin = xforms[i].ssin;
-          xform.tx = xforms[i].tx;
-          xform.ty = xforms[i].ty;
-          glyphRun->xforms.push_back(xform);
-        }
-        break;
-      }
-      case tgfx::GlyphPositioning::Matrix: {
-        auto* matrices = reinterpret_cast<const float*>(run.positions);
-        for (size_t i : indices) {
-          Matrix m = {};
-          m.a = matrices[i * 6 + 0];
-          m.b = matrices[i * 6 + 1];
-          m.c = matrices[i * 6 + 2];
-          m.d = matrices[i * 6 + 3];
-          m.tx = matrices[i * 6 + 4];
-          m.ty = matrices[i * 6 + 5];
-          glyphRun->matrices.push_back(m);
-        }
-        break;
-      }
+    // Create a key combining typeface pointer and font size for lookup.
+    // Different font sizes produce different glyph paths, so they need separate Font resources.
+    std::string lookupKey = std::to_string(reinterpret_cast<uintptr_t>(typeface.get())) + "_" +
+                            std::to_string(static_cast<int>(font.getSize()));
+
+    // Check if we already have a font ID for this key
+    auto keyIt = fontKeyToId.find(lookupKey);
+    if (keyIt != fontKeyToId.end()) {
+      // Font resource already exists, just add any new glyphs
+      std::string fontId = keyIt->second;
+      addGlyphsToFont(fontId, font, glyphs, glyphCount);
+      return fontId;
     }
 
-    return glyphRun;
+    // Create new font ID using incremental counter
+    std::string fontId = "font_" + std::to_string(nextFontId++);
+    fontKeyToId[lookupKey] = fontId;
+
+    // Create new Font resource with the ID so it gets registered in nodeMap
+    auto fontNode = document->makeNode<Font>(fontId);
+    fontResources[fontId] = fontNode;
+    glyphMapping[fontId] = {};
+
+    // Add glyphs to the new font
+    addGlyphsToFont(fontId, font, glyphs, glyphCount);
+    return fontId;
+  }
+
+  void addGlyphsToFont(const std::string& fontId, const tgfx::Font& font,
+                       const tgfx::GlyphID* glyphs, size_t glyphCount) {
+    Font* fontNode = fontResources[fontId];
+    auto& glyphMap = glyphMapping[fontId];
+
+    for (size_t i = 0; i < glyphCount; ++i) {
+      tgfx::GlyphID glyphID = glyphs[i];
+      if (glyphMap.find(glyphID) != glyphMap.end()) {
+        continue;  // Already added
+      }
+
+      // Try to get glyph path first (vector outline)
+      tgfx::Path glyphPath = {};
+      bool hasPath = font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
+
+      // Try to get glyph image (bitmap, e.g., color emoji)
+      tgfx::Matrix imageMatrix = {};
+      auto imageCodec = font.getImage(glyphID, nullptr, &imageMatrix);
+
+      if (!hasPath && !imageCodec) {
+        continue;  // No renderable content
+      }
+
+      // Create Glyph node
+      auto glyph = document->makeNode<Glyph>();
+
+      if (hasPath) {
+        // Vector glyph
+        std::string pathStr = PathToSVGString(glyphPath);
+        if (!pathStr.empty()) {
+          glyph->path = document->makeNode<PathData>();
+          *glyph->path = PathDataFromSVGString(pathStr);
+        }
+      } else if (imageCodec) {
+        // Bitmap glyph (e.g., color emoji)
+        int srcW = imageCodec->width();
+        int srcH = imageCodec->height();
+        float scaleX = imageMatrix.getScaleX();
+        float scaleY = imageMatrix.getScaleY();
+        int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
+        int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
+        if (dstW > 0 && dstH > 0) {
+          tgfx::Bitmap srcBitmap(srcW, srcH, false, false);
+          if (!srcBitmap.isEmpty()) {
+            auto* srcPixels = srcBitmap.lockPixels();
+            if (srcPixels && imageCodec->readPixels(srcBitmap.info(), srcPixels)) {
+              srcBitmap.unlockPixels();
+              tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
+              if (!dstBitmap.isEmpty()) {
+                auto* dstPixels = dstBitmap.lockPixels();
+                if (dstPixels) {
+                  auto* srcReadPixels = static_cast<const uint8_t*>(srcBitmap.lockPixels());
+                  ScalePixelsBilinear(srcReadPixels, srcW, srcH, srcBitmap.info().rowBytes(),
+                                      static_cast<uint8_t*>(dstPixels), dstW, dstH,
+                                      dstBitmap.info().rowBytes());
+                  srcBitmap.unlockPixels();
+                  dstBitmap.unlockPixels();
+                  auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
+                  if (pngData) {
+                    auto image = document->makeNode<Image>();
+                    image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
+                    glyph->image = image;
+                    glyph->offset.x = imageMatrix.getTranslateX();
+                    glyph->offset.y = imageMatrix.getTranslateY();
+                  }
+                } else {
+                  dstBitmap.unlockPixels();
+                }
+              }
+            } else {
+              srcBitmap.unlockPixels();
+            }
+          }
+        }
+      }
+
+      // Only add glyph if it has content
+      if (glyph->path || glyph->image) {
+        // Map original glyph ID to new index (1-based, since PathTypefaceBuilder uses 1-based IDs)
+        glyphMap[glyphID] = static_cast<tgfx::GlyphID>(fontNode->glyphs.size() + 1);
+        fontNode->glyphs.push_back(glyph);
+      }
+    }
   }
 
   PAGXDocument* document = nullptr;
-  Font* vectorFont = nullptr;
-  Font* bitmapFont = nullptr;
 
-  std::vector<std::pair<GlyphKey, GlyphInfo>> pendingVectorGlyphs = {};
-  std::vector<std::pair<GlyphKey, GlyphInfo>> pendingBitmapGlyphs = {};
+  // Font ID -> Font resource
+  std::unordered_map<std::string, Font*> fontResources = {};
 
-  std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> vectorGlyphMapping = {};
-  std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> bitmapGlyphMapping = {};
+  // Font ID -> (original GlyphID -> new GlyphID)
+  std::unordered_map<std::string, std::unordered_map<tgfx::GlyphID, tgfx::GlyphID>> glyphMapping =
+      {};
+
+  // Lookup key (typeface_ptr + font_size) -> Font ID
+  std::unordered_map<std::string, std::string> fontKeyToId = {};
+
+  // Counter for generating incremental font IDs
+  int nextFontId = 0;
 };
 
 bool FontEmbedder::Embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
