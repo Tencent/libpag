@@ -245,9 +245,13 @@ class TypesetterImpl : public Typesetter {
       float xOffset = 0;
       if (textLayout != nullptr) {
         xOffset = calculateLayoutOffset(textLayout, shapedInfo.totalWidth);
-        // Apply TextLayout position to Text position
-        text->position.x = textLayout->position.x;
-        text->position.y = textLayout->position.y;
+        // Apply TextLayout position to Text position only if TextLayout has a non-zero position.
+        // This allows SVG-imported text (where position is on Text) to work correctly while
+        // also supporting PAGX XML format (where position is on TextLayout).
+        if (textLayout->position.x != 0 || textLayout->position.y != 0) {
+          text->position.x = textLayout->position.x;
+          text->position.y = textLayout->position.y;
+        }
       }
 
       // Create GlyphRun with layout offset baked in
