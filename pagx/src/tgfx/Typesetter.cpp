@@ -241,21 +241,29 @@ class TypesetterImpl : public Typesetter {
         continue;
       }
 
-      // Calculate layout offset based on TextLayout
-      float xOffset = 0;
+      // Calculate alignment offset from TextLayout
+      float alignOffset = 0;
+      float positionOffsetX = 0;
+      float positionOffsetY = 0;
+
       if (textLayout != nullptr) {
-        xOffset = calculateLayoutOffset(textLayout, shapedInfo.totalWidth);
-        // Apply TextLayout position to Text position only if TextLayout has a non-zero position.
-        // This allows SVG-imported text (where position is on Text) to work correctly while
-        // also supporting PAGX XML format (where position is on TextLayout).
+        alignOffset = calculateLayoutOffset(textLayout, shapedInfo.totalWidth);
+
+        // If TextLayout has a non-zero position, it overrides Text.position.
+        // Calculate the offset needed to move from Text.position to TextLayout.position.
         if (textLayout->position.x != 0 || textLayout->position.y != 0) {
-          text->position.x = textLayout->position.x;
-          text->position.y = textLayout->position.y;
+          positionOffsetX = textLayout->position.x - text->position.x;
+          positionOffsetY = textLayout->position.y - text->position.y;
         }
       }
 
-      // Create GlyphRun with layout offset baked in
-      createGlyphRun(text, shapedInfo, xOffset);
+      // GlyphRun positions are relative to Text.position (applied by LayerBuilder).
+      // We only need to include alignment offset and any position override from TextLayout.
+      float xOffset = alignOffset + positionOffsetX;
+      float yOffset = positionOffsetY;
+
+      // Create GlyphRun with calculated offsets
+      createGlyphRun(text, shapedInfo, xOffset, yOffset);
       _textTypeset = true;
     }
   }
@@ -356,7 +364,7 @@ class TypesetterImpl : public Typesetter {
     return info;
   }
 
-  void createGlyphRun(Text* text, const ShapedTextInfo& info, float xOffset) {
+  void createGlyphRun(Text* text, const ShapedTextInfo& info, float xOffset, float yOffset) {
     if (info.originalGlyphIDs.empty()) {
       return;
     }
@@ -384,8 +392,8 @@ class TypesetterImpl : public Typesetter {
       glyphRun->xPositions.push_back(x + xOffset);
     }
 
-    // For horizontal text, y should be 0 (relative to baseline)
-    glyphRun->y = 0;
+    // Apply y offset (for TextLayout position override)
+    glyphRun->y = yOffset;
 
     text->glyphRuns.push_back(glyphRun);
   }
@@ -435,22 +443,39 @@ class TypesetterImpl : public Typesetter {
   std::string getOrCreateFontResource(const std::shared_ptr<tgfx::Typeface>& typeface,
                                       const tgfx::Font& font,
                                       const std::vector<tgfx::GlyphID>& glyphIDs) {
-    // Create unique font ID based on typeface identity
-    std::string fontId = "font_" + std::to_string(reinterpret_cast<uintptr_t>(typeface.get()));
+    // Create a key combining typeface pointer and font size for lookup.
+    // Different font sizes produce different glyph paths, so they need separate Font resources.
+    std::string lookupKey = std::to_string(reinterpret_cast<uintptr_t>(typeface.get())) + "_" +
+                            std::to_string(static_cast<int>(font.getSize()));
 
-    // Check if font resource already exists
-    auto it = _fontResources.find(fontId);
-    if (it == _fontResources.end()) {
-      // Create new Font resource with the ID so it gets registered in nodeMap
-      auto fontNode = _document->makeNode<Font>(fontId);
-      _fontResources[fontId] = fontNode;
-      _glyphMapping[fontId] = {};
+    // Check if we already have a font ID for this key
+    auto keyIt = _fontKeyToId.find(lookupKey);
+    if (keyIt != _fontKeyToId.end()) {
+      // Font resource already exists, just add any new glyphs
+      std::string fontId = keyIt->second;
+      addGlyphsToFont(fontId, font, glyphIDs);
+      return fontId;
     }
 
+    // Create new font ID using incremental counter
+    std::string fontId = "font_" + std::to_string(_nextFontId++);
+    _fontKeyToId[lookupKey] = fontId;
+
+    // Create new Font resource with the ID so it gets registered in nodeMap
+    auto fontNode = _document->makeNode<Font>(fontId);
+    _fontResources[fontId] = fontNode;
+    _glyphMapping[fontId] = {};
+
+    // Add glyphs to the new font
+    addGlyphsToFont(fontId, font, glyphIDs);
+    return fontId;
+  }
+
+  void addGlyphsToFont(const std::string& fontId, const tgfx::Font& font,
+                       const std::vector<tgfx::GlyphID>& glyphIDs) {
     Font* fontNode = _fontResources[fontId];
     auto& glyphMap = _glyphMapping[fontId];
 
-    // Add any new glyphs
     for (tgfx::GlyphID glyphID : glyphIDs) {
       if (glyphMap.find(glyphID) != glyphMap.end()) {
         continue;  // Already added
@@ -478,8 +503,6 @@ class TypesetterImpl : public Typesetter {
 
       fontNode->glyphs.push_back(glyph);
     }
-
-    return fontId;
   }
 
   // Registered typefaces by family + style
@@ -500,6 +523,12 @@ class TypesetterImpl : public Typesetter {
   // Font ID -> (original GlyphID -> new GlyphID)
   std::unordered_map<std::string, std::unordered_map<tgfx::GlyphID, tgfx::GlyphID>> _glyphMapping =
       {};
+
+  // Lookup key (typeface_ptr + font_size) -> Font ID
+  std::unordered_map<std::string, std::string> _fontKeyToId = {};
+
+  // Counter for generating incremental font IDs
+  int _nextFontId = 0;
 };
 
 std::shared_ptr<Typesetter> Typesetter::Make() {
