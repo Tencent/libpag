@@ -202,8 +202,8 @@ static Glyph* CreateBitmapGlyph(PAGXDocument* document, const GlyphInfo& info) {
 
   int srcW = imageCodec->width();
   int srcH = imageCodec->height();
-  float scaleX = imageMatrix.getScaleX();
-  float scaleY = imageMatrix.getScaleY();
+  float scaleX = std::abs(imageMatrix.getScaleX());
+  float scaleY = std::abs(imageMatrix.getScaleY());
   int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
   int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
 
@@ -222,22 +222,30 @@ static Glyph* CreateBitmapGlyph(PAGXDocument* document, const GlyphInfo& info) {
   }
   srcBitmap.unlockPixels();
 
-  tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
-  if (dstBitmap.isEmpty()) {
-    return nullptr;
+  std::shared_ptr<tgfx::Data> pngData = nullptr;
+
+  if (dstW == srcW && dstH == srcH) {
+    pngData = srcBitmap.encode(tgfx::EncodedFormat::PNG, 100);
+  } else {
+    tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
+    if (dstBitmap.isEmpty()) {
+      return nullptr;
+    }
+
+    auto* dstPixels = dstBitmap.lockPixels();
+    if (dstPixels == nullptr) {
+      return nullptr;
+    }
+    auto* srcReadPixels = static_cast<const uint8_t*>(srcBitmap.lockPixels());
+    ScalePixelsAreaAverage(srcReadPixels, srcW, srcH, srcBitmap.info().rowBytes(),
+                           static_cast<uint8_t*>(dstPixels), dstW, dstH,
+                           dstBitmap.info().rowBytes());
+    srcBitmap.unlockPixels();
+    dstBitmap.unlockPixels();
+
+    pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
   }
 
-  auto* dstPixels = dstBitmap.lockPixels();
-  if (dstPixels == nullptr) {
-    return nullptr;
-  }
-  auto* srcReadPixels = static_cast<const uint8_t*>(srcBitmap.lockPixels());
-  ScalePixelsAreaAverage(srcReadPixels, srcW, srcH, srcBitmap.info().rowBytes(),
-                         static_cast<uint8_t*>(dstPixels), dstW, dstH, dstBitmap.info().rowBytes());
-  srcBitmap.unlockPixels();
-  dstBitmap.unlockPixels();
-
-  auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
   if (pngData == nullptr) {
     return nullptr;
   }
