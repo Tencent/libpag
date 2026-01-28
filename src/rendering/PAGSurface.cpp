@@ -32,7 +32,7 @@ namespace pag {
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
     : drawable(std::move(drawable)), externalContext(externalContext) {
   rootLocker = std::make_shared<std::mutex>();
-#ifndef PAG_BUILD_FOR_WEB
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
   if (externalContext) {
     glRestorer = new GLRestorer();
   }
@@ -40,7 +40,7 @@ PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
 }
 
 PAGSurface::~PAGSurface() {
-#ifndef PAG_BUILD_FOR_WEB
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
   delete static_cast<GLRestorer*>(glRestorer);
 #endif
 }
@@ -299,7 +299,7 @@ tgfx::Context* PAGSurface::lockContext() {
     return nullptr;
   }
   auto context = device->lockContext();
-#ifndef PAG_BUILD_FOR_WEB
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
   if (context != nullptr && glRestorer != nullptr) {
     static_cast<GLRestorer*>(glRestorer)->save();
   }
@@ -308,7 +308,7 @@ tgfx::Context* PAGSurface::lockContext() {
 }
 
 void PAGSurface::unlockContext() {
-#ifndef PAG_BUILD_FOR_WEB
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
   if (glRestorer != nullptr) {
     static_cast<GLRestorer*>(glRestorer)->restore();
   }

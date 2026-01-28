@@ -18,7 +18,7 @@
 
 #include "GLRestorer.h"
 
-#ifndef PAG_BUILD_FOR_WEB
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#ifndef PAG_BUILD_FOR_WEB
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
 
 namespace pag {
 
