@@ -84,6 +84,28 @@
   border: none;
 }
 
+.perf-btn {
+  padding: 20rpx 35rpx;
+  font-size: 28rpx;
+  background: rgba(255, 255, 255, 0.1);
+  color: #999;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  border-radius: 8rpx;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: all 0.3s;
+}
+
+.perf-btn.active {
+  background: #1989fa;
+  color: #fff;
+  border-color: #1989fa;
+}
+
+.perf-btn::after {
+  border: none;
+}
+
 .canvas-container {
   flex: 1;
   position: relative;
@@ -128,4 +150,64 @@
   padding: 10rpx 20rpx;
   border-radius: 4rpx;
   font-size: 24rpx;
+}
+
+.perf-panel {
+  position: absolute;
+  top: 20rpx;
+  left: 20rpx;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 25rpx 30rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  min-width: 350rpx;
+  backdrop-filter: blur(10rpx);
+}
+
+.perf-title {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: bold;
+  margin-bottom: 15rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 10rpx;
+}
+
+.perf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12rpx 0;
+}
+
+.perf-label {
+  color: #999;
+  font-size: 24rpx;
+}
+
+.perf-value {
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+}
+
+.quality-Excellent {
+  color: #52c41a;
+}
+
+.quality-Good {
+  color: #73d13d;
+}
+
+.quality-Fair {
+  color: #faad14;
+}
+
+.quality-Poor {
+  color: #ff7a45;
+}
+
+.quality-Very {
+  color: #f5222d;
 }

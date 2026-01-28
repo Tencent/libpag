@@ -20,6 +20,10 @@
       class="reset-btn" 
       bindtap="onReset"
     >Reset</button>
+    <button 
+      class="perf-btn {{showPerf ? 'active' : ''}}" 
+      bindtap="togglePerfMonitor"
+    >FPS</button>
   </view>
 
   <!-- Canvas Area -->
@@ -41,6 +45,31 @@
     <!-- File Loading Indicator -->
     <view wx:if="{{loadingFile}}" class="loading-file">
       <text>Switching...</text>
+    </view>
+    
+    <!-- Performance Stats -->
+    <view wx:if="{{showPerf}}" class="perf-panel">
+      <view class="perf-title">Performance Monitor</view>
+      <view class="perf-row">
+        <text class="perf-label">Quality:</text>
+        <text class="perf-value quality-{{perfStats.quality}}">{{perfStats.quality}}</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">Smoothness:</text>
+        <text class="perf-value">{{perfStats.smoothness}}/100</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">FPS:</text>
+        <text class="perf-value">{{perfStats.fps}} (avg: {{perfStats.avgFPS}})</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">Frame Time:</text>
+        <text class="perf-value">{{perfStats.frameTime}}ms</text>
+      </view>
+      <view class="perf-row">
+        <text class="perf-label">Frame Drops:</text>
+        <text class="perf-value">{{perfStats.dropRate}}%</text>
+      </view>
     </view>
   </view>
 </view>

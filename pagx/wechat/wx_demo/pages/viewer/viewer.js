@@ -7,21 +7,26 @@ import {
   PAGXInit,
 } from '../../utils/pagx-viewer';
 import { WXGestureManager } from '../../utils/gesture-manager';
+import { PerformanceMonitor } from '../../utils/performance-monitor';
 
 // PAGX sample files configuration
 const SAMPLE_FILES = [
   { 
     name: 'ColorPicker', 
-    url: 'https://pag.io/pagx/testFiles/ColorPicker.libpag.pagx'
+    url: 'https://pag.io/pagx/testFiles/ColorPicker.pagx'
   },
   { 
-    name: 'complex7', 
-    url: 'https://pag.io/pagx/testFiles/complex7.pagx'
+    name: 'Baseline', 
+    url: 'https://pag.io/pagx/testFiles/Baseline.pagx'
+  },
+  { 
+    name: 'Guidelines', 
+    url: 'https://pag.io/pagx/testFiles/Guidelines.pagx'
   },
   { 
     name: 'complex6', 
     url: 'https://pag.io/pagx/testFiles/complex6.pagx'
-  }
+  },
 ];
 
 Page({
@@ -30,7 +35,18 @@ Page({
     samples: SAMPLE_FILES,
     sampleNames: SAMPLE_FILES.map(item => item.name),
     currentIndex: 0,
-    loadingFile: false
+    loadingFile: false,
+    
+    // Performance monitoring
+    showPerf: false,
+    perfStats: {
+      fps: 0,
+      avgFPS: 0,
+      frameTime: 0,
+      dropRate: 0,
+      smoothness: 0,
+      quality: 'N/A'
+    }
   },
 
   // State
@@ -39,7 +55,9 @@ Page({
   canvas: null,
   animationFrameId: 0,
   gestureManager: null,
+  perfMonitor: null,
   dpr: 2,
+  gestureJustStarted: false,
 
   async onLoad(options) {
     try {
@@ -48,6 +66,12 @@ Page({
       
       // Create gesture manager
       this.gestureManager = new WXGestureManager();
+      
+      // Create performance monitor
+      this.perfMonitor = new PerformanceMonitor();
+      this.perfMonitor.onStatsUpdate = (stats) => {
+        this.updatePerfStats(stats);
+      };
       
       // Support custom file index from query params
       if (options && options.index) {
@@ -269,7 +293,19 @@ Page({
   startRendering() {
     const render = () => {
       if (!this.View) return;
+
       this.View.draw();
+      
+      // Record frame for performance monitoring
+      if (this.perfMonitor && this.perfMonitor.enabled) {
+        this.perfMonitor.recordFrame();
+        
+        // Mark first frame after gesture start
+        if (this.gestureJustStarted) {
+          this.perfMonitor.onGestureFirstFrame();
+          this.gestureJustStarted = false;
+        }
+      }
       
       // Use Canvas.requestAnimationFrame in WeChat Miniprogram
       if (this.canvas && this.canvas.requestAnimationFrame) {
@@ -296,6 +332,13 @@ Page({
   // Touch Events
   onTouchStart(e) {
     if (!this.gestureManager) return;
+    
+    // Notify performance monitor
+    if (this.perfMonitor && this.perfMonitor.enabled) {
+      this.perfMonitor.onGestureStart();
+      this.gestureJustStarted = true;
+    }
+    
     // Pass dpr to convert touch coordinates (logical pixels) to physical pixels
     const state = this.gestureManager.onTouchStart(e.touches, this.dpr);
     this.applyGestureState(state);
@@ -313,6 +356,12 @@ Page({
     // IMPORTANT: Pass e.touches (remaining touches), not e.changedTouches (ended touches)
     const state = this.gestureManager.onTouchEnd(e.touches);
     this.applyGestureState(state);
+    
+    // Notify performance monitor
+    if (this.perfMonitor && this.perfMonitor.enabled && e.touches.length === 0) {
+      this.perfMonitor.onGestureEnd();
+      this.gestureJustStarted = false;
+    }
   },
 
   // Reset Button
@@ -336,5 +385,32 @@ Page({
     if (index !== this.data.currentIndex) {
       this.switchFile(index);
     }
+  },
+  
+  // Performance Monitoring
+  togglePerfMonitor() {
+    const newShowPerf = !this.data.showPerf;
+    this.setData({ showPerf: newShowPerf });
+    
+    if (newShowPerf && this.perfMonitor) {
+      this.perfMonitor.reset();
+      this.perfMonitor.start();
+    } else if (this.perfMonitor) {
+      this.perfMonitor.stop();
+      this.perfMonitor.logStats();
+    }
+  },
+  
+  updatePerfStats(stats) {
+    this.setData({
+      perfStats: {
+        fps: stats.currentFPS,
+        avgFPS: stats.averageFPS,
+        frameTime: stats.averageFrameTime,
+        dropRate: stats.droppedFrameRate,
+        smoothness: stats.smoothness,
+        quality: this.perfMonitor.getSummary().quality
+      }
+    });
   },
 });

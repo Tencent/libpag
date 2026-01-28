@@ -64,7 +64,7 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
 : device(device), _width(width), _height(height) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
-  displayList.setMaxTileCount(512);
+  displayList.setMaxTileCount(256);
 }
 
 static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
