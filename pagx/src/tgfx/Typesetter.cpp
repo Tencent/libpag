@@ -84,14 +84,19 @@ struct FontKeyHash {
   }
 };
 
+// Shaped glyph run for a specific font
+struct ShapedGlyphRun {
+  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+  tgfx::Font font = {};
+  std::vector<tgfx::GlyphID> glyphIDs = {};
+  std::vector<float> xPositions = {};
+};
+
 // Intermediate shaping result for a single Text element
 struct ShapedTextInfo {
   Text* text = nullptr;
-  std::vector<tgfx::GlyphID> originalGlyphIDs = {};
-  std::vector<float> xPositions = {};
+  std::vector<ShapedGlyphRun> runs = {};
   float totalWidth = 0;
-  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-  tgfx::Font font = {};
 };
 
 // Private implementation class
@@ -242,7 +247,7 @@ class TypesetterImpl : public Typesetter {
       auto* text = textElements[i];
       auto& shapedInfo = shapedInfos[i];
 
-      if (shapedInfo.originalGlyphIDs.empty()) {
+      if (shapedInfo.runs.empty()) {
         continue;
       }
 
@@ -267,8 +272,8 @@ class TypesetterImpl : public Typesetter {
       float xOffset = alignOffset + positionOffsetX;
       float yOffset = positionOffsetY;
 
-      // Create GlyphRun with calculated offsets
-      createGlyphRun(text, shapedInfo, xOffset, yOffset);
+      // Create GlyphRuns for each shaped run (different fonts)
+      createGlyphRuns(text, shapedInfo, xOffset, yOffset);
       _textTypeset = true;
     }
   }
@@ -296,17 +301,19 @@ class TypesetterImpl : public Typesetter {
     ShapedTextInfo info = {};
     info.text = text;
 
-    // Find typeface for this text
-    auto typeface = findTypeface(text->fontFamily, text->fontStyle);
-    if (!typeface) {
+    // Find primary typeface for this text
+    auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
+    if (!primaryTypeface) {
       return info;
     }
 
-    info.typeface = typeface;
-    info.font = tgfx::Font(typeface, text->fontSize);
-
+    tgfx::Font primaryFont(primaryTypeface, text->fontSize);
     float currentX = 0;
     const std::string& content = text->text;
+
+    // Current run being built
+    ShapedGlyphRun* currentRun = nullptr;
+    std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
 
     // Simple text shaping: iterate through characters
     size_t i = 0;
@@ -344,24 +351,57 @@ class TypesetterImpl : public Typesetter {
         continue;
       }
 
-      // Get glyph ID
-      tgfx::GlyphID glyphID = info.font.getGlyphID(unichar);
-      if (glyphID == 0) {
+      // Try to find a typeface that can render this character
+      std::shared_ptr<tgfx::Typeface> glyphTypeface = nullptr;
+      tgfx::Font glyphFont;
+      tgfx::GlyphID glyphID = 0;
+
+      // First try primary font
+      glyphID = primaryFont.getGlyphID(unichar);
+      if (glyphID != 0) {
+        glyphTypeface = primaryTypeface;
+        glyphFont = primaryFont;
+      } else {
+        // Try fallback typefaces
+        for (const auto& fallback : _fallbackTypefaces) {
+          if (!fallback || fallback == primaryTypeface) {
+            continue;
+          }
+          tgfx::Font fallbackFont(fallback, text->fontSize);
+          glyphID = fallbackFont.getGlyphID(unichar);
+          if (glyphID != 0) {
+            glyphTypeface = fallback;
+            glyphFont = fallbackFont;
+            break;
+          }
+        }
+      }
+
+      if (glyphID == 0 || !glyphTypeface) {
+        // No font can render this character, skip it
         continue;
       }
 
-      // Get glyph advance first (needed for spacing even if no outline)
-      float advance = info.font.getAdvance(glyphID);
+      // Get glyph advance
+      float advance = glyphFont.getAdvance(glyphID);
 
       // Check if glyph has renderable content (outline or image)
-      // Skip space-like characters that have no visual representation
       tgfx::Path testPath;
-      bool hasOutline = info.font.getPath(glyphID, &testPath) && !testPath.isEmpty();
-      bool hasImage = info.font.getImage(glyphID, nullptr, nullptr) != nullptr;
+      bool hasOutline = glyphFont.getPath(glyphID, &testPath) && !testPath.isEmpty();
+      bool hasImage = glyphFont.getImage(glyphID, nullptr, nullptr) != nullptr;
 
       if (hasOutline || hasImage) {
-        info.xPositions.push_back(currentX);
-        info.originalGlyphIDs.push_back(glyphID);
+        // Check if we need to start a new run (different typeface)
+        if (currentTypeface != glyphTypeface) {
+          info.runs.emplace_back();
+          currentRun = &info.runs.back();
+          currentRun->typeface = glyphTypeface;
+          currentRun->font = glyphFont;
+          currentTypeface = glyphTypeface;
+        }
+
+        currentRun->xPositions.push_back(currentX);
+        currentRun->glyphIDs.push_back(glyphID);
       }
 
       // Always advance position
@@ -372,38 +412,40 @@ class TypesetterImpl : public Typesetter {
     return info;
   }
 
-  void createGlyphRun(Text* text, const ShapedTextInfo& info, float xOffset, float yOffset) {
-    if (info.originalGlyphIDs.empty()) {
-      return;
-    }
-
-    // Get or create Font resource for this typeface
-    std::string fontId = getOrCreateFontResource(info.typeface, info.font, info.originalGlyphIDs);
-
-    // Create GlyphRun with remapped glyph IDs
-    auto glyphRun = _document->makeNode<GlyphRun>();
-    glyphRun->font = _fontResources[fontId];
-
-    // Remap glyph IDs to font-specific indices
-    for (tgfx::GlyphID glyphID : info.originalGlyphIDs) {
-      auto it = _glyphMapping[fontId].find(glyphID);
-      if (it != _glyphMapping[fontId].end()) {
-        glyphRun->glyphs.push_back(it->second);
-      } else {
-        glyphRun->glyphs.push_back(0);  // Missing glyph
+  void createGlyphRuns(Text* text, const ShapedTextInfo& info, float xOffset, float yOffset) {
+    for (const auto& run : info.runs) {
+      if (run.glyphIDs.empty()) {
+        continue;
       }
+
+      // Get or create Font resource for this typeface
+      std::string fontId = getOrCreateFontResource(run.typeface, run.font, run.glyphIDs);
+
+      // Create GlyphRun with remapped glyph IDs
+      auto glyphRun = _document->makeNode<GlyphRun>();
+      glyphRun->font = _fontResources[fontId];
+
+      // Remap glyph IDs to font-specific indices
+      for (tgfx::GlyphID glyphID : run.glyphIDs) {
+        auto it = _glyphMapping[fontId].find(glyphID);
+        if (it != _glyphMapping[fontId].end()) {
+          glyphRun->glyphs.push_back(it->second);
+        } else {
+          glyphRun->glyphs.push_back(0);  // Missing glyph
+        }
+      }
+
+      // Apply layout offset to x positions
+      glyphRun->xPositions.reserve(run.xPositions.size());
+      for (float x : run.xPositions) {
+        glyphRun->xPositions.push_back(x + xOffset);
+      }
+
+      // Apply y offset (for TextLayout position override)
+      glyphRun->y = yOffset;
+
+      text->glyphRuns.push_back(glyphRun);
     }
-
-    // Apply layout offset to x positions
-    glyphRun->xPositions.reserve(info.xPositions.size());
-    for (float x : info.xPositions) {
-      glyphRun->xPositions.push_back(x + xOffset);
-    }
-
-    // Apply y offset (for TextLayout position override)
-    glyphRun->y = yOffset;
-
-    text->glyphRuns.push_back(glyphRun);
   }
 
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
