@@ -1427,17 +1427,60 @@ Merges all shapes into a single shape.
 - Current transformation matrices of shapes are applied during merge
 - Merged shape's transformation matrix resets to identity matrix
 
+**Example**:
+
+```xml
+<Rectangle center="50,50" size="80,80"/>
+<Ellipse center="90,90" size="80,80"/>
+<MergePath mode="union"/>
+<Fill color="#3366FF"/>
+```
+
 ### 5.5 Text Modifiers
 
 Text modifiers transform individual glyphs within text.
 
 #### 5.5.1 Text Modifier Processing
 
-When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation.
+When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation:
+
+```xml
+<Group>
+  <Text text="Hello" fontFamily="Arial" fontSize="24"/>
+  <Text text="World" fontFamily="Arial" fontSize="24"/>
+  <TextModifier position="0,-10"/>
+  <Fill color="#333333"/>
+</Group>
+```
 
 #### 5.5.2 Text to Shape Conversion
 
-When text encounters a shape modifier, it is forcibly converted to shape paths.
+When text encounters a shape modifier, it is forcibly converted to shape paths:
+
+```
+Text Element           Shape Modifier          Subsequent Modifiers
+┌──────────┐          ┌──────────┐
+│   Text   │          │ TrimPath │
+└────┬─────┘          │RoundCorn │
+     │                │MergePath │
+     │ Accumulated    └────┬─────┘
+     │ Glyph List          │
+     ▼                     │ Triggers Conversion
+┌──────────────┐           │
+│ Glyph List   │───────────┼──────────────────────┐
+│ [H,e,l,l,o]  │           │                      │
+└──────────────┘           ▼                      ▼
+                  ┌──────────────┐      ┌──────────────────┐
+                  │ Merged into  │      │ Emoji Discarded  │
+                  │ Single Path  │      │ (Cannot convert) │
+                  └──────────────┘      └──────────────────┘
+                           │
+                           │ Subsequent text modifiers no longer effective
+                           ▼
+                  ┌──────────────┐
+                  │ TextModifier │ → Skipped (Already Path)
+                  └──────────────┘
+```
 
 **Conversion Rules**:
 
@@ -1445,6 +1488,17 @@ When text encounters a shape modifier, it is forcibly converted to shape paths.
 2. **Merge into Single Path**: All glyphs of one Text merge into **one** Path, not one independent Path per glyph
 3. **Emoji Loss**: Emoji cannot be converted to path outlines; discarded during conversion
 4. **Irreversible Conversion**: After conversion becomes pure Path; subsequent text modifiers have no effect on it
+
+**Example**:
+
+```xml
+<Group>
+  <Text fontFamily="Arial" fontSize="24"><![CDATA[Hello 😀]]></Text>
+  <TrimPath start="0" end="0.5"/>
+  <TextModifier position="0,-10"/>
+  <Fill color="#333333"/>
+</Group>
+```
 
 #### 5.5.3 TextModifier
 
@@ -1526,11 +1580,34 @@ Range selectors define the glyph range and influence degree for TextModifier.
 | `randomOrder` | bool | false | Random order |
 | `randomSeed` | int | 0 | Random seed |
 
-**SelectorUnit**: `index`, `percentage`
+**SelectorUnit**:
 
-**SelectorShape**: `square`, `rampUp`, `rampDown`, `triangle`, `round`, `smooth`
+| Value | Description |
+|-------|-------------|
+| `index` | Index: Calculate range by glyph index |
+| `percentage` | Percentage: Calculate range by percentage of total glyphs |
 
-**SelectorMode**: `add`, `subtract`, `intersect`, `min`, `max`, `difference`
+**SelectorShape**:
+
+| Value | Description |
+|-------|-------------|
+| `square` | Square: 1 within range, 0 outside |
+| `rampUp` | Ramp Up: Linear increase from 0 to 1 |
+| `rampDown` | Ramp Down: Linear decrease from 1 to 0 |
+| `triangle` | Triangle: 1 at center, 0 at edges |
+| `round` | Round: Sinusoidal transition |
+| `smooth` | Smooth: Smoother transition curve |
+
+**SelectorMode**:
+
+| Value | Description |
+|-------|-------------|
+| `add` | Add: Accumulate selector weights |
+| `subtract` | Subtract: Subtract selector weights |
+| `intersect` | Intersect: Take minimum weight |
+| `min` | Min: Take minimum value |
+| `max` | Max: Take maximum value |
+| `difference` | Difference: Take absolute difference |
 
 #### 5.5.5 TextPath
 
@@ -1571,10 +1648,27 @@ Arranges text along a specified path.
 
 #### 5.5.6 TextLayout
 
-TextLayout is a text layout modifier that applies typography to accumulated Text elements.
+TextLayout is a text layout modifier that applies typography to accumulated Text elements. It overrides the original positions of Text elements (similar to how TextPath overrides positions). Two modes are supported:
+
+- **Point Text Mode** (no width): Text does not auto-wrap; textAlign controls text alignment relative to the (x, y) anchor point
+- **Paragraph Text Mode** (with width): Text auto-wraps within the specified width
+
+During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextLayout is expanded during pre-layout, with glyph positions written directly into Text.
 
 ```xml
-<TextLayout position="150,100" width="300" height="200" textAlign="center" verticalAlign="top" writingMode="horizontal" lineHeight="1.5"/>
+<!-- Point text: center aligned -->
+<Layer>
+  <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+  <TextLayout position="150,100" textAlign="center"/>
+  <Fill color="#333333"/>
+</Layer>
+
+<!-- Paragraph text: auto-wrap -->
+<Layer>
+  <Text text="This is a long text that will auto-wrap..." fontFamily="Arial" fontSize="16"/>
+  <TextLayout position="50,50" width="300" height="200" textAlign="start" verticalAlign="top" lineHeight="1.5"/>
+  <Fill color="#333333"/>
+</Layer>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1587,15 +1681,59 @@ TextLayout is a text layout modifier that applies typography to accumulated Text
 | `writingMode` | WritingMode | horizontal | Layout direction |
 | `lineHeight` | float | 1.2 | Line height multiplier |
 
-**TextAlign**: `start`, `center`, `end`, `justify`
+**TextAlign (Horizontal Alignment)**:
 
-**VerticalAlign**: `top`, `center`, `bottom`
+| Value | Description |
+|-------|-------------|
+| `start` | Start alignment (left-aligned; right-aligned for RTL text) |
+| `center` | Center alignment |
+| `end` | End alignment (right-aligned; left-aligned for RTL text) |
+| `justify` | Justified (last line start-aligned) |
 
-**WritingMode**: `horizontal`, `vertical`
+**VerticalAlign (Vertical Alignment)**:
+
+| Value | Description |
+|-------|-------------|
+| `top` | Top alignment |
+| `center` | Vertical center |
+| `bottom` | Bottom alignment |
+
+**WritingMode (Layout Direction)**:
+
+| Value | Description |
+|-------|-------------|
+| `horizontal` | Horizontal text |
+| `vertical` | Vertical text (columns arranged right-to-left, traditional CJK vertical layout) |
 
 #### 5.5.7 Rich Text
 
 Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextLayout provides unified typography.
+
+```xml
+<Layer>
+  <!-- Regular text -->
+  <Group>
+    <Text text="This is " fontFamily="Arial" fontSize="18"/>
+    <Fill color="#333333"/>
+  </Group>
+  <!-- Bold text -->
+  <Group>
+    <Text text="bold" fontFamily="Arial-Bold" fontSize="18"/>
+    <Fill color="#333333"/>
+  </Group>
+  <!-- Colored text -->
+  <Group>
+    <Text text=" and " fontFamily="Arial" fontSize="18"/>
+    <Fill color="#333333"/>
+  </Group>
+  <Group>
+    <Text text="colored" fontFamily="Arial" fontSize="18"/>
+    <Fill color="#FF6600"/>
+  </Group>
+  <!-- Apply unified layout -->
+  <TextLayout position="50,50" width="400" textAlign="start"/>
+</Layer>
+```
 
 ### 5.6 Repeater
 
