@@ -10,7 +10,7 @@
 
 - **特性完备**：完整覆盖矢量图形、图片、富文本、滤镜效果、混合模式、遮罩等能力，满足复杂动效的描述需求。
 
-- **精简高效**：提供简洁且强大的统一结构，兼顾静态的优化描述，同时预留未来交互和脚本的扩展能力。
+- **精简高效**：提供简洁且强大的统一结构，兼顾静态矢量与动画的优化描述，同时预留未来交互和脚本的扩展能力。
 
 - **生态兼容**：可作为 After Effects、Figma、腾讯设计等设计工具的通用交换格式，实现设计资产无缝流转。
 
@@ -426,7 +426,8 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `image` | idref | (必填) | 图片引用 "@id" |
 | `tileModeX` | TileMode | clamp | X 方向平铺模式 |
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
-| `filterMode` | FilterMode | linear | 纹理滤镜模式 |
+| `minFilterMode` | FilterMode | linear | 纹理缩小时的滤镜模式 |
+| `magFilterMode` | FilterMode | linear | 纹理放大时的滤镜模式 |
 | `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
 | `matrix` | string | 单位矩阵 | 变换矩阵 |
 
@@ -2799,5 +2800,5 @@ Layer / Group
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **VerticalAlign** | `top`, `center`, `bottom` |
-| **TextDirection** | `horizontal`, `vertical` |
+| **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |

@@ -348,10 +348,13 @@ class TypesetterImpl : public Typesetter {
       // Get glyph advance first (needed for spacing even if no outline)
       float advance = info.font.getAdvance(glyphID);
 
-      // Check if glyph has an outline (skip space-like characters without outlines)
+      // Check if glyph has renderable content (outline or image)
+      // Skip space-like characters that have no visual representation
       tgfx::Path testPath;
       bool hasOutline = info.font.getPath(glyphID, &testPath) && !testPath.isEmpty();
-      if (hasOutline) {
+      bool hasImage = info.font.getImage(glyphID, nullptr, nullptr) != nullptr;
+
+      if (hasOutline || hasImage) {
         info.xPositions.push_back(currentX);
         info.originalGlyphIDs.push_back(glyphID);
       }
