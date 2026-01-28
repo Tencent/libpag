@@ -6,15 +6,15 @@
 
 ### 1.1 Design Goals
 
-- **Open and Readable**: Plain-text XML format that is easy to read and edit, with native support for version control and diff comparison, facilitating debugging, AI understanding, and content generation.
+- **Open and Readable**: Uses a plain-text XML format that is easy to read and edit, with native support for version control and diffing, facilitating debugging as well as AI understanding and generation.
 
-- **Feature Complete**: Comprehensive coverage of vector graphics, images, rich text, filter effects, blend modes, masks, and more to meet the requirements of complex animation descriptions.
+- **Feature-Complete**: Fully covers vector graphics, raster images, rich text, filter effects, blending modes, masking, and related capabilities, meeting the requirements for complex animated graphics.
 
-- **Concise and Efficient**: Provides a simple yet powerful unified structure that balances optimized static descriptions while reserving extensibility for future interactivity and scripting.
+- **Concise and Efficient**: Defines a compact yet expressive unified structure that optimizes the description of both static vector content and animations, while reserving extensibility for future interaction and scripting.
 
-- **Ecosystem Compatible**: Serves as a universal interchange format for design tools such as After Effects, Figma, and Tencent Design, enabling seamless transfer of design assets.
+- **Ecosystem Compatible**: Can serve as a common interchange format for design tools such as After Effects, Figma, and Tencent Design, enabling seamless asset exchange across platforms.
 
-- **Efficient Deployment**: Design assets can be exported and deployed to development environments with one click, achieving high compression ratios and runtime performance when converted to binary PAG format.
+- **Efficient Deployment**: Design assets can be exported and deployed to production environments with a single action, achieving high compression ratios and excellent runtime performance after conversion to the binary PAG format.
 
 ### 1.2 File Structure
 
