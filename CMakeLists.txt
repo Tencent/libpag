@@ -383,6 +383,22 @@ elseif (WIN32)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/win/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
     endif ()
+
+    # Windows hardware decoding support using Media Foundation
+    if (PAG_USE_WIN_HARDWARE_DECODER)
+        message(STATUS "Enabling Windows hardware decoder using Media Foundation")
+        list(APPEND PAG_DEFINES PAG_USE_WIN_HARDWARE_DECODER)
+        
+        # Link D3D11, DXGI and Media Foundation libraries
+        find_library(D3D11_LIB d3d11)
+        find_library(DXGI_LIB dxgi)
+        find_library(MF_LIB mf)
+        find_library(MFPLAT_LIB mfplat)
+        find_library(MFUUID_LIB mfuuid)
+        find_library(MFREADWRITE_LIB mfreadwrite)
+        list(APPEND PAG_SHARED_LIBS ${D3D11_LIB} ${DXGI_LIB} ${MF_LIB} ${MFPLAT_LIB} ${MFUUID_LIB} ${MFREADWRITE_LIB})
+    endif()
+
     find_library(Bcrypt_LIB Bcrypt)
     list(APPEND PAG_SHARED_LIBS ${Bcrypt_LIB})
     find_library(ws2_32_LIB ws2_32)
@@ -453,6 +469,10 @@ if (PAG_USE_C)
 endif ()
 
 list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
+# Include tgfx internal headers for D3D11Texture on Windows
+if (WIN32 AND PAG_USE_WIN_HARDWARE_DECODER)
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/src)
+endif()
 set(TGFX_CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tgfx/out/cache)
 if (NOT HAS_CUSTOM_TGFX_DIR AND EXISTS ${TGFX_CACHE_DIR})
     message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")

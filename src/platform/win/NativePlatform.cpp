@@ -24,11 +24,46 @@
 #include <vector>
 #include "pag/pag.h"
 
+#ifdef PAG_USE_WIN_HARDWARE_DECODER
+#include "HardwareDecoder.h"
+#endif
+
 namespace pag {
+
+#ifdef PAG_USE_WIN_HARDWARE_DECODER
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = new HardwareDecoder(format);
+    if (!decoder->isValid) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<VideoDecoder>(decoder);
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
+#endif
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
+}
+
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+#ifdef PAG_USE_WIN_HARDWARE_DECODER
+  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
+#else
+  return {VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
+#endif
 }
 
 bool NativePlatform::registerFallbackFonts() const {
