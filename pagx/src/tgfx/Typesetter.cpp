@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/Typesetter.h"
+#include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <unordered_set>
 #include "SVGPathParser.h"
@@ -33,6 +35,55 @@
 #include "tgfx/core/PathTypes.h"
 
 namespace pagx {
+
+// Scales RGBA8888 pixels using bilinear interpolation for smooth downscaling.
+static void ScalePixelsBilinear(const uint8_t* srcPixels, int srcW, int srcH, size_t srcRowBytes,
+                                uint8_t* dstPixels, int dstW, int dstH, size_t dstRowBytes) {
+  float scaleX = static_cast<float>(srcW) / static_cast<float>(dstW);
+  float scaleY = static_cast<float>(srcH) / static_cast<float>(dstH);
+
+  for (int y = 0; y < dstH; y++) {
+    float srcY = (static_cast<float>(y) + 0.5f) * scaleY - 0.5f;
+    int y0 = static_cast<int>(std::floor(srcY));
+    int y1 = y0 + 1;
+    float fy = srcY - static_cast<float>(y0);
+
+    y0 = std::max(0, std::min(y0, srcH - 1));
+    y1 = std::max(0, std::min(y1, srcH - 1));
+
+    auto* dstRow = dstPixels + y * dstRowBytes;
+
+    for (int x = 0; x < dstW; x++) {
+      float srcX = (static_cast<float>(x) + 0.5f) * scaleX - 0.5f;
+      int x0 = static_cast<int>(std::floor(srcX));
+      int x1 = x0 + 1;
+      float fx = srcX - static_cast<float>(x0);
+
+      x0 = std::max(0, std::min(x0, srcW - 1));
+      x1 = std::max(0, std::min(x1, srcW - 1));
+
+      // Sample 4 neighboring pixels
+      const auto* p00 = srcPixels + y0 * srcRowBytes + x0 * 4;
+      const auto* p10 = srcPixels + y0 * srcRowBytes + x1 * 4;
+      const auto* p01 = srcPixels + y1 * srcRowBytes + x0 * 4;
+      const auto* p11 = srcPixels + y1 * srcRowBytes + x1 * 4;
+
+      // Bilinear interpolation for each channel (RGBA)
+      for (int c = 0; c < 4; c++) {
+        float v00 = static_cast<float>(p00[c]);
+        float v10 = static_cast<float>(p10[c]);
+        float v01 = static_cast<float>(p01[c]);
+        float v11 = static_cast<float>(p11[c]);
+
+        float v0 = v00 + (v10 - v00) * fx;
+        float v1 = v01 + (v11 - v01) * fx;
+        float v = v0 + (v1 - v0) * fy;
+
+        dstRow[x * 4 + c] = static_cast<uint8_t>(std::round(std::max(0.0f, std::min(255.0f, v))));
+      }
+    }
+  }
+}
 
 // Converts a tgfx::Path to SVG path string
 static std::string PathToSVGString(const tgfx::Path& path) {
@@ -564,23 +615,38 @@ class TypesetterImpl : public Typesetter {
         int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
         int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
         if (dstW > 0 && dstH > 0) {
-          tgfx::Bitmap bitmap(dstW, dstH, false, false);
-          if (!bitmap.isEmpty()) {
-            auto* pixels = bitmap.lockPixels();
-            // readPixels supports downscaling when dstInfo size differs from codec size
-            if (pixels && imageCodec->readPixels(bitmap.info(), pixels)) {
-              bitmap.unlockPixels();
-              auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
-              if (pngData) {
-                auto image = _document->makeNode<Image>();
-                image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
-                glyph->image = image;
-                // Store offset; scale is already applied to the image
-                glyph->offset.x = imageMatrix.getTranslateX();
-                glyph->offset.y = imageMatrix.getTranslateY();
+          // Read original pixels first
+          tgfx::Bitmap srcBitmap(srcW, srcH, false, false);
+          if (!srcBitmap.isEmpty()) {
+            auto* srcPixels = srcBitmap.lockPixels();
+            if (srcPixels && imageCodec->readPixels(srcBitmap.info(), srcPixels)) {
+              srcBitmap.unlockPixels();
+              // Scale using bilinear interpolation for smooth downscaling
+              tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
+              if (!dstBitmap.isEmpty()) {
+                auto* dstPixels = dstBitmap.lockPixels();
+                if (dstPixels) {
+                  auto* srcReadPixels = static_cast<const uint8_t*>(srcBitmap.lockPixels());
+                  ScalePixelsBilinear(srcReadPixels, srcW, srcH, srcBitmap.info().rowBytes(),
+                                      static_cast<uint8_t*>(dstPixels), dstW, dstH,
+                                      dstBitmap.info().rowBytes());
+                  srcBitmap.unlockPixels();
+                  dstBitmap.unlockPixels();
+                  auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
+                  if (pngData) {
+                    auto image = _document->makeNode<Image>();
+                    image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
+                    glyph->image = image;
+                    // Store offset; scale is already applied to the image
+                    glyph->offset.x = imageMatrix.getTranslateX();
+                    glyph->offset.y = imageMatrix.getTranslateY();
+                  }
+                } else {
+                  dstBitmap.unlockPixels();
+                }
               }
             } else {
-              bitmap.unlockPixels();
+              srcBitmap.unlockPixels();
             }
           }
         }
