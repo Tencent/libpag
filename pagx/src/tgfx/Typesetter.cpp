@@ -23,9 +23,12 @@
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextLayout.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -120,6 +123,8 @@ class TypesetterImpl : public Typesetter {
     _textTypeset = false;
     _fontResources.clear();
     _glyphMapping.clear();
+    _fontKeyToId.clear();
+    _nextFontId = 0;
 
     // Process all layers
     for (auto& layer : _document->layers) {
@@ -484,27 +489,61 @@ class TypesetterImpl : public Typesetter {
         continue;  // Already added
       }
 
-      // Get glyph path
+      // Try to get glyph path first (vector outline)
       tgfx::Path glyphPath;
-      if (!font.getPath(glyphID, &glyphPath)) {
-        continue;  // No outline (e.g., color emoji)
-      }
+      bool hasPath = font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
 
-      // Convert path to SVG string
-      std::string pathStr = PathToSVGString(glyphPath);
-      if (pathStr.empty()) {
-        continue;
+      // Try to get glyph image (bitmap, e.g., color emoji)
+      tgfx::Matrix imageMatrix;
+      auto imageCodec = font.getImage(glyphID, nullptr, &imageMatrix);
+
+      if (!hasPath && !imageCodec) {
+        continue;  // No renderable content
       }
 
       // Create Glyph node
       auto glyph = _document->makeNode<Glyph>();
-      glyph->path = _document->makeNode<PathData>();
-      *glyph->path = PathDataFromSVGString(pathStr);
 
-      // Map original glyph ID to new index (1-based, since PathTypefaceBuilder uses 1-based IDs)
-      glyphMap[glyphID] = static_cast<tgfx::GlyphID>(fontNode->glyphs.size() + 1);
+      if (hasPath) {
+        // Vector glyph
+        std::string pathStr = PathToSVGString(glyphPath);
+        if (!pathStr.empty()) {
+          glyph->path = _document->makeNode<PathData>();
+          *glyph->path = PathDataFromSVGString(pathStr);
+        }
+      } else if (imageCodec) {
+        // Bitmap glyph (e.g., color emoji)
+        // Read pixels from the codec and re-encode as PNG
+        int w = imageCodec->width();
+        int h = imageCodec->height();
+        if (w > 0 && h > 0) {
+          tgfx::Bitmap bitmap(w, h, false, false);
+          if (!bitmap.isEmpty()) {
+            auto* pixels = bitmap.lockPixels();
+            if (pixels && imageCodec->readPixels(bitmap.info(), pixels)) {
+              bitmap.unlockPixels();
+              auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
+              if (pngData) {
+                auto image = _document->makeNode<Image>();
+                image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
+                glyph->image = image;
+                // Store the offset from the image matrix (translation component)
+                glyph->offset.x = imageMatrix.getTranslateX();
+                glyph->offset.y = imageMatrix.getTranslateY();
+              }
+            } else {
+              bitmap.unlockPixels();
+            }
+          }
+        }
+      }
 
-      fontNode->glyphs.push_back(glyph);
+      // Only add glyph if it has content
+      if (glyph->path || glyph->image) {
+        // Map original glyph ID to new index (1-based, since PathTypefaceBuilder uses 1-based IDs)
+        glyphMap[glyphID] = static_cast<tgfx::GlyphID>(fontNode->glyphs.size() + 1);
+        fontNode->glyphs.push_back(glyph);
+      }
     }
   }
 
