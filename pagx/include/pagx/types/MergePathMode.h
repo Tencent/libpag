@@ -18,30 +18,32 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Path merge modes for boolean operations.
  */
-class MergePath : public Element {
- public:
+enum class MergePathMode {
   /**
-   * The merge mode that determines how paths are combined. The default value is Append.
+   * Append all paths without any boolean operation.
    */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+  Append,
+  /**
+   * Union (add) all paths together.
+   */
+  Union,
+  /**
+   * Intersect all paths, keeping only overlapping areas.
+   */
+  Intersect,
+  /**
+   * Exclusive-or of all paths, keeping non-overlapping areas.
+   */
+  Xor,
+  /**
+   * Subtract subsequent paths from the first path.
+   */
+  Difference
 };
 
 }  // namespace pagx

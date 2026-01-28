@@ -18,30 +18,41 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Text vertical alignment within the layout area.
  */
-class MergePath : public Element {
- public:
+enum class VerticalAlign {
   /**
-   * The merge mode that determines how paths are combined. The default value is Append.
+   * Align text to the top of the layout area.
    */
-  MergePathMode mode = MergePathMode::Append;
+  Top,
+  /**
+   * Align text to the vertical center of the layout area.
+   */
+  Center,
+  /**
+   * Align text to the bottom of the layout area.
+   */
+  Bottom
+};
 
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+/**
+ * Text writing mode (horizontal or vertical).
+ */
+enum class WritingMode {
+  /**
+   * Horizontal text layout. Lines flow from top to bottom. This is the default mode for most
+   * languages.
+   */
+  Horizontal,
+  /**
+   * Vertical text layout. Characters are arranged vertically from top to bottom, and columns flow
+   * from right to left. This is the traditional writing mode for Chinese, Japanese, and Korean
+   * (CJK) text.
+   */
+  Vertical
 };
 
 }  // namespace pagx

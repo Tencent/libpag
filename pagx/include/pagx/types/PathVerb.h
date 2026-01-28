@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,17 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Path command types.
  */
-class MergePath : public Element {
- public:
-  /**
-   * The merge mode that determines how paths are combined. The default value is Append.
-   */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+enum class PathVerb {
+  Move,   // 1 point: destination
+  Line,   // 1 point: end point
+  Quad,   // 2 points: control point, end point
+  Cubic,  // 3 points: control point 1, control point 2, end point
+  Close   // 0 points
 };
 
 }  // namespace pagx

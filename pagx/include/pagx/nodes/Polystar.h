@@ -20,22 +20,9 @@
 
 #include "pagx/nodes/Element.h"
 #include "pagx/types/Point.h"
+#include "pagx/types/PolystarType.h"
 
 namespace pagx {
-
-/**
- * Polystar shape types.
- */
-enum class PolystarType {
-  /**
-   * A regular polygon with equal-length sides.
-   */
-  Polygon,
-  /**
-   * A star shape with alternating inner and outer points.
-   */
-  Star
-};
 
 /**
  * Polystar represents a polygon or star shape with configurable points, radii, and roundness.

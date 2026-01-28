@@ -18,30 +18,24 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Mask types that define how a mask layer affects its target.
  */
-class MergePath : public Element {
- public:
+enum class MaskType {
   /**
-   * The merge mode that determines how paths are combined. The default value is Append.
+   * Use the alpha channel of the mask to determine visibility.
    */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+  Alpha,
+  /**
+   * Use the luminance (brightness) of the mask to determine visibility.
+   */
+  Luminance,
+  /**
+   * Use the contour (outline) of the mask for masking.
+   */
+  Contour
 };
 
 }  // namespace pagx

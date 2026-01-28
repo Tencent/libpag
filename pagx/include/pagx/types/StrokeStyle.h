@@ -18,30 +18,60 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Line cap styles that define the shape at the endpoints of open paths.
  */
-class MergePath : public Element {
- public:
+enum class LineCap {
   /**
-   * The merge mode that determines how paths are combined. The default value is Append.
+   * A flat cap that ends exactly at the path endpoint.
    */
-  MergePathMode mode = MergePathMode::Append;
+  Butt,
+  /**
+   * A rounded cap that extends beyond the endpoint by half the stroke width.
+   */
+  Round,
+  /**
+   * A square cap that extends beyond the endpoint by half the stroke width.
+   */
+  Square
+};
 
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
+/**
+ * Line join styles that define the shape at the corners of paths.
+ */
+enum class LineJoin {
+  /**
+   * A sharp join that extends to a point.
+   */
+  Miter,
+  /**
+   * A rounded join with a circular arc.
+   */
+  Round,
+  /**
+   * A beveled join that cuts off the corner.
+   */
+  Bevel
+};
 
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+/**
+ * Stroke alignment relative to the path.
+ */
+enum class StrokeAlign {
+  /**
+   * Stroke is centered on the path.
+   */
+  Center,
+  /**
+   * Stroke is drawn inside the path boundary.
+   */
+  Inside,
+  /**
+   * Stroke is drawn outside the path boundary.
+   */
+  Outside
 };
 
 }  // namespace pagx

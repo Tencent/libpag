@@ -18,30 +18,20 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Fill rules that determine the interior of self-intersecting paths.
  */
-class MergePath : public Element {
- public:
+enum class FillRule {
   /**
-   * The merge mode that determines how paths are combined. The default value is Append.
+   * Non-zero winding rule. A point is inside if the winding number is non-zero.
    */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+  Winding,
+  /**
+   * Even-odd rule. A point is inside if the number of crossings is odd.
+   */
+  EvenOdd
 };
 
 }  // namespace pagx

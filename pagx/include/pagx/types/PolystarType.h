@@ -18,30 +18,20 @@
 
 #pragma once
 
-#include "pagx/nodes/Element.h"
-#include "pagx/types/MergePathMode.h"
-
 namespace pagx {
 
 /**
- * MergePath is a path modifier that merges multiple paths using boolean operations. It can append,
- * add, subtract, intersect, or exclude paths from each other.
+ * Polystar shape types.
  */
-class MergePath : public Element {
- public:
+enum class PolystarType {
   /**
-   * The merge mode that determines how paths are combined. The default value is Append.
+   * A regular polygon with equal-length sides.
    */
-  MergePathMode mode = MergePathMode::Append;
-
-  NodeType nodeType() const override {
-    return NodeType::MergePath;
-  }
-
- private:
-  MergePath() = default;
-
-  friend class PAGXDocument;
+  Polygon,
+  /**
+   * A star shape with alternating inner and outer points.
+   */
+  Star
 };
 
 }  // namespace pagx
