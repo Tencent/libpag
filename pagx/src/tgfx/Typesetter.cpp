@@ -73,12 +73,17 @@ class TypesetterContext {
   }
 
  private:
+  // A run of glyphs with the same font.
+  struct GlyphRun {
+    tgfx::Font font = {};
+    std::vector<tgfx::GlyphID> glyphIDs = {};
+    std::vector<float> xPositions = {};
+  };
+
   // Shaped text information for a single Text element.
   struct ShapedInfo {
     Text* text = nullptr;
-    std::vector<tgfx::GlyphID> glyphIDs = {};
-    std::vector<float> xPositions = {};
-    tgfx::Font font = {};
+    std::vector<GlyphRun> runs = {};
     float totalWidth = 0;
   };
 
@@ -154,7 +159,7 @@ class TypesetterContext {
 
     // Apply TextLayout and create TextBlobs
     for (auto& info : shapedInfos) {
-      if (info.glyphIDs.empty()) {
+      if (info.runs.empty()) {
         continue;
       }
 
@@ -170,18 +175,26 @@ class TypesetterContext {
         }
       }
 
-      // Apply offsets to positions
-      std::vector<float> adjustedPositions = {};
-      adjustedPositions.reserve(info.xPositions.size());
-      for (float x : info.xPositions) {
-        adjustedPositions.push_back(x + xOffset);
-      }
-
-      // Build TextBlob
+      // Build TextBlob with multiple runs
       tgfx::TextBlobBuilder builder = {};
-      auto& buffer = builder.allocRunPosH(info.font, info.glyphIDs.size(), yOffset);
-      memcpy(buffer.glyphs, info.glyphIDs.data(), info.glyphIDs.size() * sizeof(tgfx::GlyphID));
-      memcpy(buffer.positions, adjustedPositions.data(), adjustedPositions.size() * sizeof(float));
+
+      for (auto& run : info.runs) {
+        if (run.glyphIDs.empty()) {
+          continue;
+        }
+
+        // Apply offsets to positions
+        std::vector<float> adjustedPositions = {};
+        adjustedPositions.reserve(run.xPositions.size());
+        for (float x : run.xPositions) {
+          adjustedPositions.push_back(x + xOffset);
+        }
+
+        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), yOffset);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, adjustedPositions.data(),
+               adjustedPositions.size() * sizeof(float));
+      }
 
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
@@ -197,9 +210,12 @@ class TypesetterContext {
     }
 
     tgfx::Font primaryFont(primaryTypeface, text->fontSize);
-    info.font = primaryFont;
     float currentX = 0;
     const std::string& content = text->text;
+
+    // Current run being built
+    GlyphRun* currentRun = nullptr;
+    std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
 
     size_t i = 0;
     while (i < content.size()) {
@@ -239,6 +255,7 @@ class TypesetterContext {
       // Try to find glyph in primary font or fallbacks
       tgfx::GlyphID glyphID = primaryFont.getGlyphID(unichar);
       tgfx::Font glyphFont = primaryFont;
+      std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
 
       if (glyphID == 0) {
         for (const auto& fallback : typesetter->fallbackTypefaces) {
@@ -249,8 +266,7 @@ class TypesetterContext {
           glyphID = fallbackFont.getGlyphID(unichar);
           if (glyphID != 0) {
             glyphFont = fallbackFont;
-            // Note: for simplicity, we use the primary font for all glyphs.
-            // A more complete implementation would track font changes per run.
+            glyphTypeface = fallback;
             break;
           }
         }
@@ -268,8 +284,16 @@ class TypesetterContext {
       bool hasImage = glyphFont.getImage(glyphID, nullptr, nullptr) != nullptr;
 
       if (hasOutline || hasImage) {
-        info.xPositions.push_back(currentX);
-        info.glyphIDs.push_back(glyphID);
+        // Start new run if typeface changed
+        if (currentTypeface != glyphTypeface) {
+          info.runs.emplace_back();
+          currentRun = &info.runs.back();
+          currentRun->font = glyphFont;
+          currentTypeface = glyphTypeface;
+        }
+
+        currentRun->xPositions.push_back(currentX);
+        currentRun->glyphIDs.push_back(glyphID);
       }
 
       currentX += advance + text->letterSpacing;
