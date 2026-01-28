@@ -555,13 +555,19 @@ class TypesetterImpl : public Typesetter {
         }
       } else if (imageCodec) {
         // Bitmap glyph (e.g., color emoji)
-        // Read pixels from the codec and re-encode as PNG
-        int w = imageCodec->width();
-        int h = imageCodec->height();
-        if (w > 0 && h > 0) {
-          tgfx::Bitmap bitmap(w, h, false, false);
+        // The imageMatrix contains scale and translation to transform the glyph image.
+        // We scale the image to the target size during encoding, so only offset is needed at render.
+        int srcW = imageCodec->width();
+        int srcH = imageCodec->height();
+        float scaleX = imageMatrix.getScaleX();
+        float scaleY = imageMatrix.getScaleY();
+        int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
+        int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
+        if (dstW > 0 && dstH > 0) {
+          tgfx::Bitmap bitmap(dstW, dstH, false, false);
           if (!bitmap.isEmpty()) {
             auto* pixels = bitmap.lockPixels();
+            // readPixels supports downscaling when dstInfo size differs from codec size
             if (pixels && imageCodec->readPixels(bitmap.info(), pixels)) {
               bitmap.unlockPixels();
               auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
@@ -569,7 +575,7 @@ class TypesetterImpl : public Typesetter {
                 auto image = _document->makeNode<Image>();
                 image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
                 glyph->image = image;
-                // Store the offset from the image matrix (translation component)
+                // Store offset; scale is already applied to the image
                 glyph->offset.x = imageMatrix.getTranslateX();
                 glyph->offset.y = imageMatrix.getTranslateY();
               }
