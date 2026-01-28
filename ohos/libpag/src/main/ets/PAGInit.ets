@@ -53,13 +53,10 @@ export class PAGInit {
     try {
       let fontNames: string[] = await text.getSystemFontFullNamesByType(text.SystemFontType.ALL);
       if (fontNames && fontNames.length > 0) {
-        let paths = new Array<string>();
-        for (let fontName of fontNames) {
-          let fontDescriptor = await text.getFontDescriptorByFullName(fontName, text.SystemFontType.ALL);
-          if (fontDescriptor && fontDescriptor.path) {
-            paths.push(fontDescriptor.path);
-          }
-        }
+        let descriptors = await Promise.all(fontNames.map(fontName =>
+          text.getFontDescriptorByFullName(fontName, text.SystemFontType.ALL)
+        ));
+        let paths = Array.from(new Set(descriptors.filter(d => d && d.path).map(d => d.path)));
         if (paths.length > 0) {
           JPAGFont.SetFallbackFontPaths(paths);
           return true;
@@ -79,29 +76,28 @@ export class PAGInit {
       return;
     }
 
-    let paths = new Array<string>();
-    let emojiPaths = new Array<string>();
-    for (let index = 0; index < fontConfig.fallbackGroups.length; index++) {
-      const element = fontConfig.fallbackGroups[index];
+    // Use two sets to deduplicate, emoji fonts will be appended at the end
+    let pathSet = new Set<string>();
+    let emojiPathSet = new Set<string>();
+    for (const element of fontConfig.fallbackGroups) {
       if (!element || !element.fallback) {
         continue;
       }
-      for (let j = 0; j < element.fallback.length; j++) {
-        let fontInfo = font.getFontByName(element.fallback[j].family);
+      for (const fallback of element.fallback) {
+        let fontInfo = font.getFontByName(fallback.family);
         if (fontInfo == null) {
-          fontInfo = font.getFontByName(element.fallback[j].family + " Regular");
+          fontInfo = font.getFontByName(fallback.family + " Regular");
         }
         if (fontInfo != null) {
-          if (fontInfo.fullName.toLowerCase().indexOf("emoji") > 0) {
-            emojiPaths.push(fontInfo.path);
+          if (fontInfo.fullName.toLowerCase().includes("emoji")) {
+            emojiPathSet.add(fontInfo.path);
           } else {
-            paths.push(fontInfo.path);
+            pathSet.add(fontInfo.path);
           }
         }
       }
     }
-    paths = paths.concat(emojiPaths);
-    JPAGFont.SetFallbackFontPaths(paths);
+    JPAGFont.SetFallbackFontPaths(Array.from(pathSet).concat(Array.from(emojiPathSet)));
   }
 
   private static InitCacheDir() {
