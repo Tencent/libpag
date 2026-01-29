@@ -63,7 +63,7 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 60px 80px;
+    padding: 80px 120px;
     border: 2px dashed #555;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.02);
