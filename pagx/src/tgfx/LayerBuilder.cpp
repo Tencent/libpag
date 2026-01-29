@@ -51,6 +51,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
@@ -84,6 +85,7 @@
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
 #include "tgfx/layers/vectors/Text.h"
+#include "tgfx/layers/vectors/TextPath.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 
@@ -508,6 +510,8 @@ class LayerBuilderImpl {
         return convertStroke(static_cast<const Stroke*>(node));
       case NodeType::TrimPath:
         return convertTrimPath(static_cast<const TrimPath*>(node));
+      case NodeType::TextPath:
+        return convertTextPath(static_cast<const TextPath*>(node));
       case NodeType::RoundCorner:
         return convertRoundCorner(static_cast<const RoundCorner*>(node));
       case NodeType::MergePath:
@@ -772,6 +776,19 @@ class LayerBuilderImpl {
     trim->setEnd(node->end);
     trim->setOffset(node->offset);
     return trim;
+  }
+
+  std::shared_ptr<tgfx::TextPath> convertTextPath(const TextPath* node) {
+    auto textPath = std::make_shared<tgfx::TextPath>();
+    if (node->path != nullptr) {
+      textPath->setPath(ToTGFX(*node->path));
+    }
+    textPath->setTextAlign(static_cast<tgfx::TextAlign>(node->textAlign));
+    textPath->setFirstMargin(node->firstMargin);
+    textPath->setLastMargin(node->lastMargin);
+    textPath->setPerpendicular(node->perpendicular);
+    textPath->setReversed(node->reversed);
+    return textPath;
   }
 
   std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCorner* node) {
