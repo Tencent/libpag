@@ -25,6 +25,7 @@
 #include "tgfx/core/Stream.h"
 
 namespace pag {
+
 class FileInfo {
  public:
   FileInfo(std::string cacheKey, uint32_t fileID, size_t fileSize = 0)
@@ -37,6 +38,10 @@ class FileInfo {
   std::list<std::shared_ptr<FileInfo>>::iterator cachedPosition;
 };
 
+void PAGDiskCache::SetCacheDir(const std::string& dir) {
+  DiskCache::GetInstance()->setCacheDir(dir);
+}
+
 size_t PAGDiskCache::MaxDiskSize() {
   return DiskCache::GetInstance()->getMaxDiskSize();
 }
@@ -47,6 +52,24 @@ void PAGDiskCache::SetMaxDiskSize(size_t size) {
 
 void PAGDiskCache::RemoveAll() {
   DiskCache::GetInstance()->removeAll();
+}
+
+std::string DiskCache::getCacheDir() {
+  if (!customCacheDir.empty()) {
+    return customCacheDir;
+  }
+  return Platform::Current()->getCacheDir();
+}
+
+void DiskCache::setCacheDir(const std::string& dir) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  customCacheDir = dir;
+  // Update cache paths
+  auto cacheDir = dir.empty() ? Platform::Current()->getCacheDir() : dir;
+  if (!cacheDir.empty()) {
+    configPath = Directory::JoinPath(cacheDir, "cache.cfg");
+    cacheFolder = Directory::JoinPath(cacheDir, "files");
+  }
 }
 
 DiskCache* DiskCache::GetInstance() {
@@ -69,7 +92,7 @@ bool DiskCache::WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> da
 }
 
 DiskCache::DiskCache() {
-  auto cacheDir = Platform::Current()->getCacheDir();
+  auto cacheDir = getCacheDir();
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");

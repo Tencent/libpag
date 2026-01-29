@@ -182,3 +182,7 @@ bool ToCParagraphJustification(pag::ParagraphJustification paragraphJustificatio
 bool FromCLayerType(pag_layer_type cLayerType, pag::LayerType* layerType);
 
 bool TocLayerType(pag::LayerType layerType, pag_layer_type* cLayerType);
+
+bool FromCImageOrigin(pag_image_origin cImageOrigin, pag::ImageOrigin* imageOrigin);
+
+bool ToCImageOrigin(pag::ImageOrigin imageOrigin, pag_image_origin* cImageOrigin);

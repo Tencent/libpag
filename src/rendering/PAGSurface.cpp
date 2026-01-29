@@ -22,6 +22,7 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/drawables/Drawable.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
@@ -31,6 +32,17 @@ namespace pag {
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
     : drawable(std::move(drawable)), externalContext(externalContext) {
   rootLocker = std::make_shared<std::mutex>();
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+  if (externalContext) {
+    glRestorer = new GLRestorer();
+  }
+#endif
+}
+
+PAGSurface::~PAGSurface() {
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+  delete static_cast<GLRestorer*>(glRestorer);
+#endif
 }
 
 int PAGSurface::width() {
@@ -287,10 +299,20 @@ tgfx::Context* PAGSurface::lockContext() {
     return nullptr;
   }
   auto context = device->lockContext();
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+  if (context != nullptr && glRestorer != nullptr) {
+    static_cast<GLRestorer*>(glRestorer)->save();
+  }
+#endif
   return context;
 }
 
 void PAGSurface::unlockContext() {
+#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+  if (glRestorer != nullptr) {
+    static_cast<GLRestorer*>(glRestorer)->restore();
+  }
+#endif
   auto device = drawable->getDevice();
   if (device != nullptr) {
     device->unlock();
