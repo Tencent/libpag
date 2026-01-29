@@ -1215,7 +1215,7 @@ class PAG_API PAGSurface {
    */
   static std::shared_ptr<PAGSurface> MakeFrom(HardwareBufferRef hardwareBuffer);
 
-  virtual ~PAGSurface() = default;
+  virtual ~PAGSurface();
 
   /**
    * Returns the width in pixels of the surface.
@@ -1269,6 +1269,7 @@ class PAG_API PAGSurface {
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
   bool externalContext = false;
+  void* glRestorer = nullptr;
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
@@ -1678,6 +1679,16 @@ class PAG_API PAGDecoder {
  */
 class PAG_API PAGDiskCache {
  public:
+  /**
+   * Sets the disk cache directory. This should be called before any disk cache operations.
+   * If the directory does not exist, it will be created automatically.
+   * Note: Changing the cache directory after cache operations have started may cause
+   * existing cached files to become inaccessible.
+   * @param dir The absolute path of the cache directory. Pass an empty string to use the
+   * platform default cache directory.
+   */
+  static void SetCacheDir(const std::string& dir);
+
   /**
    * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
    */

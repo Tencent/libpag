@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates different stroke styles -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Basic stroke -->
+  <Layer>
+    <Rectangle center="55,55" size="70,70" roundness="8"/>
+    <Stroke color="#3498DB" width="4" cap="round" join="round"/>
+  </Layer>
+  <!-- Dashed stroke -->
+  <Layer>
+    <Rectangle center="145,55" size="70,70" roundness="8"/>
+    <Stroke color="#9B59B6" width="3" dashes="10,5" dashOffset="0"/>
+  </Layer>
+  <!-- Gradient stroke -->
+  <Layer>
+    <Path data="M 20,150 Q 100,100 180,150"/>
+    <Stroke width="6" cap="round">
+      <LinearGradient startPoint="20,150" endPoint="180,150">
+        <ColorStop offset="0" color="#FF6B6B"/>
+        <ColorStop offset="1" color="#4ECDC4"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+</pagx>

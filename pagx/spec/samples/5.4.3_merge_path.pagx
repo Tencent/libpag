@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates MergePath modifier (union mode) -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="80,80" size="100,100" roundness="8"/>
+    <Ellipse center="120,120" size="100,100"/>
+    <MergePath mode="union"/>
+    <Fill>
+      <LinearGradient startPoint="30,30" endPoint="170,170">
+        <ColorStop offset="0" color="#9B59B6"/>
+        <ColorStop offset="1" color="#3498DB"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>

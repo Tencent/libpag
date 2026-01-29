@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TrimPath modifier -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <!-- Arc path to show trim effect clearly -->
+    <Path data="M 30,100 A 70,70 0 1 1 170,100"/>
+    <TrimPath start="0.1" end="0.9" type="continuous"/>
+    <Stroke color="#3498DB" width="8" cap="round"/>
+  </Layer>
+  <Layer>
+    <!-- Small indicator dots at trim points -->
+    <Ellipse center="45,55" size="12,12"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <Layer>
+    <Ellipse center="155,55" size="12,12"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+</pagx>

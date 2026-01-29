@@ -56,6 +56,11 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/vectors/FillStyle.h"
+#include "tgfx/layers/vectors/Rectangle.h"
+#include "tgfx/layers/vectors/SolidColor.h"
+#include "tgfx/layers/vectors/VectorGroup.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/TextShaper.h"
 #include "utils/Baseline.h"
@@ -244,6 +249,123 @@ PAG_TEST(PAGXTest, ColorRefRender) {
   displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ColorRefRender"));
+
+  device->unlock();
+}
+
+/**
+ * Test case: Verify Layer can directly contain Shape + Fill without Group wrapper.
+ */
+PAG_TEST(PAGXTest, LayerDirectContent) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Test 1: Pure tgfx API - VectorLayer with VectorGroup + Rectangle + FillStyle
+  {
+    auto vectorLayer = tgfx::VectorLayer::Make();
+
+    auto group = std::make_shared<tgfx::VectorGroup>();
+
+    auto rect = std::make_shared<tgfx::Rectangle>();
+    rect->setCenter(tgfx::Point::Make(50, 50));
+    rect->setSize({100, 100});
+
+    auto fill = std::make_shared<tgfx::FillStyle>();
+    fill->setColorSource(tgfx::SolidColor::Make(tgfx::Color::Red()));
+
+    group->setElements({rect, fill});
+    vectorLayer->setContents({group});
+
+    auto surface1 = Surface::Make(context, 100, 100);
+    DisplayList displayList1;
+    displayList1.root()->addChild(vectorLayer);
+    displayList1.render(surface1.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface1, "PAGXTest/TGFXVectorLayerDirect"));
+  }
+
+  // Test 2: PAGX Layer with Group > Rectangle + Fill
+  {
+    const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100" version="1.0">
+  <Layer>
+    <Group>
+      <Rectangle center="50,50" size="100,100"/>
+      <Fill color="#FF0000"/>
+    </Group>
+  </Layer>
+</pagx>
+)";
+
+    auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                           strlen(pagxXml));
+    ASSERT_TRUE(doc != nullptr);
+
+    auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+    ASSERT_TRUE(tgfxLayer != nullptr);
+
+    auto surface2 = Surface::Make(context, 100, 100);
+    DisplayList displayList2;
+    displayList2.root()->addChild(tgfxLayer);
+    displayList2.render(surface2.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface2, "PAGXTest/PAGXLayerWithGroup"));
+  }
+
+  // Test 3: PAGX Layer with direct Rectangle + Fill (no Group)
+  {
+    const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="100" height="100" version="1.0">
+  <Layer>
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>
+)";
+
+    auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                           strlen(pagxXml));
+    ASSERT_TRUE(doc != nullptr);
+
+    auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+    ASSERT_TRUE(tgfxLayer != nullptr);
+
+    auto surface3 = Surface::Make(context, 100, 100);
+    DisplayList displayList3;
+    displayList3.root()->addChild(tgfxLayer);
+    displayList3.render(surface3.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface3, "PAGXTest/PAGXLayerDirect"));
+  }
+
+  // Test 4: PAGX Layer with LinearGradient fill
+  {
+    const char* pagxXml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="100" version="1.0">
+  <Layer>
+    <Rectangle center="100,50" size="200,100"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>
+)";
+
+    auto doc = pagx::PAGXImporter::FromXML(reinterpret_cast<const uint8_t*>(pagxXml),
+                                           strlen(pagxXml));
+    ASSERT_TRUE(doc != nullptr);
+
+    auto tgfxLayer = pagx::LayerBuilder::Build(doc.get());
+    ASSERT_TRUE(tgfxLayer != nullptr);
+
+    auto surface4 = Surface::Make(context, 200, 100);
+    DisplayList displayList4;
+    displayList4.root()->addChild(tgfxLayer);
+    displayList4.render(surface4.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface4, "PAGXTest/PAGXLinearGradient"));
+  }
 
   device->unlock();
 }
@@ -1434,6 +1556,63 @@ PAG_TEST(PAGXTest, CompleteExample) {
   displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/CompleteExample"));
+
+  device->unlock();
+}
+
+/**
+ * Test all PAGX sample files in pagx/spec/samples directory.
+ * Renders each sample and compares with baseline screenshots.
+ */
+PAG_TEST(PAGXTest, SampleFiles) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto samplesDir = ProjectPath::Absolute("pagx/spec/samples");
+  std::vector<std::string> sampleFiles;
+
+  for (const auto& entry : std::filesystem::directory_iterator(samplesDir)) {
+    if (entry.path().extension() == ".pagx") {
+      sampleFiles.push_back(entry.path().string());
+    }
+  }
+  std::sort(sampleFiles.begin(), sampleFiles.end());
+
+  for (const auto& filePath : sampleFiles) {
+    auto baseName = std::filesystem::path(filePath).stem().string();
+
+    auto doc = pagx::PAGXImporter::FromFile(filePath);
+    if (!doc) {
+      FAIL() << "Failed to load: " << filePath;
+      continue;
+    }
+
+    // Debug: print document info
+    std::cout << "[Sample] " << baseName << ": " << doc->width << "x" << doc->height << " layers="
+              << doc->layers.size() << std::endl;
+
+    pagx::Typesetter typesetter;
+    typesetter.setFallbackTypefaces(GetFallbackTypefaces());
+    auto textGlyphs = typesetter.createTextGlyphs(doc.get());
+    pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+
+    auto layer = pagx::LayerBuilder::Build(doc.get());
+    if (!layer) {
+      FAIL() << "Failed to build layer: " << filePath;
+      continue;
+    }
+
+    // Debug: print layer children count
+    std::cout << "  Built layer children: " << layer->children().size() << std::endl;
+
+    auto surface = Surface::Make(context, doc->width, doc->height);
+    DisplayList displayList;
+    displayList.root()->addChild(layer);
+    displayList.render(surface.get(), false);
+    EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/Samples/" + baseName));
+  }
 
   device->unlock();
 }

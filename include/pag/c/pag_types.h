@@ -86,6 +86,11 @@ typedef enum {
   pag_layer_type_camera,
 } pag_layer_type;
 
+typedef enum {
+  pag_image_origin_top_left,
+  pag_image_origin_bottom_left,
+} pag_image_origin;
+
 typedef struct pag_gl_texture_info {
   unsigned id = 0;
   unsigned target = 0x0DE1;  // GL_TEXTURE_2D;

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates multiple Fill layers on same shape -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="140,100" roundness="12"/>
+    <Fill>
+      <LinearGradient startPoint="30,50" endPoint="170,150">
+        <ColorStop offset="0" color="#FFE66D"/>
+        <ColorStop offset="1" color="#FF6B6B"/>
+      </LinearGradient>
+    </Fill>
+    <!-- Semi-transparent overlay -->
+    <Fill color="#9B59B640"/>
+  </Layer>
+</pagx>

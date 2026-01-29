@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="160,160"/>
+    <Fill>
+      <ConicGradient center="100,100" startAngle="0" endAngle="360">
+        <ColorStop offset="0" color="#FF6B6B"/>
+        <ColorStop offset="0.25" color="#FFE66D"/>
+        <ColorStop offset="0.5" color="#4ECDC4"/>
+        <ColorStop offset="0.75" color="#9B59B6"/>
+        <ColorStop offset="1" color="#FF6B6B"/>
+      </ConicGradient>
+    </Fill>
+  </Layer>
+</pagx>

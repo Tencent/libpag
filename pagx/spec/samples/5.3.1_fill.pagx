@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates different fill types -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Solid color fill -->
+  <Layer>
+    <Rectangle center="60,60" size="80,80" roundness="8"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <!-- Linear gradient fill -->
+  <Layer>
+    <Rectangle center="140,60" size="80,80" roundness="8"/>
+    <Fill>
+      <LinearGradient startPoint="100,20" endPoint="180,100">
+        <ColorStop offset="0" color="#9B59B6"/>
+        <ColorStop offset="1" color="#3498DB"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Radial gradient fill -->
+  <Layer>
+    <Ellipse center="100,150" size="160,80"/>
+    <Fill>
+      <RadialGradient center="100,150" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#4ECDC4"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>

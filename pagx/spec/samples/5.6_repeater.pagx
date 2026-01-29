@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Repeater modifier with position and alpha fade -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Group>
+      <Rectangle center="30,100" size="30,30" roundness="6"/>
+      <Fill color="#3498DB"/>
+      <Repeater copies="5" position="35,0" startAlpha="1" endAlpha="0.2"/>
+    </Group>
+  </Layer>
+</pagx>

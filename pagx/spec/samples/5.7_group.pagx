@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Group with transform properties -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Group anchorPoint="50,50" position="100,100" rotation="15" scale="1,1">
+      <Rectangle center="50,50" size="100,100" roundness="12"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="100,100">
+          <ColorStop offset="0" color="#FF6B6B"/>
+          <ColorStop offset="1" color="#EE5A24"/>
+        </LinearGradient>
+      </Fill>
+    </Group>
+  </Layer>
+</pagx>

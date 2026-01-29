@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates mixed Fill and Stroke on same shape -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="140,140"/>
+    <Fill>
+      <RadialGradient center="80,80" radius="100">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#3498DB"/>
+      </RadialGradient>
+    </Fill>
+    <Stroke color="#1a5276" width="4"/>
+  </Layer>
+</pagx>

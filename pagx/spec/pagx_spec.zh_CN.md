@@ -479,6 +479,41 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 **MipmapMode（多级渐远模式）**：`none`（禁用）、`nearest`（最近级别）、`linear`（线性插值）
 
+**完整示例**：演示不同平铺模式的图片填充
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="300">
+  <!-- clamp 模式：图片边缘颜色延伸 -->
+  <Layer name="ClampFill" x="100" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  
+  <!-- repeat 模式：图片重复平铺 -->
+  <Layer name="RepeatFill" x="300" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <!-- mirror 模式：图片镜像平铺 -->
+  <Layer name="MirrorFill" x="100" y="220">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <Resources>
+    <Image id="logo" source="pag_logo.png"/>
+  </Resources>
+</pagx>
+```
+
 ##### 颜色源坐标系统
 
 除纯色外，所有颜色源（渐变、图片填充）都有坐标系的概念，其坐标系**相对于几何元素的局部坐标系原点**。可通过 `matrix` 属性对颜色源坐标系应用变换。

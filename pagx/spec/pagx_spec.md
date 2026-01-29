@@ -479,6 +479,41 @@ Image patterns use an image as a color source.
 
 **MipmapMode**: `none`, `nearest`, `linear`
 
+**Complete Example**: Demonstrates ImagePattern fill with different tile modes
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="300">
+  <!-- clamp mode: edge colors extend -->
+  <Layer name="ClampFill" x="100" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  
+  <!-- repeat mode: image tiles repeatedly -->
+  <Layer name="RepeatFill" x="300" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <!-- mirror mode: image tiles with mirroring -->
+  <Layer name="MirrorFill" x="100" y="220">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <Resources>
+    <Image id="logo" source="pag_logo.png"/>
+  </Resources>
+</pagx>
+```
+
 ##### Color Source Coordinate System
 
 Except for solid colors, all color sources (gradients, image patterns) operate within a coordinate system **relative to the origin of the geometry element's local coordinate system**. The `matrix` attribute can be used to apply transforms to the color source coordinate system.

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="160,160"/>
+    <Fill>
+      <RadialGradient center="80,80" radius="120">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="0.6" color="#3498DB"/>
+        <ColorStop offset="1" color="#1a1a2e"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>

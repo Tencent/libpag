@@ -304,3 +304,31 @@ bool TocLayerType(pag::LayerType layerType, pag_layer_type* cLayerType) {
   }
   return false;
 }
+
+const struct {
+  pag_image_origin C;
+  pag::ImageOrigin Pag;
+} gImageOriginPairs[] = {
+    {pag_image_origin_top_left, pag::ImageOrigin::TopLeft},
+    {pag_image_origin_bottom_left, pag::ImageOrigin::BottomLeft},
+};
+
+bool FromCImageOrigin(pag_image_origin cImageOrigin, pag::ImageOrigin* imageOrigin) {
+  for (auto& pair : gImageOriginPairs) {
+    if (pair.C == cImageOrigin) {
+      *imageOrigin = pair.Pag;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ToCImageOrigin(pag::ImageOrigin imageOrigin, pag_image_origin* cImageOrigin) {
+  for (auto& pair : gImageOriginPairs) {
+    if (pair.Pag == imageOrigin) {
+      *cImageOrigin = pair.C;
+      return true;
+    }
+  }
+  return false;
+}

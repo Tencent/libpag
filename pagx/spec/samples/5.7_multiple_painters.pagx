@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Fill and Stroke combined on same shape -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="120,120" roundness="12"/>
+    <Fill color="#FF6B6B"/>
+    <Stroke color="#C0392B" width="4"/>
+  </Layer>
+</pagx>

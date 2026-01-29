@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates that color source coordinates are relative to geometry origin -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="120,120" roundness="8"/>
+    <Fill color="@grad"/>
+  </Layer>
+  <Resources>
+    <LinearGradient id="grad" startPoint="0,0" endPoint="120,0">
+      <ColorStop offset="0" color="#FF6B6B"/>
+      <ColorStop offset="1" color="#3498DB"/>
+    </LinearGradient>
+  </Resources>
+</pagx>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates scrollRect clipping -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Visible clip region indicator -->
+  <Layer>
+    <Rectangle center="100,100" size="100,100"/>
+    <Stroke color="#CCCCCC" width="2" dashes="4,4"/>
+  </Layer>
+  <!-- Clipped content -->
+  <Layer scrollRect="50,50,100,100">
+    <Ellipse center="100,100" size="150,150"/>
+    <Fill>
+      <RadialGradient center="100,100" radius="75">
+        <ColorStop offset="0" color="#FF6B6B"/>
+        <ColorStop offset="1" color="#EE5A24"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>

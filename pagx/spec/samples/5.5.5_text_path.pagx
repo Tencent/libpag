@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TextPath modifier -->
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Text text="PAGX Text Path" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+    <TextPath path="M 20,150 Q 100,30 180,150" textAlign="center"/>
+    <Fill color="#3498DB"/>
+  </Layer>
+</pagx>
