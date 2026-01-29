@@ -503,14 +503,14 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 12px;
+            padding: 8px 14px;
             background: #f8f9fa;
             border: 1px solid var(--border-color);
             border-radius: 6px;
             color: #555;
             font-family: inherit;
-            font-size: 13px;
-            line-height: 1;
+            font-size: 14px;
+            line-height: 1.2;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -518,8 +518,8 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             background: #e9ecef;
         }
         .lang-switch-btn svg {
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             transition: transform 0.2s;
         }
         .lang-switch.open .lang-switch-btn svg {
@@ -576,14 +576,14 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 12px;
+            padding: 8px 14px;
             background: #f8f9fa;
             border: 1px solid var(--border-color);
             border-radius: 6px;
             color: #555;
             font-family: inherit;
-            font-size: 13px;
-            line-height: 1;
+            font-size: 14px;
+            line-height: 1.2;
             text-decoration: none;
             transition: all 0.2s;
         }
@@ -592,8 +592,8 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             text-decoration: none;
         }
         .viewer-link svg {
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
         }
 ${draftStyles}
     </style>
