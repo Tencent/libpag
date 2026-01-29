@@ -1266,7 +1266,6 @@ static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
   if (!offsetStr.empty()) {
     glyph->offset = parsePoint(offsetStr);
   }
-  glyph->scale = getFloatAttribute(node, "scale", 1.0f);
   return glyph;
 }
 

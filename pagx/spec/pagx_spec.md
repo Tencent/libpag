@@ -567,15 +567,12 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 | `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
 | `offset` | point | 0,0 | Bitmap offset (only used with `image`) |
-| `scale` | float | 1 | Scale factor for image glyphs. The image is stored at higher resolution and scaled down by this factor when rendering |
 
 **Glyph Types**:
 - **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline
-- **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji; position can be adjusted with `offset`, and `scale` controls the display size relative to the stored image
+- **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji; position can be adjusted with `offset`
 
 **Path Coordinate System**: Glyph paths use final rendering coordinates with font size scaling already applied. The same character at different font sizes should be stored as separate Glyphs, as fonts may have different glyph designs at different sizes.
-
-**Image Scaling**: For bitmap glyphs, the `scale` attribute allows storing higher-resolution images that are scaled down at render time. For example, `scale="0.5"` means the stored image is 2x the display size and will be scaled to 50% when rendering. This enables sharper rendering on high-DPI displays while maintaining the correct visual size.
 
 ### 3.4 Document Hierarchy
 

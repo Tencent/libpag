@@ -135,32 +135,35 @@ static Glyph* CreateBitmapGlyph(PAGXDocument* document, const GlyphInfo& info) {
   auto imageCodec = info.imageCodec;
   auto imageMatrix = info.imageMatrix;
 
-  int width = imageCodec->width();
-  int height = imageCodec->height();
-  if (width <= 0 || height <= 0) {
+  int srcW = imageCodec->width();
+  int srcH = imageCodec->height();
+  float scaleX = std::abs(imageMatrix.getScaleX());
+  float scaleY = std::abs(imageMatrix.getScaleY());
+  int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
+  int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
+
+  if (dstW <= 0 || dstH <= 0) {
     return nullptr;
   }
 
-  tgfx::Bitmap bitmap(width, height, false, false);
-  if (bitmap.isEmpty()) {
+  tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
+  if (dstBitmap.isEmpty()) {
     return nullptr;
   }
-  auto* pixels = bitmap.lockPixels();
-  if (pixels == nullptr) {
+  auto* dstPixels = dstBitmap.lockPixels();
+  if (dstPixels == nullptr) {
     return nullptr;
   }
-  bool success = imageCodec->readPixels(bitmap.info(), pixels);
-  bitmap.unlockPixels();
+  bool success = imageCodec->readPixels(dstBitmap.info(), dstPixels);
+  dstBitmap.unlockPixels();
   if (!success) {
     return nullptr;
   }
 
-  auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
+  auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
   if (pngData == nullptr) {
     return nullptr;
   }
-
-  float scale = std::abs(imageMatrix.getScaleX());
 
   auto glyph = document->makeNode<Glyph>();
   auto image = document->makeNode<Image>();
@@ -168,7 +171,6 @@ static Glyph* CreateBitmapGlyph(PAGXDocument* document, const GlyphInfo& info) {
   glyph->image = image;
   glyph->offset.x = imageMatrix.getTranslateX();
   glyph->offset.y = imageMatrix.getTranslateY();
-  glyph->scale = scale;
 
   return glyph;
 }

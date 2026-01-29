@@ -47,12 +47,6 @@ class Glyph : public Node {
    */
   Point offset = {};
 
-  /**
-   * Scale factor for image glyphs. The image is stored at a higher resolution and scaled down by
-   * this factor when rendering. The default value is 1.0 (no scaling).
-   */
-  float scale = 1.0f;
-
   NodeType nodeType() const override {
     return NodeType::Glyph;
   }

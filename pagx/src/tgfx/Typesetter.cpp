@@ -26,7 +26,6 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextLayout.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/ImageCodec.h"
@@ -414,29 +413,6 @@ class TypesetterContext {
           }
 
           if (codec) {
-            float scale = glyph->scale;
-            if (scale != 1.0f && scale > 0) {
-              int dstW = static_cast<int>(std::round(static_cast<float>(codec->width()) * scale));
-              int dstH = static_cast<int>(std::round(static_cast<float>(codec->height()) * scale));
-              if (dstW > 0 && dstH > 0) {
-                tgfx::Bitmap bitmap(dstW, dstH, false, false);
-                if (!bitmap.isEmpty()) {
-                  auto* pixels = bitmap.lockPixels();
-                  if (pixels != nullptr && codec->readPixels(bitmap.info(), pixels)) {
-                    bitmap.unlockPixels();
-                    auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
-                    if (pngData) {
-                      auto scaledCodec = tgfx::ImageCodec::MakeFrom(pngData);
-                      if (scaledCodec) {
-                        codec = scaledCodec;
-                      }
-                    }
-                  } else {
-                    bitmap.unlockPixels();
-                  }
-                }
-              }
-            }
             builder.addGlyph(codec, ToTGFXPoint(glyph->offset));
           }
         }
