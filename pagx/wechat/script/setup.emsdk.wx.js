@@ -11,8 +11,8 @@ import Utils from "../../../third_party/vendor_tools/lib/Utils.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// const emsdkPath = path.resolve(__dirname, '../../third_party/emsdk');
-const emsdkPath = "/Users/billyjin/Desktop/project/tgfx/third_party/emsdk";
+const emsdkPath = path.resolve(__dirname, '../../../third_party/emsdk');
+// const emsdkPath = "/Users/billyjin/Desktop/project/tgfx/third_party/emsdk";
 if (!fs.existsSync(emsdkPath)) {
     try {
         Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${emsdkPath}`);
