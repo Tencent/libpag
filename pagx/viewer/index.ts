@@ -20,6 +20,60 @@ import { PAGXModule, PAGXView } from './types';
 import PAGXWasm from './wasm-mt/pagx-viewer';
 import { TGFXBind } from '@tgfx/binding';
 
+interface I18nStrings {
+    dropText: string;
+    dropSubtext: string;
+    browseFile: string;
+    loading: string;
+    errorTitle: string;
+    errorFormat: string;
+    errorBrowser: string;
+    openFile: string;
+    resetView: string;
+    invalidFile: string;
+}
+
+const i18n: Record<string, I18nStrings> = {
+    en: {
+        dropText: 'Drag & Drop PAGX file here',
+        dropSubtext: 'or',
+        browseFile: 'Browse File',
+        loading: 'Loading...',
+        errorTitle: 'Failed to load file',
+        errorFormat: 'The file could not be loaded. Please check the file format.',
+        errorBrowser: 'Minimum browser versions required:',
+        openFile: 'Open PAGX File',
+        resetView: 'Reset View',
+        invalidFile: 'Please drop a .pagx file',
+    },
+    zh: {
+        dropText: '拖放 PAGX 文件到此处',
+        dropSubtext: '或者',
+        browseFile: '选择文件',
+        loading: '加载中...',
+        errorTitle: '文件加载失败',
+        errorFormat: '无法加载该文件，请检查文件格式。',
+        errorBrowser: '浏览器最低版本要求：',
+        openFile: '打开 PAGX 文件',
+        resetView: '重置视图',
+        invalidFile: '请拖放 .pagx 文件',
+    },
+};
+
+function getLocale(): string {
+    const params = new URLSearchParams(window.location.search);
+    const langParam = params.get('lang');
+    if (langParam === 'zh' || langParam === 'en') {
+        return langParam;
+    }
+    const lang = navigator.language || '';
+    return lang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+function t(): I18nStrings {
+    return i18n[getLocale()];
+}
+
 const MIN_ZOOM = 0.001;
 const MAX_ZOOM = 1000.0;
 
@@ -551,7 +605,7 @@ async function loadPAGXFile(file: File) {
         await loadPAGXData(new Uint8Array(fileBuffer), file.name);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
-        showErrorUI('The file could not be loaded. Please check the file format.');
+        showErrorUI(t().errorFormat);
     }
 }
 
@@ -650,7 +704,7 @@ function setupDragAndDrop() {
             if (file.name.endsWith('.pagx')) {
                 loadPAGXFile(file);
             } else {
-                alert('Please drop a .pagx file');
+                alert(t().invalidFile);
             }
         }
     }, false);
@@ -699,25 +753,52 @@ function checkWasmSupport(): boolean {
     return false;
 }
 
-const BROWSER_REQUIREMENTS = `
-Minimum browser versions required:
+function getBrowserRequirements(): string {
+    return `${t().errorBrowser}
 • Chrome 57+
 • Firefox 52+
 • Safari 15+
-• Edge 79+
-`.trim();
+• Edge 79+`;
+}
+
+function applyI18n(): void {
+    const strings = t();
+    const locale = getLocale();
+    document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
+
+    const dropText = document.querySelector('.drop-text');
+    const dropSubtext = document.querySelector('.drop-subtext');
+    const fileBtn = document.getElementById('file-btn');
+    const loadingText = document.querySelector('.loading-text');
+    const errorTitle = document.querySelector('.error-title');
+    const errorBtn = document.getElementById('error-btn');
+    const openBtn = document.getElementById('open-btn');
+    const resetBtn = document.getElementById('reset-btn');
+
+    if (dropText) dropText.textContent = strings.dropText;
+    if (dropSubtext) dropSubtext.textContent = strings.dropSubtext;
+    if (fileBtn) fileBtn.textContent = strings.browseFile;
+    if (loadingText) loadingText.textContent = strings.loading;
+    if (errorTitle) errorTitle.textContent = strings.errorTitle;
+    if (errorBtn) errorBtn.textContent = strings.browseFile;
+    if (openBtn) openBtn.title = strings.openFile;
+    if (resetBtn) resetBtn.title = strings.resetView;
+}
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
+        // Apply i18n texts
+        applyI18n();
+
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
 
         if (!checkWasmSupport()) {
-            alert('Your browser does not support WebAssembly.\n\n' + BROWSER_REQUIREMENTS);
+            alert('WebAssembly is not supported.\n\n' + getBrowserRequirements());
             return;
         }
         if (!checkWebGL2Support()) {
-            alert('Your browser does not support WebGL 2.0.\n\n' + BROWSER_REQUIREMENTS);
+            alert('WebGL 2.0 is not supported.\n\n' + getBrowserRequirements());
             return;
         }
 
