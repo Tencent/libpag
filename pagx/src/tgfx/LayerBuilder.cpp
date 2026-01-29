@@ -52,7 +52,6 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/PAGXImporter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -838,27 +837,6 @@ class LayerBuilderImpl {
 };
 
 // Public API implementation
-
-LayerBuilder::Result LayerBuilder::FromData(const uint8_t* data, size_t length,
-                                            const Options& options) {
-  Result result;
-  if (data == nullptr || length == 0) {
-    return result;
-  }
-
-  auto document = PAGXImporter::FromXML(data, length);
-  if (!document) {
-    return result;
-  }
-
-  Typesetter typesetter;
-  typesetter.setFallbackTypefaces(options.fallbackTypefaces);
-
-  result.root = Build(document.get(), &typesetter);
-  result.width = document->width;
-  result.height = document->height;
-  return result;
-}
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, Typesetter* typesetter) {
   if (document == nullptr) {

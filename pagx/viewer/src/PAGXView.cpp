@@ -19,6 +19,7 @@
 #include "PAGXView.h"
 #include <emscripten/html5.h>
 #include "GridBackground.h"
+#include "pagx/PAGXImporter.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 
@@ -76,15 +77,18 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!data) {
     return;
   }
-  LayerBuilder::Options options;
-  options.fallbackTypefaces = fallbackTypefaces;
-  auto content = pagx::LayerBuilder::FromData(data->bytes(), data->size(), options);
-  if (!content.root) {
+  auto document = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (!document) {
     return;
   }
-  contentLayer = content.root;
-  pagxWidth = content.width;
-  pagxHeight = content.height;
+  Typesetter typesetter;
+  typesetter.setFallbackTypefaces(fallbackTypefaces);
+  contentLayer = LayerBuilder::Build(document.get(), &typesetter);
+  if (!contentLayer) {
+    return;
+  }
+  pagxWidth = document->width;
+  pagxHeight = document->height;
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
