@@ -75,17 +75,16 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!data) {
     return;
   }
-  // LayerBuilder::Options options;
-  // options.fallbackTypefaces = fallbackTypefaces;
-  // auto content = pagx::LayerBuilder::FromData(data->bytes(), data->size(), options);
-  auto doc = PAGXImporter::FromXML(data->bytes(), data->size());
-  auto content = pagx::LayerBuilder::Build(doc.get());
-  if (!content) {
+  auto document = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (!document) {
     return;
   }
-  contentLayer = content;
-  pagxWidth = doc->width;
-  pagxHeight = doc->height;
+  contentLayer = LayerBuilder::Build(document.get());
+  if (!contentLayer) {
+    return;
+  }
+  pagxWidth = document->width;
+  pagxHeight = document->height;
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();
