@@ -63,7 +63,7 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 80px 120px;
+    padding: 80px 60px;
     border: 2px dashed #555;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.02);
@@ -261,8 +261,9 @@ html, body {
     }
 
     .drop-zone-content {
-        width: 100%;
+        max-width: 100%;
         box-sizing: border-box;
+        padding: 60px 40px;
     }
 
     .drop-text {
@@ -270,8 +271,9 @@ html, body {
     }
 
     .error-content {
-        width: 100%;
+        max-width: 100%;
         box-sizing: border-box;
+        padding: 60px 40px;
     }
 
     .file-name {
