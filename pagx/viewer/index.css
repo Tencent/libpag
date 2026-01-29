@@ -67,7 +67,13 @@ html, body {
     border: 2px dashed #555;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
     transition: all 0.3s ease;
+}
+
+.drop-zone-content:hover {
+    border-color: #777;
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .drop-zone-content.hidden {
@@ -108,28 +114,7 @@ html, body {
 .drop-subtext {
     color: #666;
     font-size: 14px;
-    margin: 0 0 16px 0;
-}
-
-.file-btn {
-    padding: 12px 32px;
-    font-size: 16px;
-    color: #ccc;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.file-btn:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-.file-btn:active {
-    background: rgba(255, 255, 255, 0.2);
+    margin: 0;
 }
 
 .loading-content {
@@ -176,6 +161,11 @@ html, body {
     flex-direction: column;
     align-items: center;
     padding: 60px 80px;
+    cursor: pointer;
+}
+
+.error-content:hover .error-icon {
+    color: #ff6b5b;
 }
 
 .error-content.hidden {

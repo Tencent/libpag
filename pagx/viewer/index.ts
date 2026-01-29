@@ -23,7 +23,6 @@ import { TGFXBind } from '@tgfx/binding';
 interface I18nStrings {
     dropText: string;
     dropSubtext: string;
-    browseFile: string;
     loading: string;
     errorTitle: string;
     errorFormat: string;
@@ -36,8 +35,7 @@ interface I18nStrings {
 const i18n: Record<string, I18nStrings> = {
     en: {
         dropText: 'Drag & Drop PAGX file here',
-        dropSubtext: 'or',
-        browseFile: 'Browse File',
+        dropSubtext: 'or click to browse',
         loading: 'Loading...',
         errorTitle: 'Failed to load file',
         errorFormat: 'The file could not be loaded. Please check the file format.',
@@ -48,8 +46,7 @@ const i18n: Record<string, I18nStrings> = {
     },
     zh: {
         dropText: '拖放 PAGX 文件到此处',
-        dropSubtext: '或者',
-        browseFile: '选择文件',
+        dropSubtext: '或点击选择文件',
         loading: '加载中...',
         errorTitle: '文件加载失败',
         errorFormat: '无法加载该文件，请检查文件格式。',
@@ -667,10 +664,10 @@ function getPAGXUrlFromParams(): string | null {
 
 function setupDragAndDrop() {
     const dropZone = document.getElementById('drop-zone') as HTMLDivElement;
+    const dropZoneContent = document.getElementById('drop-zone-content') as HTMLDivElement;
+    const errorContent = document.getElementById('error-content') as HTMLDivElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const fileInput = document.getElementById('file-input') as HTMLInputElement;
-    const fileBtn = document.getElementById('file-btn') as HTMLButtonElement;
-    const errorBtn = document.getElementById('error-btn') as HTMLButtonElement;
     const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
     const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
@@ -709,11 +706,11 @@ function setupDragAndDrop() {
         }
     }, false);
 
-    fileBtn.addEventListener('click', () => {
+    dropZoneContent.addEventListener('click', () => {
         fileInput.click();
     });
 
-    errorBtn.addEventListener('click', () => {
+    errorContent.addEventListener('click', () => {
         fileInput.click();
     });
 
@@ -768,19 +765,15 @@ function applyI18n(): void {
 
     const dropText = document.querySelector('.drop-text');
     const dropSubtext = document.querySelector('.drop-subtext');
-    const fileBtn = document.getElementById('file-btn');
     const loadingText = document.querySelector('.loading-text');
     const errorTitle = document.querySelector('.error-title');
-    const errorBtn = document.getElementById('error-btn');
     const openBtn = document.getElementById('open-btn');
     const resetBtn = document.getElementById('reset-btn');
 
     if (dropText) dropText.textContent = strings.dropText;
     if (dropSubtext) dropSubtext.textContent = strings.dropSubtext;
-    if (fileBtn) fileBtn.textContent = strings.browseFile;
     if (loadingText) loadingText.textContent = strings.loading;
     if (errorTitle) errorTitle.textContent = strings.errorTitle;
-    if (errorBtn) errorBtn.textContent = strings.browseFile;
     if (openBtn) openBtn.title = strings.openFile;
     if (resetBtn) resetBtn.title = strings.resetView;
 }
