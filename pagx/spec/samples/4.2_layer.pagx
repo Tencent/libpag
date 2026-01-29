@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates layer properties and nesting -->
 <pagx version="1.0" width="200" height="200">
-  <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="20" y="20" antiAlias="true">
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+  <Layer name="Parent" x="30" y="30">
+    <Rectangle center="70,70" size="120,120" roundness="12"/>
+    <Fill>
+      <LinearGradient startPoint="10,10" endPoint="130,130">
+        <ColorStop offset="0" color="#FF6B6B"/>
+        <ColorStop offset="1" color="#EE5A24"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000050"/>
     <Layer name="Child">
-      <Ellipse center="60,60" size="60,60"/>
-      <Fill color="#00FF00"/>
+      <Ellipse center="70,70" size="60,60"/>
+      <Fill color="#FFFFFF"/>
     </Layer>
   </Layer>
 </pagx>

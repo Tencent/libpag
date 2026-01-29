@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates layer styles: DropShadow and InnerShadow -->
 <pagx version="1.0" width="200" height="200">
-  <Layer x="50" y="50">
-    <Rectangle center="50,50" size="100,100"/>
-    <Fill color="#FF0000"/>
-    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
-    <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
+  <Layer x="40" y="40">
+    <Rectangle center="60,60" size="120,120" roundness="16"/>
+    <Fill color="#3498DB"/>
+    <DropShadowStyle offsetX="6" offsetY="6" blurX="16" blurY="16" color="#00000060"/>
+    <InnerShadowStyle offsetX="3" offsetY="3" blurX="8" blurY="8" color="#00000030"/>
   </Layer>
 </pagx>

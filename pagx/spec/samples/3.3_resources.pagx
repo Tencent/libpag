@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="200">
+<!-- Demonstrates resource definitions and references -->
+<pagx version="1.0" width="200" height="200">
   <Layer>
-    <Rectangle center="150,100" size="200,120"/>
+    <Rectangle center="100,100" size="160,160" roundness="12"/>
     <Fill color="@skyGradient"/>
   </Layer>
   <Resources>
     <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-    <SolidColor id="brandRed" color="#FF0000"/>
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,200">
-      <ColorStop offset="0" color="#87CEEB"/>
-      <ColorStop offset="1" color="#E0F6FF"/>
+    <SolidColor id="brandRed" color="#FF6B6B"/>
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,160">
+      <ColorStop offset="0" color="#74b9ff"/>
+      <ColorStop offset="1" color="#0984e3"/>
     </LinearGradient>
   </Resources>
 </pagx>

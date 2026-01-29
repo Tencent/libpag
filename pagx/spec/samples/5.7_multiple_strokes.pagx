@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
+<!-- Demonstrates multiple Stroke layers creating outline effect -->
+<pagx version="1.0" width="200" height="200">
   <Layer>
-    <Path data="M 20,50 Q 100,10 180,50"/>
-    <Stroke color="#0088FF40" width="12" cap="round" join="round"/>
-    <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
-    <Stroke color="#0088FF" width="2" cap="round" join="round"/>
+    <Path data="M 30,100 Q 100,30 170,100 T 170,170"/>
+    <Stroke color="#3498DB20" width="16" cap="round" join="round"/>
+    <Stroke color="#3498DB60" width="8" cap="round" join="round"/>
+    <Stroke color="#3498DB" width="3" cap="round" join="round"/>
   </Layer>
 </pagx>
