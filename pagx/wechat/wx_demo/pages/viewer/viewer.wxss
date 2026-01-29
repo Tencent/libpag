@@ -12,29 +12,16 @@
   border-bottom: 1rpx solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
+  gap: 15rpx;
   flex-shrink: 0;
   z-index: 100;
 }
 
-.selector-left {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-}
-
-.selector-label {
-  color: #999;
-  font-size: 28rpx;
-  margin-right: 20rpx;
-  flex-shrink: 0;
-}
-
 .picker {
-  flex: 1;
-  max-width: 500rpx;
+  flex: 0 0 auto;
+  width: 370rpx;
+  height: 68rpx;
+  display: flex;
 }
 
 .picker-display {
@@ -42,9 +29,12 @@
   align-items: center;
   justify-content: space-between;
   background: rgba(255, 255, 255, 0.1);
-  padding: 20rpx 30rpx;
+  padding: 0 30rpx;
   border-radius: 8rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.2);
+  width: 100%;
+  height: 68rpx;
+  box-sizing: border-box;
   transition: all 0.3s;
 }
 
@@ -70,14 +60,18 @@
 }
 
 .reset-btn {
-  padding: 20rpx 35rpx;
+  padding: 0 35rpx;
   font-size: 28rpx;
   background: #07c160;
   color: #fff;
   border: none;
   border-radius: 8rpx;
+  height: 68rpx;
+  box-sizing: border-box;
   flex-shrink: 0;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .reset-btn::after {
@@ -85,14 +79,18 @@
 }
 
 .perf-btn {
-  padding: 20rpx 35rpx;
+  padding: 0 35rpx;
   font-size: 28rpx;
   background: rgba(255, 255, 255, 0.1);
   color: #999;
   border: 1rpx solid rgba(255, 255, 255, 0.2);
   border-radius: 8rpx;
+  height: 68rpx;
+  box-sizing: border-box;
   flex-shrink: 0;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.3s;
 }
 

@@ -1,21 +1,18 @@
 <view class="container">
   <!-- File Selector at Top -->
   <view class="file-selector">
-    <view class="selector-left">
-      <view class="selector-label">PAGX File:</view>
-      <picker 
-        mode="selector" 
-        range="{{sampleNames}}" 
-        value="{{currentIndex}}"
-        bindchange="onPickerChange"
-        class="picker"
-      >
-        <view class="picker-display">
-          <text class="picker-text">{{samples[currentIndex].name}}</text>
-          <text class="picker-arrow">▼</text>
-        </view>
-      </picker>
-    </view>
+    <picker 
+      mode="selector" 
+      range="{{sampleNames}}" 
+      value="{{currentIndex}}"
+      bindchange="onPickerChange"
+      class="picker"
+    >
+      <view class="picker-display">
+        <text class="picker-text">{{samples[currentIndex].name}}</text>
+        <text class="picker-arrow">▼</text>
+      </view>
+    </picker>
     <button 
       class="reset-btn" 
       bindtap="onReset"
