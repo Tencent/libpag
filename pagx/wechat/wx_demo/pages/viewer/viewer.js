@@ -12,6 +12,10 @@ import { PerformanceMonitor } from '../../utils/performance-monitor';
 // PAGX sample files configuration
 const SAMPLE_FILES = [
   { 
+    name: 'Guidelines', 
+    url: 'https://pag.io/wx_pagx_demo/Guidelines.pagx'
+  },
+  { 
     name: 'ColorPicker', 
     url: 'https://pag.io/wx_pagx_demo/ColorPicker.pagx'
   },
@@ -20,12 +24,8 @@ const SAMPLE_FILES = [
     url: 'https://pag.io/wx_pagx_demo/Baseline.pagx'
   },
   { 
-    name: 'Guidelines', 
-    url: 'https://pag.io/wx_pagx_demo/Guidelines.pagx'
-  },
-  { 
-    name: 'complex6', 
-    url: 'https://pag.io/wx_pagx_demo/complex6.pagx'
+    name: 'Overview', 
+    url: 'https://pag.io/wx_pagx_demo/Overview.pagx'
   },
 ];
 
