@@ -33,7 +33,13 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("loadPAGX", &PAGXView::loadPAGX)
       .function("updateSize", &PAGXView::updateSize)
       .function("updateZoomScaleAndOffset", &PAGXView::updateZoomScaleAndOffset)
+      .function("onZoomEnd", &PAGXView::onZoomEnd)
       .function("draw", &PAGXView::draw)
       .function("contentWidth", &PAGXView::contentWidth)
-      .function("contentHeight", &PAGXView::contentHeight);
+      .function("contentHeight", &PAGXView::contentHeight)
+      .function("setPerformanceAdaptationEnabled", &PAGXView::setPerformanceAdaptationEnabled)
+      .function("setSlowFrameThreshold", &PAGXView::setSlowFrameThreshold)
+      .function("setRecoveryWindow", &PAGXView::setRecoveryWindow)
+      .function("isLastFrameSlow", &PAGXView::isLastFrameSlow)
+      .function("getAverageFrameTime", &PAGXView::getAverageFrameTime);
 }

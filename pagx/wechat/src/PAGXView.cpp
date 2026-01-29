@@ -66,6 +66,7 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(256);
+  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
 
 static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
@@ -125,8 +126,25 @@ void PAGXView::applyCenteringTransform() {
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
+  bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
+
+  if (zoomChanged && !isZooming) {
+    isZooming = true;
+    updateAdaptiveTileRefinement();
+  }
+
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(offsetX, offsetY);
+  lastZoom = zoom;
+}
+
+void PAGXView::onZoomEnd() {
+  if (!isZooming) {
+    return;
+  }
+
+  isZooming = false;
+  updateAdaptiveTileRefinement();
 }
 
 bool PAGXView::draw() {
@@ -151,6 +169,8 @@ bool PAGXView::draw() {
     }
   }
 
+  double frameStartMs = emscripten_get_now();
+
   auto canvas = surface->getCanvas();
   canvas->clear();
 
@@ -164,6 +184,15 @@ bool PAGXView::draw() {
   }
   device->unlock();
 
+  double frameEndMs = emscripten_get_now();
+  double frameDurationMs = frameEndMs - frameStartMs;
+
+  updatePerformanceState(frameDurationMs);
+
+  if (!isZooming) {
+    updateAdaptiveTileRefinement();
+  }
+
   return true;
 }
 
@@ -173,6 +202,95 @@ int PAGXView::width() const {
 
 int PAGXView::height() const {
   return _height;
+}
+
+void PAGXView::updatePerformanceState(double frameDurationMs) {
+  if (!enablePerformanceAdaptation) {
+    return;
+  }
+
+  double now = emscripten_get_now();
+
+  if (frameDurationMs > slowFrameThresholdMs) {
+    if (!lastFrameSlow) {
+      frameHistory.clear();
+      frameHistoryTotalTime = 0.0;
+    }
+    lastFrameSlow = true;
+  }
+
+  frameHistory.push_back({now, frameDurationMs});
+  frameHistoryTotalTime += frameDurationMs;
+
+  double windowStart = now - recoveryWindowMs;
+  while (!frameHistory.empty() && frameHistory.front().timestampMs < windowStart) {
+    frameHistoryTotalTime -= frameHistory.front().durationMs;
+    frameHistory.pop_front();
+  }
+
+  if (lastFrameSlow && !frameHistory.empty()) {
+    double avgTime = frameHistoryTotalTime / static_cast<double>(frameHistory.size());
+    if (avgTime <= slowFrameThresholdMs) {
+      lastFrameSlow = false;
+    }
+  }
+}
+
+int PAGXView::calculateTargetTileRefinement(float zoom) const {
+  if (isZooming) {
+    return 0;
+  }
+
+  if (lastFrameSlow) {
+    return 1;
+  }
+
+  if (zoom < 1.0f) {
+    int count = static_cast<int>(zoom / 0.33f) + 1;
+    return std::clamp(count, 1, 3);
+  } else {
+    return 3;
+  }
+}
+
+void PAGXView::updateAdaptiveTileRefinement() {
+  if (!enablePerformanceAdaptation) {
+    return;
+  }
+
+  int targetCount = calculateTargetTileRefinement(lastZoom);
+
+  if (targetCount != currentMaxTilesRefinedPerFrame) {
+    currentMaxTilesRefinedPerFrame = targetCount;
+    displayList.setMaxTilesRefinedPerFrame(targetCount);
+  }
+}
+
+void PAGXView::setPerformanceAdaptationEnabled(bool enabled) {
+  enablePerformanceAdaptation = enabled;
+  if (!enabled) {
+    displayList.setMaxTilesRefinedPerFrame(3);
+    currentMaxTilesRefinedPerFrame = 3;
+  }
+}
+
+void PAGXView::setSlowFrameThreshold(double thresholdMs) {
+  slowFrameThresholdMs = thresholdMs;
+}
+
+void PAGXView::setRecoveryWindow(double windowMs) {
+  recoveryWindowMs = windowMs;
+}
+
+bool PAGXView::isLastFrameSlow() const {
+  return lastFrameSlow;
+}
+
+double PAGXView::getAverageFrameTime() const {
+  if (frameHistory.empty()) {
+    return 0.0;
+  }
+  return frameHistoryTotalTime / static_cast<double>(frameHistory.size());
 }
 
 }  // namespace pagx

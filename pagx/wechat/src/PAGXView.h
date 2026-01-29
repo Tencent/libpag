@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <deque>
 #include <emscripten/bind.h>
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
@@ -54,6 +55,11 @@ class PAGXView {
 
   void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
 
+  /**
+   * Notifies that zoom gesture has ended. This will restore tile refinement.
+   */
+  void onZoomEnd();
+
   bool draw();
 
   float contentWidth() const {
@@ -74,8 +80,51 @@ class PAGXView {
    */
   int height() const;
 
+  /**
+   * Enable or disable performance-based adaptation.
+   * Default: true
+   */
+  void setPerformanceAdaptationEnabled(bool enabled);
+
+  /**
+   * Set slow frame threshold in milliseconds.
+   * Default: 50.0ms (more lenient than desktop 32ms due to WeChat environment)
+   */
+  void setSlowFrameThreshold(double thresholdMs);
+
+  /**
+   * Set recovery time window in milliseconds.
+   * Default: 3000ms (3 seconds, longer than desktop 2s to reduce jitter)
+   */
+  void setRecoveryWindow(double windowMs);
+
+  /**
+   * Check if last frame was slow.
+   */
+  bool isLastFrameSlow() const;
+
+  /**
+   * Get average frame time in the recovery window.
+   */
+  double getAverageFrameTime() const;
+
  private:
   void applyCenteringTransform();
+
+  /**
+   * Update performance state based on frame duration.
+   */
+  void updatePerformanceState(double frameDurationMs);
+
+  /**
+   * Update adaptive tile refinement based on current state.
+   */
+  void updateAdaptiveTileRefinement();
+
+  /**
+   * Calculate target tile refinement count based on zoom and performance.
+   */
+  int calculateTargetTileRefinement(float zoom) const;
 
   std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
@@ -85,6 +134,25 @@ class PAGXView {
   float pagxHeight = 0.0f;
   int _width = 0;
   int _height = 0;
+
+  // Performance monitoring
+  struct FrameRecord {
+    double timestampMs = 0.0;
+    double durationMs = 0.0;
+  };
+  std::deque<FrameRecord> frameHistory = {};
+  double frameHistoryTotalTime = 0.0;
+  bool lastFrameSlow = false;
+
+  // Configuration
+  bool enablePerformanceAdaptation = true;
+  double slowFrameThresholdMs = 50.0;
+  double recoveryWindowMs = 3000.0;
+
+  // State tracking
+  float lastZoom = 1.0f;
+  bool isZooming = false;
+  int currentMaxTilesRefinedPerFrame = 3;
 };
 
 }  // namespace pagx

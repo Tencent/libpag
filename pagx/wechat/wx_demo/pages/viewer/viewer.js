@@ -67,6 +67,10 @@ Page({
       // Create gesture manager
       this.gestureManager = new WXGestureManager();
       
+      // Bind zoom event listeners
+      this.gestureManager.on('zoomStart', this.onZoomStart.bind(this));
+      this.gestureManager.on('zoomEnd', this.onZoomEnd.bind(this));
+      
       // Create performance monitor
       this.perfMonitor = new PerformanceMonitor();
       this.perfMonitor.onStatsUpdate = (stats) => {
@@ -114,6 +118,11 @@ Page({
 
   onUnload() {
     this.stopRendering();
+    
+    if (this.gestureManager) {
+      this.gestureManager.destroy();
+      this.gestureManager = null;
+    }
     
     if (this.View) {
       this.View.destroy();
@@ -285,7 +294,6 @@ Page({
     try {
       this.View.updateZoomScaleAndOffset(state.zoom, state.offsetX, state.offsetY);
     } catch (error) {
-      console.error('Failed to update C++ view:', error);
       return;
     }
   },
@@ -363,6 +371,22 @@ Page({
       this.gestureJustStarted = false;
     }
   },
+
+  // Zoom event handlers
+  onZoomStart(state) {
+    this.applyGestureState(state);
+  },
+
+  onZoomEnd(state) {
+    if (!this.View) return;
+    
+    try {
+      // Notify C++ that zoom gesture ended
+      this.View.onZoomEnd();
+    } catch (error) {
+      // Silently ignore errors
+    }
+    },
 
   // Reset Button
   onReset() {

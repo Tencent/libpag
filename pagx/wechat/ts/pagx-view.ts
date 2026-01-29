@@ -149,6 +149,14 @@ export class View {
   }
 
   /**
+   * Notify that zoom gesture has ended (for adaptive tile refinement).
+   */
+  public onZoomEnd(): void {
+    this.checkDestroyed();
+    this.nativeView!.onZoomEnd();
+  }
+
+  /**
    * Draw current frame.
    */
   public draw(): void {

@@ -18,13 +18,17 @@
 
 const TAP_TIMEOUT = 300;
 const TAP_DISTANCE_THRESHOLD = 50;
+const ZOOM_STABLE_THRESHOLD_MS = 200;
 
 export interface GestureState {
-  action: 'none' | 'update' | 'reset';
+  action: 'none' | 'update' | 'reset' | 'pan' | 'zoom' | 'zoomEnd';
   zoom: number;
   offsetX: number;
   offsetY: number;
+  isZooming?: boolean;
 }
+
+type EventListener = (data: GestureState) => void;
 
 export class WXGestureManager {
   // Current state
@@ -49,6 +53,14 @@ export class WXGestureManager {
   private lastTapX: number = 0;
   private lastTapY: number = 0;
   
+  // Zoom stability tracking
+  private lastZoomChangeTime: number = 0;
+  private zoomStableCheckTimer: number | null = null;
+  private isZooming: boolean = false;
+  
+  // Event listeners
+  private listeners: Record<string, EventListener[]> = {};
+  
   /**
    * Initialize gesture manager with canvas and content dimensions.
    * Must be called after loading PAGX file.
@@ -69,10 +81,6 @@ export class WXGestureManager {
   ): GestureState | null {
     if (canvasWidth <= 0 || canvasHeight <= 0 || 
         contentWidth <= 0 || contentHeight <= 0) {
-      console.error(
-        `Invalid dimensions: canvas=${canvasWidth}x${canvasHeight}, ` +
-        `content=${contentWidth}x${contentHeight}`
-      );
       return null;
     }
     
@@ -84,11 +92,16 @@ export class WXGestureManager {
     this.offsetX = 0;
     this.offsetY = 0;
     
+    // Reset zoom state
+    this.isZooming = false;
+    this.lastZoomChangeTime = 0;
+    
     return {
       action: 'reset',
       zoom: this.zoom,
       offsetX: this.offsetX,
-      offsetY: this.offsetY
+      offsetY: this.offsetY,
+      isZooming: false
     };
   }
   
@@ -113,7 +126,8 @@ export class WXGestureManager {
       action: 'none',
       zoom: this.zoom,
       offsetX: this.offsetX,
-      offsetY: this.offsetY
+      offsetY: this.offsetY,
+      isZooming: this.isZooming
     };
   }
   
@@ -124,11 +138,18 @@ export class WXGestureManager {
     this.zoom = 1.0;
     this.offsetX = 0;
     this.offsetY = 0;
+    
+    // Clear zoom state
+    this.isZooming = false;
+    this.lastZoomChangeTime = 0;
+    this.clearZoomStableTimer();
+    
     return {
       action: 'reset',
       zoom: this.zoom,
       offsetX: this.offsetX,
-      offsetY: this.offsetY
+      offsetY: this.offsetY,
+      isZooming: false
     };
   }
   
@@ -166,6 +187,12 @@ export class WXGestureManager {
       const dy = touches[1].y - touches[0].y;
       this.initialDistance = Math.hypot(dx, dy);
       this.initialZoom = this.zoom;
+      
+      // Mark zoom started
+      if (!this.isZooming) {
+        this.isZooming = true;
+        this.emit('zoomStart', this.getState());
+      }
     }
     
     return this.getState();
@@ -201,10 +228,11 @@ export class WXGestureManager {
       this.lastTouchY = touches[0].y;
       
       return {
-        action: 'update',
+        action: 'pan',
         zoom: this.zoom,
         offsetX: this.offsetX,
-        offsetY: this.offsetY
+        offsetY: this.offsetY,
+        isZooming: false
       };
       
     } else if (touches.length === 2) {
@@ -219,6 +247,7 @@ export class WXGestureManager {
       const currentDistance = Math.hypot(dx, dy);
       
       const scaleChange = currentDistance / this.initialDistance;
+      const oldZoom = this.zoom;
       const newZoom = this.initialZoom * scaleChange;
       
       // Calculate current pinch center (may have moved during zoom)
@@ -232,11 +261,25 @@ export class WXGestureManager {
       this.offsetY = (this.offsetY - currentPinchCenterY) * (newZoom / this.zoom) + currentPinchCenterY;
       this.zoom = newZoom;
       
+      // Track zoom change and setup stability check
+      if (Math.abs(newZoom - oldZoom) > 0.001) {
+        this.lastZoomChangeTime = Date.now();
+        
+        // Clear existing timer
+        this.clearZoomStableTimer();
+        
+        // Start new timer to check stability
+        this.zoomStableCheckTimer = setTimeout(() => {
+          this.checkZoomStability();
+        }, ZOOM_STABLE_THRESHOLD_MS) as any;
+      }
+      
       return {
-        action: 'update',
+        action: 'zoom',
         zoom: this.zoom,
         offsetX: this.offsetX,
-        offsetY: this.offsetY
+        offsetY: this.offsetY,
+        isZooming: true
       };
     }
     
@@ -248,6 +291,22 @@ export class WXGestureManager {
    * @param remainingTouches - Array of touches that are still on screen (e.touches, not e.changedTouches)
    */
   public onTouchEnd(remainingTouches: any[]): GestureState {
+    // Handle zoom end on finger lift
+    if (remainingTouches.length < 2 && this.isZooming) {
+      this.clearZoomStableTimer();
+      this.isZooming = false;
+      this.lastZoomChangeTime = 0;
+      
+      // Emit zoomEnd event
+      this.emit('zoomEnd', {
+        action: 'zoomEnd',
+        zoom: this.zoom,
+        offsetX: this.offsetX,
+        offsetY: this.offsetY,
+        isZooming: false
+      });
+    }
+    
     // Reset drag state if all fingers lifted
     if (remainingTouches.length === 0) {
       this.lastTouchX = 0;
@@ -255,5 +314,78 @@ export class WXGestureManager {
       this.initialDistance = 0;
     }
     return this.getState();
+  }
+  
+  /**
+   * Check if zoom has stabilized.
+   */
+  private checkZoomStability(): void {
+    const now = Date.now();
+    const timeSinceLastChange = now - this.lastZoomChangeTime;
+    
+    if (timeSinceLastChange >= ZOOM_STABLE_THRESHOLD_MS && this.isZooming) {
+      this.isZooming = false;
+      
+      this.emit('zoomEnd', {
+        action: 'zoomEnd',
+        zoom: this.zoom,
+        offsetX: this.offsetX,
+        offsetY: this.offsetY,
+        isZooming: false
+      });
+    }
+  }
+  
+  /**
+   * Clear stability check timer.
+   */
+  private clearZoomStableTimer(): void {
+    if (this.zoomStableCheckTimer !== null) {
+      clearTimeout(this.zoomStableCheckTimer);
+      this.zoomStableCheckTimer = null;
+    }
+  }
+  
+  /**
+   * Register event listener.
+   */
+  public on(event: string, callback: EventListener): void {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+  }
+  
+  /**
+   * Unregister event listener.
+   */
+  public off(event: string, callback: EventListener): void {
+    if (!this.listeners[event]) return;
+    const index = this.listeners[event].indexOf(callback);
+    if (index > -1) {
+      this.listeners[event].splice(index, 1);
+    }
+  }
+  
+  /**
+   * Emit event to all listeners.
+   */
+  private emit(event: string, data: GestureState): void {
+    if (!this.listeners[event]) return;
+    this.listeners[event].forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        // Silently ignore errors
+      }
+    });
+  }
+  
+  /**
+   * Cleanup resources and remove all listeners.
+   */
+  public destroy(): void {
+    this.clearZoomStableTimer();
+    this.listeners = {};
   }
 }
