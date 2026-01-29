@@ -588,8 +588,8 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             text-decoration: none;
         }
         .viewer-link svg {
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
         }
 ${draftStyles}
     </style>
