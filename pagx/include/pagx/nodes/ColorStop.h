@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Color.h"
+#include "pagx/types/Color.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {

@@ -21,9 +21,9 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "pagx/nodes/Matrix.h"
+#include "pagx/types/Matrix.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/Point.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 

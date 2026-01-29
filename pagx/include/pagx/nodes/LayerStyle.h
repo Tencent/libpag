@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/BlendMode.h"
+#include "pagx/types/BlendMode.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {

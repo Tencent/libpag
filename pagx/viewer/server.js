@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const libpagDir = path.resolve(__dirname, '../..');
 
 const app = express();
 
@@ -32,6 +33,9 @@ app.use((req, res, next) => {
   res.set('Cross-Origin-Embedder-Policy', 'require-corp');
   next();
 });
+
+// Map /fonts to resources/font directory
+app.use('/fonts', express.static(path.join(libpagDir, 'resources', 'font')));
 
 app.use('', express.static(__dirname, {
   setHeaders: (res, filePath) => {

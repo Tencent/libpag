@@ -1350,7 +1350,7 @@ class PAG_API Matrix {
  private:
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
-  float values[6];
+  float values[9];
   mutable int32_t typeMask;
   /**
    * Matrix organizes its values in row order. These members correspond to each value in Matrix.

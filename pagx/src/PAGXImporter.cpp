@@ -61,7 +61,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/nodes/Color.h"
+#include "pagx/types/Color.h"
 
 namespace pagx {
 
@@ -1724,9 +1724,22 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromFile(const std::string& filePath
 
   auto doc = FromXML(content);
   if (doc) {
+    // Convert relative paths to absolute paths
+    std::string basePath = {};
     auto lastSlash = filePath.find_last_of("/\\");
     if (lastSlash != std::string::npos) {
-      doc->basePath = filePath.substr(0, lastSlash + 1);
+      basePath = filePath.substr(0, lastSlash + 1);
+    }
+    if (!basePath.empty()) {
+      for (auto& node : doc->nodes) {
+        if (node->nodeType() == NodeType::Image) {
+          auto* image = static_cast<Image*>(node.get());
+          if (!image->filePath.empty() && image->filePath[0] != '/' &&
+              image->filePath.find("://") == std::string::npos) {
+            image->filePath = basePath + image->filePath;
+          }
+        }
+      }
     }
   }
   return doc;

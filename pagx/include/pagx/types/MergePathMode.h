@@ -18,47 +18,32 @@
 
 #pragma once
 
-#include "pagx/nodes/ColorSpace.h"
-
 namespace pagx {
 
 /**
- * An RGBA color with floating-point components and color space.
+ * Path merge modes for boolean operations.
  */
-struct Color {
+enum class MergePathMode {
   /**
-   * Red component in [0, 1] range.
+   * Append all paths without any boolean operation.
    */
-  float red = 0;
-
+  Append,
   /**
-   * Green component in [0, 1] range.
+   * Union (add) all paths together.
    */
-  float green = 0;
-
+  Union,
   /**
-   * Blue component in [0, 1] range.
+   * Intersect all paths, keeping only overlapping areas.
    */
-  float blue = 0;
-
+  Intersect,
   /**
-   * Alpha component, in [0, 1] range. Default is 1 (fully opaque).
+   * Exclusive-or of all paths, keeping non-overlapping areas.
    */
-  float alpha = 1;
-
+  Xor,
   /**
-   * The color space of this color. Default is sRGB.
+   * Subtract subsequent paths from the first path.
    */
-  ColorSpace colorSpace = ColorSpace::SRGB;
-
-  bool operator==(const Color& other) const {
-    return red == other.red && green == other.green && blue == other.blue && alpha == other.alpha &&
-           colorSpace == other.colorSpace;
-  }
-
-  bool operator!=(const Color& other) const {
-    return !(*this == other);
-  }
+  Difference
 };
 
 }  // namespace pagx

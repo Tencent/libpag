@@ -19,45 +19,11 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
-#include "pagx/nodes/Point.h"
-#include "pagx/nodes/TextAlign.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/TextAlign.h"
+#include "pagx/types/TextLayoutTypes.h"
 
 namespace pagx {
-
-/**
- * Text vertical alignment within the layout area.
- */
-enum class VerticalAlign {
-  /**
-   * Align text to the top of the layout area.
-   */
-  Top,
-  /**
-   * Align text to the vertical center of the layout area.
-   */
-  Center,
-  /**
-   * Align text to the bottom of the layout area.
-   */
-  Bottom
-};
-
-/**
- * Text writing mode (horizontal or vertical).
- */
-enum class WritingMode {
-  /**
-   * Horizontal text layout. Lines flow from top to bottom. This is the default mode for most
-   * languages.
-   */
-  Horizontal,
-  /**
-   * Vertical text layout. Characters are arranged vertically from top to bottom, and columns flow
-   * from right to left. This is the traditional writing mode for Chinese, Japanese, and Korean
-   * (CJK) text.
-   */
-  Vertical
-};
 
 /**
  * TextLayout is a text modifier that controls text layout and alignment for accumulated Text

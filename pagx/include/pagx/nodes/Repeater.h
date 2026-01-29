@@ -19,17 +19,10 @@
 #pragma once
 
 #include "pagx/nodes/Element.h"
-#include "pagx/nodes/Point.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/RepeaterOrder.h"
 
 namespace pagx {
-
-/**
- * Repeater stacking order.
- */
-enum class RepeaterOrder {
-  BelowOriginal,
-  AboveOriginal
-};
 
 /**
  * Repeater is a modifier that creates multiple copies of preceding elements with progressive

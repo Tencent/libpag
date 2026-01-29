@@ -21,8 +21,8 @@
 #include <vector>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
-#include "pagx/nodes/Matrix.h"
-#include "pagx/nodes/Point.h"
+#include "pagx/types/Matrix.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 

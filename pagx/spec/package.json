@@ -1,0 +1,16 @@
+{
+  "name": "pagx-spec",
+  "version": "1.0",
+  "stableVersion": "",
+  "description": "PAGX specification publisher",
+  "private": true,
+  "scripts": {
+    "publish": "node script/publish.js"
+  },
+  "dependencies": {
+    "highlight.js": "^11.9.0",
+    "marked": "^15.0.0",
+    "marked-gfm-heading-id": "^4.1.0",
+    "marked-highlight": "^2.2.0"
+  }
+}

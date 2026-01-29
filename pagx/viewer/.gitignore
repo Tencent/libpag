@@ -1,7 +1,5 @@
 # Build outputs
 wasm-mt/
-dist/
-fonts/
 
 # Build cache
 script/build-pagx-viewer/

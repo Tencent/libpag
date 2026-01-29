@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cmath>
-#include "pagx/nodes/Point.h"
+#include "pagx/types/Point.h"
 
 namespace pagx {
 

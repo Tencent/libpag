@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,306 +17,429 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/Typesetter.h"
-#include <unordered_map>
-#include <unordered_set>
+#include <cmath>
+#include "Base64.h"
 #include "SVGPathParser.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextLayout.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/PathTypes.h"
+#include "tgfx/core/TextBlobBuilder.h"
 
 namespace pagx {
 
-// Converts a tgfx::Path to SVG path string
-static std::string PathToSVGString(const tgfx::Path& path) {
-  std::string result = {};
-  result.reserve(256);
-  char buf[64] = {};
+void Typesetter::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
+  if (typeface == nullptr) {
+    return;
+  }
+  FontKey key = {};
+  key.family = typeface->fontFamily();
+  key.style = typeface->fontStyle();
+  registeredTypefaces[key] = std::move(typeface);
+}
 
-  path.decompose([&](tgfx::PathVerb verb, const tgfx::Point pts[4], void*) {
+void Typesetter::setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) {
+  fallbackTypefaces = std::move(typefaces);
+}
+
+// Helper to convert pagx types to tgfx types.
+static tgfx::Path ToTGFXPath(const PathData& pathData) {
+  tgfx::Path path = {};
+  pathData.forEach([&path](PathVerb verb, const float* pts) {
     switch (verb) {
-      case tgfx::PathVerb::Move:
-        snprintf(buf, sizeof(buf), "M%g %g", pts[0].x, pts[0].y);
-        result += buf;
+      case PathVerb::Move:
+        path.moveTo(pts[0], pts[1]);
         break;
-      case tgfx::PathVerb::Line:
-        snprintf(buf, sizeof(buf), "L%g %g", pts[1].x, pts[1].y);
-        result += buf;
+      case PathVerb::Line:
+        path.lineTo(pts[0], pts[1]);
         break;
-      case tgfx::PathVerb::Quad:
-        snprintf(buf, sizeof(buf), "Q%g %g %g %g", pts[1].x, pts[1].y, pts[2].x, pts[2].y);
-        result += buf;
+      case PathVerb::Quad:
+        path.quadTo(pts[0], pts[1], pts[2], pts[3]);
         break;
-      case tgfx::PathVerb::Cubic:
-        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", pts[1].x, pts[1].y, pts[2].x, pts[2].y,
-                 pts[3].x, pts[3].y);
-        result += buf;
+      case PathVerb::Cubic:
+        path.cubicTo(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5]);
         break;
-      case tgfx::PathVerb::Close:
-        result += "Z";
+      case PathVerb::Close:
+        path.close();
         break;
     }
   });
-
-  return result;
+  return path;
 }
 
-// Key for font registration: fontFamily + fontStyle
-struct FontKey {
-  std::string family = {};
-  std::string style = {};
+static tgfx::Point ToTGFXPoint(const Point& p) {
+  return tgfx::Point::Make(p.x, p.y);
+}
 
-  bool operator==(const FontKey& other) const {
-    return family == other.family && style == other.style;
+static std::shared_ptr<tgfx::Data> ToTGFXData(const std::shared_ptr<Data>& data) {
+  if (data == nullptr) {
+    return nullptr;
   }
-};
+  return tgfx::Data::MakeWithCopy(data->data(), data->size());
+}
 
-struct FontKeyHash {
-  size_t operator()(const FontKey& key) const {
-    return std::hash<std::string>()(key.family) ^ (std::hash<std::string>()(key.style) << 1);
-  }
-};
-
-// Intermediate shaping result for a single Text element
-struct ShapedTextInfo {
-  Text* text = nullptr;
-  std::vector<tgfx::GlyphID> originalGlyphIDs = {};
-  std::vector<float> xPositions = {};
-  float totalWidth = 0;
-  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
-  tgfx::Font font = {};
-};
-
-// Private implementation class
-class TypesetterImpl : public Typesetter {
+// Internal implementation class for createTextGlyphs.
+class TypesetterContext {
  public:
-  TypesetterImpl() = default;
-
-  void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) override {
-    if (!typeface) {
-      return;
-    }
-    FontKey key;
-    key.family = typeface->fontFamily();
-    key.style = typeface->fontStyle();
-    _registeredTypefaces[key] = std::move(typeface);
+  TypesetterContext(const Typesetter* typesetter, PAGXDocument* document)
+      : typesetter(typesetter), document(document) {
   }
 
-  void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) override {
-    _fallbackTypefaces = std::move(typefaces);
-  }
-
-  bool typeset(PAGXDocument* document, bool force) override {
-    if (!document) {
-      return false;
+  TextGlyphs run() {
+    if (document == nullptr) {
+      return result;
     }
-
-    _document = document;
-    _force = force;
-    _textTypeset = false;
-    _fontResources.clear();
-    _glyphMapping.clear();
 
     // Process all layers
-    for (auto& layer : _document->layers) {
+    for (auto* layer : document->layers) {
       processLayer(layer);
     }
 
     // Process compositions in nodes
-    for (auto& node : _document->nodes) {
+    for (auto& node : document->nodes) {
       if (node->nodeType() == NodeType::Composition) {
-        auto comp = static_cast<Composition*>(node.get());
-        for (auto& layer : comp->layers) {
+        auto* comp = static_cast<Composition*>(node.get());
+        for (auto* layer : comp->layers) {
           processLayer(layer);
         }
       }
     }
 
-    return _textTypeset;
+    return std::move(result);
   }
 
  private:
+  // A run of glyphs with the same font (for shaping).
+  struct ShapedGlyphRun {
+    tgfx::Font font = {};
+    std::vector<tgfx::GlyphID> glyphIDs = {};
+    std::vector<float> xPositions = {};
+  };
+
+  // Shaped text information for a single Text element.
+  struct ShapedInfo {
+    Text* text = nullptr;
+    std::vector<ShapedGlyphRun> runs = {};
+    float totalWidth = 0;
+  };
+
+  using FontKey = Typesetter::FontKey;
+
   void processLayer(Layer* layer) {
-    if (!layer) {
+    if (layer == nullptr) {
       return;
     }
 
-    // Process layer contents
-    for (auto& element : layer->contents) {
-      processElement(element);
-    }
+    processLayerContents(layer->contents);
 
-    // Process child layers
-    for (auto& child : layer->children) {
+    for (auto* child : layer->children) {
       processLayer(child);
     }
   }
 
-  void processElement(Element* element) {
-    if (!element) {
-      return;
-    }
-
-    switch (element->nodeType()) {
-      case NodeType::Text: {
-        // Standalone Text (not in a Group)
-        processStandaloneText(static_cast<Text*>(element));
-        break;
-      }
-      case NodeType::Group: {
-        processGroup(static_cast<Group*>(element));
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  void processStandaloneText(Text* text) {
-    if (!text) {
-      return;
-    }
-
-    // Check if already typeset
-    if (!text->glyphRuns.empty() && !_force) {
-      return;
-    }
-
-    // Clear existing glyph runs
-    text->glyphRuns.clear();
-
-    // Skip if no text content
-    if (text->text.empty()) {
-      return;
-    }
-
-    // Shape the text
-    auto shapedInfo = shapeText(text);
-    if (shapedInfo.originalGlyphIDs.empty()) {
-      return;
-    }
-
-    // Create GlyphRun (no layout adjustment for standalone text)
-    createGlyphRun(text, shapedInfo, 0.0f);
-    _textTypeset = true;
-  }
-
-  void processGroup(Group* group) {
-    if (!group) {
-      return;
-    }
-
-    // Find TextLayout modifier and collect Text elements
+  void processLayerContents(const std::vector<Element*>& contents) {
     const TextLayout* textLayout = nullptr;
     std::vector<Text*> textElements = {};
 
-    for (auto& element : group->elements) {
+    for (auto* element : contents) {
       if (element->nodeType() == NodeType::TextLayout) {
         textLayout = static_cast<const TextLayout*>(element);
       } else if (element->nodeType() == NodeType::Text) {
         textElements.push_back(static_cast<Text*>(element));
       } else if (element->nodeType() == NodeType::Group) {
-        // Recursively process nested groups
         processGroup(static_cast<Group*>(element));
       }
     }
 
-    // If no Text elements, nothing to do
-    if (textElements.empty()) {
+    if (!textElements.empty()) {
+      processTextWithLayout(textElements, textLayout);
+    }
+  }
+
+  void processGroup(Group* group) {
+    if (group == nullptr) {
       return;
     }
 
-    // Check if any Text in this Group needs typesetting
-    bool needsTypesetting = _force;
-    if (!needsTypesetting) {
+    const TextLayout* textLayout = nullptr;
+    std::vector<Text*> textElements = {};
+
+    for (auto* element : group->elements) {
+      if (element->nodeType() == NodeType::TextLayout) {
+        textLayout = static_cast<const TextLayout*>(element);
+      } else if (element->nodeType() == NodeType::Text) {
+        textElements.push_back(static_cast<Text*>(element));
+      } else if (element->nodeType() == NodeType::Group) {
+        processGroup(static_cast<Group*>(element));
+      }
+    }
+
+    if (!textElements.empty()) {
+      processTextWithLayout(textElements, textLayout);
+    }
+  }
+
+  void processTextWithLayout(std::vector<Text*>& textElements, const TextLayout* textLayout) {
+    // If TextLayout exists, check if ALL Text elements have embedded GlyphRun data.
+    // If any Text is missing embedded data, we must re-typeset all of them together.
+    bool allHaveEmbeddedData = true;
+    if (textLayout != nullptr) {
       for (auto* text : textElements) {
-        if (text->glyphRuns.empty() && !text->text.empty()) {
-          needsTypesetting = true;
+        if (text->glyphRuns.empty()) {
+          allHaveEmbeddedData = false;
           break;
         }
       }
     }
 
-    if (!needsTypesetting) {
+    // If no TextLayout or all have embedded data, process each Text individually
+    if (textLayout == nullptr || allHaveEmbeddedData) {
+      for (auto* text : textElements) {
+        if (!text->glyphRuns.empty()) {
+          auto textBlob = buildTextBlobFromEmbeddedGlyphRuns(text);
+          if (textBlob != nullptr) {
+            result.setTextBlob(text, textBlob);
+          }
+        } else {
+          processTextWithoutLayout(text);
+        }
+      }
       return;
     }
 
-    // Clear all GlyphRuns in the Group for re-typesetting
-    for (auto* text : textElements) {
-      text->glyphRuns.clear();
-    }
+    // TextLayout exists but some Text elements need re-typesetting.
+    // Must re-typeset all Text elements together to apply layout correctly.
+    std::vector<ShapedInfo> shapedInfos = {};
 
-    // Shape all Text elements first
-    std::vector<ShapedTextInfo> shapedInfos = {};
     for (auto* text : textElements) {
-      if (text->text.empty()) {
-        shapedInfos.push_back({});
-        continue;
+      ShapedInfo info = {};
+      info.text = text;
+
+      if (!text->text.empty()) {
+        shapeText(text, info);
       }
-      shapedInfos.push_back(shapeText(text));
+
+      shapedInfos.push_back(std::move(info));
     }
 
-    // Apply TextLayout if present
-    for (size_t i = 0; i < textElements.size(); ++i) {
-      auto* text = textElements[i];
-      auto& shapedInfo = shapedInfos[i];
-
-      if (shapedInfo.originalGlyphIDs.empty()) {
+    // Apply TextLayout and create TextBlobs
+    for (auto& info : shapedInfos) {
+      if (info.runs.empty()) {
         continue;
       }
 
-      // Calculate layout offset based on TextLayout
-      float xOffset = 0;
-      if (textLayout != nullptr) {
-        xOffset = calculateLayoutOffset(textLayout, shapedInfo.totalWidth);
+      float xOffset = calculateLayoutOffset(textLayout, info.totalWidth);
+      float yOffset = 0;
+
+      if (textLayout->position.x != 0 || textLayout->position.y != 0) {
+        xOffset += textLayout->position.x - info.text->position.x;
+        yOffset = textLayout->position.y - info.text->position.y;
       }
 
-      // Create GlyphRun with layout offset baked in
-      createGlyphRun(text, shapedInfo, xOffset);
-      _textTypeset = true;
+      // Build TextBlob with multiple runs
+      tgfx::TextBlobBuilder builder = {};
+
+      for (auto& run : info.runs) {
+        if (run.glyphIDs.empty()) {
+          continue;
+        }
+
+        // Apply offsets to positions
+        std::vector<float> adjustedPositions = {};
+        adjustedPositions.reserve(run.xPositions.size());
+        for (float x : run.xPositions) {
+          adjustedPositions.push_back(x + xOffset);
+        }
+
+        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), yOffset);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, adjustedPositions.data(),
+               adjustedPositions.size() * sizeof(float));
+      }
+
+      auto textBlob = builder.build();
+      if (textBlob != nullptr) {
+        result.setTextBlob(info.text, textBlob);
+      }
     }
   }
 
-  float calculateLayoutOffset(const TextLayout* layout, float textWidth) {
-    float xOffset = 0;
-    switch (layout->textAlign) {
-      case TextAlign::Start:
-        // No offset needed
-        break;
-      case TextAlign::Center:
-        xOffset = -0.5f * textWidth;
-        break;
-      case TextAlign::End:
-        xOffset = -textWidth;
-        break;
-      case TextAlign::Justify:
-        // Justify requires more complex handling, treat as start for now
-        break;
-    }
-    return xOffset;
-  }
-
-  ShapedTextInfo shapeText(Text* text) {
-    ShapedTextInfo info = {};
+  void processTextWithoutLayout(Text* text) {
+    ShapedInfo info = {};
     info.text = text;
 
-    // Find typeface for this text
-    auto typeface = findTypeface(text->fontFamily, text->fontStyle);
-    if (!typeface) {
-      return info;
+    if (!text->text.empty()) {
+      shapeText(text, info);
     }
 
-    info.typeface = typeface;
-    info.font = tgfx::Font(typeface, text->fontSize);
+    if (info.runs.empty()) {
+      return;
+    }
 
+    // Build TextBlob without layout offset
+    tgfx::TextBlobBuilder builder = {};
+
+    for (auto& run : info.runs) {
+      if (run.glyphIDs.empty()) {
+        continue;
+      }
+
+      auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
+      memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+      memcpy(buffer.positions, run.xPositions.data(), run.xPositions.size() * sizeof(float));
+    }
+
+    auto textBlob = builder.build();
+    if (textBlob != nullptr) {
+      result.setTextBlob(text, textBlob);
+    }
+  }
+
+  std::shared_ptr<tgfx::TextBlob> buildTextBlobFromEmbeddedGlyphRuns(const Text* text) {
+    tgfx::TextBlobBuilder builder;
+
+    for (const auto& run : text->glyphRuns) {
+      if (run->glyphs.empty()) {
+        continue;
+      }
+
+      auto typeface = buildTypefaceFromFont(run->font);
+      if (typeface == nullptr) {
+        continue;
+      }
+
+      // Embedded fonts have pre-scaled glyph data, use fontSize=1.0
+      tgfx::Font font(typeface, 1);
+      size_t count = run->glyphs.size();
+
+      // Determine positioning mode
+      if (!run->matrices.empty() && run->matrices.size() >= count) {
+        auto& buffer = builder.allocRunMatrix(font, count);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        auto* matrices = reinterpret_cast<float*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          const auto& m = run->matrices[i];
+          matrices[i * 6 + 0] = m.a;
+          matrices[i * 6 + 1] = m.b;
+          matrices[i * 6 + 2] = m.c;
+          matrices[i * 6 + 3] = m.d;
+          matrices[i * 6 + 4] = m.tx;
+          matrices[i * 6 + 5] = m.ty;
+        }
+      } else if (!run->xforms.empty() && run->xforms.size() >= count) {
+        auto& buffer = builder.allocRunRSXform(font, count);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          const auto& x = run->xforms[i];
+          xforms[i] = tgfx::RSXform::Make(x.scos, x.ssin, x.tx, x.ty);
+        }
+      } else if (!run->positions.empty() && run->positions.size() >= count) {
+        auto& buffer = builder.allocRunPos(font, count);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
+        for (size_t i = 0; i < count; i++) {
+          positions[i] = tgfx::Point::Make(run->positions[i].x, run->positions[i].y);
+        }
+      } else if (!run->xPositions.empty() && run->xPositions.size() >= count) {
+        auto& buffer = builder.allocRunPosH(font, count, run->y);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, run->xPositions.data(), count * sizeof(float));
+      }
+    }
+
+    return builder.build();
+  }
+
+  std::shared_ptr<tgfx::Typeface> buildTypefaceFromFont(const Font* fontNode) {
+    if (fontNode == nullptr || fontNode->glyphs.empty()) {
+      return nullptr;
+    }
+
+    auto it = fontCache.find(fontNode);
+    if (it != fontCache.end()) {
+      return it->second;
+    }
+
+    // Determine if font is path-based or image-based
+    bool hasPath = false;
+    bool hasImage = false;
+    for (const auto& glyph : fontNode->glyphs) {
+      if (glyph->path != nullptr) {
+        hasPath = true;
+      }
+      if (glyph->image != nullptr) {
+        hasImage = true;
+      }
+    }
+
+    std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+    if (hasPath && !hasImage) {
+      tgfx::PathTypefaceBuilder builder;
+      for (const auto& glyph : fontNode->glyphs) {
+        if (glyph->path != nullptr) {
+          builder.addGlyph(ToTGFXPath(*glyph->path));
+        }
+      }
+      typeface = builder.detach();
+    } else if (hasImage && !hasPath) {
+      tgfx::ImageTypefaceBuilder builder;
+      for (const auto& glyph : fontNode->glyphs) {
+        if (glyph->image != nullptr) {
+          std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
+          auto imageNode = glyph->image;
+          if (imageNode->data != nullptr) {
+            codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(imageNode->data));
+          } else if (imageNode->filePath.find("data:") == 0) {
+            auto commaPos = imageNode->filePath.find(',');
+            if (commaPos != std::string::npos) {
+              auto header = imageNode->filePath.substr(0, commaPos);
+              if (header.find(";base64") != std::string::npos) {
+                auto base64Data = imageNode->filePath.substr(commaPos + 1);
+                auto data = Base64Decode(base64Data);
+                if (data) {
+                  codec = tgfx::ImageCodec::MakeFrom(ToTGFXData(data));
+                }
+              }
+            }
+          } else if (!imageNode->filePath.empty()) {
+            codec = tgfx::ImageCodec::MakeFrom(imageNode->filePath);
+          }
+
+          if (codec) {
+            builder.addGlyph(codec, ToTGFXPoint(glyph->offset));
+          }
+        }
+      }
+      typeface = builder.detach();
+    }
+
+    if (typeface) {
+      fontCache[fontNode] = typeface;
+    }
+    return typeface;
+  }
+
+  void shapeText(Text* text, ShapedInfo& info) {
+    auto primaryTypeface = findTypeface(text->fontFamily, text->fontStyle);
+    if (primaryTypeface == nullptr) {
+      return;
+    }
+
+    tgfx::Font primaryFont(primaryTypeface, text->fontSize);
     float currentX = 0;
     const std::string& content = text->text;
 
-    // Simple text shaping: iterate through characters
+    // Current run being built
+    ShapedGlyphRun* currentRun = nullptr;
+    std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
+
     size_t i = 0;
     while (i < content.size()) {
       // Decode UTF-8 character
@@ -352,97 +475,103 @@ class TypesetterImpl : public Typesetter {
         continue;
       }
 
-      // Get glyph ID
-      tgfx::GlyphID glyphID = info.font.getGlyphID(unichar);
+      // Try to find glyph in primary font or fallbacks
+      tgfx::GlyphID glyphID = primaryFont.getGlyphID(unichar);
+      tgfx::Font glyphFont = primaryFont;
+      std::shared_ptr<tgfx::Typeface> glyphTypeface = primaryTypeface;
+
+      if (glyphID == 0) {
+        for (const auto& fallback : typesetter->fallbackTypefaces) {
+          if (fallback == nullptr || fallback == primaryTypeface) {
+            continue;
+          }
+          tgfx::Font fallbackFont(fallback, text->fontSize);
+          glyphID = fallbackFont.getGlyphID(unichar);
+          if (glyphID != 0) {
+            glyphFont = fallbackFont;
+            glyphTypeface = fallback;
+            break;
+          }
+        }
+      }
+
       if (glyphID == 0) {
         continue;
       }
 
-      // Get glyph advance first (needed for spacing even if no outline)
-      float advance = info.font.getAdvance(glyphID);
+      float advance = glyphFont.getAdvance(glyphID);
 
-      // Check if glyph has an outline (skip space-like characters without outlines)
-      tgfx::Path testPath;
-      bool hasOutline = info.font.getPath(glyphID, &testPath) && !testPath.isEmpty();
-      if (hasOutline) {
-        info.xPositions.push_back(currentX);
-        info.originalGlyphIDs.push_back(glyphID);
+      // Check if glyph has renderable content
+      tgfx::Path testPath = {};
+      bool hasOutline = glyphFont.getPath(glyphID, &testPath) && !testPath.isEmpty();
+      bool hasImage = glyphFont.getImage(glyphID, nullptr, nullptr) != nullptr;
+
+      if (hasOutline || hasImage) {
+        // Start new run if typeface changed
+        if (currentTypeface != glyphTypeface) {
+          info.runs.emplace_back();
+          currentRun = &info.runs.back();
+          currentRun->font = glyphFont;
+          currentTypeface = glyphTypeface;
+        }
+
+        currentRun->xPositions.push_back(currentX);
+        currentRun->glyphIDs.push_back(glyphID);
       }
 
-      // Always advance position
       currentX += advance + text->letterSpacing;
     }
 
     info.totalWidth = currentX;
-    return info;
   }
 
-  void createGlyphRun(Text* text, const ShapedTextInfo& info, float xOffset) {
-    if (info.originalGlyphIDs.empty()) {
-      return;
+  float calculateLayoutOffset(const TextLayout* layout, float textWidth) {
+    switch (layout->textAlign) {
+      case TextAlign::Start:
+        return 0;
+      case TextAlign::Center:
+        return -0.5f * textWidth;
+      case TextAlign::End:
+        return -textWidth;
+      case TextAlign::Justify:
+        // TODO: Justify requires more complex handling
+        return 0;
     }
-
-    // Get or create Font resource for this typeface
-    std::string fontId = getOrCreateFontResource(info.typeface, info.font, info.originalGlyphIDs);
-
-    // Create GlyphRun with remapped glyph IDs
-    auto glyphRun = _document->makeNode<GlyphRun>();
-    glyphRun->font = _fontResources[fontId];
-
-    // Remap glyph IDs to font-specific indices
-    for (tgfx::GlyphID glyphID : info.originalGlyphIDs) {
-      auto it = _glyphMapping[fontId].find(glyphID);
-      if (it != _glyphMapping[fontId].end()) {
-        glyphRun->glyphs.push_back(it->second);
-      } else {
-        glyphRun->glyphs.push_back(0);  // Missing glyph
-      }
-    }
-
-    // Apply layout offset to x positions
-    glyphRun->xPositions.reserve(info.xPositions.size());
-    for (float x : info.xPositions) {
-      glyphRun->xPositions.push_back(x + xOffset);
-    }
-
-    // For horizontal text, y should be 0 (relative to baseline)
-    glyphRun->y = 0;
-
-    text->glyphRuns.push_back(glyphRun);
+    return 0;
   }
 
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle) {
     // First, try exact match from registered typefaces
     if (!fontFamily.empty()) {
-      FontKey key;
+      FontKey key = {};
       key.family = fontFamily;
       key.style = fontStyle.empty() ? "Regular" : fontStyle;
-      auto it = _registeredTypefaces.find(key);
-      if (it != _registeredTypefaces.end()) {
+      auto it = typesetter->registeredTypefaces.find(key);
+      if (it != typesetter->registeredTypefaces.end()) {
         return it->second;
       }
 
       // Try matching family only (any style)
-      for (const auto& pair : _registeredTypefaces) {
+      for (const auto& pair : typesetter->registeredTypefaces) {
         if (pair.first.family == fontFamily) {
           return pair.second;
         }
       }
     }
 
-    // Then, try fallback typefaces
+    // Then, try fallback typefaces by family name
     if (!fontFamily.empty()) {
-      for (const auto& tf : _fallbackTypefaces) {
-        if (tf && tf->fontFamily() == fontFamily) {
+      for (const auto& tf : typesetter->fallbackTypefaces) {
+        if (tf != nullptr && tf->fontFamily() == fontFamily) {
           return tf;
         }
       }
     }
 
     // Use first fallback typeface
-    if (!_fallbackTypefaces.empty()) {
-      return _fallbackTypefaces[0];
+    if (!typesetter->fallbackTypefaces.empty()) {
+      return typesetter->fallbackTypefaces[0];
     }
 
     // Last resort: try system font
@@ -453,78 +582,15 @@ class TypesetterImpl : public Typesetter {
     return nullptr;
   }
 
-  std::string getOrCreateFontResource(const std::shared_ptr<tgfx::Typeface>& typeface,
-                                      const tgfx::Font& font,
-                                      const std::vector<tgfx::GlyphID>& glyphIDs) {
-    // Create unique font ID based on typeface identity
-    std::string fontId = "font_" + std::to_string(reinterpret_cast<uintptr_t>(typeface.get()));
-
-    // Check if font resource already exists
-    auto it = _fontResources.find(fontId);
-    if (it == _fontResources.end()) {
-      // Create new Font resource with the ID so it gets registered in nodeMap
-      auto fontNode = _document->makeNode<Font>(fontId);
-      _fontResources[fontId] = fontNode;
-      _glyphMapping[fontId] = {};
-    }
-
-    Font* fontNode = _fontResources[fontId];
-    auto& glyphMap = _glyphMapping[fontId];
-
-    // Add any new glyphs
-    for (tgfx::GlyphID glyphID : glyphIDs) {
-      if (glyphMap.find(glyphID) != glyphMap.end()) {
-        continue;  // Already added
-      }
-
-      // Get glyph path
-      tgfx::Path glyphPath;
-      if (!font.getPath(glyphID, &glyphPath)) {
-        continue;  // No outline (e.g., color emoji)
-      }
-
-      // Convert path to SVG string
-      std::string pathStr = PathToSVGString(glyphPath);
-      if (pathStr.empty()) {
-        continue;
-      }
-
-      // Create Glyph node
-      auto glyph = _document->makeNode<Glyph>();
-      glyph->path = _document->makeNode<PathData>();
-      *glyph->path = PathDataFromSVGString(pathStr);
-
-      // Map original glyph ID to new index (1-based, since PathTypefaceBuilder uses 1-based IDs)
-      glyphMap[glyphID] = static_cast<tgfx::GlyphID>(fontNode->glyphs.size() + 1);
-
-      fontNode->glyphs.push_back(glyph);
-    }
-
-    return fontId;
-  }
-
-  // Registered typefaces by family + style
-  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> _registeredTypefaces =
-      {};
-
-  // Fallback typefaces
-  std::vector<std::shared_ptr<tgfx::Typeface>> _fallbackTypefaces = {};
-
-  // Current processing state
-  PAGXDocument* _document = nullptr;
-  bool _force = false;
-  bool _textTypeset = false;
-
-  // Font ID -> Font resource
-  std::unordered_map<std::string, Font*> _fontResources = {};
-
-  // Font ID -> (original GlyphID -> new GlyphID)
-  std::unordered_map<std::string, std::unordered_map<tgfx::GlyphID, tgfx::GlyphID>> _glyphMapping =
-      {};
+  const Typesetter* typesetter = nullptr;
+  PAGXDocument* document = nullptr;
+  TextGlyphs result = {};
+  std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
-std::shared_ptr<Typesetter> Typesetter::Make() {
-  return std::make_shared<TypesetterImpl>();
+TextGlyphs Typesetter::createTextGlyphs(PAGXDocument* document) {
+  TypesetterContext context(this, document);
+  return context.run();
 }
 
 }  // namespace pagx

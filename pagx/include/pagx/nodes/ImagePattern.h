@@ -20,10 +20,10 @@
 
 #include <string>
 #include "pagx/nodes/ColorSource.h"
-#include "pagx/nodes/FilterMode.h"
-#include "pagx/nodes/Matrix.h"
-#include "pagx/nodes/MipmapMode.h"
-#include "pagx/nodes/TileMode.h"
+#include "pagx/types/FilterMode.h"
+#include "pagx/types/Matrix.h"
+#include "pagx/types/MipmapMode.h"
+#include "pagx/types/TileMode.h"
 
 namespace pagx {
 

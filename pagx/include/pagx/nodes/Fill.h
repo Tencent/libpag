@@ -22,24 +22,11 @@
 #include <string>
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/LayerPlacement.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/FillRule.h"
+#include "pagx/types/LayerPlacement.h"
 
 namespace pagx {
-
-/**
- * Fill rules that determine the interior of self-intersecting paths.
- */
-enum class FillRule {
-  /**
-   * Non-zero winding rule. A point is inside if the winding number is non-zero.
-   */
-  Winding,
-  /**
-   * Even-odd rule. A point is inside if the number of crossings is odd.
-   */
-  EvenOdd
-};
 
 /**
  * Fill represents a fill painter that fills shapes with a solid color, gradient, or pattern.

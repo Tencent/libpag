@@ -26,31 +26,14 @@
 #include "pagx/nodes/LayerFilter.h"
 #include "pagx/nodes/LayerStyle.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/Matrix.h"
-#include "pagx/nodes/Rect.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/MaskType.h"
+#include "pagx/types/Matrix.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
 class Composition;
-
-/**
- * Mask types that define how a mask layer affects its target.
- */
-enum class MaskType {
-  /**
-   * Use the alpha channel of the mask to determine visibility.
-   */
-  Alpha,
-  /**
-   * Use the luminance (brightness) of the mask to determine visibility.
-   */
-  Luminance,
-  /**
-   * Use the contour (outline) of the mask for masking.
-   */
-  Contour
-};
 
 /**
  * Layer represents a layer node that can contain vector elements, layer styles, filters, and child

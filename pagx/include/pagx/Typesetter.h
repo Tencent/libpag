@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2026 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,62 +19,65 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "pagx/PAGXDocument.h"
+#include "pagx/TextGlyphs.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
 /**
- * Typesetter performs text typesetting on PAGXDocument, converting Text elements to pre-shaped
- * format with embedded glyph data. It handles both text shaping (glyph mapping) and text layout
- * (alignment, line breaking, etc.).
- *
- * Terminology:
- * - Pre-shaped: Text has been typeset with embedded GlyphRun data
- * - Runtime shaping: Text needs to be shaped at render time (no GlyphRun data)
- *
- * The typesetter processes text in Group granularity:
- * - If any Text in a Group lacks GlyphRun data, the entire Group is typeset
- * - This ensures consistent TextLayout calculations within the same Group
+ * Typesetter performs text typesetting on PAGXDocument, converting Text elements into positioned
+ * glyph data (TextBlob). It handles font matching, fallback, text shaping, and layout (alignment,
+ * line breaking, etc.).
  */
 class Typesetter {
  public:
-  /**
-   * Creates a Typesetter instance.
-   */
-  static std::shared_ptr<Typesetter> Make();
-
-  virtual ~Typesetter() = default;
+  Typesetter() = default;
 
   /**
-   * Registers a typeface for a specific font family and style. When typesetting text, the
-   * registered typeface will be used if its family and style match the text's fontFamily and
-   * fontStyle.
-   * @param typeface The typeface to register.
+   * Registers a typeface for font matching. When typesetting, registered typefaces are matched
+   * first by fontFamily and fontStyle. If no registered typeface matches, the system font is used.
    */
-  virtual void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) = 0;
+  void registerTypeface(std::shared_ptr<tgfx::Typeface> typeface);
 
   /**
-   * Sets the fallback typefaces used when no registered typeface matches the text's font
-   * properties. The first matching typeface in the list will be used.
-   * @param typefaces Fallback typefaces in priority order.
+   * Sets the fallback typefaces used when a character is not found in the primary font (either
+   * registered or system). Typefaces are tried in order until one containing the character is found.
    */
-  virtual void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces) = 0;
+  void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
 
   /**
-   * Typesets all text elements in the document. For each Text element, generates GlyphRun data
-   * with positioned glyphs. TextLayout modifiers are processed to bake alignment and layout
-   * adjustments into the GlyphRun positions. Font resources are created for each unique typeface
-   * used, containing glyph path data.
-   *
-   * @param document The document to process (modified in place).
-   * @param force If true, forces re-typesetting of all text elements even if they already have
-   *              GlyphRun data. If false (default), only typesets Groups where any Text lacks
-   *              GlyphRun data.
-   * @return true if any text was typeset, false if no text elements found or all skipped.
+   * Creates TextGlyphs for all Text nodes in the document. If a Text node has embedded GlyphRun
+   * data (from a loaded PAGX file), it uses that data directly. Otherwise, it performs text
+   * shaping using registered/fallback typefaces. TextLayout modifiers are processed to apply
+   * alignment, line breaking, and other layout properties.
+   * @param document The document containing Text nodes to typeset.
+   * @return TextGlyphs containing Text -> TextBlob mappings.
    */
-  virtual bool typeset(PAGXDocument* document, bool force = false) = 0;
+  TextGlyphs createTextGlyphs(PAGXDocument* document);
+
+ private:
+  friend class TypesetterContext;
+
+  struct FontKey {
+    std::string family = {};
+    std::string style = {};
+
+    bool operator==(const FontKey& other) const {
+      return family == other.family && style == other.style;
+    }
+  };
+
+  struct FontKeyHash {
+    size_t operator()(const FontKey& key) const {
+      return std::hash<std::string>()(key.family) ^ (std::hash<std::string>()(key.style) << 1);
+    }
+  };
+
+  std::unordered_map<FontKey, std::shared_ptr<tgfx::Typeface>, FontKeyHash> registeredTypefaces = {};
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces = {};
 };
 
 }  // namespace pagx

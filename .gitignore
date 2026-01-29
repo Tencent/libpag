@@ -90,3 +90,11 @@ pagx/viewer/build-pagx
 pagx/viewer/.pagx.wasm-mt.md5
 pagx/viewer/node_modules
 pagx/viewer/package-lock.json
+
+# PAGX Site
+pagx/public
+
+# PAGX Spec
+pagx/spec/node_modules
+pagx/spec/package-lock.json
+

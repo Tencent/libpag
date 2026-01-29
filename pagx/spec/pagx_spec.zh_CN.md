@@ -1,10 +1,8 @@
-# PAGX 格式规范 v1.0
+# PAGX 格式规范
 
 ## 1. 介绍（Introduction）
 
 **PAGX**（Portable Animated Graphics XML）是一种基于 XML 的矢量动画标记语言。它提供了统一且强大的矢量图形与动画描述能力，旨在成为跨所有主要工具与运行时的矢量动画交换标准。
-
-**PAGX** (Portable Animated Graphics XML) is an XML-based markup language for describing animated vector graphics. It provides a unified and powerful representation of vector graphics and animations, designed to be the vector animation interchange standard across all major tools and runtimes.
 
 ### 1.1 设计目标
 
@@ -1181,6 +1179,45 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 |  0   0    1 |
 ```
 
+**预排版示例**：
+
+```xml
+<Resources>
+  <!-- 嵌入字体：包含 H, e, l, o 四个字形 -->
+  <Font id="myFont">
+    <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
+    <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z"/>
+    <Glyph path="M 100 0 L 100 700 L 350 700"/>
+    <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z"/>
+  </Font>
+</Resources>
+
+<Layer>
+  <!-- 预排版文本 "Hello"：使用 Horizontal 模式（单行水平文本） -->
+  <Text fontFamily="Arial" fontSize="24">
+    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
+  </Text>
+  <Fill color="#333333"/>
+</Layer>
+
+<Layer>
+  <!-- 预排版文本：使用 Point 模式（多行文本） -->
+  <Text fontFamily="Arial" fontSize="24">
+    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
+  </Text>
+  <Fill color="#333333"/>
+</Layer>
+
+<Layer>
+  <!-- 预排版文本：使用 RSXform 模式（路径文本，每个字形有旋转） -->
+  <Text fontFamily="Arial" fontSize="24">
+    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" 
+              xforms="1,0,0,50;0.98,0.17,30,48;0.94,0.34,60,42;0.87,0.5,90,32;0.77,0.64,120,18"/>
+  </Text>
+  <Fill color="#333333"/>
+</Layer>
+```
+
 ### 5.3 绘制器（Painters）
 
 绘制器（Fill、Stroke）对**当前时刻**累积的所有几何（Path 和字形列表）进行渲染。
@@ -1390,12 +1427,12 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 - 合并后的形状变换矩阵重置为单位矩阵
 
 **示例**：
+
 ```xml
-<Rectangle center="50,50" size="100,100"/>
-<Fill color="#FF0000"/>
-<Ellipse center="100,100" size="80,80"/>
+<Rectangle center="50,50" size="80,80"/>
+<Ellipse center="90,90" size="80,80"/>
 <MergePath mode="union"/>
-<Fill color="#0000FF"/>
+<Fill color="#3366FF"/>
 ```
 
 ### 5.5 文本修改器（Text Modifiers）
@@ -1675,17 +1712,38 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 
 ```xml
 <Layer>
+  <!-- 常规文本 -->
   <Group>
-    <Text text="Hello " fontFamily="Arial" fontSize="24"/>
-    <Fill color="#000000"/>
+    <Text text="This is " fontFamily="Arial" fontSize="18"/>
+    <Fill color="#333333"/>
   </Group>
+  <!-- 加粗红色文本 -->
   <Group>
-    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+    <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
     <Fill color="#FF0000"/>
   </Group>
-  <TextLayout position="50,100" width="300"/>
+  <!-- 常规文本 -->
+  <Group>
+    <Text text=" information. " fontFamily="Arial" fontSize="18"/>
+    <Fill color="#333333"/>
+  </Group>
+  <!-- 带下划线的链接样式 -->
+  <Group>
+    <Text text="Click here" fontFamily="Arial" fontSize="18"/>
+    <Fill color="#0066CC"/>
+    <Stroke color="#0066CC" width="1"/>
+  </Group>
+  <!-- 常规文本 -->
+  <Group>
+    <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
+    <Fill color="#333333"/>
+  </Group>
+  <!-- TextLayout 统一排版所有 Text -->
+  <TextLayout position="50,100" width="300" textAlign="start" lineHeight="1.5"/>
 </Layer>
 ```
+
+**说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
 
 ### 5.6 复制器（Repeater）
 
@@ -1970,52 +2028,283 @@ Layer / Group
 
 ### B.1 完整示例
 
+以下示例涵盖 PAGX 的所有主要节点类型，展示完整的文档结构。
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="300">
+<pagx version="1.0" width="800" height="520">
   
-  <!-- 背景 -->
+  <!-- ==================== 图层内容 ==================== -->
+  
+  <!-- 背景层：深色渐变 -->
   <Layer name="Background">
-    <Rectangle center="200,150" size="400,300"/>
-    <Fill color="@skyGradient"/>
+    <Rectangle center="400,260" size="800,520"/>
+    <Fill color="@bgGradient"/>
   </Layer>
   
-  <!-- 标题：使用 Group 是因为需要整体变换 -->
+  <!-- 装饰光晕 -->
+  <Layer name="GlowTopLeft" blendMode="screen">
+    <Ellipse center="100,80" size="300,300"/>
+    <Fill color="@glowPurple"/>
+  </Layer>
+  <Layer name="GlowBottomRight" blendMode="screen">
+    <Ellipse center="700,440" size="400,400"/>
+    <Fill color="@glowBlue"/>
+  </Layer>
+  
+  <!-- ===== 标题区 y=60 ===== -->
   <Layer name="Title">
-    <Group anchorPoint="100,20" position="200,50">
-      <Text text="Hello PAGX!" position="0,32" fontFamily="Helvetica" fontStyle="Bold" fontSize="32"/>
-      <Fill color="#333333"/>
-      <Stroke color="#FFFFFF" width="2" placement="foreground"/>
-    </Group>
-    <DropShadowStyle offsetX="2" offsetY="2" blurX="4" blurY="4" color="#00000040"/>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="56"/>
+    <TextLayout position="400,55" textAlign="center"/>
+    <Fill color="@titleGradient"/>
+  </Layer>
+  <Layer name="Subtitle">
+    <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="400,95" textAlign="center"/>
+    <Fill color="#FFFFFF60"/>
   </Layer>
   
-  <!-- 使用合成的星星 -->
-  <Layer composition="@star" x="50" y="80"/>
-  <Layer composition="@star" x="320" y="100" alpha="0.7"/>
+  <!-- ===== 几何图形区 y=150 ===== -->
+  <Layer name="ShapeCards" y="150">
+    <!-- 卡片1：圆角矩形 -->
+    <Group position="100,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="100,0">
+      <Rectangle center="0,0" size="50,35" roundness="6"/>
+      <Fill color="@coral"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#E7524080"/>
+    </Group>
+    
+    <!-- 卡片2：椭圆 -->
+    <Group position="230,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="230,0">
+      <Ellipse center="0,0" size="50,35"/>
+      <Fill color="@purple"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#A855F780"/>
+    </Group>
+    
+    <!-- 卡片3：星形 -->
+    <Group position="360,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="360,0">
+      <Polystar center="0,0" type="star" pointCount="5" outerRadius="22" innerRadius="10" rotation="-90"/>
+      <Fill color="@amber"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F59E0B80"/>
+    </Group>
+    
+    <!-- 卡片4：六边形 -->
+    <Group position="490,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="490,0">
+      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="24"/>
+      <Fill color="@teal"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#14B8A680"/>
+    </Group>
+    
+    <!-- 卡片5：自定义路径 -->
+    <Group position="620,0">
+      <Rectangle center="0,0" size="100,80" roundness="12"/>
+      <Fill color="#FFFFFF08"/>
+      <Stroke color="#FFFFFF15" width="1"/>
+    </Group>
+    <Group position="620,0">
+      <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
+      <Fill color="@orange"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F9731680"/>
+    </Group>
+  </Layer>
   
-  <!-- 遮罩示例 -->
-  <Layer id="maskShape" name="Mask" visible="false">
-    <Ellipse center="200,200" size="150,150"/>
+  <!-- ===== 修改器区 y=270 ===== -->
+  <Layer name="Modifiers" y="270">
+    <!-- TrimPath 波浪线 -->
+    <Group position="120,0">
+      <Path data="@wavePath"/>
+      <TrimPath start="0" end="0.75"/>
+      <Stroke color="@cyan" width="3" cap="round"/>
+    </Group>
+    
+    <!-- RoundCorner -->
+    <Group position="280,0">
+      <Rectangle center="0,0" size="60,40"/>
+      <RoundCorner radius="10"/>
+      <Fill color="@emerald"/>
+    </Group>
+    
+    <!-- MergePath -->
+    <Group position="420,0">
+      <Rectangle center="-10,0" size="35,35"/>
+      <Ellipse center="10,0" size="35,35"/>
+      <MergePath mode="xor"/>
+      <Fill color="@purple"/>
+    </Group>
+    
+    <!-- Repeater 环形 -->
+    <Group position="580,0">
+      <Ellipse center="25,0" size="10,10"/>
+      <Fill color="@cyan"/>
+      <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
+    </Group>
+    
+    <!-- 遮罩示例 -->
+    <Group position="700,0">
+      <Rectangle center="0,0" size="50,50"/>
+      <Fill color="@rainbow"/>
+    </Group>
+  </Layer>
+  <Layer id="circleMask" visible="false">
+    <Ellipse center="0,0" size="45,45"/>
     <Fill color="#FFFFFF"/>
   </Layer>
-  
-  <Layer name="MaskedContent" mask="@maskShape" maskType="alpha">
-    <Rectangle center="200,200" size="200,200"/>
-    <Fill color="#FF6B6B"/>
+  <Layer name="MaskedLayer" x="700" y="270" mask="@circleMask" maskType="alpha">
+    <Rectangle center="0,0" size="50,50"/>
+    <Fill color="@rainbow"/>
   </Layer>
   
-  <Resources>
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,300">
-      <ColorStop offset="0" color="#87CEEB"/>
-      <ColorStop offset="1" color="#E0F6FF"/>
-    </LinearGradient>
+  <!-- ===== 滤镜区 y=360 ===== -->
+  <Layer name="FilterCards" y="360">
+    <!-- 模糊滤镜 -->
+    <Group position="130,0">
+      <Rectangle center="0,0" size="80,60" roundness="10"/>
+      <Fill color="@emerald"/>
+      <BlurFilter blurX="3" blurY="3"/>
+    </Group>
     
-    <Composition id="star" width="50" height="50">
-      <Layer name="starLayer">
-        <Polystar center="25,25" type="star" pointCount="5"
-                  outerRadius="25" innerRadius="10"/>
-        <Fill color="#FFD700"/>
+    <!-- 投影滤镜 -->
+    <Group position="260,0">
+      <Rectangle center="0,0" size="80,60" roundness="10"/>
+      <Fill color="@cyan"/>
+      <DropShadowFilter offsetX="4" offsetY="4" blurX="10" blurY="10" color="#00000080"/>
+    </Group>
+    
+    <!-- 颜色矩阵（灰度） -->
+    <Group position="390,0">
+      <Ellipse center="0,0" size="55,55"/>
+      <Fill color="@purple"/>
+      <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+    </Group>
+    
+    <!-- 混合滤镜 -->
+    <Group position="520,0">
+      <Rectangle center="0,0" size="80,60" roundness="10"/>
+      <Fill color="@coral"/>
+      <BlendFilter color="#3B82F660" blendMode="overlay"/>
+    </Group>
+    
+    <!-- 图片填充 + 投影样式 -->
+    <Group position="670,0">
+      <Rectangle center="0,0" size="90,60" roundness="8"/>
+      <Fill>
+        <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
+      </Fill>
+      <Stroke color="#FFFFFF30" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="12" blurY="12" color="#00000060"/>
+    </Group>
+  </Layer>
+  
+  <!-- ===== 底部区 y=450 ===== -->
+  <Layer name="Footer" y="455">
+    <!-- 按钮组件 -->
+    <Group position="200,0">
+      <Rectangle center="0,0" size="120,36" roundness="18"/>
+      <Fill color="@buttonGradient"/>
+      <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#FFFFFF30"/>
+    </Group>
+    <Group position="200,0">
+      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+      <TextLayout position="0,0" textAlign="center"/>
+      <Fill color="#FFFFFF"/>
+    </Group>
+    
+    <!-- 预排版文本 -->
+    <Group position="400,0">
+      <Text fontFamily="Arial" fontSize="18">
+        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
+      </Text>
+      <Fill color="#FFFFFF60"/>
+    </Group>
+    
+    <!-- 合成引用 -->
+    <Group position="600,0">
+      <Rectangle center="0,0" size="100,36" roundness="8"/>
+      <Fill color="#FFFFFF10"/>
+      <Stroke color="#FFFFFF20" width="1"/>
+    </Group>
+  </Layer>
+  <Layer composition="@badgeComp" x="600" y="455"/>
+  
+  <!-- ==================== 资源区 ==================== -->
+  <Resources>
+    <!-- 图片资源（使用项目中真实存在的图片） -->
+    <Image id="photo" source="resources/apitest/imageReplacement.png"/>
+    <!-- 路径数据 -->
+    <PathData id="wavePath" data="M 0 0 Q 30 -20 60 0 T 120 0 T 180 0"/>
+    <!-- 嵌入矢量字体（图标） -->
+    <Font id="iconFont">
+      <Glyph path="M 0 -8 L 8 8 L -8 8 Z"/>
+      <Glyph path="M -8 -8 L 8 -8 L 8 8 L -8 8 Z"/>
+      <Glyph path="M 0 -10 A 10 10 0 1 1 0 10 A 10 10 0 1 1 0 -10"/>
+    </Font>
+    <!-- 背景渐变 -->
+    <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,520">
+      <ColorStop offset="0" color="#0F0F1A"/>
+      <ColorStop offset="0.5" color="#1A1A2E"/>
+      <ColorStop offset="1" color="#0D1B2A"/>
+    </LinearGradient>
+    <!-- 光晕渐变 -->
+    <RadialGradient id="glowPurple" center="0,0" radius="150">
+      <ColorStop offset="0" color="#A855F720"/>
+      <ColorStop offset="1" color="#A855F700"/>
+    </RadialGradient>
+    <RadialGradient id="glowBlue" center="0,0" radius="200">
+      <ColorStop offset="0" color="#3B82F615"/>
+      <ColorStop offset="1" color="#3B82F600"/>
+    </RadialGradient>
+    <!-- 标题渐变 -->
+    <LinearGradient id="titleGradient" startPoint="0,0" endPoint="200,0">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="0.5" color="#A855F7"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </LinearGradient>
+    <!-- 按钮渐变 -->
+    <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
+      <ColorStop offset="0" color="#A855F7"/>
+      <ColorStop offset="1" color="#3B82F6"/>
+    </LinearGradient>
+    <!-- 锥形渐变 -->
+    <ConicGradient id="rainbow" center="25,25" startAngle="0" endAngle="360">
+      <ColorStop offset="0" color="#F43F5E"/>
+      <ColorStop offset="0.25" color="#A855F7"/>
+      <ColorStop offset="0.5" color="#3B82F6"/>
+      <ColorStop offset="0.75" color="#14B8A6"/>
+      <ColorStop offset="1" color="#F43F5E"/>
+    </ConicGradient>
+    <!-- 纯色定义 -->
+    <SolidColor id="coral" color="#F43F5E"/>
+    <SolidColor id="purple" color="#A855F7"/>
+    <SolidColor id="amber" color="#F59E0B"/>
+    <SolidColor id="teal" color="#14B8A6"/>
+    <SolidColor id="orange" color="#F97316"/>
+    <SolidColor id="cyan" color="#06B6D4"/>
+    <SolidColor id="emerald" color="#10B981"/>
+    <!-- 合成组件 -->
+    <Composition id="badgeComp" width="100" height="36">
+      <Layer>
+        <Text text="v1.0" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
+        <TextLayout position="50,18" textAlign="center"/>
+        <Fill color="#FFFFFF80"/>
       </Layer>
     </Composition>
   </Resources>
@@ -2023,142 +2312,20 @@ Layer / Group
 </pagx>
 ```
 
-### B.2 功能示例
+**示例说明**：
 
-以下示例省略外层 `<?xml>`、`<pagx>`、`<Resources>` 等样板代码，仅展示核心片段。
+本示例展示了 PAGX 的完整功能集，采用现代深色主题设计：
 
-#### B.2.1 多重填充/描边
-
-```xml
-<!-- 多重填充：棋盘格图案 + 半透明红色覆盖 -->
-<Rectangle center="100,100" size="200,100" roundness="10"/>
-<Fill>
-  <ImagePattern image="@checkerboard" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
-<Fill color="#FF000080"/>
-
-<!-- 多重描边：由粗到细渐变发光效果 -->
-<Path data="M10,50 Q50,10 90,50 T170,50"/>
-<Stroke color="#0088FF40" width="12" cap="round" join="round"/>
-<Stroke color="#0088FF80" width="6" cap="round" join="round"/>
-<Stroke color="#0088FF" width="2" cap="round" join="round"/>
-```
-
-#### B.2.2 TrimPath 路径裁剪
-
-```xml
-<!-- 独立模式：每个形状独立裁剪 50% -->
-<Rectangle center="50,50" size="80,80"/>
-<Ellipse center="150,50" size="80,80"/>
-<TrimPath start="0" end="0.5" type="separate"/>
-<Stroke color="#333333" width="3"/>
-
-<!-- 连续模式：所有路径视为整体，显示中间 50% -->
-<Path data="M0,100 L100,100"/>
-<Path data="M0,120 L100,120"/>
-<TrimPath start="0.25" end="0.75" type="continuous"/>
-<Stroke color="#FF6600" width="2"/>
-```
-
-#### B.2.3 Repeater 阵列效果
-
-```xml
-<!-- 放射阵列：12 个圆点围成圆形 -->
-<Group>
-  <Ellipse center="80,0" size="10,10"/>
-  <Fill color="#3366FF"/>
-  <Repeater copies="12" position="0,0" rotation="30" anchorPoint="0,0"/>
-</Group>
-
-<!-- 渐隐阵列：透明度从 1 渐变到 0.2 -->
-<Rectangle center="0,0" size="30,30"/>
-<Fill color="#FF3366"/>
-<Repeater copies="5" position="40,0" startAlpha="1" endAlpha="0.2"/>
-```
-
-#### B.2.4 TextModifier 逐字变换
-
-```xml
-<!-- 波浪文字：逐字上下偏移 -->
-<Layer>
-  <Text text="WAVE TEXT" position="0,50" fontFamily="Arial" fontSize="32"/>
-  <TextModifier position="0,-20">
-    <RangeSelector start="0" end="1" shape="triangle"/>
-  </TextModifier>
-  <Fill color="#333333"/>
-</Layer>
-
-<!-- 颜色渐变文字 -->
-<Layer>
-  <Text text="GRADIENT" position="0,100" fontFamily="Arial" fontSize="32"/>
-  <TextModifier fillColor="#FF0000">
-    <RangeSelector start="0" end="1" shape="rampUp"/>
-  </TextModifier>
-  <Fill color="#0000FF"/>
-</Layer>
-```
-
-#### B.2.5 TextLayout 文本排版
-
-```xml
-<!-- 点文本：居中对齐 -->
-<Layer>
-  <Text text="Centered Text" fontFamily="Arial" fontSize="24"/>
-  <TextLayout position="200,50" textAlign="center"/>
-  <Fill color="#333333"/>
-</Layer>
-
-<!-- 富文本：多种样式 + 自动换行 -->
-<Layer>
-  <Group>
-    <Text text="This is " fontFamily="Arial" fontSize="16"/>
-    <Fill color="#333333"/>
-  </Group>
-  <Group>
-    <Text text="bold" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
-    <Fill color="#333333"/>
-  </Group>
-  <Group>
-    <Text text=" and " fontFamily="Arial" fontSize="16"/>
-    <Fill color="#333333"/>
-  </Group>
-  <Group>
-    <Text text="italic" fontFamily="Arial" fontStyle="Italic" fontSize="16"/>
-    <Fill color="#333333"/>
-  </Group>
-  <Group>
-    <Text text=" text that will automatically wrap." fontFamily="Arial" fontSize="16"/>
-    <Fill color="#333333"/>
-  </Group>
-  <TextLayout position="50,100" width="200" height="150" textAlign="justify" lineHeight="1.5"/>
-</Layer>
-```
-
-#### B.2.6 TextPath 沿路径文本
-
-```xml
-<!-- 引用 PathData 资源（需要在 Resources 中定义: <PathData id="arc" data="M0,100 Q100,0 200,100"/>） -->
-<!-- 居中对齐 -->
-<Layer>
-  <Text text="Text along a curved path" fontFamily="Arial" fontSize="18"/>
-  <TextPath path="@arc" textAlign="center"/>
-  <Fill color="#336699"/>
-</Layer>
-
-<!-- 强制填满路径（Justify 模式） -->
-<Layer>
-  <Text text="Justified Text" fontFamily="Arial" fontSize="18"/>
-  <TextPath path="@arc" textAlign="justify" firstMargin="20" lastMargin="20"/>
-  <Fill color="#996633"/>
-</Layer>
-
-<!-- 内联路径数据 -->
-<Layer>
-  <Text text="Inline Path" fontFamily="Arial" fontSize="18"/>
-  <TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
-  <Fill color="#339966"/>
-</Layer>
-```
+| 类别 | 涵盖节点 |
+|------|---------|
+| **资源** | Image、PathData、Font/Glyph、SolidColor、LinearGradient、RadialGradient、ConicGradient、Composition |
+| **几何元素** | Rectangle、Ellipse、Polystar（star/polygon）、Path、Text |
+| **绘制器** | Fill（纯色/渐变/图片）、Stroke |
+| **图层样式** | DropShadowStyle、InnerShadowStyle |
+| **滤镜** | BlurFilter、DropShadowFilter、BlendFilter、ColorMatrixFilter |
+| **形状修改器** | TrimPath、RoundCorner、MergePath |
+| **文本修改器** | TextModifier/RangeSelector、TextPath、TextLayout、GlyphRun |
+| **其他** | Repeater、Group、遮罩（mask/maskType）、合成引用 |
 
 ---
 
@@ -2272,8 +2439,7 @@ Layer / Group
 | `image` | idref | (必填) |
 | `tileModeX` | TileMode | clamp |
 | `tileModeY` | TileMode | clamp |
-| `minFilterMode` | FilterMode | linear |
-| `magFilterMode` | FilterMode | linear |
+| `filterMode` | FilterMode | linear |
 | `mipmapMode` | MipmapMode | linear |
 | `matrix` | string | 单位矩阵 |
 
@@ -2632,5 +2798,5 @@ Layer / Group
 | **SelectorMode** | `add`, `subtract`, `intersect`, `min`, `max`, `difference` |
 | **TextAlign** | `start`, `center`, `end`, `justify` |
 | **VerticalAlign** | `top`, `center`, `bottom` |
-| **TextDirection** | `horizontal`, `vertical` |
+| **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |

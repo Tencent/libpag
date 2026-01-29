@@ -20,21 +20,21 @@
 
 #include <string>
 #include <vector>
-#include "pagx/nodes/BlendMode.h"
-#include "pagx/nodes/Color.h"
-#include "pagx/nodes/ColorSpace.h"
+#include "pagx/types/BlendMode.h"
+#include "pagx/types/Color.h"
+#include "pagx/types/ColorSpace.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
-#include "pagx/nodes/FilterMode.h"
+#include "pagx/types/FilterMode.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LayerFilter.h"
-#include "pagx/nodes/LayerPlacement.h"
+#include "pagx/types/LayerPlacement.h"
 #include "pagx/nodes/LayerStyle.h"
-#include "pagx/nodes/Matrix.h"
+#include "pagx/types/Matrix.h"
 #include "pagx/nodes/MergePath.h"
-#include "pagx/nodes/MipmapMode.h"
+#include "pagx/types/MipmapMode.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RangeSelector.h"
@@ -42,7 +42,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextLayout.h"
 #include "pagx/nodes/TextPath.h"
-#include "pagx/nodes/TileMode.h"
+#include "pagx/types/TileMode.h"
 #include "pagx/nodes/TrimPath.h"
 
 namespace pagx {

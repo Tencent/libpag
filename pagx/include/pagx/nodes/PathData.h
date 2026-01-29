@@ -21,20 +21,10 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
-#include "pagx/nodes/Rect.h"
+#include "pagx/types/PathVerb.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
-
-/**
- * Path command types.
- */
-enum class PathVerb {
-  Move,   // 1 point: destination
-  Line,   // 1 point: end point
-  Quad,   // 2 points: control point, end point
-  Cubic,  // 3 points: control point 1, control point 2, end point
-  Close   // 0 points
-};
 
 /**
  * PathData stores path commands in a format optimized for fast iteration

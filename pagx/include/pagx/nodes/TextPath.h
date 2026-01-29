@@ -21,7 +21,7 @@
 #include <string>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/PathData.h"
-#include "pagx/nodes/TextAlign.h"
+#include "pagx/types/TextAlign.h"
 
 namespace pagx {
 
