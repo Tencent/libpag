@@ -31,7 +31,7 @@ const PAGX_DIR = path.dirname(SPEC_DIR);
 const SPEC_FILE_EN = path.join(SPEC_DIR, 'pagx_spec.md');
 const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
 const PACKAGE_FILE = path.join(SPEC_DIR, 'package.json');
-const SITE_DIR = path.join(PAGX_DIR, 'public');
+const DEFAULT_SITE_DIR = path.join(PAGX_DIR, 'public');
 
 /**
  * Read version from package.json.
@@ -710,16 +710,25 @@ function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUr
  */
 function parseArgs() {
   const args = process.argv.slice(2);
-  const options = {};
+  const options = {
+    siteDir: DEFAULT_SITE_DIR,
+  };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--help' || arg === '-h') {
+    if ((arg === '-o' || arg === '--output') && args[i + 1]) {
+      options.siteDir = path.resolve(args[i + 1]);
+      i++;
+    } else if (arg === '--help' || arg === '-h') {
       console.log(`
 PAGX Specification Publisher
 
 Usage:
-    cd pagx/spec && npm run publish
+    npm run publish [-- -o <output-dir>]
+
+Options:
+    -o, --output <dir>  Output directory (default: ../public)
+    -h, --help          Show this help message
 
 Configuration (package.json):
     version        - Current version to publish
@@ -731,12 +740,9 @@ Source files:
     spec/pagx_spec.zh_CN.md  - Chinese version
 
 Output structure:
-    public/index.html               - Redirect page
-    public/<version>/index.html     - English (default)
-    public/<version>/zh/index.html  - Chinese
-
-Examples:
-    npm run publish:spec
+    <output>/index.html               - Redirect page
+    <output>/<version>/index.html     - English (default)
+    <output>/<version>/zh/index.html  - Chinese
 `);
       process.exit(0);
     }
@@ -750,6 +756,7 @@ Examples:
  */
 function main() {
   const options = parseArgs();
+  const siteDir = options.siteDir;
 
   // Read versions from package.json
   const version = getVersion();
@@ -758,11 +765,12 @@ function main() {
 
   console.log(`Version: ${version}`);
   console.log(`Stable: ${stableVersion || '(none)'}`);
+  console.log(`Output: ${siteDir}`);
   if (isDraft) {
     console.log('Mode: Draft');
   }
 
-  const baseOutputDir = path.join(SITE_DIR, version);
+  const baseOutputDir = path.join(siteDir, version);
 
   // Viewer URL (relative path from spec pages to viewer)
   const viewerUrlFromRoot = '../viewer/';
@@ -784,12 +792,12 @@ function main() {
   const redirectVersion = stableVersion || version;
   console.log('\nGenerating redirect page...');
   console.log(`  Redirect to: ${redirectVersion}`);
-  generateRedirectPage(redirectVersion);
+  generateRedirectPage(siteDir, redirectVersion);
 
   // Copy favicon
   console.log('\nCopying favicon...');
   const faviconSrc = path.join(SPEC_DIR, 'favicon.png');
-  const faviconDest = path.join(SITE_DIR, 'favicon.png');
+  const faviconDest = path.join(siteDir, 'favicon.png');
   fs.copyFileSync(faviconSrc, faviconDest);
   console.log(`  Copied: ${faviconDest}`);
 
@@ -799,7 +807,7 @@ function main() {
 /**
  * Generate the redirect index page at site/index.html.
  */
-function generateRedirectPage(version) {
+function generateRedirectPage(siteDir, version) {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -831,8 +839,8 @@ function generateRedirectPage(version) {
 </html>
 `;
 
-  fs.mkdirSync(SITE_DIR, { recursive: true });
-  const outputFile = path.join(SITE_DIR, 'index.html');
+  fs.mkdirSync(siteDir, { recursive: true });
+  const outputFile = path.join(siteDir, 'index.html');
   fs.writeFileSync(outputFile, html, 'utf-8');
   console.log(`  Generated: ${outputFile}`);
 }
