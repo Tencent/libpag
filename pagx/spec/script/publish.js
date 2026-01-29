@@ -248,7 +248,7 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
-    <link rel="icon" href="${faviconUrl}" type="image/x-icon">
+    <link rel="icon" href="${faviconUrl}" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <style>
         :root {
@@ -769,8 +769,8 @@ function main() {
   const viewerUrlFromZh = '../../viewer/';
 
   // Favicon URL (relative path from spec pages to favicon)
-  const faviconUrlFromRoot = '../favicon.ico';
-  const faviconUrlFromZh = '../../favicon.ico';
+  const faviconUrlFromRoot = '../favicon.png';
+  const faviconUrlFromZh = '../../favicon.png';
 
   // Publish English version (default, at root)
   console.log('\nPublishing English version...');
@@ -788,8 +788,8 @@ function main() {
 
   // Copy favicon
   console.log('\nCopying favicon...');
-  const faviconSrc = path.join(SPEC_DIR, 'favicon.ico');
-  const faviconDest = path.join(SITE_DIR, 'favicon.ico');
+  const faviconSrc = path.join(SPEC_DIR, 'favicon.png');
+  const faviconDest = path.join(SITE_DIR, 'favicon.png');
   fs.copyFileSync(faviconSrc, faviconDest);
   console.log(`  Copied: ${faviconDest}`);
 
