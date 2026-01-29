@@ -11,7 +11,7 @@
  *
  * Output structure:
  *     ../public/<version>/index.html     - English (default)
- *     ../public/<version>/cn/index.html  - Chinese
+ *     ../public/<version>/zh/index.html  - Chinese
  *
  * Usage:
  *     cd pagx/spec && npm run publish
@@ -727,7 +727,7 @@ Source files:
 Output structure:
     public/index.html               - Redirect page
     public/<version>/index.html     - English (default)
-    public/<version>/cn/index.html  - Chinese
+    public/<version>/zh/index.html  - Chinese
 
 Examples:
     npm run publish:spec
@@ -760,15 +760,15 @@ function main() {
 
   // Viewer URL (relative path from spec pages to viewer)
   const viewerUrlFromRoot = '../viewer/';
-  const viewerUrlFromCn = '../../viewer/';
+  const viewerUrlFromZh = '../../viewer/';
 
   // Publish English version (default, at root)
   console.log('\nPublishing English version...');
-  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'cn/', viewerUrlFromRoot);
+  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'zh/', viewerUrlFromRoot);
 
-  // Publish Chinese version (under /cn/)
+  // Publish Chinese version (under /zh/)
   console.log('\nPublishing Chinese version...');
-  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'cn'), 'zh', version, isDraft, '../', viewerUrlFromCn);
+  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh);
 
   // Generate redirect index page (point to stableVersion if exists, otherwise current version)
   const redirectVersion = stableVersion || version;
@@ -800,7 +800,7 @@ function generateRedirectPage(version) {
             // Build redirect URL
             var path = version + '/';
             if (isChinese) {
-                path += 'cn/';
+                path += 'zh/';
             }
             
             // Redirect
