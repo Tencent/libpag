@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TextPath modifier -->
+<!-- Demonstrates TextPath modifier: text following a curved path -->
 <pagx version="1.0" width="200" height="200">
+  <!-- Guide path visualization -->
   <Layer>
-    <Text text="PAGX Text Path" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <TextPath path="M 20,150 Q 100,30 180,150" textAlign="center"/>
+    <Path data="M 20,160 Q 100,40 180,160"/>
+    <Stroke color="#E0E0E0" width="2"/>
+  </Layer>
+  <!-- Text along the curve -->
+  <Layer>
+    <Text text="PATH" fontFamily="Arial" fontStyle="Bold" fontSize="24"/>
+    <TextPath path="M 20,160 Q 100,40 180,160" textAlign="center"/>
     <Fill color="#3498DB"/>
   </Layer>
 </pagx>

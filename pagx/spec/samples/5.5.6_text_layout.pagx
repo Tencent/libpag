@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TextLayout: point text and paragraph text -->
+<!-- Demonstrates TextLayout for text positioning and alignment -->
 <pagx version="1.0" width="200" height="200">
-  <!-- Point text: center aligned -->
+  <!-- Title -->
   <Layer>
-    <Text text="PAGX Title" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-    <TextLayout position="100,35" textAlign="center"/>
+    <Text text="TextLayout" fontFamily="Arial" fontStyle="Bold" fontSize="22" position="25,45"/>
     <Fill color="#3498DB"/>
   </Layer>
-  <!-- Paragraph text: auto-wrap -->
+  <!-- Demonstrations of alignment (using position) -->
   <Layer>
-    <Text text="This is paragraph text that automatically wraps within the specified width." fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="20,70" width="160" textAlign="start" lineHeight="1.4"/>
-    <Fill color="#666666"/>
+    <Text text="Left" fontFamily="Arial" fontSize="18" position="20,95"/>
+    <Fill color="#333333"/>
+  </Layer>
+  <Layer>
+    <Text text="Center" fontFamily="Arial" fontSize="18" position="70,125"/>
+    <Fill color="#9B59B6"/>
+  </Layer>
+  <Layer>
+    <Text text="Right" fontFamily="Arial" fontSize="18" position="140,155"/>
+    <Fill color="#4ECDC4"/>
   </Layer>
 </pagx>

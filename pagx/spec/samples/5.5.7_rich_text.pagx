@@ -1,22 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="350" height="80">
+<!-- Demonstrates rich text with multiple styled Text elements -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Title -->
   <Layer>
-    <!-- Regular text -->
-    <Group>
-      <Text text="This is " fontFamily="Arial" fontSize="18"/>
-      <Fill color="#333333"/>
-    </Group>
-    <!-- Bold red text -->
-    <Group>
-      <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-      <Fill color="#FF0000"/>
-    </Group>
-    <!-- Regular text -->
-    <Group>
-      <Text text=" information." fontFamily="Arial" fontSize="18"/>
-      <Fill color="#333333"/>
-    </Group>
-    <!-- TextLayout applies unified typography -->
-    <TextLayout position="20,50" width="310" textAlign="start"/>
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="35,45"/>
+    <Fill color="#3498DB"/>
+  </Layer>
+  <!-- Multi-color text line -->
+  <Layer>
+    <Text text="Hello " fontFamily="Arial" fontSize="20" position="30,95"/>
+    <Fill color="#333333"/>
+  </Layer>
+  <Layer>
+    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="95,95"/>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <!-- Another styled line -->
+  <Layer>
+    <Text text="PAGX " fontFamily="Arial" fontStyle="Bold" fontSize="18" position="30,140"/>
+    <Fill color="#9B59B6"/>
+  </Layer>
+  <Layer>
+    <Text text="Format" fontFamily="Arial" fontSize="18" position="90,140"/>
+    <Fill color="#4ECDC4"/>
   </Layer>
 </pagx>

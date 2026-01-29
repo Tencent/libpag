@@ -1,13 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="100">
+<!-- Demonstrates TextModifier for character-level text animations -->
+<pagx version="1.0" width="200" height="200">
+  <!-- Title -->
   <Layer>
-    <Group>
-      <Text text="Hello " fontFamily="Arial" fontSize="24" position="20,50"/>
-      <Text text="World" fontFamily="Arial" fontSize="24" position="90,50"/>
-      <TextModifier position="0,-5">
-        <RangeSelector start="0" end="1" shape="triangle"/>
-      </TextModifier>
-      <Fill color="#333333"/>
-    </Group>
+    <Text text="TextModifier" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="28,45"/>
+    <Fill color="#3498DB"/>
+  </Layer>
+  <!-- Basic animated text -->
+  <Layer>
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="32" position="45,105"/>
+    <TextModifier position="0,-8">
+      <RangeSelector start="0" end="0.5" shape="triangle"/>
+    </TextModifier>
+    <Fill color="#FF6B6B"/>
+  </Layer>
+  <!-- Scaled text -->
+  <Layer>
+    <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="40,165"/>
+    <TextModifier scale="1.2,1.2">
+      <RangeSelector start="0" end="1" shape="square"/>
+    </TextModifier>
+    <Fill color="#9B59B6"/>
   </Layer>
 </pagx>

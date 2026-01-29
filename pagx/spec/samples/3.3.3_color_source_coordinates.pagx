@@ -2,12 +2,13 @@
 <!-- Demonstrates that color source coordinates are relative to geometry origin -->
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Rectangle center="100,100" size="120,120" roundness="8"/>
+    <Rectangle center="100,100" size="140,140" roundness="10"/>
     <Fill color="@grad"/>
   </Layer>
   <Resources>
-    <LinearGradient id="grad" startPoint="0,0" endPoint="120,0">
+    <LinearGradient id="grad" startPoint="0,0" endPoint="140,140">
       <ColorStop offset="0" color="#FF6B6B"/>
+      <ColorStop offset="0.5" color="#9B59B6"/>
       <ColorStop offset="1" color="#3498DB"/>
     </LinearGradient>
   </Resources>
