@@ -31,6 +31,16 @@
             </div>
             <p id="progress-text" class="progress-text">0%</p>
         </div>
+        <div id="error-content" class="error-content hidden">
+            <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <p class="error-title">Failed to load file</p>
+            <p id="error-message" class="error-message"></p>
+            <button id="error-btn" class="file-btn">Browse File</button>
+        </div>
     </div>
     <div id="toolbar" class="toolbar hidden">
         <button id="open-btn" class="toolbar-btn" title="Open PAGX File">

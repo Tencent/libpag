@@ -149,6 +149,39 @@ html, body {
     margin: 12px 0 0 0;
 }
 
+.error-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 80px;
+}
+
+.error-content.hidden {
+    display: none;
+}
+
+.error-icon {
+    width: 64px;
+    height: 64px;
+    color: #e74c3c;
+    margin-bottom: 20px;
+}
+
+.error-title {
+    color: #ccc;
+    font-size: 20px;
+    margin: 0 0 12px 0;
+}
+
+.error-message {
+    color: #888;
+    font-size: 14px;
+    margin: 0 0 24px 0;
+    max-width: 400px;
+    text-align: center;
+    word-break: break-word;
+}
+
 .toolbar {
     position: absolute;
     top: 16px;

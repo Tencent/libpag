@@ -455,10 +455,12 @@ function bindCanvasEvents(canvas: HTMLElement) {
 function showLoadingUI(): void {
     const dropZoneContent = document.getElementById('drop-zone-content');
     const loadingContent = document.getElementById('loading-content');
+    const errorContent = document.getElementById('error-content');
     const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && dropZone) {
+    if (dropZoneContent && loadingContent && errorContent && dropZone) {
         dropZoneContent.classList.add('hidden');
         loadingContent.classList.remove('hidden');
+        errorContent.classList.add('hidden');
         dropZone.classList.remove('hidden');
     }
 }
@@ -466,10 +468,27 @@ function showLoadingUI(): void {
 function showDropZoneUI(): void {
     const dropZoneContent = document.getElementById('drop-zone-content');
     const loadingContent = document.getElementById('loading-content');
+    const errorContent = document.getElementById('error-content');
     const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && dropZone) {
+    if (dropZoneContent && loadingContent && errorContent && dropZone) {
         dropZoneContent.classList.remove('hidden');
         loadingContent.classList.add('hidden');
+        errorContent.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+    }
+}
+
+function showErrorUI(message: string): void {
+    const dropZoneContent = document.getElementById('drop-zone-content');
+    const loadingContent = document.getElementById('loading-content');
+    const errorContent = document.getElementById('error-content');
+    const errorMessage = document.getElementById('error-message');
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZoneContent && loadingContent && errorContent && errorMessage && dropZone) {
+        dropZoneContent.classList.add('hidden');
+        loadingContent.classList.add('hidden');
+        errorContent.classList.remove('hidden');
+        errorMessage.textContent = message;
         dropZone.classList.remove('hidden');
     }
 }
@@ -532,8 +551,7 @@ async function loadPAGXFile(file: File) {
         await loadPAGXData(new Uint8Array(fileBuffer), file.name);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
-        showDropZoneUI();
-        alert('Failed to load PAGX file. Please check the file format.');
+        showErrorUI('The file could not be loaded. Please check the file format.');
     }
 }
 
@@ -583,8 +601,8 @@ async function loadPAGXFromURL(url: string) {
         await loadPAGXData(new Uint8Array(fileBuffer), name);
     } catch (error) {
         console.error('Failed to load PAGX from URL:', error);
-        showDropZoneUI();
-        alert(`Failed to load PAGX from URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        showErrorUI(message);
     }
 }
 
@@ -598,6 +616,7 @@ function setupDragAndDrop() {
     const container = document.getElementById('container') as HTMLDivElement;
     const fileInput = document.getElementById('file-input') as HTMLInputElement;
     const fileBtn = document.getElementById('file-btn') as HTMLButtonElement;
+    const errorBtn = document.getElementById('error-btn') as HTMLButtonElement;
     const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
     const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
@@ -637,6 +656,10 @@ function setupDragAndDrop() {
     }, false);
 
     fileBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    errorBtn.addEventListener('click', () => {
         fileInput.click();
     });
 
