@@ -449,11 +449,37 @@ class LayerBuilderImpl {
     auto layer = tgfx::VectorLayer::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> contents;
 
+    // Check if contents are all Groups, or need to be wrapped in a single VectorGroup
+    bool allGroups = true;
     for (const auto& element : node->contents) {
-      auto tgfxElement = convertVectorElement(element);
-      if (tgfxElement) {
-        contents.push_back(tgfxElement);
+      if (element->nodeType() != NodeType::Group) {
+        allGroups = false;
+        break;
       }
+    }
+
+    if (allGroups) {
+      // All contents are Groups - convert them directly
+      for (const auto& element : node->contents) {
+        auto tgfxElement = convertVectorElement(element);
+        if (tgfxElement) {
+          contents.push_back(tgfxElement);
+        }
+      }
+    } else {
+      // Contents are mixed or not Groups - wrap in a single VectorGroup
+      // This is needed because VectorLayer expects its root contents to be Groups
+      // when there are shapes + styles at the same level
+      auto wrapperGroup = std::make_shared<tgfx::VectorGroup>();
+      std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
+      for (const auto& element : node->contents) {
+        auto tgfxElement = convertVectorElement(element);
+        if (tgfxElement) {
+          elements.push_back(tgfxElement);
+        }
+      }
+      wrapperGroup->setElements(elements);
+      contents.push_back(wrapperGroup);
     }
 
     layer->setContents(contents);
