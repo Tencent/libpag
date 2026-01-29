@@ -1215,7 +1215,7 @@ class PAG_API PAGSurface {
    */
   static std::shared_ptr<PAGSurface> MakeFrom(HardwareBufferRef hardwareBuffer);
 
-  virtual ~PAGSurface() = default;
+  virtual ~PAGSurface();
 
   /**
    * Returns the width in pixels of the surface.
@@ -1269,6 +1269,7 @@ class PAG_API PAGSurface {
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
   bool externalContext = false;
+  void* glRestorer = nullptr;
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
