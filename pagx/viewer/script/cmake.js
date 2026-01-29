@@ -18,7 +18,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { fileURLToPath } from 'url';
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { createRequire } from 'module';
 import path from 'path';
 
@@ -39,10 +38,3 @@ process.argv.push("pagx-viewer");
 
 // Use vendor_tools from libpag
 require("../../../third_party/vendor_tools/lib-build");
-
-// Verify wasm files exist
-const wasmDir = path.resolve(viewerDir, 'wasm-mt');
-if (!existsSync(path.join(wasmDir, 'pagx-viewer.wasm'))) {
-    console.error('Build failed: pagx-viewer.wasm not found');
-    process.exit(1);
-}
