@@ -208,10 +208,11 @@ function createMarkedInstance() {
 /**
  * Generate the complete HTML document.
  */
-function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
+function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl) {
   const isEnglish = lang === 'en';
   const htmlLang = isEnglish ? 'en' : 'zh-CN';
   const tocTitle = isEnglish ? 'Table of Contents' : '目录';
+  const viewerLabel = isEnglish ? 'Viewer' : '在线预览';
   
   let draftBanner = '';
   let draftStyles = '';
@@ -231,7 +232,7 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
         .content {
             padding-top: 82px;
         }
-        .lang-switch {
+        .header-actions {
             top: 54px;
         }
         @media (max-width: 900px) {
@@ -495,12 +496,8 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
         .draft-banner strong {
             color: #5a4a06;
         }
-        /* Language switcher */
         .lang-switch {
-            position: fixed;
-            top: 12px;
-            right: 20px;
-            z-index: 1001;
+            position: relative;
         }
         .lang-switch-btn {
             display: flex;
@@ -562,18 +559,56 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
             background: #e3f2fd;
             color: #1565c0;
         }
+        /* Header buttons container */
+        .header-actions {
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        /* Viewer link */
+        .viewer-link {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #555;
+            font-size: 13px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .viewer-link:hover {
+            background: #e9ecef;
+            text-decoration: none;
+        }
+        .viewer-link svg {
+            width: 14px;
+            height: 14px;
+        }
 ${draftStyles}
     </style>
 </head>
 <body>
-${draftBanner}    <div class="lang-switch" onclick="this.classList.toggle('open')">
-        <button class="lang-switch-btn">
-            ${isEnglish ? 'English' : '简体中文'}
-            <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-        </button>
-        <div class="lang-switch-menu">
-            <a href="${isEnglish ? '#' : langSwitchUrl}"${isEnglish ? ' class="active"' : ''}>English</a>
-            <a href="${isEnglish ? langSwitchUrl : '#'}"${isEnglish ? '' : ' class="active"'}>简体中文</a>
+${draftBanner}    <div class="header-actions">
+        <a href="${viewerUrl}" class="viewer-link" target="_blank">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            ${viewerLabel}
+        </a>
+        <div class="lang-switch" onclick="this.classList.toggle('open')">
+            <button class="lang-switch-btn">
+                ${isEnglish ? 'English' : '简体中文'}
+                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <div class="lang-switch-menu">
+                <a href="${isEnglish ? '#' : langSwitchUrl}"${isEnglish ? ' class="active"' : ''}>English</a>
+                <a href="${isEnglish ? langSwitchUrl : '#'}"${isEnglish ? '' : ' class="active"'}>简体中文</a>
+            </div>
         </div>
     </div>
     <div class="container">
@@ -614,7 +649,7 @@ ${tocHtml}
 /**
  * Publish a single spec file.
  */
-function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl) {
+function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl) {
   if (!fs.existsSync(specFile)) {
     console.log(`  Skipped (file not found): ${specFile}`);
     return;
@@ -652,7 +687,7 @@ function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUr
   const htmlContent = marked.parse(mdContent);
 
   // Generate complete HTML document
-  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl);
+  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl);
 
   // Create output directory
   fs.mkdirSync(outputDir, { recursive: true });
@@ -723,13 +758,17 @@ function main() {
 
   const baseOutputDir = path.join(SITE_DIR, version);
 
+  // Viewer URL (relative path from spec pages to viewer)
+  const viewerUrlFromRoot = '../viewer/';
+  const viewerUrlFromCn = '../../viewer/';
+
   // Publish English version (default, at root)
   console.log('\nPublishing English version...');
-  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'cn/');
+  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'cn/', viewerUrlFromRoot);
 
   // Publish Chinese version (under /cn/)
   console.log('\nPublishing Chinese version...');
-  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'cn'), 'zh', version, isDraft, '../');
+  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'cn'), 'zh', version, isDraft, '../', viewerUrlFromCn);
 
   // Generate redirect index page (point to stableVersion if exists, otherwise current version)
   const redirectVersion = stableVersion || version;
