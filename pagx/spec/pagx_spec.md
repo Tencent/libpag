@@ -244,6 +244,8 @@ PAGX uses a standard 2D Cartesian coordinate system:
 </pagx>
 ```
 
+[▶ View Sample](samples/document-structure.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `version` | string | (required) | Format version |
@@ -271,6 +273,8 @@ PAGX uses a standard 2D Cartesian coordinate system:
   <Composition id="buttonComp" width="100" height="50"><!-- composition content --></Composition>
 </Resources>
 ```
+
+[▶ View Sample](samples/resources.pagx)
 
 #### 3.3.1 Image
 
@@ -327,6 +331,8 @@ Linear gradients interpolate along the direction from start point to end point.
 </LinearGradient>
 ```
 
+[▶ View Sample](samples/linear-gradient.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `startPoint` | point | (required) | Start point |
@@ -345,6 +351,8 @@ Radial gradients radiate outward from the center.
   <ColorStop offset="1" color="#000000"/>
 </RadialGradient>
 ```
+
+[▶ View Sample](samples/radial-gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -365,6 +373,8 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 </ConicGradient>
 ```
 
+[▶ View Sample](samples/conic-gradient.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `center` | point | 0,0 | Center point |
@@ -384,6 +394,8 @@ Diamond gradients radiate from the center toward the four corners.
   <ColorStop offset="1" color="#000000"/>
 </DiamondGradient>
 ```
+
+[▶ View Sample](samples/diamond-gradient.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -462,6 +474,8 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 </Layer>
 ```
 
+[▶ View Sample](samples/color-source-coordinate.pagx)
+
 - Applying `scale(2, 2)` transform to this layer: The rectangle becomes 200×200, and the gradient scales accordingly, maintaining consistent visual appearance
 - Directly changing Rectangle's size to 200,200: The rectangle becomes 200×200, but the gradient coordinates remain unchanged, covering only the left half of the rectangle
 
@@ -477,6 +491,8 @@ Compositions are used for content reuse (similar to After Effects pre-comps).
   </Layer>
 </Composition>
 ```
+
+[▶ View Sample](samples/composition.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -628,6 +644,8 @@ Layer background is primarily used for:
 <Layer composition="@buttonComp" x="100" y="200"/>
 ```
 
+[▶ View Sample](samples/layer.pagx)
+
 #### Child Elements
 
 Layer child elements are automatically categorized into four collections by type:
@@ -721,6 +739,8 @@ Some layer styles additionally use **layer contour** or **layer background** as 
 </Layer>
 ```
 
+[▶ View Sample](samples/layer-styles.pagx)
+
 **Common LayerStyle Attributes**:
 
 | Attribute | Type | Default | Description |
@@ -798,6 +818,8 @@ Unlike layer styles (Section 4.3), which **independently render** visual effects
   <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
 </Layer>
 ```
+
+[▶ View Sample](samples/layer-filters.pagx)
 
 #### 4.4.1 BlurFilter
 
@@ -884,6 +906,8 @@ The `scrollRect` attribute defines the layer's visible region; content outside t
 </Layer>
 ```
 
+[▶ View Sample](samples/scroll-rect.pagx)
+
 #### 4.5.2 Masking
 
 Reference another layer as a mask using the `mask` attribute.
@@ -898,6 +922,8 @@ Reference another layer as a mask using the `mask` attribute.
   <Fill color="#FF0000"/>
 </Layer>
 ```
+
+[▶ View Sample](samples/masking.pagx)
 
 **Masking Rules**:
 - The mask layer itself is not rendered (the `visible` attribute is ignored)
@@ -1250,6 +1276,8 @@ Fill draws the interior region of geometry using a specified color source.
 </Fill>
 ```
 
+[▶ View Sample](samples/fill.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `color` | color/idref | #000000 | Color value or color source reference, default black |
@@ -1291,6 +1319,8 @@ Stroke draws lines along geometry boundaries.
   </LinearGradient>
 </Stroke>
 ```
+
+[▶ View Sample](samples/stroke.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1385,6 +1415,8 @@ Trims paths to a specified start/end range.
 <TrimPath start="0.25" end="0.75" type="continuous"/>
 ```
 
+[▶ View Sample](samples/trim-path.pagx)
+
 #### 5.4.2 RoundCorner
 
 Converts sharp corners of paths to rounded corners.
@@ -1438,6 +1470,8 @@ Merges all shapes into a single shape.
 <Fill color="#3366FF"/>
 ```
 
+[▶ View Sample](samples/merge-path.pagx)
+
 ### 5.5 Text Modifiers
 
 Text modifiers transform individual glyphs within text.
@@ -1454,6 +1488,8 @@ When a text modifier is encountered, **all glyph lists** accumulated in the cont
   <Fill color="#333333"/>
 </Group>
 ```
+
+[▶ View Sample](samples/text-modifier.pagx)
 
 #### 5.5.2 Text to Shape Conversion
 
@@ -1623,6 +1659,8 @@ Arranges text along a specified path. The path can reference a PathData defined 
 <TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
 ```
 
+[▶ View Sample](samples/text-path.pagx)
+
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `path` | string/idref | (required) | SVG path data or PathData resource reference "@id" |
@@ -1676,6 +1714,8 @@ During rendering, an attached text typesetting module performs pre-layout, recal
   <Fill color="#333333"/>
 </Layer>
 ```
+
+[▶ View Sample: Point Text](samples/text-layout-point.pagx) | [▶ View Sample: Paragraph Text](samples/text-layout-paragraph.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1748,6 +1788,8 @@ Rich text is achieved through multiple Text elements within a Group, each Text h
 </Layer>
 ```
 
+[▶ View Sample](samples/rich-text.pagx)
+
 **Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
 
 ### 5.6 Repeater
@@ -1757,6 +1799,8 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 ```xml
 <Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
+
+[▶ View Sample](samples/repeater.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1824,6 +1868,8 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 </Group>
 ```
 
+[▶ View Sample](samples/repeater-text.pagx)
+
 ### 5.7 Group
 
 Group is a VectorElement container with transform properties.
@@ -1833,6 +1879,8 @@ Group is a VectorElement container with transform properties.
   <!-- child elements -->
 </Group>
 ```
+
+[▶ View Sample](samples/group.pagx)
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -1892,6 +1940,8 @@ Groups create isolated scopes for geometry accumulation and rendering:
 <Fill color="#0000FF"/>  <!-- Only fills ellipse, alpha=1.0 -->
 ```
 
+[▶ View Sample](samples/group-isolation.pagx)
+
 **Example 2 - Child Group Geometry Propagates Upward**:
 ```xml
 <Group>
@@ -1905,12 +1955,16 @@ Groups create isolated scopes for geometry accumulation and rendering:
 <Fill color="#0000FF"/>  <!-- Fill rectangle+ellipse (all child Group geometry) -->
 ```
 
+[▶ View Sample](samples/group-propagation.pagx)
+
 **Example 3 - Multiple Painters Reuse Geometry**:
 ```xml
 <Rectangle center="50,50" size="100,100"/>
 <Fill color="#FF0000"/>    <!-- Fill rectangle -->
 <Stroke color="#000000"/> <!-- Stroke same rectangle (geometry not cleared) -->
 ```
+
+[▶ View Sample](samples/multiple-painters.pagx)
 
 #### Multiple Fills and Strokes
 
@@ -1925,6 +1979,8 @@ Since painters do not clear the geometry list, the same geometry can have multip
 <Fill color="#FF000080"/>
 ```
 
+[▶ View Sample](samples/multiple-fills.pagx)
+
 **Example 5 - Multiple Strokes**:
 ```xml
 <Path d="M10,50 Q50,10 90,50 T170,50"/>
@@ -1932,6 +1988,8 @@ Since painters do not clear the geometry list, the same geometry can have multip
 <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
 <Stroke color="#0088FF" width="2" cap="round" join="round"/>
 ```
+
+[▶ View Sample](samples/multiple-strokes.pagx)
 
 **Example 6 - Mixed Overlay**:
 ```xml
@@ -1947,6 +2005,8 @@ Since painters do not clear the geometry list, the same geometry can have multip
 </Fill>
 <Stroke color="#1a3366" width="3"/>
 ```
+
+[▶ View Sample](samples/mixed-overlay.pagx)
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
 
@@ -2316,6 +2376,8 @@ The following example covers all major node types in PAGX, demonstrating complet
   
 </pagx>
 ```
+
+[▶ View Complete Sample](samples/complete-example.pagx)
 
 **Example Description**:
 

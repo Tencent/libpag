@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="350" height="150">
+  <Layer>
+    <!-- Regular text -->
+    <Group>
+      <Text text="This is " fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- Bold red text -->
+    <Group>
+      <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <!-- Regular text -->
+    <Group>
+      <Text text=" information. " fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- Underlined link style -->
+    <Group>
+      <Text text="Click here" fontFamily="Arial" fontSize="18"/>
+      <Fill color="#0066CC"/>
+    </Group>
+    <!-- Regular text -->
+    <Group>
+      <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- TextLayout applies unified typography to all Text elements -->
+    <TextLayout position="25,50" width="300" textAlign="start" lineHeight="1.5"/>
+  </Layer>
+</pagx>

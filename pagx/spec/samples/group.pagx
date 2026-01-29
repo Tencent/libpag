@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Group anchorPoint="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Ellipse center="100,100" size="40,40"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

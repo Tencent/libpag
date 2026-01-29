@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="150,150"/>
+    <Fill color="#FF0000"/>
+    <BlurFilter blurX="10" blurY="10"/>
+    <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+    <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
+  </Layer>
+</pagx>

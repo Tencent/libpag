@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Layer>
+    <Rectangle center="50,100" size="60,60"/>
+    <Fill color="#3366FF"/>
+    <Repeater copies="5" offset="0" order="belowOriginal" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+  </Layer>
+</pagx>

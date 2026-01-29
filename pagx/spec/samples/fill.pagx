@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Layer>
+    <!-- Solid color fill -->
+    <Rectangle center="75,100" size="100,100"/>
+    <Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
+  </Layer>
+  <Layer>
+    <!-- Inline linear gradient -->
+    <Rectangle center="225,100" size="100,100"/>
+    <Fill>
+      <LinearGradient startPoint="175,50" endPoint="275,50">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="150">
+  <!-- Example 2 - Child Group Geometry Propagates Upward -->
+  <Layer>
+    <Group>
+      <Rectangle center="50,75" size="60,60"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Group>
+      <Ellipse center="150,75" size="60,60"/>
+      <Fill color="#00FF00"/>
+    </Group>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>

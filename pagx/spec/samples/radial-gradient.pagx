@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <RadialGradient id="grad" center="50,50" radius="50">
+      <ColorStop offset="0" color="#FFFFFF"/>
+      <ColorStop offset="1" color="#000000"/>
+    </RadialGradient>
+    <Ellipse center="50,50" size="100,100"/>
+    <Fill color="@grad"/>
+  </Layer>
+</pagx>

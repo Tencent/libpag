@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="50,100" size="80,80"/>
+    <Ellipse center="150,100" size="80,80"/>
+    <MergePath mode="union"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>

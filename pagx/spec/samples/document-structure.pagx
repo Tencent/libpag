@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="400" height="300">
+  <Layer name="background">
+    <Rectangle center="200,150" size="400,300"/>
+    <Fill color="#F0F0F0"/>
+  </Layer>
+  <Layer name="content">
+    <Rectangle center="200,150" size="200,100" roundness="10"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+  <Resources>
+    <SolidColor id="brandRed" color="#FF0000"/>
+  </Resources>
+</pagx>
