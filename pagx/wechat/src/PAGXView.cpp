@@ -75,7 +75,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
     return;
   }
   LayerBuilder::Options options;
-  options.fallbackTypefaces = fallbackTypefaces;
+  // options.fallbackTypefaces = fallbackTypefaces;
   auto content = pagx::LayerBuilder::FromData(data->bytes(), data->size(), options);
   if (!content.root) {
     return;

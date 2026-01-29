@@ -13,19 +13,19 @@ import { PerformanceMonitor } from '../../utils/performance-monitor';
 const SAMPLE_FILES = [
   { 
     name: 'ColorPicker', 
-    url: 'https://pag.io/pagx/testFiles/ColorPicker.pagx'
+    url: 'https://pag.io/wx_pagx_demo/ColorPicker.pagx'
   },
   { 
     name: 'Baseline', 
-    url: 'https://pag.io/pagx/testFiles/Baseline.pagx'
+    url: 'https://pag.io/wx_pagx_demo/Baseline.pagx'
   },
   { 
     name: 'Guidelines', 
-    url: 'https://pag.io/pagx/testFiles/Guidelines.pagx'
+    url: 'https://pag.io/wx_pagx_demo/Guidelines.pagx'
   },
   { 
     name: 'complex6', 
-    url: 'https://pag.io/pagx/testFiles/complex6.pagx'
+    url: 'https://pag.io/wx_pagx_demo/complex6.pagx'
   },
 ];
 
