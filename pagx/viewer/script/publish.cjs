@@ -2,8 +2,7 @@
 /**
  * PAGX Viewer Publisher
  *
- * Copies the PAGX Viewer build output to the public directory.
- * Requires release build (npm run build:release).
+ * Builds and copies the PAGX Viewer to the public directory.
  *
  * Source files:
  *     index.html
@@ -12,17 +11,18 @@
  *     ../../resources/font/  (from libpag root)
  *
  * Output structure:
- *     ../public/viewer/index.html
- *     ../public/viewer/index.css
- *     ../public/viewer/fonts/
- *     ../public/viewer/wasm-mt/
+ *     <output>/index.html
+ *     <output>/index.css
+ *     <output>/fonts/
+ *     <output>/wasm-mt/
  *
  * Usage:
- *     npm run publish
+ *     npm run publish [-- -o <output-dir>]
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // Default paths
 const SCRIPT_DIR = __dirname;
@@ -30,8 +30,36 @@ const VIEWER_DIR = path.dirname(SCRIPT_DIR);
 const PAGX_DIR = path.dirname(VIEWER_DIR);
 const LIBPAG_DIR = path.dirname(PAGX_DIR);
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
-const PUBLIC_DIR = path.join(PAGX_DIR, 'public');
-const OUTPUT_DIR = path.join(PUBLIC_DIR, 'viewer');
+const DEFAULT_OUTPUT_DIR = path.join(PAGX_DIR, 'public', 'viewer');
+
+/**
+ * Parse command line arguments.
+ */
+function parseArgs() {
+  const args = process.argv.slice(2);
+  let outputDir = DEFAULT_OUTPUT_DIR;
+
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '-o' || args[i] === '--output') && args[i + 1]) {
+      outputDir = path.resolve(args[i + 1]);
+      i++;
+    } else if (args[i] === '-h' || args[i] === '--help') {
+      console.log(`
+PAGX Viewer Publisher
+
+Usage:
+    npm run publish [-- -o <output-dir>]
+
+Options:
+    -o, --output <dir>  Output directory (default: ../public/viewer)
+    -h, --help          Show this help message
+`);
+      process.exit(0);
+    }
+  }
+
+  return { outputDir };
+}
 
 /**
  * Copy a file from source to destination.
@@ -40,82 +68,68 @@ function copyFile(src, dest) {
   const destDir = path.dirname(dest);
   fs.mkdirSync(destDir, { recursive: true });
   fs.copyFileSync(src, dest);
-  console.log(`  Copied: ${path.relative(VIEWER_DIR, dest)}`);
+  console.log(`  Copied: ${dest}`);
 }
 
 /**
- * Check if the build is a release build (minified, no sourcemaps).
+ * Run a command and print output.
  */
-function checkReleaseBuild(wasmDir) {
-  const indexJs = path.join(wasmDir, 'index.js');
-
-  // Check if index.js exists
-  if (!fs.existsSync(indexJs)) {
-    return { ok: false, reason: 'wasm-mt/index.js not found. Please run "npm run build:release" first.' };
-  }
-
-  // Check if sourcemap exists (should not exist in release)
-  const mapFile = path.join(wasmDir, 'index.js.map');
-  if (fs.existsSync(mapFile)) {
-    return { ok: false, reason: 'Sourcemap file found. Please run "npm run build:release" first.' };
-  }
-
-  // Check if JS is minified (first line should be very long)
-  const content = fs.readFileSync(indexJs, 'utf-8');
-  const firstLine = content.split('\n')[0];
-  if (firstLine.length < 1000) {
-    return { ok: false, reason: 'JS file does not appear to be minified. Please run "npm run build:release" first.' };
-  }
-
-  return { ok: true };
+function runCommand(command, cwd) {
+  console.log(`  Running: ${command}`);
+  execSync(command, { cwd, stdio: 'inherit' });
 }
 
 /**
  * Main function.
  */
 function main() {
-  console.log('Publishing PAGX Viewer...\n');
+  const { outputDir } = parseArgs();
 
-  // Check if viewer build exists
-  const wasmDir = path.join(VIEWER_DIR, 'wasm-mt');
-  if (!fs.existsSync(wasmDir)) {
-    console.error('Error: Viewer build not found. Run "npm run build:release" first.');
-    process.exit(1);
-  }
+  console.log('Publishing PAGX Viewer...');
+  console.log(`Output: ${outputDir}\n`);
 
-  // Check if it's a release build
-  const releaseCheck = checkReleaseBuild(wasmDir);
-  if (!releaseCheck.ok) {
-    console.error(`Error: ${releaseCheck.reason}`);
-    process.exit(1);
-  }
+  // Build release (uses cache if available)
+  console.log('Step 1: Build release...');
+  runCommand('npm run build:release', VIEWER_DIR);
 
   // Copy index.html
+  console.log('\nStep 2: Copy files...');
   copyFile(
     path.join(VIEWER_DIR, 'index.html'),
-    path.join(OUTPUT_DIR, 'index.html')
+    path.join(outputDir, 'index.html')
   );
 
   // Copy index.css
   copyFile(
     path.join(VIEWER_DIR, 'index.css'),
-    path.join(OUTPUT_DIR, 'index.css')
+    path.join(outputDir, 'index.css')
+  );
+
+  // Copy favicon and logo
+  copyFile(
+    path.join(VIEWER_DIR, 'favicon.png'),
+    path.join(outputDir, 'favicon.png')
+  );
+  copyFile(
+    path.join(VIEWER_DIR, 'logo.png'),
+    path.join(outputDir, 'logo.png')
   );
 
   // Copy fonts from resources/font
   console.log('\n  Copying fonts...');
   copyFile(
     path.join(RESOURCES_FONT_DIR, 'NotoSansSC-Regular.otf'),
-    path.join(OUTPUT_DIR, 'fonts', 'NotoSansSC-Regular.otf')
+    path.join(outputDir, 'fonts', 'NotoSansSC-Regular.otf')
   );
   copyFile(
     path.join(RESOURCES_FONT_DIR, 'NotoColorEmoji.ttf'),
-    path.join(OUTPUT_DIR, 'fonts', 'NotoColorEmoji.ttf')
+    path.join(outputDir, 'fonts', 'NotoColorEmoji.ttf')
   );
 
   // Copy wasm-mt directory
   console.log('\n  Copying wasm-mt...');
-  const wasmOutputDir = path.join(OUTPUT_DIR, 'wasm-mt');
+  const wasmDir = path.join(VIEWER_DIR, 'wasm-mt');
+  const wasmOutputDir = path.join(outputDir, 'wasm-mt');
   copyFile(
     path.join(wasmDir, 'index.js'),
     path.join(wasmOutputDir, 'index.js')

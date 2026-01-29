@@ -18,7 +18,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { fileURLToPath } from 'url';
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { createRequire } from 'module';
 import path from 'path';
 
@@ -26,10 +25,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-process.chdir(__dirname);
+const viewerDir = path.dirname(__dirname);
+process.chdir(viewerDir);
 
 process.argv.push("-s");
-process.argv.push("../");
+process.argv.push("./");
 process.argv.push("-o");
 process.argv.push("./");
 process.argv.push("-p");
@@ -38,12 +38,3 @@ process.argv.push("pagx-viewer");
 
 // Use vendor_tools from libpag
 require("../../../third_party/vendor_tools/lib-build");
-
-// Copy wasm files to viewer/wasm-mt/ directory
-const srcDir = path.resolve(__dirname, 'wasm-mt');
-const destDir = path.resolve(__dirname, '../wasm-mt');
-if (!existsSync(destDir)) {
-    mkdirSync(destDir, { recursive: true });
-}
-copyFileSync(path.join(srcDir, 'pagx-viewer.js'), path.join(destDir, 'pagx-viewer.js'));
-copyFileSync(path.join(srcDir, 'pagx-viewer.wasm'), path.join(destDir, 'pagx-viewer.wasm'));

@@ -22,6 +22,7 @@
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/PathVerb.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace pagx {
@@ -76,18 +77,17 @@ class PathData : public Node {
   }
 
   /**
-   * Returns the array of point coordinates.
-   * Points are stored as [x0, y0, x1, y1, ...].
+   * Returns the array of points.
    */
-  const std::vector<float>& points() const {
+  const std::vector<Point>& points() const {
     return _points;
   }
 
   /**
-   * Returns the number of point coordinates.
+   * Returns the number of points.
    */
   size_t countPoints() const {
-    return _points.size() / 2;
+    return _points.size();
   }
 
   /**
@@ -98,9 +98,9 @@ class PathData : public Node {
   void forEach(Visitor&& visitor) const {
     size_t pointIndex = 0;
     for (auto verb : _verbs) {
-      const float* pts = _points.data() + pointIndex;
+      const Point* pts = _points.data() + pointIndex;
       visitor(verb, pts);
-      pointIndex += PointsPerVerb(verb) * 2;
+      pointIndex += PointsPerVerb(verb);
     }
   }
 
@@ -129,7 +129,7 @@ class PathData : public Node {
   PathData() = default;
 
   std::vector<PathVerb> _verbs = {};
-  std::vector<float> _points = {};
+  std::vector<Point> _points = {};
   Rect _cachedBounds = {};
   bool _boundsDirty = true;
 

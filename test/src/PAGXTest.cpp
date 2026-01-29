@@ -380,7 +380,7 @@ PAG_TEST(PAGXTest, PathDataForEach) {
   pathData.close();
 
   int verbCount = 0;
-  pathData.forEach([&verbCount](pagx::PathVerb, const float*) { verbCount++; });
+  pathData.forEach([&verbCount](pagx::PathVerb, const pagx::Point*) { verbCount++; });
 
   EXPECT_EQ(verbCount, 5);  // M, L, L, L, Z
 }

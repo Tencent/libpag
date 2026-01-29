@@ -20,6 +20,72 @@ import { PAGXModule, PAGXView } from './types';
 import PAGXWasm from './wasm-mt/pagx-viewer';
 import { TGFXBind } from '@tgfx/binding';
 
+interface I18nStrings {
+    dropText: string;
+    dropSubtext: string;
+    loading: string;
+    errorTitle: string;
+    errorFormat: string;
+    errorWasm: string;
+    errorFont: string;
+    errorNetwork: string;
+    errorBrowser: string;
+    openFile: string;
+    resetView: string;
+    invalidFile: string;
+    spec: string;
+    specTitle: string;
+}
+
+const i18n: Record<string, I18nStrings> = {
+    en: {
+        dropText: 'Drag & Drop PAGX file here',
+        dropSubtext: 'or click to browse',
+        loading: 'Loading...',
+        errorTitle: 'Failed to load',
+        errorFormat: 'Invalid file format. Please use a valid .pagx file.',
+        errorWasm: 'Failed to load WebAssembly module.',
+        errorFont: 'Failed to load fonts.',
+        errorNetwork: 'Network error. Please check your connection.',
+        errorBrowser: 'Minimum browser versions required:',
+        openFile: 'Open PAGX File',
+        resetView: 'Reset View',
+        invalidFile: 'Please drop a .pagx file',
+        spec: 'Spec',
+        specTitle: 'PAGX Specification',
+    },
+    zh: {
+        dropText: '拖放 PAGX 文件到此处',
+        dropSubtext: '或点击选择文件',
+        loading: '加载中...',
+        errorTitle: '加载失败',
+        errorFormat: '无效的文件格式，请使用有效的 .pagx 文件。',
+        errorWasm: 'WebAssembly 模块加载失败。',
+        errorFont: '字体加载失败。',
+        errorNetwork: '网络错误，请检查网络连接。',
+        errorBrowser: '浏览器最低版本要求：',
+        openFile: '打开 PAGX 文件',
+        resetView: '重置视图',
+        invalidFile: '请拖放 .pagx 文件',
+        spec: 'Spec',
+        specTitle: 'PAGX 格式规范',
+    },
+};
+
+function getLocale(): string {
+    const params = new URLSearchParams(window.location.search);
+    const langParam = params.get('lang');
+    if (langParam === 'zh' || langParam === 'en') {
+        return langParam;
+    }
+    const lang = navigator.language || '';
+    return lang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+function t(): I18nStrings {
+    return i18n[getLocale()];
+}
+
 const MIN_ZOOM = 0.001;
 const MAX_ZOOM = 1000.0;
 
@@ -83,6 +149,21 @@ class LoadingProgress {
         }
         // Cap at 99%, reserve 100% for after PAGX file loaded
         return Math.min(99, Math.round((loadedSize / totalSize) * 100));
+    }
+}
+
+enum ErrorType {
+    WASM = 'wasm',
+    FONT = 'font',
+    FORMAT = 'format',
+    NETWORK = 'network',
+}
+
+class ViewerError extends Error {
+    type: ErrorType;
+    constructor(type: ErrorType, message?: string) {
+        super(message);
+        this.type = type;
     }
 }
 
@@ -373,7 +454,11 @@ async function loadWasm(): Promise<void> {
     });
     viewerState.module = module as PAGXModule;
     TGFXBind(viewerState.module as any);
-    viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+    const pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+    if (!pagxView) {
+        throw new Error('Failed to create PAGXView');
+    }
+    viewerState.pagxView = pagxView;
     updateSize();
     viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
@@ -450,15 +535,28 @@ function bindCanvasEvents(canvas: HTMLElement) {
         e.preventDefault();
         gestureManager.onWheel(e, canvas, viewerState);
     }, { passive: false });
+
+    // Prevent browser pinch-to-zoom on Safari
+    canvas.addEventListener('gesturestart', (e: Event) => {
+        e.preventDefault();
+    });
+    canvas.addEventListener('gesturechange', (e: Event) => {
+        e.preventDefault();
+    });
+    canvas.addEventListener('gestureend', (e: Event) => {
+        e.preventDefault();
+    });
 }
 
 function showLoadingUI(): void {
     const dropZoneContent = document.getElementById('drop-zone-content');
     const loadingContent = document.getElementById('loading-content');
+    const errorContent = document.getElementById('error-content');
     const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && dropZone) {
+    if (dropZoneContent && loadingContent && errorContent && dropZone) {
         dropZoneContent.classList.add('hidden');
         loadingContent.classList.remove('hidden');
+        errorContent.classList.add('hidden');
         dropZone.classList.remove('hidden');
     }
 }
@@ -466,10 +564,27 @@ function showLoadingUI(): void {
 function showDropZoneUI(): void {
     const dropZoneContent = document.getElementById('drop-zone-content');
     const loadingContent = document.getElementById('loading-content');
+    const errorContent = document.getElementById('error-content');
     const dropZone = document.getElementById('drop-zone');
-    if (dropZoneContent && loadingContent && dropZone) {
+    if (dropZoneContent && loadingContent && errorContent && dropZone) {
         dropZoneContent.classList.remove('hidden');
         loadingContent.classList.add('hidden');
+        errorContent.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+    }
+}
+
+function showErrorUI(message: string): void {
+    const dropZoneContent = document.getElementById('drop-zone-content');
+    const loadingContent = document.getElementById('loading-content');
+    const errorContent = document.getElementById('error-content');
+    const errorMessage = document.getElementById('error-message');
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZoneContent && loadingContent && errorContent && errorMessage && dropZone) {
+        dropZoneContent.classList.add('hidden');
+        loadingContent.classList.add('hidden');
+        errorContent.classList.remove('hidden');
+        errorMessage.textContent = message;
         dropZone.classList.remove('hidden');
     }
 }
@@ -481,14 +596,29 @@ function hideDropZone(): void {
     }
 }
 
-async function loadPAGXFile(file: File) {
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+async function loadPAGXData(data: Uint8Array, name: string) {
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
+    const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
 
+    if (!viewerState.pagxView) {
+        throw new Error('PAGXView not initialized');
+    }
+
+    registerFontsToView();
+    viewerState.pagxView.loadPAGX(data);
+    gestureManager.resetTransform(viewerState);
+    updateSize();
+    hideDropZone();
+    toolbar.classList.remove('hidden');
+    specBtn.classList.add('hidden');
+    fileName.textContent = name;
+}
+
+async function loadPAGXFile(file: File) {
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
-    toolbar.classList.add('hidden');
     resetProgressUI();
     // Wait for 0% to render before starting
     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -517,25 +647,72 @@ async function loadPAGXFile(file: File) {
         const fileBuffer = await file.arrayBuffer();
 
         // Register fonts and load PAGX file
-        registerFontsToView();
-        viewerState.pagxView!.loadPAGX(new Uint8Array(fileBuffer));
-        gestureManager.resetTransform(viewerState);
-        updateSize();
-        hideDropZone();
-        toolbar.classList.remove('hidden');
-        fileName.textContent = file.name;
+        await loadPAGXData(new Uint8Array(fileBuffer), file.name);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
-        showDropZoneUI();
-        alert('Failed to load PAGX file. Please check the file format.');
+        showErrorUI(t().errorFormat);
     }
+}
+
+async function loadPAGXFromURL(url: string) {
+    // Show loading UI with progress reset to 0%
+    const loadingStartTime = Date.now();
+    showLoadingUI();
+    resetProgressUI();
+    // Wait for 0% to render before starting
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Start loading resources if not already started
+    if (!wasmLoadPromise) {
+        wasmLoadPromise = loadWasm();
+    }
+    if (!fontLoadPromise) {
+        fontLoadPromise = loadFonts();
+    }
+
+    try {
+        // Wait for WASM and fonts (progress goes from 0% to 99%)
+        await Promise.all([wasmLoadPromise, fontLoadPromise]);
+        updateProgressUI();
+
+        // Ensure minimum display time for loading UI (300ms)
+        const elapsed = Date.now() - loadingStartTime;
+        const minDisplayTime = 300;
+        if (elapsed < minDisplayTime) {
+            await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+        }
+
+        // Fetch PAGX file from URL
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        const fileBuffer = await response.arrayBuffer();
+
+        // Extract filename from URL
+        const urlPath = new URL(url).pathname;
+        const name = urlPath.substring(urlPath.lastIndexOf('/') + 1) || 'remote.pagx';
+
+        // Register fonts and load PAGX file
+        await loadPAGXData(new Uint8Array(fileBuffer), name);
+    } catch (error) {
+        console.error('Failed to load PAGX from URL:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        showErrorUI(message);
+    }
+}
+
+function getPAGXUrlFromParams(): string | null {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('file');
 }
 
 function setupDragAndDrop() {
     const dropZone = document.getElementById('drop-zone') as HTMLDivElement;
+    const dropZoneContent = document.getElementById('drop-zone-content') as HTMLDivElement;
+    const errorContent = document.getElementById('error-content') as HTMLDivElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const fileInput = document.getElementById('file-input') as HTMLInputElement;
-    const fileBtn = document.getElementById('file-btn') as HTMLButtonElement;
     const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
     const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
@@ -569,12 +746,16 @@ function setupDragAndDrop() {
             if (file.name.endsWith('.pagx')) {
                 loadPAGXFile(file);
             } else {
-                alert('Please drop a .pagx file');
+                alert(t().invalidFile);
             }
         }
     }, false);
 
-    fileBtn.addEventListener('click', () => {
+    dropZoneContent.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    errorContent.addEventListener('click', () => {
         fileInput.click();
     });
 
@@ -614,25 +795,55 @@ function checkWasmSupport(): boolean {
     return false;
 }
 
-const BROWSER_REQUIREMENTS = `
-Minimum browser versions required:
+function getBrowserRequirements(): string {
+    return `${t().errorBrowser}
 • Chrome 57+
 • Firefox 52+
 • Safari 15+
-• Edge 79+
-`.trim();
+• Edge 79+`;
+}
+
+function applyI18n(): void {
+    const strings = t();
+    const locale = getLocale();
+    document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
+
+    const dropText = document.querySelector('.drop-text');
+    const dropSubtext = document.querySelector('.drop-subtext');
+    const loadingText = document.querySelector('.loading-text');
+    const errorTitle = document.querySelector('.error-title');
+    const openBtn = document.getElementById('open-btn');
+    const resetBtn = document.getElementById('reset-btn');
+
+    if (dropText) dropText.textContent = strings.dropText;
+    if (dropSubtext) dropSubtext.textContent = strings.dropSubtext;
+    if (loadingText) loadingText.textContent = strings.loading;
+    if (errorTitle) errorTitle.textContent = strings.errorTitle;
+    if (openBtn) openBtn.title = strings.openFile;
+    if (resetBtn) resetBtn.title = strings.resetView;
+
+    const specBtn = document.getElementById('spec-btn');
+    const specBtnText = document.getElementById('spec-btn-text');
+    const toolbarSpecBtn = document.getElementById('toolbar-spec-btn');
+    if (specBtn) specBtn.title = strings.specTitle;
+    if (specBtnText) specBtnText.textContent = strings.spec;
+    if (toolbarSpecBtn) toolbarSpecBtn.title = strings.specTitle;
+}
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
+        // Apply i18n texts
+        applyI18n();
+
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
 
         if (!checkWasmSupport()) {
-            alert('Your browser does not support WebAssembly.\n\n' + BROWSER_REQUIREMENTS);
+            alert('WebAssembly is not supported.\n\n' + getBrowserRequirements());
             return;
         }
         if (!checkWebGL2Support()) {
-            alert('Your browser does not support WebGL 2.0.\n\n' + BROWSER_REQUIREMENTS);
+            alert('WebGL 2.0 is not supported.\n\n' + getBrowserRequirements());
             return;
         }
 
@@ -645,6 +856,12 @@ if (typeof window !== 'undefined') {
             console.error('Font load failed:', error);
             throw error;
         });
+
+        // Check for URL parameter and auto-load if present
+        const pagxUrl = getPAGXUrlFromParams();
+        if (pagxUrl) {
+            loadPAGXFromURL(pagxUrl);
+        }
     };
 
     window.onresize = () => {

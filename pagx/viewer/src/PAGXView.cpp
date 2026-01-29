@@ -19,14 +19,13 @@
 #include "PAGXView.h"
 #include <emscripten/html5.h>
 #include "GridBackground.h"
+#include "pagx/PAGXImporter.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 
 using namespace emscripten;
 
 namespace pagx {
-
-static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
 
 static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
@@ -54,7 +53,7 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  fallbackTypefaces.clear();
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
@@ -69,6 +68,7 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
+  typesetter.setFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -76,15 +76,16 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!data) {
     return;
   }
-  LayerBuilder::Options options;
-  // options.fallbackTypefaces = fallbackTypefaces;
-  auto content = pagx::LayerBuilder::FromData(data->bytes(), data->size(), options);
-  if (!content.root) {
+  auto document = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (!document) {
     return;
   }
-  contentLayer = content.root;
-  pagxWidth = content.width;
-  pagxHeight = content.height;
+  contentLayer = LayerBuilder::Build(document.get(), &typesetter);
+  if (!contentLayer) {
+    return;
+  }
+  pagxWidth = document->width;
+  pagxHeight = document->height;
   displayList.root()->removeChildren();
   displayList.root()->addChild(contentLayer);
   applyCenteringTransform();

@@ -11,7 +11,7 @@
  *
  * Output structure:
  *     ../public/<version>/index.html     - English (default)
- *     ../public/<version>/cn/index.html  - Chinese
+ *     ../public/<version>/zh/index.html  - Chinese
  *
  * Usage:
  *     cd pagx/spec && npm run publish
@@ -31,7 +31,7 @@ const PAGX_DIR = path.dirname(SPEC_DIR);
 const SPEC_FILE_EN = path.join(SPEC_DIR, 'pagx_spec.md');
 const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
 const PACKAGE_FILE = path.join(SPEC_DIR, 'package.json');
-const SITE_DIR = path.join(PAGX_DIR, 'public');
+const DEFAULT_SITE_DIR = path.join(PAGX_DIR, 'public');
 
 /**
  * Read version from package.json.
@@ -208,10 +208,11 @@ function createMarkedInstance() {
 /**
  * Generate the complete HTML document.
  */
-function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
+function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
   const isEnglish = lang === 'en';
   const htmlLang = isEnglish ? 'en' : 'zh-CN';
   const tocTitle = isEnglish ? 'Table of Contents' : '目录';
+  const viewerLabel = isEnglish ? 'Viewer' : '在线预览';
   
   let draftBanner = '';
   let draftStyles = '';
@@ -225,18 +226,18 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
     </div>
 `;
     draftStyles = `        .sidebar {
-            top: 42px;
-            height: calc(100vh - 42px);
+            top: 36px;
+            height: calc(100vh - 36px);
         }
         .content {
-            padding-top: 82px;
+            padding-top: 76px;
         }
-        .lang-switch {
-            top: 54px;
+        .header-actions {
+            top: 48px;
         }
         @media (max-width: 900px) {
             .content {
-                padding-top: 62px;
+                padding-top: 56px;
             }
         }`;
   }
@@ -247,6 +248,7 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
+    <link rel="icon" href="${faviconUrl}" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <style>
         :root {
@@ -482,9 +484,9 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
         .draft-banner {
             background-color: #fef9e7;
             border-bottom: 1px solid #f5e6b3;
-            padding: 10px 20px;
+            padding: 8px 20px;
             text-align: center;
-            font-size: 14px;
+            font-size: 13px;
             color: #7d6608;
             position: fixed;
             top: 0;
@@ -495,23 +497,21 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
         .draft-banner strong {
             color: #5a4a06;
         }
-        /* Language switcher */
         .lang-switch {
-            position: fixed;
-            top: 12px;
-            right: 20px;
-            z-index: 1001;
+            position: relative;
         }
         .lang-switch-btn {
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 12px;
+            padding: 8px 14px;
             background: #f8f9fa;
             border: 1px solid var(--border-color);
             border-radius: 6px;
             color: #555;
-            font-size: 13px;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.2;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -519,8 +519,8 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
             background: #e9ecef;
         }
         .lang-switch-btn svg {
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             transition: transform 0.2s;
         }
         .lang-switch.open .lang-switch-btn svg {
@@ -530,6 +530,7 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
             position: absolute;
             top: 100%;
             right: 0;
+            min-width: 100%;
             margin-top: 4px;
             background: white;
             border: 1px solid var(--border-color);
@@ -562,18 +563,58 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl) {
             background: #e3f2fd;
             color: #1565c0;
         }
+        /* Header buttons container */
+        .header-actions {
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        /* Viewer link */
+        .viewer-link {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #555;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .viewer-link:hover {
+            background: #e9ecef;
+            text-decoration: none;
+        }
+        .viewer-link svg {
+            width: 14px;
+            height: 14px;
+        }
 ${draftStyles}
     </style>
 </head>
 <body>
-${draftBanner}    <div class="lang-switch" onclick="this.classList.toggle('open')">
-        <button class="lang-switch-btn">
-            ${isEnglish ? 'English' : '简体中文'}
-            <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-        </button>
-        <div class="lang-switch-menu">
-            <a href="${isEnglish ? '#' : langSwitchUrl}"${isEnglish ? ' class="active"' : ''}>English</a>
-            <a href="${isEnglish ? langSwitchUrl : '#'}"${isEnglish ? '' : ' class="active"'}>简体中文</a>
+${draftBanner}    <div class="header-actions">
+        <a href="${viewerUrl}" class="viewer-link" target="_blank">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            ${viewerLabel}
+        </a>
+        <div class="lang-switch" onclick="this.classList.toggle('open')">
+            <button class="lang-switch-btn">
+                ${isEnglish ? 'English' : '简体中文'}
+                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <div class="lang-switch-menu">
+                <a href="${isEnglish ? '#' : langSwitchUrl}"${isEnglish ? ' class="active"' : ''}>English</a>
+                <a href="${isEnglish ? langSwitchUrl : '#'}"${isEnglish ? '' : ' class="active"'}>简体中文</a>
+            </div>
         </div>
     </div>
     <div class="container">
@@ -614,7 +655,7 @@ ${tocHtml}
 /**
  * Publish a single spec file.
  */
-function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl) {
+function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
   if (!fs.existsSync(specFile)) {
     console.log(`  Skipped (file not found): ${specFile}`);
     return;
@@ -652,7 +693,7 @@ function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUr
   const htmlContent = marked.parse(mdContent);
 
   // Generate complete HTML document
-  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl);
+  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl);
 
   // Create output directory
   fs.mkdirSync(outputDir, { recursive: true });
@@ -669,16 +710,25 @@ function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUr
  */
 function parseArgs() {
   const args = process.argv.slice(2);
-  const options = {};
+  const options = {
+    siteDir: DEFAULT_SITE_DIR,
+  };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === '--help' || arg === '-h') {
+    if ((arg === '-o' || arg === '--output') && args[i + 1]) {
+      options.siteDir = path.resolve(args[i + 1]);
+      i++;
+    } else if (arg === '--help' || arg === '-h') {
       console.log(`
 PAGX Specification Publisher
 
 Usage:
-    cd pagx/spec && npm run publish
+    npm run publish [-- -o <output-dir>]
+
+Options:
+    -o, --output <dir>  Output directory (default: ../public)
+    -h, --help          Show this help message
 
 Configuration (package.json):
     version        - Current version to publish
@@ -690,12 +740,9 @@ Source files:
     spec/pagx_spec.zh_CN.md  - Chinese version
 
 Output structure:
-    public/index.html               - Redirect page
-    public/<version>/index.html     - English (default)
-    public/<version>/cn/index.html  - Chinese
-
-Examples:
-    npm run publish:spec
+    <output>/index.html               - Redirect page
+    <output>/<version>/index.html     - English (default)
+    <output>/<version>/zh/index.html  - Chinese
 `);
       process.exit(0);
     }
@@ -709,6 +756,7 @@ Examples:
  */
 function main() {
   const options = parseArgs();
+  const siteDir = options.siteDir;
 
   // Read versions from package.json
   const version = getVersion();
@@ -717,25 +765,41 @@ function main() {
 
   console.log(`Version: ${version}`);
   console.log(`Stable: ${stableVersion || '(none)'}`);
+  console.log(`Output: ${siteDir}`);
   if (isDraft) {
     console.log('Mode: Draft');
   }
 
-  const baseOutputDir = path.join(SITE_DIR, version);
+  const baseOutputDir = path.join(siteDir, version);
+
+  // Viewer URL (relative path from spec pages to viewer)
+  const viewerUrlFromRoot = '../viewer/';
+  const viewerUrlFromZh = '../../viewer/';
+
+  // Favicon URL (relative path from spec pages to favicon)
+  const faviconUrlFromRoot = '../favicon.png';
+  const faviconUrlFromZh = '../../favicon.png';
 
   // Publish English version (default, at root)
   console.log('\nPublishing English version...');
-  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'cn/');
+  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'zh/', viewerUrlFromRoot, faviconUrlFromRoot);
 
-  // Publish Chinese version (under /cn/)
+  // Publish Chinese version (under /zh/)
   console.log('\nPublishing Chinese version...');
-  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'cn'), 'zh', version, isDraft, '../');
+  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh, faviconUrlFromZh);
 
   // Generate redirect index page (point to stableVersion if exists, otherwise current version)
   const redirectVersion = stableVersion || version;
   console.log('\nGenerating redirect page...');
   console.log(`  Redirect to: ${redirectVersion}`);
-  generateRedirectPage(redirectVersion);
+  generateRedirectPage(siteDir, redirectVersion);
+
+  // Copy favicon
+  console.log('\nCopying favicon...');
+  const faviconSrc = path.join(SPEC_DIR, 'favicon.png');
+  const faviconDest = path.join(siteDir, 'favicon.png');
+  fs.copyFileSync(faviconSrc, faviconDest);
+  console.log(`  Copied: ${faviconDest}`);
 
   console.log('\nDone!');
 }
@@ -743,7 +807,7 @@ function main() {
 /**
  * Generate the redirect index page at site/index.html.
  */
-function generateRedirectPage(version) {
+function generateRedirectPage(siteDir, version) {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -761,7 +825,7 @@ function generateRedirectPage(version) {
             // Build redirect URL
             var path = version + '/';
             if (isChinese) {
-                path += 'cn/';
+                path += 'zh/';
             }
             
             // Redirect
@@ -775,8 +839,8 @@ function generateRedirectPage(version) {
 </html>
 `;
 
-  fs.mkdirSync(SITE_DIR, { recursive: true });
-  const outputFile = path.join(SITE_DIR, 'index.html');
+  fs.mkdirSync(siteDir, { recursive: true });
+  const outputFile = path.join(siteDir, 'index.html');
   fs.writeFileSync(outputFile, html, 'utf-8');
   console.log(`  Generated: ${outputFile}`);
 }

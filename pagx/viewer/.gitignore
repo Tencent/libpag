@@ -2,7 +2,6 @@
 wasm-mt/
 
 # Build cache
-script/build-pagx-viewer/
-script/wasm-mt/
-script/.build.lock
-script/.*.md5
+build-pagx-viewer/
+.*.md5
+.build.lock

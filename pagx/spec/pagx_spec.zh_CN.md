@@ -237,10 +237,15 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="1920" height="1080">
-  <Layer name="background"><!-- 图层内容 --></Layer>
-  <Layer name="content"><!-- 图层内容 --></Layer>
-  <Resources><!-- 资源定义 --></Resources>
+<pagx version="1.0" width="400" height="300">
+  <Layer name="background">
+    <Rectangle center="200,150" size="400,300"/>
+    <Fill color="#F0F0F0"/>
+  </Layer>
+  <Layer name="content">
+    <Rectangle center="200,150" size="200,100" roundness="10"/>
+    <Fill color="#3366FF"/>
+  </Layer>
 </pagx>
 ```
 
@@ -259,17 +264,21 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 **元素位置**：Resources 元素可放置在根元素内的任意位置，对位置没有限制。解析器必须支持元素引用在文档后面定义的资源或图层（即前向引用）。
 
 ```xml
-<Resources>
-  <Image id="img1" source="photo.png"/>
-  <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-  <SolidColor id="brandRed" color="#FF0000"/>
-  <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,100">
-    <ColorStop offset="0" color="#87CEEB"/>
-    <ColorStop offset="1" color="#E0F6FF"/>
-  </LinearGradient>
-  <ImagePattern id="texture" image="@img1" tileModeX="repeat" tileModeY="repeat"/>
-  <Composition id="buttonComp" width="100" height="50"><!-- 合成内容 --></Composition>
-</Resources>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Layer>
+    <Rectangle center="150,100" size="200,120"/>
+    <Fill color="@skyGradient"/>
+  </Layer>
+  <Resources>
+    <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
+    <SolidColor id="brandRed" color="#FF0000"/>
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,200">
+      <ColorStop offset="0" color="#87CEEB"/>
+      <ColorStop offset="1" color="#E0F6FF"/>
+    </LinearGradient>
+  </Resources>
+</pagx>
 ```
 
 #### 3.3.1 图片（Image）
@@ -321,10 +330,18 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 线性渐变沿起点到终点的方向插值。
 
 ```xml
-<LinearGradient startPoint="0,0" endPoint="100,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</LinearGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Rectangle center="100,50" size="200,100"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -340,10 +357,18 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 径向渐变从中心向外辐射。
 
 ```xml
-<RadialGradient center="50,50" radius="50">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</RadialGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill>
+      <RadialGradient center="100,100" radius="100">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#000000"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -359,10 +384,20 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 锥形渐变（也称扫描渐变）沿圆周方向插值。
 
 ```xml
-<ConicGradient center="50,50" startAngle="0" endAngle="360">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</ConicGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="180,180"/>
+    <Fill>
+      <ConicGradient center="100,100" startAngle="0" endAngle="360">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="0.33" color="#00FF00"/>
+        <ColorStop offset="0.66" color="#0000FF"/>
+        <ColorStop offset="1" color="#FF0000"/>
+      </ConicGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -379,10 +414,18 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 菱形渐变从中心向四角辐射。
 
 ```xml
-<DiamondGradient center="50,50" radius="50">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</DiamondGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="180,180"/>
+    <Fill>
+      <DiamondGradient center="100,100" radius="90">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#000000"/>
+      </DiamondGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -449,17 +492,19 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 **示例**：在 100×100 的区域内绘制一个从左到右的线性渐变：
 
 ```xml
-<Resources>
-  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Resources>
-
-<Layer>
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="@grad"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="@grad"/>
+  </Layer>
+  <Resources>
+    <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+  </Resources>
+</pagx>
 ```
 
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
@@ -470,12 +515,18 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
 
 ```xml
-<Composition id="buttonComp" width="100" height="50">
-  <Layer name="button">
-    <Rectangle center="50,25" size="100,50" roundness="10"/>
-    <Fill color="#007AFF"/>
-  </Layer>
-</Composition>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Layer composition="@buttonComp" x="100" y="75"/>
+  <Resources>
+    <Composition id="buttonComp" width="100" height="50">
+      <Layer name="button">
+        <Rectangle center="50,25" size="100,50" roundness="10"/>
+        <Fill color="#007AFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -612,17 +663,18 @@ PAGX 文档采用层级结构组织内容：
 `<Layer>` 是内容和子图层的基本容器。
 
 ```xml
-<Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
-  <BlurFilter blurX="10" blurY="10"/>
-  <Layer name="Child">
-    <Ellipse center="50,50" size="80,80"/>
-    <Fill color="#00FF00"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="20" y="20" antiAlias="true">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+    <Layer name="Child">
+      <Ellipse center="60,60" size="60,60"/>
+      <Fill color="#00FF00"/>
+    </Layer>
   </Layer>
-</Layer>
-<Layer composition="@buttonComp" x="100" y="200"/>
+</pagx>
 ```
 
 #### 子元素
@@ -709,13 +761,15 @@ Layer 的子元素按类型自动归类为四个集合：
 部分图层样式还会额外使用**图层轮廓**或**图层背景**作为输入（详见各样式说明）。图层轮廓和图层背景的定义参见 4.1 节。
 
 ```xml
-<Layer>
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
-  <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
-  <BackgroundBlurStyle blurX="20" blurY="20" tileMode="mirror"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer x="50" y="50">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
+    <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
+  </Layer>
+</pagx>
 ```
 
 **所有 LayerStyle 共有属性**：
@@ -787,13 +841,15 @@ Layer 的子元素按类型自动归类为四个集合：
 与图层样式（4.3 节）的关键区别：图层样式在图层内容的上方或下方**独立渲染**视觉效果，而滤镜**修改**图层的整体渲染输出。图层样式先于滤镜应用。
 
 ```xml
-<Layer>
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-  <BlurFilter blurX="10" blurY="10"/>
-  <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
-  <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer x="50" y="50">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <BlurFilter blurX="5" blurY="5"/>
+    <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+  </Layer>
+</pagx>
 ```
 
 #### 4.4.1 模糊滤镜（BlurFilter）
@@ -875,10 +931,13 @@ Layer 的子元素按类型自动归类为四个集合：
 `scrollRect` 属性定义图层的可视区域，超出该区域的内容会被裁剪。
 
 ```xml
-<Layer scrollRect="0,0,100,100">
-  <Rectangle center="50,50" size="200,200"/>
-  <Fill color="#FF0000"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer scrollRect="50,50,100,100">
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>
 ```
 
 #### 4.5.2 遮罩（Masking）
@@ -886,14 +945,17 @@ Layer 的子元素按类型自动归类为四个集合：
 通过 `mask` 属性引用另一个图层作为遮罩。
 
 ```xml
-<Layer id="maskShape" visible="false">
-  <Ellipse center="100,100" size="150,150"/>
-  <Fill color="#FFFFFF"/>
-</Layer>
-<Layer mask="@maskShape" maskType="alpha">
-  <Rectangle center="100,100" size="200,200"/>
-  <Fill color="#FF0000"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer id="maskShape" visible="false">
+    <Ellipse center="100,100" size="150,150"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer mask="@maskShape" maskType="alpha">
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>
 ```
 
 **遮罩规则**：
@@ -1227,24 +1289,34 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 填充使用指定的颜色源绘制几何的内部区域。
 
 ```xml
-<!-- 纯色填充 -->
-<Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
-
-<!-- 引用共享颜色源 -->
-<Fill color="@grad1"/>
-
-<!-- 内联线性渐变（仅使用一次时推荐） -->
-<Fill>
-  <LinearGradient startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Fill>
-
-<!-- 内联图片图案 -->
-<Fill>
-  <ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <!-- 纯色填充 -->
+    <Rectangle center="50,50" size="80,80"/>
+    <Fill color="#FF0000" alpha="0.8"/>
+  </Layer>
+  <Layer>
+    <!-- 内联线性渐变 -->
+    <Rectangle center="150,50" size="80,80"/>
+    <Fill>
+      <LinearGradient startPoint="110,10" endPoint="190,90">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer>
+    <!-- 内联径向渐变 -->
+    <Ellipse center="100,150" size="160,80"/>
+    <Fill>
+      <RadialGradient center="100,150" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#3366FF"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1274,19 +1346,29 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 描边沿几何边界绘制线条。
 
 ```xml
-<!-- 基础描边 -->
-<Stroke color="#000000" width="2" cap="round" join="miter" miterLimit="4"/>
-
-<!-- 虚线描边 -->
-<Stroke color="#0000FF" width="1" dashes="5,3" dashOffset="2"/>
-
-<!-- 内联渐变描边 -->
-<Stroke width="3">
-  <LinearGradient startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Stroke>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <!-- 基础描边 -->
+    <Rectangle center="50,50" size="60,60"/>
+    <Stroke color="#000000" width="3" cap="round" join="round"/>
+  </Layer>
+  <Layer>
+    <!-- 虚线描边 -->
+    <Rectangle center="150,50" size="60,60"/>
+    <Stroke color="#0000FF" width="2" dashes="8,4" dashOffset="0"/>
+  </Layer>
+  <Layer>
+    <!-- 内联渐变描边 -->
+    <Path data="M 20,150 Q 100,100 180,150"/>
+    <Stroke width="4" cap="round">
+      <LinearGradient startPoint="20,150" endPoint="180,150">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1377,9 +1459,15 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 **连续模式示例**：
 ```xml
-<Path d="M0,0 L100,0"/>
-<Path d="M0,0 L100,0"/>
-<TrimPath start="0.25" end="0.75" type="continuous"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Path data="M 20,50 L 100,50"/>
+    <Path data="M 100,50 L 180,50"/>
+    <TrimPath start="0.25" end="0.75" type="continuous"/>
+    <Stroke color="#3366FF" width="4" cap="round"/>
+  </Layer>
+</pagx>
 ```
 
 #### 5.4.2 圆角（RoundCorner）
@@ -1429,10 +1517,15 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 **示例**：
 
 ```xml
-<Rectangle center="50,50" size="80,80"/>
-<Ellipse center="90,90" size="80,80"/>
-<MergePath mode="union"/>
-<Fill color="#3366FF"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="70,70" size="100,100"/>
+    <Ellipse center="130,130" size="100,100"/>
+    <MergePath mode="union"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
 ```
 
 ### 5.5 文本修改器（Text Modifiers）
@@ -1444,12 +1537,19 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 遇到文本修改器时，上下文中累积的**所有字形列表**会汇总为一个统一的字形列表进行操作：
 
 ```xml
-<Group>
-  <Text text="Hello" fontFamily="Arial" fontSize="24"/>
-  <Text text="World" fontFamily="Arial" fontSize="24"/>
-  <TextModifier position="0,-10"/>
-  <Fill color="#333333"/>
-</Group>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Group>
+      <Text text="Hello " fontFamily="Arial" fontSize="24" position="20,50"/>
+      <Text text="World" fontFamily="Arial" fontSize="24" position="90,50"/>
+      <TextModifier position="0,-5">
+        <RangeSelector start="0" end="1" shape="triangle"/>
+      </TextModifier>
+      <Fill color="#333333"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 #### 5.5.2 文本转形状
@@ -1611,11 +1711,14 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 将文本沿指定路径排列。路径可以通过引用 Resources 中定义的 PathData，也可以内联路径数据。
 
 ```xml
-<!-- 引用 PathData 资源 -->
-<TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicular="true" reversed="false"/>
-
-<!-- 内联路径数据 -->
-<TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="250" height="150">
+  <Layer>
+    <Text text="Hello Path" fontFamily="Arial" fontSize="20"/>
+    <TextPath path="M 20,100 Q 125,20 230,100" textAlign="center"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1657,19 +1760,21 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 渲染时会由附加的文字排版模块预先排版，重新计算每个字形的位置。TextLayout 会被预排版展开，字形位置直接写入 Text。
 
 ```xml
-<!-- 点文本：居中对齐 -->
-<Layer>
-  <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
-  <TextLayout position="150,100" textAlign="center"/>
-  <Fill color="#333333"/>
-</Layer>
-
-<!-- 段落文本：自动换行 -->
-<Layer>
-  <Text text="这是一段很长的文本，会自动换行..." fontFamily="Arial" fontSize="16"/>
-  <TextLayout position="50,50" width="300" height="200" textAlign="start" verticalAlign="top" lineHeight="1.5"/>
-  <Fill color="#333333"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="150">
+  <!-- 点文本：居中对齐 -->
+  <Layer>
+    <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="150,40" textAlign="center"/>
+    <Fill color="#333333"/>
+  </Layer>
+  <!-- 段落文本：自动换行 -->
+  <Layer>
+    <Text text="This is a longer text that demonstrates auto-wrap within a specified width." fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="20,70" width="260" textAlign="start" lineHeight="1.5"/>
+    <Fill color="#666666"/>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1711,36 +1816,28 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 富文本通过 Group 内的多个 Text 元素组合，每个 Text 可以有独立的 Fill/Stroke 样式。使用 TextLayout 进行统一排版。
 
 ```xml
-<Layer>
-  <!-- 常规文本 -->
-  <Group>
-    <Text text="This is " fontFamily="Arial" fontSize="18"/>
-    <Fill color="#333333"/>
-  </Group>
-  <!-- 加粗红色文本 -->
-  <Group>
-    <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <Fill color="#FF0000"/>
-  </Group>
-  <!-- 常规文本 -->
-  <Group>
-    <Text text=" information. " fontFamily="Arial" fontSize="18"/>
-    <Fill color="#333333"/>
-  </Group>
-  <!-- 带下划线的链接样式 -->
-  <Group>
-    <Text text="Click here" fontFamily="Arial" fontSize="18"/>
-    <Fill color="#0066CC"/>
-    <Stroke color="#0066CC" width="1"/>
-  </Group>
-  <!-- 常规文本 -->
-  <Group>
-    <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
-    <Fill color="#333333"/>
-  </Group>
-  <!-- TextLayout 统一排版所有 Text -->
-  <TextLayout position="50,100" width="300" textAlign="start" lineHeight="1.5"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="350" height="80">
+  <Layer>
+    <!-- 常规文本 -->
+    <Group>
+      <Text text="This is " fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- 加粗红色文本 -->
+    <Group>
+      <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <!-- 常规文本 -->
+    <Group>
+      <Text text=" information." fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- TextLayout 统一排版 -->
+    <TextLayout position="20,50" width="310" textAlign="start"/>
+  </Layer>
+</pagx>
 ```
 
 **说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
@@ -1811,12 +1908,16 @@ alpha = lerp(startAlpha, endAlpha, t)
 - **复制已渲染样式**：同时复制已渲染的填充和描边
 
 ```xml
-<Group>
-  <Text text="Hi" fontFamily="Arial" fontSize="24"/>  <!-- 累积字形列表 -->
-  <Fill color="#333333"/>            <!-- 渲染填充 -->
-  <Repeater copies="3"/> <!-- 复制字形列表和已渲染的填充 -->
-  <TextModifier position="0,-5"/>    <!-- 仍可对复制后的字形列表生效 -->
-</Group>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Group>
+      <Rectangle center="30,50" size="40,40"/>
+      <Fill color="#3366FF"/>
+      <Repeater copies="5" position="50,0" startAlpha="1" endAlpha="0.2"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 ### 5.7 容器（Group）
@@ -1824,9 +1925,15 @@ alpha = lerp(startAlpha, endAlpha, t)
 Group 是带变换属性的矢量元素容器。
 
 ```xml
-<Group anchorPoint="50,50" position="100,200" rotation="45" scale="1,1" skew="0" skewAxis="0" alpha="1">
-  <!-- 子元素 -->
-</Group>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Group anchorPoint="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF6600"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1879,32 +1986,47 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **示例 1 - 基本隔离**：
 ```xml
-<Group alpha="0.5">
-  <Rectangle center="50,50" size="100,100"/>    <!-- 只在组内累积 -->
-  <Fill color="#FF0000"/> <!-- 只填充组内的矩形，alpha=0.5 -->
-</Group>
-<Ellipse center="150,50" size="80,80"/>        <!-- 在组外累积 -->
-<Fill color="#0000FF"/>  <!-- 只填充椭圆，alpha=1.0 -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Group alpha="0.5">
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Ellipse center="150,50" size="80,80"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>
 ```
 
 **示例 2 - 子 Group 几何向上累积**：
 ```xml
-<Group>
-  <Rectangle center="50,50" size="100,100"/>    <!-- 累积矩形 -->
-  <Fill color="#FF0000"/> <!-- 填充矩形 -->
-</Group>
-<Group>
-  <Ellipse center="150,50" size="80,80"/>       <!-- 累积椭圆 -->
-  <Fill color="#00FF00"/> <!-- 填充椭圆 -->
-</Group>
-<Fill color="#0000FF"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Group>
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Group>
+      <Ellipse center="150,50" size="80,80"/>
+      <Fill color="#00FF00"/>
+    </Group>
+    <Fill color="#0000FF40"/>
+  </Layer>
+</pagx>
 ```
 
 **示例 3 - 多个绘制器复用几何**：
 ```xml
-<Rectangle center="50,50" size="100,100"/>
-<Fill color="#FF0000"/>    <!-- 填充矩形 -->
-<Stroke color="#000000"/> <!-- 描边同一矩形（几何未清空） -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="150" height="150">
+  <Layer>
+    <Rectangle center="75,75" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <Stroke color="#000000" width="3"/>
+  </Layer>
+</pagx>
 ```
 
 #### 多重填充与描边
@@ -1913,34 +2035,49 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 **示例 4 - 多重填充**：
 ```xml
-<Rectangle center="100,100" size="200,100" roundness="10"/>
-<Fill>
-  <ImagePattern image="@checkerboard" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
-<Fill color="#FF000080"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="160,100" roundness="10"/>
+    <Fill>
+      <LinearGradient startPoint="20,50" endPoint="180,150">
+        <ColorStop offset="0" color="#FFCC00"/>
+        <ColorStop offset="1" color="#FF6600"/>
+      </LinearGradient>
+    </Fill>
+    <Fill color="#FF000040"/>
+  </Layer>
+</pagx>
 ```
 
 **示例 5 - 多重描边**：
 ```xml
-<Path d="M10,50 Q50,10 90,50 T170,50"/>
-<Stroke color="#0088FF40" width="12" cap="round" join="round"/>
-<Stroke color="#0088FF80" width="6" cap="round" join="round"/>
-<Stroke color="#0088FF" width="2" cap="round" join="round"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Path data="M 20,50 Q 100,10 180,50"/>
+    <Stroke color="#0088FF40" width="12" cap="round" join="round"/>
+    <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
+    <Stroke color="#0088FF" width="2" cap="round" join="round"/>
+  </Layer>
+</pagx>
 ```
 
 **示例 6 - 混合叠加**：
 ```xml
-<Ellipse center="100,100" size="180,180"/>
-<Fill>
-  <RadialGradient center="100,100" radius="90">
-    <ColorStop offset="0" color="#FFFFFF"/>
-    <ColorStop offset="1" color="#3366FF"/>
-  </RadialGradient>
-</Fill>
-<Fill alpha="0.3">
-  <ImagePattern image="@noiseTexture" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
-<Stroke color="#1a3366" width="3"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="160,160"/>
+    <Fill>
+      <RadialGradient center="100,100" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#3366FF"/>
+      </RadialGradient>
+    </Fill>
+    <Stroke color="#1a3366" width="3"/>
+  </Layer>
+</pagx>
 ```
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。

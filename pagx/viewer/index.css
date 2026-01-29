@@ -24,6 +24,7 @@ html, body {
     left: 0;
     right: 0;
     z-index: 1;
+    touch-action: none;
 }
 
 .canvas:active {
@@ -38,8 +39,10 @@ html, body {
     bottom: 0;
     z-index: 100;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 40px;
     background: rgba(26, 26, 46, 0.95);
     transition: background 0.3s ease;
 }
@@ -49,7 +52,7 @@ html, body {
 }
 
 .drop-zone.drag-over .drop-zone-content {
-    border-color: #4a90d9;
+    border-color: #0052d9;
     transform: scale(1.02);
 }
 
@@ -61,15 +64,42 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    min-height: 160px;
     padding: 60px 80px;
     border: 2px dashed #555;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
     transition: all 0.3s ease;
+}
+
+.drop-zone-content:hover {
+    border-color: #777;
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .drop-zone-content.hidden {
     display: none;
+}
+
+.brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.logo {
+    width: 120px;
+    height: 120px;
+}
+
+.title {
+    color: #fff;
+    font-size: 36px;
+    font-weight: 600;
+    margin: 20px 0 0 0;
+    text-align: center;
 }
 
 .drop-icon {
@@ -88,33 +118,62 @@ html, body {
 .drop-subtext {
     color: #666;
     font-size: 14px;
-    margin: 0 0 16px 0;
+    margin: 0;
 }
 
-.file-btn {
-    padding: 12px 32px;
-    font-size: 16px;
-    color: #fff;
-    background: #4a90d9;
-    border: none;
+.spec-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s ease;
+    text-decoration: none;
+    transition: all 0.2s ease;
 }
 
-.file-btn:hover {
-    background: #5a9ee9;
+.spec-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
-.file-btn:active {
-    background: #3a80c9;
+.spec-btn svg {
+    width: 16px;
+    height: 16px;
+    color: #aaa;
+}
+
+.spec-btn:hover svg {
+    color: #ccc;
+}
+
+.spec-btn span {
+    color: #aaa;
+    font-size: 13px;
+}
+
+.spec-btn:hover span {
+    color: #ccc;
+}
+
+.spec-btn.hidden {
+    display: none;
 }
 
 .loading-content {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    min-height: 160px;
     padding: 60px 80px;
+    border: 2px solid transparent;
+    border-radius: 16px;
 }
 
 .loading-content.hidden {
@@ -138,7 +197,7 @@ html, body {
 .progress-bar {
     width: 0;
     height: 100%;
-    background: linear-gradient(90deg, #4a90d9, #5a9ee9);
+    background: linear-gradient(90deg, #0052d9, #0062e9);
     border-radius: 3px;
     transition: width 0.15s ease-out;
 }
@@ -149,11 +208,53 @@ html, body {
     margin: 12px 0 0 0;
 }
 
+.error-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    padding: 60px 80px;
+    border: 2px solid transparent;
+    border-radius: 16px;
+    cursor: pointer;
+}
+
+.error-content:hover .error-icon {
+    color: #ff6b5b;
+}
+
+.error-content.hidden {
+    display: none;
+}
+
+.error-icon {
+    width: 64px;
+    height: 64px;
+    color: #e74c3c;
+    margin-bottom: 20px;
+}
+
+.error-title {
+    color: #ccc;
+    font-size: 20px;
+    margin: 0 0 12px 0;
+}
+
+.error-message {
+    color: #888;
+    font-size: 14px;
+    margin: 0 0 24px 0;
+    max-width: 400px;
+    text-align: center;
+    word-break: break-word;
+}
+
 .toolbar {
     position: absolute;
     top: 16px;
-    left: 16px;
-    z-index: 50;
+    right: 16px;
+    z-index: 150;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -168,19 +269,24 @@ html, body {
 }
 
 .toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 36px;
     height: 36px;
     padding: 6px;
+    box-sizing: border-box;
     background: transparent;
     border: none;
     border-radius: 6px;
     cursor: pointer;
+    text-decoration: none;
     transition: background 0.2s ease;
 }
 
 .toolbar-btn svg {
-    width: 100%;
-    height: 100%;
+    width: 24px;
+    height: 24px;
     color: #ccc;
 }
 
@@ -196,15 +302,48 @@ html, body {
     background: rgba(255, 255, 255, 0.2);
 }
 
+.toolbar-btn.hidden {
+    display: none;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
 .file-name {
     color: #aaa;
     font-size: 14px;
-    padding-left: 12px;
-    padding-right: 8px;
-    margin-left: 4px;
-    border-left: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+    .drop-zone {
+        padding: 0 24px;
+    }
+
+    .drop-zone-content {
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 60px 40px;
+    }
+
+    .drop-text {
+        text-align: center;
+    }
+
+    .error-content {
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 60px 40px;
+    }
+
+    .file-name {
+        max-width: 150px;
+    }
 }

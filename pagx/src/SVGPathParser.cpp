@@ -34,30 +34,30 @@ std::string PathDataToSVGString(const PathData& pathData) {
 
   char buf[64] = {};
   for (auto verb : verbs) {
-    const float* pts = points.data() + pointIndex;
+    const Point* pts = points.data() + pointIndex;
     switch (verb) {
       case PathVerb::Move:
-        snprintf(buf, sizeof(buf), "M%g %g", pts[0], pts[1]);
+        snprintf(buf, sizeof(buf), "M%g %g", pts[0].x, pts[0].y);
         result += buf;
         break;
       case PathVerb::Line:
-        snprintf(buf, sizeof(buf), "L%g %g", pts[0], pts[1]);
+        snprintf(buf, sizeof(buf), "L%g %g", pts[0].x, pts[0].y);
         result += buf;
         break;
       case PathVerb::Quad:
-        snprintf(buf, sizeof(buf), "Q%g %g %g %g", pts[0], pts[1], pts[2], pts[3]);
+        snprintf(buf, sizeof(buf), "Q%g %g %g %g", pts[0].x, pts[0].y, pts[1].x, pts[1].y);
         result += buf;
         break;
       case PathVerb::Cubic:
-        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", pts[0], pts[1], pts[2], pts[3], pts[4],
-                 pts[5]);
+        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", pts[0].x, pts[0].y, pts[1].x, pts[1].y,
+                 pts[2].x, pts[2].y);
         result += buf;
         break;
       case PathVerb::Close:
         result += "Z";
         break;
     }
-    pointIndex += PathData::PointsPerVerb(verb) * 2;
+    pointIndex += PathData::PointsPerVerb(verb);
   }
 
   return result;

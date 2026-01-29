@@ -39,35 +39,28 @@ int PathData::PointsPerVerb(PathVerb verb) {
 
 void PathData::moveTo(float x, float y) {
   _verbs.push_back(PathVerb::Move);
-  _points.push_back(x);
-  _points.push_back(y);
+  _points.push_back({x, y});
   _boundsDirty = true;
 }
 
 void PathData::lineTo(float x, float y) {
   _verbs.push_back(PathVerb::Line);
-  _points.push_back(x);
-  _points.push_back(y);
+  _points.push_back({x, y});
   _boundsDirty = true;
 }
 
 void PathData::quadTo(float cx, float cy, float x, float y) {
   _verbs.push_back(PathVerb::Quad);
-  _points.push_back(cx);
-  _points.push_back(cy);
-  _points.push_back(x);
-  _points.push_back(y);
+  _points.push_back({cx, cy});
+  _points.push_back({x, y});
   _boundsDirty = true;
 }
 
 void PathData::cubicTo(float c1x, float c1y, float c2x, float c2y, float x, float y) {
   _verbs.push_back(PathVerb::Cubic);
-  _points.push_back(c1x);
-  _points.push_back(c1y);
-  _points.push_back(c2x);
-  _points.push_back(c2y);
-  _points.push_back(x);
-  _points.push_back(y);
+  _points.push_back({c1x, c1y});
+  _points.push_back({c2x, c2y});
+  _points.push_back({x, y});
   _boundsDirty = true;
 }
 
@@ -86,14 +79,14 @@ Rect PathData::getBounds() {
     return _cachedBounds;
   }
 
-  float minX = _points[0];
-  float minY = _points[1];
-  float maxX = _points[0];
-  float maxY = _points[1];
+  float minX = _points[0].x;
+  float minY = _points[0].y;
+  float maxX = _points[0].x;
+  float maxY = _points[0].y;
 
-  for (size_t i = 2; i < _points.size(); i += 2) {
-    float x = _points[i];
-    float y = _points[i + 1];
+  for (size_t i = 1; i < _points.size(); i++) {
+    float x = _points[i].x;
+    float y = _points[i].y;
     minX = std::min(minX, x);
     minY = std::min(minY, y);
     maxX = std::max(maxX, x);

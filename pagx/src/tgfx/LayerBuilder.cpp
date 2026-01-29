@@ -289,19 +289,19 @@ static tgfx::Matrix ToTGFX(const Matrix& m) {
 
 static tgfx::Path ToTGFX(const PathData& pathData) {
   tgfx::Path path;
-  pathData.forEach([&](PathVerb verb, const float* pts) {
+  pathData.forEach([&](PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move:
-        path.moveTo(pts[0], pts[1]);
+        path.moveTo(pts[0].x, pts[0].y);
         break;
       case PathVerb::Line:
-        path.lineTo(pts[0], pts[1]);
+        path.lineTo(pts[0].x, pts[0].y);
         break;
       case PathVerb::Quad:
-        path.quadTo(pts[0], pts[1], pts[2], pts[3]);
+        path.quadTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
         break;
       case PathVerb::Cubic:
-        path.cubicTo(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5]);
+        path.cubicTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
         break;
       case PathVerb::Close:
         path.close();
