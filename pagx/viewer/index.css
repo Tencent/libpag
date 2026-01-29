@@ -258,6 +258,7 @@ html, body {
 @media (max-width: 600px) {
     .drop-zone {
         gap: 24px;
+        padding: 0 24px;
     }
 
     .logo {
@@ -271,8 +272,9 @@ html, body {
     }
 
     .drop-zone-content {
-        padding: 40px 32px;
-        margin: 0 20px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 40px 24px;
     }
 
     .drop-icon {
@@ -283,6 +285,7 @@ html, body {
 
     .drop-text {
         font-size: 16px;
+        text-align: center;
     }
 
     .drop-subtext {
@@ -290,8 +293,9 @@ html, body {
     }
 
     .error-content {
-        padding: 40px 32px;
-        margin: 0 20px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 40px 24px;
     }
 
     .error-icon {
@@ -305,11 +309,10 @@ html, body {
 
     .error-message {
         font-size: 12px;
-        max-width: 280px;
     }
 
     .loading-content {
-        padding: 40px 32px;
+        padding: 40px 24px;
     }
 
     .loading-text {
@@ -317,7 +320,8 @@ html, body {
     }
 
     .progress-container {
-        width: 200px;
+        width: 100%;
+        max-width: 200px;
     }
 
     .file-name {
