@@ -51,7 +51,7 @@ html, body {
 }
 
 .drop-zone.drag-over .drop-zone-content {
-    border-color: #4a90d9;
+    border-color: #0052d9;
     transform: scale(1.02);
 }
 
@@ -115,7 +115,7 @@ html, body {
     padding: 12px 32px;
     font-size: 16px;
     color: #fff;
-    background: #4a90d9;
+    background: #0052d9;
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -123,11 +123,11 @@ html, body {
 }
 
 .file-btn:hover {
-    background: #5a9ee9;
+    background: #0062e9;
 }
 
 .file-btn:active {
-    background: #3a80c9;
+    background: #0042c9;
 }
 
 .loading-content {
@@ -158,7 +158,7 @@ html, body {
 .progress-bar {
     width: 0;
     height: 100%;
-    background: linear-gradient(90deg, #4a90d9, #5a9ee9);
+    background: linear-gradient(90deg, #0052d9, #0062e9);
     border-radius: 3px;
     transition: width 0.15s ease-out;
 }
