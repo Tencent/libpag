@@ -461,8 +461,28 @@ Diamond gradients radiate from the center toward the four corners.
 Image patterns use an image as a color source.
 
 ```xml
+<ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
+```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `image` | idref | (required) | Image reference "@id" |
+| `tileModeX` | TileMode | clamp | X-direction tile mode |
+| `tileModeY` | TileMode | clamp | Y-direction tile mode |
+| `filterMode` | FilterMode | linear | Texture filter mode |
+| `mipmapMode` | MipmapMode | linear | Mipmap mode |
+| `matrix` | string | identity matrix | Transform matrix |
+
+**TileMode**: `clamp`, `repeat`, `mirror`, `decal`
+
+**FilterMode**: `nearest`, `linear`
+
+**MipmapMode**: `none`, `nearest`, `linear`
+
+**Complete Example**: Demonstrates ImagePattern fill with different tile modes
+
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates ImagePattern fill with different tile modes -->
 <pagx version="1.0" width="400" height="300">
   <!-- clamp mode: edge colors extend -->
   <Layer name="ClampFill" x="100" y="80">
@@ -493,21 +513,6 @@ Image patterns use an image as a color source.
   </Resources>
 </pagx>
 ```
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `image` | idref | (required) | Image reference "@id" |
-| `tileModeX` | TileMode | clamp | X-direction tile mode |
-| `tileModeY` | TileMode | clamp | Y-direction tile mode |
-| `filterMode` | FilterMode | linear | Texture filter mode |
-| `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | string | identity matrix | Transform matrix |
-
-**TileMode**: `clamp`, `repeat`, `mirror`, `decal`
-
-**FilterMode**: `nearest`, `linear`
-
-**MipmapMode**: `none`, `nearest`, `linear`
 
 ##### Color Source Coordinate System
 

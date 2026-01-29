@@ -461,8 +461,28 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 图片图案使用图片作为颜色源。
 
 ```xml
+<ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
+```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `image` | idref | (必填) | 图片引用 "@id" |
+| `tileModeX` | TileMode | clamp | X 方向平铺模式 |
+| `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
+| `filterMode` | FilterMode | linear | 纹理滤镜模式 |
+| `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
+| `matrix` | string | 单位矩阵 | 变换矩阵 |
+
+**TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
+
+**FilterMode（滤镜模式）**：`nearest`（最近邻）、`linear`（双线性插值）
+
+**MipmapMode（多级渐远模式）**：`none`（禁用）、`nearest`（最近级别）、`linear`（线性插值）
+
+**完整示例**：演示不同平铺模式的图片填充
+
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 演示不同平铺模式的图片填充 -->
 <pagx version="1.0" width="400" height="300">
   <!-- clamp 模式：图片边缘颜色延伸 -->
   <Layer name="ClampFill" x="100" y="80">
@@ -493,21 +513,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
   </Resources>
 </pagx>
 ```
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `image` | idref | (必填) | 图片引用 "@id" |
-| `tileModeX` | TileMode | clamp | X 方向平铺模式 |
-| `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
-| `filterMode` | FilterMode | linear | 纹理滤镜模式 |
-| `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
-
-**TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
-
-**FilterMode（滤镜模式）**：`nearest`（最近邻）、`linear`（双线性插值）
-
-**MipmapMode（多级渐远模式）**：`none`（禁用）、`nearest`（最近级别）、`linear`（线性插值）
 
 ##### 颜色源坐标系统
 
