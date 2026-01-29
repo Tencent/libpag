@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <!-- Solid color fill -->
+    <Rectangle center="50,50" size="80,80"/>
+    <Fill color="#FF0000" alpha="0.8"/>
+  </Layer>
+  <Layer>
+    <!-- Inline linear gradient -->
+    <Rectangle center="150,50" size="80,80"/>
+    <Fill>
+      <LinearGradient startPoint="110,10" endPoint="190,90">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer>
+    <!-- Inline radial gradient -->
+    <Ellipse center="100,150" size="160,80"/>
+    <Fill>
+      <RadialGradient center="100,150" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#3366FF"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>

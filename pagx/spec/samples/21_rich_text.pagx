@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="350" height="80">
+  <Layer>
+    <!-- Regular text -->
+    <Group>
+      <Text text="This is " fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- Bold red text -->
+    <Group>
+      <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <!-- Regular text -->
+    <Group>
+      <Text text=" information." fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- TextLayout applies unified typography -->
+    <TextLayout position="20,50" width="310" textAlign="start"/>
+  </Layer>
+</pagx>

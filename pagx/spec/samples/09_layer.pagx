@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="20" y="20" antiAlias="true">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+    <Layer name="Child">
+      <Ellipse center="60,60" size="60,60"/>
+      <Fill color="#00FF00"/>
+    </Layer>
+  </Layer>
+</pagx>

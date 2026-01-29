@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="150">
+  <!-- Point text: center aligned -->
+  <Layer>
+    <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="150,40" textAlign="center"/>
+    <Fill color="#333333"/>
+  </Layer>
+  <!-- Paragraph text: auto-wrap -->
+  <Layer>
+    <Text text="This is a longer text that demonstrates auto-wrap within a specified width." fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="20,70" width="260" textAlign="start" lineHeight="1.5"/>
+    <Fill color="#666666"/>
+  </Layer>
+</pagx>

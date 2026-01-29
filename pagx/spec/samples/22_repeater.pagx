@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Group>
+      <Rectangle center="30,50" size="40,40"/>
+      <Fill color="#3366FF"/>
+      <Repeater copies="5" position="50,0" startAlpha="1" endAlpha="0.2"/>
+    </Group>
+  </Layer>
+</pagx>

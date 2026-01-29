@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Rectangle center="100,50" size="200,100"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Group>
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Group>
+      <Ellipse center="150,50" size="80,80"/>
+      <Fill color="#00FF00"/>
+    </Group>
+    <Fill color="#0000FF40"/>
+  </Layer>
+</pagx>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Group>
+      <Text text="Hello " fontFamily="Arial" fontSize="24" position="20,50"/>
+      <Text text="World" fontFamily="Arial" fontSize="24" position="90,50"/>
+      <TextModifier position="0,-5">
+        <RangeSelector start="0" end="1" shape="triangle"/>
+      </TextModifier>
+      <Fill color="#333333"/>
+    </Group>
+  </Layer>
+</pagx>

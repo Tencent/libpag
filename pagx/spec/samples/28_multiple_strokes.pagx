@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Path data="M 20,50 Q 100,10 180,50"/>
+    <Stroke color="#0088FF40" width="12" cap="round" join="round"/>
+    <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
+    <Stroke color="#0088FF" width="2" cap="round" join="round"/>
+  </Layer>
+</pagx>

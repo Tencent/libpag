@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="150" height="150">
+  <Layer>
+    <Rectangle center="75,75" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <Stroke color="#000000" width="3"/>
+  </Layer>
+</pagx>
