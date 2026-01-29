@@ -72,6 +72,19 @@ html, body {
     display: none;
 }
 
+.logo {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 16px;
+}
+
+.title {
+    color: #fff;
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 32px 0;
+}
+
 .drop-icon {
     width: 64px;
     height: 64px;

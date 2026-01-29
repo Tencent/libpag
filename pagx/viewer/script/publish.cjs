@@ -77,6 +77,16 @@ function main() {
     path.join(OUTPUT_DIR, 'index.css')
   );
 
+  // Copy favicon and logo
+  copyFile(
+    path.join(VIEWER_DIR, 'favicon.ico'),
+    path.join(OUTPUT_DIR, 'favicon.ico')
+  );
+  copyFile(
+    path.join(VIEWER_DIR, 'logo.png'),
+    path.join(OUTPUT_DIR, 'logo.png')
+  );
+
   // Copy fonts from resources/font
   console.log('\n  Copying fonts...');
   copyFile(

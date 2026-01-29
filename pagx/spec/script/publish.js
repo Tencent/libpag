@@ -208,7 +208,7 @@ function createMarkedInstance() {
 /**
  * Generate the complete HTML document.
  */
-function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl) {
+function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
   const isEnglish = lang === 'en';
   const htmlLang = isEnglish ? 'en' : 'zh-CN';
   const tocTitle = isEnglish ? 'Table of Contents' : '目录';
@@ -248,6 +248,7 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
+    <link rel="icon" href="${faviconUrl}" type="image/x-icon">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <style>
         :root {
@@ -654,7 +655,7 @@ ${tocHtml}
 /**
  * Publish a single spec file.
  */
-function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl) {
+function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
   if (!fs.existsSync(specFile)) {
     console.log(`  Skipped (file not found): ${specFile}`);
     return;
@@ -692,7 +693,7 @@ function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUr
   const htmlContent = marked.parse(mdContent);
 
   // Generate complete HTML document
-  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl);
+  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl);
 
   // Create output directory
   fs.mkdirSync(outputDir, { recursive: true });
@@ -767,19 +768,30 @@ function main() {
   const viewerUrlFromRoot = '../viewer/';
   const viewerUrlFromZh = '../../viewer/';
 
+  // Favicon URL (relative path from spec pages to favicon)
+  const faviconUrlFromRoot = '../favicon.ico';
+  const faviconUrlFromZh = '../../favicon.ico';
+
   // Publish English version (default, at root)
   console.log('\nPublishing English version...');
-  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'zh/', viewerUrlFromRoot);
+  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'zh/', viewerUrlFromRoot, faviconUrlFromRoot);
 
   // Publish Chinese version (under /zh/)
   console.log('\nPublishing Chinese version...');
-  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh);
+  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh, faviconUrlFromZh);
 
   // Generate redirect index page (point to stableVersion if exists, otherwise current version)
   const redirectVersion = stableVersion || version;
   console.log('\nGenerating redirect page...');
   console.log(`  Redirect to: ${redirectVersion}`);
   generateRedirectPage(redirectVersion);
+
+  // Copy favicon
+  console.log('\nCopying favicon...');
+  const faviconSrc = path.join(SPEC_DIR, 'favicon.ico');
+  const faviconDest = path.join(SITE_DIR, 'favicon.ico');
+  fs.copyFileSync(faviconSrc, faviconDest);
+  console.log(`  Copied: ${faviconDest}`);
 
   console.log('\nDone!');
 }
