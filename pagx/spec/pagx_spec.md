@@ -237,10 +237,15 @@ PAGX uses a standard 2D Cartesian coordinate system:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="1920" height="1080">
-  <Layer name="background"><!-- layer content --></Layer>
-  <Layer name="content"><!-- layer content --></Layer>
-  <Resources><!-- resource definitions --></Resources>
+<pagx version="1.0" width="400" height="300">
+  <Layer name="background">
+    <Rectangle center="200,150" size="400,300"/>
+    <Fill color="#F0F0F0"/>
+  </Layer>
+  <Layer name="content">
+    <Rectangle center="200,150" size="200,100" roundness="10"/>
+    <Fill color="#3366FF"/>
+  </Layer>
 </pagx>
 ```
 
@@ -259,17 +264,21 @@ PAGX uses a standard 2D Cartesian coordinate system:
 **Element Position**: The Resources element may be placed anywhere within the root element; there are no restrictions on its position. Parsers must support forward references—elements that reference resources or layers defined later in the document.
 
 ```xml
-<Resources>
-  <Image id="img1" source="photo.png"/>
-  <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-  <SolidColor id="brandRed" color="#FF0000"/>
-  <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,100">
-    <ColorStop offset="0" color="#87CEEB"/>
-    <ColorStop offset="1" color="#E0F6FF"/>
-  </LinearGradient>
-  <ImagePattern id="texture" image="@img1" tileModeX="repeat" tileModeY="repeat"/>
-  <Composition id="buttonComp" width="100" height="50"><!-- composition content --></Composition>
-</Resources>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Layer>
+    <Rectangle center="150,100" size="200,120"/>
+    <Fill color="@skyGradient"/>
+  </Layer>
+  <Resources>
+    <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
+    <SolidColor id="brandRed" color="#FF0000"/>
+    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,200">
+      <ColorStop offset="0" color="#87CEEB"/>
+      <ColorStop offset="1" color="#E0F6FF"/>
+    </LinearGradient>
+  </Resources>
+</pagx>
 ```
 
 #### 3.3.1 Image
@@ -321,10 +330,18 @@ Color sources define colors that can be used for fills and strokes, supporting t
 Linear gradients interpolate along the direction from start point to end point.
 
 ```xml
-<LinearGradient startPoint="0,0" endPoint="100,0">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</LinearGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Rectangle center="100,50" size="200,100"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="200,0">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -340,10 +357,18 @@ Linear gradients interpolate along the direction from start point to end point.
 Radial gradients radiate outward from the center.
 
 ```xml
-<RadialGradient center="50,50" radius="50">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</RadialGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill>
+      <RadialGradient center="100,100" radius="100">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#000000"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -359,10 +384,20 @@ Radial gradients radiate outward from the center.
 Conic gradients (also known as sweep gradients) interpolate along the circumference.
 
 ```xml
-<ConicGradient center="50,50" startAngle="0" endAngle="360">
-  <ColorStop offset="0" color="#FF0000"/>
-  <ColorStop offset="1" color="#0000FF"/>
-</ConicGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="180,180"/>
+    <Fill>
+      <ConicGradient center="100,100" startAngle="0" endAngle="360">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="0.33" color="#00FF00"/>
+        <ColorStop offset="0.66" color="#0000FF"/>
+        <ColorStop offset="1" color="#FF0000"/>
+      </ConicGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -379,10 +414,18 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 Diamond gradients radiate from the center toward the four corners.
 
 ```xml
-<DiamondGradient center="50,50" radius="50">
-  <ColorStop offset="0" color="#FFFFFF"/>
-  <ColorStop offset="1" color="#000000"/>
-</DiamondGradient>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="180,180"/>
+    <Fill>
+      <DiamondGradient center="100,100" radius="90">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#000000"/>
+      </DiamondGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -449,17 +492,19 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 **Example**: Drawing a linear gradient from left to right within a 100×100 region:
 
 ```xml
-<Resources>
-  <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Resources>
-
-<Layer>
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="@grad"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="100,100"/>
+    <Fill color="@grad"/>
+  </Layer>
+  <Resources>
+    <LinearGradient id="grad" startPoint="0,0" endPoint="100,0">
+      <ColorStop offset="0" color="#FF0000"/>
+      <ColorStop offset="1" color="#0000FF"/>
+    </LinearGradient>
+  </Resources>
+</pagx>
 ```
 
 - Applying `scale(2, 2)` transform to this layer: The rectangle becomes 200×200, and the gradient scales accordingly, maintaining consistent visual appearance
@@ -470,12 +515,18 @@ Except for solid colors, all color sources (gradients, image patterns) operate w
 Compositions are used for content reuse (similar to After Effects pre-comps).
 
 ```xml
-<Composition id="buttonComp" width="100" height="50">
-  <Layer name="button">
-    <Rectangle center="50,25" size="100,50" roundness="10"/>
-    <Fill color="#007AFF"/>
-  </Layer>
-</Composition>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Layer composition="@buttonComp" x="100" y="75"/>
+  <Resources>
+    <Composition id="buttonComp" width="100" height="50">
+      <Layer name="button">
+        <Rectangle center="50,25" size="100,50" roundness="10"/>
+        <Fill color="#007AFF"/>
+      </Layer>
+    </Composition>
+  </Resources>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -615,17 +666,18 @@ Layer background is primarily used for:
 `<Layer>` is the basic container for content and child layers.
 
 ```xml
-<Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="0" y="0" antiAlias="true">
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
-  <BlurFilter blurX="10" blurY="10"/>
-  <Layer name="Child">
-    <Ellipse center="50,50" size="80,80"/>
-    <Fill color="#00FF00"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer name="MyLayer" visible="true" alpha="1" blendMode="normal" x="20" y="20" antiAlias="true">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+    <Layer name="Child">
+      <Ellipse center="60,60" size="60,60"/>
+      <Fill color="#00FF00"/>
+    </Layer>
   </Layer>
-</Layer>
-<Layer composition="@buttonComp" x="100" y="200"/>
+</pagx>
 ```
 
 #### Child Elements
@@ -712,13 +764,15 @@ All layer styles compute effects based on **layer content**. In layer styles, la
 Some layer styles additionally use **layer contour** or **layer background** as input (see individual style descriptions). Definitions of layer contour and layer background are in Section 4.1.
 
 ```xml
-<Layer>
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-  <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
-  <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
-  <BackgroundBlurStyle blurX="20" blurY="20" tileMode="mirror"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer x="50" y="50">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <DropShadowStyle offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080" showBehindLayer="true"/>
+    <InnerShadowStyle offsetX="2" offsetY="2" blurX="5" blurY="5" color="#00000040"/>
+  </Layer>
+</pagx>
 ```
 
 **Common LayerStyle Attributes**:
@@ -790,13 +844,15 @@ Layer filters are the final stage of layer rendering. All previously rendered re
 Unlike layer styles (Section 4.3), which **independently render** visual effects above or below layer content, filters **modify** the layer's overall rendering output. Layer styles are applied before filters.
 
 ```xml
-<Layer>
-  <Rectangle center="50,50" size="100,100"/>
-  <Fill color="#FF0000"/>
-  <BlurFilter blurX="10" blurY="10"/>
-  <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
-  <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer x="50" y="50">
+    <Rectangle center="50,50" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <BlurFilter blurX="5" blurY="5"/>
+    <DropShadowFilter offsetX="5" offsetY="5" blurX="10" blurY="10" color="#00000080"/>
+  </Layer>
+</pagx>
 ```
 
 #### 4.4.1 BlurFilter
@@ -878,10 +934,13 @@ Transforms colors using a 4×5 color matrix.
 The `scrollRect` attribute defines the layer's visible region; content outside this region is clipped.
 
 ```xml
-<Layer scrollRect="0,0,100,100">
-  <Rectangle center="50,50" size="200,200"/>
-  <Fill color="#FF0000"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer scrollRect="50,50,100,100">
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>
 ```
 
 #### 4.5.2 Masking
@@ -889,14 +948,17 @@ The `scrollRect` attribute defines the layer's visible region; content outside t
 Reference another layer as a mask using the `mask` attribute.
 
 ```xml
-<Layer id="maskShape" visible="false">
-  <Ellipse center="100,100" size="150,150"/>
-  <Fill color="#FFFFFF"/>
-</Layer>
-<Layer mask="@maskShape" maskType="alpha">
-  <Rectangle center="100,100" size="200,200"/>
-  <Fill color="#FF0000"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer id="maskShape" visible="false">
+    <Ellipse center="100,100" size="150,150"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  <Layer mask="@maskShape" maskType="alpha">
+    <Rectangle center="100,100" size="200,200"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+</pagx>
 ```
 
 **Masking Rules**:
@@ -1230,24 +1292,34 @@ Painters (Fill, Stroke) render all geometry (Paths and glyph lists) accumulated 
 Fill draws the interior region of geometry using a specified color source.
 
 ```xml
-<!-- Solid color fill -->
-<Fill color="#FF0000" alpha="0.8" blendMode="normal" fillRule="winding" placement="background"/>
-
-<!-- Reference shared color source -->
-<Fill color="@grad1"/>
-
-<!-- Inline linear gradient (recommended for single use) -->
-<Fill>
-  <LinearGradient startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Fill>
-
-<!-- Inline image pattern -->
-<Fill>
-  <ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <!-- Solid color fill -->
+    <Rectangle center="50,50" size="80,80"/>
+    <Fill color="#FF0000" alpha="0.8"/>
+  </Layer>
+  <Layer>
+    <!-- Inline linear gradient -->
+    <Rectangle center="150,50" size="80,80"/>
+    <Fill>
+      <LinearGradient startPoint="110,10" endPoint="190,90">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Layer>
+    <!-- Inline radial gradient -->
+    <Ellipse center="100,150" size="160,80"/>
+    <Fill>
+      <RadialGradient center="100,150" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#3366FF"/>
+      </RadialGradient>
+    </Fill>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1277,19 +1349,29 @@ Child elements: May embed one color source (SolidColor, LinearGradient, RadialGr
 Stroke draws lines along geometry boundaries.
 
 ```xml
-<!-- Basic stroke -->
-<Stroke color="#000000" width="2" cap="round" join="miter" miterLimit="4"/>
-
-<!-- Dashed stroke -->
-<Stroke color="#0000FF" width="1" dashes="5,3" dashOffset="2"/>
-
-<!-- Inline gradient stroke -->
-<Stroke width="3">
-  <LinearGradient startPoint="0,0" endPoint="100,0">
-    <ColorStop offset="0" color="#FF0000"/>
-    <ColorStop offset="1" color="#0000FF"/>
-  </LinearGradient>
-</Stroke>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <!-- Basic stroke -->
+    <Rectangle center="50,50" size="60,60"/>
+    <Stroke color="#000000" width="3" cap="round" join="round"/>
+  </Layer>
+  <Layer>
+    <!-- Dashed stroke -->
+    <Rectangle center="150,50" size="60,60"/>
+    <Stroke color="#0000FF" width="2" dashes="8,4" dashOffset="0"/>
+  </Layer>
+  <Layer>
+    <!-- Inline gradient stroke -->
+    <Path data="M 20,150 Q 100,100 180,150"/>
+    <Stroke width="4" cap="round">
+      <LinearGradient startPoint="20,150" endPoint="180,150">
+        <ColorStop offset="0" color="#FF0000"/>
+        <ColorStop offset="1" color="#0000FF"/>
+      </LinearGradient>
+    </Stroke>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1380,9 +1462,15 @@ Trims paths to a specified start/end range.
 
 **Continuous Mode Example**:
 ```xml
-<Path d="M0,0 L100,0"/>
-<Path d="M0,0 L100,0"/>
-<TrimPath start="0.25" end="0.75" type="continuous"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Path data="M 20,50 L 100,50"/>
+    <Path data="M 100,50 L 180,50"/>
+    <TrimPath start="0.25" end="0.75" type="continuous"/>
+    <Stroke color="#3366FF" width="4" cap="round"/>
+  </Layer>
+</pagx>
 ```
 
 #### 5.4.2 RoundCorner
@@ -1432,10 +1520,15 @@ Merges all shapes into a single shape.
 **Example**:
 
 ```xml
-<Rectangle center="50,50" size="80,80"/>
-<Ellipse center="90,90" size="80,80"/>
-<MergePath mode="union"/>
-<Fill color="#3366FF"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="70,70" size="100,100"/>
+    <Ellipse center="130,130" size="100,100"/>
+    <MergePath mode="union"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
 ```
 
 ### 5.5 Text Modifiers
@@ -1447,12 +1540,19 @@ Text modifiers transform individual glyphs within text.
 When a text modifier is encountered, **all glyph lists** accumulated in the context are combined into a unified glyph list for the operation:
 
 ```xml
-<Group>
-  <Text text="Hello" fontFamily="Arial" fontSize="24"/>
-  <Text text="World" fontFamily="Arial" fontSize="24"/>
-  <TextModifier position="0,-10"/>
-  <Fill color="#333333"/>
-</Group>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Group>
+      <Text text="Hello " fontFamily="Arial" fontSize="24" position="20,50"/>
+      <Text text="World" fontFamily="Arial" fontSize="24" position="90,50"/>
+      <TextModifier position="0,-5">
+        <RangeSelector start="0" end="1" shape="triangle"/>
+      </TextModifier>
+      <Fill color="#333333"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 #### 5.5.2 Text to Shape Conversion
@@ -1616,11 +1716,14 @@ Range selectors define the glyph range and influence degree for TextModifier.
 Arranges text along a specified path. The path can reference a PathData defined in Resources, or use inline path data.
 
 ```xml
-<!-- Reference PathData resource -->
-<TextPath path="@curvePath" textAlign="start" firstMargin="0" lastMargin="0" perpendicular="true" reversed="false"/>
-
-<!-- Inline path data -->
-<TextPath path="M0,100 Q100,0 200,100" textAlign="center"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="250" height="150">
+  <Layer>
+    <Text text="Hello Path" fontFamily="Arial" fontSize="20"/>
+    <TextPath path="M 20,100 Q 125,20 230,100" textAlign="center"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1662,19 +1765,21 @@ TextLayout is a text layout modifier that applies typography to accumulated Text
 During rendering, an attached text typesetting module performs pre-layout, recalculating each glyph's position. TextLayout is expanded during pre-layout, with glyph positions written directly into Text.
 
 ```xml
-<!-- Point text: center aligned -->
-<Layer>
-  <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
-  <TextLayout position="150,100" textAlign="center"/>
-  <Fill color="#333333"/>
-</Layer>
-
-<!-- Paragraph text: auto-wrap -->
-<Layer>
-  <Text text="This is a long text that will auto-wrap..." fontFamily="Arial" fontSize="16"/>
-  <TextLayout position="50,50" width="300" height="200" textAlign="start" verticalAlign="top" lineHeight="1.5"/>
-  <Fill color="#333333"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="150">
+  <!-- Point text: center aligned -->
+  <Layer>
+    <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
+    <TextLayout position="150,40" textAlign="center"/>
+    <Fill color="#333333"/>
+  </Layer>
+  <!-- Paragraph text: auto-wrap -->
+  <Layer>
+    <Text text="This is a longer text that demonstrates auto-wrap within a specified width." fontFamily="Arial" fontSize="14"/>
+    <TextLayout position="20,70" width="260" textAlign="start" lineHeight="1.5"/>
+    <Fill color="#666666"/>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1716,36 +1821,28 @@ During rendering, an attached text typesetting module performs pre-layout, recal
 Rich text is achieved through multiple Text elements within a Group, each Text having independent Fill/Stroke styles. TextLayout provides unified typography.
 
 ```xml
-<Layer>
-  <!-- Regular text -->
-  <Group>
-    <Text text="This is " fontFamily="Arial" fontSize="18"/>
-    <Fill color="#333333"/>
-  </Group>
-  <!-- Bold red text -->
-  <Group>
-    <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
-    <Fill color="#FF0000"/>
-  </Group>
-  <!-- Regular text -->
-  <Group>
-    <Text text=" information. " fontFamily="Arial" fontSize="18"/>
-    <Fill color="#333333"/>
-  </Group>
-  <!-- Underlined link style -->
-  <Group>
-    <Text text="Click here" fontFamily="Arial" fontSize="18"/>
-    <Fill color="#0066CC"/>
-    <Stroke color="#0066CC" width="1"/>
-  </Group>
-  <!-- Regular text -->
-  <Group>
-    <Text text=" for more details." fontFamily="Arial" fontSize="18"/>
-    <Fill color="#333333"/>
-  </Group>
-  <!-- TextLayout applies unified typography to all Text elements -->
-  <TextLayout position="50,100" width="300" textAlign="start" lineHeight="1.5"/>
-</Layer>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="350" height="80">
+  <Layer>
+    <!-- Regular text -->
+    <Group>
+      <Text text="This is " fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- Bold red text -->
+    <Group>
+      <Text text="important" fontFamily="Arial" fontStyle="Bold" fontSize="18"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <!-- Regular text -->
+    <Group>
+      <Text text=" information." fontFamily="Arial" fontSize="18"/>
+      <Fill color="#333333"/>
+    </Group>
+    <!-- TextLayout applies unified typography -->
+    <TextLayout position="20,50" width="310" textAlign="start"/>
+  </Layer>
+</pagx>
 ```
 
 **Note**: Each Group's Text + Fill/Stroke defines a text segment with independent styling. TextLayout treats all segments as a single unit for typography, enabling auto-wrapping and alignment.
@@ -1816,12 +1913,16 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 - **Copy rendered styles**: Also copies already rendered fills and strokes
 
 ```xml
-<Group>
-  <Text text="Hi" fontFamily="Arial" fontSize="24"/>  <!-- Accumulate glyph list -->
-  <Fill color="#333333"/>            <!-- Render fill -->
-  <Repeater copies="3"/> <!-- Copy glyph list and rendered fill -->
-  <TextModifier position="0,-5"/>    <!-- Still affects copied glyph lists -->
-</Group>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Layer>
+    <Group>
+      <Rectangle center="30,50" size="40,40"/>
+      <Fill color="#3366FF"/>
+      <Repeater copies="5" position="50,0" startAlpha="1" endAlpha="0.2"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 ### 5.7 Group
@@ -1829,9 +1930,15 @@ When `copies` is a decimal (e.g., `3.5`), partial copies are achieved through **
 Group is a VectorElement container with transform properties.
 
 ```xml
-<Group anchorPoint="50,50" position="100,200" rotation="45" scale="1,1" skew="0" skewAxis="0" alpha="1">
-  <!-- child elements -->
-</Group>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Group anchorPoint="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF6600"/>
+    </Group>
+  </Layer>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1884,32 +1991,47 @@ Groups create isolated scopes for geometry accumulation and rendering:
 
 **Example 1 - Basic Isolation**:
 ```xml
-<Group alpha="0.5">
-  <Rectangle center="50,50" size="100,100"/>    <!-- Accumulates only within group -->
-  <Fill color="#FF0000"/> <!-- Only fills the rectangle within group, alpha=0.5 -->
-</Group>
-<Ellipse center="150,50" size="80,80"/>        <!-- Accumulates outside group -->
-<Fill color="#0000FF"/>  <!-- Only fills ellipse, alpha=1.0 -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Group alpha="0.5">
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Ellipse center="150,50" size="80,80"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+</pagx>
 ```
 
 **Example 2 - Child Group Geometry Propagates Upward**:
 ```xml
-<Group>
-  <Rectangle center="50,50" size="100,100"/>    <!-- Accumulate rectangle -->
-  <Fill color="#FF0000"/> <!-- Fill rectangle -->
-</Group>
-<Group>
-  <Ellipse center="150,50" size="80,80"/>       <!-- Accumulate ellipse -->
-  <Fill color="#00FF00"/> <!-- Fill ellipse -->
-</Group>
-<Fill color="#0000FF"/>  <!-- Fill rectangle+ellipse (all child Group geometry) -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Group>
+      <Rectangle center="50,50" size="80,80"/>
+      <Fill color="#FF0000"/>
+    </Group>
+    <Group>
+      <Ellipse center="150,50" size="80,80"/>
+      <Fill color="#00FF00"/>
+    </Group>
+    <Fill color="#0000FF40"/>
+  </Layer>
+</pagx>
 ```
 
 **Example 3 - Multiple Painters Reuse Geometry**:
 ```xml
-<Rectangle center="50,50" size="100,100"/>
-<Fill color="#FF0000"/>    <!-- Fill rectangle -->
-<Stroke color="#000000"/> <!-- Stroke same rectangle (geometry not cleared) -->
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="150" height="150">
+  <Layer>
+    <Rectangle center="75,75" size="100,100"/>
+    <Fill color="#FF0000"/>
+    <Stroke color="#000000" width="3"/>
+  </Layer>
+</pagx>
 ```
 
 #### Multiple Fills and Strokes
@@ -1918,34 +2040,49 @@ Since painters do not clear the geometry list, the same geometry can have multip
 
 **Example 4 - Multiple Fills**:
 ```xml
-<Rectangle center="100,100" size="200,100" roundness="10"/>
-<Fill>
-  <ImagePattern image="@checkerboard" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
-<Fill color="#FF000080"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Rectangle center="100,100" size="160,100" roundness="10"/>
+    <Fill>
+      <LinearGradient startPoint="20,50" endPoint="180,150">
+        <ColorStop offset="0" color="#FFCC00"/>
+        <ColorStop offset="1" color="#FF6600"/>
+      </LinearGradient>
+    </Fill>
+    <Fill color="#FF000040"/>
+  </Layer>
+</pagx>
 ```
 
 **Example 5 - Multiple Strokes**:
 ```xml
-<Path d="M10,50 Q50,10 90,50 T170,50"/>
-<Stroke color="#0088FF40" width="12" cap="round" join="round"/>
-<Stroke color="#0088FF80" width="6" cap="round" join="round"/>
-<Stroke color="#0088FF" width="2" cap="round" join="round"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="100">
+  <Layer>
+    <Path data="M 20,50 Q 100,10 180,50"/>
+    <Stroke color="#0088FF40" width="12" cap="round" join="round"/>
+    <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
+    <Stroke color="#0088FF" width="2" cap="round" join="round"/>
+  </Layer>
+</pagx>
 ```
 
 **Example 6 - Mixed Overlay**:
 ```xml
-<Ellipse center="100,100" size="180,180"/>
-<Fill>
-  <RadialGradient center="100,100" radius="90">
-    <ColorStop offset="0" color="#FFFFFF"/>
-    <ColorStop offset="1" color="#3366FF"/>
-  </RadialGradient>
-</Fill>
-<Fill alpha="0.3">
-  <ImagePattern image="@noiseTexture" tileModeX="repeat" tileModeY="repeat"/>
-</Fill>
-<Stroke color="#1a3366" width="3"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="200" height="200">
+  <Layer>
+    <Ellipse center="100,100" size="160,160"/>
+    <Fill>
+      <RadialGradient center="100,100" radius="80">
+        <ColorStop offset="0" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#3366FF"/>
+      </RadialGradient>
+    </Fill>
+    <Stroke color="#1a3366" width="3"/>
+  </Layer>
+</pagx>
 ```
 
 **Rendering Order**: Multiple painters render in document order; those appearing earlier are below.
