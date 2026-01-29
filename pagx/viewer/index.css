@@ -114,20 +114,22 @@ html, body {
 .file-btn {
     padding: 12px 32px;
     font-size: 16px;
-    color: #fff;
-    background: #0052d9;
-    border: none;
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .file-btn:hover {
-    background: #0062e9;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .file-btn:active {
-    background: #0042c9;
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .loading-content {
