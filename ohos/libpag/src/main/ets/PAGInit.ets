@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { text } from '@kit.ArkGraphics2D';
 import { font } from '@kit.ArkUI';
 import { JPAGDiskCache, JPAGFont } from 'libpag.so';
 
@@ -32,27 +34,70 @@ export class PAGInit {
   private static hasInit: boolean = false;
 
   private static InitFontFallback() {
+    // API14+: prefer the new async API, fallback to the legacy API on failure
+    if (deviceInfo.sdkApiVersion >= 14) {
+      PAGInit.InitFontFallbackWithTextModule().then((success: boolean) => {
+        if (!success) {
+          PAGInit.InitFontFallbackWithFontModule();
+        }
+      });
+      return;
+    }
+
+    // Below API14: use the legacy API
+    PAGInit.InitFontFallbackWithFontModule();
+  }
+
+  // Use the new text module API (API14+)
+  private static async InitFontFallbackWithTextModule(): Promise<boolean> {
+    try {
+      let fontNames: string[] = await text.getSystemFontFullNamesByType(text.SystemFontType.ALL);
+      if (fontNames && fontNames.length > 0) {
+        let descriptors = await Promise.all(fontNames.map(fontName =>
+          text.getFontDescriptorByFullName(fontName, text.SystemFontType.ALL)
+        ));
+        let paths = Array.from(new Set(descriptors.filter(d => d && d.path).map(d => d.path)));
+        if (paths.length > 0) {
+          JPAGFont.SetFallbackFontPaths(paths);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('[PAGInit] text.getSystemFontFullNamesByType failed: ' + e);
+    }
+    return false;
+  }
+
+  // Use the legacy font module API
+  private static InitFontFallbackWithFontModule() {
     let fontConfig = font.getUIFontConfig();
-    let paths = new Array<string>();
-    let emojiPaths = new Array<string>();
-    for (let index = 0; index < fontConfig.fallbackGroups.length; index++) {
-      const element = fontConfig.fallbackGroups[index];
-      for (let j = 0; j < element.fallback.length; j++) {
-        let fontInfo = font.getFontByName(element.fallback[j].family)
+    if (!fontConfig || !fontConfig.fallbackGroups) {
+      console.warn('[PAGInit] fontConfig is not available, skip font fallback initialization');
+      return;
+    }
+
+    // Use two sets to deduplicate, emoji fonts will be appended at the end
+    let pathSet = new Set<string>();
+    let emojiPathSet = new Set<string>();
+    for (const element of fontConfig.fallbackGroups) {
+      if (!element || !element.fallback) {
+        continue;
+      }
+      for (const fallback of element.fallback) {
+        let fontInfo = font.getFontByName(fallback.family);
         if (fontInfo == null) {
-          fontInfo = font.getFontByName(element.fallback[j].family + " Regular")
+          fontInfo = font.getFontByName(fallback.family + " Regular");
         }
         if (fontInfo != null) {
-          if (fontInfo.fullName.toLowerCase().indexOf("emoji") > 0) {
-            emojiPaths.push(fontInfo.path);
+          if (fontInfo.fullName.toLowerCase().includes("emoji")) {
+            emojiPathSet.add(fontInfo.path);
           } else {
-            paths.push(fontInfo.path);
+            pathSet.add(fontInfo.path);
           }
         }
       }
     }
-    paths.concat(emojiPaths);
-    JPAGFont.SetFallbackFontPaths(paths);
+    JPAGFont.SetFallbackFontPaths(Array.from(pathSet).concat(Array.from(emojiPathSet)));
   }
 
   private static InitCacheDir() {
