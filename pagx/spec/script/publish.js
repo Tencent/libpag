@@ -529,6 +529,7 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             position: absolute;
             top: 100%;
             right: 0;
+            min-width: 100%;
             margin-top: 4px;
             background: white;
             border: 1px solid var(--border-color);
