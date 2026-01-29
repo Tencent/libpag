@@ -481,9 +481,21 @@ function hideDropZone(): void {
     }
 }
 
-async function loadPAGXFile(file: File) {
+async function loadPAGXData(data: Uint8Array, name: string) {
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
+
+    registerFontsToView();
+    viewerState.pagxView!.loadPAGX(data);
+    gestureManager.resetTransform(viewerState);
+    updateSize();
+    hideDropZone();
+    toolbar.classList.remove('hidden');
+    fileName.textContent = name;
+}
+
+async function loadPAGXFile(file: File) {
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
 
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
@@ -517,18 +529,68 @@ async function loadPAGXFile(file: File) {
         const fileBuffer = await file.arrayBuffer();
 
         // Register fonts and load PAGX file
-        registerFontsToView();
-        viewerState.pagxView!.loadPAGX(new Uint8Array(fileBuffer));
-        gestureManager.resetTransform(viewerState);
-        updateSize();
-        hideDropZone();
-        toolbar.classList.remove('hidden');
-        fileName.textContent = file.name;
+        await loadPAGXData(new Uint8Array(fileBuffer), file.name);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
         showDropZoneUI();
         alert('Failed to load PAGX file. Please check the file format.');
     }
+}
+
+async function loadPAGXFromURL(url: string) {
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+
+    // Show loading UI with progress reset to 0%
+    const loadingStartTime = Date.now();
+    showLoadingUI();
+    toolbar.classList.add('hidden');
+    resetProgressUI();
+    // Wait for 0% to render before starting
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Start loading resources if not already started
+    if (!wasmLoadPromise) {
+        wasmLoadPromise = loadWasm();
+    }
+    if (!fontLoadPromise) {
+        fontLoadPromise = loadFonts();
+    }
+
+    try {
+        // Wait for WASM and fonts (progress goes from 0% to 99%)
+        await Promise.all([wasmLoadPromise, fontLoadPromise]);
+        updateProgressUI();
+
+        // Ensure minimum display time for loading UI (300ms)
+        const elapsed = Date.now() - loadingStartTime;
+        const minDisplayTime = 300;
+        if (elapsed < minDisplayTime) {
+            await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+        }
+
+        // Fetch PAGX file from URL
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        const fileBuffer = await response.arrayBuffer();
+
+        // Extract filename from URL
+        const urlPath = new URL(url).pathname;
+        const name = urlPath.substring(urlPath.lastIndexOf('/') + 1) || 'remote.pagx';
+
+        // Register fonts and load PAGX file
+        await loadPAGXData(new Uint8Array(fileBuffer), name);
+    } catch (error) {
+        console.error('Failed to load PAGX from URL:', error);
+        showDropZoneUI();
+        alert(`Failed to load PAGX from URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+
+function getPAGXUrlFromParams(): string | null {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('url');
 }
 
 function setupDragAndDrop() {
@@ -645,6 +707,12 @@ if (typeof window !== 'undefined') {
             console.error('Font load failed:', error);
             throw error;
         });
+
+        // Check for URL parameter and auto-load if present
+        const pagxUrl = getPAGXUrlFromParams();
+        if (pagxUrl) {
+            loadPAGXFromURL(pagxUrl);
+        }
     };
 
     window.onresize = () => {
