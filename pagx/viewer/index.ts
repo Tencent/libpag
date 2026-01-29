@@ -501,6 +501,17 @@ function bindCanvasEvents(canvas: HTMLElement) {
         e.preventDefault();
         gestureManager.onWheel(e, canvas, viewerState);
     }, { passive: false });
+
+    // Prevent browser pinch-to-zoom on Safari
+    canvas.addEventListener('gesturestart', (e: Event) => {
+        e.preventDefault();
+    });
+    canvas.addEventListener('gesturechange', (e: Event) => {
+        e.preventDefault();
+    });
+    canvas.addEventListener('gestureend', (e: Event) => {
+        e.preventDefault();
+    });
 }
 
 function showLoadingUI(): void {

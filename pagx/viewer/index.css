@@ -24,6 +24,7 @@ html, body {
     left: 0;
     right: 0;
     z-index: 1;
+    touch-action: none;
 }
 
 .canvas:active {
