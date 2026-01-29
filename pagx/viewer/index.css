@@ -257,71 +257,21 @@ html, body {
 /* Mobile */
 @media (max-width: 600px) {
     .drop-zone {
-        gap: 24px;
         padding: 0 24px;
-    }
-
-    .logo {
-        width: 80px;
-        height: 80px;
-    }
-
-    .title {
-        font-size: 24px;
-        margin: 12px 0 0 0;
     }
 
     .drop-zone-content {
         width: 100%;
         box-sizing: border-box;
-        padding: 40px 24px;
-    }
-
-    .drop-icon {
-        width: 48px;
-        height: 48px;
-        margin-bottom: 16px;
     }
 
     .drop-text {
-        font-size: 16px;
         text-align: center;
-    }
-
-    .drop-subtext {
-        font-size: 12px;
     }
 
     .error-content {
         width: 100%;
         box-sizing: border-box;
-        padding: 40px 24px;
-    }
-
-    .error-icon {
-        width: 48px;
-        height: 48px;
-    }
-
-    .error-title {
-        font-size: 16px;
-    }
-
-    .error-message {
-        font-size: 12px;
-    }
-
-    .loading-content {
-        padding: 40px 24px;
-    }
-
-    .loading-text {
-        font-size: 16px;
-    }
-
-    .progress-container {
-        width: 100%;
-        max-width: 200px;
     }
 
     .file-name {
