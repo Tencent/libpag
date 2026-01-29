@@ -27,8 +27,6 @@ using namespace emscripten;
 
 namespace pagx {
 
-static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
-
 static std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
     return nullptr;
@@ -55,7 +53,7 @@ PAGXView::PAGXView(const std::string& canvasID) : canvasID(canvasID) {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  fallbackTypefaces.clear();
+  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
@@ -70,6 +68,7 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
       fallbackTypefaces.push_back(std::move(typeface));
     }
   }
+  typesetter.setFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -81,8 +80,6 @@ void PAGXView::loadPAGX(const val& pagxData) {
   if (!document) {
     return;
   }
-  Typesetter typesetter;
-  typesetter.setFallbackTypefaces(fallbackTypefaces);
   contentLayer = LayerBuilder::Build(document.get(), &typesetter);
   if (!contentLayer) {
     return;
