@@ -26,10 +26,15 @@ interface I18nStrings {
     loading: string;
     errorTitle: string;
     errorFormat: string;
+    errorWasm: string;
+    errorFont: string;
+    errorNetwork: string;
     errorBrowser: string;
     openFile: string;
     resetView: string;
     invalidFile: string;
+    spec: string;
+    specTitle: string;
 }
 
 const i18n: Record<string, I18nStrings> = {
@@ -37,23 +42,33 @@ const i18n: Record<string, I18nStrings> = {
         dropText: 'Drag & Drop PAGX file here',
         dropSubtext: 'or click to browse',
         loading: 'Loading...',
-        errorTitle: 'Failed to load file',
-        errorFormat: 'The file could not be loaded. Please check the file format.',
+        errorTitle: 'Failed to load',
+        errorFormat: 'Invalid file format. Please use a valid .pagx file.',
+        errorWasm: 'Failed to load WebAssembly module.',
+        errorFont: 'Failed to load fonts.',
+        errorNetwork: 'Network error. Please check your connection.',
         errorBrowser: 'Minimum browser versions required:',
         openFile: 'Open PAGX File',
         resetView: 'Reset View',
         invalidFile: 'Please drop a .pagx file',
+        spec: 'Spec',
+        specTitle: 'PAGX Specification',
     },
     zh: {
         dropText: '拖放 PAGX 文件到此处',
         dropSubtext: '或点击选择文件',
         loading: '加载中...',
-        errorTitle: '文件加载失败',
-        errorFormat: '无法加载该文件，请检查文件格式。',
+        errorTitle: '加载失败',
+        errorFormat: '无效的文件格式，请使用有效的 .pagx 文件。',
+        errorWasm: 'WebAssembly 模块加载失败。',
+        errorFont: '字体加载失败。',
+        errorNetwork: '网络错误，请检查网络连接。',
         errorBrowser: '浏览器最低版本要求：',
         openFile: '打开 PAGX 文件',
         resetView: '重置视图',
         invalidFile: '请拖放 .pagx 文件',
+        spec: 'Spec',
+        specTitle: 'PAGX 格式规范',
     },
 };
 
@@ -134,6 +149,21 @@ class LoadingProgress {
         }
         // Cap at 99%, reserve 100% for after PAGX file loaded
         return Math.min(99, Math.round((loadedSize / totalSize) * 100));
+    }
+}
+
+enum ErrorType {
+    WASM = 'wasm',
+    FONT = 'font',
+    FORMAT = 'format',
+    NETWORK = 'network',
+}
+
+class ViewerError extends Error {
+    type: ErrorType;
+    constructor(type: ErrorType, message?: string) {
+        super(message);
+        this.type = type;
     }
 }
 
@@ -424,7 +454,11 @@ async function loadWasm(): Promise<void> {
     });
     viewerState.module = module as PAGXModule;
     TGFXBind(viewerState.module as any);
-    viewerState.pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+    const pagxView = viewerState.module.PAGXView.MakeFrom('#pagx-canvas');
+    if (!pagxView) {
+        throw new Error('Failed to create PAGXView');
+    }
+    viewerState.pagxView = pagxView;
     updateSize();
     viewerState.pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
     const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
@@ -563,25 +597,28 @@ function hideDropZone(): void {
 }
 
 async function loadPAGXData(data: Uint8Array, name: string) {
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
     const fileName = document.getElementById('file-name') as HTMLSpanElement;
+    const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+
+    if (!viewerState.pagxView) {
+        throw new Error('PAGXView not initialized');
+    }
 
     registerFontsToView();
-    viewerState.pagxView!.loadPAGX(data);
+    viewerState.pagxView.loadPAGX(data);
     gestureManager.resetTransform(viewerState);
     updateSize();
     hideDropZone();
     toolbar.classList.remove('hidden');
+    specBtn.classList.add('hidden');
     fileName.textContent = name;
 }
 
 async function loadPAGXFile(file: File) {
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
-    toolbar.classList.add('hidden');
     resetProgressUI();
     // Wait for 0% to render before starting
     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -618,12 +655,9 @@ async function loadPAGXFile(file: File) {
 }
 
 async function loadPAGXFromURL(url: string) {
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-
     // Show loading UI with progress reset to 0%
     const loadingStartTime = Date.now();
     showLoadingUI();
-    toolbar.classList.add('hidden');
     resetProgressUI();
     // Wait for 0% to render before starting
     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -787,6 +821,13 @@ function applyI18n(): void {
     if (errorTitle) errorTitle.textContent = strings.errorTitle;
     if (openBtn) openBtn.title = strings.openFile;
     if (resetBtn) resetBtn.title = strings.resetView;
+
+    const specBtn = document.getElementById('spec-btn');
+    const specBtnText = document.getElementById('spec-btn-text');
+    const toolbarSpecBtn = document.getElementById('toolbar-spec-btn');
+    if (specBtn) specBtn.title = strings.specTitle;
+    if (specBtnText) specBtnText.textContent = strings.spec;
+    if (toolbarSpecBtn) toolbarSpecBtn.title = strings.specTitle;
 }
 
 if (typeof window !== 'undefined') {

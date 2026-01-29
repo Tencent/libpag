@@ -226,18 +226,18 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
     </div>
 `;
     draftStyles = `        .sidebar {
-            top: 42px;
-            height: calc(100vh - 42px);
+            top: 36px;
+            height: calc(100vh - 36px);
         }
         .content {
-            padding-top: 82px;
+            padding-top: 76px;
         }
         .header-actions {
-            top: 54px;
+            top: 48px;
         }
         @media (max-width: 900px) {
             .content {
-                padding-top: 62px;
+                padding-top: 56px;
             }
         }`;
   }
@@ -484,9 +484,9 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
         .draft-banner {
             background-color: #fef9e7;
             border-bottom: 1px solid #f5e6b3;
-            padding: 10px 20px;
+            padding: 8px 20px;
             text-align: center;
-            font-size: 14px;
+            font-size: 13px;
             color: #7d6608;
             position: fixed;
             top: 0;

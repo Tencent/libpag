@@ -64,7 +64,9 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 60px 100px;
+    justify-content: center;
+    min-height: 160px;
+    padding: 60px 80px;
     border: 2px dashed #555;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.02);
@@ -119,11 +121,59 @@ html, body {
     margin: 0;
 }
 
+.spec-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.spec-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.spec-btn svg {
+    width: 16px;
+    height: 16px;
+    color: #aaa;
+}
+
+.spec-btn:hover svg {
+    color: #ccc;
+}
+
+.spec-btn span {
+    color: #aaa;
+    font-size: 13px;
+}
+
+.spec-btn:hover span {
+    color: #ccc;
+}
+
+.spec-btn.hidden {
+    display: none;
+}
+
 .loading-content {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    min-height: 160px;
     padding: 60px 80px;
+    border: 2px solid transparent;
+    border-radius: 16px;
 }
 
 .loading-content.hidden {
@@ -162,7 +212,11 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    min-height: 160px;
     padding: 60px 80px;
+    border: 2px solid transparent;
+    border-radius: 16px;
     cursor: pointer;
 }
 
@@ -199,8 +253,8 @@ html, body {
 .toolbar {
     position: absolute;
     top: 16px;
-    left: 16px;
-    z-index: 50;
+    right: 16px;
+    z-index: 150;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -215,19 +269,24 @@ html, body {
 }
 
 .toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 36px;
     height: 36px;
     padding: 6px;
+    box-sizing: border-box;
     background: transparent;
     border: none;
     border-radius: 6px;
     cursor: pointer;
+    text-decoration: none;
     transition: background 0.2s ease;
 }
 
 .toolbar-btn svg {
-    width: 100%;
-    height: 100%;
+    width: 24px;
+    height: 24px;
     color: #ccc;
 }
 
@@ -241,6 +300,10 @@ html, body {
 
 .toolbar-btn:active {
     background: rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-btn.hidden {
+    display: none;
 }
 
 .file-name {
