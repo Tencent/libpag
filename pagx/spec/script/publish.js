@@ -508,7 +508,9 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             border: 1px solid var(--border-color);
             border-radius: 6px;
             color: #555;
+            font-family: inherit;
             font-size: 13px;
+            line-height: 1;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -579,7 +581,9 @@ function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, v
             border: 1px solid var(--border-color);
             border-radius: 6px;
             color: #555;
+            font-family: inherit;
             font-size: 13px;
+            line-height: 1;
             text-decoration: none;
             transition: all 0.2s;
         }
