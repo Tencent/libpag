@@ -81,15 +81,15 @@ html, body {
 }
 
 .logo {
-    width: 80px;
-    height: 80px;
+    width: 120px;
+    height: 120px;
 }
 
 .title {
     color: #fff;
-    font-size: 28px;
+    font-size: 36px;
     font-weight: 600;
-    margin: 16px 0 0 0;
+    margin: 20px 0 0 0;
 }
 
 .drop-icon {
