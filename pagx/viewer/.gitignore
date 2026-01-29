@@ -2,5 +2,5 @@
 wasm-mt/
 
 # Build cache
-cmake-build/
+build-pagx-viewer/
 .*.md5

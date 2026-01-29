@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(PAGXViewer)
+# Disable error for the web platform.
+SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS true)
 
 # Include vendor tools from libpag root
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
