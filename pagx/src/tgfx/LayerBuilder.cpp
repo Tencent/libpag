@@ -287,6 +287,10 @@ static tgfx::Matrix ToTGFX(const Matrix& m) {
   return tgfx::Matrix::MakeAll(m.a, m.c, m.tx, m.b, m.d, m.ty);
 }
 
+static tgfx::Rect ToTGFX(const Rect& r) {
+  return tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
+}
+
 static tgfx::Path ToTGFX(const PathData& pathData) {
   tgfx::Path path;
   pathData.forEach([&](PathVerb verb, const Point* pts) {
@@ -395,7 +399,10 @@ class LayerBuilderImpl {
 
     std::shared_ptr<tgfx::Layer> layer = nullptr;
 
-    if (!node->contents.empty()) {
+    if (node->composition != nullptr) {
+      // Layer references a composition - render composition content
+      layer = convertComposition(node->composition);
+    } else if (!node->contents.empty()) {
       layer = convertVectorLayer(node);
     } else {
       layer = tgfx::Layer::Make();
@@ -421,6 +428,21 @@ class LayerBuilderImpl {
     }
 
     return layer;
+  }
+
+  std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
+    if (!comp) {
+      return nullptr;
+    }
+
+    auto containerLayer = tgfx::Layer::Make();
+    for (const auto& compLayer : comp->layers) {
+      auto childLayer = convertLayer(compLayer);
+      if (childLayer) {
+        containerLayer->addChild(childLayer);
+      }
+    }
+    return containerLayer;
   }
 
   std::shared_ptr<tgfx::Layer> convertVectorLayer(const Layer* node) {
@@ -589,6 +611,14 @@ class LayerBuilderImpl {
         auto grad = static_cast<const RadialGradient*>(node);
         return convertRadialGradient(grad);
       }
+      case NodeType::ConicGradient: {
+        auto grad = static_cast<const ConicGradient*>(node);
+        return convertConicGradient(grad);
+      }
+      case NodeType::DiamondGradient: {
+        auto grad = static_cast<const DiamondGradient*>(node);
+        return convertDiamondGradient(grad);
+      }
       case NodeType::ImagePattern: {
         auto pattern = static_cast<const ImagePattern*>(node);
         return convertImagePattern(pattern);
@@ -631,6 +661,41 @@ class LayerBuilderImpl {
     }
 
     return tgfx::Gradient::MakeRadial(ToTGFX(node->center), node->radius, colors, positions);
+  }
+
+  std::shared_ptr<tgfx::ColorSource> convertConicGradient(const ConicGradient* node) {
+    std::vector<tgfx::Color> colors;
+    std::vector<float> positions;
+
+    for (const auto& stop : node->colorStops) {
+      colors.push_back(ToTGFX(stop.color));
+      positions.push_back(stop.offset);
+    }
+
+    if (colors.empty()) {
+      colors = {tgfx::Color::Black(), tgfx::Color::White()};
+      positions = {0.0f, 1.0f};
+    }
+
+    return tgfx::Gradient::MakeConic(ToTGFX(node->center), node->startAngle, node->endAngle, colors,
+                                     positions);
+  }
+
+  std::shared_ptr<tgfx::ColorSource> convertDiamondGradient(const DiamondGradient* node) {
+    std::vector<tgfx::Color> colors;
+    std::vector<float> positions;
+
+    for (const auto& stop : node->colorStops) {
+      colors.push_back(ToTGFX(stop.color));
+      positions.push_back(stop.offset);
+    }
+
+    if (colors.empty()) {
+      colors = {tgfx::Color::Black(), tgfx::Color::White()};
+      positions = {0.0f, 1.0f};
+    }
+
+    return tgfx::Gradient::MakeDiamond(ToTGFX(node->center), node->radius, colors, positions);
   }
 
   std::shared_ptr<tgfx::ColorSource> convertImagePattern(const ImagePattern* node) {
@@ -698,6 +763,13 @@ class LayerBuilderImpl {
     auto repeater = std::make_shared<tgfx::Repeater>();
     repeater->setCopies(node->copies);
     repeater->setOffset(node->offset);
+    repeater->setOrder(static_cast<tgfx::RepeaterOrder>(node->order));
+    repeater->setAnchorPoint(ToTGFX(node->anchorPoint));
+    repeater->setPosition(ToTGFX(node->position));
+    repeater->setRotation(node->rotation);
+    repeater->setScale(ToTGFX(node->scale));
+    repeater->setStartAlpha(node->startAlpha);
+    repeater->setEndAlpha(node->endAlpha);
     return repeater;
   }
 
@@ -756,6 +828,11 @@ class LayerBuilderImpl {
     }
     if (!matrix.isIdentity()) {
       layer->setMatrix(matrix);
+    }
+
+    // Apply scrollRect if present
+    if (node->hasScrollRect) {
+      layer->setScrollRect(ToTGFX(node->scrollRect));
     }
 
     // Layer styles
