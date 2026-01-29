@@ -2,8 +2,7 @@
 /**
  * PAGX Viewer Publisher
  *
- * Copies the PAGX Viewer build output to the public directory.
- * Requires release build (npm run build:release).
+ * Builds and copies the PAGX Viewer to the public directory.
  *
  * Source files:
  *     index.html
@@ -23,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // Default paths
 const SCRIPT_DIR = __dirname;
@@ -44,30 +44,11 @@ function copyFile(src, dest) {
 }
 
 /**
- * Check if the build is a release build (minified, no sourcemaps).
+ * Run a command and print output.
  */
-function checkReleaseBuild(wasmDir) {
-  const indexJs = path.join(wasmDir, 'index.js');
-
-  // Check if index.js exists
-  if (!fs.existsSync(indexJs)) {
-    return { ok: false, reason: 'wasm-mt/index.js not found. Please run "npm run build:release" first.' };
-  }
-
-  // Check if sourcemap exists (should not exist in release)
-  const mapFile = path.join(wasmDir, 'index.js.map');
-  if (fs.existsSync(mapFile)) {
-    return { ok: false, reason: 'Sourcemap file found. Please run "npm run build:release" first.' };
-  }
-
-  // Check if JS is minified (first line should be very long)
-  const content = fs.readFileSync(indexJs, 'utf-8');
-  const firstLine = content.split('\n')[0];
-  if (firstLine.length < 1000) {
-    return { ok: false, reason: 'JS file does not appear to be minified. Please run "npm run build:release" first.' };
-  }
-
-  return { ok: true };
+function runCommand(command, cwd) {
+  console.log(`  Running: ${command}`);
+  execSync(command, { cwd, stdio: 'inherit' });
 }
 
 /**
@@ -76,21 +57,15 @@ function checkReleaseBuild(wasmDir) {
 function main() {
   console.log('Publishing PAGX Viewer...\n');
 
-  // Check if viewer build exists
-  const wasmDir = path.join(VIEWER_DIR, 'wasm-mt');
-  if (!fs.existsSync(wasmDir)) {
-    console.error('Error: Viewer build not found. Run "npm run build:release" first.');
-    process.exit(1);
-  }
+  // Clean and rebuild
+  console.log('Step 1: Clean build...');
+  runCommand('npm run clean', VIEWER_DIR);
 
-  // Check if it's a release build
-  const releaseCheck = checkReleaseBuild(wasmDir);
-  if (!releaseCheck.ok) {
-    console.error(`Error: ${releaseCheck.reason}`);
-    process.exit(1);
-  }
+  console.log('\nStep 2: Build release...');
+  runCommand('npm run build:release', VIEWER_DIR);
 
   // Copy index.html
+  console.log('\nStep 3: Copy files...');
   copyFile(
     path.join(VIEWER_DIR, 'index.html'),
     path.join(OUTPUT_DIR, 'index.html')
@@ -115,6 +90,7 @@ function main() {
 
   // Copy wasm-mt directory
   console.log('\n  Copying wasm-mt...');
+  const wasmDir = path.join(VIEWER_DIR, 'wasm-mt');
   const wasmOutputDir = path.join(OUTPUT_DIR, 'wasm-mt');
   copyFile(
     path.join(wasmDir, 'index.js'),
