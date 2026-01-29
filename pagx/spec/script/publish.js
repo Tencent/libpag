@@ -12,7 +12,6 @@
  * Output structure:
  *     ../public/<version>/index.html     - English (default)
  *     ../public/<version>/zh/index.html  - Chinese
- *     ../public/<version>/samples/       - Sample PAGX files
  *
  * Usage:
  *     cd pagx/spec && npm run publish
@@ -31,7 +30,6 @@ const SPEC_DIR = path.dirname(SCRIPT_DIR);
 const PAGX_DIR = path.dirname(SPEC_DIR);
 const SPEC_FILE_EN = path.join(SPEC_DIR, 'pagx_spec.md');
 const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
-const SAMPLES_DIR = path.join(SPEC_DIR, 'samples');
 const PACKAGE_FILE = path.join(SPEC_DIR, 'package.json');
 const SITE_DIR = path.join(PAGX_DIR, 'public');
 
@@ -735,7 +733,6 @@ Output structure:
     public/index.html               - Redirect page
     public/<version>/index.html     - English (default)
     public/<version>/zh/index.html  - Chinese
-    public/<version>/samples/       - Sample PAGX files
 
 Examples:
     npm run publish:spec
@@ -778,10 +775,6 @@ function main() {
   console.log('\nPublishing Chinese version...');
   publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh);
 
-  // Copy samples directory
-  console.log('\nCopying samples...');
-  copySamples(baseOutputDir);
-
   // Generate redirect index page (point to stableVersion if exists, otherwise current version)
   const redirectVersion = stableVersion || version;
   console.log('\nGenerating redirect page...');
@@ -789,33 +782,6 @@ function main() {
   generateRedirectPage(redirectVersion);
 
   console.log('\nDone!');
-}
-
-/**
- * Copy samples directory to output.
- */
-function copySamples(outputDir) {
-  const destDir = path.join(outputDir, 'samples');
-  
-  if (!fs.existsSync(SAMPLES_DIR)) {
-    console.log('  Skipped (samples directory not found)');
-    return;
-  }
-
-  fs.mkdirSync(destDir, { recursive: true });
-
-  const files = fs.readdirSync(SAMPLES_DIR);
-  let count = 0;
-  for (const file of files) {
-    if (file.endsWith('.pagx')) {
-      const src = path.join(SAMPLES_DIR, file);
-      const dest = path.join(destDir, file);
-      fs.copyFileSync(src, dest);
-      count++;
-    }
-  }
-
-  console.log(`  Copied ${count} sample files to ${destDir}`);
 }
 
 /**

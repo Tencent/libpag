@@ -244,8 +244,6 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
 </pagx>
 ```
 
-[▶ 查看示例](../samples/document-structure.pagx)
-
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `version` | string | (必填) | 格式版本 |
@@ -273,8 +271,6 @@ PAGX 使用标准的 2D 笛卡尔坐标系：
   <Composition id="buttonComp" width="100" height="50"><!-- 合成内容 --></Composition>
 </Resources>
 ```
-
-[▶ 查看示例](../samples/resources.pagx)
 
 #### 3.3.1 图片（Image）
 
@@ -331,8 +327,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 </LinearGradient>
 ```
 
-[▶ 查看示例](../samples/linear-gradient.pagx)
-
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `startPoint` | point | (必填) | 起点 |
@@ -351,8 +345,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
   <ColorStop offset="1" color="#000000"/>
 </RadialGradient>
 ```
-
-[▶ 查看示例](../samples/radial-gradient.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -373,8 +365,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 </ConicGradient>
 ```
 
-[▶ 查看示例](../samples/conic-gradient.pagx)
-
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `center` | point | 0,0 | 中心点 |
@@ -394,8 +384,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
   <ColorStop offset="1" color="#000000"/>
 </DiamondGradient>
 ```
-
-[▶ 查看示例](../samples/diamond-gradient.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -477,8 +465,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 - 对该图层应用 `scale(2, 2)` 变换：矩形变为 200×200，渐变也随之放大，视觉效果保持一致
 - 直接将 Rectangle 的 size 改为 200,200：矩形变为 200×200，但渐变坐标不变，只覆盖矩形的左半部分
 
-[▶ 查看示例](../samples/color-source-coordinate.pagx)
-
 #### 3.3.4 合成（Composition）
 
 合成用于内容复用（类似 After Effects 的 Pre-comp）。
@@ -491,8 +477,6 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
   </Layer>
 </Composition>
 ```
-
-[▶ 查看示例](../samples/composition.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -644,8 +628,6 @@ PAGX 文档采用层级结构组织内容：
 <Layer composition="@buttonComp" x="100" y="200"/>
 ```
 
-[▶ 查看示例](../samples/layer.pagx)
-
 #### 子元素
 
 Layer 的子元素按类型自动归类为四个集合：
@@ -739,8 +721,6 @@ Layer 的子元素按类型自动归类为四个集合：
 </Layer>
 ```
 
-[▶ 查看示例](../samples/layer-styles.pagx)
-
 **所有 LayerStyle 共有属性**：
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -818,8 +798,6 @@ Layer 的子元素按类型自动归类为四个集合：
   <ColorMatrixFilter matrix="1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0"/>
 </Layer>
 ```
-
-[▶ 查看示例](../samples/layer-filters.pagx)
 
 #### 4.4.1 模糊滤镜（BlurFilter）
 
@@ -906,8 +884,6 @@ Layer 的子元素按类型自动归类为四个集合：
 </Layer>
 ```
 
-[▶ 查看示例](../samples/scroll-rect.pagx)
-
 #### 4.5.2 遮罩（Masking）
 
 通过 `mask` 属性引用另一个图层作为遮罩。
@@ -922,8 +898,6 @@ Layer 的子元素按类型自动归类为四个集合：
   <Fill color="#FF0000"/>
 </Layer>
 ```
-
-[▶ 查看示例](../samples/masking.pagx)
 
 **遮罩规则**：
 - 遮罩图层自身不渲染（`visible` 属性被忽略）
@@ -1276,8 +1250,6 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 </Fill>
 ```
 
-[▶ 查看示例](../samples/fill.pagx)
-
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
@@ -1319,8 +1291,6 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
   </LinearGradient>
 </Stroke>
 ```
-
-[▶ 查看示例](../samples/stroke.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -1415,8 +1385,6 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <TrimPath start="0.25" end="0.75" type="continuous"/>
 ```
 
-[▶ 查看示例](../samples/trim-path.pagx)
-
 #### 5.4.2 圆角（RoundCorner）
 
 将路径的尖角转换为圆角。
@@ -1469,8 +1437,6 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 <MergePath mode="union"/>
 <Fill color="#3366FF"/>
 ```
-
-[▶ 查看示例](../samples/merge-path.pagx)
 
 ### 5.5 文本修改器（Text Modifiers）
 
@@ -1544,8 +1510,6 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
   <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
 ```
-
-[▶ 查看示例](../samples/text-modifier.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -1686,8 +1650,6 @@ finalColor = blend(originalColor, overrideColor, blendFactor)
 
 **闭合路径**：对于闭合路径，超出范围的字形会环绕到路径另一端。
 
-[▶ 查看示例](../samples/text-path.pagx)
-
 #### 5.5.6 文本排版（TextLayout）
 
 TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会覆盖 Text 元素的原始位置（类似 TextPath 覆盖位置的行为）。支持两种模式：
@@ -1786,8 +1748,6 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 
 **说明**：每个 Group 内的 Text + Fill/Stroke 定义一段样式独立的文本片段，TextLayout 将所有片段作为整体进行排版，实现自动换行和对齐。
 
-[▶ 查看示例](../samples/rich-text.pagx)
-
 ### 5.6 复制器（Repeater）
 
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
@@ -1795,8 +1755,6 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 ```xml
 <Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
-
-[▶ 查看示例](../samples/repeater.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -1864,8 +1822,6 @@ alpha = lerp(startAlpha, endAlpha, t)
 </Group>
 ```
 
-[▶ 查看示例](../samples/repeater-text.pagx)
-
 ### 5.7 容器（Group）
 
 Group 是带变换属性的矢量元素容器。
@@ -1875,8 +1831,6 @@ Group 是带变换属性的矢量元素容器。
   <!-- 子元素 -->
 </Group>
 ```
-
-[▶ 查看示例](../samples/group.pagx)
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -1936,8 +1890,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 <Fill color="#0000FF"/>  <!-- 只填充椭圆，alpha=1.0 -->
 ```
 
-[▶ 查看示例](../samples/group-isolation.pagx)
-
 **示例 2 - 子 Group 几何向上累积**：
 ```xml
 <Group>
@@ -1951,16 +1903,12 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 <Fill color="#0000FF"/>  <!-- 填充矩形+椭圆（所有子 Group 的几何） -->
 ```
 
-[▶ 查看示例](../samples/group-propagation.pagx)
-
 **示例 3 - 多个绘制器复用几何**：
 ```xml
 <Rectangle center="50,50" size="100,100"/>
 <Fill color="#FF0000"/>    <!-- 填充矩形 -->
 <Stroke color="#000000"/> <!-- 描边同一矩形（几何未清空） -->
 ```
-
-[▶ 查看示例](../samples/multiple-painters.pagx)
 
 #### 多重填充与描边
 
@@ -1975,8 +1923,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 <Fill color="#FF000080"/>
 ```
 
-[▶ 查看示例](../samples/multiple-fills.pagx)
-
 **示例 5 - 多重描边**：
 ```xml
 <Path d="M10,50 Q50,10 90,50 T170,50"/>
@@ -1984,8 +1930,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 <Stroke color="#0088FF80" width="6" cap="round" join="round"/>
 <Stroke color="#0088FF" width="2" cap="round" join="round"/>
 ```
-
-[▶ 查看示例](../samples/multiple-strokes.pagx)
 
 **示例 6 - 混合叠加**：
 ```xml
@@ -2001,8 +1945,6 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 </Fill>
 <Stroke color="#1a3366" width="3"/>
 ```
-
-[▶ 查看示例](../samples/mixed-overlay.pagx)
 
 **渲染顺序**：多个绘制器按文档顺序渲染，先出现的位于下方。
 

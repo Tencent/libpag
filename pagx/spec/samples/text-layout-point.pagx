@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="300" height="100">
-  <!-- Point text: center aligned -->
-  <Layer>
-    <Text text="Hello World" fontFamily="Arial" fontSize="24"/>
-    <TextLayout position="150,50" textAlign="center"/>
-    <Fill color="#333333"/>
-  </Layer>
-</pagx>

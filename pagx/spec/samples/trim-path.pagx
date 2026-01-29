@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="100">
-  <Layer>
-    <Path data="M 10 50 L 60 50"/>
-    <Path data="M 70 50 L 120 50"/>
-    <TrimPath start="0.25" end="0.75" type="continuous"/>
-    <Stroke color="#3366FF" width="3"/>
-  </Layer>
-</pagx>

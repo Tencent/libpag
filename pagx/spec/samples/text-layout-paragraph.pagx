@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="400" height="250">
-  <!-- Paragraph text: auto-wrap -->
-  <Layer>
-    <Text text="This is a long text that will auto-wrap when it reaches the specified width boundary." fontFamily="Arial" fontSize="16"/>
-    <TextLayout position="50,50" width="300" height="200" textAlign="start" verticalAlign="top" lineHeight="1.5"/>
-    <Fill color="#333333"/>
-  </Layer>
-</pagx>
