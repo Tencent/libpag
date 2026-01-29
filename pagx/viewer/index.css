@@ -306,13 +306,15 @@ html, body {
     display: none;
 }
 
+.toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
 .file-name {
     color: #aaa;
     font-size: 14px;
-    padding-left: 12px;
-    padding-right: 8px;
-    margin-left: 4px;
-    border-left: 1px solid rgba(255, 255, 255, 0.2);
     max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
