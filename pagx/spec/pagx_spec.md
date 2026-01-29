@@ -461,7 +461,37 @@ Diamond gradients radiate from the center toward the four corners.
 Image patterns use an image as a color source.
 
 ```xml
-<ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates ImagePattern fill with different tile modes -->
+<pagx version="1.0" width="400" height="300">
+  <!-- clamp mode: edge colors extend -->
+  <Layer name="ClampFill" x="100" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  
+  <!-- repeat mode: image tiles repeatedly -->
+  <Layer name="RepeatFill" x="300" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <!-- mirror mode: image tiles with mirroring -->
+  <Layer name="MirrorFill" x="100" y="220">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <Resources>
+    <Image id="logo" source="pag_logo.png"/>
+  </Resources>
+</pagx>
 ```
 
 | Attribute | Type | Default | Description |

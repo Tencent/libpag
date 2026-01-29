@@ -461,7 +461,37 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 图片图案使用图片作为颜色源。
 
 ```xml
-<ImagePattern image="@img1" tileModeX="repeat" tileModeY="repeat"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 演示不同平铺模式的图片填充 -->
+<pagx version="1.0" width="400" height="300">
+  <!-- clamp 模式：图片边缘颜色延伸 -->
+  <Layer name="ClampFill" x="100" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  
+  <!-- repeat 模式：图片重复平铺 -->
+  <Layer name="RepeatFill" x="300" y="80">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <!-- mirror 模式：图片镜像平铺 -->
+  <Layer name="MirrorFill" x="100" y="220">
+    <Rectangle center="0,0" size="150,120" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.25,0,0,0.25,0,0"/>
+    </Fill>
+  </Layer>
+  
+  <Resources>
+    <Image id="logo" source="pag_logo.png"/>
+  </Resources>
+</pagx>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
