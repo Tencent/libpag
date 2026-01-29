@@ -1350,7 +1350,7 @@ class PAG_API Matrix {
  private:
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
-  float values[6];
+  float values[9];
   mutable int32_t typeMask;
   /**
    * Matrix organizes its values in row order. These members correspond to each value in Matrix.
@@ -1361,6 +1361,9 @@ class PAG_API Matrix {
   static constexpr int SKEW_Y = 3;   //!< vertical skew factor
   static constexpr int SCALE_Y = 4;  //!< vertical scale factor
   static constexpr int TRANS_Y = 5;  //!< vertical translation
+  static constexpr int PERSP_0 = 6;  //!< input x-axis perspective factor
+  static constexpr int PERSP_1 = 7;  //!< input y-axis perspective factor
+  static constexpr int PERSP_2 = 8;  //!< perspective scale factor
 #pragma clang diagnostic pop
 };
 
@@ -1410,21 +1413,21 @@ enum class PAG_API PAGTimeStretchMode : uint8_t {
    * Keep the original playing speed, and display the last frame if the content's duration is less
    * than target duration.
    */
-    None = 0,
+  None = 0,
   /*
    * Change the playing speed of the content to fit target duration.
    */
-    Scale = 1,
+  Scale = 1,
   /**
    * Keep the original playing speed, but repeat the content if the content's duration is less than
    * target duration. This is the default mode.
    */
-    Repeat = 2,
+  Repeat = 2,
   /**
    * Keep the original playing speed, but repeat the content in reversed if the content's duration
    * is less than target duration.
    */
-    RepeatInverted = 3
+  RepeatInverted = 3
 };
 
 enum class PAG_API ParagraphJustification : uint8_t {
@@ -1437,11 +1440,7 @@ enum class PAG_API ParagraphJustification : uint8_t {
   FullJustifyLastLineFull = 6
 };
 
-enum class PAG_API TextDirection : uint8_t {
-  Default = 0,
-  Horizontal = 1,
-  Vertical = 2
-};
+enum class PAG_API TextDirection : uint8_t { Default = 0, Horizontal = 1, Vertical = 2 };
 
 /**
  * The Text object stores a value for a TextLayer's Source Text property.
