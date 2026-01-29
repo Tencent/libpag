@@ -88,15 +88,12 @@ function main() {
   console.log('Publishing PAGX Viewer...');
   console.log(`Output: ${outputDir}\n`);
 
-  // Clean and rebuild
-  console.log('Step 1: Clean build...');
-  runCommand('npm run clean', VIEWER_DIR);
-
-  console.log('\nStep 2: Build release...');
+  // Build release (uses cache if available)
+  console.log('Step 1: Build release...');
   runCommand('npm run build:release', VIEWER_DIR);
 
   // Copy index.html
-  console.log('\nStep 3: Copy files...');
+  console.log('\nStep 2: Copy files...');
   copyFile(
     path.join(VIEWER_DIR, 'index.html'),
     path.join(outputDir, 'index.html')
