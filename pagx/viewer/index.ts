@@ -590,7 +590,7 @@ async function loadPAGXFromURL(url: string) {
 
 function getPAGXUrlFromParams(): string | null {
     const params = new URLSearchParams(window.location.search);
-    return params.get('src');
+    return params.get('file');
 }
 
 function setupDragAndDrop() {
