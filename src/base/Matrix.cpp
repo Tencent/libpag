@@ -25,15 +25,6 @@ bool Matrix::isIdentity() const {
 }
 
 float Matrix::operator[](int index) const {
-  switch (index) {
-    case 6:
-    case 7:
-      return 0;
-    case 8:
-      return 1;
-    default:
-      break;
-  }
   return values[index];
 }
 
@@ -42,22 +33,11 @@ float Matrix::get(int index) const {
 }
 
 float& Matrix::operator[](int index) {
-  static float persp[3] = {0, 0, 1};
-  switch (index) {
-    case 6:
-      return persp[0];
-    case 7:
-      return persp[1];
-    case 8:
-      return persp[2];
-    default:
-      break;
-  }
   return ToTGFX(this)->operator[](index);
 }
 
 void Matrix::set(int index, float value) {
-  if (index > 5) {
+  if (index > 8) {
     return;
   }
   ToTGFX(this)->set(index, value);
@@ -68,7 +48,7 @@ void Matrix::get9(float buffer[9]) const {
 }
 
 void Matrix::set9(const float buffer[9]) {
-  ToTGFX(this)->set6(buffer);
+  ToTGFX(this)->set9(buffer);
 }
 
 void Matrix::reset() {
@@ -80,8 +60,8 @@ bool operator==(const Matrix& a, const Matrix& b) {
 }
 
 void Matrix::setAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
-                    float transY, float, float, float) {
-  ToTGFX(this)->setAll(scaleX, skewX, transX, skewY, scaleY, transY);
+                    float transY, float persp0, float persp1, float persp2) {
+  ToTGFX(this)->setAll(scaleX, skewX, transX, skewY, scaleY, transY, persp0, persp1, persp2);
 }
 
 void Matrix::setAffine(float a, float b, float c, float d, float tx, float ty) {
