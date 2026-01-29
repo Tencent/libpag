@@ -79,8 +79,8 @@ function main() {
 
   // Copy favicon and logo
   copyFile(
-    path.join(VIEWER_DIR, 'favicon.ico'),
-    path.join(OUTPUT_DIR, 'favicon.ico')
+    path.join(VIEWER_DIR, 'favicon.png'),
+    path.join(OUTPUT_DIR, 'favicon.png')
   );
   copyFile(
     path.join(VIEWER_DIR, 'logo.png'),
