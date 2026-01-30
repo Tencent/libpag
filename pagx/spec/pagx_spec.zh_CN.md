@@ -2545,6 +2545,10 @@ Layer / Group
 
 #### Font
 
+| 属性 | 类型 | 默认值 |
+|------|------|--------|
+| `unitsPerEm` | int | 1000 |
+
 子元素：`Glyph`*
 
 #### Glyph
@@ -2784,6 +2788,7 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `font` | idref | (必填) |
+| `fontSize` | float | 12 |
 | `glyphs` | string | (必填) |
 | `y` | float | 0 |
 | `xPositions` | string | - |

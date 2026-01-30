@@ -2545,6 +2545,10 @@ This appendix lists all node attribute definitions. The `id` and `data-*` attrib
 
 #### Font
 
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `unitsPerEm` | int | 1000 |
+
 Child elements: `Glyph`*
 
 #### Glyph
@@ -2784,6 +2788,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `font` | idref | (required) |
+| `fontSize` | float | 12 |
 | `glyphs` | string | (required) |
 | `y` | float | 0 |
 | `xPositions` | string | - |
