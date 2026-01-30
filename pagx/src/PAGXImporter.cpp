@@ -1223,7 +1223,7 @@ static Font* parseFont(const XMLNode* node, PAGXDocument* doc) {
   if (!font) {
     return nullptr;
   }
-  font->unitsPerEm = getIntAttribute(node, "unitsPerEm", 1);
+  font->unitsPerEm = getIntAttribute(node, "unitsPerEm", 1000);
   for (const auto& child : node->children) {
     if (child->tag == "Glyph") {
       auto glyph = parseGlyph(child.get(), doc);

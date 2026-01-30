@@ -983,7 +983,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto font = static_cast<const Font*>(node);
       xml.openElement("Font");
       xml.addAttribute("id", font->id);
-      xml.addAttribute("unitsPerEm", font->unitsPerEm);
+      xml.addAttribute("unitsPerEm", font->unitsPerEm, 1000);
       if (font->glyphs.empty()) {
         xml.closeElementSelfClosing();
       } else {

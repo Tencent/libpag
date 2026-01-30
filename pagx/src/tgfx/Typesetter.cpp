@@ -390,7 +390,11 @@ class TypesetterContext {
       tgfx::PathTypefaceBuilder builder;
       for (const auto& glyph : fontNode->glyphs) {
         if (glyph->path != nullptr) {
-          builder.addGlyph(ToTGFXPath(*glyph->path));
+          auto path = ToTGFXPath(*glyph->path);
+          if (glyph->offset.x != 0 || glyph->offset.y != 0) {
+            path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
+          }
+          builder.addGlyph(path);
         }
       }
       typeface = builder.detach();

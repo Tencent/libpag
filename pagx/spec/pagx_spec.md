@@ -589,7 +589,7 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `unitsPerEm` | int | 1 | Font design space units. Vector fonts use 1000, bitmap fonts use the backing size (original image size). Rendering scale = `fontSize / unitsPerEm` |
+| `unitsPerEm` | int | 1000 | Font design space units. Vector fonts typically use 1000, bitmap fonts use the backing size (original image size). Rendering scale = `fontSize / unitsPerEm` |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 
@@ -603,15 +603,15 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `path` | string | - | SVG path data (vector outline), coordinates are integer values in design space |
+| `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
-| `offset` | point | 0,0 | Bitmap offset in design space coordinates (only used with `image`) |
+| `offset` | point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
 
 **Glyph Types**:
-- **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline. Path coordinates are integer values in `unitsPerEm = 1000` design space.
-- **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji. Images use original resolution; position can be adjusted with `offset`.
+- **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline
+- **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji. Images use original resolution; position can be adjusted with `offset`
 
-**Coordinate System**: Glyph paths and bitmap offsets use design space coordinates. During rendering, the scale factor is calculated from GlyphRun's `fontSize` and Font's `unitsPerEm`: `scale = fontSize / unitsPerEm`.
+**Coordinate System**: Glyph paths and offsets use design space coordinates. During rendering, the scale factor is calculated from GlyphRun's `fontSize` and Font's `unitsPerEm`: `scale = fontSize / unitsPerEm`.
 
 ### 3.4 Document Hierarchy
 

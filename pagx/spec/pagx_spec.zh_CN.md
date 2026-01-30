@@ -589,7 +589,7 @@ Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `unitsPerEm` | int | 1 | 字体设计空间单位。矢量字体固定为 1000，位图字体为原始图片对应的字号（backingSize）。渲染时按 `fontSize / unitsPerEm` 缩放 |
+| `unitsPerEm` | int | 1000 | 字体设计空间单位。矢量字体通常使用 1000，位图字体为原始图片对应的字号（backingSize）。渲染时按 `fontSize / unitsPerEm` 缩放 |
 
 **一致性约束**：同一 Font 内的所有 Glyph 必须使用相同类型（全部 `path` 或全部 `image`），不允许混用。
 
@@ -603,15 +603,15 @@ Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | string | - | SVG 路径数据（矢量轮廓），坐标为设计空间下的整数值 |
+| `path` | string | - | SVG 路径数据（矢量轮廓） |
 | `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
-| `offset` | point | 0,0 | 位图偏移量，设计空间坐标（仅 `image` 时使用） |
+| `offset` | point | 0,0 | 字形偏移量，设计空间坐标（通常用于位图字形） |
 
 **字形类型**：
-- **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓。路径坐标为 `unitsPerEm = 1000` 设计空间下的整数值。
-- **位图字形**：指定 `image` 属性，用于 Emoji 等彩色字形。图片使用原始分辨率，可通过 `offset` 调整位置。
+- **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓
+- **位图字形**：指定 `image` 属性，用于 Emoji 等彩色字形。图片使用原始分辨率，可通过 `offset` 调整位置
 
-**坐标系说明**：字形路径和位图偏移均使用设计空间坐标。渲染时根据 GlyphRun 的 `fontSize` 和 Font 的 `unitsPerEm` 计算缩放比例：`scale = fontSize / unitsPerEm`。
+**坐标系说明**：字形路径和偏移均使用设计空间坐标。渲染时根据 GlyphRun 的 `fontSize` 和 Font 的 `unitsPerEm` 计算缩放比例：`scale = fontSize / unitsPerEm`。
 
 ### 3.4 文档层级结构
 

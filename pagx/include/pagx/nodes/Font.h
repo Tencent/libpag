@@ -43,7 +43,7 @@ class Glyph : public Node {
   Image* image = nullptr;
 
   /**
-   * Bitmap offset for image glyphs. The default value is (0,0).
+   * Glyph offset in design space. Typically used for bitmap glyphs. The default value is (0,0).
    */
   Point offset = {};
 
@@ -65,11 +65,11 @@ class Glyph : public Node {
 class Font : public Node {
  public:
   /**
-   * Units per em of the font design space. Vector fonts use 1000 (PostScript standard), bitmap
-   * fonts use the backing size (original image size). Rendering scale = fontSize / unitsPerEm.
-   * The default value is 1.
+   * Units per em of the font design space. Vector fonts typically use 1000, bitmap fonts use the
+   * backing size (original image size). Rendering scale = fontSize / unitsPerEm.
+   * The default value is 1000.
    */
-  int unitsPerEm = 1;
+  int unitsPerEm = 1000;
 
   /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing
