@@ -55,9 +55,9 @@ class GlyphRun : public Node {
   Font* font = nullptr;
 
   /**
-   * Font size for rendering. Actual scale = fontSize / font.unitsPerEm. The default value is 1.
+   * Font size for rendering. Actual scale = fontSize / font.unitsPerEm. The default value is 12.
    */
-  float fontSize = 1.0f;
+  float fontSize = 12.0f;
 
   /**
    * GlyphID sequence. GlyphID 0 indicates missing glyph (not rendered).

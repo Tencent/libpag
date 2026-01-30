@@ -1249,7 +1249,7 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `font` | idref | (required) | Font resource reference `@id` |
-| `fontSize` | float | 1 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
+| `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
 | `y` | float | 0 | Shared y coordinate (Horizontal mode only) |
 | `xPositions` | string | - | x coordinate sequence, comma-separated (Horizontal mode) |

@@ -476,7 +476,7 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
           if (run->font != nullptr && !run->font->id.empty()) {
             xml.addAttribute("font", "@" + run->font->id);
           }
-          xml.addAttribute("fontSize", run->fontSize);
+          xml.addAttribute("fontSize", run->fontSize, 12.0f);
 
           // Write glyphs as comma-separated integers
           if (!run->glyphs.empty()) {

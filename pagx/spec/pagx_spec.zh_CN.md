@@ -1249,7 +1249,7 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `font` | idref | (必填) | 引用 Font 资源 `@id` |
-| `fontSize` | float | 1 | 渲染字号。实际缩放比例 = `fontSize / font.unitsPerEm` |
+| `fontSize` | float | 12 | 渲染字号。实际缩放比例 = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (必填) | GlyphID 序列，逗号分隔（0 表示缺失字形） |
 | `y` | float | 0 | 共享 y 坐标（仅 Horizontal 模式） |
 | `xPositions` | string | - | x 坐标序列，逗号分隔（Horizontal 模式） |

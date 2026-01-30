@@ -1284,7 +1284,7 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
                        fontId.c_str());
     }
   }
-  run->fontSize = getFloatAttribute(node, "fontSize", 1);
+  run->fontSize = getFloatAttribute(node, "fontSize", 12);
   run->y = getFloatAttribute(node, "y", 0);
 
   // Parse glyphs only if font is valid
