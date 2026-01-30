@@ -65,6 +65,13 @@ class Glyph : public Node {
 class Font : public Node {
  public:
   /**
+   * Units per em of the font design space. Vector fonts use 1000 (PostScript standard), bitmap
+   * fonts use the backing size (original image size). Rendering scale = fontSize / unitsPerEm.
+   * The default value is 1.
+   */
+  int unitsPerEm = 1;
+
+  /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing
    * glyph).
    */

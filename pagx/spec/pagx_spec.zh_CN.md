@@ -575,17 +575,21 @@ Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或
 
 ```xml
 <!-- 嵌入矢量字体 -->
-<Font id="myFont">
+<Font id="myFont" unitsPerEm="1000">
   <Glyph path="M 50 0 L 300 700 L 550 0 Z"/>
   <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
 </Font>
 
 <!-- 嵌入位图字体（Emoji） -->
-<Font id="emojiFont">
+<Font id="emojiFont" unitsPerEm="136">
   <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
   <Glyph image="emoji/heart.png" offset="0,-5"/>
 </Font>
 ```
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `unitsPerEm` | int | 1 | 字体设计空间单位。矢量字体固定为 1000，位图字体为原始图片对应的字号（backingSize）。渲染时按 `fontSize / unitsPerEm` 缩放 |
 
 **一致性约束**：同一 Font 内的所有 Glyph 必须使用相同类型（全部 `path` 或全部 `image`），不允许混用。
 
@@ -599,15 +603,15 @@ Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `path` | string | - | SVG 路径数据（矢量轮廓） |
+| `path` | string | - | SVG 路径数据（矢量轮廓），坐标为设计空间下的整数值 |
 | `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
-| `offset` | point | 0,0 | 位图偏移量（仅 `image` 时使用） |
+| `offset` | point | 0,0 | 位图偏移量，设计空间坐标（仅 `image` 时使用） |
 
 **字形类型**：
-- **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓
-- **位图字形**：指定 `image` 属性，用于 Emoji 等彩色字形，可通过 `offset` 调整位置
+- **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓。路径坐标为 `unitsPerEm = 1000` 设计空间下的整数值。
+- **位图字形**：指定 `image` 属性，用于 Emoji 等彩色字形。图片使用原始分辨率，可通过 `offset` 调整位置。
 
-**路径坐标系**：字形路径使用最终渲染坐标，已包含字号缩放。不同字号的同一字符应作为独立 Glyph 存储，因为字体在不同字号下可能有不同的字形设计。
+**坐标系说明**：字形路径和位图偏移均使用设计空间坐标。渲染时根据 GlyphRun 的 `fontSize` 和 Font 的 `unitsPerEm` 计算缩放比例：`scale = fontSize / unitsPerEm`。
 
 ### 3.4 文档层级结构
 
@@ -1242,15 +1246,16 @@ Line 3]]>
 
 GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一个字体资源。
 
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `font` | idref | 引用 Font 资源 `@id` |
-| `glyphs` | string | GlyphID 序列，逗号分隔（0 表示缺失字形） |
-| `y` | float | 共享 y 坐标（仅 Horizontal 模式），默认 0 |
-| `xPositions` | string | x 坐标序列，逗号分隔（Horizontal 模式） |
-| `positions` | string | (x,y) 坐标序列，分号分隔（Point 模式） |
-| `xforms` | string | RSXform 序列 (scos,ssin,tx,ty)，分号分隔（RSXform 模式） |
-| `matrices` | string | Matrix 序列 (a,b,c,d,tx,ty)，分号分隔（Matrix 模式） |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `font` | idref | (必填) | 引用 Font 资源 `@id` |
+| `fontSize` | float | 1 | 渲染字号。实际缩放比例 = `fontSize / font.unitsPerEm` |
+| `glyphs` | string | (必填) | GlyphID 序列，逗号分隔（0 表示缺失字形） |
+| `y` | float | 0 | 共享 y 坐标（仅 Horizontal 模式） |
+| `xPositions` | string | - | x 坐标序列，逗号分隔（Horizontal 模式） |
+| `positions` | string | - | (x,y) 坐标序列，分号分隔（Point 模式） |
+| `xforms` | string | - | RSXform 序列 (scos,ssin,tx,ty)，分号分隔（RSXform 模式） |
+| `matrices` | string | - | Matrix 序列 (a,b,c,d,tx,ty)，分号分隔（Matrix 模式） |
 
 **定位模式选择**（优先级从高到低）：
 1. 有 `matrices` → Matrix 模式：每个字形有完整 2D 仿射变换
@@ -1281,7 +1286,7 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 ```xml
 <Resources>
   <!-- 嵌入字体：包含 H, e, l, o 四个字形 -->
-  <Font id="myFont">
+  <Font id="myFont" unitsPerEm="1000">
     <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
     <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z"/>
     <Glyph path="M 100 0 L 100 700 L 350 700"/>
@@ -1292,7 +1297,7 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 <Layer>
   <!-- 预排版文本 "Hello"：使用 Horizontal 模式（单行水平文本） -->
   <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
+    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
   </Text>
   <Fill color="#333333"/>
 </Layer>
@@ -1300,7 +1305,7 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 <Layer>
   <!-- 预排版文本：使用 Point 模式（多行文本） -->
   <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
+    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
   </Text>
   <Fill color="#333333"/>
 </Layer>
@@ -1308,7 +1313,7 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 <Layer>
   <!-- 预排版文本：使用 RSXform 模式（路径文本，每个字形有旋转） -->
   <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" 
+    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
               xforms="1,0,0,50;0.98,0.17,30,48;0.94,0.34,60,42;0.87,0.5,90,32;0.77,0.64,120,18"/>
   </Text>
   <Fill color="#333333"/>

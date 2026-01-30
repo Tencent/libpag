@@ -314,8 +314,14 @@ class TypesetterContext {
         continue;
       }
 
-      // Embedded fonts have pre-scaled glyph data, use fontSize=1.0
-      tgfx::Font font(typeface, 1);
+      // Calculate font size based on fontSize and unitsPerEm
+      // Rendering scale = fontSize / unitsPerEm
+      int unitsPerEm = (run->font != nullptr) ? run->font->unitsPerEm : 1;
+      if (unitsPerEm <= 0) {
+        unitsPerEm = 1;
+      }
+      float fontSizeForTypeface = run->fontSize / static_cast<float>(unitsPerEm);
+      tgfx::Font font(typeface, fontSizeForTypeface);
       size_t count = run->glyphs.size();
 
       // Determine positioning mode

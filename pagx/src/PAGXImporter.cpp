@@ -1223,6 +1223,7 @@ static Font* parseFont(const XMLNode* node, PAGXDocument* doc) {
   if (!font) {
     return nullptr;
   }
+  font->unitsPerEm = getIntAttribute(node, "unitsPerEm", 1);
   for (const auto& child : node->children) {
     if (child->tag == "Glyph") {
       auto glyph = parseGlyph(child.get(), doc);
@@ -1283,6 +1284,7 @@ static GlyphRun* parseGlyphRun(const XMLNode* node, PAGXDocument* doc) {
                        fontId.c_str());
     }
   }
+  run->fontSize = getFloatAttribute(node, "fontSize", 1);
   run->y = getFloatAttribute(node, "y", 0);
 
   // Parse glyphs only if font is valid
