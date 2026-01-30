@@ -17,7 +17,7 @@
           <ColorStop offset="1" color="#8B5CF6"/>
         </LinearGradient>
       </Fill>
-      <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
     </Group>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
   </Layer>
 </pagx>

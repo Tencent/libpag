@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates rich text with multiple styled Text elements -->
+<!-- Demonstrates rich text with multiple styled Text elements in Groups -->
 <pagx version="1.0" width="400" height="400">
   <!-- Dark background -->
   <Layer>
@@ -17,28 +17,28 @@
       </LinearGradient>
     </Fill>
   </Layer>
-  <!-- Multi-color text line: Hello -->
+  <!-- Rich text line 1: "Hello World" with different styles -->
   <Layer>
-    <Text text="Hello " fontFamily="Arial" fontSize="44"/>
-    <TextLayout position="80,190" textAlign="left"/>
-    <Fill color="#94A3B8"/>
+    <Group>
+      <Text text="Hello " fontFamily="Arial" fontSize="44"/>
+      <Fill color="#94A3B8"/>
+    </Group>
+    <Group>
+      <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="44"/>
+      <Fill color="#F43F5E"/>
+    </Group>
+    <TextLayout position="200,190" textAlign="center"/>
   </Layer>
-  <!-- Multi-color text line: World -->
+  <!-- Rich text line 2: "PAGX Format" with different styles -->
   <Layer>
-    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="44"/>
-    <TextLayout position="215,190" textAlign="left"/>
-    <Fill color="#F43F5E"/>
-  </Layer>
-  <!-- Another styled line: PAGX -->
-  <Layer>
-    <Text text="PAGX " fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
-    <TextLayout position="80,290" textAlign="left"/>
-    <Fill color="#6366F1"/>
-  </Layer>
-  <!-- Format -->
-  <Layer>
-    <Text text="Format" fontFamily="Arial" fontSize="40"/>
-    <TextLayout position="205,290" textAlign="left"/>
-    <Fill color="#06B6D4"/>
+    <Group>
+      <Text text="PAGX " fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+      <Fill color="#6366F1"/>
+    </Group>
+    <Group>
+      <Text text="Format" fontFamily="Arial" fontSize="40"/>
+      <Fill color="#06B6D4"/>
+    </Group>
+    <TextLayout position="200,290" textAlign="center"/>
   </Layer>
 </pagx>

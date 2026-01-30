@@ -416,7 +416,12 @@ static void parseResources(const XMLNode* node, PAGXDocument* doc) {
       continue;
     }
     // Try to parse as a color source (which is also a Node)
-    parseColorSource(child.get(), doc);
+    auto colorSource = parseColorSource(child.get(), doc);
+    if (colorSource) {
+      continue;
+    }
+    // Unknown resource type - report error.
+    tgfx::PrintError("PAGXImporter: Unknown element '%s' in Resources.\n", child->tag.c_str());
   }
 }
 
@@ -524,7 +529,10 @@ static Layer* parseLayer(const XMLNode* node, PAGXDocument* doc) {
     auto filter = parseLayerFilter(child.get(), doc);
     if (filter) {
       layer->filters.push_back(filter);
+      continue;
     }
+    // Unknown node type - report error.
+    tgfx::PrintError("PAGXImporter: Unknown element '%s' in Layer.\n", child->tag.c_str());
   }
 
   return layer;
@@ -535,6 +543,8 @@ static void parseContents(const XMLNode* node, Layer* layer, PAGXDocument* doc) 
     auto element = parseElement(child.get(), doc);
     if (element) {
       layer->contents.push_back(element);
+    } else {
+      tgfx::PrintError("PAGXImporter: Unknown element '%s' in contents.\n", child->tag.c_str());
     }
   }
 }
@@ -544,6 +554,8 @@ static void parseStyles(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
     auto style = parseLayerStyle(child.get(), doc);
     if (style) {
       layer->styles.push_back(style);
+    } else {
+      tgfx::PrintError("PAGXImporter: Unknown element '%s' in styles.\n", child->tag.c_str());
     }
   }
 }
@@ -553,6 +565,8 @@ static void parseFilters(const XMLNode* node, Layer* layer, PAGXDocument* doc) {
     auto filter = parseLayerFilter(child.get(), doc);
     if (filter) {
       layer->filters.push_back(filter);
+    } else {
+      tgfx::PrintError("PAGXImporter: Unknown element '%s' in filters.\n", child->tag.c_str());
     }
   }
 }
@@ -1003,6 +1017,8 @@ static Group* parseGroup(const XMLNode* node, PAGXDocument* doc) {
     auto element = parseElement(child.get(), doc);
     if (element) {
       group->elements.push_back(element);
+    } else {
+      tgfx::PrintError("PAGXImporter: Unknown element '%s' in Group.\n", child->tag.c_str());
     }
   }
 

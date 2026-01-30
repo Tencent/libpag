@@ -32,66 +32,64 @@
   </Layer>
   
   <!-- ===== Shape Area y=150 ===== -->
-  <Layer name="ShapeCards" y="150">
-    <!-- Card 1: Rounded Rectangle -->
-    <Group position="100,0">
-      <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-    </Group>
-    <Group position="100,0">
-      <Rectangle center="0,0" size="50,35" roundness="8"/>
-      <Fill color="@coral"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
-    </Group>
-    
-    <!-- Card 2: Ellipse -->
-    <Group position="230,0">
-      <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-    </Group>
-    <Group position="230,0">
-      <Ellipse center="0,0" size="50,35"/>
-      <Fill color="@purple"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
-    </Group>
-    
-    <!-- Card 3: Star -->
-    <Group position="360,0">
-      <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-    </Group>
-    <Group position="360,0">
-      <Polystar center="0,0" type="star" pointCount="5" outerRadius="24" innerRadius="11" rotation="-90"/>
-      <Fill color="@amber"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
-    </Group>
-    
-    <!-- Card 4: Hexagon -->
-    <Group position="490,0">
-      <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-    </Group>
-    <Group position="490,0">
-      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="26"/>
-      <Fill color="@teal"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
-    </Group>
-    
-    <!-- Card 5: Custom Path -->
-    <Group position="620,0">
-      <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-    </Group>
-    <Group position="620,0">
-      <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
-      <Fill color="@orange"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
-    </Group>
+  <!-- Card 1: Rounded Rectangle -->
+  <Layer y="150" x="100">
+    <Rectangle center="0,0" size="100,80" roundness="12"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
+  </Layer>
+  <Layer y="150" x="100">
+    <Rectangle center="0,0" size="50,35" roundness="8"/>
+    <Fill color="@coral"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
+  </Layer>
+  
+  <!-- Card 2: Ellipse -->
+  <Layer y="150" x="230">
+    <Rectangle center="0,0" size="100,80" roundness="12"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
+  </Layer>
+  <Layer y="150" x="230">
+    <Ellipse center="0,0" size="50,35"/>
+    <Fill color="@purple"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
+  </Layer>
+  
+  <!-- Card 3: Star -->
+  <Layer y="150" x="360">
+    <Rectangle center="0,0" size="100,80" roundness="12"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
+  </Layer>
+  <Layer y="150" x="360">
+    <Polystar center="0,0" type="star" pointCount="5" outerRadius="24" innerRadius="11" rotation="-90"/>
+    <Fill color="@amber"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
+  </Layer>
+  
+  <!-- Card 4: Hexagon -->
+  <Layer y="150" x="490">
+    <Rectangle center="0,0" size="100,80" roundness="12"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
+  </Layer>
+  <Layer y="150" x="490">
+    <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="26"/>
+    <Fill color="@teal"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
+  </Layer>
+  
+  <!-- Card 5: Custom Path -->
+  <Layer y="150" x="620">
+    <Rectangle center="0,0" size="100,80" roundness="12"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
+  </Layer>
+  <Layer y="150" x="620">
+    <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
+    <Fill color="@orange"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
   </Layer>
   
   <!-- ===== Modifier Area y=270 ===== -->
@@ -125,7 +123,7 @@
       <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
     </Group>
     
-    <!-- Mask Example -->
+    <!-- Mask Example (shape without mask) -->
     <Group position="700,0">
       <Rectangle center="0,0" size="50,50"/>
       <Fill color="@rainbow"/>
@@ -141,74 +139,70 @@
   </Layer>
   
   <!-- ===== Filter Area y=360 ===== -->
-  <Layer name="FilterCards" y="360">
-    <!-- Blur Filter -->
-    <Group position="130,0">
-      <Rectangle center="0,0" size="80,60" roundness="10"/>
-      <Fill color="@emerald"/>
-      <BlurFilter blurX="3" blurY="3"/>
-    </Group>
-    
-    <!-- Drop Shadow Filter -->
-    <Group position="260,0">
-      <Rectangle center="0,0" size="80,60" roundness="10"/>
-      <Fill color="@cyan"/>
-      <DropShadowFilter offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000080"/>
-    </Group>
-    
-    <!-- Color Matrix (Grayscale) -->
-    <Group position="390,0">
-      <Ellipse center="0,0" size="55,55"/>
-      <Fill color="@purple"/>
-      <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
-    </Group>
-    
-    <!-- Blend Filter -->
-    <Group position="520,0">
-      <Rectangle center="0,0" size="80,60" roundness="10"/>
-      <Fill color="@coral"/>
-      <BlendFilter color="#6366F160" blendMode="overlay"/>
-    </Group>
-    
-    <!-- Image Fill + Drop Shadow Style -->
-    <Group position="670,0">
-      <Rectangle center="0,0" size="90,60" roundness="8"/>
-      <Fill>
-        <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
-      </Fill>
-      <Stroke color="#FFFFFF20" width="1"/>
-      <DropShadowStyle offsetX="0" offsetY="6" blurX="16" blurY="16" color="#00000060"/>
-    </Group>
+  <!-- Blur Filter -->
+  <Layer y="360" x="130">
+    <Rectangle center="0,0" size="80,60" roundness="10"/>
+    <Fill color="@emerald"/>
+    <BlurFilter blurX="3" blurY="3"/>
+  </Layer>
+  
+  <!-- Drop Shadow Filter -->
+  <Layer y="360" x="260">
+    <Rectangle center="0,0" size="80,60" roundness="10"/>
+    <Fill color="@cyan"/>
+    <DropShadowFilter offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000080"/>
+  </Layer>
+  
+  <!-- Color Matrix (Grayscale) -->
+  <Layer y="360" x="390">
+    <Ellipse center="0,0" size="55,55"/>
+    <Fill color="@purple"/>
+    <ColorMatrixFilter matrix="0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0.33,0.33,0.33,0,0,0,0,0,1,0"/>
+  </Layer>
+  
+  <!-- Blend Filter -->
+  <Layer y="360" x="520">
+    <Rectangle center="0,0" size="80,60" roundness="10"/>
+    <Fill color="@coral"/>
+    <BlendFilter color="#6366F160" blendMode="overlay"/>
+  </Layer>
+  
+  <!-- Image Fill + Drop Shadow Style -->
+  <Layer y="360" x="670">
+    <Rectangle center="0,0" size="90,60" roundness="8"/>
+    <Fill>
+      <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+    <Stroke color="#FFFFFF20" width="1"/>
+    <DropShadowStyle offsetX="0" offsetY="6" blurX="16" blurY="16" color="#00000060"/>
   </Layer>
   
   <!-- ===== Footer Area y=450 ===== -->
-  <Layer name="Footer" y="455">
-    <!-- Button Component -->
-    <Group position="200,0">
-      <Rectangle center="0,0" size="120,36" roundness="18"/>
-      <Fill color="@buttonGradient"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
-    </Group>
-    <Group position="200,0">
-      <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="0,-5" textAlign="center"/>
-      <Fill color="#FFFFFF"/>
-    </Group>
-    
-    <!-- Pre-layout Text -->
-    <Group position="400,0">
-      <Text fontFamily="Arial" fontSize="18">
-        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
-      </Text>
-      <Fill color="#64748B"/>
-    </Group>
-    
-    <!-- Composition Reference -->
-    <Group position="600,0">
-      <Rectangle center="0,0" size="100,36" roundness="8"/>
-      <Fill color="#1E293B"/>
-      <Stroke color="#334155" width="1"/>
-    </Group>
+  <!-- Button Component -->
+  <Layer y="455" x="200">
+    <Rectangle center="0,0" size="120,36" roundness="18"/>
+    <Fill color="@buttonGradient"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
+  </Layer>
+  <Layer y="455" x="200">
+    <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
+    <TextLayout position="0,-5" textAlign="center"/>
+    <Fill color="#FFFFFF"/>
+  </Layer>
+  
+  <!-- Pre-layout Text -->
+  <Layer y="455" x="400">
+    <Text fontFamily="Arial" fontSize="18">
+      <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
+    </Text>
+    <Fill color="#64748B"/>
+  </Layer>
+  
+  <!-- Composition Reference -->
+  <Layer y="455" x="600">
+    <Rectangle center="0,0" size="100,36" roundness="8"/>
+    <Fill color="#1E293B"/>
+    <Stroke color="#334155" width="1"/>
   </Layer>
   <Layer composition="@badgeComp" x="600" y="455"/>
   
