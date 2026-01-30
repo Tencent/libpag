@@ -67,11 +67,11 @@ function formatDate(date, lang) {
 }
 
 /**
- * Convert heading text to URL-friendly slug.
+ * Convert heading text to URL-friendly slug (English only).
  */
 function slugify(text) {
   let slug = text.toLowerCase();
-  slug = slug.replace(/[^\w\u4e00-\u9fff\s-]/g, '');
+  slug = slug.replace(/[^\w\s-]/g, '');
   slug = slug.replace(/[\s_]+/g, '-');
   slug = slug.replace(/-+/g, '-');
   slug = slug.replace(/^-|-$/g, '');
@@ -79,26 +79,61 @@ function slugify(text) {
 }
 
 /**
- * Extract headings from Markdown for TOC generation.
+ * Extract all heading slugs from English Markdown content in order.
+ * Returns an array of slugs that can be used sequentially for Chinese version.
  */
-function parseMarkdownHeadings(content) {
-  const headings = [];
+function extractEnglishSlugs(content) {
+  const slugs = [];
   const slugCounts = {};
   const lines = content.split('\n');
 
   for (const line of lines) {
     const match = line.match(/^(#{1,6})\s+(.+)$/);
     if (match) {
-      const level = match[1].length;
       const text = match[2].trim();
       let slug = slugify(text);
 
-      // Handle duplicate slugs
       if (slugCounts[slug] !== undefined) {
         slugCounts[slug]++;
         slug = `${slug}-${slugCounts[slug]}`;
       } else {
         slugCounts[slug] = 0;
+      }
+
+      slugs.push(slug);
+    }
+  }
+  return slugs;
+}
+
+/**
+ * Extract headings from Markdown for TOC generation.
+ * If englishSlugs is provided, uses them in order instead of generating from Chinese text.
+ */
+function parseMarkdownHeadings(content, englishSlugs = null) {
+  const headings = [];
+  const lines = content.split('\n');
+  const slugCounts = {};
+  let slugIndex = 0;
+
+  for (const line of lines) {
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      const level = match[1].length;
+      const text = match[2].trim();
+      let slug;
+
+      if (englishSlugs && slugIndex < englishSlugs.length) {
+        slug = englishSlugs[slugIndex];
+        slugIndex++;
+      } else {
+        slug = slugify(text);
+        if (slugCounts[slug] !== undefined) {
+          slugCounts[slug]++;
+          slug = `${slug}-${slugCounts[slug]}`;
+        } else {
+          slugCounts[slug] = 0;
+        }
       }
 
       headings.push({ level, text, slug });
@@ -183,7 +218,6 @@ function createMarkedInstance() {
     }),
     gfmHeadingId({
       prefix: '',
-      // Custom slug function to handle Chinese characters
       slug: (text) => {
         let slug = slugify(text);
         if (slugCounts[slug] !== undefined) {
@@ -203,6 +237,19 @@ function createMarkedInstance() {
   });
 
   return marked;
+}
+
+/**
+ * Replace heading IDs in HTML content with provided slugs in order.
+ */
+function replaceHeadingIds(html, slugs) {
+  let slugIndex = 0;
+  return html.replace(/<h([1-6])\s+id="[^"]*"/g, (match, level) => {
+    if (slugIndex < slugs.length) {
+      return `<h${level} id="${slugs[slugIndex++]}"`;
+    }
+    return match;
+  });
 }
 
 /**
@@ -654,8 +701,9 @@ ${tocHtml}
 
 /**
  * Publish a single spec file.
+ * For Chinese version, uses englishSlugs to generate English anchor IDs.
  */
-function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
+function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl, faviconUrl, englishSlugs = null) {
   if (!fs.existsSync(specFile)) {
     console.log(`  Skipped (file not found): ${specFile}`);
     return;
@@ -682,15 +730,20 @@ function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUr
   const titleMatch = mdContent.match(/^#\s+(.+)$/m);
   const title = titleMatch ? titleMatch[1] : 'PAGX Format Specification';
 
-  // Parse headings for TOC
-  const headings = parseMarkdownHeadings(mdContent);
+  // Parse headings for TOC (use English slugs for Chinese version)
+  const headings = parseMarkdownHeadings(mdContent, englishSlugs);
 
   // Generate TOC HTML
   const tocHtml = generateTocHtml(headings);
 
   // Convert Markdown to HTML using marked
   const marked = createMarkedInstance();
-  const htmlContent = marked.parse(mdContent);
+  let htmlContent = marked.parse(mdContent);
+
+  // For Chinese version, replace heading IDs with English slugs
+  if (englishSlugs) {
+    htmlContent = replaceHeadingIds(htmlContent, englishSlugs);
+  }
 
   // Generate complete HTML document
   const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl);
@@ -780,13 +833,21 @@ function main() {
   const faviconUrlFromRoot = '../favicon.png';
   const faviconUrlFromZh = '../../favicon.png';
 
+  // Extract English slugs for Chinese version to use the same anchor IDs
+  let englishSlugs = null;
+  if (fs.existsSync(SPEC_FILE_EN)) {
+    const enContent = fs.readFileSync(SPEC_FILE_EN, 'utf-8');
+    englishSlugs = extractEnglishSlugs(enContent);
+    console.log(`\nExtracted ${englishSlugs.length} heading slugs from English version`);
+  }
+
   // Publish English version (default, at root)
   console.log('\nPublishing English version...');
   publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'zh/', viewerUrlFromRoot, faviconUrlFromRoot);
 
-  // Publish Chinese version (under /zh/)
+  // Publish Chinese version (under /zh/) with English anchor IDs
   console.log('\nPublishing Chinese version...');
-  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh, faviconUrlFromZh);
+  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
 
   // Generate redirect index page (point to stableVersion if exists, otherwise current version)
   const redirectVersion = stableVersion || version;
