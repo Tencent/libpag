@@ -6,12 +6,12 @@
     <Rectangle center="200,200" size="400,400"/>
     <Fill color="#0F172A"/>
   </Layer>
-  <!-- Diamond gradient shape - using smaller radius to show diamond corners -->
+  <!-- Diamond gradient shape -->
+  <!-- Rectangle size=320x320, half=160. Diamond radius=160 so corners touch rect edges exactly -->
   <Layer>
     <Rectangle center="200,200" size="320,320" roundness="24"/>
     <Fill>
-      <!-- Diamond with radius 120 shows corners clearly within 320x320 rect -->
-      <DiamondGradient center="200,200" radius="120">
+      <DiamondGradient center="200,200" radius="160">
         <ColorStop offset="0" color="#FBBF24"/>
         <ColorStop offset="0.4" color="#F59E0B"/>
         <ColorStop offset="0.7" color="#D97706"/>
