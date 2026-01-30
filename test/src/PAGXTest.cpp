@@ -1258,6 +1258,62 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
 }
 
 /**
+ * Test case: Text shaping with emoji (mixed vector and bitmap fonts)
+ */
+PAG_TEST(PAGXTest, TextShaperEmoji) {
+  std::string svgPath = ProjectPath::Absolute("resources/apitest/SVG/emoji.svg");
+
+  auto doc = pagx::SVGImporter::Parse(svgPath);
+  ASSERT_TRUE(doc != nullptr);
+
+  int canvasWidth = static_cast<int>(doc->width);
+  int canvasHeight = static_cast<int>(doc->height);
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typefaces = GetFallbackTypefaces();
+
+  // Typeset text and embed fonts
+  pagx::Typesetter typesetter;
+  typesetter.setFallbackTypefaces(typefaces);
+  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
+  EXPECT_FALSE(textGlyphs.empty());
+  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+
+  // Render typeset document
+  auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
+  ASSERT_TRUE(originalLayer != nullptr);
+
+  auto originalSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList originalDL;
+  originalDL.root()->addChild(originalLayer);
+  originalDL.render(originalSurface.get(), false);
+
+  // Export and reload
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  std::string pagxPath = SavePAGXFile(xml, "PAGXTest/emoji_preshaped.pagx");
+
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
+  auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
+  ASSERT_TRUE(reloadedLayer != nullptr);
+
+  // Render pre-shaped
+  auto preshapedSurface = Surface::Make(context, canvasWidth, canvasHeight);
+  DisplayList preshapedDL;
+  preshapedDL.root()->addChild(reloadedLayer);
+  preshapedDL.render(preshapedSurface.get(), false);
+
+  EXPECT_TRUE(Baseline::Compare(originalSurface, "PAGXTest/TextShaperEmoji_Original"));
+  EXPECT_TRUE(Baseline::Compare(preshapedSurface, "PAGXTest/TextShaperEmoji_PreShaped"));
+
+  device->unlock();
+}
+
+/**
  * Test case: Complete PAGX example from specification document.
  * This tests the full rendering capabilities of PAGX including:
  * - Multiple layers with different Y positions

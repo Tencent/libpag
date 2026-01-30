@@ -27,6 +27,10 @@ html, body {
     touch-action: none;
 }
 
+.canvas.hidden {
+    display: none;
+}
+
 .canvas:active {
     cursor: grabbing;
 }
@@ -65,13 +69,15 @@ html, body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 160px;
+    width: 420px;
+    height: 280px;
     padding: 60px 80px;
     border: 2px dashed #555;
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.02);
     cursor: pointer;
     transition: all 0.3s ease;
+    box-sizing: border-box;
 }
 
 .drop-zone-content:hover {
@@ -170,10 +176,11 @@ html, body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 160px;
-    padding: 60px 80px;
+    width: 420px;
+    height: 280px;
     border: 2px solid transparent;
     border-radius: 16px;
+    box-sizing: border-box;
 }
 
 .loading-content.hidden {
@@ -213,11 +220,12 @@ html, body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 160px;
-    padding: 60px 80px;
+    width: 420px;
+    height: 280px;
     border: 2px solid transparent;
     border-radius: 16px;
     cursor: pointer;
+    box-sizing: border-box;
 }
 
 .error-content:hover .error-icon {

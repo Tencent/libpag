@@ -141,7 +141,7 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
   glyphPath.transform(tgfx::Matrix::MakeScale(scale, scale));
 
   if (builder.font == nullptr) {
-    builder.font = document->makeNode<Font>("vector_font");
+    builder.font = document->makeNode<Font>();
     builder.font->unitsPerEm = kVectorFontUnitsPerEm;
   }
 
@@ -177,7 +177,7 @@ static void CollectBitmapGlyph(
     }
     builder.backingSize = static_cast<int>(std::round(font.getSize() / scaleX));
     builder.typeface = typeface;
-    builder.font = document->makeNode<Font>("bitmap_font");
+    builder.font = document->makeNode<Font>();
     builder.font->unitsPerEm = builder.backingSize;
   }
 
@@ -328,6 +328,17 @@ bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
           CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders);
         }
       }
+    }
+  }
+
+  // Assign sequential IDs to all fonts
+  int fontIndex = 1;
+  if (vectorBuilder.font != nullptr) {
+    vectorBuilder.font->id = "font" + std::to_string(fontIndex++);
+  }
+  for (auto& [typeface, builder] : bitmapBuilders) {
+    if (builder.font != nullptr) {
+      builder.font->id = "font" + std::to_string(fontIndex++);
     }
   }
 

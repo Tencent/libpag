@@ -1,4 +1,4 @@
-# PAGX Format Specification
+# PAGX Specification
 
 ## 1. Introduction
 
@@ -589,7 +589,7 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `unitsPerEm` | int | 1000 | Font design space units. Vector fonts typically use 1000, bitmap fonts use the backing size (original image size). Rendering scale = `fontSize / unitsPerEm` |
+| `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 
@@ -609,7 +609,7 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 
 **Glyph Types**:
 - **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline
-- **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji. Images use original resolution; position can be adjusted with `offset`
+- **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji; position can be adjusted with `offset`
 
 **Coordinate System**: Glyph paths and offsets use design space coordinates. During rendering, the scale factor is calculated from GlyphRun's `fontSize` and Font's `unitsPerEm`: `scale = fontSize / unitsPerEm`.
 

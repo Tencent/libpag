@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="{{htmlLang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}}</title>
+    <link rel="icon" href="{{faviconUrl}}" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --code-bg: #f6f8fa;
+            --border-color: #e1e4e8;
+            --toc-width: 280px;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; overflow-x: hidden; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .container { display: flex; max-width: 1400px; margin: 0 auto; }
+        
+        /* Sidebar */
+        .sidebar {
+            width: var(--toc-width);
+            position: fixed;
+            top: 0;
+            left: max(0px, calc((100vw - 1400px) / 2));
+            height: 100vh;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-right: 1px solid var(--border-color);
+            z-index: 100;
+        }
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-header h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            color: #666;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+        .sidebar-close {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #666;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .sidebar ul { list-style: none; padding: 0; margin: 0; }
+        .sidebar li { margin: 4px 0; }
+        .sidebar a {
+            color: #555;
+            text-decoration: none;
+            font-size: 13px;
+            display: block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .sidebar a:hover { background: #e9ecef; color: var(--primary-color); }
+        .sidebar ul ul { padding-left: 15px; }
+        .sidebar ul ul a { font-size: 12px; color: #777; }
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+        }
+        
+        /* Content */
+        .content {
+            flex: 1;
+            margin-left: var(--toc-width);
+            padding: 40px 60px;
+            max-width: calc(100% - var(--toc-width));
+            min-width: 0;
+        }
+        
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 { margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; }
+        h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; }
+        h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); }
+        h3 { font-size: 1.25em; }
+        h4 { font-size: 1em; }
+        h5 { font-size: 0.875em; }
+        h6 { font-size: 0.85em; color: #6a737d; }
+        a { color: var(--primary-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        p { margin-top: 0; margin-bottom: 16px; }
+        strong { font-weight: 600; }
+        
+        /* Code */
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+            background-color: var(--code-bg);
+            padding: 0.2em 0.4em;
+            border-radius: 6px;
+        }
+        pre {
+            background-color: var(--code-bg);
+            border-radius: 6px;
+            padding: 16px;
+            overflow-x: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            border: 1px solid var(--border-color);
+        }
+        pre code { background-color: transparent; padding: 0; border-radius: 0; font-size: 100%; }
+        .hljs { background: var(--code-bg) !important; }
+        
+        /* Table */
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; display: block; overflow-x: auto; }
+        th, td { border: 1px solid var(--border-color); padding: 8px 13px; text-align: left; white-space: nowrap; }
+        th { background-color: #f6f8fa; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        /* Other elements */
+        blockquote { margin: 0; padding: 0 1em; color: #6a737d; border-left: 0.25em solid #dfe2e5; }
+        hr { height: 0.25em; padding: 0; margin: 24px 0; background-color: var(--border-color); border: 0; }
+        ul, ol { padding-left: 2em; margin-top: 0; margin-bottom: 16px; }
+        li { margin: 4px 0; }
+        li > ul, li > ol { margin-top: 4px; margin-bottom: 0; }
+        img { max-width: 100%; box-sizing: content-box; }
+        
+        /* Version info block */
+        .version-info {
+            border-left: 4px solid;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+        }
+        .version-info.stable {
+            border-color: #1e7e34;
+            background-color: #f0f9f1;
+        }
+        .version-info.draft {
+            border-color: #d4a000;
+            background-color: #fffbf0;
+        }
+        .version-info.outdated {
+            border-color: #c42c2c;
+            background-color: #fef6f6;
+        }
+        .version-info .version-status {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .version-info.stable .version-status { color: #1e5631; }
+        .version-info.draft .version-status { color: #6a4c00; }
+        .version-info.outdated .version-status { color: #82071e; }
+        .version-info p { margin-bottom: 4px; font-size: 14px; color: #555; }
+        
+        /* Back to top */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 40px;
+            height: 40px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .back-to-top.visible { opacity: 1; }
+        .back-to-top:hover { background: #0052a3; }
+        
+        /* Header actions */
+        .header-actions {
+            position: fixed;
+            top: 12px;
+            right: 20px;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: #555;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.2;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .header-btn:hover { background: #e9ecef; text-decoration: none; }
+        .header-btn svg { width: 14px; height: 14px; }
+        .toc-toggle { display: none; }
+        
+        /* Language switch */
+        .lang-switch { position: relative; }
+        .lang-switch svg { transition: transform 0.2s; }
+        .lang-switch.open svg { transform: rotate(180deg); }
+        .lang-switch-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 100%;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s;
+        }
+        .lang-switch.open .lang-switch-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+        .lang-switch-menu a { display: block; padding: 8px 16px; color: #555; font-size: 13px; text-decoration: none; white-space: nowrap; }
+        .lang-switch-menu a:hover { background: #f8f9fa; color: var(--primary-color); }
+        .lang-switch-menu a.active { background: #e3f2fd; color: #1565c0; }
+        
+        /* Mobile */
+        @media (max-width: 900px) {
+            .sidebar {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 85%;
+                max-width: 320px;
+                height: 100vh;
+                z-index: 1001;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .sidebar.open { display: block; transform: translateX(0); }
+            .sidebar-close { display: block; }
+            .sidebar-overlay.open { display: block; z-index: 1000; }
+            .content { margin-left: 0; max-width: 100%; padding: 16px; width: 100%; }
+            .toc-toggle { display: flex; }
+            .header-actions { top: 8px; right: 12px; gap: 6px; }
+            .header-btn span { display: none; }
+            .header-btn { padding: 8px 10px; gap: 0; }
+            .back-to-top { bottom: 20px; right: 20px; }
+            h1 { font-size: 1.5em; padding-right: 140px; }
+            pre { font-size: 80%; }
+            table { font-size: 90%; }
+            th, td { padding: 6px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-actions">
+        <button class="header-btn toc-toggle" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            <span>{{tocLabel}}</span>
+        </button>
+        <a href="{{viewerUrl}}" class="header-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>{{viewerLabel}}</span>
+        </a>
+        <div class="lang-switch" onclick="this.classList.toggle('open')">
+            <button class="header-btn">
+                <span>{{currentLang}}</span>
+                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            </button>
+            <div class="lang-switch-menu">
+                <a href="{{enUrl}}"{{enActive}}>English</a>
+                <a href="{{zhUrl}}"{{zhActive}}>简体中文</a>
+            </div>
+        </div>
+    </div>
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>{{tocTitle}}</h2>
+                <button class="sidebar-close" onclick="toggleSidebar()">&times;</button>
+            </div>
+            <div class="toc">
+{{tocHtml}}
+            </div>
+        </nav>
+        <main class="content">
+{{content}}
+        </main>
+    </div>
+    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">↑</button>
+    <script>
+        window.addEventListener('scroll', function() {
+            var btn = document.querySelector('.back-to-top');
+            btn.classList.toggle('visible', window.scrollY > 300);
+        });
+        document.addEventListener('click', function(e) {
+            var langSwitch = document.querySelector('.lang-switch');
+            if (!langSwitch.contains(e.target)) langSwitch.classList.remove('open');
+        });
+        function toggleSidebar() {
+            var sidebar = document.querySelector('.sidebar');
+            var overlay = document.querySelector('.sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+            document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+        }
+        document.querySelectorAll('.sidebar a').forEach(function(link) {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 900) toggleSidebar();
+            });
+        });
+    </script>
+</body>
+</html>
