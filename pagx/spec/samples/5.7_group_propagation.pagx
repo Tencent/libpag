@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates style propagation: Fill outside Groups applies to all shapes -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Groups with shared overlay fill -->
   <Layer>
     <Group>
-      <Rectangle center="70,100" size="80,80" roundness="8"/>
-      <Fill color="#FF6B6B"/>
+      <Rectangle center="140,200" size="160,160" roundness="24"/>
+      <Fill color="#F43F5E"/>
     </Group>
     <Group>
-      <Ellipse center="130,100" size="80,80"/>
-      <Fill color="#4ECDC4"/>
+      <Ellipse center="260,200" size="160,160"/>
+      <Fill color="#06B6D4"/>
     </Group>
     <!-- Semi-transparent overlay applied to both shapes -->
-    <Fill color="#9B59B630"/>
+    <Fill color="#8B5CF630"/>
   </Layer>
 </pagx>

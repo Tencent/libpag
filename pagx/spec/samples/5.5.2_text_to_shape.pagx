@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates TextToShape modifier: converting text to editable paths -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Text converted to shape with gradient fill -->
+  <Layer>
+    <Text text="SHAPE" fontFamily="Arial" fontStyle="Bold" fontSize="84"/>
+    <TextLayout position="200,200" textAlign="center"/>
+    <TextToShape/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="320,0">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.5" color="#EC4899"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
+    <Stroke color="#FFFFFF20" width="2"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#EC489960"/>
+  </Layer>
+</pagx>

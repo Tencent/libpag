@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates mixed Fill and Stroke on same shape -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Ellipse center="100,100" size="140,140"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Circle with fill and stroke -->
+  <Layer>
+    <Ellipse center="200,200" size="280,280"/>
     <Fill>
-      <RadialGradient center="80,80" radius="100">
+      <!-- RadialGradient uses canvas coordinates. Ellipse center is at 200,200, 
+           highlight offset should be relative to that. 140,140 creates top-left highlight -->
+      <RadialGradient center="140,140" radius="200">
         <ColorStop offset="0" color="#FFFFFF"/>
-        <ColorStop offset="1" color="#3498DB"/>
+        <ColorStop offset="0.4" color="#06B6D4"/>
+        <ColorStop offset="1" color="#0891B2"/>
       </RadialGradient>
     </Fill>
-    <Stroke color="#1a5276" width="4"/>
+    <Stroke color="#0E7490" width="8"/>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#06B6D460"/>
   </Layer>
 </pagx>

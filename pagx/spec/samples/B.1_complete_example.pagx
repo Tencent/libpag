@@ -9,14 +9,14 @@
     <Fill color="@bgGradient"/>
   </Layer>
   
-  <!-- Decorative glow -->
+  <!-- Decorative glow effects -->
   <Layer name="GlowTopLeft" blendMode="screen">
-    <Ellipse center="100,80" size="300,300"/>
+    <Ellipse center="80,60" size="320,320"/>
     <Fill color="@glowPurple"/>
   </Layer>
   <Layer name="GlowBottomRight" blendMode="screen">
-    <Ellipse center="700,440" size="400,400"/>
-    <Fill color="@glowBlue"/>
+    <Ellipse center="720,460" size="400,400"/>
+    <Fill color="@glowCyan"/>
   </Layer>
   
   <!-- ===== Title Area y=60 ===== -->
@@ -28,7 +28,7 @@
   <Layer name="Subtitle">
     <Text text="Portable Animated Graphics XML" fontFamily="Arial" fontSize="14"/>
     <TextLayout position="400,95" textAlign="center"/>
-    <Fill color="#FFFFFF60"/>
+    <Fill color="#94A3B8"/>
   </Layer>
   
   <!-- ===== Shape Area y=150 ===== -->
@@ -36,61 +36,61 @@
     <!-- Card 1: Rounded Rectangle -->
     <Group position="100,0">
       <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#FFFFFF08"/>
-      <Stroke color="#FFFFFF15" width="1"/>
+      <Fill color="#1E293B"/>
+      <Stroke color="#334155" width="1"/>
     </Group>
     <Group position="100,0">
-      <Rectangle center="0,0" size="50,35" roundness="6"/>
+      <Rectangle center="0,0" size="50,35" roundness="8"/>
       <Fill color="@coral"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#E7524080"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F43F5E80"/>
     </Group>
     
     <!-- Card 2: Ellipse -->
     <Group position="230,0">
       <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#FFFFFF08"/>
-      <Stroke color="#FFFFFF15" width="1"/>
+      <Fill color="#1E293B"/>
+      <Stroke color="#334155" width="1"/>
     </Group>
     <Group position="230,0">
       <Ellipse center="0,0" size="50,35"/>
       <Fill color="@purple"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#A855F780"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
     </Group>
     
     <!-- Card 3: Star -->
     <Group position="360,0">
       <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#FFFFFF08"/>
-      <Stroke color="#FFFFFF15" width="1"/>
+      <Fill color="#1E293B"/>
+      <Stroke color="#334155" width="1"/>
     </Group>
     <Group position="360,0">
-      <Polystar center="0,0" type="star" pointCount="5" outerRadius="22" innerRadius="10" rotation="-90"/>
+      <Polystar center="0,0" type="star" pointCount="5" outerRadius="24" innerRadius="11" rotation="-90"/>
       <Fill color="@amber"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F59E0B80"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F59E0B80"/>
     </Group>
     
     <!-- Card 4: Hexagon -->
     <Group position="490,0">
       <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#FFFFFF08"/>
-      <Stroke color="#FFFFFF15" width="1"/>
+      <Fill color="#1E293B"/>
+      <Stroke color="#334155" width="1"/>
     </Group>
     <Group position="490,0">
-      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="24"/>
+      <Polystar center="0,0" type="polygon" pointCount="6" outerRadius="26"/>
       <Fill color="@teal"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#14B8A680"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#14B8A680"/>
     </Group>
     
     <!-- Card 5: Custom Path -->
     <Group position="620,0">
       <Rectangle center="0,0" size="100,80" roundness="12"/>
-      <Fill color="#FFFFFF08"/>
-      <Stroke color="#FFFFFF15" width="1"/>
+      <Fill color="#1E293B"/>
+      <Stroke color="#334155" width="1"/>
     </Group>
     <Group position="620,0">
       <Path data="M -20 -15 L 0 -25 L 20 -15 L 20 15 L 0 25 L -20 15 Z"/>
       <Fill color="@orange"/>
-      <DropShadowStyle offsetX="0" offsetY="4" blurX="8" blurY="8" color="#F9731680"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#F9731680"/>
     </Group>
   </Layer>
   
@@ -153,7 +153,7 @@
     <Group position="260,0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@cyan"/>
-      <DropShadowFilter offsetX="4" offsetY="4" blurX="10" blurY="10" color="#00000080"/>
+      <DropShadowFilter offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000080"/>
     </Group>
     
     <!-- Color Matrix (Grayscale) -->
@@ -167,7 +167,7 @@
     <Group position="520,0">
       <Rectangle center="0,0" size="80,60" roundness="10"/>
       <Fill color="@coral"/>
-      <BlendFilter color="#3B82F660" blendMode="overlay"/>
+      <BlendFilter color="#6366F160" blendMode="overlay"/>
     </Group>
     
     <!-- Image Fill + Drop Shadow Style -->
@@ -176,8 +176,8 @@
       <Fill>
         <ImagePattern image="@photo" tileModeX="clamp" tileModeY="clamp"/>
       </Fill>
-      <Stroke color="#FFFFFF30" width="1"/>
-      <DropShadowStyle offsetX="0" offsetY="6" blurX="12" blurY="12" color="#00000060"/>
+      <Stroke color="#FFFFFF20" width="1"/>
+      <DropShadowStyle offsetX="0" offsetY="6" blurX="16" blurY="16" color="#00000060"/>
     </Group>
   </Layer>
   
@@ -187,11 +187,11 @@
     <Group position="200,0">
       <Rectangle center="0,0" size="120,36" roundness="18"/>
       <Fill color="@buttonGradient"/>
-      <InnerShadowStyle offsetX="0" offsetY="1" blurX="2" blurY="2" color="#FFFFFF30"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
     </Group>
     <Group position="200,0">
       <Text text="Get Started" fontFamily="Arial" fontStyle="Bold" fontSize="13"/>
-      <TextLayout position="0,0" textAlign="center"/>
+      <TextLayout position="0,-5" textAlign="center"/>
       <Fill color="#FFFFFF"/>
     </Group>
     
@@ -200,14 +200,14 @@
       <Text fontFamily="Arial" fontSize="18">
         <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
       </Text>
-      <Fill color="#FFFFFF60"/>
+      <Fill color="#64748B"/>
     </Group>
     
     <!-- Composition Reference -->
     <Group position="600,0">
       <Rectangle center="0,0" size="100,36" roundness="8"/>
-      <Fill color="#FFFFFF10"/>
-      <Stroke color="#FFFFFF20" width="1"/>
+      <Fill color="#1E293B"/>
+      <Stroke color="#334155" width="1"/>
     </Group>
   </Layer>
   <Layer composition="@badgeComp" x="600" y="455"/>
@@ -226,41 +226,41 @@
     </Font>
     <!-- Background Gradient -->
     <LinearGradient id="bgGradient" startPoint="0,0" endPoint="800,520">
-      <ColorStop offset="0" color="#0F0F1A"/>
-      <ColorStop offset="0.5" color="#1A1A2E"/>
-      <ColorStop offset="1" color="#0D1B2A"/>
+      <ColorStop offset="0" color="#0F172A"/>
+      <ColorStop offset="0.5" color="#1E293B"/>
+      <ColorStop offset="1" color="#0F172A"/>
     </LinearGradient>
-    <!-- Glow Gradients -->
-    <RadialGradient id="glowPurple" center="0,0" radius="150">
-      <ColorStop offset="0" color="#A855F720"/>
-      <ColorStop offset="1" color="#A855F700"/>
+    <!-- Glow Gradients (center relative to ellipse geometry) -->
+    <RadialGradient id="glowPurple" center="160,160" radius="160">
+      <ColorStop offset="0" color="#8B5CF625"/>
+      <ColorStop offset="1" color="#8B5CF600"/>
     </RadialGradient>
-    <RadialGradient id="glowBlue" center="0,0" radius="200">
-      <ColorStop offset="0" color="#3B82F615"/>
-      <ColorStop offset="1" color="#3B82F600"/>
+    <RadialGradient id="glowCyan" center="200,200" radius="200">
+      <ColorStop offset="0" color="#06B6D418"/>
+      <ColorStop offset="1" color="#06B6D400"/>
     </RadialGradient>
     <!-- Title Gradient -->
     <LinearGradient id="titleGradient" startPoint="0,0" endPoint="200,0">
       <ColorStop offset="0" color="#FFFFFF"/>
-      <ColorStop offset="0.5" color="#A855F7"/>
-      <ColorStop offset="1" color="#3B82F6"/>
+      <ColorStop offset="0.5" color="#8B5CF6"/>
+      <ColorStop offset="1" color="#06B6D4"/>
     </LinearGradient>
     <!-- Button Gradient -->
     <LinearGradient id="buttonGradient" startPoint="0,0" endPoint="120,0">
-      <ColorStop offset="0" color="#A855F7"/>
-      <ColorStop offset="1" color="#3B82F6"/>
+      <ColorStop offset="0" color="#6366F1"/>
+      <ColorStop offset="1" color="#8B5CF6"/>
     </LinearGradient>
-    <!-- Conic Gradient -->
+    <!-- Conic Gradient (center relative to rectangle geometry: size 50x50, center at 0,0, so geometry origin is -25,-25) -->
     <ConicGradient id="rainbow" center="25,25" startAngle="0" endAngle="360">
       <ColorStop offset="0" color="#F43F5E"/>
-      <ColorStop offset="0.25" color="#A855F7"/>
-      <ColorStop offset="0.5" color="#3B82F6"/>
-      <ColorStop offset="0.75" color="#14B8A6"/>
+      <ColorStop offset="0.25" color="#8B5CF6"/>
+      <ColorStop offset="0.5" color="#06B6D4"/>
+      <ColorStop offset="0.75" color="#10B981"/>
       <ColorStop offset="1" color="#F43F5E"/>
     </ConicGradient>
     <!-- Solid Colors -->
     <SolidColor id="coral" color="#F43F5E"/>
-    <SolidColor id="purple" color="#A855F7"/>
+    <SolidColor id="purple" color="#8B5CF6"/>
     <SolidColor id="amber" color="#F59E0B"/>
     <SolidColor id="teal" color="#14B8A6"/>
     <SolidColor id="orange" color="#F97316"/>
@@ -270,8 +270,8 @@
     <Composition id="badgeComp" width="100" height="36">
       <Layer>
         <Text text="v1.0" fontFamily="Arial" fontStyle="Bold" fontSize="12"/>
-        <TextLayout position="50,18" textAlign="center"/>
-        <Fill color="#FFFFFF80"/>
+        <TextLayout position="50,-5" textAlign="center"/>
+        <Fill color="#94A3B8"/>
       </Layer>
     </Composition>
   </Resources>

@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates conic (sweep) gradient -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Ellipse center="100,100" size="160,160"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Conic gradient circle -->
+  <Layer>
+    <Ellipse center="200,200" size="320,320"/>
     <Fill>
-      <ConicGradient center="100,100" startAngle="0" endAngle="360">
-        <ColorStop offset="0" color="#FF6B6B"/>
-        <ColorStop offset="0.25" color="#FFE66D"/>
-        <ColorStop offset="0.5" color="#4ECDC4"/>
-        <ColorStop offset="0.75" color="#9B59B6"/>
-        <ColorStop offset="1" color="#FF6B6B"/>
+      <ConicGradient center="200,200" startAngle="0" endAngle="360">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="0.2" color="#F59E0B"/>
+        <ColorStop offset="0.4" color="#10B981"/>
+        <ColorStop offset="0.6" color="#06B6D4"/>
+        <ColorStop offset="0.8" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#F43F5E"/>
       </ConicGradient>
     </Fill>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="32" blurY="32" color="#8B5CF650"/>
   </Layer>
 </pagx>

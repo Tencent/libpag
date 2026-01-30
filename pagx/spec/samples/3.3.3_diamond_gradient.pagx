@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates diamond gradient -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Rectangle center="100,100" size="160,160" roundness="8"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Diamond gradient shape - using smaller radius to show diamond corners -->
+  <Layer>
+    <Rectangle center="200,200" size="320,320" roundness="24"/>
     <Fill>
-      <DiamondGradient center="100,100" radius="80">
-        <ColorStop offset="0" color="#FFE66D"/>
-        <ColorStop offset="0.5" color="#FF6B6B"/>
-        <ColorStop offset="1" color="#1a1a2e"/>
+      <!-- Diamond with radius 120 shows corners clearly within 320x320 rect -->
+      <DiamondGradient center="200,200" radius="120">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="0.4" color="#F59E0B"/>
+        <ColorStop offset="0.7" color="#D97706"/>
+        <ColorStop offset="1" color="#1E293B"/>
       </DiamondGradient>
     </Fill>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#F59E0B50"/>
   </Layer>
 </pagx>

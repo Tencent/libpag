@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Fill and Stroke combined on same shape -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Rectangle center="100,100" size="120,120" roundness="12"/>
-    <Fill color="#FF6B6B"/>
-    <Stroke color="#C0392B" width="4"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Rectangle with fill and stroke -->
+  <Layer>
+    <Rectangle center="200,200" size="260,260" roundness="32"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#E11D48"/>
+      </LinearGradient>
+    </Fill>
+    <Stroke color="#BE123C" width="8"/>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#F43F5E60"/>
   </Layer>
 </pagx>

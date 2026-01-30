@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Group isolation: alpha applied to group, not individual shapes -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Group alpha="0.6">
-      <Rectangle center="70,100" size="100,100" roundness="8"/>
-      <Fill color="#FF6B6B"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Group with alpha isolation -->
+  <Layer>
+    <Group alpha="0.7">
+      <Rectangle center="140,200" size="200,200" roundness="24"/>
+      <Fill color="#F43F5E"/>
     </Group>
-    <Ellipse center="130,100" size="100,100"/>
-    <Fill color="#3498DB"/>
+    <Ellipse center="260,200" size="200,200"/>
+    <Fill color="#06B6D4"/>
   </Layer>
 </pagx>

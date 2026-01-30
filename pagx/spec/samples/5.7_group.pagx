@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Group with transform properties -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Group anchorPoint="50,50" position="100,100" rotation="15" scale="1,1">
-      <Rectangle center="50,50" size="100,100" roundness="12"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Transformed group -->
+  <Layer>
+    <Group anchorPoint="110,110" position="200,200" rotation="12" scale="1,1">
+      <Rectangle center="110,110" size="220,220" roundness="32"/>
       <Fill>
-        <LinearGradient startPoint="0,0" endPoint="100,100">
-          <ColorStop offset="0" color="#FF6B6B"/>
-          <ColorStop offset="1" color="#EE5A24"/>
+        <LinearGradient startPoint="0,0" endPoint="220,220">
+          <ColorStop offset="0" color="#F43F5E"/>
+          <ColorStop offset="0.5" color="#EC4899"/>
+          <ColorStop offset="1" color="#8B5CF6"/>
         </LinearGradient>
       </Fill>
+      <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#EC489960"/>
     </Group>
   </Layer>
 </pagx>

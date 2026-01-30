@@ -1,25 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TextModifier for character-level text animations -->
-<pagx version="1.0" width="200" height="200">
-  <!-- Title -->
+<!-- Demonstrates TextModifier for character-level text styling -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Text text="TextModifier" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="28,45"/>
-    <Fill color="#3498DB"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
   </Layer>
-  <!-- Basic animated text -->
+  <!-- Wave animation effect -->
   <Layer>
-    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="32" position="45,105"/>
-    <TextModifier position="0,-8">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
+    <TextLayout position="200,140" textAlign="center"/>
+    <TextModifier position="0,-20">
       <RangeSelector start="0" end="0.5" shape="triangle"/>
     </TextModifier>
-    <Fill color="#FF6B6B"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#3B82F6"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
-  <!-- Scaled text -->
+  <!-- Scale effect -->
   <Layer>
-    <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="28" position="40,165"/>
-    <TextModifier scale="1.2,1.2">
+    <Text text="SCALE" fontFamily="Arial" fontStyle="Bold" fontSize="72"/>
+    <TextLayout position="200,280" textAlign="center"/>
+    <TextModifier scale="1.15,1.15">
       <RangeSelector start="0" end="1" shape="square"/>
     </TextModifier>
-    <Fill color="#9B59B6"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
 </pagx>

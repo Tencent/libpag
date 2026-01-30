@@ -1,25 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates TrimPath modifier: partially drawing a path -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <!-- Full circle shown as reference -->
-    <Ellipse center="100,100" size="120,120"/>
-    <Stroke color="#E0E0E0" width="8" cap="round"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
   </Layer>
+  <!-- Background circle (full reference) -->
   <Layer>
-    <!-- Trimmed arc -->
-    <Ellipse center="100,100" size="120,120"/>
-    <TrimPath start="0" end="0.7" type="continuous"/>
-    <Stroke color="#3498DB" width="8" cap="round"/>
+    <Ellipse center="200,200" size="260,260"/>
+    <Stroke color="#334155" width="20" cap="round"/>
   </Layer>
+  <!-- Trimmed arc showing progress -->
   <Layer>
-    <!-- Start indicator -->
-    <Ellipse center="160,100" size="12,12"/>
-    <Fill color="#4ECDC4"/>
+    <Ellipse center="200,200" size="260,260"/>
+    <TrimPath start="0" end="0.75" type="continuous"/>
+    <Stroke width="20" cap="round">
+      <ConicGradient center="130,130" startAngle="0" endAngle="270">
+        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </ConicGradient>
+    </Stroke>
   </Layer>
+  <!-- Start indicator dot -->
   <Layer>
-    <!-- End indicator -->
-    <Ellipse center="64,48" size="12,12"/>
-    <Fill color="#FF6B6B"/>
+    <Ellipse center="330,200" size="28,28"/>
+    <Fill color="#06B6D4"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#06B6D480"/>
+  </Layer>
+  <!-- End indicator dot -->
+  <Layer>
+    <Ellipse center="108,108" size="28,28"/>
+    <Fill color="#8B5CF6"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF680"/>
   </Layer>
 </pagx>

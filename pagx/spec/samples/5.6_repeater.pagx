@@ -1,11 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates Repeater modifier with position and alpha fade -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Repeated rectangles with fade -->
   <Layer>
     <Group>
-      <Rectangle center="30,100" size="30,30" roundness="6"/>
-      <Fill color="#3498DB"/>
-      <Repeater copies="5" position="35,0" startAlpha="1" endAlpha="0.2"/>
+      <Rectangle center="60,200" size="56,56" roundness="12"/>
+      <Fill>
+        <LinearGradient startPoint="0,0" endPoint="56,56">
+          <ColorStop offset="0" color="#6366F1"/>
+          <ColorStop offset="1" color="#8B5CF6"/>
+        </LinearGradient>
+      </Fill>
+      <Repeater copies="5" position="70,0" startAlpha="1" endAlpha="0.15"/>
     </Group>
   </Layer>
 </pagx>

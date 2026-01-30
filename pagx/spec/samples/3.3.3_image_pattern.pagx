@@ -1,40 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates ImagePattern fill with different tile modes -->
-<pagx version="1.0" width="200" height="200">
-  <!-- Clamp mode: original size, centered -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  
+  <!-- Clamp mode: original size, centered in 140x140 rect -->
+  <!-- Image is 256x256, scale 0.5 = 128x128. To center in 140x140: offset = (140-128)/2 = 6 -->
   <Layer name="ClampFill">
-    <Rectangle center="60,60" size="80,80" roundness="8"/>
+    <Rectangle center="110,110" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.3,0,0,0.3,-12,-12"/>
+      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.5,0,0,0.5,48,48"/>
     </Fill>
-    <Stroke color="#CCCCCC" width="1"/>
+    <Stroke color="#334155" width="2"/>
   </Layer>
   
   <!-- Repeat mode: tiled pattern -->
   <Layer name="RepeatFill">
-    <Rectangle center="140,60" size="80,80" roundness="8"/>
+    <Rectangle center="290,110" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.15,0,0,0.15,0,0"/>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.24,0,0,0.24,0,0"/>
     </Fill>
-    <Stroke color="#CCCCCC" width="1"/>
+    <Stroke color="#334155" width="2"/>
   </Layer>
   
   <!-- Mirror mode: mirrored tiles -->
   <Layer name="MirrorFill">
-    <Rectangle center="60,140" size="80,80" roundness="8"/>
+    <Rectangle center="110,290" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.15,0,0,0.15,0,0"/>
+      <ImagePattern image="@logo" tileModeX="mirror" tileModeY="mirror" matrix="0.24,0,0,0.24,0,0"/>
     </Fill>
-    <Stroke color="#CCCCCC" width="1"/>
+    <Stroke color="#334155" width="2"/>
   </Layer>
   
-  <!-- Ellipse with image -->
-  <Layer name="EllipseFill">
-    <Ellipse center="140,140" size="80,80"/>
+  <!-- Repeat mode: scaled pattern -->
+  <Layer name="RepeatScaled">
+    <Rectangle center="290,290" size="140,140" roundness="24"/>
     <Fill>
-      <ImagePattern image="@logo" tileModeX="clamp" tileModeY="clamp" matrix="0.3,0,0,0.3,-12,-12"/>
+      <ImagePattern image="@logo" tileModeX="repeat" tileModeY="repeat" matrix="0.35,0,0,0.35,0,0"/>
     </Fill>
-    <Stroke color="#CCCCCC" width="1"/>
+    <Stroke color="#334155" width="2"/>
   </Layer>
   
   <Resources>

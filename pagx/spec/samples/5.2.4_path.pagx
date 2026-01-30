@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates Path shape with custom bezier curves -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  
+  <!-- Heart shape -->
+  <Layer>
+    <Path data="M 100,140 C 100,100 140,80 160,80 C 200,80 200,120 200,140 C 200,120 200,80 240,80 C 260,80 300,100 300,140 C 300,200 200,280 200,280 C 200,280 100,200 100,140 Z"/>
+    <Fill>
+      <LinearGradient startPoint="100,80" endPoint="300,280">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#F43F5E60"/>
+  </Layer>
+  
+  <!-- Lightning bolt -->
+  <Layer>
+    <Path data="M 320,60 L 280,160 L 320,160 L 280,260 L 360,140 L 320,140 L 360,60 Z"/>
+    <Fill>
+      <LinearGradient startPoint="280,60" endPoint="360,260">
+        <ColorStop offset="0" color="#FBBF24"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#F59E0B60"/>
+  </Layer>
+  
+  <!-- Arrow -->
+  <Layer>
+    <Path data="M 40,320 L 160,320 L 160,280 L 220,340 L 160,400 L 160,360 L 40,360 Z"/>
+    <Fill color="#06B6D4"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#06B6D460"/>
+  </Layer>
+  
+  <!-- Cloud shape -->
+  <Layer>
+    <Path data="M 280,340 C 260,340 250,360 260,380 C 240,380 230,400 250,420 L 370,420 C 390,400 380,380 360,380 C 380,360 360,340 340,350 C 340,330 310,320 280,340 Z"/>
+    <Fill color="#8B5CF6"/>
+    <DropShadowStyle offsetX="0" offsetY="4" blurX="12" blurY="12" color="#8B5CF660"/>
+  </Layer>
+</pagx>

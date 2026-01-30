@@ -1,27 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates rich text with multiple styled Text elements -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
   <!-- Title -->
   <Layer>
-    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="24" position="35,45"/>
-    <Fill color="#3498DB"/>
+    <Text text="Rich Text" fontFamily="Arial" fontStyle="Bold" fontSize="52"/>
+    <TextLayout position="200,80" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="260,0">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Fill>
   </Layer>
-  <!-- Multi-color text line -->
+  <!-- Multi-color text line: Hello -->
   <Layer>
-    <Text text="Hello " fontFamily="Arial" fontSize="20" position="30,95"/>
-    <Fill color="#333333"/>
+    <Text text="Hello " fontFamily="Arial" fontSize="44"/>
+    <TextLayout position="80,190" textAlign="left"/>
+    <Fill color="#94A3B8"/>
   </Layer>
+  <!-- Multi-color text line: World -->
   <Layer>
-    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="20" position="95,95"/>
-    <Fill color="#FF6B6B"/>
+    <Text text="World" fontFamily="Arial" fontStyle="Bold" fontSize="44"/>
+    <TextLayout position="215,190" textAlign="left"/>
+    <Fill color="#F43F5E"/>
   </Layer>
-  <!-- Another styled line -->
+  <!-- Another styled line: PAGX -->
   <Layer>
-    <Text text="PAGX " fontFamily="Arial" fontStyle="Bold" fontSize="18" position="30,140"/>
-    <Fill color="#9B59B6"/>
+    <Text text="PAGX " fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+    <TextLayout position="80,290" textAlign="left"/>
+    <Fill color="#6366F1"/>
   </Layer>
+  <!-- Format -->
   <Layer>
-    <Text text="Format" fontFamily="Arial" fontSize="18" position="90,140"/>
-    <Fill color="#4ECDC4"/>
+    <Text text="Format" fontFamily="Arial" fontSize="40"/>
+    <TextLayout position="205,290" textAlign="left"/>
+    <Fill color="#06B6D4"/>
   </Layer>
 </pagx>
