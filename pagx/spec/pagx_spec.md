@@ -2134,18 +2134,14 @@ This appendix describes node categorization and nesting rules.
 
 | Category | Nodes |
 |----------|-------|
-| **Document Root** | `pagx` |
-| **Resources** | `Resources`, `Image`, `PathData`, `Font`, `Glyph`, `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ColorStop`, `ImagePattern`, `Composition` |
-| **Layer** | `Layer` |
+| **Containers** | `pagx`, `Resources`, `Layer`, `Group` |
+| **Resources** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
+| **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
-| **Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
-| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text` |
-| **Pre-layout Data** | `GlyphRun` (Text child element) |
+| **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
+| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
-| **Shape Modifiers** | `TrimPath`, `RoundCorner`, `MergePath` |
-| **Text Modifiers** | `TextModifier`, `TextPath`, `TextLayout` |
-| **Text Selectors** | `RangeSelector` (TextModifier child element) |
-| **Other** | `Repeater`, `Group` |
 
 ### A.2 Document Containment
 

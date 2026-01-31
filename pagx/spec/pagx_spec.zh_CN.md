@@ -2132,18 +2132,14 @@ Group 创建独立的作用域，用于隔离几何累积和渲染：
 
 | 分类 | 节点 |
 |------|------|
-| **文档根** | `pagx` |
-| **资源** | `Resources`, `Image`, `PathData`, `Font`, `Glyph`, `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ColorStop`, `ImagePattern`, `Composition` |
-| **图层** | `Layer` |
+| **容器** | `pagx`, `Resources`, `Layer`, `Group` |
+| **资源** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
+| **颜色源** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
 | **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
-| **滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
-| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text` |
-| **预排版数据** | `GlyphRun`（Text 子元素） |
+| **图层滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
+| **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
+| **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout`, `Repeater` |
 | **绘制器** | `Fill`, `Stroke` |
-| **形状修改器** | `TrimPath`, `RoundCorner`, `MergePath` |
-| **文本修改器** | `TextModifier`, `TextPath`, `TextLayout` |
-| **文本选择器** | `RangeSelector`（TextModifier 子元素） |
-| **其他** | `Repeater`, `Group` |
 
 ### A.2 文档包含关系
 
