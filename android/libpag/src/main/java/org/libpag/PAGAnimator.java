@@ -11,7 +11,7 @@ import java.lang.ref.WeakReference;
 /**
  * PAGAnimator provides a simple timing engine for running animations.
  */
-class PAGAnimator {
+public class PAGAnimator {
     /**
      * This interface is used to receive notifications when the status of the associated PAGAnimator
      * changes, and to flush the animation frame.
