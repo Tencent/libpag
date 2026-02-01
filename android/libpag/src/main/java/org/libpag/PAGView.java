@@ -89,8 +89,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         void onFlush();
     }
 
-    private ArrayList<PAGViewListener> mViewListeners = new ArrayList<>();
-    private ArrayList<PAGFlushListener> mPAGFlushListeners = new ArrayList<>();
+    private final ArrayList<PAGViewListener> mViewListeners = new ArrayList<>();
+    private final ArrayList<PAGFlushListener> mPAGFlushListeners = new ArrayList<>();
 
     public PAGView(Context context) {
         super(context);
