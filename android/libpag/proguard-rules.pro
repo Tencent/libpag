@@ -79,3 +79,7 @@
     private void onAnimationRepeat();
     private void onAnimationUpdate();
 }
+
+
+-keep class org.libpag.** {*;}
+-keep class androidx.exifinterface.** {*;}

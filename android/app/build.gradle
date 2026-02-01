@@ -1,13 +1,14 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
-    compileSdkVersion rootProject.compileSdkVersion
+    compileSdkVersion 36
     buildToolsVersion rootProject.buildToolsVersion
 
     defaultConfig {
         applicationId "org.libpag.pagviewer"
-        minSdkVersion rootProject.minSdkVersion
+        minSdkVersion 23
         targetSdkVersion rootProject.targetSdkVersion
         versionCode 1
         versionName "1.0"
@@ -42,6 +43,17 @@ android {
     }
     namespace 'libpag.pagviewer'
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlin {
+        jvmToolchain(17)
+    }
+
+    buildFeatures {
+        compose true
+    }
 }
 
 project.afterEvaluate {
@@ -93,7 +105,12 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$appcompatVersion"
     debugImplementation project(':libpag')
     releaseImplementation project(':libpag')
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion"
+    implementation(project(":libpag-compose"))
+
+    implementation("androidx.activity:activity-compose:1.12.3")
+    implementation("androidx.compose.ui:ui:1.10.2")
+    implementation("androidx.compose.foundation:foundation:1.10.2")
+    implementation("androidx.compose.runtime:runtime:1.10.2")
 }
 
 configurations.all {

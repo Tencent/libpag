@@ -29,13 +29,12 @@ import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.View;
 
-import java.io.File;
+import org.extra.tools.LibraryLoadUtils;
+import org.libpag.PAGImageViewHelper.DecoderInfo;
+
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.extra.tools.LibraryLoadUtils;
-import org.libpag.PAGImageViewHelper.DecoderInfo;
 
 public class PAGImageView extends View implements PAGAnimator.Listener {
 
@@ -740,7 +739,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _matrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode, decoderInfo._width, decoderInfo._height, width, height);
     }
 
-    private static native int ContentVersion(PAGComposition pagComposition);
+    static native int ContentVersion(PAGComposition pagComposition);
 
     @Override
     public void onAnimationStart(PAGAnimator animator) {

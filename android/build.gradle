@@ -2,15 +2,14 @@
 
 buildscript {
     ext {
-        kotlinVersion = '1.6.21'
-        supportLibVersion = '28.0.0'
+        kotlinVersion = '2.3.0'
         junitVersion = '4.12'
-        compileSdkVersion = 33
+        compileSdkVersion = 35
         buildToolsVersion = '35.0.0'
         ndkVersion = '28.0.13004108'
         minSdkVersion = 21
-        targetSdkVersion = 33
-        agpVersion = '8.8.1'
+        targetSdkVersion = 35
+        agpVersion = '8.9.1'
         appcompatVersion = '1.4.2' // after this version, compileSdkVersion must large than 31
     }
     repositories {
@@ -35,6 +34,11 @@ buildscript {
             force 'org.apache.commons:commons-compress:1.26.0'
         }
     }
+}
+
+
+plugins {
+    id 'org.jetbrains.kotlin.plugin.compose' version '2.3.0'
 }
 
 allprojects {
