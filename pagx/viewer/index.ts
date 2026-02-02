@@ -35,6 +35,7 @@ interface I18nStrings {
     invalidFile: string;
     spec: string;
     specTitle: string;
+    leave: string;
 }
 
 const i18n: Record<string, I18nStrings> = {
@@ -53,6 +54,7 @@ const i18n: Record<string, I18nStrings> = {
         invalidFile: 'Please drop a .pagx file',
         spec: 'Spec',
         specTitle: 'PAGX Specification',
+        leave: 'Leave',
     },
     zh: {
         dropText: '拖放 PAGX 文件到此处',
@@ -69,6 +71,7 @@ const i18n: Record<string, I18nStrings> = {
         invalidFile: '请拖放 .pagx 文件',
         spec: 'Spec',
         specTitle: 'PAGX 格式规范',
+        leave: '离开',
     },
 };
 
@@ -197,6 +200,20 @@ class GestureManager {
     private mouseWheelRatio = 800;
     private touchWheelRatio = 100;
 
+    // Drag state
+    private isDragging = false;
+    private dragStartX = 0;
+    private dragStartY = 0;
+    private dragStartOffsetX = 0;
+    private dragStartOffsetY = 0;
+
+    // Touch state
+    private lastTouchDistance = 0;
+    private lastTouchCenterX = 0;
+    private lastTouchCenterY = 0;
+    private isTouchPanning = false;
+    private isTouchZooming = false;
+
     public zoom = 1.0;
     public offsetX = 0;
     public offsetY = 0;
@@ -313,6 +330,135 @@ class GestureManager {
                 this.resetScaleTimeout(event, canvas, viewerState);
                 this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, viewerState);
             }
+        }
+    }
+
+    // Mouse drag handlers
+    public onMouseDown(event: MouseEvent, canvas: HTMLElement) {
+        // Only handle left mouse button
+        if (event.button !== 0) {
+            return;
+        }
+        this.isDragging = true;
+        this.dragStartX = event.clientX;
+        this.dragStartY = event.clientY;
+        this.dragStartOffsetX = this.offsetX;
+        this.dragStartOffsetY = this.offsetY;
+        canvas.style.cursor = 'grabbing';
+    }
+
+    public onMouseMove(event: MouseEvent, viewerState: ViewerState) {
+        if (!this.isDragging) {
+            return;
+        }
+        const deltaX = (event.clientX - this.dragStartX) * window.devicePixelRatio;
+        const deltaY = (event.clientY - this.dragStartY) * window.devicePixelRatio;
+        this.offsetX = this.dragStartOffsetX + deltaX;
+        this.offsetY = this.dragStartOffsetY + deltaY;
+        viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+    }
+
+    public onMouseUp(canvas: HTMLElement) {
+        this.isDragging = false;
+        canvas.style.cursor = 'grab';
+    }
+
+    // Touch handlers
+    private getTouchDistance(touches: TouchList): number {
+        if (touches.length < 2) {
+            return 0;
+        }
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private getTouchCenter(touches: TouchList): { x: number; y: number } {
+        if (touches.length < 2) {
+            return { x: touches[0].clientX, y: touches[0].clientY };
+        }
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2,
+        };
+    }
+
+    public onTouchStart(event: TouchEvent, canvas: HTMLElement) {
+        if (event.touches.length === 1) {
+            // Single finger pan
+            this.isTouchPanning = true;
+            this.isTouchZooming = false;
+            this.dragStartX = event.touches[0].clientX;
+            this.dragStartY = event.touches[0].clientY;
+            this.dragStartOffsetX = this.offsetX;
+            this.dragStartOffsetY = this.offsetY;
+        } else if (event.touches.length === 2) {
+            // Two finger zoom/pan
+            this.isTouchPanning = false;
+            this.isTouchZooming = true;
+            this.lastTouchDistance = this.getTouchDistance(event.touches);
+            const center = this.getTouchCenter(event.touches);
+            this.lastTouchCenterX = center.x;
+            this.lastTouchCenterY = center.y;
+            this.scaleStartZoom = this.zoom;
+            this.dragStartOffsetX = this.offsetX;
+            this.dragStartOffsetY = this.offsetY;
+        }
+    }
+
+    public onTouchMove(event: TouchEvent, canvas: HTMLElement, viewerState: ViewerState) {
+        if (event.touches.length === 1 && this.isTouchPanning) {
+            // Single finger pan
+            const deltaX = (event.touches[0].clientX - this.dragStartX) * window.devicePixelRatio;
+            const deltaY = (event.touches[0].clientY - this.dragStartY) * window.devicePixelRatio;
+            this.offsetX = this.dragStartOffsetX + deltaX;
+            this.offsetY = this.dragStartOffsetY + deltaY;
+            viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+        } else if (event.touches.length === 2 && this.isTouchZooming) {
+            // Two finger zoom and pan
+            const currentDistance = this.getTouchDistance(event.touches);
+            const center = this.getTouchCenter(event.touches);
+            const rect = canvas.getBoundingClientRect();
+            const pixelX = (center.x - rect.left) * window.devicePixelRatio;
+            const pixelY = (center.y - rect.top) * window.devicePixelRatio;
+
+            // Calculate zoom
+            if (this.lastTouchDistance > 0) {
+                const scale = currentDistance / this.lastTouchDistance;
+                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom * scale));
+
+                // Zoom around pinch center
+                this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
+                this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
+                this.zoom = newZoom;
+            }
+
+            // Also handle pan during pinch
+            const centerDeltaX = (center.x - this.lastTouchCenterX) * window.devicePixelRatio;
+            const centerDeltaY = (center.y - this.lastTouchCenterY) * window.devicePixelRatio;
+            this.offsetX += centerDeltaX;
+            this.offsetY += centerDeltaY;
+
+            this.lastTouchDistance = currentDistance;
+            this.lastTouchCenterX = center.x;
+            this.lastTouchCenterY = center.y;
+
+            viewerState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
+        }
+    }
+
+    public onTouchEnd(event: TouchEvent, canvas: HTMLElement) {
+        if (event.touches.length === 0) {
+            this.isTouchPanning = false;
+            this.isTouchZooming = false;
+        } else if (event.touches.length === 1) {
+            // Switched from pinch to single finger
+            this.isTouchPanning = true;
+            this.isTouchZooming = false;
+            this.dragStartX = event.touches[0].clientX;
+            this.dragStartY = event.touches[0].clientY;
+            this.dragStartOffsetX = this.offsetX;
+            this.dragStartOffsetY = this.offsetY;
         }
     }
 }
@@ -531,10 +677,45 @@ function setupVisibilityListeners() {
 }
 
 function bindCanvasEvents(canvas: HTMLElement) {
+    // Set initial cursor style
+    canvas.style.cursor = 'grab';
+
+    // Wheel events for scroll and zoom
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
         gestureManager.onWheel(e, canvas, viewerState);
     }, { passive: false });
+
+    // Mouse drag events
+    canvas.addEventListener('mousedown', (e: MouseEvent) => {
+        e.preventDefault();
+        gestureManager.onMouseDown(e, canvas);
+    });
+    canvas.addEventListener('mousemove', (e: MouseEvent) => {
+        gestureManager.onMouseMove(e, viewerState);
+    });
+    canvas.addEventListener('mouseup', () => {
+        gestureManager.onMouseUp(canvas);
+    });
+    canvas.addEventListener('mouseleave', () => {
+        gestureManager.onMouseUp(canvas);
+    });
+
+    // Touch events for mobile
+    canvas.addEventListener('touchstart', (e: TouchEvent) => {
+        e.preventDefault();
+        gestureManager.onTouchStart(e, canvas);
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (e: TouchEvent) => {
+        e.preventDefault();
+        gestureManager.onTouchMove(e, canvas, viewerState);
+    }, { passive: false });
+    canvas.addEventListener('touchend', (e: TouchEvent) => {
+        gestureManager.onTouchEnd(e, canvas);
+    });
+    canvas.addEventListener('touchcancel', (e: TouchEvent) => {
+        gestureManager.onTouchEnd(e, canvas);
+    });
 
     // Prevent browser pinch-to-zoom on Safari
     canvas.addEventListener('gesturestart', (e: Event) => {
@@ -596,10 +777,28 @@ function hideDropZone(): void {
     }
 }
 
+const DEFAULT_TITLE = 'PAGX Viewer';
+
+function goHome(): void {
+    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+    const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
+
+    if (viewerState.pagxView) {
+        viewerState.pagxView.loadPAGX(new Uint8Array(0));
+        gestureManager.resetTransform(viewerState);
+    }
+    canvas.classList.add('hidden');
+    toolbar.classList.add('hidden');
+    specBtn.classList.remove('hidden');
+    document.title = DEFAULT_TITLE;
+    showDropZoneUI();
+}
+
 async function loadPAGXData(data: Uint8Array, name: string) {
-    const fileName = document.getElementById('file-name') as HTMLSpanElement;
     const specBtn = document.getElementById('spec-btn') as HTMLAnchorElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
 
     if (!viewerState.pagxView) {
         throw new Error('PAGXView not initialized');
@@ -610,9 +809,10 @@ async function loadPAGXData(data: Uint8Array, name: string) {
     gestureManager.resetTransform(viewerState);
     updateSize();
     hideDropZone();
+    canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
     specBtn.classList.add('hidden');
-    fileName.textContent = name;
+    document.title = 'PAGX Viewer - ' + name;
 }
 
 async function loadPAGXFile(file: File) {
@@ -713,6 +913,7 @@ function setupDragAndDrop() {
     const errorContent = document.getElementById('error-content') as HTMLDivElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const fileInput = document.getElementById('file-input') as HTMLInputElement;
+    const leaveBtn = document.getElementById('leave-btn') as HTMLButtonElement;
     const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
     const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
@@ -757,6 +958,10 @@ function setupDragAndDrop() {
 
     errorContent.addEventListener('click', () => {
         fileInput.click();
+    });
+
+    leaveBtn.addEventListener('click', () => {
+        goHome();
     });
 
     openBtn.addEventListener('click', () => {
@@ -814,6 +1019,7 @@ function applyI18n(): void {
     const errorTitle = document.querySelector('.error-title');
     const openBtn = document.getElementById('open-btn');
     const resetBtn = document.getElementById('reset-btn');
+    const leaveBtn = document.getElementById('leave-btn');
 
     if (dropText) dropText.textContent = strings.dropText;
     if (dropSubtext) dropSubtext.textContent = strings.dropSubtext;
@@ -821,13 +1027,12 @@ function applyI18n(): void {
     if (errorTitle) errorTitle.textContent = strings.errorTitle;
     if (openBtn) openBtn.title = strings.openFile;
     if (resetBtn) resetBtn.title = strings.resetView;
+    if (leaveBtn) leaveBtn.title = strings.leave;
 
     const specBtn = document.getElementById('spec-btn');
     const specBtnText = document.getElementById('spec-btn-text');
-    const toolbarSpecBtn = document.getElementById('toolbar-spec-btn');
     if (specBtn) specBtn.title = strings.specTitle;
     if (specBtnText) specBtnText.textContent = strings.spec;
-    if (toolbarSpecBtn) toolbarSpecBtn.title = strings.specTitle;
 }
 
 if (typeof window !== 'undefined') {

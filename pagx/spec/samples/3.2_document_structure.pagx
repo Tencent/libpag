@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates basic PAGX document structure -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Background with subtle gradient -->
   <Layer name="background">
-    <Rectangle center="100,100" size="200,200"/>
-    <Fill color="#F5F5F5"/>
-  </Layer>
-  <Layer name="content">
-    <Rectangle center="100,100" size="120,120" roundness="16"/>
+    <Rectangle center="200,200" size="400,400"/>
     <Fill>
-      <LinearGradient startPoint="40,40" endPoint="160,160">
-        <ColorStop offset="0" color="#3498DB"/>
-        <ColorStop offset="1" color="#9B59B6"/>
+      <LinearGradient startPoint="0,0" endPoint="400,400">
+        <ColorStop offset="0" color="#0F172A"/>
+        <ColorStop offset="1" color="#1E293B"/>
       </LinearGradient>
     </Fill>
+  </Layer>
+  <!-- Main content card with modern gradient -->
+  <Layer name="content">
+    <Rectangle center="200,200" size="240,240" roundness="40"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="240,240">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="0" offsetY="16" blurX="48" blurY="48" color="#6366F160"/>
   </Layer>
 </pagx>

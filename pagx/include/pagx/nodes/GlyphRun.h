@@ -55,6 +55,11 @@ class GlyphRun : public Node {
   Font* font = nullptr;
 
   /**
+   * Font size for rendering. Actual scale = fontSize / font.unitsPerEm. The default value is 12.
+   */
+  float fontSize = 12.0f;
+
+  /**
    * GlyphID sequence. GlyphID 0 indicates missing glyph (not rendered).
    */
   std::vector<uint16_t> glyphs = {};

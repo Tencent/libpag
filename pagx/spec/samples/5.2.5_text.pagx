@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates text layout with positioning -->
+<!-- Demonstrates Text shape -->
 <pagx version="1.0" width="400" height="400">
   <!-- Dark background -->
   <Layer>
@@ -12,7 +12,7 @@
     <TextLayout position="200,140" textAlign="center"/>
     <Fill>
       <LinearGradient startPoint="0,0" endPoint="280,0">
-        <ColorStop offset="0" color="#06B6D4"/>
+        <ColorStop offset="0" color="#6366F1"/>
         <ColorStop offset="0.5" color="#8B5CF6"/>
         <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
@@ -20,14 +20,14 @@
   </Layer>
   <!-- Subtitle -->
   <Layer>
-    <Text text="Text Demo" fontFamily="Arial" fontSize="36"/>
-    <TextLayout position="200,240" textAlign="center"/>
+    <Text text="Text Shape" fontFamily="Arial" fontSize="36"/>
+    <TextLayout position="200,220" textAlign="center"/>
     <Fill color="#94A3B8"/>
   </Layer>
-  <!-- Description -->
+  <!-- Small description -->
   <Layer>
     <Text text="Beautiful Typography" fontFamily="Arial" fontSize="24"/>
-    <TextLayout position="200,320" textAlign="center"/>
+    <TextLayout position="200,300" textAlign="center"/>
     <Fill color="#64748B"/>
   </Layer>
 </pagx>

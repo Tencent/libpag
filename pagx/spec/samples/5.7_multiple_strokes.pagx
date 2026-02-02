@@ -1,10 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates multiple Stroke layers creating outline effect -->
-<pagx version="1.0" width="200" height="200">
+<!-- Demonstrates multiple Stroke styles creating glow/outline effect -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Path data="M 30,100 Q 100,30 170,100 T 170,170"/>
-    <Stroke color="#3498DB20" width="16" cap="round" join="round"/>
-    <Stroke color="#3498DB60" width="8" cap="round" join="round"/>
-    <Stroke color="#3498DB" width="3" cap="round" join="round"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Path with multiple glow strokes -->
+  <Layer>
+    <Path data="M 60,200 Q 200,60 340,200 Q 200,340 60,200"/>
+    <!-- Outer glow -->
+    <Stroke color="#8B5CF615" width="48" cap="round" join="round"/>
+    <!-- Middle glow -->
+    <Stroke color="#8B5CF640" width="28" cap="round" join="round"/>
+    <!-- Core stroke -->
+    <Stroke width="8" cap="round" join="round">
+      <LinearGradient startPoint="0,0" endPoint="280,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="0.5" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#EC4899"/>
+      </LinearGradient>
+    </Stroke>
   </Layer>
 </pagx>

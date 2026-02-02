@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates RoundCorner modifier -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Original sharp rectangle (reference) -->
+  <Layer>
+    <Rectangle center="120,120" size="140,140"/>
+    <Stroke color="#475569" width="3" dashes="8,5"/>
+  </Layer>
+  <!-- RoundCorner applied to sharp rectangle -->
+  <Layer>
+    <Rectangle center="120,120" size="140,140"/>
+    <RoundCorner radius="30"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#10B981"/>
+        <ColorStop offset="1" color="#059669"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#10B98160"/>
+  </Layer>
+  <!-- Original star (reference) -->
+  <Layer>
+    <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
+    <Stroke color="#475569" width="3" dashes="8,5"/>
+  </Layer>
+  <!-- RoundCorner applied to star -->
+  <Layer>
+    <Polystar center="290,120" type="star" pointCount="5" outerRadius="70" innerRadius="32" rotation="-90"/>
+    <RoundCorner radius="12"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="140,140">
+        <ColorStop offset="0" color="#F59E0B"/>
+        <ColorStop offset="1" color="#D97706"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#F59E0B60"/>
+  </Layer>
+  <!-- Large rounded hexagon -->
+  <Layer>
+    <Polystar center="200,300" type="polygon" pointCount="6" outerRadius="80"/>
+    <RoundCorner radius="20"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="160,160">
+        <ColorStop offset="0" color="#8B5CF6"/>
+        <ColorStop offset="1" color="#7C3AED"/>
+      </LinearGradient>
+    </Fill>
+    <DropShadowStyle offsetX="0" offsetY="8" blurX="24" blurY="24" color="#8B5CF660"/>
+  </Layer>
+</pagx>

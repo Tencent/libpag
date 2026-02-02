@@ -30,7 +30,7 @@ const VIEWER_DIR = path.dirname(SCRIPT_DIR);
 const PAGX_DIR = path.dirname(VIEWER_DIR);
 const LIBPAG_DIR = path.dirname(PAGX_DIR);
 const RESOURCES_FONT_DIR = path.join(LIBPAG_DIR, 'resources', 'font');
-const DEFAULT_OUTPUT_DIR = path.join(PAGX_DIR, 'public', 'viewer');
+const DEFAULT_OUTPUT_DIR = path.join(PAGX_DIR, 'public');
 
 /**
  * Parse command line arguments.

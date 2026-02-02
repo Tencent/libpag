@@ -32,6 +32,8 @@
 
 namespace pagx {
 
+static constexpr int kVectorFontUnitsPerEm = 1000;
+
 static std::string PathToSVGString(const tgfx::Path& path) {
   std::string result = {};
   result.reserve(256);
@@ -40,20 +42,26 @@ static std::string PathToSVGString(const tgfx::Path& path) {
   path.decompose([&](tgfx::PathVerb verb, const tgfx::Point pts[4], void*) {
     switch (verb) {
       case tgfx::PathVerb::Move:
-        snprintf(buf, sizeof(buf), "M%g %g", pts[0].x, pts[0].y);
+        snprintf(buf, sizeof(buf), "M%d %d", static_cast<int>(std::round(pts[0].x)),
+                 static_cast<int>(std::round(pts[0].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Line:
-        snprintf(buf, sizeof(buf), "L%g %g", pts[1].x, pts[1].y);
+        snprintf(buf, sizeof(buf), "L%d %d", static_cast<int>(std::round(pts[1].x)),
+                 static_cast<int>(std::round(pts[1].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Quad:
-        snprintf(buf, sizeof(buf), "Q%g %g %g %g", pts[1].x, pts[1].y, pts[2].x, pts[2].y);
+        snprintf(buf, sizeof(buf), "Q%d %d %d %d", static_cast<int>(std::round(pts[1].x)),
+                 static_cast<int>(std::round(pts[1].y)), static_cast<int>(std::round(pts[2].x)),
+                 static_cast<int>(std::round(pts[2].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Cubic:
-        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", pts[1].x, pts[1].y, pts[2].x, pts[2].y,
-                 pts[3].x, pts[3].y);
+        snprintf(buf, sizeof(buf), "C%d %d %d %d %d %d", static_cast<int>(std::round(pts[1].x)),
+                 static_cast<int>(std::round(pts[1].y)), static_cast<int>(std::round(pts[2].x)),
+                 static_cast<int>(std::round(pts[2].y)), static_cast<int>(std::round(pts[3].x)),
+                 static_cast<int>(std::round(pts[3].y)));
         result += buf;
         break;
       case tgfx::PathVerb::Close:
@@ -67,125 +75,169 @@ static std::string PathToSVGString(const tgfx::Path& path) {
 
 struct GlyphKey {
   const tgfx::Typeface* typeface = nullptr;
-  int fontSize = 0;
   tgfx::GlyphID glyphID = 0;
 
   bool operator==(const GlyphKey& other) const {
-    return typeface == other.typeface && fontSize == other.fontSize && glyphID == other.glyphID;
+    return typeface == other.typeface && glyphID == other.glyphID;
   }
 };
 
 struct GlyphKeyHash {
   size_t operator()(const GlyphKey& key) const {
     size_t h = std::hash<const void*>()(key.typeface);
-    h ^= std::hash<int>()(key.fontSize) << 1;
-    h ^= std::hash<uint16_t>()(key.glyphID) << 2;
+    h ^= std::hash<uint16_t>()(key.glyphID) << 1;
     return h;
   }
 };
 
-struct GlyphInfo {
-  std::string pathString = {};
-  std::shared_ptr<tgfx::ImageCodec> imageCodec = nullptr;
-  tgfx::Matrix imageMatrix = {};
+struct VectorFontBuilder {
+  Font* font = nullptr;
+  std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> glyphMapping = {};
 };
 
-static void CollectGlyphs(
-    const std::shared_ptr<tgfx::TextBlob>& textBlob,
-    std::vector<std::pair<GlyphKey, GlyphInfo>>& pendingVectorGlyphs,
-    std::vector<std::pair<GlyphKey, GlyphInfo>>& pendingBitmapGlyphs,
-    std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& vectorGlyphMapping,
-    std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& bitmapGlyphMapping) {
-  for (const auto& run : *textBlob) {
-    auto* typeface = run.font.getTypeface().get();
-    int fontSize = static_cast<int>(run.font.getSize());
+struct BitmapFontBuilder {
+  const tgfx::Typeface* typeface = nullptr;
+  int backingSize = 0;
+  Font* font = nullptr;
+  std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> glyphMapping = {};
+};
 
-    for (size_t i = 0; i < run.glyphCount; ++i) {
-      tgfx::GlyphID glyphID = run.glyphs[i];
-      GlyphKey key = {typeface, fontSize, glyphID};
-
-      if (vectorGlyphMapping.find(key) != vectorGlyphMapping.end() ||
-          bitmapGlyphMapping.find(key) != bitmapGlyphMapping.end()) {
-        continue;
-      }
-
-      tgfx::Path glyphPath = {};
-      bool hasPath = run.font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
-
-      tgfx::Matrix imageMatrix = {};
-      auto imageCodec = run.font.getImage(glyphID, nullptr, &imageMatrix);
-
-      if (hasPath) {
-        GlyphInfo info = {};
-        info.pathString = PathToSVGString(glyphPath);
-        if (!info.pathString.empty()) {
-          pendingVectorGlyphs.push_back({key, info});
-        }
-      } else if (imageCodec) {
-        GlyphInfo info = {};
-        info.imageCodec = imageCodec;
-        info.imageMatrix = imageMatrix;
-        pendingBitmapGlyphs.push_back({key, info});
-      }
-    }
+static void CollectMaxFontSize(const tgfx::Font& font, tgfx::GlyphID glyphID,
+                               std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes) {
+  GlyphKey key = {font.getTypeface().get(), glyphID};
+  float fontSize = font.getSize();
+  auto it = maxSizes.find(key);
+  if (it == maxSizes.end() || fontSize > it->second) {
+    maxSizes[key] = fontSize;
   }
 }
 
-static Glyph* CreateBitmapGlyph(PAGXDocument* document, const GlyphInfo& info) {
-  auto imageCodec = info.imageCodec;
-  auto imageMatrix = info.imageMatrix;
+static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
+                               tgfx::GlyphID glyphID,
+                               const std::unordered_map<GlyphKey, float, GlyphKeyHash>& maxSizes,
+                               VectorFontBuilder& builder) {
+  GlyphKey key = {font.getTypeface().get(), glyphID};
 
-  int srcW = imageCodec->width();
-  int srcH = imageCodec->height();
-  float scaleX = std::abs(imageMatrix.getScaleX());
-  float scaleY = std::abs(imageMatrix.getScaleY());
-  int dstW = static_cast<int>(std::round(static_cast<float>(srcW) * scaleX));
-  int dstH = static_cast<int>(std::round(static_cast<float>(srcH) * scaleY));
-
-  if (dstW <= 0 || dstH <= 0) {
-    return nullptr;
+  if (builder.glyphMapping.count(key) > 0) {
+    return;
   }
 
-  tgfx::Bitmap dstBitmap(dstW, dstH, false, false);
-  if (dstBitmap.isEmpty()) {
-    return nullptr;
+  auto it = maxSizes.find(key);
+  if (it == maxSizes.end()) {
+    return;
   }
-  auto* dstPixels = dstBitmap.lockPixels();
-  if (dstPixels == nullptr) {
-    return nullptr;
+
+  float maxSize = it->second;
+  if (std::abs(font.getSize() - maxSize) > 0.001f) {
+    return;
   }
-  bool success = imageCodec->readPixels(dstBitmap.info(), dstPixels);
-  dstBitmap.unlockPixels();
+
+  tgfx::Path glyphPath = {};
+  if (!font.getPath(glyphID, &glyphPath) || glyphPath.isEmpty()) {
+    return;
+  }
+
+  float scale = static_cast<float>(kVectorFontUnitsPerEm) / font.getSize();
+  glyphPath.transform(tgfx::Matrix::MakeScale(scale, scale));
+
+  if (builder.font == nullptr) {
+    builder.font = document->makeNode<Font>();
+    builder.font->unitsPerEm = kVectorFontUnitsPerEm;
+  }
+
+  auto glyph = document->makeNode<Glyph>();
+  glyph->path = document->makeNode<PathData>();
+  *glyph->path = PathDataFromSVGString(PathToSVGString(glyphPath));
+
+  builder.font->glyphs.push_back(glyph);
+  builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
+}
+
+static void CollectBitmapGlyph(
+    PAGXDocument* document, const tgfx::Font& font, tgfx::GlyphID glyphID,
+    std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder>& builders) {
+  auto* typeface = font.getTypeface().get();
+  auto& builder = builders[typeface];
+
+  GlyphKey key = {typeface, glyphID};
+  if (builder.glyphMapping.count(key) > 0) {
+    return;
+  }
+
+  tgfx::Matrix imageMatrix = {};
+  auto imageCodec = font.getImage(glyphID, nullptr, &imageMatrix);
+  if (!imageCodec) {
+    return;
+  }
+
+  if (builder.backingSize == 0) {
+    float scaleX = std::abs(imageMatrix.getScaleX());
+    if (scaleX < 0.001f) {
+      return;
+    }
+    builder.backingSize = static_cast<int>(std::round(font.getSize() / scaleX));
+    builder.typeface = typeface;
+    builder.font = document->makeNode<Font>();
+    builder.font->unitsPerEm = builder.backingSize;
+  }
+
+  int width = imageCodec->width();
+  int height = imageCodec->height();
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    return;
+  }
+  auto* pixels = bitmap.lockPixels();
+  if (pixels == nullptr) {
+    return;
+  }
+  bool success = imageCodec->readPixels(bitmap.info(), pixels);
+  bitmap.unlockPixels();
   if (!success) {
-    return nullptr;
+    return;
   }
 
-  auto pngData = dstBitmap.encode(tgfx::EncodedFormat::PNG, 100);
+  auto pngData = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
   if (pngData == nullptr) {
-    return nullptr;
+    return;
   }
 
   auto glyph = document->makeNode<Glyph>();
   auto image = document->makeNode<Image>();
   image->data = pagx::Data::MakeWithCopy(pngData->data(), pngData->size());
   glyph->image = image;
-  glyph->offset.x = imageMatrix.getTranslateX();
-  glyph->offset.y = imageMatrix.getTranslateY();
 
-  return glyph;
+  float fontSize = font.getSize();
+  float backingSize = static_cast<float>(builder.backingSize);
+  glyph->offset.x = imageMatrix.getTranslateX() / fontSize * backingSize;
+  glyph->offset.y = imageMatrix.getTranslateY() / fontSize * backingSize;
+
+  builder.font->glyphs.push_back(glyph);
+  builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
+}
+
+static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
+  tgfx::Path glyphPath = {};
+  return font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
 }
 
 static GlyphRun* CreateGlyphRunForIndices(
     PAGXDocument* document, const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
-    Font* font, const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& mapping,
-    const tgfx::Typeface* typeface, int fontSize) {
+    Font* font,
+    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping, float fontSize) {
   auto glyphRun = document->makeNode<GlyphRun>();
   glyphRun->font = font;
+  glyphRun->fontSize = fontSize;
 
+  auto* typeface = run.font.getTypeface().get();
   for (size_t i : indices) {
-    GlyphKey key = {typeface, fontSize, run.glyphs[i]};
-    auto it = mapping.find(key);
-    if (it != mapping.end()) {
+    GlyphKey key = {typeface, run.glyphs[i]};
+    auto it = glyphMapping.find(key);
+    if (it != glyphMapping.end()) {
       glyphRun->glyphs.push_back(it->second);
     } else {
       glyphRun->glyphs.push_back(0);
@@ -243,48 +295,54 @@ bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
     return false;
   }
 
-  std::vector<std::pair<GlyphKey, GlyphInfo>> pendingVectorGlyphs = {};
-  std::vector<std::pair<GlyphKey, GlyphInfo>> pendingBitmapGlyphs = {};
-  std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> vectorGlyphMapping = {};
-  std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash> bitmapGlyphMapping = {};
+  std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};
+  VectorFontBuilder vectorBuilder = {};
+  std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
 
-  // First pass: collect all glyphs from all TextBlobs
+  // First pass: collect max font size for each vector glyph
   for (const auto& [text, textBlob] : textGlyphs.textBlobs) {
-    if (textBlob != nullptr) {
-      CollectGlyphs(textBlob, pendingVectorGlyphs, pendingBitmapGlyphs, vectorGlyphMapping,
-                    bitmapGlyphMapping);
+    if (textBlob == nullptr) {
+      continue;
     }
-  }
-
-  // Create Font nodes
-  Font* vectorFont = nullptr;
-  Font* bitmapFont = nullptr;
-
-  if (!pendingVectorGlyphs.empty()) {
-    vectorFont = document->makeNode<Font>("vector_font");
-    tgfx::GlyphID nextID = 1;
-    for (auto& [key, info] : pendingVectorGlyphs) {
-      auto glyph = document->makeNode<Glyph>();
-      glyph->path = document->makeNode<PathData>();
-      *glyph->path = PathDataFromSVGString(info.pathString);
-      vectorFont->glyphs.push_back(glyph);
-      vectorGlyphMapping[key] = nextID++;
-    }
-  }
-
-  if (!pendingBitmapGlyphs.empty()) {
-    bitmapFont = document->makeNode<Font>("bitmap_font");
-    tgfx::GlyphID nextID = 1;
-    for (auto& [key, info] : pendingBitmapGlyphs) {
-      auto glyph = CreateBitmapGlyph(document, info);
-      if (glyph != nullptr) {
-        bitmapFont->glyphs.push_back(glyph);
-        bitmapGlyphMapping[key] = nextID++;
+    for (const auto& run : *textBlob) {
+      for (size_t i = 0; i < run.glyphCount; ++i) {
+        tgfx::GlyphID glyphID = run.glyphs[i];
+        if (IsVectorGlyph(run.font, glyphID)) {
+          CollectMaxFontSize(run.font, glyphID, maxFontSizes);
+        }
       }
     }
   }
 
-  // Second pass: create GlyphRuns for each Text
+  // Second pass: collect glyphs using max font size for vector, first encounter for bitmap
+  for (const auto& [text, textBlob] : textGlyphs.textBlobs) {
+    if (textBlob == nullptr) {
+      continue;
+    }
+    for (const auto& run : *textBlob) {
+      for (size_t i = 0; i < run.glyphCount; ++i) {
+        tgfx::GlyphID glyphID = run.glyphs[i];
+        if (IsVectorGlyph(run.font, glyphID)) {
+          CollectVectorGlyph(document, run.font, glyphID, maxFontSizes, vectorBuilder);
+        } else {
+          CollectBitmapGlyph(document, run.font, glyphID, bitmapBuilders);
+        }
+      }
+    }
+  }
+
+  // Assign sequential IDs to all fonts
+  int fontIndex = 1;
+  if (vectorBuilder.font != nullptr) {
+    vectorBuilder.font->id = "font" + std::to_string(fontIndex++);
+  }
+  for (auto& [typeface, builder] : bitmapBuilders) {
+    if (builder.font != nullptr) {
+      builder.font->id = "font" + std::to_string(fontIndex++);
+    }
+  }
+
+  // Third pass: create GlyphRuns for each Text
   for (const auto& [text, textBlob] : textGlyphs.textBlobs) {
     if (textBlob == nullptr) {
       continue;
@@ -298,33 +356,42 @@ bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
       }
 
       auto* typeface = run.font.getTypeface().get();
-      int fontSize = static_cast<int>(run.font.getSize());
+      float fontSize = run.font.getSize();
 
       std::vector<size_t> vectorIndices = {};
       std::vector<size_t> bitmapIndices = {};
 
       for (size_t i = 0; i < run.glyphCount; ++i) {
-        GlyphKey key = {typeface, fontSize, run.glyphs[i]};
-        if (vectorGlyphMapping.find(key) != vectorGlyphMapping.end()) {
+        tgfx::GlyphID glyphID = run.glyphs[i];
+        GlyphKey key = {typeface, glyphID};
+
+        if (vectorBuilder.glyphMapping.count(key) > 0) {
           vectorIndices.push_back(i);
-        } else if (bitmapGlyphMapping.find(key) != bitmapGlyphMapping.end()) {
-          bitmapIndices.push_back(i);
+        } else {
+          auto builderIt = bitmapBuilders.find(typeface);
+          if (builderIt != bitmapBuilders.end() && builderIt->second.glyphMapping.count(key) > 0) {
+            bitmapIndices.push_back(i);
+          }
         }
       }
 
-      if (!vectorIndices.empty() && vectorFont != nullptr) {
-        auto glyphRun = CreateGlyphRunForIndices(document, run, vectorIndices, vectorFont,
-                                                 vectorGlyphMapping, typeface, fontSize);
+      if (!vectorIndices.empty() && vectorBuilder.font != nullptr) {
+        auto glyphRun = CreateGlyphRunForIndices(document, run, vectorIndices, vectorBuilder.font,
+                                                 vectorBuilder.glyphMapping, fontSize);
         if (glyphRun != nullptr) {
           text->glyphRuns.push_back(glyphRun);
         }
       }
 
-      if (!bitmapIndices.empty() && bitmapFont != nullptr) {
-        auto glyphRun = CreateGlyphRunForIndices(document, run, bitmapIndices, bitmapFont,
-                                                 bitmapGlyphMapping, typeface, fontSize);
-        if (glyphRun != nullptr) {
-          text->glyphRuns.push_back(glyphRun);
+      if (!bitmapIndices.empty()) {
+        auto builderIt = bitmapBuilders.find(typeface);
+        if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
+          auto glyphRun =
+              CreateGlyphRunForIndices(document, run, bitmapIndices, builderIt->second.font,
+                                       builderIt->second.glyphMapping, fontSize);
+          if (glyphRun != nullptr) {
+            text->glyphRuns.push_back(glyphRun);
+          }
         }
       }
     }

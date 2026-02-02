@@ -1,18 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates layer properties and nesting -->
-<pagx version="1.0" width="200" height="200">
-  <Layer name="Parent" x="30" y="30">
-    <Rectangle center="70,70" size="120,120" roundness="12"/>
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
+  <Layer>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Parent layer with nested child -->
+  <Layer name="Parent" x="50" y="50">
+    <Rectangle center="150,150" size="260,260" roundness="32"/>
     <Fill>
-      <LinearGradient startPoint="10,10" endPoint="130,130">
-        <ColorStop offset="0" color="#FF6B6B"/>
-        <ColorStop offset="1" color="#EE5A24"/>
+      <LinearGradient startPoint="0,0" endPoint="260,260">
+        <ColorStop offset="0" color="#F43F5E"/>
+        <ColorStop offset="1" color="#EC4899"/>
       </LinearGradient>
     </Fill>
-    <DropShadowStyle offsetX="4" offsetY="4" blurX="12" blurY="12" color="#00000050"/>
+    <DropShadowStyle offsetX="0" offsetY="16" blurX="40" blurY="40" color="#F43F5E60"/>
+    <!-- Nested child layer -->
     <Layer name="Child">
-      <Ellipse center="70,70" size="60,60"/>
+      <Ellipse center="150,150" size="120,120"/>
       <Fill color="#FFFFFF"/>
+      <DropShadowStyle offsetX="0" offsetY="4" blurX="16" blurY="16" color="#00000030"/>
     </Layer>
   </Layer>
 </pagx>

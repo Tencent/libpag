@@ -1,4 +1,4 @@
-# PAGX Format Specification
+# PAGX Specification
 
 ## 1. Introduction
 
@@ -575,17 +575,21 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 
 ```xml
 <!-- Embedded vector font -->
-<Font id="myFont">
+<Font id="myFont" unitsPerEm="1000">
   <Glyph path="M 50 0 L 300 700 L 550 0 Z"/>
   <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
 </Font>
 
 <!-- Embedded bitmap font (Emoji) -->
-<Font id="emojiFont">
+<Font id="emojiFont" unitsPerEm="136">
   <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
   <Glyph image="emoji/heart.png" offset="0,-5"/>
 </Font>
 ```
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 
@@ -601,13 +605,13 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 |-----------|------|---------|-------------|
 | `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
-| `offset` | point | 0,0 | Bitmap offset (only used with `image`) |
+| `offset` | point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
 
 **Glyph Types**:
 - **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline
 - **Bitmap glyph**: Specifies the `image` attribute for colored glyphs like emoji; position can be adjusted with `offset`
 
-**Path Coordinate System**: Glyph paths use final rendering coordinates with font size scaling already applied. The same character at different font sizes should be stored as separate Glyphs, as fonts may have different glyph designs at different sizes.
+**Coordinate System**: Glyph paths and offsets use design space coordinates. During rendering, the scale factor is calculated from GlyphRun's `fontSize` and Font's `unitsPerEm`: `scale = fontSize / unitsPerEm`.
 
 ### 3.4 Document Hierarchy
 
@@ -1242,15 +1246,16 @@ Line 3]]>
 
 GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independently referencing one font resource.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `font` | idref | Font resource reference `@id` |
-| `glyphs` | string | GlyphID sequence, comma-separated (0 means missing glyph) |
-| `y` | float | Shared y coordinate (Horizontal mode only), default 0 |
-| `xPositions` | string | x coordinate sequence, comma-separated (Horizontal mode) |
-| `positions` | string | (x,y) coordinate sequence, semicolon-separated (Point mode) |
-| `xforms` | string | RSXform sequence (scos,ssin,tx,ty), semicolon-separated (RSXform mode) |
-| `matrices` | string | Matrix sequence (a,b,c,d,tx,ty), semicolon-separated (Matrix mode) |
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `font` | idref | (required) | Font resource reference `@id` |
+| `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
+| `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
+| `y` | float | 0 | Shared y coordinate (Horizontal mode only) |
+| `xPositions` | string | - | x coordinate sequence, comma-separated (Horizontal mode) |
+| `positions` | string | - | (x,y) coordinate sequence, semicolon-separated (Point mode) |
+| `xforms` | string | - | RSXform sequence (scos,ssin,tx,ty), semicolon-separated (RSXform mode) |
+| `matrices` | string | - | Matrix sequence (a,b,c,d,tx,ty), semicolon-separated (Matrix mode) |
 
 **Positioning Mode Selection** (priority from high to low):
 1. Has `matrices` → Matrix mode: Each glyph has full 2D affine transform
@@ -1281,7 +1286,7 @@ Matrix is a full 2D affine transformation matrix with six components (a, b, c, d
 ```xml
 <Resources>
   <!-- Embedded font: contains glyphs for H, e, l, o -->
-  <Font id="myFont">
+  <Font id="myFont" unitsPerEm="1000">
     <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
     <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z"/>
     <Glyph path="M 100 0 L 100 700 L 350 700"/>
@@ -1292,7 +1297,7 @@ Matrix is a full 2D affine transformation matrix with six components (a, b, c, d
 <Layer>
   <!-- Pre-layout text "Hello": Horizontal mode (single-line horizontal text) -->
   <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
+    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
   </Text>
   <Fill color="#333333"/>
 </Layer>
@@ -1300,7 +1305,7 @@ Matrix is a full 2D affine transformation matrix with six components (a, b, c, d
 <Layer>
   <!-- Pre-layout text: Point mode (multi-line text) -->
   <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
+    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
   </Text>
   <Fill color="#333333"/>
 </Layer>
@@ -1308,7 +1313,7 @@ Matrix is a full 2D affine transformation matrix with six components (a, b, c, d
 <Layer>
   <!-- Pre-layout text: RSXform mode (path text, each glyph rotated) -->
   <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" glyphs="1,2,3,3,4" 
+    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
               xforms="1,0,0,50;0.98,0.17,30,48;0.94,0.34,60,42;0.87,0.5,90,32;0.77,0.64,120,18"/>
   </Text>
   <Fill color="#333333"/>
@@ -2129,18 +2134,14 @@ This appendix describes node categorization and nesting rules.
 
 | Category | Nodes |
 |----------|-------|
-| **Document Root** | `pagx` |
-| **Resources** | `Resources`, `Image`, `PathData`, `Font`, `Glyph`, `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ColorStop`, `ImagePattern`, `Composition` |
-| **Layer** | `Layer` |
+| **Containers** | `pagx`, `Resources`, `Layer`, `Group` |
+| **Resources** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` |
+| **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` |
 | **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` |
-| **Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
-| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text` |
-| **Pre-layout Data** | `GlyphRun` (Text child element) |
+| **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` |
+| **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` |
+| **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `TextLayout`, `Repeater` |
 | **Painters** | `Fill`, `Stroke` |
-| **Shape Modifiers** | `TrimPath`, `RoundCorner`, `MergePath` |
-| **Text Modifiers** | `TextModifier`, `TextPath`, `TextLayout` |
-| **Text Selectors** | `RangeSelector` (TextModifier child element) |
-| **Other** | `Repeater`, `Group` |
 
 ### A.2 Document Containment
 
@@ -2540,6 +2541,10 @@ This appendix lists all node attribute definitions. The `id` and `data-*` attrib
 
 #### Font
 
+| Attribute | Type | Default |
+|-----------|------|---------|
+| `unitsPerEm` | int | 1000 |
+
 Child elements: `Glyph`*
 
 #### Glyph
@@ -2779,6 +2784,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `font` | idref | (required) |
+| `fontSize` | float | 12 |
 | `glyphs` | string | (required) |
 | `y` | float | 0 |
 | `xPositions` | string | - |

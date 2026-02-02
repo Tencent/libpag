@@ -2,16 +2,11 @@
 /**
  * PAGX Specification Publisher
  *
- * Converts the PAGX specification Markdown documents to standalone HTML pages
- * with syntax highlighting and optional draft banner.
+ * Converts the PAGX specification Markdown documents to standalone HTML pages.
  *
  * Source files:
  *     pagx_spec.md        - English version
  *     pagx_spec.zh_CN.md  - Chinese version
- *
- * Output structure:
- *     ../public/<version>/index.html     - English (default)
- *     ../public/<version>/zh/index.html  - Chinese
  *
  * Usage:
  *     cd pagx/spec && npm run publish
@@ -24,14 +19,21 @@ const { markedHighlight } = require('marked-highlight');
 const { gfmHeadingId } = require('marked-gfm-heading-id');
 const hljs = require('highlight.js');
 
-// Default paths
+// Paths
 const SCRIPT_DIR = __dirname;
 const SPEC_DIR = path.dirname(SCRIPT_DIR);
 const PAGX_DIR = path.dirname(SPEC_DIR);
 const SPEC_FILE_EN = path.join(SPEC_DIR, 'pagx_spec.md');
 const SPEC_FILE_ZH = path.join(SPEC_DIR, 'pagx_spec.zh_CN.md');
 const PACKAGE_FILE = path.join(SPEC_DIR, 'package.json');
+const TEMPLATE_FILE = path.join(SCRIPT_DIR, 'template.html');
 const DEFAULT_SITE_DIR = path.join(PAGX_DIR, 'public');
+
+// Base URL for the spec site
+const BASE_URL = 'https://pag.io/pagx';
+
+// Load template
+const TEMPLATE = fs.readFileSync(TEMPLATE_FILE, 'utf-8');
 
 /**
  * Read version from package.json.
@@ -61,48 +63,85 @@ function formatDate(date, lang) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
                     'July', 'August', 'September', 'October', 'November', 'December'];
     return `${day} ${months[month - 1]} ${year}`;
-  } else {
-    return `${year} 年 ${month} 月 ${day} 日`;
   }
+  return `${year} 年 ${month} 月 ${day} 日`;
 }
 
 /**
  * Convert heading text to URL-friendly slug.
+ * Removes leading section numbers (e.g., "3.3.5 Font" -> "font").
  */
 function slugify(text) {
-  let slug = text.toLowerCase();
-  slug = slug.replace(/[^\w\u4e00-\u9fff\s-]/g, '');
-  slug = slug.replace(/[\s_]+/g, '-');
-  slug = slug.replace(/-+/g, '-');
-  slug = slug.replace(/^-|-$/g, '');
-  return slug || 'section';
+  return text.toLowerCase()
+    .replace(/^[\d.]+\s+/, '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'section';
+}
+
+/**
+ * Extract all heading slugs from English Markdown content.
+ * Appendix headings are prefixed with "ref-" to avoid conflicts.
+ */
+function extractEnglishSlugs(content) {
+  const slugs = [];
+  const slugCounts = {};
+  let inAppendix = false;
+
+  for (const line of content.split('\n')) {
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (!match) continue;
+
+    const text = match[2].trim();
+    if (text.startsWith('Appendix')) inAppendix = true;
+
+    let slug = slugify(text);
+    if (inAppendix && !text.startsWith('Appendix')) {
+      slug = 'ref-' + slug;
+    }
+
+    if (slugCounts[slug] !== undefined) {
+      slugCounts[slug]++;
+      slug = `${slug}-${slugCounts[slug]}`;
+    } else {
+      slugCounts[slug] = 0;
+    }
+
+    slugs.push(slug);
+  }
+  return slugs;
 }
 
 /**
  * Extract headings from Markdown for TOC generation.
  */
-function parseMarkdownHeadings(content) {
+function parseMarkdownHeadings(content, englishSlugs = null) {
   const headings = [];
   const slugCounts = {};
-  const lines = content.split('\n');
+  let slugIndex = 0;
 
-  for (const line of lines) {
+  for (const line of content.split('\n')) {
     const match = line.match(/^(#{1,6})\s+(.+)$/);
-    if (match) {
-      const level = match[1].length;
-      const text = match[2].trim();
-      let slug = slugify(text);
+    if (!match) continue;
 
-      // Handle duplicate slugs
+    const level = match[1].length;
+    const text = match[2].trim();
+    let slug;
+
+    if (englishSlugs && slugIndex < englishSlugs.length) {
+      slug = englishSlugs[slugIndex++];
+    } else {
+      slug = slugify(text);
       if (slugCounts[slug] !== undefined) {
         slugCounts[slug]++;
         slug = `${slug}-${slugCounts[slug]}`;
       } else {
         slugCounts[slug] = 0;
       }
-
-      headings.push({ level, text, slug });
     }
+
+    headings.push({ level, text, slug });
   }
   return headings;
 }
@@ -111,43 +150,29 @@ function parseMarkdownHeadings(content) {
  * Generate HTML for table of contents.
  */
 function generateTocHtml(headings) {
-  if (!headings.length) {
-    return '';
-  }
+  if (!headings.length) return '';
 
   const html = ['<ul>'];
   const stack = [1];
 
   for (let i = 0; i < headings.length; i++) {
-    const heading = headings[i];
-    const level = heading.level;
+    const { level, text, slug } = headings[i];
+    if (level === 1) continue;
 
-    // Skip h1 in TOC since it's the document title
-    if (level === 1) {
-      continue;
-    }
-
-    // Adjust for starting from h2
     const adjustedLevel = level - 1;
 
-    // Close lists if going up
     while (stack.length > adjustedLevel) {
       html.push('</ul></li>');
       stack.pop();
     }
-
-    // Open new lists if going down
     while (stack.length < adjustedLevel) {
       html.push('<li><ul>');
       stack.push(stack.length + 1);
     }
 
-    // Add the item
-    html.push(`<li><a href="#${heading.slug}">${heading.text}</a>`);
+    html.push(`<li><a href="#${slug}">${text}</a>`);
 
-    // Check if next heading is a child
-    const nextIdx = i + 1;
-    if (nextIdx < headings.length && headings[nextIdx].level > level) {
+    if (i + 1 < headings.length && headings[i + 1].level > level) {
       html.push('<ul>');
       stack.push(stack.length + 1);
     } else {
@@ -155,7 +180,6 @@ function generateTocHtml(headings) {
     }
   }
 
-  // Close remaining lists
   while (stack.length > 1) {
     html.push('</ul></li>');
     stack.pop();
@@ -166,12 +190,12 @@ function generateTocHtml(headings) {
 }
 
 /**
- * Create configured Marked instance with syntax highlighting.
+ * Create configured Marked instance.
  */
 function createMarkedInstance() {
   const slugCounts = {};
 
-  const marked = new Marked(
+  return new Marked(
     markedHighlight({
       langPrefix: 'hljs language-',
       highlight(code, lang) {
@@ -183,7 +207,6 @@ function createMarkedInstance() {
     }),
     gfmHeadingId({
       prefix: '',
-      // Custom slug function to handle Chinese characters
       slug: (text) => {
         let slug = slugify(text);
         if (slugCounts[slug] !== undefined) {
@@ -196,616 +219,79 @@ function createMarkedInstance() {
       },
     })
   );
-
-  marked.setOptions({
-    gfm: true,
-    breaks: false,
-  });
-
-  return marked;
 }
 
 /**
- * Generate the complete HTML document.
+ * Replace heading IDs in HTML content with provided slugs.
  */
-function generateHtml(content, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
+function replaceHeadingIds(html, slugs) {
+  let i = 0;
+  return html.replace(/<h([1-6])\s+id="[^"]*"/g, (match, level) => {
+    return i < slugs.length ? `<h${level} id="${slugs[i++]}"` : match;
+  });
+}
+
+/**
+ * Generate HTML document from template.
+ */
+function generateHtml(content, title, tocHtml, lang, langSwitchUrl, viewerUrl, faviconUrl) {
   const isEnglish = lang === 'en';
-  const htmlLang = isEnglish ? 'en' : 'zh-CN';
-  const tocTitle = isEnglish ? 'Table of Contents' : '目录';
-  const viewerLabel = isEnglish ? 'Viewer' : '在线预览';
-  
-  let draftBanner = '';
-  let draftStyles = '';
 
-  if (showDraft) {
-    const draftText = isEnglish
-      ? '<strong>DRAFT</strong> This specification is a working draft and may change at any time.'
-      : '<strong>草案</strong> 本规范为草稿版本，内容可能随时变更。';
-    draftBanner = `    <div class="draft-banner">
-        ${draftText}
-    </div>
-`;
-    draftStyles = `        .sidebar {
-            top: 36px;
-            height: calc(100vh - 36px);
-        }
-        .content {
-            padding-top: 76px;
-        }
-        .header-actions {
-            top: 48px;
-        }
-        @media (max-width: 900px) {
-            .content {
-                padding-top: 56px;
-            }
-        }`;
-  }
+  const vars = {
+    htmlLang: isEnglish ? 'en' : 'zh-CN',
+    title,
+    faviconUrl,
+    viewerUrl,
+    tocTitle: isEnglish ? 'Table of Contents' : '目录',
+    tocLabel: isEnglish ? 'TOC' : '目录',
+    viewerLabel: isEnglish ? 'Viewer' : '在线预览',
+    currentLang: isEnglish ? 'English' : '简体中文',
+    enUrl: isEnglish ? '#' : langSwitchUrl,
+    zhUrl: isEnglish ? langSwitchUrl : '#',
+    enActive: isEnglish ? ' class="active"' : '',
+    zhActive: isEnglish ? '' : ' class="active"',
+    tocHtml,
+    content,
+  };
 
-  return `<!DOCTYPE html>
-<html lang="${htmlLang}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
-    <link rel="icon" href="${faviconUrl}" type="image/png">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-    <style>
-        :root {
-            --primary-color: #0066cc;
-            --bg-color: #ffffff;
-            --text-color: #333333;
-            --code-bg: #f6f8fa;
-            --border-color: #e1e4e8;
-            --toc-width: 280px;
-        }
-        * {
-            box-sizing: border-box;
-        }
-        html {
-            scroll-behavior: smooth;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: var(--text-color);
-            background-color: var(--bg-color);
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            display: flex;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        .sidebar {
-            width: var(--toc-width);
-            position: fixed;
-            top: 0;
-            left: max(0px, calc((100vw - 1400px) / 2));
-            height: 100vh;
-            overflow-y: auto;
-            padding: 20px;
-            background: #f8f9fa;
-            border-right: 1px solid var(--border-color);
-        }
-        .sidebar h2 {
-            font-size: 14px;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .sidebar li {
-            margin: 4px 0;
-        }
-        .sidebar a {
-            color: #555;
-            text-decoration: none;
-            font-size: 13px;
-            display: block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-        .sidebar a:hover {
-            background: #e9ecef;
-            color: var(--primary-color);
-        }
-        .sidebar ul ul {
-            padding-left: 15px;
-        }
-        .sidebar ul ul a {
-            font-size: 12px;
-            color: #777;
-        }
-        .content {
-            flex: 1;
-            margin-left: var(--toc-width);
-            padding: 40px 60px;
-            max-width: calc(100% - var(--toc-width));
-        }
-        h1, h2, h3, h4, h5, h6 {
-            margin-top: 24px;
-            margin-bottom: 16px;
-            font-weight: 600;
-            line-height: 1.25;
-        }
-        h1 {
-            font-size: 2em;
-            padding-bottom: 0.3em;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 16px;
-        }
-        .last-updated {
-            margin-top: 0;
-            margin-bottom: 24px;
-            color: #6a737d;
-            font-size: 14px;
-        }
-        h2 {
-            font-size: 1.5em;
-            padding-bottom: 0.3em;
-            border-bottom: 1px solid var(--border-color);
-        }
-        h3 { font-size: 1.25em; }
-        h4 { font-size: 1em; }
-        h5 { font-size: 0.875em; }
-        h6 { font-size: 0.85em; color: #6a737d; }
-        
-        a {
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        p {
-            margin-top: 0;
-            margin-bottom: 16px;
-        }
-        code {
-            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 85%;
-            background-color: var(--code-bg);
-            padding: 0.2em 0.4em;
-            border-radius: 6px;
-        }
-        pre {
-            background-color: var(--code-bg);
-            border-radius: 6px;
-            padding: 16px;
-            overflow: auto;
-            font-size: 85%;
-            line-height: 1.45;
-            border: 1px solid var(--border-color);
-        }
-        pre code {
-            background-color: transparent;
-            padding: 0;
-            border-radius: 0;
-            font-size: 100%;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 16px 0;
-            overflow: auto;
-        }
-        th, td {
-            border: 1px solid var(--border-color);
-            padding: 8px 13px;
-            text-align: left;
-        }
-        th {
-            background-color: #f6f8fa;
-            font-weight: 600;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        blockquote {
-            margin: 0;
-            padding: 0 1em;
-            color: #6a737d;
-            border-left: 0.25em solid #dfe2e5;
-        }
-        hr {
-            height: 0.25em;
-            padding: 0;
-            margin: 24px 0;
-            background-color: var(--border-color);
-            border: 0;
-        }
-        ul, ol {
-            padding-left: 2em;
-            margin-top: 0;
-            margin-bottom: 16px;
-        }
-        li {
-            margin: 4px 0;
-        }
-        li > ul, li > ol {
-            margin-top: 4px;
-            margin-bottom: 0;
-        }
-        strong {
-            font-weight: 600;
-        }
-        img {
-            max-width: 100%;
-            box-sizing: content-box;
-        }
-        .hljs {
-            background: var(--code-bg) !important;
-        }
-        @media (max-width: 900px) {
-            .sidebar {
-                display: none;
-            }
-            .content {
-                margin-left: 0;
-                max-width: 100%;
-                padding: 20px;
-            }
-        }
-        /* Back to top button */
-        .back-to-top {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 40px;
-            height: 40px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .back-to-top.visible {
-            opacity: 1;
-        }
-        .back-to-top:hover {
-            background: #0052a3;
-        }
-        /* Draft banner */
-        .draft-banner {
-            background-color: #fef9e7;
-            border-bottom: 1px solid #f5e6b3;
-            padding: 8px 20px;
-            text-align: center;
-            font-size: 13px;
-            color: #7d6608;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-        }
-        .draft-banner strong {
-            color: #5a4a06;
-        }
-        .lang-switch {
-            position: relative;
-        }
-        .lang-switch-btn {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            background: #f8f9fa;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: #555;
-            font-family: inherit;
-            font-size: 14px;
-            line-height: 1.2;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .lang-switch-btn:hover {
-            background: #e9ecef;
-        }
-        .lang-switch-btn svg {
-            width: 14px;
-            height: 14px;
-            transition: transform 0.2s;
-        }
-        .lang-switch.open .lang-switch-btn svg {
-            transform: rotate(180deg);
-        }
-        .lang-switch-menu {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            min-width: 100%;
-            margin-top: 4px;
-            background: white;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            overflow: hidden;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-8px);
-            transition: all 0.2s;
-        }
-        .lang-switch.open .lang-switch-menu {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-        .lang-switch-menu a {
-            display: block;
-            padding: 8px 16px;
-            color: #555;
-            font-size: 13px;
-            text-decoration: none;
-            white-space: nowrap;
-        }
-        .lang-switch-menu a:hover {
-            background: #f8f9fa;
-            color: var(--primary-color);
-        }
-        .lang-switch-menu a.active {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-        /* Header buttons container */
-        .header-actions {
-            position: fixed;
-            top: 12px;
-            right: 20px;
-            z-index: 1001;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        /* Viewer link */
-        .viewer-link {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            background: #f8f9fa;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: #555;
-            font-family: inherit;
-            font-size: 14px;
-            line-height: 1.2;
-            text-decoration: none;
-            transition: all 0.2s;
-        }
-        .viewer-link:hover {
-            background: #e9ecef;
-            text-decoration: none;
-        }
-        .viewer-link svg {
-            width: 14px;
-            height: 14px;
-        }
-${draftStyles}
-    </style>
-</head>
-<body>
-${draftBanner}    <div class="header-actions">
-        <a href="${viewerUrl}" class="viewer-link" target="_blank">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            ${viewerLabel}
-        </a>
-        <div class="lang-switch" onclick="this.classList.toggle('open')">
-            <button class="lang-switch-btn">
-                ${isEnglish ? 'English' : '简体中文'}
-                <svg viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-            </button>
-            <div class="lang-switch-menu">
-                <a href="${isEnglish ? '#' : langSwitchUrl}"${isEnglish ? ' class="active"' : ''}>English</a>
-                <a href="${isEnglish ? langSwitchUrl : '#'}"${isEnglish ? '' : ' class="active"'}>简体中文</a>
-            </div>
-        </div>
-    </div>
-    <div class="container">
-        <nav class="sidebar">
-            <h2>${tocTitle}</h2>
-            <div class="toc">
-${tocHtml}
-            </div>
-        </nav>
-        <main class="content">
-            ${content}
-        </main>
-    </div>
-    <button class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">↑</button>
-    
-    <script>
-        // Back to top button visibility
-        window.addEventListener('scroll', function() {
-            const btn = document.querySelector('.back-to-top');
-            if (window.scrollY > 300) {
-                btn.classList.add('visible');
-            } else {
-                btn.classList.remove('visible');
-            }
-        });
-        // Close language menu when clicking outside
-        document.addEventListener('click', function(e) {
-            const langSwitch = document.querySelector('.lang-switch');
-            if (!langSwitch.contains(e.target)) {
-                langSwitch.classList.remove('open');
-            }
-        });
-    </script>
-</body>
-</html>`;
+  return TEMPLATE.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || '');
 }
 
 /**
  * Publish a single spec file.
  */
-function publishSpec(specFile, outputDir, lang, version, showDraft, langSwitchUrl, viewerUrl, faviconUrl) {
+function publishSpec(specFile, outputDir, lang, langSwitchUrl, viewerUrl, faviconUrl, englishSlugs = null) {
   if (!fs.existsSync(specFile)) {
     console.log(`  Skipped (file not found): ${specFile}`);
     return;
   }
 
   console.log(`  Reading: ${specFile}`);
-  let mdContent = fs.readFileSync(specFile, 'utf-8');
+  const mdContent = fs.readFileSync(specFile, 'utf-8');
 
-  // Get file last modified time
-  const stats = fs.statSync(specFile);
-  const lastModified = stats.mtime;
-
-  // Format date based on language
-  const dateStr = formatDate(lastModified, lang);
-
-  // Generate version info HTML
-  const isEnglish = lang === 'en';
-  const lastUpdatedLabel = isEnglish ? `Last updated: ${dateStr}` : `最后更新：${dateStr}`;
-
-  // Inject version into title and add last updated below
-  mdContent = mdContent.replace(/^(#\s+.+)$/m, `$1 ${version}\n\n<p class="last-updated">${lastUpdatedLabel}</p>`);
-
-  // Extract title
   const titleMatch = mdContent.match(/^#\s+(.+)$/m);
   const title = titleMatch ? titleMatch[1] : 'PAGX Format Specification';
 
-  // Parse headings for TOC
-  const headings = parseMarkdownHeadings(mdContent);
-
-  // Generate TOC HTML
+  const headings = parseMarkdownHeadings(mdContent, englishSlugs);
   const tocHtml = generateTocHtml(headings);
 
-  // Convert Markdown to HTML using marked
   const marked = createMarkedInstance();
-  const htmlContent = marked.parse(mdContent);
+  let htmlContent = marked.parse(mdContent);
 
-  // Generate complete HTML document
-  const html = generateHtml(htmlContent, title, tocHtml, lang, showDraft, langSwitchUrl, viewerUrl, faviconUrl);
+  if (englishSlugs) {
+    htmlContent = replaceHeadingIds(htmlContent, englishSlugs);
+  }
 
-  // Create output directory
+  const html = generateHtml(htmlContent, title, tocHtml, lang, langSwitchUrl, viewerUrl, faviconUrl);
+
   fs.mkdirSync(outputDir, { recursive: true });
-
-  // Write output file
   const outputFile = path.join(outputDir, 'index.html');
   fs.writeFileSync(outputFile, html, 'utf-8');
-
   console.log(`  Published: ${outputFile}`);
 }
 
 /**
- * Parse command line arguments.
- */
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const options = {
-    siteDir: DEFAULT_SITE_DIR,
-  };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if ((arg === '-o' || arg === '--output') && args[i + 1]) {
-      options.siteDir = path.resolve(args[i + 1]);
-      i++;
-    } else if (arg === '--help' || arg === '-h') {
-      console.log(`
-PAGX Specification Publisher
-
-Usage:
-    npm run publish [-- -o <output-dir>]
-
-Options:
-    -o, --output <dir>  Output directory (default: ../public)
-    -h, --help          Show this help message
-
-Configuration (package.json):
-    version        - Current version to publish
-    stableVersion  - Latest stable version (empty if none)
-                     If version != stableVersion, draft banner is shown
-
-Source files:
-    spec/pagx_spec.md        - English version
-    spec/pagx_spec.zh_CN.md  - Chinese version
-
-Output structure:
-    <output>/index.html               - Redirect page
-    <output>/<version>/index.html     - English (default)
-    <output>/<version>/zh/index.html  - Chinese
-`);
-      process.exit(0);
-    }
-  }
-
-  return options;
-}
-
-/**
- * Main function.
- */
-function main() {
-  const options = parseArgs();
-  const siteDir = options.siteDir;
-
-  // Read versions from package.json
-  const version = getVersion();
-  const stableVersion = getStableVersion();
-  const isDraft = version !== stableVersion;
-
-  console.log(`Version: ${version}`);
-  console.log(`Stable: ${stableVersion || '(none)'}`);
-  console.log(`Output: ${siteDir}`);
-  if (isDraft) {
-    console.log('Mode: Draft');
-  }
-
-  const baseOutputDir = path.join(siteDir, version);
-
-  // Viewer URL (relative path from spec pages to viewer)
-  const viewerUrlFromRoot = '../viewer/';
-  const viewerUrlFromZh = '../../viewer/';
-
-  // Favicon URL (relative path from spec pages to favicon)
-  const faviconUrlFromRoot = '../favicon.png';
-  const faviconUrlFromZh = '../../favicon.png';
-
-  // Publish English version (default, at root)
-  console.log('\nPublishing English version...');
-  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', version, isDraft, 'zh/', viewerUrlFromRoot, faviconUrlFromRoot);
-
-  // Publish Chinese version (under /zh/)
-  console.log('\nPublishing Chinese version...');
-  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', version, isDraft, '../', viewerUrlFromZh, faviconUrlFromZh);
-
-  // Generate redirect index page (point to stableVersion if exists, otherwise current version)
-  const redirectVersion = stableVersion || version;
-  console.log('\nGenerating redirect page...');
-  console.log(`  Redirect to: ${redirectVersion}`);
-  generateRedirectPage(siteDir, redirectVersion);
-
-  // Copy favicon
-  console.log('\nCopying favicon...');
-  const faviconSrc = path.join(SPEC_DIR, 'favicon.png');
-  const faviconDest = path.join(siteDir, 'favicon.png');
-  fs.copyFileSync(faviconSrc, faviconDest);
-  console.log(`  Copied: ${faviconDest}`);
-
-  console.log('\nDone!');
-}
-
-/**
- * Generate the redirect index page at site/index.html.
+ * Generate redirect page in latest folder.
  */
 function generateRedirectPage(siteDir, version) {
   const html = `<!DOCTYPE html>
@@ -816,19 +302,8 @@ function generateRedirectPage(siteDir, version) {
     <title>PAGX Specification</title>
     <script>
         (function() {
-            var version = '${version}';
-            
-            // Check browser language
             var lang = navigator.language || navigator.userLanguage || '';
-            var isChinese = lang.toLowerCase().startsWith('zh');
-            
-            // Build redirect URL
-            var path = version + '/';
-            if (isChinese) {
-                path += 'zh/';
-            }
-            
-            // Redirect
+            var path = '../${version}/' + (lang.toLowerCase().startsWith('zh') ? 'zh/' : '');
             window.location.replace(path);
         })();
     </script>
@@ -836,13 +311,281 @@ function generateRedirectPage(siteDir, version) {
 <body>
     <p>Redirecting to the latest specification...</p>
 </body>
-</html>
-`;
+</html>`;
 
-  fs.mkdirSync(siteDir, { recursive: true });
-  const outputFile = path.join(siteDir, 'index.html');
+  const latestDir = path.join(siteDir, 'latest');
+  fs.mkdirSync(latestDir, { recursive: true });
+  const outputFile = path.join(latestDir, 'index.html');
   fs.writeFileSync(outputFile, html, 'utf-8');
   console.log(`  Generated: ${outputFile}`);
+}
+
+/**
+ * Find all published versions in the site directory.
+ */
+function findPublishedVersions(siteDir) {
+  if (!fs.existsSync(siteDir)) return [];
+
+  const entries = fs.readdirSync(siteDir, { withFileTypes: true });
+  const versions = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    // Skip non-version directories
+    if (['latest', 'fonts', 'wasm-mt', 'node_modules', 'viewer'].includes(entry.name)) continue;
+    // Version directories must match semver pattern (e.g., 1.0, 0.5, 2.1.3)
+    if (!/^\d+\.\d+(\.\d+)?$/.test(entry.name)) continue;
+    // Check if it looks like a version (contains index.html)
+    const indexPath = path.join(siteDir, entry.name, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      versions.push(entry.name);
+    }
+  }
+
+  return versions;
+}
+
+/**
+ * Generate version info block HTML (left border style).
+ * - Stable (latest): green border
+ * - Draft: yellow border with draft warning
+ * - Outdated: red border with outdated warning
+ */
+function generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated) {
+  const langSuffix = isZh ? 'zh/' : '';
+  const thisUrl = `${BASE_URL}/${thisVersion}/${langSuffix}`;
+  const latestUrl = `${BASE_URL}/latest/`;
+
+  // Check version status
+  const isOutdated = stableVersion && thisVersion !== stableVersion &&
+    thisVersion.localeCompare(stableVersion, undefined, { numeric: true }) < 0;
+  const isDraft = !isOutdated && thisVersion !== stableVersion;
+
+  // Determine status class and text
+  let statusClass, statusText;
+  if (isOutdated) {
+    statusClass = 'outdated';
+    statusText = isZh
+      ? `版本 ${thisVersion} (过时) — 当前版本不是最新版本，请查阅最新版本获取最新内容。`
+      : `Version ${thisVersion} (Outdated) — This is not the latest version. Please refer to the latest version for up-to-date content.`;
+  } else if (isDraft) {
+    statusClass = 'draft';
+    statusText = isZh
+      ? `版本 ${thisVersion} (草稿) — 本规范为草稿版本，内容可能随时变更。`
+      : `Version ${thisVersion} (Draft) — This specification is a working draft and may change at any time.`;
+  } else {
+    statusClass = 'stable';
+    statusText = isZh ? `版本 ${thisVersion} (正式)` : `Version ${thisVersion} (Stable)`;
+  }
+
+  // Generate labels
+  const labels = isZh
+    ? { updated: '最后更新：', this: '当前版本：', latest: '最新版本：', draft: '草稿版本：' }
+    : { updated: 'Last updated:', this: 'This version:', latest: 'Latest version:', draft: "Editor's draft:" };
+
+  // Generate links
+  let linksHtml = `<p><strong>${labels.updated}</strong> ${lastUpdated}</p>
+<p><strong>${labels.this}</strong> <a href="${thisUrl}">${thisUrl}</a></p>
+<p><strong>${labels.latest}</strong> <a href="${latestUrl}">${latestUrl}</a></p>`;
+
+  if (draftVersion !== stableVersion) {
+    const draftUrl = `${BASE_URL}/${draftVersion}/${langSuffix}`;
+    linksHtml += `\n<p><strong>${labels.draft}</strong> <a href="${draftUrl}">${draftUrl}</a></p>`;
+  }
+
+  return `<div class="version-info ${statusClass}">
+<div class="version-status">${statusText}</div>
+${linksHtml}
+</div>`;
+}
+
+/**
+ * Update version links in an HTML file.
+ * Removes old version links block and inserts new one after the h1 title.
+ * Preserves the original "last updated" time from the existing HTML.
+ */
+function updateVersionLinks(htmlFile, thisVersion, draftVersion, stableVersion, isZh) {
+  if (!fs.existsSync(htmlFile)) return false;
+
+  let html = fs.readFileSync(htmlFile, 'utf-8');
+
+  // Extract existing "last updated" date from HTML, preserve it
+  // Matches: "30 January 2026" or "2026 年 1 月 30 日"
+  const lastUpdatedRegex = /(\d{1,2}\s+\w+\s+\d{4}|\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日)/;
+  const lastUpdatedMatch = html.match(lastUpdatedRegex);
+  const lastUpdated = lastUpdatedMatch ? lastUpdatedMatch[1] : formatDate(new Date(), isZh ? 'zh' : 'en');
+
+  // Generate version info block
+  const versionInfoHtml = generateVersionInfoHtml(thisVersion, draftVersion, stableVersion, isZh, lastUpdated);
+
+
+  // Update CSS: replace old version-info styles with new ones (with background colors)
+  const versionInfoCss = `/* Version info block */
+        .version-info {
+            border-left: 4px solid;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+        }
+        .version-info.stable {
+            border-color: #1e7e34;
+            background-color: #f0f9f1;
+        }
+        .version-info.draft {
+            border-color: #d4a000;
+            background-color: #fffbf0;
+        }
+        .version-info.outdated {
+            border-color: #c42c2c;
+            background-color: #fef6f6;
+        }
+        .version-info .version-status {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .version-info.stable .version-status { color: #1e5631; }
+        .version-info.draft .version-status { color: #6a4c00; }
+        .version-info.outdated .version-status { color: #82071e; }
+        .version-info p { margin-bottom: 4px; font-size: 14px; color: #555; }`;
+
+  // Replace existing version-info CSS block or insert new one
+  if (html.includes('/* Version info block */')) {
+    html = html.replace(
+      /\/\* Version info block \*\/[\s\S]*?\.version-info p \{[^}]+\}/,
+      versionInfoCss
+    );
+  } else {
+    // Insert after img styles
+    html = html.replace(
+      /(img \{[^}]+\})/,
+      `$1\n\n        ${versionInfoCss}`
+    );
+  }
+
+  // Restore h1 border-bottom if it was removed
+  html = html.replace(
+    /h1 \{ font-size: 2em; margin-bottom: 16px; \}/,
+    'h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; }'
+  );
+
+
+  // Pattern to match everything from h1 closing tag to first h2 opening tag
+  const versionBlockRegex = /(<h1[^>]*>)[^<]*(<\/h1>)[\s\S]*?(<h2)/;
+
+  const match = html.match(versionBlockRegex);
+  if (match) {
+    const h1Open = match[1];
+    const h1Close = match[2];
+    const h2Open = match[3];
+
+    // Get the title text between h1 tags
+    const titleMatch = html.match(/<h1[^>]*>([^<]*)<\/h1>/);
+    let title = titleMatch ? titleMatch[1] : '';
+
+    // Remove version number from title if present
+    title = title.replace(/\s+\d+\.\d+(\.\d+)?$/, '');
+
+    // Also update the h1 id
+    const cleanH1Open = h1Open.replace(/id="[^"]*"/, 'id="pagx-format-specification"');
+
+    // Structure: title -> version info block -> content
+    const newContent = `${cleanH1Open}${title}${h1Close}\n${versionInfoHtml}\n${h2Open}`;
+    html = html.replace(versionBlockRegex, newContent);
+    fs.writeFileSync(htmlFile, html, 'utf-8');
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Update version links in all published versions.
+ */
+function updateAllVersionLinks(siteDir, draftVersion, stableVersion) {
+  const versions = findPublishedVersions(siteDir);
+  if (versions.length === 0) return;
+
+  console.log('\nUpdating version links in all versions...');
+
+  for (const ver of versions) {
+    const enFile = path.join(siteDir, ver, 'index.html');
+    const zhFile = path.join(siteDir, ver, 'zh', 'index.html');
+
+    if (updateVersionLinks(enFile, ver, draftVersion, stableVersion, false)) {
+      console.log(`  Updated: ${enFile}`);
+    }
+    if (updateVersionLinks(zhFile, ver, draftVersion, stableVersion, true)) {
+      console.log(`  Updated: ${zhFile}`);
+    }
+  }
+}
+
+/**
+ * Parse command line arguments.
+ */
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const options = { siteDir: DEFAULT_SITE_DIR };
+
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '-o' || args[i] === '--output') && args[i + 1]) {
+      options.siteDir = path.resolve(args[++i]);
+    } else if (args[i] === '-h' || args[i] === '--help') {
+      console.log(`
+PAGX Specification Publisher
+
+Usage: npm run publish [-- -o <output-dir>]
+
+Options:
+    -o, --output <dir>  Output directory (default: ../public)
+    -h, --help          Show this help message
+`);
+      process.exit(0);
+    }
+  }
+  return options;
+}
+
+/**
+ * Main function.
+ */
+function main() {
+  const { siteDir } = parseArgs();
+  const version = getVersion();
+  const stableVersion = getStableVersion();
+
+  console.log(`Version: ${version}`);
+  console.log(`Stable: ${stableVersion || '(none)'}`);
+  console.log(`Output: ${siteDir}`);
+
+  const baseOutputDir = path.join(siteDir, version);
+  const viewerUrlFromRoot = '../';
+  const viewerUrlFromZh = '../../';
+  const faviconUrlFromRoot = '../favicon.png';
+  const faviconUrlFromZh = '../../favicon.png';
+
+  let englishSlugs = null;
+  if (fs.existsSync(SPEC_FILE_EN)) {
+    englishSlugs = extractEnglishSlugs(fs.readFileSync(SPEC_FILE_EN, 'utf-8'));
+    console.log(`\nExtracted ${englishSlugs.length} heading slugs from English version`);
+  }
+
+  console.log('\nPublishing English version...');
+  publishSpec(SPEC_FILE_EN, baseOutputDir, 'en', 'zh/', viewerUrlFromRoot, faviconUrlFromRoot, englishSlugs);
+
+  console.log('\nPublishing Chinese version...');
+  publishSpec(SPEC_FILE_ZH, path.join(baseOutputDir, 'zh'), 'zh', '../', viewerUrlFromZh, faviconUrlFromZh, englishSlugs);
+
+  console.log('\nGenerating redirect page...');
+  console.log(`  Redirect to: ${stableVersion || version}`);
+  generateRedirectPage(siteDir, stableVersion || version);
+
+  // Update version links in all published versions
+  updateAllVersionLinks(siteDir, version, stableVersion);
+
+  console.log('\nCopying favicon...');
+  fs.copyFileSync(path.join(SPEC_DIR, 'favicon.png'), path.join(siteDir, 'favicon.png'));
+  console.log(`  Copied: ${path.join(siteDir, 'favicon.png')}`);
+
+  console.log('\nDone!');
 }
 
 main();

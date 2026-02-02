@@ -1,14 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates that color source coordinates are relative to geometry origin -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Rectangle center="100,100" size="120,120" roundness="8"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Gradient showing coordinate system -->
+  <Layer>
+    <Rectangle center="200,200" size="300,300" roundness="24"/>
     <Fill color="@grad"/>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#EC489950"/>
   </Layer>
   <Resources>
-    <LinearGradient id="grad" startPoint="0,0" endPoint="120,0">
-      <ColorStop offset="0" color="#FF6B6B"/>
-      <ColorStop offset="1" color="#3498DB"/>
+    <LinearGradient id="grad" startPoint="0,0" endPoint="300,300">
+      <ColorStop offset="0" color="#EC4899"/>
+      <ColorStop offset="0.5" color="#8B5CF6"/>
+      <ColorStop offset="1" color="#6366F1"/>
     </LinearGradient>
   </Resources>
 </pagx>

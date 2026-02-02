@@ -1,16 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Demonstrates TextLayout: point text and paragraph text -->
-<pagx version="1.0" width="200" height="200">
-  <!-- Point text: center aligned -->
+<!-- Demonstrates TextLayout for text positioning and alignment -->
+<pagx version="1.0" width="400" height="400">
+  <!-- Dark background -->
   <Layer>
-    <Text text="PAGX Title" fontFamily="Arial" fontStyle="Bold" fontSize="20"/>
-    <TextLayout position="100,35" textAlign="center"/>
-    <Fill color="#3498DB"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
   </Layer>
-  <!-- Paragraph text: auto-wrap -->
+  <!-- Title -->
   <Layer>
-    <Text text="This is paragraph text that automatically wraps within the specified width." fontFamily="Arial" fontSize="14"/>
-    <TextLayout position="20,70" width="160" textAlign="start" lineHeight="1.4"/>
-    <Fill color="#666666"/>
+    <Text text="Layout Demo" fontFamily="Arial" fontStyle="Bold" fontSize="48"/>
+    <TextLayout position="200,80" textAlign="center"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="320,0">
+        <ColorStop offset="0" color="#6366F1"/>
+        <ColorStop offset="1" color="#8B5CF6"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <!-- Start aligned -->
+  <Layer>
+    <Text text="PAGX" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+    <TextLayout position="40,180" textAlign="start"/>
+    <Fill color="#F43F5E"/>
+  </Layer>
+  <!-- Center aligned -->
+  <Layer>
+    <Text text="Text" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+    <TextLayout position="200,250" textAlign="center"/>
+    <Fill color="#10B981"/>
+  </Layer>
+  <!-- End aligned -->
+  <Layer>
+    <Text text="DEMO" fontFamily="Arial" fontStyle="Bold" fontSize="40"/>
+    <TextLayout position="360,320" textAlign="end"/>
+    <Fill color="#06B6D4"/>
   </Layer>
 </pagx>

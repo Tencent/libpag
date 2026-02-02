@@ -1,16 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates resource definitions and references -->
-<pagx version="1.0" width="200" height="200">
+<pagx version="1.0" width="400" height="400">
+  <!-- Background -->
   <Layer>
-    <Rectangle center="100,100" size="160,160" roundness="12"/>
-    <Fill color="@skyGradient"/>
+    <Rectangle center="200,200" size="400,400"/>
+    <Fill color="#0F172A"/>
+  </Layer>
+  <!-- Main shape using gradient resource reference -->
+  <Layer>
+    <Rectangle center="200,200" size="320,320" roundness="32"/>
+    <Fill color="@oceanGradient"/>
+    <DropShadowStyle offsetX="0" offsetY="12" blurX="40" blurY="40" color="#06B6D450"/>
+  </Layer>
+  <!-- Shape using solid color resource reference -->
+  <Layer>
+    <Ellipse center="200,200" size="120,120"/>
+    <Fill color="@coral"/>
   </Layer>
   <Resources>
-    <PathData id="curvePath" data="M 0 0 C 50 0 50 100 100 100"/>
-    <SolidColor id="brandRed" color="#FF6B6B"/>
-    <LinearGradient id="skyGradient" startPoint="0,0" endPoint="0,160">
-      <ColorStop offset="0" color="#74b9ff"/>
-      <ColorStop offset="1" color="#0984e3"/>
+    <SolidColor id="coral" color="#F43F5E"/>
+    <LinearGradient id="oceanGradient" startPoint="0,0" endPoint="320,320">
+      <ColorStop offset="0" color="#06B6D4"/>
+      <ColorStop offset="1" color="#3B82F6"/>
     </LinearGradient>
   </Resources>
 </pagx>
