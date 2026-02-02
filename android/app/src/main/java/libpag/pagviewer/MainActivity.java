@@ -1,6 +1,7 @@
 package libpag.pagviewer;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -39,6 +40,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     RelativeLayout containerView;
     Button btPlayFirst;
     Button btPlaySecond;
+    Button btCompose;
 
     PAGView pagView;
     RelativeLayout pagImageViewGroup;
@@ -69,6 +71,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             return;
         }
         btPlaySecond.setOnClickListener(this);
+
+        btCompose = findViewById(R.id.btn_compose);
+        btCompose.setOnClickListener(this);
 
         addPAGViewAndPlay();
         activatedView(btPlayFirst.getId());
@@ -182,7 +187,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 addPAGImageViewsAndPlay();
             }
             activatedView(R.id.play_second);
-        } else {
+        } else if(v.getId() == R.id.play_first) {
             if (pagImageViewGroup != null) {
                 containerView.removeView(pagImageViewGroup);
                 pagImageViewGroup.removeAllViews();
@@ -192,6 +197,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 addPAGViewAndPlay();
             }
             activatedView(R.id.play_first);
+        } else if (v.getId() == R.id.btn_compose) {
+            Intent intent = new Intent(this, ComposeActivity.class);
+            this.startActivity(intent);
         }
     }
 
