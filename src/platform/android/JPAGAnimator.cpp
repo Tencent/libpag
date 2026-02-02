@@ -123,14 +123,21 @@ class JPAGAnimator {
     return animator;
   }
 
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    animator->cancel();
-    animator = nullptr;
-    listener = nullptr;
-  }
+    void clear() {
+        std::shared_ptr<pag::PAGAnimator> tempAnimator;
+        std::shared_ptr<pag::AnimatorListener> tempListener;
+        {
+            std::lock_guard<std::mutex> autoLock(locker);
+            tempAnimator = std::move(animator);
+            tempListener = std::move(listener);
+        }
+        // Call cancel outside the lock to avoid deadlock
+        if (tempAnimator) {
+            tempAnimator->cancel();
+        }
+    }
 
- private:
+private:
   std::mutex locker;
   std::shared_ptr<pag::AnimatorListener> listener;
   std::shared_ptr<pag::PAGAnimator> animator;
