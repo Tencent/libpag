@@ -2,21 +2,20 @@
   "compilerOptions": {
     "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
     "target": "ES2020",
-    "module": "ES2020",
-    "allowJs": true,
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "moduleResolution": "Node",
+    "declaration": true,
+    "declarationDir": "./types",
+    "emitDeclarationOnly": true,
+    "removeComments": false,
+    "skipLibCheck": true,
     "experimentalDecorators": true,
-    "strict": true,
-    "outDir": "./wasm-mt",
+    "moduleResolution": "Node",
     "baseUrl": ".",
     "resolveJsonModule": true,
     "paths": {
       "@tgfx/*": [
         "../../third_party/tgfx/web/src/*"
-      ],
+      ]
     }
   },
-  "include": ["*.ts", "ts/**/*.ts"]
+  "include": ["ts/pagx.ts"]
 }

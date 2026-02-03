@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "clean": "rimraf --glob .pagx-viewer.wasm.md5",
-    "build:wechat:js": "rollup -c ./script/rollup.wx.js &&  node script/copy-files.js",
+    "build:wechat:js": "rollup -c ./script/rollup.wx.js &&  node script/copy-files.js  &&  tsc -p ./tsconfig.type.json ",
     "build:wechat": "npm run clean && node script/cmake.wx.js -a wasm && brotli -f ./ts/wasm/pagx-viewer.wasm && npm run build:wechat:js",
     "server": "node server.js"
   },

@@ -53,7 +53,6 @@ Page({
   View: null,
   module: null,
   canvas: null,
-  animationFrameId: 0,
   gestureManager: null,
   perfMonitor: null,
   dpr: 2,
@@ -66,10 +65,6 @@ Page({
       
       // Create gesture manager
       this.gestureManager = new WXGestureManager();
-      
-      // Bind zoom event listeners
-      this.gestureManager.on('zoomStart', this.onZoomStart.bind(this));
-      this.gestureManager.on('zoomEnd', this.onZoomEnd.bind(this));
       
       // Create performance monitor
       this.perfMonitor = new PerformanceMonitor();
@@ -104,7 +99,20 @@ Page({
       // Apply initial state to ensure C++ side is synchronized
       this.applyGestureState(initState);
       
-      this.startRendering();
+      // Setup performance monitoring callbacks
+      this.View.setRenderCallbacks(null, () => {
+        if (this.perfMonitor && this.perfMonitor.enabled) {
+          this.perfMonitor.recordFrame();
+          
+          // Mark first frame after gesture start
+          if (this.gestureJustStarted) {
+            this.perfMonitor.onGestureFirstFrame();
+            this.gestureJustStarted = false;
+          }
+        }
+      });
+      
+      this.View.startRendering();
       this.setData({ loading: false });
     } catch (error) {
       console.error('Initialization failed:', error);
@@ -117,8 +125,6 @@ Page({
   },
 
   onUnload() {
-    this.stopRendering();
-    
     if (this.gestureManager) {
       this.gestureManager.destroy();
       this.gestureManager = null;
@@ -163,14 +169,14 @@ Page({
                   
                   // Set canvas physical pixel size based on display size and device pixel ratio
                   // This ensures sharp rendering on high-DPI displays
-                  const dpr = wx.getSystemInfoSync().pixelRatio || 2;
-                  this.canvas.width = Math.floor(rect.width * dpr);
-                  this.canvas.height = Math.floor(rect.height * dpr);
+                  this.canvas.width = Math.floor(rect.width * this.dpr);
+                  this.canvas.height = Math.floor(rect.height * this.dpr);
                   
                   // Create View
                   this.View = await this.module.View.init(this.module, this.canvas, {
                     useScale: false,
-                    firstFrame: false
+                    firstFrame: false,
+                    autoRender: false
                   });
                   
                   if (!this.View) {
@@ -291,49 +297,10 @@ Page({
     }
     
     // Always update C++ side immediately for smooth rendering
-    try {
+    try {// 0,0 1,1
       this.View.updateZoomScaleAndOffset(state.zoom, state.offsetX, state.offsetY);
     } catch (error) {
-      return;
-    }
-  },
-
-  startRendering() {
-    const render = () => {
-      if (!this.View) return;
-
-      this.View.draw();
-      
-      // Record frame for performance monitoring
-      if (this.perfMonitor && this.perfMonitor.enabled) {
-        this.perfMonitor.recordFrame();
-        
-        // Mark first frame after gesture start
-        if (this.gestureJustStarted) {
-          this.perfMonitor.onGestureFirstFrame();
-          this.gestureJustStarted = false;
-        }
-      }
-      
-      // Use Canvas.requestAnimationFrame in WeChat Miniprogram
-      if (this.canvas && this.canvas.requestAnimationFrame) {
-        this.animationFrameId = this.canvas.requestAnimationFrame(render);
-      } else {
-        // Fallback to setTimeout if canvas not ready
-        this.animationFrameId = setTimeout(render, 16);
-      }
-    };
-    render();
-  },
-
-  stopRendering() {
-    if (this.animationFrameId) {
-      if (this.canvas && this.canvas.cancelAnimationFrame) {
-        this.canvas.cancelAnimationFrame(this.animationFrameId);
-      } else {
-        clearTimeout(this.animationFrameId);
-      }
-      this.animationFrameId = 0;
+      // Silently ignore errors
     }
   },
 
@@ -371,22 +338,6 @@ Page({
       this.gestureJustStarted = false;
     }
   },
-
-  // Zoom event handlers
-  onZoomStart(state) {
-    this.applyGestureState(state);
-  },
-
-  onZoomEnd(state) {
-    if (!this.View) return;
-    
-    try {
-      // Notify C++ that zoom gesture ended
-      this.View.onZoomEnd();
-    } catch (error) {
-      // Silently ignore errors
-    }
-    },
 
   // Reset Button
   onReset() {

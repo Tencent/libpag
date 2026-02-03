@@ -10,3 +10,4 @@ script/.build.lock
 .*.md5
 package-lock.json
 ts/wasm
+types/
