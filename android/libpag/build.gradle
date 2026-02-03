@@ -36,6 +36,8 @@ android {
                 abiFilters.add("x86_64")
             }
         }
+
+        consumerProguardFiles("proguard-rules.pro")
     }
     sourceSets {
         main {
@@ -44,12 +46,10 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled false
         }
         debug {
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled false
         }
     }
     externalNativeBuild {
