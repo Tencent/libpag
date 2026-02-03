@@ -57,6 +57,7 @@ class PAGXView {
 
   /**
    * Notifies that zoom gesture has ended. This will restore tile refinement.
+   * Note: This is called automatically by internal detection, no need to call manually.
    */
   void onZoomEnd();
 
@@ -98,16 +99,6 @@ class PAGXView {
    */
   void setRecoveryWindow(double windowMs);
 
-  /**
-   * Check if last frame was slow.
-   */
-  bool isLastFrameSlow() const;
-
-  /**
-   * Get average frame time in the recovery window.
-   */
-  double getAverageFrameTime() const;
-
  private:
   void applyCenteringTransform();
 
@@ -148,11 +139,21 @@ class PAGXView {
   bool enablePerformanceAdaptation = true;
   double slowFrameThresholdMs = 50.0;
   double recoveryWindowMs = 3000.0;
+  double zoomInEndTimeoutMs = 300.0;    // Timeout for zoom in (faster refinement)
+  double zoomOutEndTimeoutMs = 800.0;   // Timeout for zoom out (slower refinement)
+  double upgradeRetryDelayMs = 300.0;   // Delay before retrying upgrade when performance is still slow
+  size_t minRecoveryFramesStatic = 20;  // Minimum frames to confirm recovery in static state
+  size_t minRecoveryFramesZoomEnd = 10; // Minimum frames to confirm recovery after zoom ends
 
   // State tracking
   float lastZoom = 1.0f;
+  float zoomStartValue = 1.0f;          // Zoom value at gesture start
+  float accumulatedZoomChange = 0.0f;   // Accumulated zoom change during gesture
   bool isZooming = false;
-  int currentMaxTilesRefinedPerFrame = 3;
+  bool isZoomingIn = false;
+  int currentMaxTilesRefinedPerFrame = 1;
+  double tryUpgradeTimestampMs = 0.0;
+  double lastZoomUpdateTimestampMs = 0.0;
 };
 
 }  // namespace pagx

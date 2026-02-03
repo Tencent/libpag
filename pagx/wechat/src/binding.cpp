@@ -39,7 +39,5 @@ EMSCRIPTEN_BINDINGS(PAGXView) {
       .function("contentHeight", &PAGXView::contentHeight)
       .function("setPerformanceAdaptationEnabled", &PAGXView::setPerformanceAdaptationEnabled)
       .function("setSlowFrameThreshold", &PAGXView::setSlowFrameThreshold)
-      .function("setRecoveryWindow", &PAGXView::setRecoveryWindow)
-      .function("isLastFrameSlow", &PAGXView::isLastFrameSlow)
-      .function("getAverageFrameTime", &PAGXView::getAverageFrameTime);
+      .function("setRecoveryWindow", &PAGXView::setRecoveryWindow);
 }

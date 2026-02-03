@@ -69,8 +69,6 @@ PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
   displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
 
-static std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
-
 void PAGXView::loadPAGX(const val& pagxData) {
   auto data = GetDataFromEmscripten(pagxData);
   if (!data) {
@@ -128,9 +126,24 @@ void PAGXView::applyCenteringTransform() {
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
 
-  if (zoomChanged && !isZooming) {
-    isZooming = true;
-    updateAdaptiveTileRefinement();
+  if (zoomChanged) {
+    if (!isZooming) {
+      isZooming = true;
+      zoomStartValue = lastZoom;
+      accumulatedZoomChange = 0.0f;
+      updateAdaptiveTileRefinement();
+    }
+    
+    // Accumulate zoom change to determine overall direction
+    float currentChange = zoom - lastZoom;
+    accumulatedZoomChange += currentChange;
+    
+    // Determine direction based on accumulated change (ignoring noise < 0.01)
+    if (std::abs(accumulatedZoomChange) > 0.01f) {
+      isZoomingIn = (accumulatedZoomChange > 0.0f);
+    }
+    
+    lastZoomUpdateTimestampMs = emscripten_get_now();
   }
 
   displayList.setZoomScale(zoom);
@@ -144,7 +157,15 @@ void PAGXView::onZoomEnd() {
   }
 
   isZooming = false;
-  updateAdaptiveTileRefinement();
+
+  if (!enablePerformanceAdaptation) {
+    return;
+  }
+
+  currentMaxTilesRefinedPerFrame = 1;
+  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+
+  tryUpgradeTimestampMs = emscripten_get_now() + 200.0;
 }
 
 bool PAGXView::draw() {
@@ -168,7 +189,6 @@ bool PAGXView::draw() {
       return false;
     }
   }
-
   double frameStartMs = emscripten_get_now();
 
   auto canvas = surface->getCanvas();
@@ -189,8 +209,30 @@ bool PAGXView::draw() {
 
   updatePerformanceState(frameDurationMs);
 
-  if (!isZooming) {
-    updateAdaptiveTileRefinement();
+  if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
+    double currentTimeoutMs = isZoomingIn ? zoomInEndTimeoutMs : zoomOutEndTimeoutMs;
+    double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
+    
+    if (timeSinceLastUpdate >= currentTimeoutMs) {
+      onZoomEnd();
+    }
+  }
+
+  if (!isZooming && enablePerformanceAdaptation) {
+    if (tryUpgradeTimestampMs > 0.0) {
+      if (frameStartMs >= tryUpgradeTimestampMs) {
+        if (!lastFrameSlow) {
+          int targetCount = calculateTargetTileRefinement(lastZoom);
+          currentMaxTilesRefinedPerFrame = targetCount;
+          displayList.setMaxTilesRefinedPerFrame(targetCount);
+          tryUpgradeTimestampMs = 0.0;
+        } else {
+          tryUpgradeTimestampMs = frameStartMs + upgradeRetryDelayMs;
+        }
+      }
+    } else {
+      updateAdaptiveTileRefinement();
+    }
   }
 
   return true;
@@ -230,13 +272,15 @@ void PAGXView::updatePerformanceState(double frameDurationMs) {
 
   if (lastFrameSlow && !frameHistory.empty()) {
     double avgTime = frameHistoryTotalTime / static_cast<double>(frameHistory.size());
-    if (avgTime <= slowFrameThresholdMs) {
+    size_t minFrames = isZooming ? minRecoveryFramesZoomEnd : minRecoveryFramesStatic;
+    if (avgTime <= slowFrameThresholdMs && frameHistory.size() >= minFrames) {
       lastFrameSlow = false;
     }
   }
 }
 
 int PAGXView::calculateTargetTileRefinement(float zoom) const {
+  // Performance-first strategy: disable tile refinement during zooming to reduce stutter
   if (isZooming) {
     return 0;
   }
@@ -248,9 +292,9 @@ int PAGXView::calculateTargetTileRefinement(float zoom) const {
   if (zoom < 1.0f) {
     int count = static_cast<int>(zoom / 0.33f) + 1;
     return std::clamp(count, 1, 3);
-  } else {
-    return 3;
   }
+
+  return 3;
 }
 
 void PAGXView::updateAdaptiveTileRefinement() {
@@ -269,8 +313,9 @@ void PAGXView::updateAdaptiveTileRefinement() {
 void PAGXView::setPerformanceAdaptationEnabled(bool enabled) {
   enablePerformanceAdaptation = enabled;
   if (!enabled) {
-    displayList.setMaxTilesRefinedPerFrame(3);
     currentMaxTilesRefinedPerFrame = 3;
+    displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+    tryUpgradeTimestampMs = 0.0;
   }
 }
 
@@ -280,17 +325,6 @@ void PAGXView::setSlowFrameThreshold(double thresholdMs) {
 
 void PAGXView::setRecoveryWindow(double windowMs) {
   recoveryWindowMs = windowMs;
-}
-
-bool PAGXView::isLastFrameSlow() const {
-  return lastFrameSlow;
-}
-
-double PAGXView::getAverageFrameTime() const {
-  if (frameHistory.empty()) {
-    return 0.0;
-  }
-  return frameHistoryTotalTime / static_cast<double>(frameHistory.size());
 }
 
 }  // namespace pagx

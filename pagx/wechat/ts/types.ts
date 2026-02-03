@@ -13,8 +13,6 @@ export interface PAGXViewNative {
     setPerformanceAdaptationEnabled: (enabled: boolean) => void;
     setSlowFrameThreshold: (thresholdMs: number) => void;
     setRecoveryWindow: (windowMs: number) => void;
-    isLastFrameSlow: () => boolean;
-    getAverageFrameTime: () => number;
     delete: () => void;
 }
 

@@ -25,14 +25,20 @@ declare const wx: wx;
 
 export interface PAGXViewOptions {
   /**
-   * Use style to scale canvas. default false.
-   * When target canvas is offscreen canvas, useScale is false.
+   * Auto start rendering loop. default false.
+   * When true, the view will automatically start rendering after initialization.
    */
-  useScale?: boolean;
+  autoRender?: boolean;
   /**
-   * Render first frame when view init. default true.
+   * Custom render callback. Called before each frame is drawn.
+   * Can be used for performance monitoring or custom rendering logic.
    */
-  firstFrame?: boolean;
+  onBeforeRender?: () => void;
+  /**
+   * Custom render callback. Called after each frame is drawn.
+   * Can be used for performance monitoring or custom rendering logic.
+   */
+  onAfterRender?: () => void;
 }
 
 /**
@@ -53,9 +59,6 @@ export class View {
   ): Promise<View> {
     const view = new View(module, canvas);
     view.pagViewOptions = { ...view.pagViewOptions, ...options };
-
-    // Reset canvas size if needed
-    view.resetSize(view.pagViewOptions.useScale);
 
     // Create RenderCanvas
     view.renderCanvas = RenderCanvas.from(module, canvas);
@@ -80,6 +83,10 @@ export class View {
       throw new Error('Failed to create PAGXViewWechat');
     }
 
+    if (view.pagViewOptions.autoRender) {
+      view.startRendering();
+    }
+
     return view;
   }
 
@@ -89,10 +96,11 @@ export class View {
   private backendContext: BackendContext | null = null;
   private canvas: WxCanvas | null = null;
   private pagViewOptions: PAGXViewOptions = {
-    useScale: false,
-    firstFrame: true,
+    autoRender: false,
   };
   private isDestroyed = false;
+  private isRendering = false;
+  private animationFrameId: number = 0;
 
   private constructor(module: PAGX, canvas: WxCanvas) {
     this.module = module;
@@ -150,25 +158,13 @@ export class View {
 
   /**
    * Notify that zoom gesture has ended (for adaptive tile refinement).
+   * Note: This is now handled automatically by PAGXView internal detection.
+   * No need to call manually unless you want to force trigger.
+   * @deprecated Automatic detection is enabled, manual call is optional.
    */
   public onZoomEnd(): void {
     this.checkDestroyed();
     this.nativeView!.onZoomEnd();
-  }
-
-  /**
-   * Draw current frame.
-   */
-  public draw(): void {
-    this.checkDestroyed();
-
-    if (!this.backendContext) {
-      return;
-    }
-
-    this.backendContext.makeCurrent(this.module);
-    this.nativeView!.draw();
-    this.backendContext.clearCurrent(this.module);
   }
 
   /**
@@ -188,12 +184,60 @@ export class View {
   }
 
   /**
+   * Start the rendering loop.
+   * This will continuously call draw() using requestAnimationFrame.
+   */
+  public startRendering(): void {
+    this.checkDestroyed();
+    if (this.isRendering) {
+      return;
+    }
+    this.isRendering = true;
+    this.renderLoop();
+  }
+
+  /**
+   * Stop the rendering loop.
+   */
+  public stopRendering(): void {
+    if (!this.isRendering) {
+      return;
+    }
+    this.isRendering = false;
+    if (this.animationFrameId) {
+      if (this.canvas && (this.canvas as any).cancelAnimationFrame) {
+        (this.canvas as any).cancelAnimationFrame(this.animationFrameId);
+      } else {
+        clearTimeout(this.animationFrameId);
+      }
+      this.animationFrameId = 0;
+    }
+  }
+
+  /**
+   * Check if the view is currently rendering.
+   */
+  public isCurrentlyRendering(): boolean {
+    return this.isRendering;
+  }
+
+  /**
+   * Set render callback functions for performance monitoring.
+   */
+  public setRenderCallbacks(onBeforeRender?: () => void, onAfterRender?: () => void): void {
+    this.pagViewOptions.onBeforeRender = onBeforeRender;
+    this.pagViewOptions.onAfterRender = onAfterRender;
+  }
+
+  /**
    * Destroy PAGXView and release all resources.
    */
   public destroy(): void {
     if (this.isDestroyed) {
       return;
     }
+
+    this.stopRendering();
 
     if (this.nativeView) {
       if (this.backendContext) {
@@ -216,13 +260,9 @@ export class View {
     this.isDestroyed = true;
   }
 
-  private resetSize(useScale = false): void {
+  private resetSize(): void {
     if (!this.canvas) {
       throw new Error('Canvas element is not found!');
-    }
-
-    if (!useScale) {
-      return;
     }
 
     // Calculate display size for WeChat MiniProgram
@@ -237,6 +277,38 @@ export class View {
   private checkDestroyed(): void {
     if (this.isDestroyed) {
       throw new Error('PAGXView has been destroyed');
+    }
+  }
+
+  private renderLoop(): void {
+    if (!this.isRendering || this.isDestroyed) {
+      return;
+    }
+
+    if (!this.backendContext) {
+      return;
+    }
+
+    if (this.pagViewOptions.onBeforeRender) {
+      this.pagViewOptions.onBeforeRender();
+    }
+
+    this.backendContext.makeCurrent(this.module);
+    this.nativeView!.draw();
+    this.backendContext.clearCurrent(this.module);
+
+    if (this.pagViewOptions.onAfterRender) {
+      this.pagViewOptions.onAfterRender();
+    }
+
+    if (this.canvas && (this.canvas as any).requestAnimationFrame) {
+      this.animationFrameId = (this.canvas as any).requestAnimationFrame(() => {
+        this.renderLoop();
+      });
+    } else {
+      this.animationFrameId = setTimeout(() => {
+        this.renderLoop();
+      }, 16) as any;
     }
   }
 }
