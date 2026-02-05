@@ -34,6 +34,12 @@
 
 namespace pagx {
 
+static constexpr float FloatNearlyZero = 1.0f / (1 << 12);
+
+static bool FloatNearlyEqual(float x, float y) {
+  return std::abs(x - y) <= FloatNearlyZero;
+}
+
 void Typesetter::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
     return;
@@ -120,6 +126,7 @@ class TypesetterContext {
     tgfx::Font font = {};
     std::vector<tgfx::GlyphID> glyphIDs = {};
     std::vector<float> xPositions = {};
+    bool canUseDefaultMode = true;
   };
 
   // Shaped text information for a single Text element.
@@ -290,9 +297,15 @@ class TypesetterContext {
         continue;
       }
 
-      auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
-      memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
-      memcpy(buffer.positions, run.xPositions.data(), run.xPositions.size() * sizeof(float));
+      if (run.canUseDefaultMode) {
+        // Default mode: use font's advance values to position glyphs
+        auto& buffer = builder.allocRun(run.font, run.glyphIDs.size(), 0, 0);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+      } else {
+        auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
+        memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
+        memcpy(buffer.positions, run.xPositions.data(), run.xPositions.size() * sizeof(float));
+      }
     }
 
     auto textBlob = builder.build();
@@ -450,10 +463,12 @@ class TypesetterContext {
     tgfx::Font primaryFont(primaryTypeface, text->fontSize);
     float currentX = 0;
     const std::string& content = text->text;
+    bool hasLetterSpacing = !FloatNearlyEqual(text->letterSpacing, 0.0f);
 
     // Current run being built
     ShapedGlyphRun* currentRun = nullptr;
     std::shared_ptr<tgfx::Typeface> currentTypeface = nullptr;
+    float runStartX = 0;
 
     size_t i = 0;
     while (i < content.size()) {
@@ -528,6 +543,9 @@ class TypesetterContext {
           currentRun = &info.runs.back();
           currentRun->font = glyphFont;
           currentTypeface = glyphTypeface;
+          runStartX = currentX;
+          // Can use Default mode only if run starts at 0 and no letterSpacing
+          currentRun->canUseDefaultMode = FloatNearlyEqual(runStartX, 0.0f) && !hasLetterSpacing;
         }
 
         currentRun->xPositions.push_back(currentX);
