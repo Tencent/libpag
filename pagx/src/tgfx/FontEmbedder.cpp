@@ -32,7 +32,12 @@
 
 namespace pagx {
 
-static constexpr int kVectorFontUnitsPerEm = 1000;
+static constexpr int VectorFontUnitsPerEm = 1000;
+static constexpr float FloatNearlyZero = 1.0f / (1 << 12);
+
+static bool FloatNearlyEqual(float x, float y) {
+  return std::abs(x - y) <= FloatNearlyZero;
+}
 
 static std::string PathToSVGString(const tgfx::Path& path) {
   std::string result = {};
@@ -137,12 +142,12 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
     return;
   }
 
-  float scale = static_cast<float>(kVectorFontUnitsPerEm) / font.getSize();
+  float scale = static_cast<float>(VectorFontUnitsPerEm) / font.getSize();
   glyphPath.transform(tgfx::Matrix::MakeScale(scale, scale));
 
   if (builder.font == nullptr) {
     builder.font = document->makeNode<Font>();
-    builder.font->unitsPerEm = kVectorFontUnitsPerEm;
+    builder.font->unitsPerEm = VectorFontUnitsPerEm;
   }
 
   auto glyph = document->makeNode<Glyph>();
@@ -233,8 +238,6 @@ static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
 }
 
-static constexpr float kPositionTolerance = 0.5f;
-
 static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
                               Font* font,
                               const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& map,
@@ -255,7 +258,7 @@ static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_
   auto* typeface = run.font.getTypeface().get();
   for (size_t i : indices) {
     float actualX = run.positions[i];
-    if (std::abs(actualX - expectedX) > kPositionTolerance) {
+    if (!FloatNearlyEqual(actualX, expectedX)) {
       return false;
     }
     GlyphKey key = {typeface, run.glyphs[i]};
