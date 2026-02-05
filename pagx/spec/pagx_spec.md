@@ -323,7 +323,7 @@ Color sources define colors that can be used for fills and strokes, supporting t
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color | (required) | Color value |
+| `color` | Color | (required) | Color value |
 
 ##### LinearGradient
 
@@ -346,9 +346,9 @@ Linear gradients interpolate along the direction from start point to end point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `startPoint` | point | (required) | Start point |
-| `endPoint` | point | (required) | End point |
-| `matrix` | string | identity matrix | Transform matrix |
+| `startPoint` | Point | (required) | Start point |
+| `endPoint` | Point | (required) | End point |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by the projection position of P onto the line connecting start and end points.
 
@@ -373,9 +373,9 @@ Radial gradients radiate outward from the center.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by `distance(P, center) / radius`.
 
@@ -402,10 +402,10 @@ Conic gradients (also known as sweep gradients) interpolate along the circumfere
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `startAngle` | float | 0 | Start angle |
 | `endAngle` | float | 360 | End angle |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by the ratio of `atan2(P.y - center.y, P.x - center.x)` within the `[startAngle, endAngle]` range.
 
@@ -430,9 +430,9 @@ Diamond gradients radiate from the center toward the four corners.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `radius` | float | (required) | Gradient radius |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **Calculation**: For a point P, its color is determined by the Manhattan distance `(|P.x - center.x| + |P.y - center.y|) / radius`.
 
@@ -445,7 +445,7 @@ Diamond gradients radiate from the center toward the four corners.
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `offset` | float | (required) | Position 0.0~1.0 |
-| `color` | color | (required) | Stop color |
+| `color` | Color | (required) | Stop color |
 
 **Common Gradient Rules**:
 
@@ -471,7 +471,7 @@ Image patterns use an image as a color source.
 | `tileModeY` | TileMode | clamp | Y-direction tile mode |
 | `filterMode` | FilterMode | linear | Texture filter mode |
 | `mipmapMode` | MipmapMode | linear | Mipmap mode |
-| `matrix` | string | identity matrix | Transform matrix |
+| `matrix` | Matrix | identity matrix | Transform matrix |
 
 **TileMode**: `clamp`, `repeat`, `mirror`, `decal`
 
@@ -606,7 +606,7 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 | `advance` | float | (required) | Horizontal advance width in design space coordinates (unitsPerEm units) |
 | `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
-| `offset` | point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
+| `offset` | Point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
 
 **Glyph Types**:
 - **Vector glyph**: Specifies the `path` attribute using SVG path syntax to describe the outline
@@ -740,14 +740,14 @@ Layer child elements are automatically categorized into four collections by type
 | `blendMode` | BlendMode | normal | Blend mode |
 | `x` | float | 0 | X position |
 | `y` | float | 0 | Y position |
-| `matrix` | string | identity matrix | 2D transform "a,b,c,d,tx,ty" |
-| `matrix3D` | string | - | 3D transform (16 values, column-major) |
+| `matrix` | Matrix | identity matrix | 2D transform "a,b,c,d,tx,ty" |
+| `matrix3D` | Matrix | - | 3D transform (16 values, column-major) |
 | `preserve3D` | bool | false | Preserve 3D transform |
 | `antiAlias` | bool | true | Edge anti-aliasing |
 | `groupOpacity` | bool | false | Group opacity |
 | `passThroughBackground` | bool | true | Whether to pass background through to child layers |
 | `excludeChildEffectsInLayerStyle` | bool | false | Whether layer styles exclude child layer effects |
-| `scrollRect` | string | - | Scroll clipping region "x,y,w,h" |
+| `scrollRect` | Rect | - | Scroll clipping region "x,y,w,h" |
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
@@ -828,7 +828,7 @@ Draws a drop shadow **below** the layer. Computes shadow shape based on opaque l
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 | `showBehindLayer` | bool | true | Whether shadow shows behind layer |
 
 **Rendering Steps**:
@@ -866,7 +866,7 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 
 **Rendering Steps**:
 1. Get opaque layer content and offset by `(offsetX, offsetY)`
@@ -910,7 +910,7 @@ Generates shadow effect based on filter input. Unlike DropShadowStyle, the filte
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 | `shadowOnly` | bool | false | Show shadow only |
 
 **Rendering Steps**:
@@ -929,7 +929,7 @@ Draws shadow inside the filter input.
 | `offsetY` | float | 0 | Y offset |
 | `blurX` | float | 0 | X blur radius |
 | `blurY` | float | 0 | Y blur radius |
-| `color` | color | #000000 | Shadow color |
+| `color` | Color | #000000 | Shadow color |
 | `shadowOnly` | bool | false | Show shadow only |
 
 **Rendering Steps**:
@@ -944,7 +944,7 @@ Overlays a specified color onto the layer using a specified blend mode.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color | (required) | Blend color |
+| `color` | Color | (required) | Blend color |
 | `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
 
 #### 4.4.5 ColorMatrixFilter
@@ -953,7 +953,7 @@ Transforms colors using a 4×5 color matrix.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `matrix` | string | (required) | 4x5 color matrix (20 comma-separated floats) |
+| `matrix` | Matrix | (required) | 4x5 color matrix (20 comma-separated floats) |
 
 **Matrix Format** (20 values, row-major):
 ```
@@ -1085,8 +1085,8 @@ Rectangles are defined from center point with uniform corner rounding support.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
-| `size` | size | 100,100 | Dimensions "width,height" |
+| `center` | Point | 0,0 | Center point |
+| `size` | Size | 100,100 | Dimensions "width,height" |
 | `roundness` | float | 0 | Corner radius |
 | `reversed` | bool | false | Reverse path direction |
 
@@ -1114,8 +1114,8 @@ Ellipses are defined from center point.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
-| `size` | size | 100,100 | Dimensions "width,height" |
+| `center` | Point | 0,0 | Center point |
+| `size` | Size | 100,100 | Dimensions "width,height" |
 | `reversed` | bool | false | Reverse path direction |
 
 **Calculation Rules**:
@@ -1138,7 +1138,7 @@ Supports both regular polygon and star modes.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center` | point | 0,0 | Center point |
+| `center` | Point | 0,0 | Center point |
 | `type` | PolystarType | star | Type (see below) |
 | `pointCount` | float | 5 | Number of points (supports decimals) |
 | `outerRadius` | float | 100 | Outer radius |
@@ -1209,7 +1209,7 @@ Text elements provide geometric shapes for text content. Unlike shape elements t
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `text` | string | "" | Text content |
-| `position` | point | 0,0 | Text start position, y is baseline (may be overridden by TextLayout) |
+| `position` | Point | 0,0 | Text start position, y is baseline (may be overridden by TextLayout) |
 | `fontFamily` | string | system default | Font family |
 | `fontStyle` | string | "Regular" | Font variant (Regular, Bold, Italic, Bold Italic, etc.) |
 | `fontSize` | float | 12 | Font size |
@@ -1363,7 +1363,7 @@ Fill draws the interior region of geometry using a specified color source.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color/idref | #000000 | Color value or color source reference, default black |
+| `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
 | `fillRule` | FillRule | winding | Fill rule (see below) |
@@ -1415,7 +1415,7 @@ Stroke draws lines along geometry boundaries.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `color` | color/idref | #000000 | Color value or color source reference, default black |
+| `color` | Color/idref | #000000 | Color value or color source reference, default black |
 | `width` | float | 1 | Stroke width |
 | `alpha` | float | 1 | Opacity 0~1 |
 | `blendMode` | BlendMode | normal | Blend mode (see Section 4.1) |
@@ -1654,15 +1654,15 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
-| `position` | point | 0,0 | Position offset |
+| `anchorPoint` | Point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
+| `position` | Point | 0,0 | Position offset |
 | `rotation` | float | 0 | Rotation |
-| `scale` | point | 1,1 | Scale |
+| `scale` | Point | 1,1 | Scale |
 | `skew` | float | 0 | Skew |
 | `skewAxis` | float | 0 | Skew axis |
 | `alpha` | float | 1 | Opacity |
-| `fillColor` | color | - | Fill color override |
-| `strokeColor` | color | - | Stroke color override |
+| `fillColor` | Color | - | Fill color override |
+| `strokeColor` | Color | - | Stroke color override |
 | `strokeWidth` | float | - | Stroke width override |
 
 **Selector Calculation**:
@@ -1823,7 +1823,7 @@ During rendering, an attached text typesetting module performs pre-layout, recal
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `position` | point | 0,0 | Layout origin |
+| `position` | Point | 0,0 | Layout origin |
 | `width` | float | auto | Layout width (auto-wraps when specified) |
 | `height` | float | auto | Layout height (enables vertical alignment when specified) |
 | `textAlign` | TextAlign | start | Horizontal alignment |
@@ -1899,10 +1899,10 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 | `copies` | float | 3 | Number of copies |
 | `offset` | float | 0 | Start offset |
 | `order` | RepeaterOrder | belowOriginal | Stacking order |
-| `anchorPoint` | point | 0,0 | Anchor point |
-| `position` | point | 100,100 | Position offset per copy |
+| `anchorPoint` | Point | 0,0 | Anchor point |
+| `position` | Point | 100,100 | Position offset per copy |
 | `rotation` | float | 0 | Rotation per copy |
-| `scale` | point | 1,1 | Scale per copy |
+| `scale` | Point | 1,1 | Scale per copy |
 | `startAlpha` | float | 1 | First copy opacity |
 | `endAlpha` | float | 1 | Last copy opacity |
 
@@ -1982,10 +1982,10 @@ Group is a VectorElement container with transform properties.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | point | 0,0 | Anchor point "x,y" |
-| `position` | point | 0,0 | Position "x,y" |
+| `anchorPoint` | Point | 0,0 | Anchor point "x,y" |
+| `position` | Point | 0,0 | Position "x,y" |
 | `rotation` | float | 0 | Rotation angle |
-| `scale` | point | 1,1 | Scale "sx,sy" |
+| `scale` | Point | 1,1 | Scale "sx,sy" |
 | `skew` | float | 0 | Skew amount |
 | `skewAxis` | float | 0 | Skew axis angle |
 | `alpha` | float | 1 | Opacity 0~1 |
@@ -2556,21 +2556,21 @@ Child elements: `Glyph`*
 | `advance` | float | (required) |
 | `path` | string | - |
 | `image` | string | - |
-| `offset` | point | 0,0 |
+| `offset` | Point | 0,0 |
 
 #### SolidColor
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color | (required) |
+| `color` | Color | (required) |
 
 #### LinearGradient
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `startPoint` | point | (required) |
-| `endPoint` | point | (required) |
-| `matrix` | string | identity matrix |
+| `startPoint` | Point | (required) |
+| `endPoint` | Point | (required) |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2578,9 +2578,9 @@ Child elements: `ColorStop`+
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `radius` | float | (required) |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2588,10 +2588,10 @@ Child elements: `ColorStop`+
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `startAngle` | float | 0 |
 | `endAngle` | float | 360 |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2599,9 +2599,9 @@ Child elements: `ColorStop`+
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `radius` | float | (required) |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 Child elements: `ColorStop`+
 
@@ -2610,7 +2610,7 @@ Child elements: `ColorStop`+
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `offset` | float | (required) |
-| `color` | color | (required) |
+| `color` | Color | (required) |
 
 #### ImagePattern
 
@@ -2621,7 +2621,7 @@ Child elements: `ColorStop`+
 | `tileModeY` | TileMode | clamp |
 | `filterMode` | FilterMode | linear |
 | `mipmapMode` | MipmapMode | linear |
-| `matrix` | string | identity matrix |
+| `matrix` | Matrix | identity matrix |
 
 ### C.3 Layer Node
 
@@ -2635,14 +2635,14 @@ Child elements: `ColorStop`+
 | `blendMode` | BlendMode | normal |
 | `x` | float | 0 |
 | `y` | float | 0 |
-| `matrix` | string | identity matrix |
-| `matrix3D` | string | - |
+| `matrix` | Matrix | identity matrix |
+| `matrix3D` | Matrix | - |
 | `preserve3D` | bool | false |
 | `antiAlias` | bool | true |
 | `groupOpacity` | bool | false |
 | `passThroughBackground` | bool | true |
 | `excludeChildEffectsInLayerStyle` | bool | false |
-| `scrollRect` | string | - |
+| `scrollRect` | Rect | - |
 | `mask` | idref | - |
 | `maskType` | MaskType | alpha |
 | `composition` | idref | - |
@@ -2659,7 +2659,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `showBehindLayer` | bool | true |
 | `blendMode` | BlendMode | normal |
 
@@ -2671,7 +2671,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `blendMode` | BlendMode | normal |
 
 #### BackgroundBlurStyle
@@ -2701,7 +2701,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `shadowOnly` | bool | false |
 
 #### InnerShadowFilter
@@ -2712,21 +2712,21 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `shadowOnly` | bool | false |
 
 #### BlendFilter
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color | (required) |
+| `color` | Color | (required) |
 | `blendMode` | BlendMode | normal |
 
 #### ColorMatrixFilter
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `matrix` | string | (required) |
+| `matrix` | Matrix | (required) |
 
 ### C.6 Geometry Element Nodes
 
@@ -2734,8 +2734,8 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
-| `size` | size | 100,100 |
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
 
@@ -2743,15 +2743,15 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
-| `size` | size | 100,100 |
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
 | `reversed` | bool | false |
 
 #### Polystar
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `type` | PolystarType | star |
 | `pointCount` | float | 5 |
 | `outerRadius` | float | 100 |
@@ -2773,7 +2773,7 @@ Child elements: `VectorElement`*, `LayerStyle`*, `LayerFilter`*, `Layer`* (autom
 | Attribute | Type | Default |
 |-----------|------|---------|
 | `text` | string | "" |
-| `position` | point | 0,0 |
+| `position` | Point | 0,0 |
 | `fontFamily` | string | system default |
 | `fontStyle` | string | "Regular" |
 | `fontSize` | float | 12 |
@@ -2802,7 +2802,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color/idref | #000000 |
+| `color` | Color/idref | #000000 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
 | `fillRule` | FillRule | winding |
@@ -2812,7 +2812,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `color` | color/idref | #000000 |
+| `color` | Color/idref | #000000 |
 | `width` | float | 1 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
@@ -2853,15 +2853,15 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 0,0 |
+| `anchorPoint` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |
-| `fillColor` | color | - |
-| `strokeColor` | color | - |
+| `fillColor` | Color | - |
+| `strokeColor` | Color | - |
 | `strokeWidth` | float | - |
 
 Child elements: `RangeSelector`*
@@ -2897,7 +2897,7 @@ Child elements: `RangeSelector`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `position` | point | 0,0 |
+| `position` | Point | 0,0 |
 | `width` | float | auto |
 | `height` | float | auto |
 | `textAlign` | TextAlign | start |
@@ -2914,10 +2914,10 @@ Child elements: `RangeSelector`*
 | `copies` | float | 3 |
 | `offset` | float | 0 |
 | `order` | RepeaterOrder | belowOriginal |
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 100,100 |
+| `anchorPoint` | Point | 0,0 |
+| `position` | Point | 100,100 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `startAlpha` | float | 1 |
 | `endAlpha` | float | 1 |
 
@@ -2925,10 +2925,10 @@ Child elements: `RangeSelector`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 0,0 |
+| `anchorPoint` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |

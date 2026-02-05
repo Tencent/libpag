@@ -323,7 +323,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color | (必填) | 颜色值 |
+| `color` | Color | (必填) | 颜色值 |
 
 ##### 线性渐变（LinearGradient）
 
@@ -346,9 +346,9 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `startPoint` | point | (必填) | 起点 |
-| `endPoint` | point | (必填) | 终点 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
+| `startPoint` | Point | (必填) | 起点 |
+| `endPoint` | Point | (必填) | 终点 |
+| `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由 P 在起点-终点连线上的投影位置决定。
 
@@ -373,9 +373,9 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
+| `center` | Point | 0,0 | 中心点 |
 | `radius` | float | (必填) | 渐变半径 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
+| `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由 `distance(P, center) / radius` 决定。
 
@@ -402,10 +402,10 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
+| `center` | Point | 0,0 | 中心点 |
 | `startAngle` | float | 0 | 起始角度 |
 | `endAngle` | float | 360 | 结束角度 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
+| `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由 `atan2(P.y - center.y, P.x - center.x)` 在 `[startAngle, endAngle]` 范围内的比例决定。
 
@@ -430,9 +430,9 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
+| `center` | Point | 0,0 | 中心点 |
 | `radius` | float | (必填) | 渐变半径 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
+| `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
 **计算**：对于点 P，其颜色由曼哈顿距离 `(|P.x - center.x| + |P.y - center.y|) / radius` 决定。
 
@@ -445,7 +445,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `offset` | float | (必填) | 位置 0.0~1.0 |
-| `color` | color | (必填) | 色标颜色 |
+| `color` | Color | (必填) | 色标颜色 |
 
 **渐变通用规则**：
 
@@ -471,7 +471,7 @@ PathData 定义可复用的路径数据，供 Path 元素和 TextPath 修改器�
 | `tileModeY` | TileMode | clamp | Y 方向平铺模式 |
 | `filterMode` | FilterMode | linear | 纹理滤镜模式 |
 | `mipmapMode` | MipmapMode | linear | 多级渐远纹理模式 |
-| `matrix` | string | 单位矩阵 | 变换矩阵 |
+| `matrix` | Matrix | 单位矩阵 | 变换矩阵 |
 
 **TileMode（平铺模式）**：`clamp`（钳制）、`repeat`（重复）、`mirror`（镜像）、`decal`（贴花）
 
@@ -605,7 +605,7 @@ Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，�
 |------|------|--------|------|
 | `path` | string | - | SVG 路径数据（矢量轮廓） |
 | `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
-| `offset` | point | 0,0 | 字形偏移量，设计空间坐标（通常用于位图字形） |
+| `offset` | Point | 0,0 | 字形偏移量，设计空间坐标（通常用于位图字形） |
 | `advance` | float | (必填) | 水平步进宽度，设计空间坐标 |
 
 **字形类型**：
@@ -740,14 +740,14 @@ Layer 的子元素按类型自动归类为四个集合：
 | `blendMode` | BlendMode | normal | 混合模式 |
 | `x` | float | 0 | X 位置 |
 | `y` | float | 0 | Y 位置 |
-| `matrix` | string | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
-| `matrix3D` | string | - | 3D 变换（16 个值，列优先） |
+| `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
+| `matrix3D` | Matrix | - | 3D 变换（16 个值，列优先） |
 | `preserve3D` | bool | false | 保持 3D 变换 |
 | `antiAlias` | bool | true | 边缘抗锯齿 |
 | `groupOpacity` | bool | false | 组透明度 |
 | `passThroughBackground` | bool | true | 是否允许背景透传给子图层 |
 | `excludeChildEffectsInLayerStyle` | bool | false | 图层样式是否排除子图层效果 |
-| `scrollRect` | string | - | 滚动裁剪区域 "x,y,w,h" |
+| `scrollRect` | Rect | - | 滚动裁剪区域 "x,y,w,h" |
 | `mask` | idref | - | 遮罩图层引用 "@id" |
 | `maskType` | MaskType | alpha | 遮罩类型 |
 | `composition` | idref | - | 合成引用 "@id" |
@@ -828,7 +828,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `offsetY` | float | 0 | Y 偏移 |
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
-| `color` | color | #000000 | 阴影颜色 |
+| `color` | Color | #000000 | 阴影颜色 |
 | `showBehindLayer` | bool | true | 图层后面是否显示阴影 |
 
 **渲染步骤**：
@@ -866,7 +866,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `offsetY` | float | 0 | Y 偏移 |
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
-| `color` | color | #000000 | 阴影颜色 |
+| `color` | Color | #000000 | 阴影颜色 |
 
 **渲染步骤**：
 1. 获取不透明图层内容并偏移 `(offsetX, offsetY)`
@@ -910,7 +910,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `offsetY` | float | 0 | Y 偏移 |
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
-| `color` | color | #000000 | 阴影颜色 |
+| `color` | Color | #000000 | 阴影颜色 |
 | `shadowOnly` | bool | false | 仅显示阴影 |
 
 **渲染步骤**：
@@ -929,7 +929,7 @@ Layer 的子元素按类型自动归类为四个集合：
 | `offsetY` | float | 0 | Y 偏移 |
 | `blurX` | float | 0 | X 模糊半径 |
 | `blurY` | float | 0 | Y 模糊半径 |
-| `color` | color | #000000 | 阴影颜色 |
+| `color` | Color | #000000 | 阴影颜色 |
 | `shadowOnly` | bool | false | 仅显示阴影 |
 
 **渲染步骤**：
@@ -944,7 +944,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color | (必填) | 混合颜色 |
+| `color` | Color | (必填) | 混合颜色 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 
 #### 4.4.5 颜色矩阵滤镜（ColorMatrixFilter）
@@ -953,7 +953,7 @@ Layer 的子元素按类型自动归类为四个集合：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `matrix` | string | (必填) | 4x5 颜色矩阵（20 个逗号分隔的浮点数） |
+| `matrix` | Matrix | (必填) | 4x5 颜色矩阵（20 个逗号分隔的浮点数） |
 
 **矩阵格式**（20 个值，行优先）：
 ```
@@ -1085,8 +1085,8 @@ VectorElement 按**文档顺序**依次处理，文档中靠前的元素先处�
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
-| `size` | size | 100,100 | 尺寸 "width,height" |
+| `center` | Point | 0,0 | 中心点 |
+| `size` | Size | 100,100 | 尺寸 "width,height" |
 | `roundness` | float | 0 | 圆角半径 |
 | `reversed` | bool | false | 反转路径方向 |
 
@@ -1114,8 +1114,8 @@ rect.bottom = center.y + size.height / 2
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
-| `size` | size | 100,100 | 尺寸 "width,height" |
+| `center` | Point | 0,0 | 中心点 |
+| `size` | Size | 100,100 | 尺寸 "width,height" |
 | `reversed` | bool | false | 反转路径方向 |
 
 **计算规则**：
@@ -1138,7 +1138,7 @@ boundingRect.bottom = center.y + size.height / 2
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `center` | point | 0,0 | 中心点 |
+| `center` | Point | 0,0 | 中心点 |
 | `type` | PolystarType | star | 类型（见下方） |
 | `pointCount` | float | 5 | 顶点数（支持小数） |
 | `outerRadius` | float | 100 | 外半径 |
@@ -1209,7 +1209,7 @@ y = center.y + outerRadius * sin(angle)
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `text` | string | "" | 文本内容 |
-| `position` | point | 0,0 | 文本起点位置，y 为基线（可被 TextLayout 覆盖） |
+| `position` | Point | 0,0 | 文本起点位置，y 为基线（可被 TextLayout 覆盖） |
 | `fontFamily` | string | 系统默认 | 字体族 |
 | `fontStyle` | string | "Regular" | 字体变体（Regular, Bold, Italic, Bold Italic 等） |
 | `fontSize` | float | 12 | 字号 |
@@ -1363,7 +1363,7 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
+| `color` | Color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
 | `fillRule` | FillRule | winding | 填充规则（见下方） |
@@ -1415,7 +1415,7 @@ Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) �
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `color` | color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
+| `color` | Color/idref | #000000 | 颜色值或颜色源引用，默认黑色 |
 | `width` | float | 1 | 描边宽度 |
 | `alpha` | float | 1 | 透明度 0~1 |
 | `blendMode` | BlendMode | normal | 混合模式（见 4.1 节） |
@@ -1652,15 +1652,15 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchorPoint` | point | 0,0 | 锚点偏移，相对于字形默认锚点位置。每个字形的默认锚点位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置 |
-| `position` | point | 0,0 | 位置偏移 |
+| `anchorPoint` | Point | 0,0 | 锚点偏移，相对于字形默认锚点位置。每个字形的默认锚点位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置 |
+| `position` | Point | 0,0 | 位置偏移 |
 | `rotation` | float | 0 | 旋转 |
-| `scale` | point | 1,1 | 缩放 |
+| `scale` | Point | 1,1 | 缩放 |
 | `skew` | float | 0 | 倾斜 |
 | `skewAxis` | float | 0 | 倾斜轴 |
 | `alpha` | float | 1 | 透明度 |
-| `fillColor` | color | - | 填充颜色覆盖 |
-| `strokeColor` | color | - | 描边颜色覆盖 |
+| `fillColor` | Color | - | 填充颜色覆盖 |
+| `strokeColor` | Color | - | 描边颜色覆盖 |
 | `strokeWidth` | float | - | 描边宽度覆盖 |
 
 **选择器计算**：
@@ -1821,7 +1821,7 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `position` | point | 0,0 | 排版原点 |
+| `position` | Point | 0,0 | 排版原点 |
 | `width` | float | auto | 排版宽度（有值则自动换行） |
 | `height` | float | auto | 排版高度（有值则启用垂直对齐） |
 | `textAlign` | TextAlign | start | 水平对齐（见下方） |
@@ -1897,10 +1897,10 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 | `copies` | float | 3 | 副本数 |
 | `offset` | float | 0 | 起始偏移 |
 | `order` | RepeaterOrder | belowOriginal | 堆叠顺序（见下方） |
-| `anchorPoint` | point | 0,0 | 锚点 |
-| `position` | point | 100,100 | 每个副本的位置偏移 |
+| `anchorPoint` | Point | 0,0 | 锚点 |
+| `position` | Point | 100,100 | 每个副本的位置偏移 |
 | `rotation` | float | 0 | 每个副本的旋转 |
-| `scale` | point | 1,1 | 每个副本的缩放 |
+| `scale` | Point | 1,1 | 每个副本的缩放 |
 | `startAlpha` | float | 1 | 首个副本透明度 |
 | `endAlpha` | float | 1 | 末个副本透明度 |
 
@@ -1980,10 +1980,10 @@ Group 是带变换属性的矢量元素容器。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchorPoint` | point | 0,0 | 锚点 "x,y" |
-| `position` | point | 0,0 | 位置 "x,y" |
+| `anchorPoint` | Point | 0,0 | 锚点 "x,y" |
+| `position` | Point | 0,0 | 位置 "x,y" |
 | `rotation` | float | 0 | 旋转角度 |
-| `scale` | point | 1,1 | 缩放 "sx,sy" |
+| `scale` | Point | 1,1 | 缩放 "sx,sy" |
 | `skew` | float | 0 | 倾斜量 |
 | `skewAxis` | float | 0 | 倾斜轴角度 |
 | `alpha` | float | 1 | 透明度 0~1 |
@@ -2555,22 +2555,22 @@ Layer / Group
 |------|------|--------|
 | `path` | string | - |
 | `image` | string | - |
-| `offset` | point | 0,0 |
+| `offset` | Point | 0,0 |
 | `advance` | float | (必填) |
 
 #### SolidColor
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color | (必填) |
+| `color` | Color | (必填) |
 
 #### LinearGradient
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `startPoint` | point | (必填) |
-| `endPoint` | point | (必填) |
-| `matrix` | string | 单位矩阵 |
+| `startPoint` | Point | (必填) |
+| `endPoint` | Point | (必填) |
+| `matrix` | Matrix | 单位矩阵 |
 
 子元素：`ColorStop`+
 
@@ -2578,9 +2578,9 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `radius` | float | (必填) |
-| `matrix` | string | 单位矩阵 |
+| `matrix` | Matrix | 单位矩阵 |
 
 子元素：`ColorStop`+
 
@@ -2588,10 +2588,10 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `startAngle` | float | 0 |
 | `endAngle` | float | 360 |
-| `matrix` | string | 单位矩阵 |
+| `matrix` | Matrix | 单位矩阵 |
 
 子元素：`ColorStop`+
 
@@ -2599,9 +2599,9 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `radius` | float | (必填) |
-| `matrix` | string | 单位矩阵 |
+| `matrix` | Matrix | 单位矩阵 |
 
 子元素：`ColorStop`+
 
@@ -2610,7 +2610,7 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `offset` | float | (必填) |
-| `color` | color | (必填) |
+| `color` | Color | (必填) |
 
 #### ImagePattern
 
@@ -2621,7 +2621,7 @@ Layer / Group
 | `tileModeY` | TileMode | clamp |
 | `filterMode` | FilterMode | linear |
 | `mipmapMode` | MipmapMode | linear |
-| `matrix` | string | 单位矩阵 |
+| `matrix` | Matrix | 单位矩阵 |
 
 ### C.3 图层节点
 
@@ -2635,14 +2635,14 @@ Layer / Group
 | `blendMode` | BlendMode | normal |
 | `x` | float | 0 |
 | `y` | float | 0 |
-| `matrix` | string | 单位矩阵 |
-| `matrix3D` | string | - |
+| `matrix` | Matrix | 单位矩阵 |
+| `matrix3D` | Matrix | - |
 | `preserve3D` | bool | false |
 | `antiAlias` | bool | true |
 | `groupOpacity` | bool | false |
 | `passThroughBackground` | bool | true |
 | `excludeChildEffectsInLayerStyle` | bool | false |
-| `scrollRect` | string | - |
+| `scrollRect` | Rect | - |
 | `mask` | idref | - |
 | `maskType` | MaskType | alpha |
 | `composition` | idref | - |
@@ -2659,7 +2659,7 @@ Layer / Group
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `showBehindLayer` | bool | true |
 | `blendMode` | BlendMode | normal |
 
@@ -2671,7 +2671,7 @@ Layer / Group
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `blendMode` | BlendMode | normal |
 
 #### BackgroundBlurStyle
@@ -2701,7 +2701,7 @@ Layer / Group
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `shadowOnly` | bool | false |
 
 #### InnerShadowFilter
@@ -2712,21 +2712,21 @@ Layer / Group
 | `offsetY` | float | 0 |
 | `blurX` | float | 0 |
 | `blurY` | float | 0 |
-| `color` | color | #000000 |
+| `color` | Color | #000000 |
 | `shadowOnly` | bool | false |
 
 #### BlendFilter
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color | (必填) |
+| `color` | Color | (必填) |
 | `blendMode` | BlendMode | normal |
 
 #### ColorMatrixFilter
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `matrix` | string | (必填) |
+| `matrix` | Matrix | (必填) |
 
 ### C.6 几何元素节点
 
@@ -2734,8 +2734,8 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `center` | point | 0,0 |
-| `size` | size | 100,100 |
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
 | `roundness` | float | 0 |
 | `reversed` | bool | false |
 
@@ -2743,15 +2743,15 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `center` | point | 0,0 |
-| `size` | size | 100,100 |
+| `center` | Point | 0,0 |
+| `size` | Size | 100,100 |
 | `reversed` | bool | false |
 
 #### Polystar
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `center` | point | 0,0 |
+| `center` | Point | 0,0 |
 | `type` | PolystarType | star |
 | `pointCount` | float | 5 |
 | `outerRadius` | float | 100 |
@@ -2773,7 +2773,7 @@ Layer / Group
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
 | `text` | string | "" |
-| `position` | point | 0,0 |
+| `position` | Point | 0,0 |
 | `fontFamily` | string | 系统默认 |
 | `fontStyle` | string | "Regular" |
 | `fontSize` | float | 12 |
@@ -2802,7 +2802,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color/idref | #000000 |
+| `color` | Color/idref | #000000 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
 | `fillRule` | FillRule | winding |
@@ -2812,7 +2812,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `color` | color/idref | #000000 |
+| `color` | Color/idref | #000000 |
 | `width` | float | 1 |
 | `alpha` | float | 1 |
 | `blendMode` | BlendMode | normal |
@@ -2853,15 +2853,15 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 0,0 |
+| `anchorPoint` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |
-| `fillColor` | color | - |
-| `strokeColor` | color | - |
+| `fillColor` | Color | - |
+| `strokeColor` | Color | - |
 | `strokeWidth` | float | - |
 
 子元素：`RangeSelector`*
@@ -2897,7 +2897,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `position` | point | 0,0 |
+| `position` | Point | 0,0 |
 | `width` | float | auto |
 | `height` | float | auto |
 | `textAlign` | TextAlign | start |
@@ -2914,10 +2914,10 @@ Layer / Group
 | `copies` | float | 3 |
 | `offset` | float | 0 |
 | `order` | RepeaterOrder | belowOriginal |
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 100,100 |
+| `anchorPoint` | Point | 0,0 |
+| `position` | Point | 100,100 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `startAlpha` | float | 1 |
 | `endAlpha` | float | 1 |
 
@@ -2925,10 +2925,10 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `anchorPoint` | point | 0,0 |
-| `position` | point | 0,0 |
+| `anchorPoint` | Point | 0,0 |
+| `position` | Point | 0,0 |
 | `rotation` | float | 0 |
-| `scale` | point | 1,1 |
+| `scale` | Point | 1,1 |
 | `skew` | float | 0 |
 | `skewAxis` | float | 0 |
 | `alpha` | float | 1 |
