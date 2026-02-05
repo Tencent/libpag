@@ -23,9 +23,18 @@
 namespace pagx {
 
 static constexpr float FloatNearlyZero = 1.0f / (1 << 12);
+static constexpr float Pi = 3.14159265358979323846f;
 
 inline bool FloatNearlyEqual(float x, float y) {
   return std::abs(x - y) <= FloatNearlyZero;
+}
+
+inline float DegreesToRadians(float degrees) {
+  return degrees * Pi / 180.0f;
+}
+
+inline float RadiansToDegrees(float radians) {
+  return radians * 180.0f / Pi;
 }
 
 }  // namespace pagx

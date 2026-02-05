@@ -492,35 +492,17 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
             xml.addRequiredAttribute("glyphs", glyphsStr);
           }
 
-          // Determine positioning mode
-          if (!run->matrices.empty()) {
-            // Matrix mode: semicolon-separated groups of 6 values
-            std::string matStr = {};
-            char buf[32] = {};
-            for (size_t i = 0; i < run->matrices.size(); i++) {
-              if (i > 0) {
-                matStr += ";";
-              }
-              const auto& m = run->matrices[i];
-              snprintf(buf, sizeof(buf), "%g,%g,%g,%g,%g,%g", m.a, m.b, m.c, m.d, m.tx, m.ty);
-              matStr += buf;
-            }
-            xml.addRequiredAttribute("matrices", matStr);
-          } else if (!run->xforms.empty()) {
-            // RSXform mode: semicolon-separated groups of 4 values
-            std::string xformsStr = {};
-            char buf[64] = {};
-            for (size_t i = 0; i < run->xforms.size(); i++) {
-              if (i > 0) {
-                xformsStr += ";";
-              }
-              const auto& x = run->xforms[i];
-              snprintf(buf, sizeof(buf), "%g,%g,%g,%g", x.scos, x.ssin, x.tx, x.ty);
-              xformsStr += buf;
-            }
-            xml.addRequiredAttribute("xforms", xformsStr);
-          } else if (!run->positions.empty()) {
-            // Point mode: semicolon-separated x,y pairs
+          // Write x/y overall offsets (only if non-zero)
+          xml.addAttribute("x", run->x, 0.0f);
+          xml.addAttribute("y", run->y, 0.0f);
+
+          // Write xOffsets (comma-separated)
+          if (!run->xOffsets.empty()) {
+            xml.addRequiredAttribute("xOffsets", floatListToString(run->xOffsets));
+          }
+
+          // Write positions (semicolon-separated x,y pairs)
+          if (!run->positions.empty()) {
             std::string posStr = {};
             char buf[32] = {};
             for (size_t i = 0; i < run->positions.size(); i++) {
@@ -531,14 +513,44 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
               posStr += buf;
             }
             xml.addRequiredAttribute("positions", posStr);
-          } else if (!run->xPositions.empty()) {
-            // Horizontal mode
-            xml.addAttribute("y", run->y);
-            xml.addRequiredAttribute("xPositions", floatListToString(run->xPositions));
-          } else {
-            // Default mode: use x/y as starting point
-            xml.addAttribute("x", run->x);
-            xml.addAttribute("y", run->y);
+          }
+
+          // Write anchors (semicolon-separated x,y pairs)
+          if (!run->anchors.empty()) {
+            std::string anchorsStr = {};
+            char buf[32] = {};
+            for (size_t i = 0; i < run->anchors.size(); i++) {
+              if (i > 0) {
+                anchorsStr += ";";
+              }
+              snprintf(buf, sizeof(buf), "%g,%g", run->anchors[i].x, run->anchors[i].y);
+              anchorsStr += buf;
+            }
+            xml.addRequiredAttribute("anchors", anchorsStr);
+          }
+
+          // Write scales (semicolon-separated sx,sy pairs)
+          if (!run->scales.empty()) {
+            std::string scalesStr = {};
+            char buf[32] = {};
+            for (size_t i = 0; i < run->scales.size(); i++) {
+              if (i > 0) {
+                scalesStr += ";";
+              }
+              snprintf(buf, sizeof(buf), "%g,%g", run->scales[i].x, run->scales[i].y);
+              scalesStr += buf;
+            }
+            xml.addRequiredAttribute("scales", scalesStr);
+          }
+
+          // Write rotations (comma-separated angles in degrees)
+          if (!run->rotations.empty()) {
+            xml.addRequiredAttribute("rotations", floatListToString(run->rotations));
+          }
+
+          // Write skews (comma-separated angles in degrees)
+          if (!run->skews.empty()) {
+            xml.addRequiredAttribute("skews", floatListToString(run->skews));
           }
 
           xml.closeElementSelfClosing();

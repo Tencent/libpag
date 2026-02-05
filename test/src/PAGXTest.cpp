@@ -767,12 +767,12 @@ PAG_TEST(PAGXTest, GlyphRunHorizontal) {
   glyphRun->font = font;
   glyphRun->glyphs = {1, 2, 1};
   glyphRun->y = 50;
-  glyphRun->xPositions = {10, 60, 110};
+  glyphRun->xOffsets = {10, 60, 110};
 
   EXPECT_EQ(glyphRun->nodeType(), pagx::NodeType::GlyphRun);
   EXPECT_EQ(glyphRun->font, font);
   EXPECT_EQ(glyphRun->glyphs.size(), 3u);
-  EXPECT_EQ(glyphRun->xPositions.size(), 3u);
+  EXPECT_EQ(glyphRun->xOffsets.size(), 3u);
   EXPECT_FLOAT_EQ(glyphRun->y, 50.0f);
 }
 
@@ -794,23 +794,23 @@ PAG_TEST(PAGXTest, GlyphRunPointPositions) {
 }
 
 /**
- * Test case: GlyphRun node with RSXform positioning
+ * Test case: GlyphRun node with rotations and scales
  */
-PAG_TEST(PAGXTest, GlyphRunRSXform) {
+PAG_TEST(PAGXTest, GlyphRunTransforms) {
   auto doc = pagx::PAGXDocument::Make(0, 0);
   auto font = doc->makeNode<pagx::Font>("testFont");
   auto glyphRun = doc->makeNode<pagx::GlyphRun>();
   glyphRun->font = font;
   glyphRun->glyphs = {1, 2};
-
-  pagx::RSXform xform1 = {1, 0, 10, 20};
-  pagx::RSXform xform2 = {0.707f, 0.707f, 60, 80};
-  glyphRun->xforms = {xform1, xform2};
+  glyphRun->positions = {{10, 20}, {60, 80}};
+  glyphRun->rotations = {0, 45};
+  glyphRun->scales = {{1, 1}, {1.5f, 1.5f}};
 
   EXPECT_EQ(glyphRun->nodeType(), pagx::NodeType::GlyphRun);
-  EXPECT_EQ(glyphRun->xforms.size(), 2u);
-  EXPECT_FLOAT_EQ(glyphRun->xforms[0].scos, 1.0f);
-  EXPECT_FLOAT_EQ(glyphRun->xforms[1].ssin, 0.707f);
+  EXPECT_EQ(glyphRun->rotations.size(), 2u);
+  EXPECT_FLOAT_EQ(glyphRun->rotations[1], 45.0f);
+  EXPECT_EQ(glyphRun->scales.size(), 2u);
+  EXPECT_FLOAT_EQ(glyphRun->scales[1].x, 1.5f);
 }
 
 /**
@@ -826,7 +826,7 @@ PAG_TEST(PAGXTest, TextPrecomposed) {
   glyphRun->font = font;
   glyphRun->glyphs = {1, 2, 3};
   glyphRun->y = 24;
-  glyphRun->xPositions = {0, 24, 48};
+  glyphRun->xOffsets = {0, 24, 48};
   text->glyphRuns.push_back(glyphRun);
 
   EXPECT_EQ(text->nodeType(), pagx::NodeType::Text);
@@ -1050,7 +1050,7 @@ PAG_TEST(PAGXTest, FontGlyphRoundTrip) {
   glyphRun->font = font;
   glyphRun->glyphs = {1, 2};
   glyphRun->y = 60;
-  glyphRun->xPositions = {10, 60};
+  glyphRun->xOffsets = {10, 60};
   text->glyphRuns.push_back(glyphRun);
 
   auto fill = doc->makeNode<pagx::Fill>();

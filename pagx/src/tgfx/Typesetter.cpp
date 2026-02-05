@@ -332,39 +332,108 @@ class TypesetterContext {
       tgfx::Font font(typeface, fontSizeForTypeface);
       size_t count = run->glyphs.size();
 
-      // Determine positioning mode (priority: matrices > xforms > positions > xPositions > Default)
-      if (!run->matrices.empty() && run->matrices.size() >= count) {
+      // Check if we need matrix mode (has transforms)
+      bool hasTransforms = !run->scales.empty() || !run->rotations.empty() || !run->skews.empty() ||
+                           !run->anchors.empty();
+
+      if (hasTransforms) {
+        // Matrix mode: compute transform matrix for each glyph
         auto& buffer = builder.allocRunMatrix(font, count);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
         auto* matrices = reinterpret_cast<float*>(buffer.positions);
+
+        float advanceScale = run->fontSize / static_cast<float>(unitsPerEm);
+
         for (size_t i = 0; i < count; i++) {
-          const auto& m = run->matrices[i];
-          matrices[i * 6 + 0] = m.a;
-          matrices[i * 6 + 1] = m.b;
-          matrices[i * 6 + 2] = m.c;
-          matrices[i * 6 + 3] = m.d;
-          matrices[i * 6 + 4] = m.tx;
-          matrices[i * 6 + 5] = m.ty;
-        }
-      } else if (!run->xforms.empty() && run->xforms.size() >= count) {
-        auto& buffer = builder.allocRunRSXform(font, count);
-        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        auto* xforms = reinterpret_cast<tgfx::RSXform*>(buffer.positions);
-        for (size_t i = 0; i < count; i++) {
-          const auto& x = run->xforms[i];
-          xforms[i] = tgfx::RSXform::Make(x.scos, x.ssin, x.tx, x.ty);
+          // Get glyph advance for default anchor calculation
+          float glyphAdvance = 0.0f;
+          if (run->font != nullptr && run->glyphs[i] > 0 &&
+              run->glyphs[i] <= run->font->glyphs.size()) {
+            glyphAdvance = run->font->glyphs[run->glyphs[i] - 1]->advance * advanceScale;
+          }
+
+          // Calculate position: x + xOffsets[i] + positions[i].x, y + positions[i].y
+          float posX = run->x;
+          float posY = run->y;
+          if (i < run->xOffsets.size()) {
+            posX += run->xOffsets[i];
+          }
+          if (i < run->positions.size()) {
+            posX += run->positions[i].x;
+            posY += run->positions[i].y;
+          }
+
+          // Default anchor: (advance * 0.5, 0)
+          float anchorX = glyphAdvance * 0.5f;
+          float anchorY = 0.0f;
+          if (i < run->anchors.size()) {
+            anchorX += run->anchors[i].x;
+            anchorY += run->anchors[i].y;
+          }
+
+          // Get scale, rotation, skew
+          float scaleX = 1.0f, scaleY = 1.0f;
+          if (i < run->scales.size()) {
+            scaleX = run->scales[i].x;
+            scaleY = run->scales[i].y;
+          }
+          float rotation = 0.0f;
+          if (i < run->rotations.size()) {
+            rotation = run->rotations[i];
+          }
+          float skew = 0.0f;
+          if (i < run->skews.size()) {
+            skew = run->skews[i];
+          }
+
+          // Build transform matrix following TextModifier order:
+          // 1. translate(-anchor)
+          // 2. scale
+          // 3. skew (along vertical axis)
+          // 4. rotation
+          // 5. translate(anchor)
+          // 6. translate(position)
+          tgfx::Matrix m = tgfx::Matrix::I();
+          m.postTranslate(-anchorX, -anchorY);
+          m.postScale(scaleX, scaleY);
+          if (skew != 0.0f) {
+            float skewRad = DegreesToRadians(skew);
+            m.postSkew(std::tan(skewRad), 0.0f);
+          }
+          if (rotation != 0.0f) {
+            m.postRotate(rotation);
+          }
+          m.postTranslate(anchorX, anchorY);
+          m.postTranslate(posX, posY);
+
+          // Store matrix (a, b, c, d, tx, ty)
+          matrices[i * 6 + 0] = m.getScaleX();
+          matrices[i * 6 + 1] = m.getSkewY();
+          matrices[i * 6 + 2] = m.getSkewX();
+          matrices[i * 6 + 3] = m.getScaleY();
+          matrices[i * 6 + 4] = m.getTranslateX();
+          matrices[i * 6 + 5] = m.getTranslateY();
         }
       } else if (!run->positions.empty() && run->positions.size() >= count) {
+        // Point mode: each glyph has (x, y) offset combined with overall x/y
         auto& buffer = builder.allocRunPos(font, count);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
         auto* positions = reinterpret_cast<tgfx::Point*>(buffer.positions);
         for (size_t i = 0; i < count; i++) {
-          positions[i] = tgfx::Point::Make(run->positions[i].x, run->positions[i].y);
+          float posX = run->x + run->positions[i].x;
+          float posY = run->y + run->positions[i].y;
+          if (i < run->xOffsets.size()) {
+            posX += run->xOffsets[i];
+          }
+          positions[i] = tgfx::Point::Make(posX, posY);
         }
-      } else if (!run->xPositions.empty() && run->xPositions.size() >= count) {
+      } else if (!run->xOffsets.empty() && run->xOffsets.size() >= count) {
+        // Horizontal mode: x offsets + shared y
         auto& buffer = builder.allocRunPosH(font, count, run->y);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
-        memcpy(buffer.positions, run->xPositions.data(), count * sizeof(float));
+        for (size_t i = 0; i < count; i++) {
+          buffer.positions[i] = run->x + run->xOffsets[i];
+        }
       } else {
         // Default mode: use font's advance values to position glyphs
         auto& buffer = builder.allocRun(font, count, run->x, run->y);
