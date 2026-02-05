@@ -50,7 +50,7 @@ class Repeater : public Element {
   /**
    * The anchor point for transformations.
    */
-  Point anchorPoint = {};
+  Point anchor = {};
 
   /**
    * The position offset applied between each copy. The default value is {100, 100}.

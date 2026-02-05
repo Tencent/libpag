@@ -899,8 +899,8 @@ static TextModifier* parseTextModifier(const XMLNode* node, PAGXDocument* doc) {
   if (!modifier) {
     return nullptr;
   }
-  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
-  modifier->anchorPoint = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchor", "0,0");
+  modifier->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   modifier->position = parsePoint(positionStr);
   modifier->rotation = getFloatAttribute(node, "rotation", 0);
@@ -984,8 +984,8 @@ static Repeater* parseRepeater(const XMLNode* node, PAGXDocument* doc) {
   repeater->copies = getFloatAttribute(node, "copies", 3);
   repeater->offset = getFloatAttribute(node, "offset", 0);
   repeater->order = RepeaterOrderFromString(getAttribute(node, "order", "belowOriginal"));
-  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
-  repeater->anchorPoint = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchor", "0,0");
+  repeater->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "100,100");
   repeater->position = parsePoint(positionStr);
   repeater->rotation = getFloatAttribute(node, "rotation", 0);
@@ -1002,8 +1002,8 @@ static Group* parseGroup(const XMLNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   // group->name (removed) = getAttribute(node, "name");
-  auto anchorStr = getAttribute(node, "anchorPoint", "0,0");
-  group->anchorPoint = parsePoint(anchorStr);
+  auto anchorStr = getAttribute(node, "anchor", "0,0");
+  group->anchor = parsePoint(anchorStr);
   auto positionStr = getAttribute(node, "position", "0,0");
   group->position = parsePoint(positionStr);
   group->rotation = getFloatAttribute(node, "rotation", 0);

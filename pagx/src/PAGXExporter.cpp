@@ -666,8 +666,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifier*>(node);
       xml.openElement("TextModifier");
-      if (modifier->anchorPoint.x != 0 || modifier->anchorPoint.y != 0) {
-        xml.addAttribute("anchorPoint", pointToString(modifier->anchorPoint));
+      if (modifier->anchor.x != 0 || modifier->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(modifier->anchor));
       }
       if (modifier->position.x != 0 || modifier->position.y != 0) {
         xml.addAttribute("position", pointToString(modifier->position));
@@ -770,8 +770,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
       if (repeater->order != RepeaterOrder::BelowOriginal) {
         xml.addAttribute("order", RepeaterOrderToString(repeater->order));
       }
-      if (repeater->anchorPoint.x != 0 || repeater->anchorPoint.y != 0) {
-        xml.addAttribute("anchorPoint", pointToString(repeater->anchorPoint));
+      if (repeater->anchor.x != 0 || repeater->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(repeater->anchor));
       }
       if (repeater->position.x != 100 || repeater->position.y != 100) {
         xml.addAttribute("position", pointToString(repeater->position));
@@ -788,8 +788,8 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
-      if (group->anchorPoint.x != 0 || group->anchorPoint.y != 0) {
-        xml.addAttribute("anchorPoint", pointToString(group->anchorPoint));
+      if (group->anchor.x != 0 || group->anchor.y != 0) {
+        xml.addAttribute("anchor", pointToString(group->anchor));
       }
       if (group->position.x != 0 || group->position.y != 0) {
         xml.addAttribute("position", pointToString(group->position));

@@ -779,7 +779,7 @@ class LayerBuilderImpl {
     repeater->setCopies(node->copies);
     repeater->setOffset(node->offset);
     repeater->setOrder(static_cast<tgfx::RepeaterOrder>(node->order));
-    repeater->setAnchorPoint(ToTGFX(node->anchorPoint));
+    repeater->setAnchorPoint(ToTGFX(node->anchor));
     repeater->setPosition(ToTGFX(node->position));
     repeater->setRotation(node->rotation);
     repeater->setScale(ToTGFX(node->scale));
@@ -807,8 +807,8 @@ class LayerBuilderImpl {
     group->setElements(elements);
 
     // Apply transform properties
-    if (node->anchorPoint.x != 0 || node->anchorPoint.y != 0) {
-      group->setAnchorPoint(ToTGFX(node->anchorPoint));
+    if (node->anchor.x != 0 || node->anchor.y != 0) {
+      group->setAnchorPoint(ToTGFX(node->anchor));
     }
     if (node->position.x != 0 || node->position.y != 0) {
       group->setPosition(ToTGFX(node->position));
