@@ -1252,74 +1252,138 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 | `font` | idref | (必填) | 引用 Font 资源 `@id` |
 | `fontSize` | float | 12 | 渲染字号。实际缩放比例 = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (必填) | GlyphID 序列，逗号分隔（0 表示缺失字形） |
-| `x` | float | 0 | 起始 x 坐标（仅 Default 模式） |
-| `y` | float | 0 | 共享 y 坐标（Default 和 Horizontal 模式） |
-| `xPositions` | string | - | x 坐标序列，逗号分隔（Horizontal 模式） |
-| `positions` | string | - | (x,y) 坐标序列，分号分隔（Point 模式） |
-| `xforms` | string | - | RSXform 序列 (scos,ssin,tx,ty)，分号分隔（RSXform 模式） |
-| `matrices` | string | - | Matrix 序列 (a,b,c,d,tx,ty)，分号分隔（Matrix 模式） |
+| `x` | float | 0 | 总体 X 偏移 |
+| `y` | float | 0 | 总体 Y 偏移 |
+| `xOffsets` | string | - | 每字形 X 偏移，逗号分隔 |
+| `positions` | string | - | 每字形 (x,y) 偏移，分号分隔 |
+| `anchors` | string | - | 每字形锚点偏移 (x,y)，分号分隔。默认锚点为 (advance×0.5, 0) |
+| `scales` | string | - | 每字形缩放 (sx,sy)，分号分隔。默认 1,1 |
+| `rotations` | string | - | 每字形旋转角度（度），逗号分隔。默认 0 |
+| `skews` | string | - | 每字形斜切角度（度），逗号分隔。默认 0 |
 
-**定位模式选择**（优先级从高到低）：
-1. 有 `matrices` → Matrix 模式：每个字形有完整 2D 仿射变换
-2. 有 `xforms` → RSXform 模式：每个字形有旋转+缩放+平移（路径文本）
-3. 有 `positions` → Point 模式：每个字形有独立 (x,y) 位置（多行/复杂布局）
-4. 有 `xPositions` → Horizontal 模式：每个字形有 x 坐标，共享 `y` 值（单行水平文本）
-5. 以上都没有 → Default 模式：首个字形起始于 `(x, y)`，后续字形依次累加 Font 中每个 Glyph 的 `advance` 属性（最简洁格式）
+**属性叠加关系**：
 
-**RSXform 说明**：
-RSXform 是压缩的旋转+缩放矩阵，四个分量 (scos, ssin, tx, ty) 表示：
-```
-| scos  -ssin   tx |
-| ssin   scos   ty |
-|   0      0     1 |
-```
-其中 scos = scale × cos(angle)，ssin = scale × sin(angle)。
+位置属性 `x`、`y`、`xOffsets`、`positions` 不互斥，可叠加使用。最终位置计算如下：
 
-**Matrix 说明**：
-Matrix 是完整的 2D 仿射变换矩阵，六个分量 (a, b, c, d, tx, ty) 表示：
 ```
-|  a   c   tx |
-|  b   d   ty |
-|  0   0    1 |
+finalX[i] = x + xOffsets[i] + positions[i].x
+finalY[i] = y + positions[i].y
 ```
+
+- 未指定 `xOffsets` 时，`xOffsets[i]` 视为 0
+- 未指定 `positions` 时，`positions[i]` 视为 (0, 0)
+- 不指定 `xOffsets` 和 `positions` 时：首个字形位于 (x, y)，后续字形依次累加 advance
+
+**变换应用顺序**：
+
+当字形有 scale、rotation 或 skew 变换时，按以下顺序应用（与 TextModifier 一致）：
+
+1. 平移到锚点（`translate(-anchor)`）
+2. 缩放（`scale`）
+3. 斜切（`skew`，沿垂直轴方向）
+4. 旋转（`rotation`）
+5. 平移回锚点（`translate(anchor)`）
+6. 平移到位置（`translate(position)`）
+
+**锚点说明**：
+
+- 每个字形的**默认锚点**位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置
+- `anchors` 属性记录的是相对于默认锚点的偏移，最终锚点 = 默认锚点 + anchors[i]
 
 **预排版示例**：
 
 ```xml
-<Resources>
-  <!-- 嵌入字体：包含 H, e, l, o 四个字形 -->
-  <Font id="myFont" unitsPerEm="1000">
-    <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
-    <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z"/>
-    <Glyph path="M 100 0 L 100 700 L 350 700"/>
-    <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z"/>
-  </Font>
-</Resources>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <!-- 嵌入字体：包含 H, e, l, o 四个字形 -->
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
 
-<Layer>
-  <!-- 预排版文本 "Hello"：使用 Horizontal 模式（单行水平文本） -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- 示例 1：基本用法（依次累加 advance） -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" x="20" y="50"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
 
-<Layer>
-  <!-- 预排版文本：使用 Point 模式（多行文本） -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- 示例 2：自定义 X 偏移的单行水平文本 -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
+                y="100" xOffsets="20,50,75,90,105"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
 
-<Layer>
-  <!-- 预排版文本：使用 RSXform 模式（路径文本，每个字形有旋转） -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
-              xforms="1,0,0,50;0.98,0.17,30,48;0.94,0.34,60,42;0.87,0.5,90,32;0.77,0.64,120,18"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- 示例 3：自由定位的多行文本 -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
+                positions="20,150;50,150;75,150;20,180;50,180"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
+</pagx>
+```
+
+**带变换的预排版示例**（路径文本场景）：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="150">
+  <Resources>
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
+
+  <Layer>
+    <!-- 沿弧线排列的文本：每个字形有不同的位置和旋转 -->
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
+                positions="30,100;70,80;120,70;170,80;210,100"
+                rotations="-30,-15,0,15,30"/>
+    </Text>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
+```
+
+**带缩放和斜切的示例**：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Resources>
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
+
+  <Layer>
+    <!-- 带缩放和斜切效果的文本 -->
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
+                y="50" xOffsets="20,55,95,125,160"
+                scales="1,1;1.2,1.2;1.5,1.5;1.2,1.2;1,1"
+                skews="0,5,10,5,0"/>
+    </Text>
+    <Fill color="#FF6600"/>
+  </Layer>
+</pagx>
 ```
 
 ### 5.3 绘制器（Painters）
@@ -2406,7 +2470,7 @@ Layer / Group
     <!-- 预排版文本 -->
     <Group position="400,0">
       <Text fontFamily="Arial" fontSize="18">
-        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xPositions="0,28,56"/>
+        <GlyphRun font="@iconFont" glyphs="1,2,3" y="0" xOffsets="0,28,56"/>
       </Text>
       <Fill color="#FFFFFF60"/>
     </Group>
@@ -2791,10 +2855,12 @@ Layer / Group
 | `glyphs` | string | (必填) |
 | `x` | float | 0 |
 | `y` | float | 0 |
-| `xPositions` | string | - |
+| `xOffsets` | string | - |
 | `positions` | string | - |
-| `xforms` | string | - |
-| `matrices` | string | - |
+| `anchors` | string | - |
+| `scales` | string | - |
+| `rotations` | string | - |
+| `skews` | string | - |
 
 ### C.7 绘制器节点
 

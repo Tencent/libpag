@@ -1252,74 +1252,138 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 | `font` | idref | (required) | Font resource reference `@id` |
 | `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
-| `x` | float | 0 | Starting x coordinate (Default mode only) |
-| `y` | float | 0 | Shared y coordinate (Default and Horizontal modes) |
-| `xPositions` | string | - | x coordinate sequence, comma-separated (Horizontal mode) |
-| `positions` | string | - | (x,y) coordinate sequence, semicolon-separated (Point mode) |
-| `xforms` | string | - | RSXform sequence (scos,ssin,tx,ty), semicolon-separated (RSXform mode) |
-| `matrices` | string | - | Matrix sequence (a,b,c,d,tx,ty), semicolon-separated (Matrix mode) |
+| `x` | float | 0 | Overall X offset |
+| `y` | float | 0 | Overall Y offset |
+| `xOffsets` | string | - | Per-glyph X offset, comma-separated |
+| `positions` | string | - | Per-glyph (x,y) offset, semicolon-separated |
+| `anchors` | string | - | Per-glyph anchor offset (x,y), semicolon-separated. Default anchor is (advance×0.5, 0) |
+| `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Default 1,1 |
+| `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Default 0 |
+| `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Default 0 |
 
-**Positioning Mode Selection** (priority from high to low):
-1. Has `matrices` → Matrix mode: Each glyph has full 2D affine transform
-2. Has `xforms` → RSXform mode: Each glyph has rotation+scale+translation (path text)
-3. Has `positions` → Point mode: Each glyph has independent (x,y) position (multi-line/complex layout)
-4. Has `xPositions` → Horizontal mode: Each glyph has x coordinate, sharing `y` value (single-line horizontal text)
-5. None of the above → Default mode: First glyph starts at `(x, y)`, subsequent glyphs are positioned by accumulating each Glyph's `advance` attribute in Font (most compact format)
+**Attribute Stacking**:
 
-**RSXform**:
-RSXform is a compressed rotation+scale matrix with four components (scos, ssin, tx, ty):
-```
-| scos  -ssin   tx |
-| ssin   scos   ty |
-|   0      0     1 |
-```
-Where scos = scale × cos(angle), ssin = scale × sin(angle).
+Position attributes `x`, `y`, `xOffsets`, `positions` are not mutually exclusive and can be combined. Final position is calculated as:
 
-**Matrix**:
-Matrix is a full 2D affine transformation matrix with six components (a, b, c, d, tx, ty):
 ```
-|  a   c   tx |
-|  b   d   ty |
-|  0   0    1 |
+finalX[i] = x + xOffsets[i] + positions[i].x
+finalY[i] = y + positions[i].y
 ```
+
+- When `xOffsets` is not specified, `xOffsets[i]` is treated as 0
+- When `positions` is not specified, `positions[i]` is treated as (0, 0)
+- When neither `xOffsets` nor `positions` is specified: First glyph positioned at (x, y), subsequent glyphs positioned by accumulating each Glyph's `advance` attribute
+
+**Transform Application Order**:
+
+When a glyph has scale, rotation, or skew transforms, they are applied in the following order (consistent with TextModifier):
+
+1. Translate to anchor (`translate(-anchor)`)
+2. Scale (`scale`)
+3. Skew (`skew`, along vertical axis)
+4. Rotate (`rotation`)
+5. Translate back from anchor (`translate(anchor)`)
+6. Translate to position (`translate(position)`)
+
+**Anchor Description**:
+
+- Each glyph's **default anchor** is at `(advance × 0.5, 0)`, the horizontal center at baseline
+- The `anchors` attribute records offsets relative to the default anchor, final anchor = default anchor + anchors[i]
 
 **Pre-layout Examples**:
 
 ```xml
-<Resources>
-  <!-- Embedded font: contains glyphs for H, e, l, o -->
-  <Font id="myFont" unitsPerEm="1000">
-    <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700"/>
-    <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z"/>
-    <Glyph path="M 100 0 L 100 700 L 350 700"/>
-    <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z"/>
-  </Font>
-</Resources>
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="200">
+  <Resources>
+    <!-- Embedded font: contains glyphs for H, e, l, o -->
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
 
-<Layer>
-  <!-- Pre-layout text "Hello": Horizontal mode (single-line horizontal text) -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" y="100" xPositions="0,30,55,70,85"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- Example 1: Basic usage (sequentially accumulating advance) -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" x="20" y="50"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
 
-<Layer>
-  <!-- Pre-layout text: Point mode (multi-line text) -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" positions="0,50;30,50;55,50;0,100;30,100"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- Example 2: Custom X offsets for single-line horizontal text -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
+                y="100" xOffsets="20,50,75,90,105"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
 
-<Layer>
-  <!-- Pre-layout text: RSXform mode (path text, each glyph rotated) -->
-  <Text fontFamily="Arial" fontSize="24">
-    <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
-              xforms="1,0,0,50;0.98,0.17,30,48;0.94,0.34,60,42;0.87,0.5,90,32;0.77,0.64,120,18"/>
-  </Text>
-  <Fill color="#333333"/>
-</Layer>
+  <!-- Example 3: Free positioning for multi-line text -->
+  <Layer>
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4" 
+                positions="20,150;50,150;75,150;20,180;50,180"/>
+    </Text>
+    <Fill color="#333333"/>
+  </Layer>
+</pagx>
+```
+
+**Pre-layout Example with Transforms** (path text scenario):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="150">
+  <Resources>
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
+
+  <Layer>
+    <!-- Text arranged along an arc: each glyph has different position and rotation -->
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
+                positions="30,100;70,80;120,70;170,80;210,100"
+                rotations="-30,-15,0,15,30"/>
+    </Text>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>
+```
+
+**Example with Scale and Skew**:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx version="1.0" width="300" height="100">
+  <Resources>
+    <Font id="myFont" unitsPerEm="1000">
+      <Glyph path="M 0 0 L 0 700 M 0 350 L 400 350 M 400 0 L 400 700" advance="500"/>
+      <Glyph path="M 50 250 C 50 450 350 450 350 250 C 350 50 50 50 50 250 Z" advance="400"/>
+      <Glyph path="M 100 0 L 100 700 L 350 700" advance="350"/>
+      <Glyph path="M 200 350 C 200 550 0 550 0 350 C 0 150 200 150 200 350 Z" advance="400"/>
+    </Font>
+  </Resources>
+
+  <Layer>
+    <!-- Text with scale and skew effects -->
+    <Text fontFamily="Arial" fontSize="24">
+      <GlyphRun font="@myFont" fontSize="24" glyphs="1,2,3,3,4"
+                y="50" xOffsets="20,55,95,125,160"
+                scales="1,1;1.2,1.2;1.5,1.5;1.2,1.2;1,1"
+                skews="0,5,10,5,0"/>
+    </Text>
+    <Fill color="#FF6600"/>
+  </Layer>
+</pagx>
 ```
 
 ### 5.3 Painters
@@ -2791,10 +2855,12 @@ Child elements: `CDATA` text, `GlyphRun`*
 | `glyphs` | string | (required) |
 | `x` | float | 0 |
 | `y` | float | 0 |
-| `xPositions` | string | - |
+| `xOffsets` | string | - |
 | `positions` | string | - |
-| `xforms` | string | - |
-| `matrices` | string | - |
+| `anchors` | string | - |
+| `scales` | string | - |
+| `rotations` | string | - |
+| `skews` | string | - |
 
 ### C.7 Painter Nodes
 
