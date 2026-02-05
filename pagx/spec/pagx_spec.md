@@ -1256,14 +1256,14 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 | `y` | float | 0 | Overall Y offset |
 | `xOffsets` | string | - | Per-glyph X offset, comma-separated |
 | `positions` | string | - | Per-glyph (x,y) offset, semicolon-separated |
-| `anchors` | string | - | Per-glyph anchor offset (x,y), semicolon-separated. Default anchor is (advance×0.5, 0) |
-| `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Default 1,1 |
-| `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Default 0 |
-| `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Default 0 |
+| `anchors` | string | - | Per-glyph anchor offset (x,y), semicolon-separated. The anchor is the center point for scale, rotation, and skew transforms. Default anchor is (advance×0.5, 0) |
+| `scales` | string | - | Per-glyph scale (sx,sy), semicolon-separated. Scaling is applied around the anchor point. Default 1,1 |
+| `rotations` | string | - | Per-glyph rotation angle (degrees), comma-separated. Rotation is applied around the anchor point. Default 0 |
+| `skews` | string | - | Per-glyph skew angle (degrees), comma-separated. Skewing is applied around the anchor point. Default 0 |
 
-**Attribute Stacking**:
+All attributes are optional and can be combined. When an attribute array is shorter than the glyph count, missing values use defaults.
 
-Position attributes `x`, `y`, `xOffsets`, `positions` are not mutually exclusive and can be combined. Final position is calculated as:
+**Position Calculation**:
 
 ```
 finalX[i] = x + xOffsets[i] + positions[i].x
@@ -1285,7 +1285,7 @@ When a glyph has scale, rotation, or skew transforms, they are applied in the fo
 5. Translate back from anchor (`translate(anchor)`)
 6. Translate to position (`translate(position)`)
 
-**Anchor Description**:
+**Anchor**:
 
 - Each glyph's **default anchor** is at `(advance × 0.5, 0)`, the horizontal center at baseline
 - The `anchors` attribute records offsets relative to the default anchor, final anchor = default anchor + anchors[i]

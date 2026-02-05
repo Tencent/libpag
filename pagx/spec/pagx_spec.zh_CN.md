@@ -1256,14 +1256,14 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 | `y` | float | 0 | 总体 Y 偏移 |
 | `xOffsets` | string | - | 每字形 X 偏移，逗号分隔 |
 | `positions` | string | - | 每字形 (x,y) 偏移，分号分隔 |
-| `anchors` | string | - | 每字形锚点偏移 (x,y)，分号分隔。默认锚点为 (advance×0.5, 0) |
-| `scales` | string | - | 每字形缩放 (sx,sy)，分号分隔。默认 1,1 |
-| `rotations` | string | - | 每字形旋转角度（度），逗号分隔。默认 0 |
-| `skews` | string | - | 每字形斜切角度（度），逗号分隔。默认 0 |
+| `anchors` | string | - | 每字形锚点偏移 (x,y)，分号分隔。锚点是缩放、旋转和斜切变换的中心点。默认锚点为 (advance×0.5, 0) |
+| `scales` | string | - | 每字形缩放 (sx,sy)，分号分隔。缩放围绕锚点进行。默认 1,1 |
+| `rotations` | string | - | 每字形旋转角度（度），逗号分隔。旋转围绕锚点进行。默认 0 |
+| `skews` | string | - | 每字形斜切角度（度），逗号分隔。斜切围绕锚点进行。默认 0 |
 
-**属性叠加关系**：
+所有属性均为可选，可任意组合使用。当属性数组长度小于字形数量时，缺失的值使用默认值。
 
-位置属性 `x`、`y`、`xOffsets`、`positions` 不互斥，可叠加使用。最终位置计算如下：
+**位置计算**：
 
 ```
 finalX[i] = x + xOffsets[i] + positions[i].x
@@ -1285,7 +1285,7 @@ finalY[i] = y + positions[i].y
 5. 平移回锚点（`translate(anchor)`）
 6. 平移到位置（`translate(position)`）
 
-**锚点说明**：
+**锚点**：
 
 - 每个字形的**默认锚点**位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置
 - `anchors` 属性记录的是相对于默认锚点的偏移，最终锚点 = 默认锚点 + anchors[i]
