@@ -74,22 +74,25 @@ class GlyphRun : public Node {
 
   /**
    * Per-glyph anchor point offsets relative to the default anchor (advance * 0.5, 0).
-   * The anchor point affects the center of scale and rotation transforms.
+   * The anchor is the center point for scale, rotation, and skew transforms.
    */
   std::vector<Point> anchors = {};
 
   /**
    * Per-glyph scale factors (scaleX, scaleY). Default is (1, 1).
+   * Scaling is applied around the anchor point.
    */
   std::vector<Point> scales = {};
 
   /**
    * Per-glyph rotation angles in degrees. Default is 0.
+   * Rotation is applied around the anchor point.
    */
   std::vector<float> rotations = {};
 
   /**
    * Per-glyph skew angles in degrees (along vertical axis). Default is 0.
+   * Skewing is applied around the anchor point.
    */
   std::vector<float> skews = {};
 
