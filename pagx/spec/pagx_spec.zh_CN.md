@@ -606,7 +606,7 @@ Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，�
 | `path` | string | - | SVG 路径数据（矢量轮廓） |
 | `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
 | `offset` | point | 0,0 | 字形偏移量，设计空间坐标（通常用于位图字形） |
-| `advance` | float | (必填) | 水平步进宽度，设计空间坐标。决定 Default 定位模式下字形间距 |
+| `advance` | float | (必填) | 水平步进宽度，设计空间坐标 |
 
 **字形类型**：
 - **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓
@@ -1263,7 +1263,7 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 2. 有 `xforms` → RSXform 模式：每个字形有旋转+缩放+平移（路径文本）
 3. 有 `positions` → Point 模式：每个字形有独立 (x,y) 位置（多行/复杂布局）
 4. 有 `xPositions` → Horizontal 模式：每个字形有 x 坐标，共享 `y` 值（单行水平文本）
-5. 以上都没有 → Default 模式：根据字体的 `advance` 属性自动计算位置（最简洁格式）
+5. 以上都没有 → Default 模式：根据 Font 字体中每个 Glyph 的 `advance` 属性自动计算水平排版位置，首个字形位于 x=0，后续字形依次累加前一字形的 advance（最简洁格式）
 
 **RSXform 说明**：
 RSXform 是压缩的旋转+缩放矩阵，四个分量 (scos, ssin, tx, ty) 表示：
@@ -1651,7 +1651,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchorPoint` | point | 0,0 | 锚点偏移 |
+| `anchorPoint` | point | 0,0 | 锚点偏移，相对于字形默认锚点位置。每个字形的默认锚点位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置 |
 | `position` | point | 0,0 | 位置偏移 |
 | `rotation` | float | 0 | 旋转 |
 | `scale` | point | 1,1 | 缩放 |

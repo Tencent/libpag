@@ -603,7 +603,7 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `advance` | float | (required) | Horizontal advance width in design space coordinates (unitsPerEm units). Determines spacing to next glyph in Default positioning mode |
+| `advance` | float | (required) | Horizontal advance width in design space coordinates (unitsPerEm units) |
 | `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
 | `offset` | point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
@@ -1263,7 +1263,7 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 2. Has `xforms` → RSXform mode: Each glyph has rotation+scale+translation (path text)
 3. Has `positions` → Point mode: Each glyph has independent (x,y) position (multi-line/complex layout)
 4. Has `xPositions` → Horizontal mode: Each glyph has x coordinate, sharing `y` value (single-line horizontal text)
-5. None of the above → Default mode: Automatically calculate positions from font's `advance` attribute (most compact format)
+5. None of the above → Default mode: Automatically calculate horizontal layout positions from each Glyph's `advance` attribute in Font. First glyph is at x=0, subsequent glyphs are positioned by accumulating the previous glyph's advance (most compact format)
 
 **RSXform**:
 RSXform is a compressed rotation+scale matrix with four components (scos, ssin, tx, ty):
@@ -1653,7 +1653,7 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | point | 0,0 | Anchor point offset |
+| `anchorPoint` | point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
 | `position` | point | 0,0 | Position offset |
 | `rotation` | float | 0 | Rotation |
 | `scale` | point | 1,1 | Scale |

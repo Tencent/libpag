@@ -233,6 +233,47 @@ static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
   return font.getPath(glyphID, &glyphPath) && !glyphPath.isEmpty();
 }
 
+static constexpr float kPositionTolerance = 0.5f;
+
+static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
+                              Font* font,
+                              const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& map,
+                              float fontSize, float* outOffsetY) {
+  if (run.positioning != tgfx::GlyphPositioning::Horizontal &&
+      run.positioning != tgfx::GlyphPositioning::Default) {
+    return false;
+  }
+  if (run.positioning == tgfx::GlyphPositioning::Default) {
+    *outOffsetY = run.offsetY;
+    return true;
+  }
+  if (indices.empty()) {
+    return false;
+  }
+  float scale = fontSize / static_cast<float>(font->unitsPerEm);
+  float expectedX = 0.0f;
+  auto* typeface = run.font.getTypeface().get();
+  for (size_t i : indices) {
+    float actualX = run.positions[i];
+    if (std::abs(actualX - expectedX) > kPositionTolerance) {
+      return false;
+    }
+    GlyphKey key = {typeface, run.glyphs[i]};
+    auto it = map.find(key);
+    if (it == map.end() || it->second == 0) {
+      return false;
+    }
+    tgfx::GlyphID mappedID = it->second;
+    if (mappedID > font->glyphs.size()) {
+      return false;
+    }
+    float advance = font->glyphs[mappedID - 1]->advance * scale;
+    expectedX += advance;
+  }
+  *outOffsetY = run.offsetY;
+  return true;
+}
+
 static GlyphRun* CreateGlyphRunForIndices(
     PAGXDocument* document, const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
     Font* font,
@@ -250,6 +291,13 @@ static GlyphRun* CreateGlyphRunForIndices(
     } else {
       glyphRun->glyphs.push_back(0);
     }
+  }
+
+  // Try to use Default mode if positions match advance-based layout
+  float offsetY = 0.0f;
+  if (CanUseDefaultMode(run, indices, font, glyphMapping, fontSize, &offsetY)) {
+    glyphRun->y = offsetY;
+    return glyphRun;
   }
 
   switch (run.positioning) {
@@ -293,6 +341,8 @@ static GlyphRun* CreateGlyphRunForIndices(
       }
       break;
     }
+    default:
+      break;
   }
 
   return glyphRun;
