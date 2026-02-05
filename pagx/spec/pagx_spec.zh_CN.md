@@ -1252,7 +1252,8 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 | `font` | idref | (必填) | 引用 Font 资源 `@id` |
 | `fontSize` | float | 12 | 渲染字号。实际缩放比例 = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (必填) | GlyphID 序列，逗号分隔（0 表示缺失字形） |
-| `y` | float | 0 | 共享 y 坐标（仅 Horizontal 模式） |
+| `x` | float | 0 | 起始 x 坐标（仅 Default 模式） |
+| `y` | float | 0 | 共享 y 坐标（Default 和 Horizontal 模式） |
 | `xPositions` | string | - | x 坐标序列，逗号分隔（Horizontal 模式） |
 | `positions` | string | - | (x,y) 坐标序列，分号分隔（Point 模式） |
 | `xforms` | string | - | RSXform 序列 (scos,ssin,tx,ty)，分号分隔（RSXform 模式） |
@@ -1263,7 +1264,7 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 2. 有 `xforms` → RSXform 模式：每个字形有旋转+缩放+平移（路径文本）
 3. 有 `positions` → Point 模式：每个字形有独立 (x,y) 位置（多行/复杂布局）
 4. 有 `xPositions` → Horizontal 模式：每个字形有 x 坐标，共享 `y` 值（单行水平文本）
-5. 以上都没有 → Default 模式：根据 Font 字体中每个 Glyph 的 `advance` 属性自动计算水平排版位置，首个字形位于 x=0，后续字形依次累加前一字形的 advance（最简洁格式）
+5. 以上都没有 → Default 模式：首个字形起始于 `(x, y)`，后续字形依次累加 Font 中每个 Glyph 的 `advance` 属性（最简洁格式）
 
 **RSXform 说明**：
 RSXform 是压缩的旋转+缩放矩阵，四个分量 (scos, ssin, tx, ty) 表示：
@@ -2788,6 +2789,7 @@ Layer / Group
 | `font` | idref | (必填) |
 | `fontSize` | float | 12 |
 | `glyphs` | string | (必填) |
+| `x` | float | 0 |
 | `y` | float | 0 |
 | `xPositions` | string | - |
 | `positions` | string | - |

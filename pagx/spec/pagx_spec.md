@@ -1252,7 +1252,8 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 | `font` | idref | (required) | Font resource reference `@id` |
 | `fontSize` | float | 12 | Rendering font size. Actual scale = `fontSize / font.unitsPerEm` |
 | `glyphs` | string | (required) | GlyphID sequence, comma-separated (0 means missing glyph) |
-| `y` | float | 0 | Shared y coordinate (Horizontal mode only) |
+| `x` | float | 0 | Starting x coordinate (Default mode only) |
+| `y` | float | 0 | Shared y coordinate (Default and Horizontal modes) |
 | `xPositions` | string | - | x coordinate sequence, comma-separated (Horizontal mode) |
 | `positions` | string | - | (x,y) coordinate sequence, semicolon-separated (Point mode) |
 | `xforms` | string | - | RSXform sequence (scos,ssin,tx,ty), semicolon-separated (RSXform mode) |
@@ -1263,7 +1264,7 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 2. Has `xforms` → RSXform mode: Each glyph has rotation+scale+translation (path text)
 3. Has `positions` → Point mode: Each glyph has independent (x,y) position (multi-line/complex layout)
 4. Has `xPositions` → Horizontal mode: Each glyph has x coordinate, sharing `y` value (single-line horizontal text)
-5. None of the above → Default mode: Automatically calculate horizontal layout positions from each Glyph's `advance` attribute in Font. First glyph is at x=0, subsequent glyphs are positioned by accumulating the previous glyph's advance (most compact format)
+5. None of the above → Default mode: First glyph starts at `(x, y)`, subsequent glyphs are positioned by accumulating each Glyph's `advance` attribute in Font (most compact format)
 
 **RSXform**:
 RSXform is a compressed rotation+scale matrix with four components (scos, ssin, tx, ty):
@@ -2788,6 +2789,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 | `font` | idref | (required) |
 | `fontSize` | float | 12 |
 | `glyphs` | string | (required) |
+| `x` | float | 0 |
 | `y` | float | 0 |
 | `xPositions` | string | - |
 | `positions` | string | - |

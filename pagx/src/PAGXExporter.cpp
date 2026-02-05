@@ -535,6 +535,10 @@ static void writeVectorElement(XMLBuilder& xml, const Element* node, const Optio
             // Horizontal mode
             xml.addAttribute("y", run->y);
             xml.addRequiredAttribute("xPositions", floatListToString(run->xPositions));
+          } else {
+            // Default mode: use x/y as starting point
+            xml.addAttribute("x", run->x);
+            xml.addAttribute("y", run->y);
           }
 
           xml.closeElementSelfClosing();

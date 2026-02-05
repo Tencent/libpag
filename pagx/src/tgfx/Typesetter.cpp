@@ -126,6 +126,7 @@ class TypesetterContext {
     tgfx::Font font = {};
     std::vector<tgfx::GlyphID> glyphIDs = {};
     std::vector<float> xPositions = {};
+    float startX = 0;
     bool canUseDefaultMode = true;
   };
 
@@ -298,8 +299,8 @@ class TypesetterContext {
       }
 
       if (run.canUseDefaultMode) {
-        // Default mode: use font's advance values to position glyphs
-        auto& buffer = builder.allocRun(run.font, run.glyphIDs.size(), 0, 0);
+        // Default mode: use font's advance values to position glyphs, starting at run.startX
+        auto& buffer = builder.allocRun(run.font, run.glyphIDs.size(), run.startX, 0);
         memcpy(buffer.glyphs, run.glyphIDs.data(), run.glyphIDs.size() * sizeof(tgfx::GlyphID));
       } else {
         auto& buffer = builder.allocRunPosH(run.font, run.glyphIDs.size(), 0);
@@ -372,7 +373,7 @@ class TypesetterContext {
         memcpy(buffer.positions, run->xPositions.data(), count * sizeof(float));
       } else {
         // Default mode: use font's advance values to position glyphs
-        auto& buffer = builder.allocRun(font, count, 0, run->y);
+        auto& buffer = builder.allocRun(font, count, run->x, run->y);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
         // No positions to fill - tgfx will compute from font advances
       }
@@ -544,8 +545,9 @@ class TypesetterContext {
           currentRun->font = glyphFont;
           currentTypeface = glyphTypeface;
           runStartX = currentX;
-          // Can use Default mode only if run starts at 0 and no letterSpacing
-          currentRun->canUseDefaultMode = FloatNearlyEqual(runStartX, 0.0f) && !hasLetterSpacing;
+          currentRun->startX = runStartX;
+          // Can use Default mode if no letterSpacing (positions follow advance values)
+          currentRun->canUseDefaultMode = !hasLetterSpacing;
         }
 
         currentRun->xPositions.push_back(currentX);

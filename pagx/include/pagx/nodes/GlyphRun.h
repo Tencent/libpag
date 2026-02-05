@@ -65,7 +65,12 @@ class GlyphRun : public Node {
   std::vector<uint16_t> glyphs = {};
 
   /**
-   * Shared y coordinate for Horizontal positioning mode. The default value is 0.
+   * Starting x coordinate for Default positioning mode. The default value is 0.
+   */
+  float x = 0.0f;
+
+  /**
+   * Shared y coordinate for Default and Horizontal positioning modes. The default value is 0.
    */
   float y = 0.0f;
 

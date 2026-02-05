@@ -241,12 +241,15 @@ static bool IsVectorGlyph(const tgfx::Font& font, tgfx::GlyphID glyphID) {
 static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_t>& indices,
                               Font* font,
                               const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& map,
-                              float fontSize, float* outOffsetY) {
+                              float fontSize, float* outOffsetX, float* outOffsetY) {
   if (run.positioning != tgfx::GlyphPositioning::Horizontal &&
       run.positioning != tgfx::GlyphPositioning::Default) {
     return false;
   }
   if (run.positioning == tgfx::GlyphPositioning::Default) {
+    // Default mode doesn't have explicit positions, so we can't extract startX from positions.
+    // This case is already Default mode, just pass through.
+    *outOffsetX = 0;
     *outOffsetY = run.offsetY;
     return true;
   }
@@ -254,7 +257,9 @@ static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_
     return false;
   }
   float scale = fontSize / static_cast<float>(font->unitsPerEm);
-  float expectedX = 0.0f;
+  // Use first glyph's x position as the starting point
+  float startX = run.positions[indices[0]];
+  float expectedX = startX;
   auto* typeface = run.font.getTypeface().get();
   for (size_t i : indices) {
     float actualX = run.positions[i];
@@ -273,6 +278,7 @@ static bool CanUseDefaultMode(const tgfx::GlyphRun& run, const std::vector<size_
     float advance = font->glyphs[mappedID - 1]->advance * scale;
     expectedX += advance;
   }
+  *outOffsetX = startX;
   *outOffsetY = run.offsetY;
   return true;
 }
@@ -297,8 +303,10 @@ static GlyphRun* CreateGlyphRunForIndices(
   }
 
   // Try to use Default mode if positions match advance-based layout
+  float offsetX = 0.0f;
   float offsetY = 0.0f;
-  if (CanUseDefaultMode(run, indices, font, glyphMapping, fontSize, &offsetY)) {
+  if (CanUseDefaultMode(run, indices, font, glyphMapping, fontSize, &offsetX, &offsetY)) {
+    glyphRun->x = offsetX;
     glyphRun->y = offsetY;
     return glyphRun;
   }
