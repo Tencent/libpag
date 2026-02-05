@@ -1646,7 +1646,7 @@ Text Element           Shape Modifier          Subsequent Modifiers
 Applies transforms and style overrides to glyphs within selected ranges. TextModifier may contain multiple RangeSelector child elements.
 
 ```xml
-<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
   <RangeSelector start="0" end="0.5" shape="rampUp"/>
   <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
@@ -1654,7 +1654,7 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | Point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
+| `anchor` | Point | 0,0 | Anchor point offset, relative to glyph's default anchor position. Each glyph's default anchor is at `(advance × 0.5, 0)`, the horizontal center at baseline |
 | `position` | Point | 0,0 | Position offset |
 | `rotation` | float | 0 | Rotation |
 | `scale` | Point | 1,1 | Scale |
@@ -1678,11 +1678,11 @@ The `factor` calculated by the selector ranges from [-1, 1] and controls the deg
 factor = clamp(selectorFactor × weight, -1, 1)
 
 // Position and rotation: apply factor linearly
-transform = translate(-anchorPoint × factor) 
+transform = translate(-anchor × factor) 
           × scale(1 + (scale - 1) × factor)  // Scale interpolates from 1 to target value
           × skew(skew × factor, skewAxis)
           × rotate(rotation × factor)
-          × translate(anchorPoint × factor)
+          × translate(anchor × factor)
           × translate(position × factor)
 
 // Opacity: use absolute value of factor
@@ -1891,7 +1891,7 @@ Rich text is achieved through multiple Text elements within a Group, each Text h
 Repeater duplicates accumulated content and rendered styles, applying progressive transforms to each copy. Repeater affects both Paths and glyph lists simultaneously, and does not trigger text-to-shape conversion.
 
 ```xml
-<Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+<Repeater copies="5" offset="1" order="belowOriginal" anchor="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
 
 | Attribute | Type | Default | Description |
@@ -1899,7 +1899,7 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 | `copies` | float | 3 | Number of copies |
 | `offset` | float | 0 | Start offset |
 | `order` | RepeaterOrder | belowOriginal | Stacking order |
-| `anchorPoint` | Point | 0,0 | Anchor point |
+| `anchor` | Point | 0,0 | Anchor point |
 | `position` | Point | 100,100 | Position offset per copy |
 | `rotation` | float | 0 | Rotation per copy |
 | `scale` | Point | 1,1 | Scale per copy |
@@ -1909,11 +1909,11 @@ Repeater duplicates accumulated content and rendered styles, applying progressiv
 **Transform Calculation** (i-th copy, i starts from 0):
 ```
 progress = i + offset
-matrix = translate(-anchorPoint) 
+matrix = translate(-anchor) 
        × scale(scale^progress)      // Exponential scaling
        × rotate(rotation × progress) // Linear rotation
        × translate(position × progress) // Linear translation
-       × translate(anchorPoint)
+       × translate(anchor)
 ```
 
 **Opacity Interpolation**:
@@ -1972,7 +1972,7 @@ Group is a VectorElement container with transform properties.
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Group anchorPoint="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
+    <Group anchor="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
       <Rectangle center="50,50" size="80,80"/>
       <Fill color="#FF6600"/>
     </Group>
@@ -1982,7 +1982,7 @@ Group is a VectorElement container with transform properties.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `anchorPoint` | Point | 0,0 | Anchor point "x,y" |
+| `anchor` | Point | 0,0 | Anchor point "x,y" |
 | `position` | Point | 0,0 | Position "x,y" |
 | `rotation` | float | 0 | Rotation angle |
 | `scale` | Point | 1,1 | Scale "sx,sy" |
@@ -1994,7 +1994,7 @@ Group is a VectorElement container with transform properties.
 
 Transforms are applied in the following order:
 
-1. Translate to negative anchor point (`translate(-anchorPoint)`)
+1. Translate to negative anchor point (`translate(-anchor)`)
 2. Scale (`scale`)
 3. Skew (`skew` along `skewAxis` direction)
 4. Rotate (`rotation`)
@@ -2002,7 +2002,7 @@ Transforms are applied in the following order:
 
 **Transform Matrix**:
 ```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchorPoint)
+M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
 ```
 
 **Skew Transform**:
@@ -2332,7 +2332,7 @@ The following example covers all major node types in PAGX, demonstrating complet
     <Group position="580,0">
       <Ellipse center="25,0" size="10,10"/>
       <Fill color="@cyan"/>
-      <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
+      <Repeater copies="8" rotation="45" anchor="0,0" startAlpha="1" endAlpha="0.15"/>
     </Group>
     
     <!-- Mask Example -->
@@ -2853,7 +2853,7 @@ Child elements: `CDATA` text, `GlyphRun`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `anchorPoint` | Point | 0,0 |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |
@@ -2914,7 +2914,7 @@ Child elements: `RangeSelector`*
 | `copies` | float | 3 |
 | `offset` | float | 0 |
 | `order` | RepeaterOrder | belowOriginal |
-| `anchorPoint` | Point | 0,0 |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 100,100 |
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |
@@ -2925,7 +2925,7 @@ Child elements: `RangeSelector`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
-| `anchorPoint` | Point | 0,0 |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |

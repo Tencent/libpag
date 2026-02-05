@@ -1644,7 +1644,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。TextModifier 可包含多个 RangeSelector 子元素，用于定义不同的选择范围和影响因子。
 
 ```xml
-<TextModifier anchorPoint="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
   <RangeSelector start="0" end="0.5" shape="rampUp"/>
   <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
@@ -1652,7 +1652,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchorPoint` | Point | 0,0 | 锚点偏移，相对于字形默认锚点位置。每个字形的默认锚点位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置 |
+| `anchor` | Point | 0,0 | 锚点偏移，相对于字形默认锚点位置。每个字形的默认锚点位于 `(advance × 0.5, 0)`，即字形水平中心的基线位置 |
 | `position` | Point | 0,0 | 位置偏移 |
 | `rotation` | float | 0 | 旋转 |
 | `scale` | Point | 1,1 | 缩放 |
@@ -1676,11 +1676,11 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 factor = clamp(selectorFactor × weight, -1, 1)
 
 // 位置和旋转：线性应用 factor
-transform = translate(-anchorPoint × factor) 
+transform = translate(-anchor × factor) 
           × scale(1 + (scale - 1) × factor)  // 缩放从 1 插值到目标值
           × skew(skew × factor, skewAxis)
           × rotate(rotation × factor)
-          × translate(anchorPoint × factor)
+          × translate(anchor × factor)
           × translate(position × factor)
 
 // 透明度：使用 factor 的绝对值
@@ -1889,7 +1889,7 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 复制累积的内容和已渲染的样式，对每个副本应用渐进变换。Repeater 对 Path 和字形列表同时生效，且不会触发文本转形状。
 
 ```xml
-<Repeater copies="5" offset="1" order="belowOriginal" anchorPoint="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
+<Repeater copies="5" offset="1" order="belowOriginal" anchor="0,0" position="50,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="0.2"/>
 ```
 
 | 属性 | 类型 | 默认值 | 说明 |
@@ -1897,7 +1897,7 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 | `copies` | float | 3 | 副本数 |
 | `offset` | float | 0 | 起始偏移 |
 | `order` | RepeaterOrder | belowOriginal | 堆叠顺序（见下方） |
-| `anchorPoint` | Point | 0,0 | 锚点 |
+| `anchor` | Point | 0,0 | 锚点 |
 | `position` | Point | 100,100 | 每个副本的位置偏移 |
 | `rotation` | float | 0 | 每个副本的旋转 |
 | `scale` | Point | 1,1 | 每个副本的缩放 |
@@ -1907,11 +1907,11 @@ TextLayout 是文本排版修改器，对累积的 Text 元素应用排版，会
 **变换计算**（第 i 个副本，i 从 0 开始）：
 ```
 progress = i + offset
-matrix = translate(-anchorPoint) 
+matrix = translate(-anchor) 
        × scale(scale^progress)      // 指数缩放
        × rotate(rotation × progress) // 线性旋转
        × translate(position × progress) // 线性位移
-       × translate(anchorPoint)
+       × translate(anchor)
 ```
 
 **透明度插值**：
@@ -1970,7 +1970,7 @@ Group 是带变换属性的矢量元素容器。
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx version="1.0" width="200" height="200">
   <Layer>
-    <Group anchorPoint="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
+    <Group anchor="50,50" position="100,100" rotation="45" scale="1,1" alpha="0.8">
       <Rectangle center="50,50" size="80,80"/>
       <Fill color="#FF6600"/>
     </Group>
@@ -1980,7 +1980,7 @@ Group 是带变换属性的矢量元素容器。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `anchorPoint` | Point | 0,0 | 锚点 "x,y" |
+| `anchor` | Point | 0,0 | 锚点 "x,y" |
 | `position` | Point | 0,0 | 位置 "x,y" |
 | `rotation` | float | 0 | 旋转角度 |
 | `scale` | Point | 1,1 | 缩放 "sx,sy" |
@@ -1992,7 +1992,7 @@ Group 是带变换属性的矢量元素容器。
 
 变换按以下顺序应用（后应用的变换先计算）：
 
-1. 平移到锚点的负方向（`translate(-anchorPoint)`）
+1. 平移到锚点的负方向（`translate(-anchor)`）
 2. 缩放（`scale`）
 3. 倾斜（`skew` 沿 `skewAxis` 方向）
 4. 旋转（`rotation`）
@@ -2000,7 +2000,7 @@ Group 是带变换属性的矢量元素容器。
 
 **变换矩阵**：
 ```
-M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchorPoint)
+M = translate(position) × rotate(rotation) × skew(skew, skewAxis) × scale(scale) × translate(-anchor)
 ```
 
 **倾斜变换**：
@@ -2330,7 +2330,7 @@ Layer / Group
     <Group position="580,0">
       <Ellipse center="25,0" size="10,10"/>
       <Fill color="@cyan"/>
-      <Repeater copies="8" rotation="45" anchorPoint="0,0" startAlpha="1" endAlpha="0.15"/>
+      <Repeater copies="8" rotation="45" anchor="0,0" startAlpha="1" endAlpha="0.15"/>
     </Group>
     
     <!-- 遮罩示例 -->
@@ -2853,7 +2853,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `anchorPoint` | Point | 0,0 |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |
@@ -2914,7 +2914,7 @@ Layer / Group
 | `copies` | float | 3 |
 | `offset` | float | 0 |
 | `order` | RepeaterOrder | belowOriginal |
-| `anchorPoint` | Point | 0,0 |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 100,100 |
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |
@@ -2925,7 +2925,7 @@ Layer / Group
 
 | 属性 | 类型 | 默认值 |
 |------|------|--------|
-| `anchorPoint` | Point | 0,0 |
+| `anchor` | Point | 0,0 |
 | `position` | Point | 0,0 |
 | `rotation` | float | 0 |
 | `scale` | Point | 1,1 |
