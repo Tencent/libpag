@@ -125,6 +125,11 @@ void PAGXView::applyCenteringTransform() {
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
+  if (zoom <= 1.0f) {
+    displayList.setSubtreeCacheMaxSize(1024);
+  } else {
+    displayList.setSubtreeCacheMaxSize(0);
+  }
 
   if (zoomChanged) {
     if (!isZooming) {
