@@ -18,8 +18,8 @@
 
 #include "pagx/FontEmbedder.h"
 #include <algorithm>
-#include <cmath>
 #include <unordered_map>
+#include "MathUtil.h"
 #include "SVGPathParser.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
@@ -33,11 +33,6 @@
 namespace pagx {
 
 static constexpr int VectorFontUnitsPerEm = 1000;
-static constexpr float FloatNearlyZero = 1.0f / (1 << 12);
-
-static bool FloatNearlyEqual(float x, float y) {
-  return std::abs(x - y) <= FloatNearlyZero;
-}
 
 static std::string PathToSVGString(const tgfx::Path& path) {
   std::string result = {};

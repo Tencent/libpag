@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/Typesetter.h"
-#include <cmath>
 #include "Base64.h"
+#include "MathUtil.h"
 #include "SVGPathParser.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
@@ -33,12 +33,6 @@
 #include "tgfx/core/TextBlobBuilder.h"
 
 namespace pagx {
-
-static constexpr float FloatNearlyZero = 1.0f / (1 << 12);
-
-static bool FloatNearlyEqual(float x, float y) {
-  return std::abs(x - y) <= FloatNearlyZero;
-}
 
 void Typesetter::registerTypeface(std::shared_ptr<tgfx::Typeface> typeface) {
   if (typeface == nullptr) {
