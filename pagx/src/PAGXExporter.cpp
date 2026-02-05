@@ -1010,6 +1010,7 @@ static void writeResource(XMLBuilder& xml, const Node* node, const Options& opti
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             xml.addAttribute("offset", pointToString(glyph->offset));
           }
+          xml.addRequiredAttribute("advance", glyph->advance);
           xml.closeElementSelfClosing();
         }
         xml.closeElement();

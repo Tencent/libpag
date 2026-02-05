@@ -149,6 +149,10 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
   glyph->path = document->makeNode<PathData>();
   *glyph->path = PathDataFromSVGString(PathToSVGString(glyphPath));
 
+  // Get advance in font size space and scale to unitsPerEm space
+  float advance = font.getAdvance(glyphID);
+  glyph->advance = advance * scale;
+
   builder.font->glyphs.push_back(glyph);
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());
 }
@@ -215,6 +219,10 @@ static void CollectBitmapGlyph(
   float backingSize = static_cast<float>(builder.backingSize);
   glyph->offset.x = imageMatrix.getTranslateX() / fontSize * backingSize;
   glyph->offset.y = imageMatrix.getTranslateY() / fontSize * backingSize;
+
+  // Get advance in font size space and scale to unitsPerEm (backingSize) space
+  float advance = font.getAdvance(glyphID);
+  glyph->advance = advance / fontSize * backingSize;
 
   builder.font->glyphs.push_back(glyph);
   builder.glyphMapping[key] = static_cast<tgfx::GlyphID>(builder.font->glyphs.size());

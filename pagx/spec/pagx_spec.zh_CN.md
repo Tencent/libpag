@@ -576,14 +576,14 @@ Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或
 ```xml
 <!-- 嵌入矢量字体 -->
 <Font id="myFont" unitsPerEm="1000">
-  <Glyph path="M 50 0 L 300 700 L 550 0 Z"/>
-  <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
+  <Glyph path="M 50 0 L 300 700 L 550 0 Z" advance="600"/>
+  <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z" advance="550"/>
 </Font>
 
 <!-- 嵌入位图字体（Emoji） -->
 <Font id="emojiFont" unitsPerEm="136">
-  <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
-  <Glyph image="emoji/heart.png" offset="0,-5"/>
+  <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..." advance="136"/>
+  <Glyph image="emoji/heart.png" offset="0,-5" advance="136"/>
 </Font>
 ```
 
@@ -606,12 +606,13 @@ Glyph 定义单个字形的渲染数据。`path` 和 `image` 二选一必填，�
 | `path` | string | - | SVG 路径数据（矢量轮廓） |
 | `image` | string | - | 图片数据（base64 数据 URI）或外部文件路径 |
 | `offset` | point | 0,0 | 字形偏移量，设计空间坐标（通常用于位图字形） |
+| `advance` | float | (必填) | 水平步进宽度，设计空间坐标。决定 Default 定位模式下字形间距 |
 
 **字形类型**：
 - **矢量字形**：指定 `path` 属性，使用 SVG 路径语法描述轮廓
 - **位图字形**：指定 `image` 属性，用于 Emoji 等彩色字形，可通过 `offset` 调整位置
 
-**坐标系说明**：字形路径和偏移均使用设计空间坐标。渲染时根据 GlyphRun 的 `fontSize` 和 Font 的 `unitsPerEm` 计算缩放比例：`scale = fontSize / unitsPerEm`。
+**坐标系说明**：字形路径、偏移和步进均使用设计空间坐标。渲染时根据 GlyphRun 的 `fontSize` 和 Font 的 `unitsPerEm` 计算缩放比例：`scale = fontSize / unitsPerEm`。
 
 ### 3.4 文档层级结构
 
@@ -1262,7 +1263,7 @@ GlyphRun 定义一组字形的预排版数据，每个 GlyphRun 独立引用一�
 2. 有 `xforms` → RSXform 模式：每个字形有旋转+缩放+平移（路径文本）
 3. 有 `positions` → Point 模式：每个字形有独立 (x,y) 位置（多行/复杂布局）
 4. 有 `xPositions` → Horizontal 模式：每个字形有 x 坐标，共享 `y` 值（单行水平文本）
-5. 仅 `glyphs` → 不支持，必须提供位置数据
+5. 以上都没有 → Default 模式：根据字体的 `advance` 属性自动计算位置（最简洁格式）
 
 **RSXform 说明**：
 RSXform 是压缩的旋转+缩放矩阵，四个分量 (scos, ssin, tx, ty) 表示：
@@ -2554,6 +2555,7 @@ Layer / Group
 | `path` | string | - |
 | `image` | string | - |
 | `offset` | point | 0,0 |
+| `advance` | float | (必填) |
 
 #### SolidColor
 

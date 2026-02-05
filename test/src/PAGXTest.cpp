@@ -847,12 +847,12 @@ PAG_TEST(PAGXTest, PathTypefaceBasic) {
   tgfx::PathTypefaceBuilder builder;
   auto path1 = tgfx::SVGPathParser::FromSVGString("M0 0 L40 0 L40 50 L0 50 Z");
   ASSERT_TRUE(path1 != nullptr);
-  auto glyphId1 = builder.addGlyph(*path1);
+  auto glyphId1 = builder.addGlyph(*path1, 50);
   EXPECT_EQ(glyphId1, 1);
 
   auto path2 = tgfx::SVGPathParser::FromSVGString("M0 0 L20 50 L40 0 Z");
   ASSERT_TRUE(path2 != nullptr);
-  auto glyphId2 = builder.addGlyph(*path2);
+  auto glyphId2 = builder.addGlyph(*path2, 50);
   EXPECT_EQ(glyphId2, 2);
 
   auto typeface = builder.detach();

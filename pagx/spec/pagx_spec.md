@@ -576,14 +576,14 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 ```xml
 <!-- Embedded vector font -->
 <Font id="myFont" unitsPerEm="1000">
-  <Glyph path="M 50 0 L 300 700 L 550 0 Z"/>
-  <Glyph path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
+  <Glyph advance="600" path="M 50 0 L 300 700 L 550 0 Z"/>
+  <Glyph advance="550" path="M 100 0 L 100 700 L 400 700 C 550 700 550 400 400 400 Z"/>
 </Font>
 
 <!-- Embedded bitmap font (Emoji) -->
 <Font id="emojiFont" unitsPerEm="136">
-  <Glyph image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
-  <Glyph image="emoji/heart.png" offset="0,-5"/>
+  <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
+  <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
 ```
 
@@ -603,6 +603,7 @@ Glyph defines rendering data for a single glyph. Either `path` or `image` must b
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `advance` | float | (required) | Horizontal advance width in design space coordinates (unitsPerEm units). Determines spacing to next glyph in Default positioning mode |
 | `path` | string | - | SVG path data (vector outline) |
 | `image` | string | - | Image data (base64 data URI) or external file path |
 | `offset` | point | 0,0 | Glyph offset in design space coordinates (typically used for bitmap glyphs) |
@@ -1262,7 +1263,7 @@ GlyphRun defines pre-layout data for a group of glyphs, each GlyphRun independen
 2. Has `xforms` → RSXform mode: Each glyph has rotation+scale+translation (path text)
 3. Has `positions` → Point mode: Each glyph has independent (x,y) position (multi-line/complex layout)
 4. Has `xPositions` → Horizontal mode: Each glyph has x coordinate, sharing `y` value (single-line horizontal text)
-5. Only `glyphs` → Not supported; position data must be provided
+5. None of the above → Default mode: Automatically calculate positions from font's `advance` attribute (most compact format)
 
 **RSXform**:
 RSXform is a compressed rotation+scale matrix with four components (scos, ssin, tx, ty):
@@ -2551,6 +2552,7 @@ Child elements: `Glyph`*
 
 | Attribute | Type | Default |
 |-----------|------|---------|
+| `advance` | float | (required) |
 | `path` | string | - |
 | `image` | string | - |
 | `offset` | point | 0,0 |

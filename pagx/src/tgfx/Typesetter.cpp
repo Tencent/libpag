@@ -324,7 +324,7 @@ class TypesetterContext {
       tgfx::Font font(typeface, fontSizeForTypeface);
       size_t count = run->glyphs.size();
 
-      // Determine positioning mode
+      // Determine positioning mode (priority: matrices > xforms > positions > xPositions > Default)
       if (!run->matrices.empty() && run->matrices.size() >= count) {
         auto& buffer = builder.allocRunMatrix(font, count);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
@@ -357,6 +357,11 @@ class TypesetterContext {
         auto& buffer = builder.allocRunPosH(font, count, run->y);
         memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
         memcpy(buffer.positions, run->xPositions.data(), count * sizeof(float));
+      } else {
+        // Default mode: use font's advance values to position glyphs
+        auto& buffer = builder.allocRun(font, count, 0, run->y);
+        memcpy(buffer.glyphs, run->glyphs.data(), count * sizeof(tgfx::GlyphID));
+        // No positions to fill - tgfx will compute from font advances
       }
     }
 
@@ -394,7 +399,7 @@ class TypesetterContext {
           if (glyph->offset.x != 0 || glyph->offset.y != 0) {
             path.transform(tgfx::Matrix::MakeTrans(glyph->offset.x, glyph->offset.y));
           }
-          builder.addGlyph(path);
+          builder.addGlyph(path, glyph->advance);
         }
       }
       typeface = builder.detach();
@@ -423,7 +428,7 @@ class TypesetterContext {
           }
 
           if (codec) {
-            builder.addGlyph(codec, ToTGFXPoint(glyph->offset));
+            builder.addGlyph(codec, ToTGFXPoint(glyph->offset), glyph->advance);
           }
         }
       }

@@ -47,6 +47,12 @@ class Glyph : public Node {
    */
   Point offset = {};
 
+  /**
+   * Horizontal advance width in design space (unitsPerEm coordinates). This value determines the
+   * spacing to the next glyph when using Default positioning mode.
+   */
+  float advance = 0.0f;
+
   NodeType nodeType() const override {
     return NodeType::Glyph;
   }

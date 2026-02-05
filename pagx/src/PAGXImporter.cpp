@@ -1283,6 +1283,7 @@ static Glyph* parseGlyph(const XMLNode* node, PAGXDocument* doc) {
   if (!offsetStr.empty()) {
     glyph->offset = parsePoint(offsetStr);
   }
+  glyph->advance = getFloatAttribute(node, "advance", 0);
   return glyph;
 }
 
