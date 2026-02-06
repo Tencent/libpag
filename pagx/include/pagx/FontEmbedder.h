@@ -19,12 +19,12 @@
 #pragma once
 
 #include "pagx/PAGXDocument.h"
-#include "pagx/TextGlyphs.h"
+#include "pagx/ShapedText.h"
 
 namespace pagx {
 
 /**
- * FontEmbedder extracts glyph data from TextGlyphsMap and embeds it into the PAGXDocument.
+ * FontEmbedder extracts glyph data from ShapedTextMap and embeds it into the PAGXDocument.
  * It creates Font nodes with glyph paths/images and updates Text nodes with GlyphRun data.
  *
  * Font merging strategy:
@@ -37,18 +37,18 @@ class FontEmbedder {
   FontEmbedder() = default;
 
   /**
-   * Embeds font data from TextGlyphsMap into the document.
+   * Embeds font data from ShapedTextMap into the document.
    *
    * This method:
-   * 1. Iterates all TextBlobs in textGlyphsMap, extracts glyph data (paths or images)
+   * 1. Iterates all TextBlobs in shapedTextMap, extracts glyph data (paths or images)
    * 2. Merges glyphs into Font nodes (one for vector, one for bitmap)
    * 3. Creates GlyphRun nodes for each Text, referencing the embedded fonts
    *
    * @param document The document to embed fonts into (modified in place).
-   * @param textGlyphsMap The typesetting results containing Text -> TextGlyphs mappings.
+   * @param shapedTextMap The typesetting results containing Text -> ShapedText mappings.
    * @return true if embedding succeeded, false otherwise.
    */
-  bool embed(PAGXDocument* document, const TextGlyphsMap& textGlyphsMap);
+  bool embed(PAGXDocument* document, const ShapedTextMap& shapedTextMap);
 };
 
 }  // namespace pagx

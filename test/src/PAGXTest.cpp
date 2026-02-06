@@ -27,7 +27,7 @@
 #include "pagx/SVGImporter.h"
 #include "pagx/Typesetter.h"
 #include "pagx/FontEmbedder.h"
-#include "pagx/TextGlyphs.h"
+#include "pagx/ShapedText.h"
 #include "../../pagx/src/StringParser.h"
 #include "../../pagx/src/SVGPathParser.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -148,8 +148,8 @@ PAG_TEST(PAGXTest, SVGToPAGXAll) {
     }
 
     // Step 2: Typeset text elements and embed fonts
-    auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+    auto shapedText = typesetter.shape(doc.get());
+    pagx::FontEmbedder().embed(doc.get(), shapedText);
 
     // Step 3: Export to XML and save as PAGX file
     std::string xml = pagx::PAGXExporter::ToXML(*doc);
@@ -1109,9 +1109,9 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   // Step 2: Typeset text and embed fonts
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(typefaces);
-  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-  EXPECT_FALSE(textGlyphs.empty());
-  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+  auto shapedText = typesetter.shape(doc.get());
+  EXPECT_FALSE(shapedText.empty());
+  pagx::FontEmbedder().embed(doc.get(), shapedText);
 
   // Verify Font resources were added
   bool hasFontResource = false;
@@ -1177,7 +1177,7 @@ PAG_TEST(PAGXTest, TextShaperRoundTrip) {
   }
   EXPECT_TRUE(glyphRunFound);
 
-  // Intentionally not providing TextGlyphs to verify embedded font works
+  // Intentionally not providing ShapedText to verify embedded font works
   auto reloadedLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
   ASSERT_TRUE(reloadedLayer != nullptr);
 
@@ -1222,9 +1222,9 @@ PAG_TEST(PAGXTest, TextShaperMultipleText) {
   // Typeset text and embed fonts
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(typefaces);
-  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-  EXPECT_FALSE(textGlyphs.empty());
-  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+  auto shapedText = typesetter.shape(doc.get());
+  EXPECT_FALSE(shapedText.empty());
+  pagx::FontEmbedder().embed(doc.get(), shapedText);
 
   // Render typeset document
   auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
@@ -1278,9 +1278,9 @@ PAG_TEST(PAGXTest, TextShaperEmoji) {
   // Typeset text and embed fonts
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(typefaces);
-  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-  EXPECT_FALSE(textGlyphs.empty());
-  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+  auto shapedText = typesetter.shape(doc.get());
+  EXPECT_FALSE(shapedText.empty());
+  pagx::FontEmbedder().embed(doc.get(), shapedText);
 
   // Render typeset document
   auto originalLayer = pagx::LayerBuilder::Build(doc.get(), &typesetter);
@@ -1599,8 +1599,8 @@ PAG_TEST(PAGXTest, CompleteExample) {
   // Typeset text elements and embed fonts
   pagx::Typesetter typesetter;
   typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-  auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-  pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+  auto shapedText = typesetter.shape(doc.get());
+  pagx::FontEmbedder().embed(doc.get(), shapedText);
 
   // Build layer tree
   auto layer = pagx::LayerBuilder::Build(doc.get());
@@ -1650,8 +1650,8 @@ PAG_TEST(PAGXTest, SampleFiles) {
 
     pagx::Typesetter typesetter;
     typesetter.setFallbackTypefaces(GetFallbackTypefaces());
-    auto textGlyphs = typesetter.createTextGlyphs(doc.get());
-    pagx::FontEmbedder().embed(doc.get(), textGlyphs);
+    auto shapedText = typesetter.shape(doc.get());
+    pagx::FontEmbedder().embed(doc.get(), shapedText);
 
     auto layer = pagx::LayerBuilder::Build(doc.get());
     if (!layer) {

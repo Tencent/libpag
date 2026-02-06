@@ -91,7 +91,7 @@ class TypesetterContext {
       : typesetter(typesetter), document(document) {
   }
 
-  TextGlyphsMap run() {
+  ShapedTextMap run() {
     if (document == nullptr) {
       return result;
     }
@@ -204,9 +204,9 @@ class TypesetterContext {
     if (textLayout == nullptr || allHaveEmbeddedData) {
       for (auto* text : textElements) {
         if (!text->glyphRuns.empty()) {
-          auto textGlyphs = buildTextGlyphsFromEmbeddedGlyphRuns(text);
-          if (textGlyphs.textBlob != nullptr) {
-            result[text] = std::move(textGlyphs);
+          auto shapedText = buildShapedTextFromEmbeddedGlyphRuns(text);
+          if (shapedText.textBlob != nullptr) {
+            result[text] = std::move(shapedText);
           }
         } else {
           processTextWithoutLayout(text);
@@ -267,9 +267,9 @@ class TypesetterContext {
 
       auto textBlob = builder.build();
       if (textBlob != nullptr) {
-        TextGlyphs textGlyphs = {};
-        textGlyphs.textBlob = textBlob;
-        result[info.text] = std::move(textGlyphs);
+        ShapedText shapedText = {};
+        shapedText.textBlob = textBlob;
+        result[info.text] = std::move(shapedText);
       }
     }
   }
@@ -307,14 +307,14 @@ class TypesetterContext {
 
     auto textBlob = builder.build();
     if (textBlob != nullptr) {
-      TextGlyphs textGlyphs = {};
-      textGlyphs.textBlob = textBlob;
-      result[text] = std::move(textGlyphs);
+      ShapedText shapedText = {};
+      shapedText.textBlob = textBlob;
+      result[text] = std::move(shapedText);
     }
   }
 
-  TextGlyphs buildTextGlyphsFromEmbeddedGlyphRuns(const Text* text) {
-    TextGlyphs textGlyphs = {};
+  ShapedText buildShapedTextFromEmbeddedGlyphRuns(const Text* text) {
+    ShapedText shapedText = {};
     tgfx::TextBlobBuilder builder;
 
     for (const auto& run : text->glyphRuns) {
@@ -341,9 +341,9 @@ class TypesetterContext {
       if (!run->anchors.empty()) {
         for (size_t i = 0; i < count; i++) {
           if (i < run->anchors.size()) {
-            textGlyphs.anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
-          } else {
-            textGlyphs.anchors.push_back(tgfx::Point::Zero());
+          shapedText.anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
+        } else {
+          shapedText.anchors.push_back(tgfx::Point::Zero());
           }
         }
       }
@@ -380,8 +380,8 @@ class TypesetterContext {
       }
     }
 
-    textGlyphs.textBlob = builder.build();
-    return textGlyphs;
+    shapedText.textBlob = builder.build();
+    return shapedText;
   }
 
   std::shared_ptr<tgfx::Typeface> buildTypefaceFromFont(const Font* fontNode) {
@@ -621,11 +621,11 @@ class TypesetterContext {
 
   const Typesetter* typesetter = nullptr;
   PAGXDocument* document = nullptr;
-  TextGlyphsMap result = {};
+  ShapedTextMap result = {};
   std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>> fontCache = {};
 };
 
-TextGlyphsMap Typesetter::createTextGlyphs(PAGXDocument* document) {
+ShapedTextMap Typesetter::shape(PAGXDocument* document) {
   TypesetterContext context(this, document);
   return context.run();
 }

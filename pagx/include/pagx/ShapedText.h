@@ -29,9 +29,9 @@ namespace pagx {
 class Text;
 
 /**
- * Shaped glyph data containing the TextBlob and per-glyph anchor offsets.
+ * Shaped text data containing the TextBlob and per-glyph anchor offsets.
  */
-struct TextGlyphs {
+struct ShapedText {
   /**
    * The shaped TextBlob containing glyph positions.
    */
@@ -44,8 +44,8 @@ struct TextGlyphs {
 };
 
 /**
- * Mapping from Text nodes to their shaped glyph data.
+ * Mapping from Text nodes to their shaped text data.
  */
-using TextGlyphsMap = std::unordered_map<Text*, TextGlyphs>;
+using ShapedTextMap = std::unordered_map<Text*, ShapedText>;
 
 }  // namespace pagx

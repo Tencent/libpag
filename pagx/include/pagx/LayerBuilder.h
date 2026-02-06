@@ -27,7 +27,7 @@ namespace pagx {
 
 /**
  * LayerBuilder converts PAGXDocument to tgfx::Layer tree for rendering.
- * Text elements are rendered using the Typesetter to create TextGlyphs.
+ * Text elements are rendered using the Typesetter to create ShapedText.
  */
 class LayerBuilder {
  public:

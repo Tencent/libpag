@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/PAGXDocument.h"
-#include "pagx/TextGlyphs.h"
+#include "pagx/ShapedText.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -49,14 +49,14 @@ class Typesetter {
   void setFallbackTypefaces(std::vector<std::shared_ptr<tgfx::Typeface>> typefaces);
 
   /**
-   * Creates TextGlyphsMap for all Text nodes in the document. If a Text node has embedded GlyphRun
+   * Performs text shaping for all Text nodes in the document. If a Text node has embedded GlyphRun
    * data (from a loaded PAGX file), it uses that data directly. Otherwise, it performs text
    * shaping using registered/fallback typefaces. TextLayout modifiers are processed to apply
    * alignment, line breaking, and other layout properties.
    * @param document The document containing Text nodes to typeset.
-   * @return TextGlyphsMap containing Text -> TextGlyphs mappings.
+   * @return ShapedTextMap containing Text -> ShapedText mappings.
    */
-  TextGlyphsMap createTextGlyphs(PAGXDocument* document);
+  ShapedTextMap shape(PAGXDocument* document);
 
  private:
   friend class TypesetterContext;

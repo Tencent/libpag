@@ -358,7 +358,7 @@ namespace {
 // Build context that maintains state during layer tree construction
 class LayerBuilderContext {
  public:
-  explicit LayerBuilderContext(const TextGlyphsMap& textGlyphsMap) : _textGlyphsMap(textGlyphsMap) {
+  explicit LayerBuilderContext(const ShapedTextMap& shapedTextMap) : _shapedTextMap(shapedTextMap) {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
@@ -546,12 +546,12 @@ class LayerBuilderContext {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto it = _textGlyphsMap.find(const_cast<Text*>(node));
-    if (it == _textGlyphsMap.end() || it->second.textBlob == nullptr) {
+    auto it = _shapedTextMap.find(const_cast<Text*>(node));
+    if (it == _shapedTextMap.end() || it->second.textBlob == nullptr) {
       return nullptr;
     }
-    auto& textGlyphs = it->second;
-    auto tgfxText = tgfx::Text::Make(textGlyphs.textBlob, textGlyphs.anchors);
+    auto& shapedText = it->second;
+    auto tgfxText = tgfx::Text::Make(shapedText.textBlob, shapedText.anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
@@ -926,7 +926,7 @@ class LayerBuilderContext {
     }
   }
 
-  const TextGlyphsMap& _textGlyphsMap;
+  const ShapedTextMap& _shapedTextMap;
   const PAGXDocument* _document = nullptr;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
@@ -942,16 +942,16 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, Typeset
     return nullptr;
   }
 
-  // Create TextGlyphsMap using provided or default Typesetter
-  TextGlyphsMap textGlyphsMap;
+  // Create ShapedTextMap using provided or default Typesetter
+  ShapedTextMap shapedTextMap;
   if (typesetter != nullptr) {
-    textGlyphsMap = typesetter->createTextGlyphs(document);
+    shapedTextMap = typesetter->shape(document);
   } else {
     Typesetter defaultTypesetter;
-    textGlyphsMap = defaultTypesetter.createTextGlyphs(document);
+    shapedTextMap = defaultTypesetter.shape(document);
   }
 
-  LayerBuilderContext context(textGlyphsMap);
+  LayerBuilderContext context(shapedTextMap);
   return context.build(*document);
 }
 
