@@ -29,6 +29,11 @@ using namespace emscripten;
 
 namespace pagx {
 
+// 最大缓存限制为 1GB
+constexpr size_t MAX_CACHE_LIMIT = 1U * 1024 * 1024 * 1024;
+// GPU 有效帧的过期时间，超过该帧数未使用的资源将被释放
+constexpr size_t EXPIRATION_FRAMES = 10 * 60;
+
 std::shared_ptr<PAGXView> PAGXView::MakeFrom(int width, int height) {
   if (width <= 0 || height <= 0) {
     return nullptr;
@@ -183,6 +188,9 @@ bool PAGXView::draw() {
     return false;
   }
 
+  context->setCacheLimit(MAX_CACHE_LIMIT);
+  context->setResourceExpirationFrames(EXPIRATION_FRAMES);
+
   if (surface == nullptr || surface->width() != _width || surface->height() != _height) {
     tgfx::GLFrameBufferInfo glInfo = {};
     glInfo.id = 0;
@@ -204,10 +212,33 @@ bool PAGXView::draw() {
   displayList.render(surface.get(), false);
 
   auto recording = context->flush();
+  auto t1 = emscripten_get_now();
   if (recording) {
     context->submit(std::move(recording));
   }
   device->unlock();
+  auto t2 = emscripten_get_now();
+
+  if ((t2-t1)>20) {
+    char logBuffer[256];
+    snprintf(logBuffer, sizeof(logBuffer),
+         "[Context] submit:  Total: %.2f ms | displayList.maxTilesRefinedPerFrame:%d | isZooming:%s | zoom:%.2f",
+         t2-t1, displayList.maxTilesRefinedPerFrame(),isZooming?"true":"false",lastZoom);
+    val::global("console").call<void>("log", std::string(logBuffer));
+  }
+
+  static double lastLogTime = 0.0;
+  double now = emscripten_get_now();
+  if (now - lastLogTime > 1000.0) {
+    size_t cacheLimit = context->cacheLimit();
+    size_t expirationFrames = context->resourceExpirationFrames();
+    char logBuffer[256];
+    snprintf(logBuffer, sizeof(logBuffer),
+             "[Context] cacheLimit: %zu bytes (%.2f MB) | resourceExpirationFrames: %zu",
+             cacheLimit, static_cast<double>(cacheLimit) / (1024.0 * 1024.0), expirationFrames);
+    val::global("console").call<void>("log", std::string(logBuffer));
+    lastLogTime = now;
+  }
 
   double frameEndMs = emscripten_get_now();
   double frameDurationMs = frameEndMs - frameStartMs;
