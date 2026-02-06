@@ -81,9 +81,9 @@ struct InheritedStyle {
 /**
  * Internal SVG parser implementation using expat-based XML DOM parsing.
  */
-class SVGParserImpl {
+class SVGParserContext {
  public:
-  explicit SVGParserImpl(const SVGImporter::Options& options);
+  explicit SVGParserContext(const SVGImporter::Options& options);
 
   std::shared_ptr<PAGXDocument> parse(const uint8_t* data, size_t length);
   std::shared_ptr<PAGXDocument> parseFile(const std::string& filePath);

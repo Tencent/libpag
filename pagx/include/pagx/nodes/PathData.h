@@ -134,7 +134,7 @@ class PathData : public Node {
   bool _boundsDirty = true;
 
   friend class PAGXDocument;
-  friend class SVGParserImpl;
+  friend class SVGParserContext;
   friend PathData PathDataFromSVGString(const std::string& d);
 };
 

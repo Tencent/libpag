@@ -460,7 +460,7 @@ static GlyphRun* CreateGlyphRunForIndices(
   return glyphRun;
 }
 
-bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
+bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphsMap& textGlyphsMap) {
   if (document == nullptr) {
     return false;
   }
@@ -470,11 +470,11 @@ bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
 
   // First pass: collect max font size for each vector glyph
-  for (const auto& [text, shapedText] : textGlyphs.shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (const auto& [text, textGlyphs] : textGlyphsMap) {
+    if (textGlyphs.textBlob == nullptr) {
       continue;
     }
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *textGlyphs.textBlob) {
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
         if (IsVectorGlyph(run.font, glyphID)) {
@@ -485,11 +485,11 @@ bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
   }
 
   // Second pass: collect glyphs using max font size for vector, first encounter for bitmap
-  for (const auto& [text, shapedText] : textGlyphs.shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (const auto& [text, textGlyphs] : textGlyphsMap) {
+    if (textGlyphs.textBlob == nullptr) {
       continue;
     }
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *textGlyphs.textBlob) {
       for (size_t i = 0; i < run.glyphCount; ++i) {
         tgfx::GlyphID glyphID = run.glyphs[i];
         if (IsVectorGlyph(run.font, glyphID)) {
@@ -513,14 +513,14 @@ bool FontEmbedder::embed(PAGXDocument* document, const TextGlyphs& textGlyphs) {
   }
 
   // Third pass: create GlyphRuns for each Text
-  for (const auto& [text, shapedText] : textGlyphs.shapedTextMap) {
-    if (shapedText.textBlob == nullptr) {
+  for (const auto& [text, textGlyphs] : textGlyphsMap) {
+    if (textGlyphs.textBlob == nullptr) {
       continue;
     }
 
     text->glyphRuns.clear();
 
-    for (const auto& run : *shapedText.textBlob) {
+    for (const auto& run : *textGlyphs.textBlob) {
       if (run.glyphCount == 0) {
         continue;
       }

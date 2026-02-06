@@ -353,10 +353,12 @@ static tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
   return tgfx::LayerMaskType::Alpha;
 }
 
-// Internal builder class
-class LayerBuilderImpl {
+namespace {
+
+// Build context that maintains state during layer tree construction
+class LayerBuilderContext {
  public:
-  explicit LayerBuilderImpl(const TextGlyphs& textGlyphs) : _textGlyphs(textGlyphs) {
+  explicit LayerBuilderContext(const TextGlyphsMap& textGlyphsMap) : _textGlyphsMap(textGlyphsMap) {
   }
 
   std::shared_ptr<tgfx::Layer> build(const PAGXDocument& document) {
@@ -544,11 +546,12 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto shapedText = _textGlyphs.get(node);
-    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
+    auto it = _textGlyphsMap.find(const_cast<Text*>(node));
+    if (it == _textGlyphsMap.end() || it->second.textBlob == nullptr) {
       return nullptr;
     }
-    auto tgfxText = tgfx::Text::Make(shapedText->textBlob, shapedText->anchors);
+    auto& textGlyphs = it->second;
+    auto tgfxText = tgfx::Text::Make(textGlyphs.textBlob, textGlyphs.anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }
@@ -923,12 +926,14 @@ class LayerBuilderImpl {
     }
   }
 
-  const TextGlyphs& _textGlyphs;
+  const TextGlyphsMap& _textGlyphsMap;
   const PAGXDocument* _document = nullptr;
   std::unordered_map<const Layer*, std::shared_ptr<tgfx::Layer>> _tgfxLayerByPagxLayer = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
 };
+
+}  // namespace
 
 // Public API implementation
 
@@ -937,17 +942,17 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, Typeset
     return nullptr;
   }
 
-  // Create TextGlyphs using provided or default Typesetter
-  TextGlyphs textGlyphs;
+  // Create TextGlyphsMap using provided or default Typesetter
+  TextGlyphsMap textGlyphsMap;
   if (typesetter != nullptr) {
-    textGlyphs = typesetter->createTextGlyphs(document);
+    textGlyphsMap = typesetter->createTextGlyphs(document);
   } else {
     Typesetter defaultTypesetter;
-    textGlyphs = defaultTypesetter.createTextGlyphs(document);
+    textGlyphsMap = defaultTypesetter.createTextGlyphs(document);
   }
 
-  LayerBuilderImpl builder(textGlyphs);
-  return builder.build(*document);
+  LayerBuilderContext context(textGlyphsMap);
+  return context.build(*document);
 }
 
 }  // namespace pagx

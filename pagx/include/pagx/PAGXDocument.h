@@ -110,7 +110,7 @@ class PAGXDocument {
 
   friend class PAGXImporter;
   friend class PAGXExporter;
-  friend class TypesetterImpl;
+  friend class TypesetterContext;
 };
 
 }  // namespace pagx

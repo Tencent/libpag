@@ -29,9 +29,9 @@ namespace pagx {
 class Text;
 
 /**
- * Shaped text data containing the TextBlob and per-glyph anchor offsets.
+ * Shaped glyph data containing the TextBlob and per-glyph anchor offsets.
  */
-struct ShapedText {
+struct TextGlyphs {
   /**
    * The shaped TextBlob containing glyph positions.
    */
@@ -44,33 +44,8 @@ struct ShapedText {
 };
 
 /**
- * TextGlyphs holds the text typesetting results, mapping Text nodes to their shaped TextBlob
- * representations. This class serves as the bridge between text typesetting (by Typesetter) and
- * downstream consumers (LayerBuilder for rendering, FontEmbedder for font embedding).
+ * Mapping from Text nodes to their shaped glyph data.
  */
-class TextGlyphs {
- public:
-  TextGlyphs() = default;
-
-  /**
-   * Sets the shaped text data for a Text node.
-   */
-  void set(Text* text, ShapedText data);
-
-  /**
-   * Returns the shaped text data for the given Text node, or nullptr if not found.
-   */
-  const ShapedText* get(const Text* text) const;
-
-  /**
-   * Returns true if there are no mappings.
-   */
-  bool empty() const;
-
- private:
-  friend class FontEmbedder;
-
-  std::unordered_map<Text*, ShapedText> shapedTextMap = {};
-};
+using TextGlyphsMap = std::unordered_map<Text*, TextGlyphs>;
 
 }  // namespace pagx

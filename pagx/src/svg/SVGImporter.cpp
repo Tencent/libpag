@@ -33,7 +33,7 @@ namespace pagx {
 
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                              const Options& options) {
-  SVGParserImpl parser(options);
+  SVGParserContext parser(options);
   auto doc = parser.parseFile(filePath);
   if (doc) {
     // Convert relative paths to absolute paths
@@ -60,7 +60,7 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
 
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const uint8_t* data, size_t length,
                                              const Options& options) {
-  SVGParserImpl parser(options);
+  SVGParserContext parser(options);
   return parser.parse(data, length);
 }
 
@@ -69,12 +69,12 @@ std::shared_ptr<PAGXDocument> SVGImporter::ParseString(const std::string& svgCon
   return Parse(reinterpret_cast<const uint8_t*>(svgContent.data()), svgContent.size(), options);
 }
 
-// ============== SVGParserImpl ==============
+// ============== SVGParserContext ==============
 
-SVGParserImpl::SVGParserImpl(const SVGImporter::Options& options) : _options(options) {
+SVGParserContext::SVGParserContext(const SVGImporter::Options& options) : _options(options) {
 }
 
-std::shared_ptr<PAGXDocument> SVGParserImpl::parse(const uint8_t* data, size_t length) {
+std::shared_ptr<PAGXDocument> SVGParserContext::parse(const uint8_t* data, size_t length) {
   if (!data || length == 0) {
     return nullptr;
   }
@@ -87,7 +87,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parse(const uint8_t* data, size_t l
   return parseDOM(dom);
 }
 
-std::shared_ptr<PAGXDocument> SVGParserImpl::parseFile(const std::string& filePath) {
+std::shared_ptr<PAGXDocument> SVGParserContext::parseFile(const std::string& filePath) {
   auto dom = DOM::MakeFromFile(filePath);
   if (!dom) {
     return nullptr;
@@ -96,7 +96,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseFile(const std::string& filePa
   return parseDOM(dom);
 }
 
-std::string SVGParserImpl::getAttribute(const std::shared_ptr<DOMNode>& node,
+std::string SVGParserContext::getAttribute(const std::shared_ptr<DOMNode>& node,
                                         const std::string& name,
                                         const std::string& defaultValue) const {
   // CSS priority: style attribute > presentation attribute > CSS class rules
@@ -242,7 +242,7 @@ std::string SVGParserImpl::getAttribute(const std::shared_ptr<DOMNode>& node,
   return defaultValue;
 }
 
-std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>& dom) {
+std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<DOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
     return nullptr;
@@ -367,7 +367,7 @@ std::shared_ptr<PAGXDocument> SVGParserImpl::parseDOM(const std::shared_ptr<DOM>
   return _document;
 }
 
-InheritedStyle SVGParserImpl::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
+InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                                     const InheritedStyle& parentStyle) {
   InheritedStyle style = parentStyle;
 
@@ -460,7 +460,7 @@ InheritedStyle SVGParserImpl::computeInheritedStyle(const std::shared_ptr<DOMNod
   return style;
 }
 
-void SVGParserImpl::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
+void SVGParserContext::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
   auto child = defsNode->getFirstChild();
   while (child) {
     std::string id = getAttribute(child, "id");
@@ -475,7 +475,7 @@ void SVGParserImpl::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
   }
 }
 
-void SVGParserImpl::parseStyleElement(const std::shared_ptr<DOMNode>& styleNode) {
+void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNode) {
   // Get the text content of the <style> element.
   auto textNode = styleNode->getFirstChild();
   if (!textNode || textNode->type != DOMNodeType::Text) {
@@ -557,7 +557,7 @@ void SVGParserImpl::parseStyleElement(const std::shared_ptr<DOMNode>& styleNode)
   }
 }
 
-Layer* SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNode>& element,
+Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                                      const InheritedStyle& parentStyle) {
   const auto& tag = element->name;
 
@@ -678,7 +678,7 @@ Layer* SVGParserImpl::convertToLayer(const std::shared_ptr<DOMNode>& element,
   return layer;
 }
 
-void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
+void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
                                     std::vector<Element*>& contents,
                                     const InheritedStyle& inheritedStyle,
                                     ShadowOnlyType shadowOnlyType) {
@@ -734,7 +734,7 @@ void SVGParserImpl::convertChildren(const std::shared_ptr<DOMNode>& element,
   }
 }
 
-Element* SVGParserImpl::convertElement(
+Element* SVGParserContext::convertElement(
     const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
@@ -759,7 +759,7 @@ Element* SVGParserImpl::convertElement(
   return nullptr;
 }
 
-Group* SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& element,
+Group* SVGParserContext::convertG(const std::shared_ptr<DOMNode>& element,
                                                const InheritedStyle& parentStyle) {
   // Compute inherited style for this group element.
   InheritedStyle inheritedStyle = computeInheritedStyle(element, parentStyle);
@@ -795,7 +795,7 @@ Group* SVGParserImpl::convertG(const std::shared_ptr<DOMNode>& element,
   return group;
 }
 
-Element* SVGParserImpl::convertRect(
+Element* SVGParserContext::convertRect(
     const std::shared_ptr<DOMNode>& element) {
   float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
   float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
@@ -818,7 +818,7 @@ Element* SVGParserImpl::convertRect(
   return rect;
 }
 
-Element* SVGParserImpl::convertCircle(
+Element* SVGParserContext::convertCircle(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
@@ -833,7 +833,7 @@ Element* SVGParserImpl::convertCircle(
   return ellipse;
 }
 
-Element* SVGParserImpl::convertEllipse(
+Element* SVGParserContext::convertEllipse(
     const std::shared_ptr<DOMNode>& element) {
   float cx = parseLength(getAttribute(element, "cx"), _viewBoxWidth);
   float cy = parseLength(getAttribute(element, "cy"), _viewBoxHeight);
@@ -849,7 +849,7 @@ Element* SVGParserImpl::convertEllipse(
   return ellipse;
 }
 
-Element* SVGParserImpl::convertLine(
+Element* SVGParserContext::convertLine(
     const std::shared_ptr<DOMNode>& element) {
   float x1 = parseLength(getAttribute(element, "x1"), _viewBoxWidth);
   float y1 = parseLength(getAttribute(element, "y1"), _viewBoxHeight);
@@ -868,7 +868,7 @@ Element* SVGParserImpl::convertLine(
   return path;
 }
 
-Element* SVGParserImpl::convertPolyline(
+Element* SVGParserContext::convertPolyline(
     const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   auto pathDataNode = _document->makeNode<PathData>();
@@ -880,7 +880,7 @@ Element* SVGParserImpl::convertPolyline(
   return path;
 }
 
-Element* SVGParserImpl::convertPolygon(
+Element* SVGParserContext::convertPolygon(
     const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   auto pathDataNode = _document->makeNode<PathData>();
@@ -892,7 +892,7 @@ Element* SVGParserImpl::convertPolygon(
   return path;
 }
 
-Element* SVGParserImpl::convertPath(
+Element* SVGParserContext::convertPath(
     const std::shared_ptr<DOMNode>& element) {
   auto path = _document->makeNode<Path>();
   std::string d = getAttribute(element, "d");
@@ -907,7 +907,7 @@ Element* SVGParserImpl::convertPath(
   return path;
 }
 
-Group* SVGParserImpl::convertText(const std::shared_ptr<DOMNode>& element,
+Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
                                                   const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
 
@@ -1022,7 +1022,7 @@ Group* SVGParserImpl::convertText(const std::shared_ptr<DOMNode>& element,
   return group;
 }
 
-Element* SVGParserImpl::convertUse(
+Element* SVGParserContext::convertUse(
     const std::shared_ptr<DOMNode>& element) {
   std::string href = getAttribute(element, "xlink:href");
   if (href.empty()) {
@@ -1105,7 +1105,7 @@ Element* SVGParserImpl::convertUse(
   return group;
 }
 
-LinearGradient* SVGParserImpl::convertLinearGradient(
+LinearGradient* SVGParserContext::convertLinearGradient(
     const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
   auto gradient = _document->makeNode<LinearGradient>();
 
@@ -1165,7 +1165,7 @@ LinearGradient* SVGParserImpl::convertLinearGradient(
   return gradient;
 }
 
-RadialGradient* SVGParserImpl::convertRadialGradient(
+RadialGradient* SVGParserContext::convertRadialGradient(
     const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
   auto gradient = _document->makeNode<RadialGradient>();
 
@@ -1248,7 +1248,7 @@ RadialGradient* SVGParserImpl::convertRadialGradient(
   return gradient;
 }
 
-ImagePattern* SVGParserImpl::convertPattern(
+ImagePattern* SVGParserContext::convertPattern(
     const std::shared_ptr<DOMNode>& element, const Rect& shapeBounds) {
   auto pattern = _document->makeNode<ImagePattern>();
 
@@ -1374,7 +1374,7 @@ ImagePattern* SVGParserImpl::convertPattern(
   return pattern;
 }
 
-void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
+void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
                                   std::vector<Element*>& contents,
                                   const InheritedStyle& inheritedStyle) {
   // Get shape bounds for pattern calculations (computed once, used if needed).
@@ -1539,7 +1539,7 @@ void SVGParserImpl::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
 }
 
-Rect SVGParserImpl::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
+Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
   if (tag == "rect") {
@@ -1613,7 +1613,7 @@ Rect SVGParserImpl::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   return Rect::MakeXYWH(0, 0, 0, 0);
 }
 
-Matrix SVGParserImpl::parseTransform(const std::string& value) {
+Matrix SVGParserContext::parseTransform(const std::string& value) {
   Matrix result = Matrix::Identity();
   if (value.empty()) {
     return result;
@@ -1722,7 +1722,7 @@ Matrix SVGParserImpl::parseTransform(const std::string& value) {
   return result;
 }
 
-Color SVGParserImpl::parseColor(const std::string& value) {
+Color SVGParserContext::parseColor(const std::string& value) {
   if (value.empty() || value == "none") {
     return {0, 0, 0, 0, ColorSpace::SRGB};
   }
@@ -2025,7 +2025,7 @@ Color SVGParserImpl::parseColor(const std::string& value) {
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
-std::string SVGParserImpl::colorToHex(const std::string& value) {
+std::string SVGParserContext::colorToHex(const std::string& value) {
   if (value.empty() || value == "none") {
     return value;
   }
@@ -2114,7 +2114,7 @@ std::string SVGParserImpl::colorToHex(const std::string& value) {
   return result;
 }
 
-float SVGParserImpl::parseLength(const std::string& value, float containerSize) {
+float SVGParserContext::parseLength(const std::string& value, float containerSize) {
   if (value.empty()) {
     return 0;
   }
@@ -2148,14 +2148,14 @@ float SVGParserImpl::parseLength(const std::string& value, float containerSize) 
   return num;
 }
 
-std::vector<float> SVGParserImpl::parseViewBox(const std::string& value) {
+std::vector<float> SVGParserContext::parseViewBox(const std::string& value) {
   if (value.empty()) {
     return {};
   }
   return ParseSpaceSeparatedFloats(value);
 }
 
-PathData SVGParserImpl::parsePoints(const std::string& value, bool closed) {
+PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
   PathData path;
   if (value.empty()) {
     return path;
@@ -2195,7 +2195,7 @@ PathData SVGParserImpl::parsePoints(const std::string& value, bool closed) {
   return path;
 }
 
-std::string SVGParserImpl::resolveUrl(const std::string& url) {
+std::string SVGParserContext::resolveUrl(const std::string& url) {
   if (url.empty()) {
     return "";
   }
@@ -2214,7 +2214,7 @@ std::string SVGParserImpl::resolveUrl(const std::string& url) {
   return url;
 }
 
-Image* SVGParserImpl::registerImageResource(const std::string& imageSource) {
+Image* SVGParserContext::registerImageResource(const std::string& imageSource) {
   if (imageSource.empty()) {
     return nullptr;
   }
@@ -2239,7 +2239,7 @@ Image* SVGParserImpl::registerImageResource(const std::string& imageSource) {
   return imageNode;
 }
 
-std::string SVGParserImpl::registerPathDataResource(PathData* pathData) {
+std::string SVGParserContext::registerPathDataResource(PathData* pathData) {
   std::string pathId = generateUniqueId("path");
   pathData->id = pathId;
   return pathId;
@@ -2306,7 +2306,7 @@ static bool isSimpleShapeLayer(const Layer* layer, const Element*& outGeometry,
   return false;
 }
 
-void SVGParserImpl::mergeAdjacentLayers(std::vector<Layer*>& layers) {
+void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
   if (layers.size() < 2) {
     return;
   }
@@ -2362,7 +2362,7 @@ void SVGParserImpl::mergeAdjacentLayers(std::vector<Layer*>& layers) {
   layers = merged;
 }
 
-Layer* SVGParserImpl::convertMaskElement(
+Layer* SVGParserContext::convertMaskElement(
     const std::shared_ptr<DOMNode>& maskElement, const InheritedStyle& parentStyle) {
   auto maskLayer = _document->makeNode<Layer>();
   maskLayer->id = getAttribute(maskElement, "id");
@@ -2420,7 +2420,7 @@ Layer* SVGParserImpl::convertMaskElement(
   return maskLayer;
 }
 
-bool SVGParserImpl::convertFilterElement(
+bool SVGParserContext::convertFilterElement(
     const std::shared_ptr<DOMNode>& filterElement,
     std::vector<LayerFilter*>& filters,
     std::vector<LayerStyle*>& styles,
@@ -2825,7 +2825,7 @@ bool SVGParserImpl::convertFilterElement(
   return filters.size() > initialFilterCount || styles.size() > initialStyleCount;
 }
 
-void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
+void SVGParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   if (!node) {
     return;
   }
@@ -2851,7 +2851,7 @@ void SVGParserImpl::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   }
 }
 
-std::string SVGParserImpl::generateUniqueId(const std::string& prefix) {
+std::string SVGParserContext::generateUniqueId(const std::string& prefix) {
   std::string id;
   do {
     id = prefix + std::to_string(_nextGeneratedId++);
@@ -2860,7 +2860,7 @@ std::string SVGParserImpl::generateUniqueId(const std::string& prefix) {
   return id;
 }
 
-void SVGParserImpl::parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer) {
+void SVGParserContext::parseCustomData(const std::shared_ptr<DOMNode>& element, Layer* layer) {
   if (!element || !layer) {
     return;
   }
@@ -2875,7 +2875,7 @@ void SVGParserImpl::parseCustomData(const std::shared_ptr<DOMNode>& element, Lay
   }
 }
 
-void SVGParserImpl::countColorSourceReferences(const std::shared_ptr<DOMNode>& root) {
+void SVGParserContext::countColorSourceReferences(const std::shared_ptr<DOMNode>& root) {
   // Traverse all elements and count references to gradients/patterns.
   auto child = root->getFirstChild();
   while (child) {
@@ -2886,7 +2886,7 @@ void SVGParserImpl::countColorSourceReferences(const std::shared_ptr<DOMNode>& r
   }
 }
 
-void SVGParserImpl::countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element) {
+void SVGParserContext::countColorSourceReferencesInElement(const std::shared_ptr<DOMNode>& element) {
   if (!element) {
     return;
   }
@@ -2926,11 +2926,11 @@ void SVGParserImpl::countColorSourceReferencesInElement(const std::shared_ptr<DO
   }
 }
 
-std::string SVGParserImpl::generateColorSourceId() {
+std::string SVGParserContext::generateColorSourceId() {
   return generateUniqueId("color");
 }
 
-ColorSource* SVGParserImpl::getColorSourceForRef(const std::string& refId,
+ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
                                                                   const Rect& shapeBounds) {
   auto defIt = _defs.find(refId);
   if (defIt == _defs.end()) {
