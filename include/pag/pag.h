@@ -951,12 +951,6 @@ class PAG_API PAGComposition : public PAGLayer {
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
-  /**
-   * Returns true if this PAGComposition and all its descendants contain only BitmapSequences,
-   * without any vector graphics (Shape, Text, Solid layers) or VideoSequences.
-   */
-  bool hasBitmapSequenceOnly() const;
-
  protected:
   int _width = 0;
   int _height = 0;

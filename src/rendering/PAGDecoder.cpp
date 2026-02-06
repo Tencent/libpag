@@ -107,9 +107,15 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   if (composition == nullptr || maxFrameRate <= 0 || scale <= 0) {
     return nullptr;
   }
-  // Limit scale to 1.0 for pure bitmap sequence compositions
-  if (composition->hasBitmapSequenceOnly()) {
-    scale = std::min(scale, 1.0f);
+  // Limit scale based on single composition size ratio
+  auto singleComposition = GetSingleComposition(composition);
+  if (singleComposition != nullptr && composition->width() > 0 && composition->height() > 0) {
+    float widthRatio = static_cast<float>(singleComposition->width) / 
+                       static_cast<float>(composition->width());
+    float heightRatio = static_cast<float>(singleComposition->height) / 
+                        static_cast<float>(composition->height());
+    float maxScale = std::min(widthRatio, heightRatio);
+    scale = std::min(scale, maxScale);
   }
   auto width = roundf(static_cast<float>(composition->width()) * scale);
   auto height = roundf(static_cast<float>(composition->height()) * scale);
