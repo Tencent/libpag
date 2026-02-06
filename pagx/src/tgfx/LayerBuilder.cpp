@@ -501,7 +501,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::Rectangle> convertRectangle(const Rectangle* node) {
-    auto rect = std::make_shared<tgfx::Rectangle>();
+    auto rect = tgfx::Rectangle::Make();
     rect->setCenter(ToTGFX(node->center));
     rect->setSize({node->size.width, node->size.height});
     rect->setRoundness(node->roundness);
@@ -510,7 +510,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::Ellipse> convertEllipse(const Ellipse* node) {
-    auto ellipse = std::make_shared<tgfx::Ellipse>();
+    auto ellipse = tgfx::Ellipse::Make();
     ellipse->setCenter(ToTGFX(node->center));
     ellipse->setSize({node->size.width, node->size.height});
     ellipse->setReversed(node->reversed);
@@ -518,7 +518,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::Polystar> convertPolystar(const Polystar* node) {
-    auto polystar = std::make_shared<tgfx::Polystar>();
+    auto polystar = tgfx::Polystar::Make();
     polystar->setCenter(ToTGFX(node->center));
     polystar->setPointCount(node->pointCount);
     polystar->setOuterRadius(node->outerRadius);
@@ -536,7 +536,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::ShapePath> convertPath(const Path* node) {
-    auto shapePath = std::make_shared<tgfx::ShapePath>();
+    auto shapePath = tgfx::ShapePath::Make();
     if (node->data) {
       shapePath->setPath(ToTGFX(*node->data));
     }
@@ -544,44 +544,47 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto tgfxText = std::make_shared<tgfx::Text>();
-
     auto textBlob = _textGlyphs.getTextBlob(node);
-    if (textBlob) {
-      tgfxText->setTextBlob(textBlob);
+    if (textBlob == nullptr) {
+      return nullptr;
     }
-    tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
+    auto anchors = _textGlyphs.getAnchors(node);
+    auto tgfxText = tgfx::Text::Make(textBlob, anchors);
+    if (tgfxText) {
+      tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
+    }
     return tgfxText;
   }
 
   std::shared_ptr<tgfx::FillStyle> convertFill(const Fill* node) {
-    auto fill = std::make_shared<tgfx::FillStyle>();
-
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
     if (node->color) {
       colorSource = convertColorSource(node->color);
     }
-
-    if (colorSource) {
-      fill->setColorSource(colorSource);
+    if (colorSource == nullptr) {
+      return nullptr;
     }
 
-    fill->setAlpha(node->alpha);
+    auto fill = tgfx::FillStyle::Make(colorSource);
+    if (fill) {
+      fill->setAlpha(node->alpha);
+    }
     return fill;
   }
 
   std::shared_ptr<tgfx::StrokeStyle> convertStroke(const Stroke* node) {
-    auto stroke = std::make_shared<tgfx::StrokeStyle>();
-
     std::shared_ptr<tgfx::ColorSource> colorSource = nullptr;
     if (node->color) {
       colorSource = convertColorSource(node->color);
     }
-
-    if (colorSource) {
-      stroke->setColorSource(colorSource);
+    if (colorSource == nullptr) {
+      return nullptr;
     }
 
+    auto stroke = tgfx::StrokeStyle::Make(colorSource);
+    if (stroke == nullptr) {
+      return nullptr;
+    }
     stroke->setStrokeWidth(node->width);
     stroke->setAlpha(node->alpha);
     stroke->setLineCap(ToTGFX(node->cap));
@@ -743,7 +746,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::TrimPath> convertTrimPath(const TrimPath* node) {
-    auto trim = std::make_shared<tgfx::TrimPath>();
+    auto trim = tgfx::TrimPath::Make();
     trim->setStart(node->start);
     trim->setEnd(node->end);
     trim->setOffset(node->offset);
@@ -751,7 +754,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::TextPath> convertTextPath(const TextPath* node) {
-    auto textPath = std::make_shared<tgfx::TextPath>();
+    auto textPath = tgfx::TextPath::Make();
     if (node->path != nullptr) {
       textPath->setPath(ToTGFX(*node->path));
     }
@@ -764,22 +767,22 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::RoundCorner> convertRoundCorner(const RoundCorner* node) {
-    auto round = std::make_shared<tgfx::RoundCorner>();
+    auto round = tgfx::RoundCorner::Make();
     round->setRadius(node->radius);
     return round;
   }
 
   std::shared_ptr<tgfx::MergePath> convertMergePath(const MergePath*) {
-    auto merge = std::make_shared<tgfx::MergePath>();
+    auto merge = tgfx::MergePath::Make();
     return merge;
   }
 
   std::shared_ptr<tgfx::Repeater> convertRepeater(const Repeater* node) {
-    auto repeater = std::make_shared<tgfx::Repeater>();
+    auto repeater = tgfx::Repeater::Make();
     repeater->setCopies(node->copies);
     repeater->setOffset(node->offset);
     repeater->setOrder(static_cast<tgfx::RepeaterOrder>(node->order));
-    repeater->setAnchorPoint(ToTGFX(node->anchor));
+    repeater->setAnchor(ToTGFX(node->anchor));
     repeater->setPosition(ToTGFX(node->position));
     repeater->setRotation(node->rotation);
     repeater->setScale(ToTGFX(node->scale));
@@ -789,7 +792,7 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
-    auto group = std::make_shared<tgfx::VectorGroup>();
+    auto group = tgfx::VectorGroup::Make();
     std::vector<std::shared_ptr<tgfx::VectorElement>> elements;
 
     for (const auto& element : node->elements) {
@@ -808,7 +811,7 @@ class LayerBuilderImpl {
 
     // Apply transform properties
     if (node->anchor.x != 0 || node->anchor.y != 0) {
-      group->setAnchorPoint(ToTGFX(node->anchor));
+      group->setAnchor(ToTGFX(node->anchor));
     }
     if (node->position.x != 0 || node->position.y != 0) {
       group->setPosition(ToTGFX(node->position));

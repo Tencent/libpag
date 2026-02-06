@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
+#include "tgfx/core/Point.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace pagx {
@@ -37,14 +39,23 @@ class TextGlyphs {
   TextGlyphs() = default;
 
   /**
-   * Sets the TextBlob for a Text node.
+   * Sets the TextBlob and optional anchors for a Text node.
+   * @param text The Text node.
+   * @param textBlob The shaped TextBlob.
+   * @param anchors Optional anchor offsets for each glyph.
    */
-  void setTextBlob(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob);
+  void setTextBlob(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob,
+                   std::vector<tgfx::Point> anchors = {});
 
   /**
    * Returns the TextBlob for the given Text node, or nullptr if not found.
    */
   std::shared_ptr<tgfx::TextBlob> getTextBlob(const Text* text) const;
+
+  /**
+   * Returns the anchor offsets for the given Text node.
+   */
+  const std::vector<tgfx::Point>& getAnchors(const Text* text) const;
 
   /**
    * Returns true if there are no mappings.
@@ -54,7 +65,12 @@ class TextGlyphs {
  private:
   friend class FontEmbedder;
 
-  std::unordered_map<Text*, std::shared_ptr<tgfx::TextBlob>> textBlobs = {};
+  struct TextData {
+    std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+    std::vector<tgfx::Point> anchors = {};
+  };
+
+  std::unordered_map<Text*, TextData> textDataMap = {};
 };
 
 }  // namespace pagx

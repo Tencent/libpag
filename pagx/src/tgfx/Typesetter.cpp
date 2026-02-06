@@ -204,9 +204,10 @@ class TypesetterContext {
     if (textLayout == nullptr || allHaveEmbeddedData) {
       for (auto* text : textElements) {
         if (!text->glyphRuns.empty()) {
-          auto textBlob = buildTextBlobFromEmbeddedGlyphRuns(text);
+          std::vector<tgfx::Point> anchors = {};
+          auto textBlob = buildTextBlobFromEmbeddedGlyphRuns(text, &anchors);
           if (textBlob != nullptr) {
-            result.setTextBlob(text, textBlob);
+            result.setTextBlob(text, textBlob, std::move(anchors));
           }
         } else {
           processTextWithoutLayout(text);
@@ -309,7 +310,8 @@ class TypesetterContext {
     }
   }
 
-  std::shared_ptr<tgfx::TextBlob> buildTextBlobFromEmbeddedGlyphRuns(const Text* text) {
+  std::shared_ptr<tgfx::TextBlob> buildTextBlobFromEmbeddedGlyphRuns(const Text* text,
+                                                                     std::vector<tgfx::Point>* outAnchors) {
     tgfx::TextBlobBuilder builder;
 
     for (const auto& run : text->glyphRuns) {
@@ -332,7 +334,22 @@ class TypesetterContext {
       tgfx::Font font(typeface, fontSizeForTypeface);
       size_t count = run->glyphs.size();
 
-      // Note: scales, rotations, skews, anchors are NOT processed here.
+      // Collect anchors for each glyph in this run
+      if (outAnchors != nullptr && !run->anchors.empty()) {
+        for (size_t i = 0; i < count; i++) {
+          if (i < run->anchors.size()) {
+            outAnchors->push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
+          } else {
+            outAnchors->push_back(tgfx::Point::Zero());
+          }
+        }
+      } else if (outAnchors != nullptr) {
+        for (size_t i = 0; i < count; i++) {
+          outAnchors->push_back(tgfx::Point::Zero());
+        }
+      }
+
+      // Note: scales, rotations, skews are NOT processed here.
       // These transform attributes should be handled by tgfx layer (similar to TextModifier).
       // Typesetter only computes position information for TextBlob.
 

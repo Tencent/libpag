@@ -266,14 +266,13 @@ PAG_TEST(PAGXTest, LayerDirectContent) {
   {
     auto vectorLayer = tgfx::VectorLayer::Make();
 
-    auto group = std::make_shared<tgfx::VectorGroup>();
+    auto group = tgfx::VectorGroup::Make();
 
-    auto rect = std::make_shared<tgfx::Rectangle>();
+    auto rect = tgfx::Rectangle::Make();
     rect->setCenter(tgfx::Point::Make(50, 50));
     rect->setSize({100, 100});
 
-    auto fill = std::make_shared<tgfx::FillStyle>();
-    fill->setColorSource(tgfx::SolidColor::Make(tgfx::Color::Red()));
+    auto fill = tgfx::FillStyle::Make(tgfx::SolidColor::Make(tgfx::Color::Red()));
 
     group->setElements({rect, fill});
     vectorLayer->setContents({group});
