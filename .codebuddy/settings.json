@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "defaultMode": "bypassPermissions"
-  },
-  "includeCoAuthoredBy": false,
-  "model": "claude-opus-4.5"
-}
