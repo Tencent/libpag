@@ -20,36 +20,22 @@
 
 namespace pagx {
 
-static const std::vector<tgfx::Point> EmptyAnchors = {};
-
-void TextGlyphs::setTextBlob(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob,
-                             std::vector<tgfx::Point> anchors) {
-  if (text != nullptr && textBlob != nullptr) {
-    TextData data = {};
-    data.textBlob = std::move(textBlob);
-    data.anchors = std::move(anchors);
-    textDataMap[text] = std::move(data);
+void TextGlyphs::set(Text* text, ShapedText data) {
+  if (text != nullptr && data.textBlob != nullptr) {
+    shapedTextMap[text] = std::move(data);
   }
 }
 
-std::shared_ptr<tgfx::TextBlob> TextGlyphs::getTextBlob(const Text* text) const {
-  auto it = textDataMap.find(const_cast<Text*>(text));
-  if (it != textDataMap.end()) {
-    return it->second.textBlob;
+const ShapedText* TextGlyphs::get(const Text* text) const {
+  auto it = shapedTextMap.find(const_cast<Text*>(text));
+  if (it != shapedTextMap.end()) {
+    return &it->second;
   }
   return nullptr;
 }
 
-const std::vector<tgfx::Point>& TextGlyphs::getAnchors(const Text* text) const {
-  auto it = textDataMap.find(const_cast<Text*>(text));
-  if (it != textDataMap.end()) {
-    return it->second.anchors;
-  }
-  return EmptyAnchors;
-}
-
 bool TextGlyphs::empty() const {
-  return textDataMap.empty();
+  return shapedTextMap.empty();
 }
 
 }  // namespace pagx

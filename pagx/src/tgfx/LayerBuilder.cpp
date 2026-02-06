@@ -544,12 +544,11 @@ class LayerBuilderImpl {
   }
 
   std::shared_ptr<tgfx::Text> convertText(const Text* node) {
-    auto textBlob = _textGlyphs.getTextBlob(node);
-    if (textBlob == nullptr) {
+    auto shapedText = _textGlyphs.get(node);
+    if (shapedText == nullptr || shapedText->textBlob == nullptr) {
       return nullptr;
     }
-    auto anchors = _textGlyphs.getAnchors(node);
-    auto tgfxText = tgfx::Text::Make(textBlob, anchors);
+    auto tgfxText = tgfx::Text::Make(shapedText->textBlob, shapedText->anchors);
     if (tgfxText) {
       tgfxText->setPosition(tgfx::Point::Make(node->position.x, node->position.y));
     }

@@ -27,7 +27,21 @@
 namespace pagx {
 
 class Text;
-class FontEmbedderImpl;
+
+/**
+ * Shaped text data containing the TextBlob and per-glyph anchor offsets.
+ */
+struct ShapedText {
+  /**
+   * The shaped TextBlob containing glyph positions.
+   */
+  std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+
+  /**
+   * Per-glyph anchor offsets relative to default anchor (advance * 0.5, 0).
+   */
+  std::vector<tgfx::Point> anchors = {};
+};
 
 /**
  * TextGlyphs holds the text typesetting results, mapping Text nodes to their shaped TextBlob
@@ -39,23 +53,14 @@ class TextGlyphs {
   TextGlyphs() = default;
 
   /**
-   * Sets the TextBlob and optional anchors for a Text node.
-   * @param text The Text node.
-   * @param textBlob The shaped TextBlob.
-   * @param anchors Optional anchor offsets for each glyph.
+   * Sets the shaped text data for a Text node.
    */
-  void setTextBlob(Text* text, std::shared_ptr<tgfx::TextBlob> textBlob,
-                   std::vector<tgfx::Point> anchors = {});
+  void set(Text* text, ShapedText data);
 
   /**
-   * Returns the TextBlob for the given Text node, or nullptr if not found.
+   * Returns the shaped text data for the given Text node, or nullptr if not found.
    */
-  std::shared_ptr<tgfx::TextBlob> getTextBlob(const Text* text) const;
-
-  /**
-   * Returns the anchor offsets for the given Text node.
-   */
-  const std::vector<tgfx::Point>& getAnchors(const Text* text) const;
+  const ShapedText* get(const Text* text) const;
 
   /**
    * Returns true if there are no mappings.
@@ -65,12 +70,7 @@ class TextGlyphs {
  private:
   friend class FontEmbedder;
 
-  struct TextData {
-    std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
-    std::vector<tgfx::Point> anchors = {};
-  };
-
-  std::unordered_map<Text*, TextData> textDataMap = {};
+  std::unordered_map<Text*, ShapedText> shapedTextMap = {};
 };
 
 }  // namespace pagx
