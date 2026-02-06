@@ -680,4 +680,41 @@ void PAGComposition::updateDurationAndFrameRate() {
   }
 }
 
+bool PAGComposition::hasBitmapSequenceOnly() const {
+  auto composition = static_cast<PreComposeLayer*>(layer)->composition;
+  if (composition != nullptr) {
+    auto type = composition->type();
+    if (type == CompositionType::Bitmap || type == CompositionType::Video) {
+      return true;
+    }
+  }
+
+  bool hasSequenceContent = false;
+  for (const auto& childLayer : layers) {
+    auto layerType = childLayer->layerType();
+    switch (layerType) {
+      case LayerType::Shape:
+      case LayerType::Text:
+      case LayerType::Solid:
+      case LayerType::Image:
+        return false;
+      case LayerType::PreCompose: {
+        auto childComposition = std::static_pointer_cast<PAGComposition>(childLayer);
+        if (!childComposition->hasBitmapSequenceOnly()) {
+          return false;
+        }
+        hasSequenceContent = true;
+        break;
+      }
+      case LayerType::Null:
+      case LayerType::Camera:
+        break;
+      default:
+        return false;
+    }
+  }
+
+  return hasSequenceContent;
+}
+
 }  // namespace pag
