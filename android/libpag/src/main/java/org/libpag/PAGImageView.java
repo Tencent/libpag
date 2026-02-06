@@ -740,7 +740,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _matrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode, decoderInfo._width, decoderInfo._height, width, height);
     }
 
-    private static native int ContentVersion(PAGComposition pagComposition);
+    static native int ContentVersion(PAGComposition pagComposition);
 
     @Override
     public void onAnimationStart(PAGAnimator animator) {

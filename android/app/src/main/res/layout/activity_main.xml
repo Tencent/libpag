@@ -30,7 +30,7 @@
             android:text="PAGView"
             android:textAllCaps="false"
             android:textColor="#ffffff"
-            android:textSize="18sp" />
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/play_second"
@@ -44,7 +44,21 @@
             android:text="PAGImageView"
             android:textAllCaps="false"
             android:textColor="#ffffff"
-            android:textSize="18sp" />
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btn_compose"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="@drawable/bt_drawable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="Compose"
+            android:textAllCaps="false"
+            android:textColor="#ffffff"
+            android:textSize="14sp" />
 
     </LinearLayout>
 
